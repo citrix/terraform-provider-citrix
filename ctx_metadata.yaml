@@ -1,0 +1,10 @@
+owner: zhuolunl
+pipeline:
+  citool: ''
+  releaseBranch: ''
+  sonarqube: null
+productionUse: CustomerCurrent
+repoType: Other
+reporting:
+  product: CVAD
+  teamname: cvad-team-radhe
