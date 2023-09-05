@@ -1,0 +1,7 @@
+# Terraform plugin framework .gitignore
+
+*.exe
+
+# VSCode .gitignore
+
+.vscode/*
