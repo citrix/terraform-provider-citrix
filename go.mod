@@ -3,7 +3,7 @@ module github.com/citrix/terraform-provider-citrix
 go 1.20
 
 require (
-	github.com/citrix/citrix-daas-rest-go v0.0.0
+	github.com/citrix/citrix-daas-rest-go v0.1.0-alpha
 	github.com/google/uuid v1.3.0
 	github.com/hashicorp/terraform-plugin-docs v0.14.1
 	github.com/hashicorp/terraform-plugin-framework v1.2.0
@@ -72,4 +72,4 @@ require (
 	google.golang.org/protobuf v1.30.0 // indirect
 )
 
-replace github.com/citrix/citrix-daas-rest-go => ../citrix-daas-rest-go
+// replace github.com/citrix/citrix-daas-rest-go => ../citrix-daas-rest-go
