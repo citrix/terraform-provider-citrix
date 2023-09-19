@@ -3,10 +3,12 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
 	citrixdaas "github.com/citrix/terraform-provider-citrix/internal/daas"
+	"github.com/google/uuid"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -40,11 +42,6 @@ var (
 			"Production": "api.citrixcloud.jp",
 			"Staging":    "api.citrixcloudstaging.jp",
 		},
-	}
-
-	citrixDaasHostnameTemplate = map[string]string{
-		"Production": "%s.xendesktop.net",
-		"Staging":    "%s.xdstaging.net",
 	}
 )
 
@@ -138,6 +135,33 @@ func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 				Sensitive: true,
 			},
 		},
+	}
+}
+
+func getClientInterceptor(ctx context.Context) citrixclient.MiddlewareAuthFunction {
+	return func(authClient *citrixclient.CitrixDaasClient, r *http.Request) {
+		// Auth
+		if authClient != nil && r.Header.Get("Authorization") == "" {
+			token, err := authClient.SignIn()
+			if err != nil {
+				tflog.Error(ctx, "Could not sign into Citrix DaaS, error: "+err.Error())
+			}
+			r.Header["Authorization"] = []string{token}
+		}
+
+		// TransactionId
+		transactionId := r.Header.Get("Citrix-TransactionId")
+		if transactionId == "" {
+			transactionId = uuid.NewString()
+			r.Header.Add("Citrix-TransactionId", transactionId)
+		}
+
+		// Log the request
+		tflog.Info(ctx, "Orchestration API request", map[string]interface{}{
+			"url":           r.URL.String(),
+			"method":        r.Method,
+			"transactionId": transactionId,
+		})
 	}
 }
 
@@ -322,7 +346,7 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	}
 
 	if !onPremise && hostname == "" {
-		hostname = fmt.Sprintf(citrixDaasHostnameTemplate[environment], customerId)
+		hostname = citrixCloudAuthenticationHostname[region][environment]
 	}
 
 	ctx = tflog.SetField(ctx, "citrix_hostname", hostname)
@@ -338,8 +362,10 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 	tflog.Debug(ctx, "Creating Citrix API client")
 
+	userAgent := "citrix-terraform-provider/" + p.version + " (https://github.com/citrix/terraform-provider-citrix)"
+
 	// Create a new Citrix API client using the configuration values
-	client, err := citrixclient.NewCitrixDaasClient(authUrl, hostname, customerId, clientId, clientSecret, onPremise)
+	client, err := citrixclient.NewCitrixDaasClient(authUrl, hostname, customerId, clientId, clientSecret, onPremise, &userAgent, getClientInterceptor(ctx))
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Create Citrix API Client",
@@ -354,7 +380,6 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	// type Configure methods.
 	resp.DataSourceData = client
 	resp.ResourceData = client
-
 	tflog.Info(ctx, "Configured Citrix API client", map[string]any{"success": true})
 }
 

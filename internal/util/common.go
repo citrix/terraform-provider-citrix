@@ -9,6 +9,8 @@ import (
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 
 	"github.com/google/uuid"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
@@ -21,9 +23,11 @@ type NameValueStringPairModel struct {
 func ParseNameValueStringPairToClientModel(stringPairs []NameValueStringPairModel) *[]citrixorchestration.NameValueStringPairModel {
 	var res = &[]citrixorchestration.NameValueStringPairModel{}
 	for _, stringPair := range stringPairs {
+		name := stringPair.Name.ValueString()
+		value := stringPair.Value.ValueString()
 		*res = append(*res, citrixorchestration.NameValueStringPairModel{
-			Name:  stringPair.Name.ValueStringPointer(),
-			Value: stringPair.Value.ValueStringPointer(),
+			Name:  *citrixorchestration.NewNullableString(&name),
+			Value: *citrixorchestration.NewNullableString(&value),
 		})
 	}
 	return res
@@ -33,8 +37,8 @@ func ParseNameValueStringPairToPluginModel(stringPairs []citrixorchestration.Nam
 	var res = &[]NameValueStringPairModel{}
 	for _, stringPair := range stringPairs {
 		*res = append(*res, NameValueStringPairModel{
-			Name:  types.StringValue(*stringPair.Name),
-			Value: types.StringValue(*stringPair.Value),
+			Name:  types.StringValue(stringPair.GetName()),
+			Value: types.StringValue(stringPair.GetValue()),
 		})
 	}
 	return res
@@ -42,8 +46,8 @@ func ParseNameValueStringPairToPluginModel(stringPairs []citrixorchestration.Nam
 
 func AppendNameValueStringPair(stringPairs *[]citrixorchestration.NameValueStringPairModel, name string, appendValue string) {
 	*stringPairs = append(*stringPairs, citrixorchestration.NameValueStringPairModel{
-		Name:  &name,
-		Value: &appendValue,
+		Name:  *citrixorchestration.NewNullableString(&name),
+		Value: *citrixorchestration.NewNullableString(&appendValue),
 	})
 }
 
@@ -67,7 +71,7 @@ func ReadClientError(err error) string {
 		if unmarshalError != nil {
 			return err.Error()
 		}
-		return *msgObj.ErrorMessage
+		return msgObj.GetErrorMessage()
 	}
 
 	return err.Error()
@@ -99,6 +103,13 @@ func GetJobIdFromHttpResponse(httpResponse http.Response) string {
 	return jobId
 }
 
+func GetTransactionIdFromHttpResponse(httpResponse *http.Response) string {
+	if httpResponse == nil {
+		return "failed before request was sent"
+	}
+	return httpResponse.Header.Get("Citrix-TransactionId")
+}
+
 func TypeBoolToString(from types.Bool) string {
 	return strconv.FormatBool(from.ValueBool())
 }
@@ -106,4 +117,14 @@ func TypeBoolToString(from types.Bool) string {
 func StringToTypeBool(from string) types.Bool {
 	result, _ := strconv.ParseBool(from)
 	return types.BoolValue(result)
+}
+
+func GetValidatorFromEnum[V ~string, T []V](enum T) validator.String {
+	var values []string
+	for _, i := range enum {
+		values = append(values, string(i))
+	}
+	return stringvalidator.OneOfCaseInsensitive(
+		values...,
+	)
 }

@@ -16,7 +16,7 @@ We ask you not to submit security concerns via GitHub. For details on submitting
 When submitting a bug be sure to include:
 * The version of the provider.
 * Your terraform plan with all secrets and identifying information removed.
-* A copy of the terraform console output including any errors.
+* A copy of the terraform console output including any errors and the transactionId if specified.
 * Does the issue occur if you use the product UI or APIs?
 
 ### Provider issue vs Product issue vs Configuration issue
