@@ -12,19 +12,30 @@ import (
 
 // testAccPreCheck validates the necessary test API keys exist
 // in the testing environment
-func TestOnPremProviderPreCheck(t *testing.T) {
-	if v := os.Getenv("CITRIX_HOSTNAME"); v == "" {
-		t.Fatal("CITRIX_HOSTNAME must be set for acceptance tests")
-	}
+
+func TestProviderPreCheck(t *testing.T) {
+
 	if v := os.Getenv("CITRIX_CLIENT_ID"); v == "" {
 		t.Fatal("CITRIX_CLIENT_ID must be set for acceptance tests")
 	}
 	if v := os.Getenv("CITRIX_CLIENT_SECRET"); v == "" {
 		t.Fatal("CITRIX_CLIENT_SECRET must be set for acceptance tests")
 	}
+
+	if v := os.Getenv("CITRIX_CUSTOMER_ID"); v == "" || v == "CitrixOnPremises" {
+		testOnPremProviderPreCheck(t)
+	} else {
+		testCloudProviderPreCheck(t)
+	}
 }
 
-func TestCloudProviderPreCheck(t *testing.T) {
+func testOnPremProviderPreCheck(t *testing.T) {
+	if v := os.Getenv("CITRIX_HOSTNAME"); v == "" {
+		t.Fatal("CITRIX_HOSTNAME must be set for acceptance tests")
+	}
+}
+
+func testCloudProviderPreCheck(t *testing.T) {
 	region := os.Getenv("CITRIX_REGION")
 	env := os.Getenv("CITRIX_ENVIRONMENT")
 	hostname := os.Getenv("CITRIX_HOSTNAME")
@@ -32,12 +43,6 @@ func TestCloudProviderPreCheck(t *testing.T) {
 		if hostname == "" {
 			t.Fatal("CITRIX_REGION and CITRIX_ENVIRONMENT must be set for cloud provider acceptance tests. Or you can use CITRIX_HOSTNAME instead.")
 		}
-	}
-	if v := os.Getenv("CITRIX_CLIENT_ID"); v == "" {
-		t.Fatal("CITRIX_CLIENT_ID must be set for acceptance tests")
-	}
-	if v := os.Getenv("CITRIX_CLIENT_SECRET"); v == "" {
-		t.Fatal("CITRIX_CLIENT_SECRET must be set for acceptance tests")
 	}
 }
 

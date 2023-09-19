@@ -107,23 +107,22 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 		body.SetMetadata(*metadata)
 	}
 
-	createZoneRequest := r.client.ApiClient.ZonesTPApi.ZonesTPCreateZone(ctx, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId)
-	token, _ := r.client.SignIn()
-	createZoneRequest = createZoneRequest.Authorization(token)
-	createZoneRequest = createZoneRequest.Request(body)
+	createZoneRequest := r.client.ApiClient.ZonesAPIsDAAS.ZonesCreateZone(ctx)
+	createZoneRequest = createZoneRequest.CreateZoneRequestModel(body)
 
 	// Create new zone
-	_, err := createZoneRequest.Execute()
+	httpResp, err := citrixdaasclient.AddRequestData(createZoneRequest, r.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error creating zone",
-			"Error message: "+util.ReadClientError(err),
+			"Error Creating Zone",
+			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
 		)
 		return
 	}
 
 	// Try getting the new zone with zone name
-	zone, err := getZone(ctx, r.client, resp.Diagnostics, plan.Name.ValueString())
+	zone, err := getZone(ctx, r.client, &resp.Diagnostics, plan.Name.ValueString())
 	if err != nil {
 		return
 	}
@@ -150,7 +149,7 @@ func (r *zoneResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	}
 
 	// Get refreshed zone properties from Orchestration
-	zone, err := getZone(ctx, r.client, resp.Diagnostics, state.Id.ValueString())
+	zone, err := getZone(ctx, r.client, &resp.Diagnostics, state.Id.ValueString())
 	if err != nil {
 		return
 	}
@@ -177,7 +176,8 @@ func (r *zoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	// Get refreshed zone properties from Orchestration
 	zoneId := plan.Id.ValueString()
-	_, err := getZone(ctx, r.client, resp.Diagnostics, zoneId)
+	zoneName := plan.Name.ValueString()
+	_, err := getZone(ctx, r.client, &resp.Diagnostics, zoneId)
 	if err != nil {
 		return
 	}
@@ -186,25 +186,26 @@ func (r *zoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	var editZoneRequestBody = &citrixorchestration.EditZoneRequestModel{}
 	editZoneRequestBody.SetName(plan.Name.ValueString())
 	editZoneRequestBody.SetDescription(plan.Description.ValueString())
-	metadata := util.ParseNameValueStringPairToClientModel(*plan.Metadata)
-	editZoneRequestBody.SetMetadata(*metadata)
+	if plan.Metadata != nil {
+		metadata := util.ParseNameValueStringPairToClientModel(*plan.Metadata)
+		editZoneRequestBody.SetMetadata(*metadata)
+	}
 
 	// Update zone
-	editZoneRequest := r.client.ApiClient.ZonesTPApi.ZonesTPEditZone(ctx, zoneId, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId)
-	token, _ := r.client.SignIn()
-	editZoneRequest = editZoneRequest.Authorization(token)
-	editZoneRequest = editZoneRequest.Request(*editZoneRequestBody)
-	_, err = editZoneRequest.Execute()
+	editZoneRequest := r.client.ApiClient.ZonesAPIsDAAS.ZonesEditZone(ctx, zoneId)
+	editZoneRequest = editZoneRequest.EditZoneRequestModel(*editZoneRequestBody)
+	httpResp, err := citrixdaasclient.AddRequestData(editZoneRequest, r.client).Execute()
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Updating Zone",
-			"Error message: "+util.ReadClientError(err),
+			"Error Updating Zone "+zoneName,
+			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
 		)
 	}
 
 	// Fetch updated zone from GetZone.
-	updatedZone, err := getZone(ctx, r.client, resp.Diagnostics, zoneId)
+	updatedZone, err := getZone(ctx, r.client, &resp.Diagnostics, zoneId)
 	if err != nil {
 		return
 	}
@@ -231,14 +232,14 @@ func (r *zoneResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 
 	// Delete existing zone
 	zoneId := state.Id.ValueString()
-	deleteZoneRequest := r.client.ApiClient.ZonesTPApi.ZonesTPDeleteZone(ctx, zoneId, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId)
-	token, _ := r.client.SignIn()
-	deleteZoneRequest = deleteZoneRequest.Authorization(token)
-	_, err := deleteZoneRequest.Execute()
+	zoneName := state.Name.ValueString()
+	deleteZoneRequest := r.client.ApiClient.ZonesAPIsDAAS.ZonesDeleteZone(ctx, zoneId)
+	httpResp, err := citrixdaasclient.AddRequestData(deleteZoneRequest, r.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Deleting Zone with Id "+state.Id.ValueString(),
-			"Error message: "+util.ReadClientError(err),
+			"Error Deleting Zone "+zoneName,
+			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
 		)
 		return
 	}
@@ -270,48 +271,15 @@ func (r *zoneResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRe
 }
 
 // Gets the zone and logs any errors
-func getZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics diag.Diagnostics, zoneId string) (*citrixorchestration.ZoneDetailResponseModel, error) {
-	getZoneRequest := client.ApiClient.ZonesTPApi.ZonesTPGetZone(ctx, zoneId, client.ClientConfig.CustomerId, client.ClientConfig.SiteId)
-	token, _ := client.SignIn()
-	getZoneRequest = getZoneRequest.Authorization(token)
-	zone, resp, err := getZoneRequest.Execute()
+func getZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, zoneId string) (*citrixorchestration.ZoneDetailResponseModel, error) {
+	getZoneRequest := client.ApiClient.ZonesAPIsDAAS.ZonesGetZone(ctx, zoneId)
+	zone, httpResp, err := citrixdaasclient.AddRequestData(getZoneRequest, client).Execute()
 	if err != nil {
 		diagnostics.AddError(
 			"Error Reading Zone with name or Id "+zoneId,
-			"TransactionId: "+resp.Header.Get("Citrix-TransactionId")+"\nError message: "+util.ReadClientError(err),
+			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
 		)
 	}
 	return zone, err
-}
-
-func zoneNameOrIdCheck[T models.ResourceWithZoneModel](client *citrixdaasclient.CitrixDaasClient, ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
-	// Retrieve values from plan
-	if !req.Plan.Raw.IsNull() && !req.State.Raw.IsNull() {
-		var plan T
-		diags := req.Plan.Get(ctx, &plan)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		// Retrieve values from state
-		var state T
-		diags2 := req.State.Get(ctx, &state)
-		resp.Diagnostics.Append(diags2...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		if !plan.GetZone().IsNull() && !state.GetZone().IsNull() && plan.GetZone().ValueString() != state.GetZone().ValueString() {
-			zone, err := getZone(ctx, client, resp.Diagnostics, state.GetZone().ValueString())
-			if err != nil {
-				return
-			}
-
-			if zone.Id == plan.GetZone().ValueString() || zone.Name == plan.GetZone().ValueString() {
-				// plan and state are referring to the same zone, fix up the plane
-				resp.Plan.SetAttribute(ctx, path.Root("zone"), state.GetZone().ValueString())
-			}
-		}
-	}
 }

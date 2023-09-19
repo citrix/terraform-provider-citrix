@@ -114,18 +114,3 @@ To find all the Citrix DaaS resources manageable via Terraform, understand all t
 Refer the [DaaS Zone documentation](docs/resources/daas_zone.md) to configure a zone via terraform. 
 
 ## Frequently Asked Questions
-
-### `resource.name` vs `resource.id`
-In general either name or Id can be used interchangeably to refer to a resource in Citrix DaaS. The recommendation is to use `resource.id` when referring to other resources in the Terraform configuration files, for example:
-```hcl
-resource "citrix_daas_zone" "example-zone" {
-    name = "example-zone" 👈
-    ...
-}
-```
-
-When importing a resource either name or Id can be used:
-```shell
-terraform import citrix_daas_zone.example-zone b2339edf-7b00-436e-9c3a-54c987c3526e
-terraform import citrix_daas_zone.example-zone example-zone
-```
