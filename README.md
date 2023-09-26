@@ -114,3 +114,6 @@ To find all the Citrix DaaS resources manageable via Terraform, understand all t
 Refer the [DaaS Zone documentation](docs/resources/daas_zone.md) to configure a zone via terraform. 
 
 ## Frequently Asked Questions
+
+
+<sub>Copyright © 2023. Citrix Systems, Inc. All Rights Reserved.</sub>
