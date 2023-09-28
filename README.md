@@ -15,7 +15,8 @@ Citrix has developed a custom Terraform provider for automating Citrix product d
     - [Start writing Terraform for managing your Citrix DaaS site](#start-writing-terraform-for-managing-your-citrix-daas-site)
     - [Create a Zone in Citrix DaaS as the first step](#create-a-zone-in-citrix-daas-as-the-first-step)
   - [Frequently Asked Questions](#frequently-asked-questions)
-    - [`resource.name` vs `resource.id`](#resourcename-vs-resourceid)
+  - [Attributions](#attributions)
+  - [License](#license)
 
 ## Citrix Terraform Provider Documentation
 
@@ -115,5 +116,15 @@ Refer the [DaaS Zone documentation](docs/resources/daas_zone.md) to configure a 
 
 ## Frequently Asked Questions
 
+
+## Attributions
+The code in this repository makes use of the following packages:
+-	Hashicorp Terraform Plugin Framework (https://github.com/hashicorp/terraform-plugin-framework)
+-	Google Go Uuid (https://github.com/google/uuid)
+
+## License 
+This project is Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 
+
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 
 <sub>Copyright © 2023. Citrix Systems, Inc. All Rights Reserved.</sub>
