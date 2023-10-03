@@ -1,24 +1,24 @@
-# Terraform `Citrix` Provider
+# Plugin for Terraform Provider for Citrix®
 
 Citrix has developed a custom Terraform provider for automating Citrix product deployments and configurations. Using [Terraform](https://www.terraform.io) with Citrix provider, you can manage your Citrix products via Infrastructure as Code, giving you higher efficiency and consistency on infrastructure management, as well as better reusability on infrastructure configuration.
 
 ## Table of Content
-- [Terraform `Citrix` Provider](#terraform-citrix-provider)
+- [Plugin for Terraform Provider for Citrix®](#plugin-for-terraform-provider-for-citrix)
   - [Table of Content](#table-of-content)
-  - [Citrix Terraform Provider Documentation](#citrix-terraform-provider-documentation)
+  - [Plugin for Terraform Provider for Citrix® Documentation](#plugin-for-terraform-provider-for-citrix-documentation)
     - [Navigating the repository](#navigating-the-repository)
     - [Provider Configuration](#provider-configuration)
     - [Resource Configuration](#resource-configuration)
-  - [Using Citrix Terraform provider for Citrix DaaS](#using-citrix-terraform-provider-for-citrix-daas)
+  - [Using the Plugin for Terraform Provider for Citrix DaaS™](#using-the-plugin-for-terraform-provider-for-citrix-daas)
     - [Install Terraform](#install-terraform)
-    - [Configure your Citrix Terraform Provider](#configure-your-citrix-terraform-provider)
+    - [Configure your Plugin for Terraform Provider for Citrix DaaS™](#configure-your-plugin-for-terraform-provider-for-citrix-daas)
     - [Start writing Terraform for managing your Citrix DaaS site](#start-writing-terraform-for-managing-your-citrix-daas-site)
     - [Create a Zone in Citrix DaaS as the first step](#create-a-zone-in-citrix-daas-as-the-first-step)
   - [Frequently Asked Questions](#frequently-asked-questions)
   - [Attributions](#attributions)
   - [License](#license)
 
-## Citrix Terraform Provider Documentation
+## Plugin for Terraform Provider for Citrix® Documentation
 
 ### Navigating the repository
 
@@ -92,19 +92,19 @@ resource "citrix_daas_zone" "example-zone" {
 }
 ```
 
-Please refer the Citrix Terraform Provider documentation such as [docs/resources/daas_zone.md](docs/resources/daas_zone.md) to find out the configurable properties of each type of resources, understand what they do, and what option values are supported.
+Please refer the Plugin for Terraform Provider for Citrix DaaS™ documentation such as [docs/resources/daas_zone.md](docs/resources/daas_zone.md) to find out the configurable properties of each type of resources, understand what they do, and what option values are supported.
 
 ---------
 
-## Using Citrix Terraform provider for Citrix DaaS
+## Using the Plugin for Terraform Provider for Citrix DaaS™
 
 ### Install Terraform
 
 Refer the [Hashicorp documentation](https://learn.hashicorp.com/tutorials/terraform/install-cli) for installing Terraform CLI for your own environment.
 
-### Configure your Citrix Terraform Provider
+### Configure your Plugin for Terraform Provider for Citrix DaaS™
 
-Refer section [Understanding Provider Configuration](#understanding-provider-configuration) or [Provider documentation](docs/index.md) to configure Citrix Terraform Provider for the Citrix DaaS site you want to manage with Terraform.
+Refer section [Understanding Provider Configuration](#understanding-provider-configuration) or [Provider documentation](docs/index.md) to configure the provider for the Citrix DaaS site you want to manage with Terraform.
 
 ### Start writing Terraform for managing your Citrix DaaS site
 

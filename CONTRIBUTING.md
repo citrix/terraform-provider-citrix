@@ -1,4 +1,4 @@
-# Citrix Terraform Provider Contribution Guide
+# Plugin for Terraform Provider for Citrix® Contribution Guide
 
 Thank you for considering contributing to this project! Please follow these guidelines to ensure your effort is inline with our policies and guidelines.
 

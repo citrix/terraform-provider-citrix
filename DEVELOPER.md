@@ -1,10 +1,10 @@
-# Citrix Terraform Provider Developer Guide
+# Plugin for Terraform Provider for Citrix® Developer Guide
 
-This documentation will guide you through the process of setting up your dev environment for running Citrix Terraform Provider server locally on your dev machine.
+This documentation will guide you through the process of setting up your dev environment for running Plugin for Terraform Provider for Citrix® server locally on your dev machine.
 
 ## Table of Contents
 
-- [Citrix Terraform Provider Developer Guide](#citrix-terraform-provider-developer-guide)
+- [Plugin for Terraform Provider for Citrix® Developer Guide](#plugin-for-terraform-provider-for-citrix-developer-guide)
   - [Table of Contents](#table-of-contents)
   - [Install Dependencies](#install-dependencies)
   - [Load project in VSCode for Go Development](#load-project-in-vscode-for-go-development)
