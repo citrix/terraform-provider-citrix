@@ -28,8 +28,6 @@ terraform {
 
 # Cloud Provider
 provider "citrix" {
-  region        = "US"
-  environment   = "Production"
   customer_id   = ""
   client_id     = ""
   client_secret = ""
@@ -51,6 +49,6 @@ provider "citrix" {
 - `client_id` (String) Client Id for Citrix DaaS service authentication. <br />For Citrix On-Premise customers: Use this to specify Doamin Admin Username. <br />For Citrix Cloud customers: Use this to specify Cloud API Key Client Id.<br />Can be set via Environment Variable **CITRIX_CLIENT_ID**.
 - `client_secret` (String, Sensitive) Client Secret for Citrix DaaS service authentication. <br />For Citrix On-Premise customers: Use this to specify Doamin Admin Password. <br />For Citrix Cloud customers: Use this to specify Cloud API Key Client Secret.<br />Can be set via Environment Variable **CITRIX_CLIENT_SECRET**.
 - `customer_id` (String) Citrix Cloud customer ID. Only applicable for Citrix Cloud customers.<br />Can be set via Environment Variable **CITRIX_CUSTOMER_ID**.
-- `environment` (String) Deployment environment of the customer. Only applicable for Citrix Cloud customers. Available options: `Production`, `Staging`. <br />Can be set via Environment Variable **CITRIX_ENVIRONMENT**.
+- `disable_ssl_verification` (Boolean) Disable SSL verification against the target DDC. <br />Only applicable to on-premises customers. Citrix Cloud customers should omit this option. Set to true to skip SSL verification only when the target DDC does not have a valid SSL certificate issued by a trusted CA. <br />When set to true, please make sure that your provider config is set for a known DDC hostname. <br />[It is recommended to configure a valid certificate for the target DDC](https://docs.citrix.com/en-us/citrix-virtual-apps-desktops/install-configure/install-core/secure-web-studio-deployment) <br />Can be set via Environment Variable **CITRIX_DISABLE_SSL_VERIFICATION**.
+- `environment` (String) Citrix Cloud environment of the customer. Only applicable for Citrix Cloud customers. Available options: `Production`, `Staging`, `Japan`, `JapanStaging`. <br />Can be set via Environment Variable **CITRIX_ENVIRONMENT**.
 - `hostname` (String) Host name / base URL of Citrix DaaS service. <br />For Citrix On-Premise customers (Required): Use this to specify Delivery Controller hostname. <br />For Citrix Cloud customers (Optional): Use this to force override the Citrix DaaS service hostname.<br />Can be set via Environment Variable **CITRIX_HOSTNAME**.
-- `region` (String) Deployment region of the Citrix Cloud customer. Only applicable for Citrix Cloud customers. Available options: `US`, `EU`, `AP-S`, `JP`. <br />Can be set via Environment Variable **CITRIX_REGION**.

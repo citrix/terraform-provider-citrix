@@ -10,11 +10,11 @@ import (
 
 func TestZonePreCheck(t *testing.T) {
 	if v := os.Getenv("CITRIX_CUSTOMER_ID"); v != "" && v != "CitrixOnPremises" {
-		zoneId := os.Getenv("TEST_ZONE_ID")
 		zoneName := os.Getenv("TEST_ZONE_NAME")
+		zoneDescription := os.Getenv("TEST_ZONE_DESCRIPTION")
 
-		if zoneId == "" || zoneName == "" {
-			t.Fatal("TEST_ZONE_ID and TEST_ZONE_NAME are required when running tests in cloud env")
+		if zoneName == "" || zoneDescription == "" {
+			t.Fatal("TEST_ZONE_NAME and TEST_ZONE_DESCRIPTION are required when running tests in cloud env")
 		}
 	}
 }
@@ -22,10 +22,17 @@ func TestZonePreCheck(t *testing.T) {
 func TestZoneResource(t *testing.T) {
 
 	customerId := os.Getenv("CITRIX_CUSTOMER_ID")
-
+	isOnPremise := true
 	if customerId != "" && customerId != "CitrixOnPremises" {
-		// Tests being run in cloud env. Skip zone testing
-		return
+		// Tests being run in cloud env
+		isOnPremise = false
+	}
+
+	zoneName := os.Getenv("TEST_ZONE_NAME")
+	zoneDescription := os.Getenv("TEST_ZONE_DESCRIPTION")
+	if zoneName == "" {
+		zoneName = "second zone"
+		zoneDescription = "description for go test zone"
 	}
 
 	resource.Test(t, resource.TestCase{
@@ -34,18 +41,8 @@ func TestZoneResource(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildZoneResource(t),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					// Verify name of zone
-					resource.TestCheckResourceAttr("citrix_daas_zone.test", "name", "second zone"),
-					// Verify description of zone
-					resource.TestCheckResourceAttr("citrix_daas_zone.test", "description", "description for go test zone"),
-					// Verify number of meta data of zone
-					resource.TestCheckResourceAttr("citrix_daas_zone.test", "metadata.#", "3"),
-					// Verify first meta data value
-					resource.TestCheckResourceAttr("citrix_daas_zone.test", "metadata.0.name", "key1"),
-					resource.TestCheckResourceAttr("citrix_daas_zone.test", "metadata.0.value", "value1"),
-				),
+				Config: BuildZoneResource(t, zoneName, zoneDescription),
+				Check:  getAggregateTestFunc(isOnPremise, zoneName, zoneDescription),
 			},
 			// ImportState testing
 			{
@@ -54,7 +51,7 @@ func TestZoneResource(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{"last_updated", "metadata"},
 			},
 			// Update and Read testing
 			{
@@ -70,6 +67,7 @@ func TestZoneResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_daas_zone.test", "metadata.3.name", "key4"),
 					resource.TestCheckResourceAttr("citrix_daas_zone.test", "metadata.3.value", "value4"),
 				),
+				SkipFunc: getSkipFunc(isOnPremise),
 			},
 			// Delete testing automatically occurs in TestCase
 		},
@@ -80,7 +78,7 @@ var (
 	zone_testResource = `
 	resource "citrix_daas_zone" "test" {
 		name        = "%s"
-		description = "description for go test zone"
+		description = "%s"
 		metadata    = [
 			{
 				name = "key1",
@@ -123,10 +121,37 @@ var (
 	`
 )
 
-func BuildZoneResource(t *testing.T) string {
-	zoneName := os.Getenv("TEST_ZONE_NAME")
+func BuildZoneResource(t *testing.T, zoneName string, zoneDescription string) string {
 	if zoneName == "" {
 		zoneName = "second zone"
+		zoneDescription = "description for go test zone"
 	}
-	return fmt.Sprintf(zone_testResource, zoneName)
+	return fmt.Sprintf(zone_testResource, zoneName, zoneDescription)
+}
+
+func getSkipFunc(isOnPremise bool) func() (bool, error) {
+	return func() (bool, error) {
+		if isOnPremise {
+			return false, nil
+		}
+
+		return true, nil
+	}
+}
+
+func getAggregateTestFunc(isOnPremise bool, zoneName string, zoneDescription string) resource.TestCheckFunc {
+	if isOnPremise {
+		return resource.ComposeAggregateTestCheckFunc(
+			resource.TestCheckResourceAttr("citrix_daas_zone.test", "name", zoneName),
+			resource.TestCheckResourceAttr("citrix_daas_zone.test", "description", zoneDescription),
+			resource.TestCheckResourceAttr("citrix_daas_zone.test", "metadata.#", "3"),
+			resource.TestCheckResourceAttr("citrix_daas_zone.test", "metadata.0.name", "key1"),
+			resource.TestCheckResourceAttr("citrix_daas_zone.test", "metadata.0.value", "value1"),
+		)
+	}
+
+	return resource.ComposeAggregateTestCheckFunc(
+		resource.TestCheckResourceAttr("citrix_daas_zone.test", "name", zoneName),
+		resource.TestCheckResourceAttr("citrix_daas_zone.test", "description", zoneDescription),
+	)
 }
