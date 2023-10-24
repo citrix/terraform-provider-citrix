@@ -98,6 +98,28 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
+	if !r.client.AuthConfig.OnPremise {
+		// Zone creation is not allowed for cloud. Check if zone exists and import if it does.
+		// If zone does not exist, throw an error
+		getZoneRequest := r.client.ApiClient.ZonesAPIsDAAS.ZonesGetZone(ctx, plan.Name.ValueString())
+		zone, _, err := citrixdaasclient.AddRequestData(getZoneRequest, r.client).Execute()
+
+		if err == nil && zone != nil {
+			// zone exists. Add it to the state file
+			plan = plan.RefreshPropertyValues(zone, false)
+
+			diags = resp.State.Set(ctx, plan)
+			resp.Diagnostics.Append(diags...)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error creating Zone",
+				"Zones and Cloud Connectors are managed only by Citrix Cloud. Ensure you have a resource location manually created and connectors deployed in it and then try again.",
+			)
+		}
+
+		return
+	}
+
 	// Generate API request body from plan
 	var body citrixorchestration.CreateZoneRequestModel
 	body.SetName(plan.Name.ValueString())
@@ -186,6 +208,7 @@ func (r *zoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	var editZoneRequestBody = &citrixorchestration.EditZoneRequestModel{}
 	editZoneRequestBody.SetName(plan.Name.ValueString())
 	editZoneRequestBody.SetDescription(plan.Description.ValueString())
+
 	if plan.Metadata != nil {
 		metadata := util.ParseNameValueStringPairToClientModel(*plan.Metadata)
 		editZoneRequestBody.SetMetadata(*metadata)
@@ -230,6 +253,11 @@ func (r *zoneResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		return
 	}
 
+	// For cloud, just delete from state file. A warning was already added in Modify Plan
+	if !r.client.AuthConfig.OnPremise {
+		return
+	}
+
 	// Delete existing zone
 	zoneId := state.Id.ValueString()
 	zoneName := state.Name.ValueString()
@@ -260,13 +288,23 @@ func (r *zoneResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRe
 			return
 		}
 
-		if !r.client.AuthConfig.OnPremise && plan.Metadata != nil {
-			resp.Diagnostics.AddWarning(
-				"Cannot Modify Cloud Zone Metadata",
-				"Skipping zone metadata changes. In DaaS cloud, zones are synchronized with Citrix Cloud Resource Locations. "+
-					"Zone metadata is readonly.",
-			)
+		if !r.client.AuthConfig.OnPremise && !req.State.Raw.IsNull() {
+			stateAndPlanDiff, _ := req.State.Raw.Diff(req.Plan.Raw)
+			if len(stateAndPlanDiff) > 0 {
+				resp.Diagnostics.AddWarning(
+					"Attempting to modify Zone",
+					"Zones and Cloud Connectors are managed only by Citrix Cloud. You may update the description but any metadata changes will be skipped.",
+				)
+			}
 		}
+	}
+
+	if req.Plan.Raw.IsNull() && !r.client.AuthConfig.OnPremise {
+		resp.Diagnostics.AddWarning(
+			"Attempting to delete Zone",
+			"Zones and Cloud Connectors are managed only by Citrix Cloud. The requested zone will be deleted from terraform state but you will still need to manually delete these resources "+
+				"by logging into Citrix Cloud.",
+		)
 	}
 }
 
@@ -276,7 +314,7 @@ func getZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, dia
 	zone, httpResp, err := citrixdaasclient.AddRequestData(getZoneRequest, client).Execute()
 	if err != nil {
 		diagnostics.AddError(
-			"Error Reading Zone with name or Id "+zoneId,
+			"Error Reading Zone "+zoneId,
 			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)

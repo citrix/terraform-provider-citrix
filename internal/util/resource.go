@@ -4,12 +4,12 @@ import (
 	"context"
 	"strings"
 
-	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 )
 
-func GetSingleResourcePathFromHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorName, folderPath, resourceName, resourceType, resourceGroupName string) string {
-	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorResourcePoolResources(ctx, hypervisorName, hypervisorName)
+func GetSingleResourcePathFromHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName string) string {
+	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorResourcePoolResources(ctx, hypervisorName, hypervisorPoolName)
 	req = req.Children(1)
 
 	if folderPath != "" {
@@ -45,10 +45,9 @@ func GetSingleResourcePathFromHypervisor(ctx context.Context, client *citrixdaas
 	return ""
 }
 
-func GetSingleResourcePath(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, connectionDetails *citrixorchestration.HypervisorConnectionDetailRequestModel, folderPath, resourceName, resourceType, resourceGroupName string) string {
-	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorAllResourcesWithoutConnection(ctx)
+func GetSingleResourcePath(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorId, folderPath, resourceName, resourceType, resourceGroupName string) string {
+	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorAllResources(ctx, hypervisorId)
 	req = req.Children(1)
-	req = req.HypervisorConnectionDetailRequestModel(*connectionDetails)
 	if folderPath != "" {
 		req = req.Path(folderPath)
 	}
@@ -81,10 +80,9 @@ func GetSingleResourcePath(ctx context.Context, client *citrixdaasclient.CitrixD
 	return ""
 }
 
-func GetAllResourcePathList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, connectionDetails *citrixorchestration.HypervisorConnectionDetailRequestModel, folderPath, resourceType string) []string {
-	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorAllResourcesWithoutConnection(ctx)
+func GetAllResourcePathList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorId, folderPath, resourceType string) []string {
+	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorAllResources(ctx, hypervisorId)
 	req = req.Children(1)
-	req = req.HypervisorConnectionDetailRequestModel(*connectionDetails)
 	req = req.Path(folderPath)
 	req = req.Type_([]string{resourceType})
 
@@ -102,15 +100,11 @@ func GetAllResourcePathList(ctx context.Context, client *citrixdaasclient.Citrix
 	return result
 }
 
-func GetFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, connectionDetails *citrixorchestration.HypervisorConnectionDetailRequestModel, folderPath, resourceType string, filter []string) ([]string, error) {
-	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorAllResourcesWithoutConnection(ctx)
+func GetFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorId, folderPath, resourceType string, filter []string, connectionType citrixorchestration.HypervisorConnectionType) ([]string, error) {
+	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorAllResources(ctx, hypervisorId)
 	req = req.Children(1)
-	req = req.HypervisorConnectionDetailRequestModel(*connectionDetails)
 	req = req.Path(folderPath)
 	req = req.Type_([]string{resourceType})
-
-	token, _ := client.SignIn()
-	req = req.Authorization(token)
 
 	resources, res, err := citrixdaasclient.AddRequestData(req, client).Execute()
 	if err != nil {
@@ -121,7 +115,11 @@ func GetFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.C
 	result := []string{}
 	if filter != nil {
 		for _, child := range resources.Children {
-			if Contains(filter, child.GetName()) {
+			name := child.GetName()
+			if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS {
+				name = strings.Split(name, " ")[0]
+			}
+			if Contains(filter, name) {
 				result = append(result, child.GetXDPath())
 			}
 		}
