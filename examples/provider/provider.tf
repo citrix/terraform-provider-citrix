@@ -13,8 +13,6 @@ terraform {
 
 # Cloud Provider
 provider "citrix" {
-  region        = "US"
-  environment   = "Production"
   customer_id   = ""
   client_id     = ""
   client_secret = ""
