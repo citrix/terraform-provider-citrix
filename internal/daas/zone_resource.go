@@ -42,7 +42,7 @@ func (r *zoneResource) Metadata(_ context.Context, req resource.MetadataRequest,
 // Schema defines the schema for the data source.
 func (r *zoneResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a zone.",
+		Description: "Manages a zone.\nFor cloud DDC, Zones and Cloud Connectors are managed only by Citrix Cloud. Ensure you have a resource location manually created and connectors deployed in it. You may then apply or import the zone using the zone Id.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the zone.",
@@ -52,11 +52,11 @@ func (r *zoneResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "Name of the zone.",
+				Description: "Name of the zone.\nFor Cloud DDC, ensure this matches the name of the existing zone that needs to be used.",
 				Required:    true,
 			},
 			"description": schema.StringAttribute{
-				Description: "Description of the zone.",
+				Description: "Description of the zone.\nFor Cloud DDC, ensure this matches the description of the existing zone that needs to be used.",
 				Optional:    true,
 			},
 			"metadata": schema.ListNestedAttribute{

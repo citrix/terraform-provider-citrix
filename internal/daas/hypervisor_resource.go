@@ -245,16 +245,49 @@ func (r *hypervisorResource) Create(ctx context.Context, req resource.CreateRequ
 	body.SetConnectionDetails(connectionDetails)
 
 	createHypervisorRequest := r.client.ApiClient.HypervisorsAPIsDAAS.HypervisorsCreateHypervisor(ctx)
-	createHypervisorRequest = createHypervisorRequest.CreateHypervisorRequestModel(body)
+	createHypervisorRequest = createHypervisorRequest.CreateHypervisorRequestModel(body).Async(true)
 
 	// Create new hypervisor
-	hypervisor, httpResp, err := citrixdaasclient.AddRequestData(createHypervisorRequest, r.client).Execute()
+	_, httpResp, err := citrixdaasclient.AddRequestData(createHypervisorRequest, r.client).Execute()
+
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor",
 			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return
+	}
+
+	jobId := util.GetJobIdFromHttpResponse(*httpResp)
+	jobResponseModel, err := r.client.WaitForJob(ctx, jobId, 10)
+
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error creating Hypervisor",
+			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nJobId: "+jobResponseModel.GetId()+
+				"\nError message: "+jobResponseModel.GetErrorString(),
+		)
+		return
+	}
+
+	if jobResponseModel.GetStatus() != citrixorchestration.JOBSTATUS_COMPLETE {
+		errorDetail := "TransactionId: " + util.GetTransactionIdFromHttpResponse(httpResp) +
+			"\nJobId: " + jobResponseModel.GetId()
+
+		if jobResponseModel.GetStatus() == citrixorchestration.JOBSTATUS_FAILED {
+			errorDetail = errorDetail + "\nError message: " + jobResponseModel.GetErrorString()
+		}
+
+		resp.Diagnostics.AddError(
+			"Error creating Hypervisor",
+			errorDetail,
+		)
+	}
+
+	hypervisor, err := GetHypervisor(ctx, r.client, &resp.Diagnostics, plan.Name.ValueString())
+	if err != nil {
 		return
 	}
 
