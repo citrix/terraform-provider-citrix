@@ -1,16 +1,3 @@
-terraform {
-  required_version = ">= 1.4.0"
-
-  required_providers {
-    citrix = {
-      source  = "citrix/citrix"
-      version = ">=0.0.0"
-    }
-  }
-
-  backend "local" {}
-}
-
 # Cloud Provider
 provider "citrix" {
   customer_id   = ""

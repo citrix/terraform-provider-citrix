@@ -4,11 +4,13 @@ page_title: "citrix_daas_zone Resource - citrix"
 subcategory: ""
 description: |-
   Manages a zone.
+  For cloud DDC, Zones and Cloud Connectors are managed only by Citrix Cloud. Ensure you have a resource location manually created and connectors deployed in it. You may then apply or import the zone using the zone Id.
 ---
 
 # citrix_daas_zone (Resource)
 
 Manages a zone.
+For cloud DDC, Zones and Cloud Connectors are managed only by Citrix Cloud. Ensure you have a resource location manually created and connectors deployed in it. You may then apply or import the zone using the zone Id.
 
 ## Example Usage
 
@@ -31,10 +33,12 @@ resource "citrix_daas_zone" "example-zone" {
 ### Required
 
 - `name` (String) Name of the zone.
+For Cloud DDC, ensure this matches the name of the existing zone that needs to be used.
 
 ### Optional
 
 - `description` (String) Description of the zone.
+For Cloud DDC, ensure this matches the description of the existing zone that needs to be used.
 - `metadata` (Attributes List) Metadata of the zone. Cannot be modified in DaaS cloud. (see [below for nested schema](#nestedatt--metadata))
 
 ### Read-Only

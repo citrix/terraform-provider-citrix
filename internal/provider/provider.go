@@ -68,7 +68,7 @@ func (p *citrixProvider) Metadata(_ context.Context, _ provider.MetadataRequest,
 // Schema defines the provider-level schema for configuration data.
 func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Interact with Citrix Cloud / Citrix On-Premise Service.",
+		Description: "Manage and deploy Citrix resources easily using the Citrix Terraform provider. The provider currently supports both Citrix Virtual Apps & Desktops(CVAD) and Citrix Desktop as a Service (DaaS) solutions. You can automate creation of site setup including host connections, machine catalogs and delivery groups etc for both CVAD and Citrix DaaS. You can deploy resources in Azure, AWS and GCP. The provider is developed and maintained by Citrix. Please note that this provider is still in **tech preview**.",
 		Attributes: map[string]schema.Attribute{
 			"hostname": schema.StringAttribute{
 				Description: "Host name / base URL of Citrix DaaS service. " + "<br />" +
