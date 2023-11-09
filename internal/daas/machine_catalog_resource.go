@@ -141,12 +141,28 @@ func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequ
 								Optional:    true,
 							},
 							"storage_account": schema.StringAttribute{
-								Description: "The Azure Storage Account where the image VHD for creating machines is located. Only applicable to Azure Hypervisor.",
+								Description: "The Azure Storage Account where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.",
 								Optional:    true,
+								Validators: []validator.String{
+									stringvalidator.AlsoRequires(path.Expressions{
+										path.MatchRelative().AtParent().AtName("container"),
+									}...),
+									stringvalidator.AlsoRequires(path.Expressions{
+										path.MatchRelative().AtParent().AtName("resource_group"),
+									}...),
+								},
 							},
 							"container": schema.StringAttribute{
-								Description: "The Azure Storage Account Container where the image VHD for creating machines is located. Only applicable to Azure Hypervisor.",
+								Description: "The Azure Storage Account Container where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.",
 								Optional:    true,
+								Validators: []validator.String{
+									stringvalidator.AlsoRequires(path.Expressions{
+										path.MatchRelative().AtParent().AtName("storage_account"),
+									}...),
+									stringvalidator.AlsoRequires(path.Expressions{
+										path.MatchRelative().AtParent().AtName("resource_group"),
+									}...),
+								},
 							},
 							"image_ami": schema.StringAttribute{
 								Description: "AMI of the AWS image to be used as the template image for the machine catalog. Only applicable to AWS Hypervisor.",
@@ -228,6 +244,13 @@ func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequ
 								"StandardSSD_LRS",
 								"Premium_LRS",
 							),
+						},
+					},
+					"vda_resource_group": schema.StringAttribute{
+						Description: "Designated resource group where the VDA VMs will be located on Azure.",
+						Optional:    true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
 						},
 					},
 					"use_managed_disks": schema.BoolAttribute{
@@ -369,12 +392,24 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 		serviceOfferingPath := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, serviceOffering, "serviceoffering", "")
 		provisioningScheme.SetServiceOfferingPath(serviceOfferingPath)
 
-		queryPath = fmt.Sprintf(
-			"image.folder\\%s.resourcegroup\\%s.storageaccount\\%s.container",
-			plan.ProvisioningScheme.MachineConfig.ResourceGroup.ValueString(),
-			plan.ProvisioningScheme.MachineConfig.StorageAccount.ValueString(),
-			plan.ProvisioningScheme.MachineConfig.Container.ValueString())
-		imagePath := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, masterImage, "", "")
+		resourceGroup := plan.ProvisioningScheme.MachineConfig.ResourceGroup.ValueString()
+		storageAccount := plan.ProvisioningScheme.MachineConfig.StorageAccount.ValueString()
+		container := plan.ProvisioningScheme.MachineConfig.Container.ValueString()
+		imagePath := ""
+		if storageAccount != "" && container != "" {
+			queryPath = fmt.Sprintf(
+				"image.folder\\%s.resourcegroup\\%s.storageaccount\\%s.container",
+				resourceGroup,
+				storageAccount,
+				container)
+			imagePath = util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, masterImage, "", "")
+		} else {
+			queryPath = fmt.Sprintf(
+				"image.folder\\%s.resourcegroup",
+				resourceGroup)
+			imagePath = util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, masterImage, "", "")
+		}
+
 		provisioningScheme.SetMasterImagePath(imagePath)
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
 		serviceOfferingPath := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", serviceOffering, "serviceoffering", "")
@@ -607,7 +642,6 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		queryPath := "serviceoffering.folder"
 		serviceOfferingPath := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, serviceOffering, "folder", "")
 		body.SetServiceOfferingPath(serviceOfferingPath)
-
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
 		serviceOfferingPath := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", serviceOffering, "serviceoffering", "")
 		body.SetServiceOfferingPath(serviceOfferingPath)
@@ -654,12 +688,23 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 
 	switch hypervisor.GetConnectionType() {
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
-		queryPath := fmt.Sprintf(
-			"image.folder\\%s.resourcegroup\\%s.storageaccount\\%s.container",
-			plan.ProvisioningScheme.MachineConfig.ResourceGroup.ValueString(),
-			plan.ProvisioningScheme.MachineConfig.StorageAccount.ValueString(),
-			plan.ProvisioningScheme.MachineConfig.Container.ValueString())
-		imagePath = util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, plan.ProvisioningScheme.MachineConfig.MasterImage.ValueString(), "", "")
+		newImage := plan.ProvisioningScheme.MachineConfig.MasterImage.ValueString()
+		resourceGroup := plan.ProvisioningScheme.MachineConfig.ResourceGroup.ValueString()
+		storageAccount := plan.ProvisioningScheme.MachineConfig.StorageAccount.ValueString()
+		container := plan.ProvisioningScheme.MachineConfig.Container.ValueString()
+		if storageAccount != "" && container != "" {
+			queryPath := fmt.Sprintf(
+				"image.folder\\%s.resourcegroup\\%s.storageaccount\\%s.container",
+				resourceGroup,
+				storageAccount,
+				container)
+			imagePath = util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, newImage, "", "")
+		} else {
+			queryPath := fmt.Sprintf(
+				"image.folder\\%s.resourcegroup",
+				resourceGroup)
+			imagePath = util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, newImage, "", "")
+		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
 		imageId := fmt.Sprintf("%s (%s)", plan.ProvisioningScheme.MachineConfig.MasterImage.ValueString(), plan.ProvisioningScheme.MachineConfig.ImageAmi.ValueString())
 		imagePath = util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", imageId, "template", "")

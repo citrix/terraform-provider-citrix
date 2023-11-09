@@ -37,6 +37,7 @@ type ProvisioningSchemeModel struct {
 	MachineAccountCreationRules *MachineAccountCreationRulesModel `tfsdk:"machine_account_creation_rules"`
 	AvailabilityZones           types.String                      `tfsdk:"availability_zones"`
 	StorageType                 types.String                      `tfsdk:"storage_type"`
+	VdaResourceGroup            types.String                      `tfsdk:"vda_resource_group"`
 	UseManagedDisks             types.Bool                        `tfsdk:"use_managed_disks"`
 	WritebackCache              *WritebackCacheModel              `tfsdk:"writeback_cache"`
 }
@@ -138,9 +139,15 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 		if masterImageXdPath != "" {
 			segments := strings.Split(masterImage.GetXDPath(), "\\")
 			lastIndex := len(segments)
-			r.ProvisioningScheme.MachineConfig.Container = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
-			r.ProvisioningScheme.MachineConfig.StorageAccount = types.StringValue(strings.Split(segments[lastIndex-3], ".")[0])
-			r.ProvisioningScheme.MachineConfig.ResourceGroup = types.StringValue(strings.Split(segments[lastIndex-4], ".")[0])
+			if lastIndex == 8 {
+				// VHD image
+				r.ProvisioningScheme.MachineConfig.Container = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
+				r.ProvisioningScheme.MachineConfig.StorageAccount = types.StringValue(strings.Split(segments[lastIndex-3], ".")[0])
+				r.ProvisioningScheme.MachineConfig.ResourceGroup = types.StringValue(strings.Split(segments[lastIndex-4], ".")[0])
+			} else {
+				// Snapshot or Managed Disk
+				r.ProvisioningScheme.MachineConfig.ResourceGroup = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
+			}
 		}
 	}
 
@@ -215,6 +222,8 @@ func (res *ProvisioningSchemeModel) RefreshProperties(stringPairs []citrixorches
 			res.UseManagedDisks = util.StringToTypeBool(stringPair.GetValue())
 		case "Zones":
 			res.AvailabilityZones = types.StringValue(stringPair.GetValue())
+		case "ResourceGroups":
+			res.VdaResourceGroup = types.StringValue(stringPair.GetValue())
 		case "WBCDiskStorageType":
 			if res.WritebackCache == nil {
 				res.WritebackCache = &WritebackCacheModel{WBCDiskStorageType: types.StringValue(stringPair.GetValue())}
@@ -254,6 +263,9 @@ func ParseCustomPropertiesToClientModel(provisioningScheme ProvisioningSchemeMod
 	var res = &[]citrixorchestration.NameValueStringPairModel{}
 	if !provisioningScheme.StorageType.IsNull() {
 		util.AppendNameValueStringPair(res, "StorageType", provisioningScheme.StorageType.ValueString())
+	}
+	if !provisioningScheme.VdaResourceGroup.IsNull() {
+		util.AppendNameValueStringPair(res, "ResourceGroups", provisioningScheme.VdaResourceGroup.ValueString())
 	}
 	if provisioningScheme.UseManagedDisks.ValueBool() {
 		util.AppendNameValueStringPair(res, "UseManagedDisks", "true")
