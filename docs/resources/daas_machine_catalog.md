@@ -93,6 +93,7 @@ Optional:
 
 - `availability_zones` (String) The Azure Availability Zones containing provisioned virtual machines. Use a comma as a delimiter for multiple availability_zones.
 - `network_mapping` (Attributes) Specifies how the attached NICs are mapped to networks.  If this parameter is omitted, provisioned VMs are created with a single NIC, which is mapped to the default network in the hypervisor resource pool.  If this parameter is supplied, machines are created with the number of NICs specified in the map, and each NIC is attached to the specified network. (see [below for nested schema](#nestedatt--provisioning_scheme--network_mapping))
+- `vda_resource_group` (String) Designated resource group where the VDA VMs will be located on Azure.
 - `writeback_cache` (Attributes) Write-back Cache config. Leave this empty to disable Write-back Cache. (see [below for nested schema](#nestedatt--provisioning_scheme--writeback_cache))
 
 <a id="nestedatt--provisioning_scheme--machine_account_creation_rules"></a>
@@ -119,13 +120,13 @@ Required:
 
 Optional:
 
-- `container` (String) The Azure Storage Account Container where the image VHD for creating machines is located. Only applicable to Azure Hypervisor.
+- `container` (String) The Azure Storage Account Container where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.
 - `image_ami` (String) AMI of the AWS image to be used as the template image for the machine catalog. Only applicable to AWS Hypervisor.
 - `machine_profile` (String) The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone. Only applicable to GCP Hypervisor.
 - `master_image` (String) The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors.
 - `resource_group` (String) The Azure Resource Group where the image VHD for creating machines is located. Only applicable to Azure Hypervisor.
 - `service_offering` (String) The VM Sku of a Cloud service offering to use when creating machines.
-- `storage_account` (String) The Azure Storage Account where the image VHD for creating machines is located. Only applicable to Azure Hypervisor.
+- `storage_account` (String) The Azure Storage Account where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.
 
 
 <a id="nestedatt--provisioning_scheme--network_mapping"></a>

@@ -246,6 +246,10 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		disableSslVerification = config.DisableSslVerification.ValueBool()
 	}
 
+	if environment == "" {
+		environment = "Production" // default to production
+	}
+
 	if customerId == "" {
 		customerId = "CitrixOnPremises"
 	}
@@ -347,8 +351,27 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		if httpResp != nil {
 			if httpResp.StatusCode == 401 {
 				resp.Diagnostics.AddError(
+					"Invalid credential in provider config",
+					"Make sure client_id and client_secret is correct in provider config. ",
+				)
+			} else if httpResp.StatusCode == 503 {
+				if onPremise {
+					resp.Diagnostics.AddError(
+						"Citrix DaaS service unavailable",
+						"Please check if you can access Web Studio. \n\n"+
+							"Please ensure that Citrix Orchestration Service on the target DDC(s) are running reachable from this Machine.",
+					)
+				} else {
+					resp.Diagnostics.AddError(
+						"Citrix DaaS service unavailable",
+						"The DDC(s) for the customer cannot be reached. Please check if you can access DaaS UI.",
+					)
+				}
+			} else {
+				resp.Diagnostics.AddError(
 					"Unable to Create Citrix API Client",
-					"The provider credential is invalid. Make sure client_id and client_secret is correct in provider config. ",
+					"An unexpected error occurred when creating the Citrix API client. \n\n"+
+						"Error: "+err.Error(),
 				)
 			}
 		} else {
@@ -358,24 +381,41 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 			syscallErr := new(os.SyscallError)
 			if errors.As(err, &urlErr) && errors.As(urlErr.Err, &opErr) && errors.As(opErr.Err, &syscallErr) && syscallErr.Err == syscall.Errno(10060) {
 				resp.Diagnostics.AddError(
-					"Unable to Create Citrix API Client",
-					"An unexpected error occurred when creating the Citrix API client. \n\n"+
-						"Error: DDC(s) cannot be reached. \n\n"+
-						"Ensure that the DDC(s) are running. Make sure this machine has proper network routing to reach the DDC(s) and is not blocked by any firewall rules.",
+					"DDC(s) cannot be reached",
+					"Ensure that the DDC(s) are running. Make sure this machine has proper network routing to reach the DDC(s) and is not blocked by any firewall rules.",
 				)
+
+				return
 			}
 
-			// Case 2: Invalid Certificate
+			// Case 2: Invalid certificate
 			cryptoErr := new(tls.CertificateVerificationError)
 			errors.As(urlErr.Err, &cryptoErr)
 			if len(cryptoErr.UnverifiedCertificates) > 0 {
 				resp.Diagnostics.AddError(
-					"Unable to Create Citrix API Client",
-					"An unexpected error occurred when creating the Citrix API client. \n\n"+
-						"Error: DDC(s) does not have a valid SSL certificate issued by a trusted Certificate Authority. \n\n"+
-						"If you are running against on-premise DDC(s) that does not have an SSL certificate issue by a trusted CA, consider setting \"disable_ssl_verification\" to \"true\" in provider config.",
+					"DDC(s) does not have a valid SSL certificate issued by a trusted Certificate Authority",
+					"If you are running against on-premise DDC(s) that does not have an SSL certificate issue by a trusted CA, consider setting \"disable_ssl_verification\" to \"true\" in provider config.",
 				)
+
+				return
 			}
+
+			// Case 3: Malformed hostname
+			if urlErr != nil && opErr.Err == nil {
+				resp.Diagnostics.AddError(
+					"Invalid DDC(s) hostname",
+					"Please revise the hostname in provider config and make sure it is a valid hostname or IP address.",
+				)
+
+				return
+			}
+
+			// Case 4: Catch all other errors
+			resp.Diagnostics.AddError(
+				"Unable to Create Citrix API Client",
+				"An unexpected error occurred when creating the Citrix API client. \n\n"+
+					"Error: "+err.Error(),
+			)
 		}
 
 		return
