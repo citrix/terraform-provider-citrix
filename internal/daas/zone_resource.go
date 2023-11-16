@@ -2,6 +2,7 @@ package daas
 
 import (
 	"context"
+	"net/http"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -98,7 +99,7 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	if !r.client.AuthConfig.OnPremise {
+	if !r.client.AuthConfig.OnPremises {
 		// Zone creation is not allowed for cloud. Check if zone exists and import if it does.
 		// If zone does not exist, throw an error
 		getZoneRequest := r.client.ApiClient.ZonesAPIsDAAS.ZonesGetZone(ctx, plan.Name.ValueString())
@@ -150,7 +151,7 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(zone, r.client.AuthConfig.OnPremise)
+	plan = plan.RefreshPropertyValues(zone, r.client.AuthConfig.OnPremises)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -171,12 +172,12 @@ func (r *zoneResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	}
 
 	// Get refreshed zone properties from Orchestration
-	zone, err := getZone(ctx, r.client, &resp.Diagnostics, state.Id.ValueString())
+	zone, err := readZone(ctx, r.client, resp, state.Id.ValueString())
 	if err != nil {
 		return
 	}
 
-	state = state.RefreshPropertyValues(zone, r.client.AuthConfig.OnPremise)
+	state = state.RefreshPropertyValues(zone, r.client.AuthConfig.OnPremises)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -218,7 +219,6 @@ func (r *zoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	editZoneRequest := r.client.ApiClient.ZonesAPIsDAAS.ZonesEditZone(ctx, zoneId)
 	editZoneRequest = editZoneRequest.EditZoneRequestModel(*editZoneRequestBody)
 	httpResp, err := citrixdaasclient.AddRequestData(editZoneRequest, r.client).Execute()
-
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Updating Zone "+zoneName,
@@ -234,7 +234,7 @@ func (r *zoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 
 	// Update resource state with updated property values
-	plan = plan.RefreshPropertyValues(updatedZone, r.client.AuthConfig.OnPremise)
+	plan = plan.RefreshPropertyValues(updatedZone, r.client.AuthConfig.OnPremises)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -254,7 +254,7 @@ func (r *zoneResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	}
 
 	// For cloud, just delete from state file. A warning was already added in Modify Plan
-	if !r.client.AuthConfig.OnPremise {
+	if !r.client.AuthConfig.OnPremises {
 		return
 	}
 
@@ -263,7 +263,7 @@ func (r *zoneResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	zoneName := state.Name.ValueString()
 	deleteZoneRequest := r.client.ApiClient.ZonesAPIsDAAS.ZonesDeleteZone(ctx, zoneId)
 	httpResp, err := citrixdaasclient.AddRequestData(deleteZoneRequest, r.client).Execute()
-	if err != nil {
+	if err != nil && httpResp.StatusCode != http.StatusNotFound {
 		resp.Diagnostics.AddError(
 			"Error Deleting Zone "+zoneName,
 			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
@@ -288,7 +288,7 @@ func (r *zoneResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRe
 			return
 		}
 
-		if !r.client.AuthConfig.OnPremise && !req.State.Raw.IsNull() {
+		if !r.client.AuthConfig.OnPremises && !req.State.Raw.IsNull() {
 			stateAndPlanDiff, _ := req.State.Raw.Diff(req.Plan.Raw)
 			if len(stateAndPlanDiff) > 0 {
 				resp.Diagnostics.AddWarning(
@@ -299,7 +299,7 @@ func (r *zoneResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRe
 		}
 	}
 
-	if req.Plan.Raw.IsNull() && !r.client.AuthConfig.OnPremise {
+	if req.Plan.Raw.IsNull() && !r.client.AuthConfig.OnPremises {
 		resp.Diagnostics.AddWarning(
 			"Attempting to delete Zone",
 			"Zones and Cloud Connectors are managed only by Citrix Cloud. The requested zone will be deleted from terraform state but you will still need to manually delete these resources "+
@@ -311,7 +311,7 @@ func (r *zoneResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRe
 // Gets the zone and logs any errors
 func getZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, zoneId string) (*citrixorchestration.ZoneDetailResponseModel, error) {
 	getZoneRequest := client.ApiClient.ZonesAPIsDAAS.ZonesGetZone(ctx, zoneId)
-	zone, httpResp, err := citrixdaasclient.AddRequestData(getZoneRequest, client).Execute()
+	zone, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ZoneDetailResponseModel](getZoneRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error Reading Zone "+zoneId,
@@ -319,5 +319,12 @@ func getZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, dia
 				"\nError message: "+util.ReadClientError(err),
 		)
 	}
+
+	return zone, err
+}
+
+func readZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, zoneId string) (*citrixorchestration.ZoneDetailResponseModel, error) {
+	getZoneRequest := client.ApiClient.ZonesAPIsDAAS.ZonesGetZone(ctx, zoneId)
+	zone, _, err := util.ReadResource[*citrixorchestration.ZoneDetailResponseModel](getZoneRequest, ctx, client, resp, "Zone", zoneId)
 	return zone, err
 }

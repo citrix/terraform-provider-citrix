@@ -18,7 +18,7 @@ resource "citrix_daas_delivery_group" "example-delivery-group" {
     associated_machine_catalogs = [
         {
         machine_catalog = citrix_daas_machine_catalog.example-machine-catalog.id
-        count = 1
+        machine_count = 1
         }
     ]
     autoscale_enabled = true 
@@ -80,8 +80,8 @@ resource "citrix_daas_delivery_group" "example-delivery-group" {
 
 Required:
 
-- `count` (Number) The number of machines to assign from the machine catalog to the delivery group.
 - `machine_catalog` (String) Id of the machine catalog from which to add machines.
+- `machine_count` (Number) The number of machines to assign from the machine catalog to the delivery group.
 
 
 <a id="nestedatt--autoscale_settings"></a>

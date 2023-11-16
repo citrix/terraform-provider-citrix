@@ -3,12 +3,14 @@ package daas
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/models"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
+	"github.com/hashicorp/go-azure-helpers/resourcemanager/location"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -53,7 +55,7 @@ func (r *hypervisorResourcePoolResource) Schema(_ context.Context, _ resource.Sc
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "Name of the resource pool.",
+				Description: "Name of the resource pool. Name should be unique across all hypervisors.",
 				Required:    true,
 			},
 			"hypervisor": schema.StringAttribute{
@@ -66,6 +68,9 @@ func (r *hypervisorResourcePoolResource) Schema(_ context.Context, _ resource.Sc
 			"hypervisor_connection_type": schema.StringAttribute{
 				Description: "Connection Type of the hypervisor (AzureRM, AWS, GCP).",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"virtual_network_resource_group": schema.StringAttribute{
 				Description: "The name of the resource group where the vnet resides. Required when connection type is Azure.",
@@ -83,7 +88,7 @@ func (r *hypervisorResourcePoolResource) Schema(_ context.Context, _ resource.Sc
 			},
 			"subnets": schema.ListAttribute{
 				ElementType: types.StringType,
-				Description: "List of subets to allocate VDAs within the virtual network. Required when connection type is Azure or GCP.",
+				Description: "List of subnets to allocate VDAs within the virtual network. Required when connection type is Azure or GCP.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.RequiresReplaceIfConfigured(),
@@ -93,7 +98,14 @@ func (r *hypervisorResourcePoolResource) Schema(_ context.Context, _ resource.Sc
 				Description: "Cloud Region where the virtual network sits in. Required when connection type is Azure or GCP.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplaceIfConfigured(),
+					stringplanmodifier.RequiresReplaceIf(
+						func(_ context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+							resp.RequiresReplace = !req.ConfigValue.IsNull() && !req.StateValue.IsNull() &&
+								(location.Normalize(req.ConfigValue.ValueString()) != location.Normalize(req.StateValue.ValueString()))
+						},
+						"Force replacement when region changes, unless changing between Azure region name (East US) and Id (eastus)",
+						"Force replacement when region changes, unless changing between Azure region name (East US) and Id (eastus)",
+					),
 				},
 			},
 			"availability_zone": schema.StringAttribute{
@@ -184,9 +196,23 @@ func (r *hypervisorResourcePoolResource) Create(ctx context.Context, req resourc
 			)
 			return
 		}
-		regionPath := util.GetSingleResourcePath(ctx, r.client, hypervisorId, "", plan.Region.ValueString(), "", "")
+		regionPath, err := util.GetSingleResourcePath(ctx, r.client, hypervisorId, "", plan.Region.ValueString(), "", "")
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating Hypervisor Resource Pool for Azure",
+				fmt.Sprintf("Cloud Region %s, error: %s", plan.Region.ValueString(), err.Error()),
+			)
+			return
+		}
 		resourcePoolDetails.SetRegion(regionPath)
-		vnetPath := util.GetSingleResourcePath(ctx, r.client, hypervisorId, fmt.Sprintf("%s/virtualprivatecloud.folder", regionPath), plan.VirtualNetwork.ValueString(), "VirtualPrivateCloud", plan.VirtualNetworkResourceGroup.ValueString())
+		vnetPath, err := util.GetSingleResourcePath(ctx, r.client, hypervisorId, fmt.Sprintf("%s/virtualprivatecloud.folder", regionPath), plan.VirtualNetwork.ValueString(), "VirtualPrivateCloud", plan.VirtualNetworkResourceGroup.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating Hypervisor Resource Pool for Azure",
+				fmt.Sprintf("Virtual Network %s in region %s, error: %s", plan.VirtualNetwork.ValueString(), plan.Region.ValueString(), err.Error()),
+			)
+			return
+		}
 		resourcePoolDetails.SetVirtualNetwork(vnetPath)
 		//Checking the subnet
 		if len(plan.Subnets) == 0 {
@@ -265,13 +291,13 @@ func (r *hypervisorResourcePoolResource) Create(ctx context.Context, req resourc
 	createResourcePoolRequest := r.client.ApiClient.HypervisorsAPIsDAAS.HypervisorsCreateResourcePool(ctx, hypervisorId)
 	createResourcePoolRequest = createResourcePoolRequest.CreateHypervisorResourcePoolRequestModel(resourcePoolDetails)
 	resourcePool, httpResp, err := citrixdaasclient.AddRequestData(createResourcePoolRequest, r.client).Execute()
-
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Resource Pool for Hypervisor "+hypervisorId,
 			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return
 	}
 
 	plan = plan.RefreshPropertyValues(*resourcePool, hypervisorConnectionType)
@@ -297,7 +323,7 @@ func (r *hypervisorResourcePoolResource) Read(ctx context.Context, req resource.
 	hypervisorId := state.Hypervisor.ValueString()
 
 	// Get the resource pool
-	resourcePool, err := GetHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, hypervisorId, state.Id.ValueString())
+	resourcePool, err := readHypervisorResourcePool(ctx, r.client, resp, hypervisorId, state.Id.ValueString())
 	if err != nil {
 		return
 	}
@@ -343,11 +369,11 @@ func (r *hypervisorResourcePoolResource) Update(ctx context.Context, req resourc
 	patchResourcePoolRequest := r.client.ApiClient.HypervisorsAPIsDAAS.HypervisorsPatchHypervisorResourcePool(ctx, plan.Hypervisor.ValueString(), plan.Id.ValueString())
 	patchResourcePoolRequest = patchResourcePoolRequest.EditHypervisorResourcePoolRequestModel(editHypervisorResourcePool).Async(true)
 	httpResp, err := citrixdaasclient.AddRequestData(patchResourcePoolRequest, r.client).Execute()
-
+	txId := util.GetTransactionIdFromHttpResponse(httpResp)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating Resource Pool for Hypervisor "+plan.Hypervisor.ValueString(),
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+txId+
 				"\nError message: "+util.ReadClientError(err),
 		)
 		return
@@ -359,7 +385,7 @@ func (r *hypervisorResourcePoolResource) Update(ctx context.Context, req resourc
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating Resource Pool for Hypervisor "+plan.Hypervisor.ValueString(),
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+txId+
 				"\nJobId: "+jobResponseModel.GetId()+
 				"\nError message: "+jobResponseModel.GetErrorString(),
 		)
@@ -367,7 +393,7 @@ func (r *hypervisorResourcePoolResource) Update(ctx context.Context, req resourc
 	}
 
 	if jobResponseModel.GetStatus() != citrixorchestration.JOBSTATUS_COMPLETE {
-		errorDetail := "TransactionId: " + util.GetTransactionIdFromHttpResponse(httpResp) +
+		errorDetail := "TransactionId: " + txId +
 			"\nJobId: " + jobResponseModel.GetId()
 
 		if jobResponseModel.GetStatus() == citrixorchestration.JOBSTATUS_FAILED {
@@ -426,7 +452,7 @@ func (r *hypervisorResourcePoolResource) Delete(ctx context.Context, req resourc
 	hypervisorId := state.Hypervisor.ValueString()
 	deleteHypervisorResourcePoolRequest := r.client.ApiClient.HypervisorsAPIsDAAS.HypervisorsDeleteHypervisorResourcePool(ctx, hypervisorId, state.Id.ValueString())
 	httpResp, err := citrixdaasclient.AddRequestData(deleteHypervisorResourcePoolRequest, r.client).Execute()
-	if err != nil {
+	if err != nil && httpResp.StatusCode != http.StatusNotFound {
 		resp.Diagnostics.AddError(
 			"Error deleting Resource Pool for Hypervisor "+hypervisorId,
 			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
@@ -438,7 +464,7 @@ func (r *hypervisorResourcePoolResource) Delete(ctx context.Context, req resourc
 
 func GetHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId, hypervisorResourcePoolId string) (*citrixorchestration.HypervisorResourcePoolDetailResponseModel, error) {
 	getResourcePoolsRequest := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorResourcePool(ctx, hypervisorId, hypervisorResourcePoolId)
-	resourcePool, httpResp, err := citrixdaasclient.AddRequestData(getResourcePoolsRequest, client).Execute()
+	resourcePool, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.HypervisorResourcePoolDetailResponseModel](getResourcePoolsRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error reading ResourcePool for Hypervisor "+hypervisorId,
@@ -447,5 +473,11 @@ func GetHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.Cit
 		)
 	}
 
+	return resourcePool, err
+}
+
+func readHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, hypervisorId, hypervisorResourcePoolId string) (*citrixorchestration.HypervisorResourcePoolDetailResponseModel, error) {
+	getResourcePoolsRequest := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorResourcePool(ctx, hypervisorId, hypervisorResourcePoolId)
+	resourcePool, _, err := util.ReadResource[*citrixorchestration.HypervisorResourcePoolDetailResponseModel](getResourcePoolsRequest, ctx, client, resp, "Resource Pool", hypervisorResourcePoolId)
 	return resourcePool, err
 }

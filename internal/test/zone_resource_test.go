@@ -22,10 +22,10 @@ func TestZonePreCheck(t *testing.T) {
 func TestZoneResource(t *testing.T) {
 
 	customerId := os.Getenv("CITRIX_CUSTOMER_ID")
-	isOnPremise := true
+	isOnPremises := true
 	if customerId != "" && customerId != "CitrixOnPremises" {
 		// Tests being run in cloud env
-		isOnPremise = false
+		isOnPremises = false
 	}
 
 	zoneName := os.Getenv("TEST_ZONE_NAME")
@@ -42,7 +42,7 @@ func TestZoneResource(t *testing.T) {
 			// Create and Read testing
 			{
 				Config: BuildZoneResource(t, zoneName, zoneDescription),
-				Check:  getAggregateTestFunc(isOnPremise, zoneName, zoneDescription),
+				Check:  getAggregateTestFunc(isOnPremises, zoneName, zoneDescription),
 			},
 			// ImportState testing
 			{
@@ -67,7 +67,7 @@ func TestZoneResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_daas_zone.test", "metadata.3.name", "key4"),
 					resource.TestCheckResourceAttr("citrix_daas_zone.test", "metadata.3.value", "value4"),
 				),
-				SkipFunc: getSkipFunc(isOnPremise),
+				SkipFunc: getSkipFunc(isOnPremises),
 			},
 			// Delete testing automatically occurs in TestCase
 		},
@@ -129,9 +129,9 @@ func BuildZoneResource(t *testing.T, zoneName string, zoneDescription string) st
 	return fmt.Sprintf(zone_testResource, zoneName, zoneDescription)
 }
 
-func getSkipFunc(isOnPremise bool) func() (bool, error) {
+func getSkipFunc(isOnPremises bool) func() (bool, error) {
 	return func() (bool, error) {
-		if isOnPremise {
+		if isOnPremises {
 			return false, nil
 		}
 
@@ -139,8 +139,8 @@ func getSkipFunc(isOnPremise bool) func() (bool, error) {
 	}
 }
 
-func getAggregateTestFunc(isOnPremise bool, zoneName string, zoneDescription string) resource.TestCheckFunc {
-	if isOnPremise {
+func getAggregateTestFunc(isOnPremises bool, zoneName string, zoneDescription string) resource.TestCheckFunc {
+	if isOnPremises {
 		return resource.ComposeAggregateTestCheckFunc(
 			resource.TestCheckResourceAttr("citrix_daas_zone.test", "name", zoneName),
 			resource.TestCheckResourceAttr("citrix_daas_zone.test", "description", zoneDescription),

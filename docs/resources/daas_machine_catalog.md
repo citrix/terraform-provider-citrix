@@ -86,13 +86,13 @@ Required:
 - `machine_account_creation_rules` (Attributes) Rules specifying how Active Directory machine accounts should be created when machines are provisioned. (see [below for nested schema](#nestedatt--provisioning_scheme--machine_account_creation_rules))
 - `machine_config` (Attributes) Machine Configuration (see [below for nested schema](#nestedatt--provisioning_scheme--machine_config))
 - `number_of_total_machines` (Number) Number of VDA machines allocated in the catalog.
-- `storage_type` (String) Storage account type used for provisioned virtual machine disks. Storage account types include: Standard_LRS, StandardSSD_LRS and Premium_LRS.
 - `use_managed_disks` (Boolean) Indicate whether to use Azure managed disks for the provisioned virtual machine.
 
 Optional:
 
 - `availability_zones` (String) The Azure Availability Zones containing provisioned virtual machines. Use a comma as a delimiter for multiple availability_zones.
 - `network_mapping` (Attributes) Specifies how the attached NICs are mapped to networks.  If this parameter is omitted, provisioned VMs are created with a single NIC, which is mapped to the default network in the hypervisor resource pool.  If this parameter is supplied, machines are created with the number of NICs specified in the map, and each NIC is attached to the specified network. (see [below for nested schema](#nestedatt--provisioning_scheme--network_mapping))
+- `storage_type` (String) Storage account type used for provisioned virtual machine disks on Azure. Storage account types include: Standard_LRS, StandardSSD_LRS and Premium_LRS.
 - `vda_resource_group` (String) Designated resource group where the VDA VMs will be located on Azure.
 - `writeback_cache` (Attributes) Write-back Cache config. Leave this empty to disable Write-back Cache. (see [below for nested schema](#nestedatt--provisioning_scheme--writeback_cache))
 

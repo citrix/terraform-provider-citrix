@@ -2,7 +2,8 @@ package daas
 
 import (
 	"context"
-	"errors"
+	"fmt"
+	"net/http"
 	"regexp"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
@@ -75,7 +76,7 @@ func (r *deliveryGroupResource) Schema(_ context.Context, _ resource.SchemaReque
 							Description: "Id of the machine catalog from which to add machines.",
 							Required:    true,
 						},
-						"count": schema.Int64Attribute{
+						"machine_count": schema.Int64Attribute{
 							Description: "The number of machines to assign from the machine catalog to the delivery group.",
 							Required:    true,
 							Validators: []validator.Int64{
@@ -95,7 +96,6 @@ func (r *deliveryGroupResource) Schema(_ context.Context, _ resource.SchemaReque
 							stringvalidator.RegexMatches(regexp.MustCompile(`^[^@]+@\b(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}`), "Users must be in UPN format."),
 						),
 					),
-					listvalidator.SizeAtLeast(1),
 				},
 			},
 			"autoscale_enabled": schema.BoolAttribute{
@@ -437,7 +437,7 @@ func (r *deliveryGroupResource) Read(ctx context.Context, req resource.ReadReque
 	}
 
 	deliveryGroupId := state.Id.ValueString()
-	deliveryGroup, err := getDeliveryGroup(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
+	deliveryGroup, err := readDeliveryGroup(ctx, r.client, resp, deliveryGroupId)
 	if err != nil {
 		return
 	}
@@ -552,7 +552,6 @@ func (r *deliveryGroupResource) Update(ctx context.Context, req resource.UpdateR
 	updateDeliveryGroupRequest := r.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsPatchDeliveryGroup(ctx, deliveryGroupId)
 	updateDeliveryGroupRequest = updateDeliveryGroupRequest.EditDeliveryGroupRequestModel(editDeliveryGroupRequestBody)
 	httpResp, err := citrixdaasclient.AddRequestData(updateDeliveryGroupRequest, r.client).Execute()
-
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating Delivery Group "+deliveryGroupName,
@@ -622,7 +621,7 @@ func (r *deliveryGroupResource) Delete(ctx context.Context, req resource.DeleteR
 	deliveryGroupName := state.Name.ValueString()
 	deleteDeliveryGroupRequest := r.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsDeleteDeliveryGroup(ctx, deliveryGroupId)
 	httpResp, err := citrixdaasclient.AddRequestData(deleteDeliveryGroupRequest, r.client).Execute()
-	if err != nil {
+	if err != nil && httpResp.StatusCode != http.StatusNotFound {
 		resp.Diagnostics.AddError(
 			"Error Deleting Delivery Group "+deliveryGroupName,
 			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
@@ -738,8 +737,7 @@ func validatePowerManagementSettings(plan models.DeliveryGroupResourceModel, ses
 
 func getDeliveryGroup(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string) (*citrixorchestration.DeliveryGroupDetailResponseModel, error) {
 	getDeliveryGroupRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroup(ctx, deliveryGroupId)
-	deliveryGroup, httpResp, err := citrixdaasclient.AddRequestData(getDeliveryGroupRequest, client).Execute()
-
+	deliveryGroup, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.DeliveryGroupDetailResponseModel](getDeliveryGroupRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error reading Delivery Group "+deliveryGroupId,
@@ -751,10 +749,15 @@ func getDeliveryGroup(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 	return deliveryGroup, err
 }
 
+func readDeliveryGroup(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, deliveryGroupId string) (*citrixorchestration.DeliveryGroupDetailResponseModel, error) {
+	getDeliveryGroupRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroup(ctx, deliveryGroupId)
+	deliveryGroup, _, err := util.ReadResource[*citrixorchestration.DeliveryGroupDetailResponseModel](getDeliveryGroupRequest, ctx, client, resp, "Delivery Group", deliveryGroupId)
+	return deliveryGroup, err
+}
+
 func getDeliveryGroupDesktops(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string) (*citrixorchestration.DesktopResponseModelCollection, error) {
 	getDeliveryGroupDesktopsRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroupsDesktops(ctx, deliveryGroupId)
-	deliveryGroupDesktops, httpResp, err := citrixdaasclient.AddRequestData(getDeliveryGroupDesktopsRequest, client).Execute()
-
+	deliveryGroupDesktops, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.DesktopResponseModelCollection](getDeliveryGroupDesktopsRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error reading Desktops for Delivery Group "+deliveryGroupId,
@@ -767,10 +770,8 @@ func getDeliveryGroupDesktops(ctx context.Context, client *citrixdaasclient.Citr
 }
 
 func getDeliveryGroupPowerTimeSchemes(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string) (*citrixorchestration.PowerTimeSchemeResponseModelCollection, error) {
-
 	getDeliveryGroupPowerTimeSchemesRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroupPowerTimeSchemes(ctx, deliveryGroupId)
-	deliveryGroupPowerTimeSchemes, httpResp, err := citrixdaasclient.AddRequestData(getDeliveryGroupPowerTimeSchemesRequest, client).Execute()
-
+	deliveryGroupPowerTimeSchemes, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.PowerTimeSchemeResponseModelCollection](getDeliveryGroupPowerTimeSchemesRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error reading Power Time Schemes for Delivery Group "+deliveryGroupId,
@@ -784,8 +785,7 @@ func getDeliveryGroupPowerTimeSchemes(ctx context.Context, client *citrixdaascli
 
 func getDeliveryGroupMachines(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string) (*citrixorchestration.MachineResponseModelCollection, error) {
 	getDeliveryGroupMachineCatalogsRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroupMachines(ctx, deliveryGroupId)
-	deliveryGroupMachines, httpResp, err := citrixdaasclient.AddRequestData(getDeliveryGroupMachineCatalogsRequest, client).Execute()
-
+	deliveryGroupMachines, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.MachineResponseModelCollection](getDeliveryGroupMachineCatalogsRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error reading Machines for Delivery Group "+deliveryGroupId,
@@ -808,7 +808,7 @@ func validateAndReturnMachineCatalogSessionSupport(ctx context.Context, client c
 		}
 
 		if sessionSupport != nil && *sessionSupport != catalog.GetSessionSupport() {
-			err := errors.New("all associated machine catalogs must have the same session support")
+			err := fmt.Errorf("all associated machine catalogs must have the same session support")
 			diagnostics.AddError("Error validating associated Machine Catalogs", "Ensure all associated Machine Catalogs have the same Session Support.")
 			return "", err
 		}
@@ -827,7 +827,7 @@ func getDeliveryGroupAddMachinesRequest(associatedMachineCatalogs []models.Deliv
 	for _, associatedMachineCatalog := range associatedMachineCatalogs {
 		var deliveryGroupMachineCatalogs citrixorchestration.DeliveryGroupAddMachinesRequestModel
 		deliveryGroupMachineCatalogs.SetMachineCatalog(associatedMachineCatalog.MachineCatalog.ValueString())
-		deliveryGroupMachineCatalogs.SetCount(int32(associatedMachineCatalog.Count.ValueInt64()))
+		deliveryGroupMachineCatalogs.SetCount(int32(associatedMachineCatalog.MachineCount.ValueInt64()))
 		deliveryGroupMachineCatalogs.SetAssignMachinesToUsers([]citrixorchestration.AssignMachineToUserRequestModel{})
 		deliveryGroupMachineCatalogsArray = append(deliveryGroupMachineCatalogsArray, deliveryGroupMachineCatalogs)
 	}
@@ -856,10 +856,10 @@ func addMachinesToDeliveryGroup(ctx context.Context, client *citrixdaasclient.Ci
 	deliveryGroupMachineCatalogs.SetMachineCatalog(catalogId)
 	deliveryGroupMachineCatalogs.SetCount(int32(numOfMachines))
 	deliveryGroupMachineCatalogs.SetAssignMachinesToUsers(deliveryGroupAssignMachinesToUsers)
+
 	updateDeliveryGroupRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsDoAddMachines(ctx, deliveryGroupId)
 	updateDeliveryGroupRequest = updateDeliveryGroupRequest.DeliveryGroupAddMachinesRequestModel(deliveryGroupMachineCatalogs)
 	updatedDeliveryGroup, httpResp, err := citrixdaasclient.AddRequestData(updateDeliveryGroupRequest, client).Execute()
-
 	if err != nil {
 		diagnostics.AddError(
 			"Error adding machine(s) to Delivery Group "+deliveryGroupId,
@@ -875,7 +875,6 @@ func removeMachinesFromDeliveryGroup(ctx context.Context, client *citrixdaasclie
 	for _, machineToRemove := range machinesToRemove {
 		updateDeliveryGroupRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsDoRemoveMachines(ctx, deliveryGroupId, machineToRemove)
 		httpResp, err := citrixdaasclient.AddRequestData(updateDeliveryGroupRequest, client).Execute()
-
 		if err != nil {
 			diagnostics.AddError(
 				"Error removing machine from Delivery Group "+deliveryGroupId,
@@ -905,7 +904,7 @@ func addRemoveMachinesFromDeliveryGroup(ctx context.Context, client *citrixdaasc
 		requestedAssociatedMachineCatalogsMap[associatedMachineCatalog.MachineCatalog.ValueString()] = true
 
 		associatedMachineCatalogId := associatedMachineCatalog.MachineCatalog.ValueString()
-		requestedCount := int(associatedMachineCatalog.Count.ValueInt64())
+		requestedCount := int(associatedMachineCatalog.MachineCount.ValueInt64())
 		machineCatalogMachines := existingAssociatedMachineCatalogsMap[associatedMachineCatalogId]
 		existingCount := len(machineCatalogMachines)
 

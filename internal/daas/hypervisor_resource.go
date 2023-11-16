@@ -2,6 +2,7 @@ package daas
 
 import (
 	"context"
+	"net/http"
 	"regexp"
 	"strconv"
 	"time"
@@ -249,11 +250,11 @@ func (r *hypervisorResource) Create(ctx context.Context, req resource.CreateRequ
 
 	// Create new hypervisor
 	_, httpResp, err := citrixdaasclient.AddRequestData(createHypervisorRequest, r.client).Execute()
-
+	txId := util.GetTransactionIdFromHttpResponse(httpResp)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor",
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+txId+
 				"\nError message: "+util.ReadClientError(err),
 		)
 		return
@@ -265,7 +266,7 @@ func (r *hypervisorResource) Create(ctx context.Context, req resource.CreateRequ
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor",
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+txId+
 				"\nJobId: "+jobResponseModel.GetId()+
 				"\nError message: "+jobResponseModel.GetErrorString(),
 		)
@@ -273,7 +274,7 @@ func (r *hypervisorResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 
 	if jobResponseModel.GetStatus() != citrixorchestration.JOBSTATUS_COMPLETE {
-		errorDetail := "TransactionId: " + util.GetTransactionIdFromHttpResponse(httpResp) +
+		errorDetail := "TransactionId: " + txId +
 			"\nJobId: " + jobResponseModel.GetId()
 
 		if jobResponseModel.GetStatus() == citrixorchestration.JOBSTATUS_FAILED {
@@ -314,7 +315,7 @@ func (r *hypervisorResource) Read(ctx context.Context, req resource.ReadRequest,
 
 	// Get refreshed hypervisor properties from Orchestration
 	hypervisorId := state.Id.ValueString()
-	hypervisor, err := GetHypervisor(ctx, r.client, &resp.Diagnostics, hypervisorId)
+	hypervisor, err := readHypervisor(ctx, r.client, resp, hypervisorId)
 	if err != nil {
 		return
 	}
@@ -384,7 +385,6 @@ func (r *hypervisorResource) Update(ctx context.Context, req resource.UpdateRequ
 	patchHypervisorRequest := r.client.ApiClient.HypervisorsAPIsDAAS.HypervisorsPatchHypervisor(ctx, hypervisorId)
 	patchHypervisorRequest = patchHypervisorRequest.EditHypervisorConnectionRequestModel(editHypervisorRequestBody)
 	httpResp, err := citrixdaasclient.AddRequestData(patchHypervisorRequest, r.client).Execute()
-
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating Hypervisor "+hypervisorName,
@@ -424,7 +424,7 @@ func (r *hypervisorResource) Delete(ctx context.Context, req resource.DeleteRequ
 	hypervisorName := state.Name.ValueString()
 	deleteHypervisorRequest := r.client.ApiClient.HypervisorsAPIsDAAS.HypervisorsDeleteHypervisor(ctx, hypervisorId)
 	httpResp, err := citrixdaasclient.AddRequestData(deleteHypervisorRequest, r.client).Execute()
-	if err != nil {
+	if err != nil && httpResp.StatusCode != http.StatusNotFound {
 		resp.Diagnostics.AddError(
 			"Error deleting Hypervisor "+hypervisorName,
 			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
@@ -443,14 +443,21 @@ func (r *hypervisorResource) ImportState(ctx context.Context, req resource.Impor
 func GetHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId string) (*citrixorchestration.HypervisorDetailResponseModel, error) {
 	// Resolve resource path for service offering and master image
 	getHypervisorReq := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisor(ctx, hypervisorId)
-	hypervisor, httpResp, err := citrixdaasclient.AddRequestData(getHypervisorReq, client).Execute()
+	hypervisor, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.HypervisorDetailResponseModel](getHypervisorReq, client)
 	if err != nil {
 		diagnostics.AddError(
-			"Error reading hypervisor "+hypervisorId,
+			"Error reading Hypervisor "+hypervisorId,
 			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 	}
+
+	return hypervisor, err
+}
+
+func readHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, hypervisorId string) (*citrixorchestration.HypervisorDetailResponseModel, error) {
+	getHypervisorReq := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisor(ctx, hypervisorId)
+	hypervisor, _, err := util.ReadResource[*citrixorchestration.HypervisorDetailResponseModel](getHypervisorReq, ctx, client, resp, "Hypervisor", hypervisorId)
 	return hypervisor, err
 }
 

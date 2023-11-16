@@ -38,7 +38,9 @@ func (r HypervisorResourcePoolResourceModel) RefreshPropertyValues(resourcePool 
 	switch hypervisorConnectionType {
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
 		region := resourcePool.GetRegion()
-		r.Region = types.StringValue(region.GetName())
+		if r.shouldSetRegion(region) {
+			r.Region = types.StringValue(region.GetName())
+		}
 		virtualNetwork := resourcePool.GetVirtualNetwork()
 		resourceGroupName := getResourceGroupNameFromVnetId(virtualNetwork.GetId())
 		r.VirtualNetworkResourceGroup = types.StringValue(resourceGroupName)
@@ -63,7 +65,9 @@ func (r HypervisorResourcePoolResourceModel) RefreshPropertyValues(resourcePool 
 
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
 		region := resourcePool.GetRegion()
-		r.Region = types.StringValue(region.GetName())
+		if r.shouldSetRegion(region) {
+			r.Region = types.StringValue(region.GetName())
+		}
 		project := resourcePool.GetProject()
 		r.ProjectName = types.StringValue(project.GetName())
 		virtualNetwork := resourcePool.GetVirtualPrivateCloud()
@@ -76,4 +80,10 @@ func (r HypervisorResourcePoolResourceModel) RefreshPropertyValues(resourcePool 
 	}
 
 	return r
+}
+
+func (r HypervisorResourcePoolResourceModel) shouldSetRegion(region citrixorchestration.HypervisorResourceRefResponseModel) bool {
+	// Always store name in state for the first time, but allow either if already specified in state or plan
+	return r.Region.IsNull() || r.Region.ValueString() == "" ||
+		(!strings.EqualFold(r.Region.ValueString(), region.GetName()) && !strings.EqualFold(r.Region.ValueString(), region.GetId()))
 }

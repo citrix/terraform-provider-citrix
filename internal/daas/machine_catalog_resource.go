@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"net/http"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -236,8 +237,8 @@ func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequ
 						Optional:    true,
 					},
 					"storage_type": schema.StringAttribute{
-						Description: "Storage account type used for provisioned virtual machine disks. Storage account types include: Standard_LRS, StandardSSD_LRS and Premium_LRS.",
-						Required:    true,
+						Description: "Storage account type used for provisioned virtual machine disks on Azure. Storage account types include: Standard_LRS, StandardSSD_LRS and Premium_LRS.",
+						Optional:    true,
 						Validators: []validator.String{
 							stringvalidator.OneOf(
 								"Standard_LRS",
@@ -499,22 +500,23 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 
 	// Create new machine catalog
 	_, httpResp, err := citrixdaasclient.AddRequestData(createMachineCatalogRequest, r.client).Execute()
+	txId := util.GetTransactionIdFromHttpResponse(httpResp)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Machine Catalog",
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+txId+
 				"\nError message: "+util.ReadClientError(err),
 		)
 		return
 	}
 
 	jobId := util.GetJobIdFromHttpResponse(*httpResp)
-	jobResponseModel, err := r.client.WaitForJob(ctx, jobId, 60)
+	jobResponseModel, err := r.client.WaitForJob(ctx, jobId, 120)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Machine Catalog",
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+txId+
 				"\nJobId: "+jobResponseModel.GetId()+
 				"\nError message: "+jobResponseModel.GetErrorString(),
 		)
@@ -522,7 +524,7 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 	}
 
 	if jobResponseModel.GetStatus() != citrixorchestration.JOBSTATUS_COMPLETE {
-		errorDetail := "TransactionId: " + util.GetTransactionIdFromHttpResponse(httpResp) +
+		errorDetail := "TransactionId: " + txId +
 			"\nJobId: " + jobResponseModel.GetId()
 
 		if jobResponseModel.GetStatus() == citrixorchestration.JOBSTATUS_FAILED {
@@ -566,7 +568,7 @@ func (r *machineCatalogResource) Read(ctx context.Context, req resource.ReadRequ
 	// Get refreshed machine catalog state from Orchestration
 	catalogId := state.Id.ValueString()
 
-	catalog, err := GetMachineCatalog(ctx, r.client, &resp.Diagnostics, catalogId, true)
+	catalog, _, err := readMachineCatalog(ctx, r.client, resp, catalogId)
 	if err != nil {
 		return
 	}
@@ -726,21 +728,22 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		updateMasterImageRequest := r.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsUpdateMachineCatalogProvisioningScheme(ctx, catalogId)
 		updateMasterImageRequest = updateMasterImageRequest.UpdateMachineCatalogProvisioningSchemeRequestModel(updateProvisioningSchemeModel)
 		_, httpResp, err := citrixdaasclient.AddRequestData(updateMasterImageRequest, r.client).Async(true).Execute()
+		txId := util.GetTransactionIdFromHttpResponse(httpResp)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating Image for Machine Catalog "+catalogName,
-				"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+				"TransactionId: "+txId+
 					"\nError message: "+util.ReadClientError(err),
 			)
 		}
 
 		jobId := util.GetJobIdFromHttpResponse(*httpResp)
-		jobResponseModel, err := r.client.WaitForJob(ctx, jobId, 30)
+		jobResponseModel, err := r.client.WaitForJob(ctx, jobId, 60)
 
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating Image for Machine Catalog "+catalogName,
-				"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+				"TransactionId: "+txId+
 					"\nJobId: "+jobResponseModel.GetId()+
 					"\nError message: "+jobResponseModel.GetErrorString(),
 			)
@@ -748,7 +751,7 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		}
 
 		if jobResponseModel.GetStatus() != citrixorchestration.JOBSTATUS_COMPLETE {
-			errorDetail := "TransactionId: " + util.GetTransactionIdFromHttpResponse(httpResp) +
+			errorDetail := "TransactionId: " + txId +
 				"\nJobId: " + jobResponseModel.GetId()
 
 			if jobResponseModel.GetStatus() == citrixorchestration.JOBSTATUS_FAILED {
@@ -776,14 +779,12 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 
 		getMachinesRequest := r.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogMachines(ctx, catalogId)
 		getMachinesResponse, httpResp, err := citrixdaasclient.AddRequestData(getMachinesRequest, r.client).Execute()
-
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error deleting machine(s) from Machine Catalog "+catalogName,
 				"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nCould not retrieve machines for machine catalog",
 			)
-
 			return
 		}
 
@@ -826,14 +827,12 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 				updateMachineRequest := r.client.ApiClient.MachinesAPIsDAAS.MachinesUpdateMachineCatalogMachine(ctx, machineToDelete.GetId())
 				updateMachineRequest = updateMachineRequest.UpdateMachineRequestModel(updateMachineModel)
 				httpResp, err := citrixdaasclient.AddRequestData(updateMachineRequest, r.client).Execute()
-
 				if err != nil {
 					resp.Diagnostics.AddError(
 						"Error putting machine in maintenance mode",
 						"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
 							"\nError message: "+util.ReadClientError(err),
 					)
-
 					return
 				}
 			}
@@ -841,14 +840,13 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 			deleteMachineRequest := r.client.ApiClient.MachinesAPIsDAAS.MachinesRemoveMachine(ctx, machineToDelete.GetId())
 			deleteMachineRequest = deleteMachineRequest.XAdminCredential(header).DeleteVm(true).DeleteAccount(citrixorchestration.MACHINEACCOUNTDELETEOPTION_DELETE).Async(true)
 			httpResp, err := citrixdaasclient.AddRequestData(deleteMachineRequest, r.client).Execute()
-
+			txId := util.GetTransactionIdFromHttpResponse(httpResp)
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error deleting machine from Machine Catalog "+catalogName,
-					"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+					"TransactionId: "+txId+
 						"\nError message: "+util.ReadClientError(err),
 				)
-
 				return
 			}
 
@@ -858,16 +856,15 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error deleting machine from Machine Catalog "+catalogName,
-					"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+					"TransactionId: "+txId+
 						"\nJobId: "+jobResponseModel.GetId()+
 						"\nError message: "+jobResponseModel.GetErrorString(),
 				)
-
 				return
 			}
 
 			if jobResponseModel.GetStatus() != citrixorchestration.JOBSTATUS_COMPLETE {
-				errorDetail := "TransactionId: " + util.GetTransactionIdFromHttpResponse(httpResp) +
+				errorDetail := "TransactionId: " + txId +
 					"\nJobId: " + jobResponseModel.GetId()
 
 				if jobResponseModel.GetStatus() == citrixorchestration.JOBSTATUS_FAILED {
@@ -929,24 +926,22 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		for i := 0; i < int(addMachinesCount); i++ {
 			addMachineRequest = addMachineRequest.Async(true)
 			_, httpResp, err := citrixdaasclient.AddRequestData(addMachineRequest, r.client).Execute()
-
+			txId := util.GetTransactionIdFromHttpResponse(httpResp)
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error adding Machine to Machine Catalog "+catalogName,
-					"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+					"TransactionId: "+txId+
 						"\nCould not add machine to machine catalog, unexpected error: "+util.ReadClientError(err),
 				)
 			}
 
 			jobId := util.GetJobIdFromHttpResponse(*httpResp)
-			maxWaitTimeInMinutes := 30
-
-			jobResponseModel, err := r.client.WaitForJob(ctx, jobId, maxWaitTimeInMinutes)
+			jobResponseModel, err := r.client.WaitForJob(ctx, jobId, 30)
 
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error adding Machine to Machine Catalog "+catalogName,
-					"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+					"TransactionId: "+txId+
 						"\nJobId: "+jobResponseModel.GetId()+
 						"\nError message: "+jobResponseModel.GetErrorString(),
 				)
@@ -954,7 +949,7 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 			}
 
 			if jobResponseModel.GetStatus() != citrixorchestration.JOBSTATUS_COMPLETE {
-				errorDetail := "TransactionId: " + util.GetTransactionIdFromHttpResponse(httpResp) +
+				errorDetail := "TransactionId: " + txId +
 					"\nJobId: " + jobResponseModel.GetId()
 
 				if jobResponseModel.GetStatus() == citrixorchestration.JOBSTATUS_FAILED {
@@ -995,34 +990,49 @@ func (r *machineCatalogResource) Delete(ctx context.Context, req resource.Delete
 		return
 	}
 
-	// Delete existing order
 	catalogId := state.Id.ValueString()
+
+	_, httpResp, err := readMachineCatalog(ctx, r.client, nil, catalogId)
+
+	if err != nil {
+		if httpResp.StatusCode == http.StatusNotFound {
+			return
+		}
+
+		resp.Diagnostics.AddError(
+			"Error reading Machine Catalog "+catalogId,
+			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+
+		return
+	}
+
+	// Delete existing order
 	catalogName := state.Name.ValueString()
 	deleteMachineCatalogRequest := r.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsDeleteMachineCatalog(ctx, catalogId)
 
 	// Add domain credential header
 	header := generateAdminCredentialHeader(state)
 	deleteMachineCatalogRequest = deleteMachineCatalogRequest.XAdminCredential(header).DeleteVm(true).DeleteAccount(citrixorchestration.MACHINEACCOUNTDELETEOPTION_DELETE).Async(true)
-	httpResp, err := citrixdaasclient.AddRequestData(deleteMachineCatalogRequest, r.client).Execute()
-
-	if err != nil {
+	httpResp, err = citrixdaasclient.AddRequestData(deleteMachineCatalogRequest, r.client).Execute()
+	txId := util.GetTransactionIdFromHttpResponse(httpResp)
+	if err != nil && httpResp.StatusCode != http.StatusNotFound {
 		resp.Diagnostics.AddError(
 			"Error deleting Machine Catalog "+catalogName,
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+txId+
 				"\nError message: "+util.ReadClientError(err),
 		)
 		return
 	}
 
 	jobId := util.GetJobIdFromHttpResponse(*httpResp)
-	maxWaitTimeInMinutes := 30
-
-	jobResponseModel, err := r.client.WaitForJob(ctx, jobId, maxWaitTimeInMinutes)
+	jobResponseModel, err := r.client.WaitForJob(ctx, jobId, 60)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting Machine Catalog "+catalogName,
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+txId+
 				"\nJobId: "+jobResponseModel.GetId()+
 				"\nError message: "+jobResponseModel.GetErrorString(),
 		)
@@ -1030,7 +1040,7 @@ func (r *machineCatalogResource) Delete(ctx context.Context, req resource.Delete
 	}
 
 	if jobResponseModel.GetStatus() != citrixorchestration.JOBSTATUS_COMPLETE {
-		errorDetail := "TransactionId: " + util.GetTransactionIdFromHttpResponse(httpResp) +
+		errorDetail := "TransactionId: " + txId +
 			"\nJobId: " + jobResponseModel.GetId()
 
 		if jobResponseModel.GetStatus() == citrixorchestration.JOBSTATUS_FAILED {
@@ -1059,8 +1069,7 @@ func generateAdminCredentialHeader(plan models.MachineCatalogResourceModel) stri
 
 func GetMachineCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, machineCatalogId string, addErrorToDiagnostics bool) (*citrixorchestration.MachineCatalogDetailResponseModel, error) {
 	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId)
-	catalog, httpResp, err := citrixdaasclient.AddRequestData(getMachineCatalogRequest, client).Execute()
-
+	catalog, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.MachineCatalogDetailResponseModel](getMachineCatalogRequest, client)
 	if err != nil && addErrorToDiagnostics {
 		diagnostics.AddError(
 			"Error reading Machine Catalog "+machineCatalogId,
@@ -1070,4 +1079,10 @@ func GetMachineCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasC
 	}
 
 	return catalog, err
+}
+
+func readMachineCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, machineCatalogId string) (*citrixorchestration.MachineCatalogDetailResponseModel, *http.Response, error) {
+	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId)
+	catalog, httpResp, err := util.ReadResource[*citrixorchestration.MachineCatalogDetailResponseModel](getMachineCatalogRequest, ctx, client, resp, "Machine Catalog", machineCatalogId)
+	return catalog, httpResp, err
 }

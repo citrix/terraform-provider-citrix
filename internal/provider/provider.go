@@ -3,8 +3,10 @@ package provider
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -15,6 +17,7 @@ import (
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
 	citrixdaas "github.com/citrix/terraform-provider-citrix/internal/daas"
 	"github.com/google/uuid"
+	"golang.org/x/mod/semver"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -72,7 +75,7 @@ func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 		Attributes: map[string]schema.Attribute{
 			"hostname": schema.StringAttribute{
 				Description: "Host name / base URL of Citrix DaaS service. " + "<br />" +
-					"For Citrix On-Premise customers (Required): Use this to specify Delivery Controller hostname. " + "<br />" +
+					"For Citrix On-Premises customers (Required): Use this to specify Delivery Controller hostname. " + "<br />" +
 					"For Citrix Cloud customers (Optional): Use this to force override the Citrix DaaS service hostname." + "<br />" +
 					"Can be set via Environment Variable **CITRIX_HOSTNAME**.",
 				Optional: true,
@@ -97,14 +100,14 @@ func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 			},
 			"client_id": schema.StringAttribute{
 				Description: "Client Id for Citrix DaaS service authentication. " + "<br />" +
-					"For Citrix On-Premise customers: Use this to specify Doamin Admin Username. " + "<br />" +
+					"For Citrix On-Premises customers: Use this to specify Doamin Admin Username. " + "<br />" +
 					"For Citrix Cloud customers: Use this to specify Cloud API Key Client Id." + "<br />" +
 					"Can be set via Environment Variable **CITRIX_CLIENT_ID**.",
 				Optional: true,
 			},
 			"client_secret": schema.StringAttribute{
 				Description: "Client Secret for Citrix DaaS service authentication. " + "<br />" +
-					"For Citrix On-Premise customers: Use this to specify Doamin Admin Password. " + "<br />" +
+					"For Citrix On-Premises customers: Use this to specify Doamin Admin Password. " + "<br />" +
 					"For Citrix Cloud customers: Use this to specify Cloud API Key Client Secret." + "<br />" +
 					"Can be set via Environment Variable **CITRIX_CLIENT_SECRET**.",
 				Optional:  true,
@@ -122,36 +125,71 @@ func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 	}
 }
 
-func getClientInterceptor(ctx context.Context) citrixclient.MiddlewareAuthFunction {
-	return func(authClient *citrixclient.CitrixDaasClient, r *http.Request) {
-		// Auth
-		if authClient != nil && r.Header.Get("Authorization") == "" {
-			token, _, err := authClient.SignIn()
-			if err != nil {
-				tflog.Error(ctx, "Could not sign into Citrix DaaS, error: "+err.Error())
-			}
-			r.Header["Authorization"] = []string{token}
+func middlewareAuthFunc(authClient *citrixclient.CitrixDaasClient, r *http.Request) {
+	// Auth
+	if authClient != nil && r.Header.Get("Authorization") == "" {
+		token, _, err := authClient.SignIn()
+		if err != nil {
+			tflog.Error(r.Context(), "Could not sign into Citrix DaaS, error: "+err.Error())
 		}
-
-		// TransactionId
-		transactionId := r.Header.Get("Citrix-TransactionId")
-		if transactionId == "" {
-			transactionId = uuid.NewString()
-			r.Header.Add("Citrix-TransactionId", transactionId)
-		}
-
-		// Log the request
-		tflog.Info(ctx, "Orchestration API request", map[string]interface{}{
-			"url":           r.URL.String(),
-			"method":        r.Method,
-			"transactionId": transactionId,
-		})
+		r.Header["Authorization"] = []string{token}
 	}
+
+	// TransactionId
+	transactionId := r.Header.Get("Citrix-TransactionId")
+	if transactionId == "" {
+		transactionId = uuid.NewString()
+		r.Header.Add("Citrix-TransactionId", transactionId)
+	}
+
+	// Log the request
+	tflog.Info(r.Context(), "Orchestration API request", map[string]interface{}{
+		"url":           r.URL.String(),
+		"method":        r.Method,
+		"transactionId": transactionId,
+	})
+}
+
+type RegistryResponse struct {
+	Version string `json:"version"`
+}
+
+func (p *citrixProvider) versionCheck(resp *provider.ConfigureResponse) {
+	if !semver.IsValid("v" + p.version) {
+		return
+	}
+	httpResp, err := http.Get("https://registry.terraform.io/v1/providers/citrix/citrix")
+	if err != nil {
+		return
+	}
+	defer httpResp.Body.Close()
+	if httpResp.StatusCode != 200 {
+		return
+	}
+
+	body, err := io.ReadAll(httpResp.Body)
+	if err != nil {
+		return
+	}
+	registryResp := RegistryResponse{}
+	err = json.Unmarshal(body, &registryResp)
+	if err != nil {
+		return
+	}
+
+	if semver.Compare("v"+registryResp.Version, "v"+p.version) > 0 {
+		resp.Diagnostics.AddWarning(
+			"New version of the citrix/citrix provider is available",
+			fmt.Sprintf("Please update the provider version in terraform configuration to >=%s and then run `terraform init --upgrade` to get the latest version.", registryResp.Version))
+	}
+	return
 }
 
 // Configure prepares a Citrixdaas API client for data sources and resources.
 func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 	tflog.Info(ctx, "Configuring Citrix Cloud client")
+
+	p.versionCheck(resp)
 
 	// Retrieve provider data from configuration
 	var config citrixProviderModel
@@ -254,25 +292,25 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		customerId = "CitrixOnPremises"
 	}
 
-	onPremise := false
+	onPremises := false
 	if customerId == "CitrixOnPremises" {
-		onPremise = true
+		onPremises = true
 	}
 
 	// If any of the expected configurations are missing, return
 	// errors with provider-specific guidance.
 
-	// On-premise customer must specify hostname with DDC hostname / IP address
-	if onPremise && hostname == "" {
+	// On-premises customer must specify hostname with DDC hostname / IP address
+	if onPremises && hostname == "" {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("hostname"),
 			"Missing Citrix DaaS API Host",
-			"The provider cannot create the Citrix API client as there is a missing or empty value for the Citrix DaaS API hostname for on-premise customers. "+
+			"The provider cannot create the Citrix API client as there is a missing or empty value for the Citrix DaaS API hostname for on-premises customers. "+
 				"Set the host value in the configuration. Ensure the value is not empty. ",
 		)
 	}
 
-	if !onPremise && disableSslVerification {
+	if !onPremises && disableSslVerification {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("disable_ssl_verification"),
 			"Cannot disable SSL verification for Citrix Cloud customer",
@@ -303,7 +341,7 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		return
 	}
 
-	if !onPremise && hostname == "" {
+	if !onPremises && hostname == "" {
 		if environment == "Production" {
 			hostname = "api.cloud.com"
 		} else if environment == "Staging" {
@@ -316,7 +354,7 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	}
 
 	authUrl := ""
-	if onPremise {
+	if onPremises {
 		authUrl = fmt.Sprintf("https://%s/citrix/orchestration/api/techpreview/tokens", hostname)
 	} else {
 		if environment == "Production" {
@@ -333,20 +371,20 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	}
 
 	ctx = tflog.SetField(ctx, "citrix_hostname", hostname)
-	if !onPremise {
+	if !onPremises {
 		ctx = tflog.SetField(ctx, "citrix_customer_id", customerId)
 	}
 	ctx = tflog.SetField(ctx, "citrix_client_id", clientId)
 	ctx = tflog.SetField(ctx, "citrix_client_secret", clientSecret)
 	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "citrix_client_secret")
-	ctx = tflog.SetField(ctx, "citrix_on_premise", onPremise)
+	ctx = tflog.SetField(ctx, "citrix_on_premises", onPremises)
 
 	tflog.Debug(ctx, "Creating Citrix API client")
 
 	userAgent := "citrix-terraform-provider/" + p.version + " (https://github.com/citrix/terraform-provider-citrix)"
 
 	// Create a new Citrix API client using the configuration values
-	client, httpResp, err := citrixclient.NewCitrixDaasClient(authUrl, hostname, customerId, clientId, clientSecret, onPremise, disableSslVerification, &userAgent, getClientInterceptor(ctx))
+	client, httpResp, err := citrixclient.NewCitrixDaasClient(ctx, authUrl, hostname, customerId, clientId, clientSecret, onPremises, disableSslVerification, &userAgent, middlewareAuthFunc)
 	if err != nil {
 		if httpResp != nil {
 			if httpResp.StatusCode == 401 {
@@ -355,7 +393,7 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 					"Make sure client_id and client_secret is correct in provider config. ",
 				)
 			} else if httpResp.StatusCode == 503 {
-				if onPremise {
+				if onPremises {
 					resp.Diagnostics.AddError(
 						"Citrix DaaS service unavailable",
 						"Please check if you can access Web Studio. \n\n"+
@@ -394,7 +432,7 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 			if len(cryptoErr.UnverifiedCertificates) > 0 {
 				resp.Diagnostics.AddError(
 					"DDC(s) does not have a valid SSL certificate issued by a trusted Certificate Authority",
-					"If you are running against on-premise DDC(s) that does not have an SSL certificate issue by a trusted CA, consider setting \"disable_ssl_verification\" to \"true\" in provider config.",
+					"If you are running against on-premises DDC(s) that does not have an SSL certificate issue by a trusted CA, consider setting \"disable_ssl_verification\" to \"true\" in provider config.",
 				)
 
 				return
@@ -430,7 +468,9 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 // DataSources defines the data sources implemented in the provider.
 func (p *citrixProvider) DataSources(_ context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{}
+	return []func() datasource.DataSource{
+		citrixdaas.NewVdaDataSource,
+	}
 }
 
 // Resources defines the resources implemented in the provider.
