@@ -5,7 +5,7 @@ provider "citrix" {
   client_secret = ""
 }
 
-# On-Premise Provider
+# On-Premises Provider
 provider "citrix" {
   hostname      = "10.0.0.6"
   client_id     = "foo.local\\admin"

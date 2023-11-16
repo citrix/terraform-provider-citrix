@@ -2,6 +2,7 @@ package util
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
@@ -20,11 +21,10 @@ func GetSingleResourcePathFromHypervisor(ctx context.Context, client *citrixdaas
 		req = req.Type_([]string{resourceType})
 	}
 
-	resources, res, err := citrixdaasclient.AddRequestData(req, client).Execute()
+	resources, _, err := citrixdaasclient.AddRequestData(req, client).Execute()
 	if err != nil {
 		return ""
 	}
-	defer res.Body.Close()
 
 	for _, child := range resources.Children {
 		if child.GetName() == resourceName {
@@ -45,7 +45,7 @@ func GetSingleResourcePathFromHypervisor(ctx context.Context, client *citrixdaas
 	return ""
 }
 
-func GetSingleResourcePath(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorId, folderPath, resourceName, resourceType, resourceGroupName string) string {
+func GetSingleResourcePath(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorId, folderPath, resourceName, resourceType, resourceGroupName string) (string, error) {
 	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorAllResources(ctx, hypervisorId)
 	req = req.Children(1)
 	if folderPath != "" {
@@ -55,29 +55,29 @@ func GetSingleResourcePath(ctx context.Context, client *citrixdaasclient.CitrixD
 		req = req.Type_([]string{resourceType})
 	}
 
-	resources, res, err := citrixdaasclient.AddRequestData(req, client).Execute()
+	resources, _, err := citrixdaasclient.AddRequestData(req, client).Execute()
 	if err != nil {
-		return ""
+		return "", err
 	}
-	defer res.Body.Close()
 
 	for _, child := range resources.Children {
-		if child.GetName() == resourceName {
+		if strings.EqualFold(child.GetName(), resourceName) ||
+			(child.GetResourceType() == "Region" && strings.EqualFold(child.GetId(), resourceName)) { // support both Azure region name or id ("East US" and "eastus")
 			if resourceType == "VirtualPrivateCloud" {
 				// For vnet, ID is resourceGroup/vnetName. Match the resourceGroup as well
 				resourceGroupAndVnetName := strings.Split(child.GetId(), "/")
 				if resourceGroupAndVnetName[0] == resourceGroupName {
-					return child.GetXDPath()
+					return child.GetXDPath(), nil
 				} else {
 					continue
 				}
 			}
 
-			return child.GetXDPath()
+			return child.GetXDPath(), nil
 		}
 	}
 
-	return ""
+	return "", fmt.Errorf("Could not find resource.")
 }
 
 func GetAllResourcePathList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorId, folderPath, resourceType string) []string {
@@ -86,11 +86,10 @@ func GetAllResourcePathList(ctx context.Context, client *citrixdaasclient.Citrix
 	req = req.Path(folderPath)
 	req = req.Type_([]string{resourceType})
 
-	resources, res, err := citrixdaasclient.AddRequestData(req, client).Execute()
+	resources, _, err := citrixdaasclient.AddRequestData(req, client).Execute()
 	if err != nil {
 		return []string{}
 	}
-	defer res.Body.Close()
 
 	result := []string{}
 	for _, child := range resources.Children {
@@ -106,11 +105,10 @@ func GetFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.C
 	req = req.Path(folderPath)
 	req = req.Type_([]string{resourceType})
 
-	resources, res, err := citrixdaasclient.AddRequestData(req, client).Execute()
+	resources, _, err := citrixdaasclient.AddRequestData(req, client).Execute()
 	if err != nil {
 		return []string{}, err
 	}
-	defer res.Body.Close()
 
 	result := []string{}
 	if filter != nil {

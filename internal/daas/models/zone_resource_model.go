@@ -15,7 +15,7 @@ type ZoneResourceModel struct {
 	Metadata    *[]util.NameValueStringPairModel `tfsdk:"metadata"`
 }
 
-func (r ZoneResourceModel) RefreshPropertyValues(zone *citrixorchestration.ZoneDetailResponseModel, onpremise bool) ZoneResourceModel {
+func (r ZoneResourceModel) RefreshPropertyValues(zone *citrixorchestration.ZoneDetailResponseModel, onpremises bool) ZoneResourceModel {
 	// Overwrite zone with refreshed state
 	r.Id = types.StringValue(zone.GetId())
 	r.Name = types.StringValue(zone.GetName())
@@ -28,7 +28,7 @@ func (r ZoneResourceModel) RefreshPropertyValues(zone *citrixorchestration.ZoneD
 	}
 
 	metadata := zone.GetMetadata()
-	if onpremise && (r.Metadata != nil || len(metadata) > 0) {
+	if onpremises && (r.Metadata != nil || len(metadata) > 0) {
 		// Cloud customers cannot modify Zone metadata because of CC zone syncing
 		// On-Prem customers can have either nil value for metadata, or provide an empty array
 		r.Metadata = util.ParseNameValueStringPairToPluginModel(metadata)

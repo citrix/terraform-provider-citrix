@@ -77,7 +77,7 @@ resource "citrix_daas_delivery_group" "testDeliveryGroup" {
 	associated_machine_catalogs = [
 		{
 			machine_catalog = citrix_daas_machine_catalog.testMachineCatalog.id
-			count = 1
+			machine_count = 1
 		}
 	]
 	autoscale_settings = {
@@ -115,7 +115,7 @@ resource "citrix_daas_delivery_group" "testDeliveryGroup" {
 	associated_machine_catalogs = [
 		{
 			machine_catalog = citrix_daas_machine_catalog.testMachineCatalog.id
-			count = 2
+			machine_count = 2
 		}
 	]
 	autoscale_settings = {

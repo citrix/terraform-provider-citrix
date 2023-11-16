@@ -52,7 +52,7 @@ resource "citrix_daas_hypervisor_resource_pool" "example-gcp-hypervisor-resource
 ### Required
 
 - `hypervisor` (String) Id of the hypervisor for which the resource pool needs to be created.
-- `name` (String) Name of the resource pool.
+- `name` (String) Name of the resource pool. Name should be unique across all hypervisors.
 - `virtual_network` (String) Name of the cloud virtual network.
 
 ### Optional
@@ -60,7 +60,7 @@ resource "citrix_daas_hypervisor_resource_pool" "example-gcp-hypervisor-resource
 - `availability_zone` (String) The name of the availability zone resource to use for provisioning operations in this resource pool. Required when connection type is AWS.
 - `project_name` (String) GCP Project name. Required when connection type is GCP.
 - `region` (String) Cloud Region where the virtual network sits in. Required when connection type is Azure or GCP.
-- `subnets` (List of String) List of subets to allocate VDAs within the virtual network. Required when connection type is Azure or GCP.
+- `subnets` (List of String) List of subnets to allocate VDAs within the virtual network. Required when connection type is Azure or GCP.
 - `virtual_network_resource_group` (String) The name of the resource group where the vnet resides. Required when connection type is Azure.
 
 ### Read-Only

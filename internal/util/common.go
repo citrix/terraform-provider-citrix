@@ -1,15 +1,19 @@
 package util
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
@@ -127,4 +131,26 @@ func GetValidatorFromEnum[V ~string, T []V](enum T) validator.String {
 	return stringvalidator.OneOfCaseInsensitive(
 		values...,
 	)
+}
+
+func ReadResource[ResponseType any](request any, ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, resourceType, resourceIdOrName string) (ResponseType, *http.Response, error) {
+	response, httpResp, err := citrixdaasclient.ExecuteWithRetry[ResponseType](request, client)
+	if err != nil && resp != nil {
+		if httpResp.StatusCode == http.StatusNotFound {
+			resp.Diagnostics.AddWarning(
+				fmt.Sprintf("%s not found", resourceType),
+				fmt.Sprintf("%s %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", resourceType, resourceIdOrName),
+			)
+
+			resp.State.RemoveResource(ctx)
+		} else {
+			resp.Diagnostics.AddError(
+				fmt.Sprintf("Error Reading %s %s", resourceType, resourceIdOrName),
+				"TransactionId: "+GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+ReadClientError(err),
+			)
+		}
+	}
+
+	return response, httpResp, err
 }

@@ -10,7 +10,7 @@ import (
 
 type DeliveryGroupMachineCatalogModel struct {
 	MachineCatalog types.String `tfsdk:"machine_catalog"`
-	Count          types.Int64  `tfsdk:"count"`
+	MachineCount   types.Int64  `tfsdk:"machine_count"`
 }
 
 type PowerTimeSchemePoolSizeScheduleRequestModel struct {
@@ -193,7 +193,7 @@ func (r DeliveryGroupResourceModel) updatePlanWithAssociatedCatalogs(machines *c
 	for key, val := range machineCatalogMap {
 		var deliveryGroupMachineCatalogModel DeliveryGroupMachineCatalogModel
 		deliveryGroupMachineCatalogModel.MachineCatalog = types.StringValue(key)
-		deliveryGroupMachineCatalogModel.Count = types.Int64Value(int64(val))
+		deliveryGroupMachineCatalogModel.MachineCount = types.Int64Value(int64(val))
 		r.AssociatedMachineCatalogs = append(r.AssociatedMachineCatalogs, deliveryGroupMachineCatalogModel)
 	}
 
@@ -203,12 +203,18 @@ func (r DeliveryGroupResourceModel) updatePlanWithAssociatedCatalogs(machines *c
 func (r DeliveryGroupResourceModel) updatePlanWithDesktops(deliveryGroupDesktops *citrixorchestration.DesktopResponseModelCollection) DeliveryGroupResourceModel {
 	dgDesktops := deliveryGroupDesktops.GetItems()
 	if len(dgDesktops) == 0 {
-		r.Users = nil
+		if r.Users != nil {
+			// If plan has empty list
+			r.Users = []types.String{}
+		}
 	} else {
 		dgDesktop := dgDesktops[0]
 		includedUsers := getPrincipalNameForUserFromDeliveryGroupDesktop(dgDesktop)
 		if len(includedUsers) == 0 {
-			r.Users = nil
+			if r.Users != nil {
+				// If plan has empty list
+				r.Users = []types.String{}
+			}
 		} else {
 			r.Users = util.ConvertPrimitiveStringArrayToBaseStringArray(includedUsers)
 		}
