@@ -237,7 +237,7 @@ func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequ
 						Optional:    true,
 					},
 					"storage_type": schema.StringAttribute{
-						Description: "Storage account type used for provisioned virtual machine disks on Azure. Storage account types include: Standard_LRS, StandardSSD_LRS and Premium_LRS.",
+						Description: "Storage account type used for provisioned virtual machine disks on Azure. Storage account types include: Standard_LRS, StandardSSD_LRS and Premium_LRS. Only applicable to Azure hypervisor catalogs.",
 						Optional:    true,
 						Validators: []validator.String{
 							stringvalidator.OneOf(
@@ -255,8 +255,8 @@ func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequ
 						},
 					},
 					"use_managed_disks": schema.BoolAttribute{
-						Description: "Indicate whether to use Azure managed disks for the provisioned virtual machine.",
-						Required:    true,
+						Description: "Indicate whether to use Azure managed disks for the provisioned virtual machine. Only applicable to Azure hypervisor catalogs.",
+						Optional:    true,
 						PlanModifiers: []planmodifier.Bool{
 							boolplanmodifier.RequiresReplace(),
 						},
