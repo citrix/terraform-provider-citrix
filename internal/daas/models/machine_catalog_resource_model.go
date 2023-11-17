@@ -267,10 +267,12 @@ func ParseCustomPropertiesToClientModel(provisioningScheme ProvisioningSchemeMod
 	if !provisioningScheme.VdaResourceGroup.IsNull() {
 		util.AppendNameValueStringPair(res, "ResourceGroups", provisioningScheme.VdaResourceGroup.ValueString())
 	}
-	if provisioningScheme.UseManagedDisks.ValueBool() {
-		util.AppendNameValueStringPair(res, "UseManagedDisks", "true")
-	} else {
-		util.AppendNameValueStringPair(res, "UseManagedDisks", "false")
+	if !provisioningScheme.UseManagedDisks.IsNull() {
+		if provisioningScheme.UseManagedDisks.ValueBool() {
+			util.AppendNameValueStringPair(res, "UseManagedDisks", "true")
+		} else {
+			util.AppendNameValueStringPair(res, "UseManagedDisks", "false")
+		}
 	}
 	if !provisioningScheme.AvailabilityZones.IsNull() {
 		util.AppendNameValueStringPair(res, "Zones", provisioningScheme.AvailabilityZones.ValueString())
