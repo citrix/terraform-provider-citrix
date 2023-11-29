@@ -1,3 +1,5 @@
+// Copyright © 2023. Citrix Systems, Inc.
+
 package test
 
 import (
@@ -64,7 +66,7 @@ func TestMachineCatalogResource(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"service_account", "service_account_password", "provisioning_scheme.network_mapping"},
+				ImportStateVerifyIgnore: []string{"service_account", "service_account_password", "provisioning_scheme.network_mapping", "provisioning_scheme.writeback_cache", "provisioning_scheme.machine_config.service_offering"},
 			},
 			//Update description, master image and add machine test
 			{

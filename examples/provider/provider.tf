@@ -2,12 +2,12 @@
 provider "citrix" {
   customer_id   = ""
   client_id     = ""
-  client_secret = ""
+  # secret can be specified via the CITRIX_CLIENT_SECRET environment variable
 }
 
 # On-Premises Provider
 provider "citrix" {
   hostname      = "10.0.0.6"
   client_id     = "foo.local\\admin"
-  client_secret = "foo"
+  # secret can be specified via the CITRIX_CLIENT_SECRET environment variable
 }

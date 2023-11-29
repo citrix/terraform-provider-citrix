@@ -1,3 +1,5 @@
+// Copyright © 2023. Citrix Systems, Inc.
+
 package models
 
 import (
@@ -24,6 +26,7 @@ type HypervisorResourcePoolResourceModel struct {
 	AvailabilityZone types.String `tfsdk:"availability_zone"`
 	/** GCP Resource Pool **/
 	ProjectName types.String `tfsdk:"project_name"`
+	SharedVpc   types.Bool   `tfsdk:"shared_vpc"`
 }
 
 func (r HypervisorResourcePoolResourceModel) RefreshPropertyValues(resourcePool citrixorchestration.HypervisorResourcePoolDetailResponseModel, hypervisorConnectionType citrixorchestration.HypervisorConnectionType) HypervisorResourcePoolResourceModel {

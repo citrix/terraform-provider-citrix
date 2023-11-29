@@ -1,3 +1,5 @@
+// Copyright © 2023. Citrix Systems, Inc.
+
 package daas
 
 import (
@@ -5,6 +7,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -12,6 +16,7 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -130,19 +135,19 @@ func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequ
 								Required:    true,
 							},
 							"service_offering": schema.StringAttribute{
-								Description: "The VM Sku of a Cloud service offering to use when creating machines.",
+								Description: "**[Azure, AWS: Required]** The VM Sku of a Cloud service offering to use when creating machines.",
 								Optional:    true,
 							},
 							"master_image": schema.StringAttribute{
 								Description: "The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors.",
-								Optional:    true,
+								Required:    true,
 							},
 							"resource_group": schema.StringAttribute{
-								Description: "The Azure Resource Group where the image VHD for creating machines is located. Only applicable to Azure Hypervisor.",
+								Description: "**[Azure: Required]** The Azure Resource Group where the image VHD for creating machines is located.",
 								Optional:    true,
 							},
 							"storage_account": schema.StringAttribute{
-								Description: "The Azure Storage Account where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.",
+								Description: "**[Azure: Optional]** The Azure Storage Account where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.",
 								Optional:    true,
 								Validators: []validator.String{
 									stringvalidator.AlsoRequires(path.Expressions{
@@ -154,7 +159,7 @@ func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequ
 								},
 							},
 							"container": schema.StringAttribute{
-								Description: "The Azure Storage Account Container where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.",
+								Description: "**[Azure: Optional]** The Azure Storage Account Container where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.",
 								Optional:    true,
 								Validators: []validator.String{
 									stringvalidator.AlsoRequires(path.Expressions{
@@ -165,12 +170,48 @@ func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequ
 									}...),
 								},
 							},
+							"gallery_image": schema.SingleNestedAttribute{
+								Description: "**[Azure: Optional]** Details of the Azure Image Gallery image to use for creating machines. Only Applicable to Azure Image Gallery image.",
+								Optional:    true,
+								Attributes: map[string]schema.Attribute{
+									"gallery": schema.StringAttribute{
+										Description: "The Azure Image Gallery where the image for creating machines is located. Only applicable to Azure Image Gallery image.",
+										Required:    true,
+									},
+									"definition": schema.StringAttribute{
+										Description: "The image definition for the image to be used in the Azure Image Gallery. Only applicable to Azure Image Gallery image.",
+										Required:    true,
+									},
+									"version": schema.StringAttribute{
+										Description: "The image version for the image to be used in the Azure Image Gallery. Only applicable to Azure Image Gallery image.",
+										Required:    true,
+									},
+								},
+								Validators: []validator.Object{
+									objectvalidator.AlsoRequires(path.Expressions{
+										path.MatchRelative().AtParent().AtName("resource_group"),
+									}...),
+									objectvalidator.ConflictsWith(path.Expressions{
+										path.MatchRelative().AtParent().AtName("storage_account"),
+									}...),
+									objectvalidator.ConflictsWith(path.Expressions{
+										path.MatchRelative().AtParent().AtName("container"),
+									}...),
+									objectvalidator.ConflictsWith(path.Expressions{
+										path.MatchRelative().AtParent().AtName("master_image"),
+									}...),
+								},
+							},
 							"image_ami": schema.StringAttribute{
-								Description: "AMI of the AWS image to be used as the template image for the machine catalog. Only applicable to AWS Hypervisor.",
+								Description: "**[AWS: Required]** AMI of the AWS image to be used as the template image for the machine catalog.",
 								Optional:    true,
 							},
 							"machine_profile": schema.StringAttribute{
-								Description: "The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone. Only applicable to GCP Hypervisor.",
+								Description: "**[GCP: Optional]** The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone. If not specified, the VM specified in master_image will be used as template.",
+								Optional:    true,
+							},
+							"machine_snapshot": schema.StringAttribute{
+								Description: "**[GCP: Optional]** The name of the virtual machine snapshot of a GCP VM that will be used as master image.",
 								Optional:    true,
 							},
 						},
@@ -237,25 +278,31 @@ func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequ
 						Optional:    true,
 					},
 					"storage_type": schema.StringAttribute{
-						Description: "Storage account type used for provisioned virtual machine disks on Azure. Storage account types include: Standard_LRS, StandardSSD_LRS and Premium_LRS. Only applicable to Azure hypervisor catalogs.",
-						Optional:    true,
+						Description: "**[Azure, GCP: Required]** Storage account type used for provisioned virtual machine disks on Azure / GCP." + "<br />" +
+							"Azure storage types include: `Standard_LRS`, `StandardSSD_LRS` and `Premium_LRS`." + "<br />" +
+							"GCP storage types include: `pd-standar`, `pd-balanced`, `pd-ssd` and `pd-extreme`.",
+						Optional: true,
 						Validators: []validator.String{
 							stringvalidator.OneOf(
 								"Standard_LRS",
 								"StandardSSD_LRS",
 								"Premium_LRS",
+								"pd-standard",
+								"pd-balanced",
+								"pd-ssd",
+								"pd-extreme",
 							),
 						},
 					},
 					"vda_resource_group": schema.StringAttribute{
-						Description: "Designated resource group where the VDA VMs will be located on Azure.",
+						Description: "**[Azure: Optional]** Designated resource group where the VDA VMs will be located on Azure.",
 						Optional:    true,
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.RequiresReplace(),
 						},
 					},
 					"use_managed_disks": schema.BoolAttribute{
-						Description: "Indicate whether to use Azure managed disks for the provisioned virtual machine. Only applicable to Azure hypervisor catalogs.",
+						Description: "**[Azure: Optional]** Indicate whether to use Azure managed disks for the provisioned virtual machine.",
 						Optional:    true,
 						PlanModifiers: []planmodifier.Bool{
 							boolplanmodifier.RequiresReplace(),
@@ -390,38 +437,136 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 	switch hypervisor.GetConnectionType() {
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
 		queryPath := "serviceoffering.folder"
-		serviceOfferingPath := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, serviceOffering, "serviceoffering", "")
+		serviceOfferingPath, err := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, serviceOffering, "serviceoffering", "")
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating Machine Catalog",
+				fmt.Sprintf("Failed to resolve service offering %s on Azure, error: %s", serviceOffering, err.Error()),
+			)
+			return
+		}
 		provisioningScheme.SetServiceOfferingPath(serviceOfferingPath)
 
 		resourceGroup := plan.ProvisioningScheme.MachineConfig.ResourceGroup.ValueString()
-		storageAccount := plan.ProvisioningScheme.MachineConfig.StorageAccount.ValueString()
-		container := plan.ProvisioningScheme.MachineConfig.Container.ValueString()
 		imagePath := ""
-		if storageAccount != "" && container != "" {
-			queryPath = fmt.Sprintf(
-				"image.folder\\%s.resourcegroup\\%s.storageaccount\\%s.container",
-				resourceGroup,
-				storageAccount,
-				container)
-			imagePath = util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, masterImage, "", "")
-		} else {
-			queryPath = fmt.Sprintf(
-				"image.folder\\%s.resourcegroup",
-				resourceGroup)
-			imagePath = util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, masterImage, "", "")
+		if masterImage != "" {
+			storageAccount := plan.ProvisioningScheme.MachineConfig.StorageAccount.ValueString()
+			container := plan.ProvisioningScheme.MachineConfig.Container.ValueString()
+			if storageAccount != "" && container != "" {
+				queryPath = fmt.Sprintf(
+					"image.folder\\%s.resourcegroup\\%s.storageaccount\\%s.container",
+					resourceGroup,
+					storageAccount,
+					container)
+				imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, masterImage, "", "")
+				if err != nil {
+					resp.Diagnostics.AddError(
+						"Error creating Machine Catalog",
+						fmt.Sprintf("Failed to resolve master image VHD %s in container %s of storage account %s, error: %s", masterImage, container, storageAccount, err.Error()),
+					)
+					return
+				}
+			} else {
+				queryPath = fmt.Sprintf(
+					"image.folder\\%s.resourcegroup",
+					resourceGroup)
+				imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, masterImage, "", "")
+				if err != nil {
+					resp.Diagnostics.AddError(
+						"Error creating Machine Catalog",
+						fmt.Sprintf("Failed to resolve master image Managed Disk or Snapshot %s, error: %s", masterImage, err.Error()),
+					)
+					return
+				}
+			}
+		} else if plan.ProvisioningScheme.MachineConfig.GalleryImage != nil {
+			gallery := plan.ProvisioningScheme.MachineConfig.GalleryImage.Gallery.ValueString()
+			definition := plan.ProvisioningScheme.MachineConfig.GalleryImage.Definition.ValueString()
+			version := plan.ProvisioningScheme.MachineConfig.GalleryImage.Version.ValueString()
+			if gallery != "" && definition != "" {
+				queryPath = fmt.Sprintf(
+					"image.folder\\%s.resourcegroup\\%s.gallery\\%s.imagedefinition",
+					resourceGroup,
+					gallery,
+					definition)
+				imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, version, "", "")
+				if err != nil {
+					resp.Diagnostics.AddError(
+						"Error creating Machine Catalog",
+						fmt.Sprintf("Failed to locate Azure Image Gallery image %s of version %s in gallery %s, error: %s", masterImage, version, gallery, err.Error()),
+					)
+					return
+				}
+			}
 		}
 
 		provisioningScheme.SetMasterImagePath(imagePath)
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
-		serviceOfferingPath := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", serviceOffering, "serviceoffering", "")
+		serviceOfferingPath, err := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", serviceOffering, "serviceoffering", "")
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating Machine Catalog",
+				fmt.Sprintf("Failed to resolve service offering %s on AWS, error: %s", serviceOffering, err.Error()),
+			)
+			return
+		}
 		provisioningScheme.SetServiceOfferingPath(serviceOfferingPath)
 
 		imageId := fmt.Sprintf("%s (%s)", masterImage, plan.ProvisioningScheme.MachineConfig.ImageAmi.ValueString())
-		imagePath := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", imageId, "template", "")
+		imagePath, err := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", imageId, "template", "")
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating Machine Catalog",
+				fmt.Sprintf("Failed to locate AWS image %s with AMI %s, error: %s", masterImage, plan.ProvisioningScheme.MachineConfig.ImageAmi.ValueString(), err.Error()),
+			)
+			return
+		}
 		provisioningScheme.SetMasterImagePath(imagePath)
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
-		machineProfilePath := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", plan.ProvisioningScheme.MachineConfig.MachineProfile.ValueString(), "vm", "")
-		provisioningScheme.SetMachineProfilePath(machineProfilePath)
+		if serviceOffering != "" {
+			resp.Diagnostics.AddError(
+				"Error creating Machine Catalog",
+				"GCP machine catalog does not support service_offering. Please use master_image (and optionally with machine_snapshot) or machine_profile to specify the GCP VM you want to use as a template for the VM SKU.",
+			)
+			return
+		}
+		imagePath := ""
+		snapshot := plan.ProvisioningScheme.MachineConfig.MachineSnapshot.ValueString()
+		if snapshot != "" {
+			queryPath := fmt.Sprintf("%s.vm", plan.ProvisioningScheme.MachineConfig.MasterImage.ValueString())
+			imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, plan.ProvisioningScheme.MachineConfig.MachineSnapshot.ValueString(), "snapshot", "")
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error creating Machine Catalog",
+					fmt.Sprintf("Failed to locate master image snapshot %s on GCP, error: %s", plan.ProvisioningScheme.MachineConfig.MachineProfile.ValueString(), err.Error()),
+				)
+				return
+			}
+		} else {
+			imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", plan.ProvisioningScheme.MachineConfig.MasterImage.ValueString(), "vm", "")
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error creating Machine Catalog",
+					fmt.Sprintf("Failed to locate master image machine %s on GCP, error: %s", plan.ProvisioningScheme.MachineConfig.MachineProfile.ValueString(), err.Error()),
+				)
+				return
+			}
+		}
+
+		provisioningScheme.SetMasterImagePath(imagePath)
+
+		machineProfile := plan.ProvisioningScheme.MachineConfig.MachineProfile.ValueString()
+		if machineProfile != "" {
+			machineProfilePath, err := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", machineProfile, "vm", "")
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error creating Machine Catalog",
+					fmt.Sprintf("Failed to locate machine profile %s on GCP, error: %s", plan.ProvisioningScheme.MachineConfig.MachineProfile.ValueString(), err.Error()),
+				)
+				return
+			}
+			provisioningScheme.SetMachineProfilePath(machineProfilePath)
+		}
 	}
 
 	if plan.ProvisioningScheme.NetworkMapping != nil {
@@ -445,7 +590,7 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 
 	}
 
-	customProperties := models.ParseCustomPropertiesToClientModel(*plan.ProvisioningScheme)
+	customProperties := models.ParseCustomPropertiesToClientModel(*plan.ProvisioningScheme, hypervisor.ConnectionType)
 
 	provisioningScheme.SetCustomProperties(*customProperties)
 
@@ -500,7 +645,7 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 
 	// Create new machine catalog
 	_, httpResp, err := citrixdaasclient.AddRequestData(createMachineCatalogRequest, r.client).Execute()
-	txId := util.GetTransactionIdFromHttpResponse(httpResp)
+	txId := citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Machine Catalog",
@@ -510,7 +655,7 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	jobId := util.GetJobIdFromHttpResponse(*httpResp)
+	jobId := citrixdaasclient.GetJobIdFromHttpResponse(*httpResp)
 	jobResponseModel, err := r.client.WaitForJob(ctx, jobId, 120)
 
 	if err != nil {
@@ -642,14 +787,45 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 	switch hypervisor.GetConnectionType() {
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
 		queryPath := "serviceoffering.folder"
-		serviceOfferingPath := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, serviceOffering, "folder", "")
+		serviceOfferingPath, err := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, serviceOffering, "serviceoffering", "")
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating Machine Catalog",
+				fmt.Sprintf("Failed to resolve service offering %s on Azure, error: %s", serviceOffering, err.Error()),
+			)
+			return
+		}
 		body.SetServiceOfferingPath(serviceOfferingPath)
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
-		serviceOfferingPath := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", serviceOffering, "serviceoffering", "")
+		serviceOfferingPath, err := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", serviceOffering, "serviceoffering", "")
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating Machine Catalog",
+				fmt.Sprintf("Failed to resolve service offering %s on AWS, error: %s", serviceOffering, err.Error()),
+			)
+			return
+		}
 		body.SetServiceOfferingPath(serviceOfferingPath)
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
-		machineProfilePath := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", plan.ProvisioningScheme.MachineConfig.MachineProfile.ValueString(), "vm", "")
-		body.SetMachineProfilePath(machineProfilePath)
+		if serviceOffering != "" {
+			resp.Diagnostics.AddError(
+				"Error updating Machine Catalog",
+				"GCP machine catalog does not support service_offering. Please use master_image (and optionally with machine_snapshot) or machine_profile to specify the GCP VM you want to use as a template for the VM SKU.",
+			)
+			return
+		}
+		machineProfile := plan.ProvisioningScheme.MachineConfig.MachineProfile.ValueString()
+		if machineProfile != "" {
+			machineProfilePath, err := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", plan.ProvisioningScheme.MachineConfig.MachineProfile.ValueString(), "vm", "")
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error updating Machine Catalog",
+					fmt.Sprintf("Failed to locate machine profile %s on GCP, error: %s", plan.ProvisioningScheme.MachineConfig.MachineProfile.ValueString(), err.Error()),
+				)
+				return
+			}
+			body.SetMachineProfilePath(machineProfilePath)
+		}
 	}
 
 	if plan.ProvisioningScheme.NetworkMapping != nil {
@@ -667,7 +843,7 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		}
 	}
 
-	customProperties := models.ParseCustomPropertiesToClientModel(*plan.ProvisioningScheme)
+	customProperties := models.ParseCustomPropertiesToClientModel(*plan.ProvisioningScheme, hypervisor.ConnectionType)
 	body.SetCustomProperties(*customProperties)
 
 	updateMachineCatalogRequest := r.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsUpdateMachineCatalog(ctx, catalogId)
@@ -676,291 +852,31 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating Machine Catalog "+catalogName,
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 		return
 	}
 
-	provScheme := catalog.GetProvisioningScheme()
-	masterImage := provScheme.GetMasterImage()
+	err = updateCatalogImage(ctx, r.client, resp, catalog, hypervisor, hypervisorResourcePool, plan)
 
-	// Check if XDPath has changed for the image
-	imagePath := ""
-
-	switch hypervisor.GetConnectionType() {
-	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
-		newImage := plan.ProvisioningScheme.MachineConfig.MasterImage.ValueString()
-		resourceGroup := plan.ProvisioningScheme.MachineConfig.ResourceGroup.ValueString()
-		storageAccount := plan.ProvisioningScheme.MachineConfig.StorageAccount.ValueString()
-		container := plan.ProvisioningScheme.MachineConfig.Container.ValueString()
-		if storageAccount != "" && container != "" {
-			queryPath := fmt.Sprintf(
-				"image.folder\\%s.resourcegroup\\%s.storageaccount\\%s.container",
-				resourceGroup,
-				storageAccount,
-				container)
-			imagePath = util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, newImage, "", "")
-		} else {
-			queryPath := fmt.Sprintf(
-				"image.folder\\%s.resourcegroup",
-				resourceGroup)
-			imagePath = util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, newImage, "", "")
-		}
-	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
-		imageId := fmt.Sprintf("%s (%s)", plan.ProvisioningScheme.MachineConfig.MasterImage.ValueString(), plan.ProvisioningScheme.MachineConfig.ImageAmi.ValueString())
-		imagePath = util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", imageId, "template", "")
-	}
-
-	// Update Master Image for Machine Catalog
-	if masterImage.GetXDPath() != imagePath {
-		var updateProvisioningSchemeModel citrixorchestration.UpdateMachineCatalogProvisioningSchemeRequestModel
-		var rebootOption citrixorchestration.RebootMachinesRequestModel
-
-		// Update the image immediately
-		rebootOption.SetRebootDuration(60)
-		rebootOption.SetWarningDuration(15)
-		rebootOption.SetWarningMessage("Warning: An important update is about to be installed. To ensure that no loss of data occurs, save any outstanding work and close all applications.")
-		updateProvisioningSchemeModel.SetRebootOptions(rebootOption)
-		updateProvisioningSchemeModel.SetMasterImagePath(imagePath)
-		updateProvisioningSchemeModel.SetStoreOldImage(true)
-		updateProvisioningSchemeModel.SetMinimumFunctionalLevel("L7_20")
-		updateMasterImageRequest := r.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsUpdateMachineCatalogProvisioningScheme(ctx, catalogId)
-		updateMasterImageRequest = updateMasterImageRequest.UpdateMachineCatalogProvisioningSchemeRequestModel(updateProvisioningSchemeModel)
-		_, httpResp, err := citrixdaasclient.AddRequestData(updateMasterImageRequest, r.client).Async(true).Execute()
-		txId := util.GetTransactionIdFromHttpResponse(httpResp)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error updating Image for Machine Catalog "+catalogName,
-				"TransactionId: "+txId+
-					"\nError message: "+util.ReadClientError(err),
-			)
-		}
-
-		jobId := util.GetJobIdFromHttpResponse(*httpResp)
-		jobResponseModel, err := r.client.WaitForJob(ctx, jobId, 60)
-
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error updating Image for Machine Catalog "+catalogName,
-				"TransactionId: "+txId+
-					"\nJobId: "+jobResponseModel.GetId()+
-					"\nError message: "+jobResponseModel.GetErrorString(),
-			)
-			return
-		}
-
-		if jobResponseModel.GetStatus() != citrixorchestration.JOBSTATUS_COMPLETE {
-			errorDetail := "TransactionId: " + txId +
-				"\nJobId: " + jobResponseModel.GetId()
-
-			if jobResponseModel.GetStatus() == citrixorchestration.JOBSTATUS_FAILED {
-				errorDetail = errorDetail + "\nError message: " + jobResponseModel.GetErrorString()
-			}
-
-			resp.Diagnostics.AddError(
-				"Error updating image for Machine Catalog "+catalogName,
-				errorDetail,
-			)
-			return
-		}
-
-	}
-
-	if catalog.GetTotalCount() > int32(plan.ProvisioningScheme.NumTotalMachines.ValueInt64()) {
-
-		if catalog.GetAllocationType() != citrixorchestration.ALLOCATIONTYPE_RANDOM {
-			resp.Diagnostics.AddError(
-				"Error updating Machine Catalog "+catalogName,
-				"Deleting machine(s) is supported for machine catalogs with Random allocation type only.",
-			)
-			return
-		}
-
-		getMachinesRequest := r.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogMachines(ctx, catalogId)
-		getMachinesResponse, httpResp, err := citrixdaasclient.AddRequestData(getMachinesRequest, r.client).Execute()
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error deleting machine(s) from Machine Catalog "+catalogName,
-				"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nCould not retrieve machines for machine catalog",
-			)
-			return
-		}
-
-		machineDeleteRequestCount := int(catalog.GetTotalCount()) - int(plan.ProvisioningScheme.NumTotalMachines.ValueInt64())
-		machinesToDelete := []citrixorchestration.MachineResponseModel{}
-
-		for _, machine := range getMachinesResponse.GetItems() {
-			if !machine.GetDeliveryGroup().Id.IsSet() || machine.GetSessionCount() == 0 {
-				machinesToDelete = append(machinesToDelete, machine)
-			}
-
-			if len(machinesToDelete) == machineDeleteRequestCount {
-				break
-			}
-		}
-
-		machinesToDeleteCount := len(machinesToDelete)
-
-		if machineDeleteRequestCount > machinesToDeleteCount {
-			errorString := fmt.Sprintf("%d machine(s) requested to be deleted. %d machine(s) qualify for deletion.", machineDeleteRequestCount, machinesToDeleteCount)
-
-			resp.Diagnostics.AddError(
-				"Error deleting machine(s) from Machine Catalog "+catalogName,
-				errorString+" Ensure machine that needs to be deleted has no active sessions.",
-			)
-
-			return
-		}
-
-		header := generateAdminCredentialHeader(plan)
-
-		for _, machineToDelete := range machinesToDelete {
-			isMachineInMaintenanceMode := machineToDelete.GetInMaintenanceMode()
-
-			if !isMachineInMaintenanceMode {
-				// machine is not in maintenance mode. Put machine in maintenance mode first before deleting
-				var updateMachineModel citrixorchestration.UpdateMachineRequestModel
-				updateMachineModel.SetInMaintenanceMode(true)
-
-				updateMachineRequest := r.client.ApiClient.MachinesAPIsDAAS.MachinesUpdateMachineCatalogMachine(ctx, machineToDelete.GetId())
-				updateMachineRequest = updateMachineRequest.UpdateMachineRequestModel(updateMachineModel)
-				httpResp, err := citrixdaasclient.AddRequestData(updateMachineRequest, r.client).Execute()
-				if err != nil {
-					resp.Diagnostics.AddError(
-						"Error putting machine in maintenance mode",
-						"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
-							"\nError message: "+util.ReadClientError(err),
-					)
-					return
-				}
-			}
-
-			deleteMachineRequest := r.client.ApiClient.MachinesAPIsDAAS.MachinesRemoveMachine(ctx, machineToDelete.GetId())
-			deleteMachineRequest = deleteMachineRequest.XAdminCredential(header).DeleteVm(true).DeleteAccount(citrixorchestration.MACHINEACCOUNTDELETEOPTION_DELETE).Async(true)
-			httpResp, err := citrixdaasclient.AddRequestData(deleteMachineRequest, r.client).Execute()
-			txId := util.GetTransactionIdFromHttpResponse(httpResp)
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error deleting machine from Machine Catalog "+catalogName,
-					"TransactionId: "+txId+
-						"\nError message: "+util.ReadClientError(err),
-				)
-				return
-			}
-
-			jobId := util.GetJobIdFromHttpResponse(*httpResp)
-			jobResponseModel, err := r.client.WaitForJob(ctx, jobId, 30)
-
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error deleting machine from Machine Catalog "+catalogName,
-					"TransactionId: "+txId+
-						"\nJobId: "+jobResponseModel.GetId()+
-						"\nError message: "+jobResponseModel.GetErrorString(),
-				)
-				return
-			}
-
-			if jobResponseModel.GetStatus() != citrixorchestration.JOBSTATUS_COMPLETE {
-				errorDetail := "TransactionId: " + txId +
-					"\nJobId: " + jobResponseModel.GetId()
-
-				if jobResponseModel.GetStatus() == citrixorchestration.JOBSTATUS_FAILED {
-					errorDetail = errorDetail + "\nError message: " + jobResponseModel.GetErrorString()
-				}
-
-				resp.Diagnostics.AddError(
-					"Error deleting machine from Machine Catalog "+catalogName,
-					errorDetail,
-				)
-
-				return
-			}
-		}
-
-		catalog, err = GetMachineCatalog(ctx, r.client, &resp.Diagnostics, catalogId, true)
-		if err != nil {
-			return
-		}
-
-		// Update resource state with updated items and timestamp
-		plan = plan.RefreshPropertyValues(ctx, catalog, hypervisor.GetConnectionType())
-
-		diags = resp.State.Set(ctx, plan)
-		resp.Diagnostics.Append(diags...)
+	if err != nil {
 		return
 	}
 
-	if catalog.GetTotalCount() < int32(plan.ProvisioningScheme.NumTotalMachines.ValueInt64()) {
-		// Calculate the number of new machines to be added
-		addMachinesCount := int32(plan.ProvisioningScheme.NumTotalMachines.ValueInt64()) - catalog.GetTotalCount()
-
-		var updateMachineAccountCreationRule citrixorchestration.UpdateMachineAccountCreationRulesRequestModel
-		updateMachineAccountCreationRule.SetNamingScheme(plan.ProvisioningScheme.MachineAccountCreationRules.NamingScheme.ValueString())
-		namingScheme, err := citrixorchestration.NewNamingSchemeTypeFromValue(plan.ProvisioningScheme.MachineAccountCreationRules.NamingSchemeType.ValueString())
+	if catalog.GetTotalCount() > int32(plan.ProvisioningScheme.NumTotalMachines.ValueInt64()) {
+		// delete machines from machine catalog
+		err = deleteMachinesFromMachineCatalog(ctx, r.client, resp, catalog, plan)
 		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error updating Machine Catalog "+catalogName,
-				"Unsupported machine account naming scheme type.",
-			)
 			return
 		}
-		updateMachineAccountCreationRule.SetNamingSchemeType(*namingScheme)
-		updateMachineAccountCreationRule.SetDomain(plan.ProvisioningScheme.MachineAccountCreationRules.Domain.ValueString())
-		updateMachineAccountCreationRule.SetOU(plan.ProvisioningScheme.MachineAccountCreationRules.Ou.ValueString())
+	}
 
-		var addMachineRequestBody citrixorchestration.AddMachineToMachineCatalogDetailRequestModel
-		addMachineRequestBody.SetMachineAccountCreationRules(updateMachineAccountCreationRule)
-
-		addMachineRequest := r.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsAddMachineCatalogMachine(ctx, catalogId)
-		addMachineRequest = addMachineRequest.AddMachineToMachineCatalogDetailRequestModel(addMachineRequestBody)
-
-		// Add domain credential header
-		header := generateAdminCredentialHeader(plan)
-		addMachineRequest = addMachineRequest.XAdminCredential(header)
-
-		// Add one machine after another synchronously for now
-		// TODO: Convert to async using semaphore / goroutine scheme
-		for i := 0; i < int(addMachinesCount); i++ {
-			addMachineRequest = addMachineRequest.Async(true)
-			_, httpResp, err := citrixdaasclient.AddRequestData(addMachineRequest, r.client).Execute()
-			txId := util.GetTransactionIdFromHttpResponse(httpResp)
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error adding Machine to Machine Catalog "+catalogName,
-					"TransactionId: "+txId+
-						"\nCould not add machine to machine catalog, unexpected error: "+util.ReadClientError(err),
-				)
-			}
-
-			jobId := util.GetJobIdFromHttpResponse(*httpResp)
-			jobResponseModel, err := r.client.WaitForJob(ctx, jobId, 30)
-
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error adding Machine to Machine Catalog "+catalogName,
-					"TransactionId: "+txId+
-						"\nJobId: "+jobResponseModel.GetId()+
-						"\nError message: "+jobResponseModel.GetErrorString(),
-				)
-				return
-			}
-
-			if jobResponseModel.GetStatus() != citrixorchestration.JOBSTATUS_COMPLETE {
-				errorDetail := "TransactionId: " + txId +
-					"\nJobId: " + jobResponseModel.GetId()
-
-				if jobResponseModel.GetStatus() == citrixorchestration.JOBSTATUS_FAILED {
-					errorDetail = errorDetail + "\nError message: " + jobResponseModel.GetErrorString()
-				}
-
-				resp.Diagnostics.AddError(
-					"Error adding Machine to Machine Catalog "+catalogName,
-					errorDetail,
-				)
-			}
+	if catalog.GetTotalCount() < int32(plan.ProvisioningScheme.NumTotalMachines.ValueInt64()) {
+		// add machines to machine catalog
+		err = addMachinesToMachineCatalog(ctx, r.client, resp, catalog, plan)
+		if err != nil {
+			return
 		}
 	}
 
@@ -1001,7 +917,7 @@ func (r *machineCatalogResource) Delete(ctx context.Context, req resource.Delete
 
 		resp.Diagnostics.AddError(
 			"Error reading Machine Catalog "+catalogId,
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 
@@ -1016,7 +932,7 @@ func (r *machineCatalogResource) Delete(ctx context.Context, req resource.Delete
 	header := generateAdminCredentialHeader(state)
 	deleteMachineCatalogRequest = deleteMachineCatalogRequest.XAdminCredential(header).DeleteVm(true).DeleteAccount(citrixorchestration.MACHINEACCOUNTDELETEOPTION_DELETE).Async(true)
 	httpResp, err = citrixdaasclient.AddRequestData(deleteMachineCatalogRequest, r.client).Execute()
-	txId := util.GetTransactionIdFromHttpResponse(httpResp)
+	txId := citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
 	if err != nil && httpResp.StatusCode != http.StatusNotFound {
 		resp.Diagnostics.AddError(
 			"Error deleting Machine Catalog "+catalogName,
@@ -1026,7 +942,7 @@ func (r *machineCatalogResource) Delete(ctx context.Context, req resource.Delete
 		return
 	}
 
-	jobId := util.GetJobIdFromHttpResponse(*httpResp)
+	jobId := citrixdaasclient.GetJobIdFromHttpResponse(*httpResp)
 	jobResponseModel, err := r.client.WaitForJob(ctx, jobId, 60)
 
 	if err != nil {
@@ -1067,13 +983,41 @@ func generateAdminCredentialHeader(plan models.MachineCatalogResourceModel) stri
 	return header
 }
 
+func generateBatchApiHeaders(client *citrixdaasclient.CitrixDaasClient, plan models.MachineCatalogResourceModel, generateCredentialHeader bool) ([]citrixorchestration.NameValueStringPairModel, *http.Response, error) {
+	headers := []citrixorchestration.NameValueStringPairModel{}
+
+	cwsAuthToken, httpResp, err := client.SignIn()
+	var token string
+	if err != nil {
+		return headers, httpResp, err
+	}
+
+	if cwsAuthToken != "" {
+		token = strings.Split(cwsAuthToken, "=")[1]
+		var header citrixorchestration.NameValueStringPairModel
+		header.SetName("Authorization")
+		header.SetValue("Bearer " + token)
+		headers = append(headers, header)
+	}
+
+	if generateCredentialHeader {
+		adminCredentialHeader := generateAdminCredentialHeader(plan)
+		var header citrixorchestration.NameValueStringPairModel
+		header.SetName("X-AdminCredential")
+		header.SetValue(adminCredentialHeader)
+		headers = append(headers, header)
+	}
+
+	return headers, httpResp, err
+}
+
 func GetMachineCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, machineCatalogId string, addErrorToDiagnostics bool) (*citrixorchestration.MachineCatalogDetailResponseModel, error) {
 	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId)
 	catalog, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.MachineCatalogDetailResponseModel](getMachineCatalogRequest, client)
 	if err != nil && addErrorToDiagnostics {
 		diagnostics.AddError(
 			"Error reading Machine Catalog "+machineCatalogId,
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 	}
@@ -1085,4 +1029,407 @@ func readMachineCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaas
 	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId)
 	catalog, httpResp, err := util.ReadResource[*citrixorchestration.MachineCatalogDetailResponseModel](getMachineCatalogRequest, ctx, client, resp, "Machine Catalog", machineCatalogId)
 	return catalog, httpResp, err
+}
+
+func updateCatalogImage(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, catalog *citrixorchestration.MachineCatalogDetailResponseModel, hypervisor *citrixorchestration.HypervisorDetailResponseModel, hypervisorResourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel, plan models.MachineCatalogResourceModel) error {
+
+	catalogName := catalog.GetName()
+	catalogId := catalog.GetId()
+
+	provScheme := catalog.GetProvisioningScheme()
+	masterImage := provScheme.GetMasterImage()
+
+	// Check if XDPath has changed for the image
+	imagePath := ""
+	var err error
+	switch hypervisor.GetConnectionType() {
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
+		newImage := plan.ProvisioningScheme.MachineConfig.MasterImage.ValueString()
+		resourceGroup := plan.ProvisioningScheme.MachineConfig.ResourceGroup.ValueString()
+		if newImage != "" {
+			storageAccount := plan.ProvisioningScheme.MachineConfig.StorageAccount.ValueString()
+			container := plan.ProvisioningScheme.MachineConfig.Container.ValueString()
+			if storageAccount != "" && container != "" {
+				queryPath := fmt.Sprintf(
+					"image.folder\\%s.resourcegroup\\%s.storageaccount\\%s.container",
+					resourceGroup,
+					storageAccount,
+					container)
+				imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, newImage, "", "")
+				if err != nil {
+					resp.Diagnostics.AddError(
+						"Error updating Machine Catalog",
+						fmt.Sprintf("Failed to resolve master image VHD %s in container %s of storage account %s, error: %s", newImage, container, storageAccount, err.Error()),
+					)
+					return err
+				}
+			} else {
+				queryPath := fmt.Sprintf(
+					"image.folder\\%s.resourcegroup",
+					resourceGroup)
+				imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, newImage, "", "")
+				if err != nil {
+					resp.Diagnostics.AddError(
+						"Error updating Machine Catalog",
+						fmt.Sprintf("Failed to resolve master image Managed Disk or Snapshot %s, error: %s", newImage, err.Error()),
+					)
+					return err
+				}
+			}
+		} else if plan.ProvisioningScheme.MachineConfig.GalleryImage != nil {
+			gallery := plan.ProvisioningScheme.MachineConfig.GalleryImage.Gallery.ValueString()
+			definition := plan.ProvisioningScheme.MachineConfig.GalleryImage.Definition.ValueString()
+			version := plan.ProvisioningScheme.MachineConfig.GalleryImage.Version.ValueString()
+			if gallery != "" && definition != "" {
+				queryPath := fmt.Sprintf(
+					"image.folder\\%s.resourcegroup\\%s.gallery\\%s.imagedefinition",
+					resourceGroup,
+					gallery,
+					definition)
+				imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, version, "", "")
+				if err != nil {
+					resp.Diagnostics.AddError(
+						"Error updating Machine Catalog",
+						fmt.Sprintf("Failed to locate Azure Image Gallery image %s of version %s in gallery %s, error: %s", newImage, version, gallery, err.Error()),
+					)
+					return err
+				}
+			}
+		}
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
+		imageId := fmt.Sprintf("%s (%s)", plan.ProvisioningScheme.MachineConfig.MasterImage.ValueString(), plan.ProvisioningScheme.MachineConfig.ImageAmi.ValueString())
+		imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", imageId, "template", "")
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating Machine Catalog",
+				fmt.Sprintf("Failed to locate AWS image %s with AMI %s, error: %s", plan.ProvisioningScheme.MachineConfig.MasterImage.ValueString(), plan.ProvisioningScheme.MachineConfig.ImageAmi.ValueString(), err.Error()),
+			)
+			return err
+		}
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
+		newImage := plan.ProvisioningScheme.MachineConfig.MasterImage.ValueString()
+		snapshot := plan.ProvisioningScheme.MachineConfig.MachineSnapshot.ValueString()
+		if snapshot != "" {
+			queryPath := fmt.Sprintf("%s.vm", newImage)
+			imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, plan.ProvisioningScheme.MachineConfig.MachineSnapshot.ValueString(), "snapshot", "")
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error updating Machine Catalog",
+					fmt.Sprintf("Failed to locate master image snapshot %s on GCP, error: %s", plan.ProvisioningScheme.MachineConfig.MachineProfile.ValueString(), err.Error()),
+				)
+				return err
+			}
+		} else {
+			imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", newImage, "vm", "")
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error updating Machine Catalog",
+					fmt.Sprintf("Failed to locate master image machine %s on GCP, error: %s", plan.ProvisioningScheme.MachineConfig.MachineProfile.ValueString(), err.Error()),
+				)
+				return err
+			}
+		}
+	}
+
+	if masterImage.GetXDPath() == imagePath {
+		return nil
+	}
+
+	// Update Master Image for Machine Catalog
+	var updateProvisioningSchemeModel citrixorchestration.UpdateMachineCatalogProvisioningSchemeRequestModel
+	var rebootOption citrixorchestration.RebootMachinesRequestModel
+
+	// Update the image immediately
+	rebootOption.SetRebootDuration(60)
+	rebootOption.SetWarningDuration(15)
+	rebootOption.SetWarningMessage("Warning: An important update is about to be installed. To ensure that no loss of data occurs, save any outstanding work and close all applications.")
+	updateProvisioningSchemeModel.SetRebootOptions(rebootOption)
+	updateProvisioningSchemeModel.SetMasterImagePath(imagePath)
+	updateProvisioningSchemeModel.SetStoreOldImage(true)
+	updateProvisioningSchemeModel.SetMinimumFunctionalLevel("L7_20")
+	updateMasterImageRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsUpdateMachineCatalogProvisioningScheme(ctx, catalogId)
+	updateMasterImageRequest = updateMasterImageRequest.UpdateMachineCatalogProvisioningSchemeRequestModel(updateProvisioningSchemeModel)
+	_, httpResp, err := citrixdaasclient.AddRequestData(updateMasterImageRequest, client).Async(true).Execute()
+	txId := citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating Image for Machine Catalog "+catalogName,
+			"TransactionId: "+txId+
+				"\nError message: "+util.ReadClientError(err),
+		)
+	}
+
+	jobId := citrixdaasclient.GetJobIdFromHttpResponse(*httpResp)
+	jobResponseModel, err := client.WaitForJob(ctx, jobId, 60)
+
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating Image for Machine Catalog "+catalogName,
+			"TransactionId: "+txId+
+				"\nJobId: "+jobResponseModel.GetId()+
+				"\nError message: "+jobResponseModel.GetErrorString(),
+		)
+		return err
+	}
+
+	if jobResponseModel.GetStatus() != citrixorchestration.JOBSTATUS_COMPLETE {
+		errorDetail := "TransactionId: " + txId +
+			"\nJobId: " + jobResponseModel.GetId()
+
+		if jobResponseModel.GetStatus() == citrixorchestration.JOBSTATUS_FAILED {
+			errorDetail = errorDetail + "\nError message: " + jobResponseModel.GetErrorString()
+		}
+
+		resp.Diagnostics.AddError(
+			"Error updating image for Machine Catalog "+catalogName,
+			errorDetail,
+		)
+		return err
+	}
+
+	return nil
+}
+
+func deleteMachinesFromMachineCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, catalog *citrixorchestration.MachineCatalogDetailResponseModel, plan models.MachineCatalogResourceModel) error {
+	catalogId := catalog.GetId()
+	catalogName := catalog.GetName()
+
+	if catalog.GetAllocationType() != citrixorchestration.ALLOCATIONTYPE_RANDOM {
+		resp.Diagnostics.AddError(
+			"Error updating Machine Catalog "+catalogName,
+			"Deleting machine(s) is supported for machine catalogs with Random allocation type only.",
+		)
+		return fmt.Errorf("deleting machine(s) is supported for machine catalogs with Random allocation type only")
+	}
+
+	getMachinesRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogMachines(ctx, catalogId)
+	getMachinesResponse, httpResp, err := citrixdaasclient.AddRequestData(getMachinesRequest, client).Execute()
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error deleting machine(s) from Machine Catalog "+catalogName,
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nCould not retrieve machines for machine catalog",
+		)
+		return err
+	}
+
+	machineDeleteRequestCount := int(catalog.GetTotalCount()) - int(plan.ProvisioningScheme.NumTotalMachines.ValueInt64())
+	machinesToDelete := []citrixorchestration.MachineResponseModel{}
+
+	for _, machine := range getMachinesResponse.GetItems() {
+		if !machine.GetDeliveryGroup().Id.IsSet() || machine.GetSessionCount() == 0 {
+			machinesToDelete = append(machinesToDelete, machine)
+		}
+
+		if len(machinesToDelete) == machineDeleteRequestCount {
+			break
+		}
+	}
+
+	machinesToDeleteCount := len(machinesToDelete)
+
+	if machineDeleteRequestCount > machinesToDeleteCount {
+		errorString := fmt.Sprintf("%d machine(s) requested to be deleted. %d machine(s) qualify for deletion.", machineDeleteRequestCount, machinesToDeleteCount)
+
+		resp.Diagnostics.AddError(
+			"Error deleting machine(s) from Machine Catalog "+catalogName,
+			errorString+" Ensure machine that needs to be deleted has no active sessions.",
+		)
+
+		return err
+	}
+
+	// first put machine in maintenance mode and then perform delete
+	// use batch API for both
+
+	batchApiHeaders, httpResp, err := generateBatchApiHeaders(client, plan, false)
+	txId := citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating Machine Catalog "+catalogName,
+			"TransactionId: "+txId+
+				"\nCould not put machine(s) into maintenance mode before deleting them, unexpected error: "+util.ReadClientError(err),
+		)
+		return err
+	}
+	batchRequestItems := []citrixorchestration.BatchRequestItemModel{}
+
+	for index, machineToDelete := range machinesToDelete {
+		isMachineInMaintenanceMode := machineToDelete.GetInMaintenanceMode()
+
+		if !isMachineInMaintenanceMode {
+			// machine is not in maintenance mode. Put machine in maintenance mode first before deleting
+			var updateMachineModel citrixorchestration.UpdateMachineRequestModel
+			updateMachineModel.SetInMaintenanceMode(true)
+			updateMachineStringBody, err := util.ConvertToString(updateMachineModel)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error removing Machine(s) from Machine Catalog "+catalogName,
+					"An unexpected error occurred: "+err.Error(),
+				)
+				return err
+			}
+
+			var batchRequestItem citrixorchestration.BatchRequestItemModel
+			batchRequestItem.SetReference(strconv.Itoa(index))
+			batchRequestItem.SetMethod(http.MethodPatch)
+			batchRequestItem.SetRelativeUrl(fmt.Sprintf("/Machines/%s", machineToDelete.GetId()))
+			batchRequestItem.SetBody(updateMachineStringBody)
+			batchRequestItem.SetHeaders(batchApiHeaders)
+			batchRequestItems = append(batchRequestItems, batchRequestItem)
+		}
+	}
+
+	if len(batchRequestItems) > 0 {
+		// If there are any machines that need to be put in maintenance mode
+		var batchRequestModel citrixorchestration.BatchRequestModel
+		batchRequestModel.SetItems(batchRequestItems)
+		successfulJobs, txId, err := citrixdaasclient.PerformBatchOperation(ctx, client, batchRequestModel)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error deleting machine(s) from Machine Catalog "+catalogName,
+				"TransactionId: "+txId+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return err
+		}
+
+		if successfulJobs < len(batchRequestItems) {
+			errMsg := fmt.Sprintf("An error occurred while putting machine(s) into maintenance mode before deleting them. %d of %d machines were put in the maintenance mode.", successfulJobs, len(batchRequestItems))
+			err = fmt.Errorf(errMsg)
+			resp.Diagnostics.AddError(
+				"Error updating Machine Catalog "+catalogName,
+				"TransactionId: "+txId+
+					"\n"+errMsg,
+			)
+
+			return err
+		}
+	}
+
+	batchApiHeaders, httpResp, err = generateBatchApiHeaders(client, plan, true)
+	txId = citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating Machine Catalog "+catalogName,
+			"TransactionId: "+txId+
+				"\nCould not delete machine(s) from machine catalog, unexpected error: "+util.ReadClientError(err),
+		)
+		return err
+	}
+
+	batchRequestItems = []citrixorchestration.BatchRequestItemModel{}
+	for index, machineToDelete := range machinesToDelete {
+		var batchRequestItem citrixorchestration.BatchRequestItemModel
+		batchRequestItem.SetReference(strconv.Itoa(index))
+		batchRequestItem.SetMethod(http.MethodDelete)
+		batchRequestItem.SetHeaders(batchApiHeaders)
+		batchRequestItem.SetRelativeUrl(fmt.Sprintf("/Machines/%s?deleteVm=true&deleteAccount=Delete", machineToDelete.GetId()))
+		batchRequestItems = append(batchRequestItems, batchRequestItem)
+	}
+
+	batchRequestModel := citrixorchestration.BatchRequestModel{}
+	batchRequestModel.SetItems(batchRequestItems)
+	successfulJobs, txId, err := citrixdaasclient.PerformBatchOperation(ctx, client, batchRequestModel)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error deleting machine(s) from Machine Catalog "+catalogName,
+			"TransactionId: "+txId+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		return err
+	}
+
+	if successfulJobs < len(machinesToDelete) {
+		errMsg := fmt.Sprintf("An error occurred while deleting machine(s) from Machine Catalog. %d of %d machines were deleted from the Machine Catalog.", successfulJobs, len(batchRequestItems))
+		err = fmt.Errorf(errMsg)
+		resp.Diagnostics.AddError(
+			"Error updating Machine Catalog "+catalogName,
+			"TransactionId: "+txId+
+				"\n"+errMsg,
+		)
+
+		return err
+	}
+
+	return nil
+}
+
+func addMachinesToMachineCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, catalog *citrixorchestration.MachineCatalogDetailResponseModel, plan models.MachineCatalogResourceModel) error {
+	catalogId := catalog.GetId()
+	catalogName := catalog.GetName()
+
+	addMachinesCount := int32(plan.ProvisioningScheme.NumTotalMachines.ValueInt64()) - catalog.GetTotalCount()
+
+	var updateMachineAccountCreationRule citrixorchestration.UpdateMachineAccountCreationRulesRequestModel
+	updateMachineAccountCreationRule.SetNamingScheme(plan.ProvisioningScheme.MachineAccountCreationRules.NamingScheme.ValueString())
+	namingScheme, err := citrixorchestration.NewNamingSchemeTypeFromValue(plan.ProvisioningScheme.MachineAccountCreationRules.NamingSchemeType.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error adding Machine to Machine Catalog "+catalogName,
+			"Unsupported machine account naming scheme type.",
+		)
+		return err
+	}
+	updateMachineAccountCreationRule.SetNamingSchemeType(*namingScheme)
+	updateMachineAccountCreationRule.SetDomain(plan.ProvisioningScheme.MachineAccountCreationRules.Domain.ValueString())
+	updateMachineAccountCreationRule.SetOU(plan.ProvisioningScheme.MachineAccountCreationRules.Ou.ValueString())
+	var addMachineRequestBody citrixorchestration.AddMachineToMachineCatalogDetailRequestModel
+	addMachineRequestBody.SetMachineAccountCreationRules(updateMachineAccountCreationRule)
+
+	addMachineRequestStringBody, err := util.ConvertToString(addMachineRequestBody)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error adding Machine to Machine Catalog "+catalogName,
+			"An unexpected error occurred: "+err.Error(),
+		)
+		return err
+	}
+
+	batchApiHeaders, httpResp, err := generateBatchApiHeaders(client, plan, true)
+	txId := citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating Machine Catalog "+catalogName,
+			"TransactionId: "+txId+
+				"\nCould not add machine to Machine Catalog, unexpected error: "+util.ReadClientError(err),
+		)
+		return err
+	}
+
+	batchRequestItems := []citrixorchestration.BatchRequestItemModel{}
+	for i := 0; i < int(addMachinesCount); i++ {
+		var batchRequestItem citrixorchestration.BatchRequestItemModel
+		batchRequestItem.SetMethod(http.MethodPost)
+		batchRequestItem.SetReference(strconv.Itoa(i))
+		batchRequestItem.SetRelativeUrl(fmt.Sprintf("/MachineCatalogs/%s/Machines", catalogId))
+		batchRequestItem.SetBody(addMachineRequestStringBody)
+		batchRequestItem.SetHeaders(batchApiHeaders)
+		batchRequestItems = append(batchRequestItems, batchRequestItem)
+	}
+	var batchRequestModel citrixorchestration.BatchRequestModel
+	batchRequestModel.SetItems(batchRequestItems)
+	successfulJobs, txId, err := citrixdaasclient.PerformBatchOperation(ctx, client, batchRequestModel)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error adding machine(s) to Machine Catalog "+catalogName,
+			"TransactionId: "+txId+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		return err
+	}
+
+	if successfulJobs < int(addMachinesCount) {
+		errMsg := fmt.Sprintf("An error occurred while adding machine(s) to the Machine Catalog. %d of %d machines were added to the Machine Catalog.", successfulJobs, addMachinesCount)
+		err = fmt.Errorf(errMsg)
+		resp.Diagnostics.AddError(
+			"Error updating Machine Catalog "+catalogName,
+			"TransactionId: "+txId+
+				"\n"+errMsg,
+		)
+
+		return err
+	}
+
+	return nil
 }

@@ -1,3 +1,5 @@
+// Copyright © 2023. Citrix Systems, Inc.
+
 package daas
 
 import (
@@ -101,7 +103,6 @@ func (r *deliveryGroupResource) Schema(_ context.Context, _ resource.SchemaReque
 			"autoscale_enabled": schema.BoolAttribute{
 				Description: "Whether auto-scale is enabled for the delivery group.",
 				Optional:    true,
-				Computed:    true,
 			},
 			"autoscale_settings": schema.SingleNestedAttribute{
 				Description: "The power management settings governing the machine(s) in the delivery group.",
@@ -110,17 +111,14 @@ func (r *deliveryGroupResource) Schema(_ context.Context, _ resource.SchemaReque
 					"timezone": schema.StringAttribute{
 						Description: "The time zone in which this delivery group's machines reside.",
 						Optional:    true,
-						Computed:    true,
 					},
 					"peak_disconnect_timeout_minutes": schema.Int64Attribute{
 						Description: "The number of minutes before the configured action should be performed after a user session disconnects in peak hours.",
 						Optional:    true,
-						Computed:    true,
 					},
 					"peak_log_off_action": schema.StringAttribute{
 						Description: "The action to be performed after a configurable period of a user session ending in peak hours.",
 						Optional:    true,
-						Computed:    true,
 						Validators: []validator.String{
 							sessionHostingActionEnumValidator(),
 						},
@@ -128,7 +126,6 @@ func (r *deliveryGroupResource) Schema(_ context.Context, _ resource.SchemaReque
 					"peak_disconnect_action": schema.StringAttribute{
 						Description: "The action to be performed after a configurable period of a user session disconnecting in peak hours.",
 						Optional:    true,
-						Computed:    true,
 						Validators: []validator.String{
 							sessionHostingActionEnumValidator(),
 						},
@@ -136,7 +133,6 @@ func (r *deliveryGroupResource) Schema(_ context.Context, _ resource.SchemaReque
 					"peak_extended_disconnect_action": schema.StringAttribute{
 						Description: "The action to be performed after a second configurable period of a user session disconnecting in peak hours.",
 						Optional:    true,
-						Computed:    true,
 						Validators: []validator.String{
 							sessionHostingActionEnumValidator(),
 						},
@@ -144,17 +140,14 @@ func (r *deliveryGroupResource) Schema(_ context.Context, _ resource.SchemaReque
 					"peak_extended_disconnect_timeout_minutes": schema.Int64Attribute{
 						Description: "The number of minutes before the second configured action should be performed after a user session disconnects in peak hours.",
 						Optional:    true,
-						Computed:    true,
 					},
 					"off_peak_disconnect_timeout_minutes": schema.Int64Attribute{
 						Description: "The number of minutes before the configured action should be performed after a user session disconnectts outside peak hours.",
 						Optional:    true,
-						Computed:    true,
 					},
 					"off_peak_log_off_action": schema.StringAttribute{
 						Description: "The action to be performed after a configurable period of a user session ending outside peak hours.",
 						Optional:    true,
-						Computed:    true,
 						Validators: []validator.String{
 							sessionHostingActionEnumValidator(),
 						},
@@ -162,7 +155,6 @@ func (r *deliveryGroupResource) Schema(_ context.Context, _ resource.SchemaReque
 					"off_peak_disconnect_action": schema.StringAttribute{
 						Description: "The action to be performed after a configurable period of a user session disconnecting outside peak hours.",
 						Optional:    true,
-						Computed:    true,
 						Validators: []validator.String{
 							sessionHostingActionEnumValidator(),
 						},
@@ -170,7 +162,6 @@ func (r *deliveryGroupResource) Schema(_ context.Context, _ resource.SchemaReque
 					"off_peak_extended_disconnect_action": schema.StringAttribute{
 						Description: "The action to be performed after a second configurable period of a user session disconnecting outside peak hours.",
 						Optional:    true,
-						Computed:    true,
 						Validators: []validator.String{
 							sessionHostingActionEnumValidator(),
 						},
@@ -178,42 +169,34 @@ func (r *deliveryGroupResource) Schema(_ context.Context, _ resource.SchemaReque
 					"off_peak_extended_disconnect_timeout_minutes": schema.Int64Attribute{
 						Description: "The number of minutes before the second configured action should be performed after a user session disconnects outside peak hours.",
 						Optional:    true,
-						Computed:    true,
 					},
 					"peak_buffer_size_percent": schema.Int64Attribute{
 						Description: "The percentage of machines in the delivery group that should be kept available in an idle state in peak hours.",
 						Optional:    true,
-						Computed:    true,
 					},
 					"off_peak_buffer_size_percent": schema.Int64Attribute{
 						Description: "The percentage of machines in the delivery group that should be kept available in an idle state outside peak hours.",
 						Optional:    true,
-						Computed:    true,
 					},
 					"power_off_delay_minutes": schema.Int64Attribute{
 						Description: "Delay before machines are powered off, when scaling down. Specified in minutes. Applies only to multi-session machines.",
 						Optional:    true,
-						Computed:    true,
 					},
 					"disconnect_peak_idle_session_after_seconds": schema.Int64Attribute{
 						Description: "Specifies the time in seconds after which an idle session belonging to the delivery group is disconnected during peak time.",
 						Optional:    true,
-						Computed:    true,
 					},
 					"disconnect_off_peak_idle_session_after_seconds": schema.Int64Attribute{
 						Description: "Specifies the time in seconds after which an idle session belonging to the delivery group is disconnected during off-peak time.",
 						Optional:    true,
-						Computed:    true,
 					},
 					"log_off_peak_disconnected_session_after_seconds": schema.Int64Attribute{
 						Description: "Specifies the time in seconds after which a disconnected session belonging to the delivery group is terminated during peak time.",
 						Optional:    true,
-						Computed:    true,
 					},
 					"log_off_off_peak_disconnected_session_after_seconds": schema.Int64Attribute{
 						Description: "Specifies the time in seconds after which a disconnected session belonging to the delivery group is terminated during off peak time.",
 						Optional:    true,
-						Computed:    true,
 					},
 					"power_time_schemes": schema.ListNestedAttribute{
 						Description: "Power management time schemes.  No two schemes for the same delivery group may cover the same day of the week.",
@@ -390,7 +373,7 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Delivery Group",
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 		return
@@ -555,7 +538,7 @@ func (r *deliveryGroupResource) Update(ctx context.Context, req resource.UpdateR
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating Delivery Group "+deliveryGroupName,
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 		return
@@ -624,7 +607,7 @@ func (r *deliveryGroupResource) Delete(ctx context.Context, req resource.DeleteR
 	if err != nil && httpResp.StatusCode != http.StatusNotFound {
 		resp.Diagnostics.AddError(
 			"Error Deleting Delivery Group "+deliveryGroupName,
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 		return
@@ -741,7 +724,7 @@ func getDeliveryGroup(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 	if err != nil {
 		diagnostics.AddError(
 			"Error reading Delivery Group "+deliveryGroupId,
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 	}
@@ -761,7 +744,7 @@ func getDeliveryGroupDesktops(ctx context.Context, client *citrixdaasclient.Citr
 	if err != nil {
 		diagnostics.AddError(
 			"Error reading Desktops for Delivery Group "+deliveryGroupId,
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 	}
@@ -775,7 +758,7 @@ func getDeliveryGroupPowerTimeSchemes(ctx context.Context, client *citrixdaascli
 	if err != nil {
 		diagnostics.AddError(
 			"Error reading Power Time Schemes for Delivery Group "+deliveryGroupId,
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 	}
@@ -789,7 +772,7 @@ func getDeliveryGroupMachines(ctx context.Context, client *citrixdaasclient.Citr
 	if err != nil {
 		diagnostics.AddError(
 			"Error reading Machines for Delivery Group "+deliveryGroupId,
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 	}
@@ -863,7 +846,7 @@ func addMachinesToDeliveryGroup(ctx context.Context, client *citrixdaasclient.Ci
 	if err != nil {
 		diagnostics.AddError(
 			"Error adding machine(s) to Delivery Group "+deliveryGroupId,
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 	}
@@ -878,7 +861,7 @@ func removeMachinesFromDeliveryGroup(ctx context.Context, client *citrixdaasclie
 		if err != nil {
 			diagnostics.AddError(
 				"Error removing machine from Delivery Group "+deliveryGroupId,
-				"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadClientError(err),
 			)
 

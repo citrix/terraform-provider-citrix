@@ -1,3 +1,5 @@
+// Copyright © 2023. Citrix Systems, Inc.
+
 package daas
 
 import (
@@ -110,7 +112,7 @@ func (d *VdaDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error listing Machine Catalog VDAs"+machineCatalogId,
-				"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadClientError(err),
 			)
 		}
@@ -126,7 +128,7 @@ func (d *VdaDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error listing Delivery Group VDAs"+deliveryGroupId,
-				"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadClientError(err),
 			)
 		}

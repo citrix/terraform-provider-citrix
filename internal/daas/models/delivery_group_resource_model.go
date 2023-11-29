@@ -1,3 +1,5 @@
+// Copyright © 2023. Citrix Systems, Inc.
+
 package models
 
 import (
@@ -65,7 +67,6 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(deliveryGroup *citrixo
 	// Set required values
 	r.Id = types.StringValue(deliveryGroup.GetId())
 	r.Name = types.StringValue(deliveryGroup.GetName())
-	r.AutoscaleEnabled = types.BoolValue(deliveryGroup.GetAutoScaleEnabled())
 	r.TotalMachines = types.Int64Value(int64(deliveryGroup.GetTotalMachines()))
 
 	// Set optional values
@@ -79,24 +80,7 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(deliveryGroup *citrixo
 		return r
 	}
 
-	r.AutoscaleSettings.Timezone = types.StringValue(deliveryGroup.GetTimeZone())
-	r.AutoscaleSettings.PeakDisconnectTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetPeakDisconnectTimeoutMinutes()))
-	r.AutoscaleSettings.PeakLogOffAction = types.StringValue(reflect.ValueOf(deliveryGroup.GetPeakLogOffAction()).String())
-	r.AutoscaleSettings.PeakDisconnectAction = types.StringValue(reflect.ValueOf(deliveryGroup.GetPeakDisconnectAction()).String())
-	r.AutoscaleSettings.PeakExtendedDisconnectAction = types.StringValue(reflect.ValueOf(deliveryGroup.GetPeakExtendedDisconnectAction()).String())
-	r.AutoscaleSettings.PeakExtendedDisconnectTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetPeakExtendedDisconnectTimeoutMinutes()))
-	r.AutoscaleSettings.OffPeakDisconnectTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetOffPeakDisconnectTimeoutMinutes()))
-	r.AutoscaleSettings.OffPeakLogOffAction = types.StringValue(reflect.ValueOf(deliveryGroup.GetOffPeakLogOffAction()).String())
-	r.AutoscaleSettings.OffPeakDisconnectAction = types.StringValue(reflect.ValueOf(deliveryGroup.GetOffPeakExtendedDisconnectAction()).String())
-	r.AutoscaleSettings.OffPeakExtendedDisconnectAction = types.StringValue(reflect.ValueOf(deliveryGroup.GetOffPeakExtendedDisconnectAction()).String())
-	r.AutoscaleSettings.OffPeakExtendedDisconnectTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetOffPeakExtendedDisconnectTimeoutMinutes()))
-	r.AutoscaleSettings.PeakBufferSizePercent = types.Int64Value(int64(deliveryGroup.GetPeakBufferSizePercent()))
-	r.AutoscaleSettings.OffPeakBufferSizePercent = types.Int64Value(int64(deliveryGroup.GetOffPeakBufferSizePercent()))
-	r.AutoscaleSettings.PowerOffDelayMinutes = types.Int64Value(int64(deliveryGroup.GetPowerOffDelayMinutes()))
-	r.AutoscaleSettings.DisconnectPeakIdleSessionAfterSeconds = types.Int64Value(int64(deliveryGroup.GetDisconnectPeakIdleSessionAfterSeconds()))
-	r.AutoscaleSettings.DisconnectOffPeakIdleSessionAfterSeconds = types.Int64Value(int64(deliveryGroup.GetDisconnectOffPeakIdleSessionAfterSeconds()))
-	r.AutoscaleSettings.LogoffPeakDisconnectedSessionAfterSeconds = types.Int64Value(int64(deliveryGroup.GetLogoffPeakDisconnectedSessionAfterSeconds()))
-	r.AutoscaleSettings.LogoffOffPeakDisconnectedSessionAfterSeconds = types.Int64Value(int64(deliveryGroup.GetLogoffOffPeakDisconnectedSessionAfterSeconds()))
+	r = r.updatePlanWithAutoscaleSettings(deliveryGroup)
 
 	parsedPowerTimeSchemes := ParsePowerTimeSchemesClientToPluginModel(dgPowerTimeSchemes.GetItems())
 	r.AutoscaleSettings.PowerTimeSchemes = parsedPowerTimeSchemes
@@ -218,6 +202,87 @@ func (r DeliveryGroupResourceModel) updatePlanWithDesktops(deliveryGroupDesktops
 		} else {
 			r.Users = util.ConvertPrimitiveStringArrayToBaseStringArray(includedUsers)
 		}
+	}
+
+	return r
+}
+
+func (r DeliveryGroupResourceModel) updatePlanWithAutoscaleSettings(deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel) DeliveryGroupResourceModel {
+
+	if !r.AutoscaleEnabled.IsNull() {
+		r.AutoscaleEnabled = types.BoolValue(deliveryGroup.GetAutoScaleEnabled())
+	}
+
+	if !r.AutoscaleSettings.Timezone.IsNull() {
+		r.AutoscaleSettings.Timezone = types.StringValue(deliveryGroup.GetTimeZone())
+	}
+
+	if !r.AutoscaleSettings.PeakDisconnectTimeoutMinutes.IsNull() {
+		r.AutoscaleSettings.PeakDisconnectTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetPeakDisconnectTimeoutMinutes()))
+	}
+
+	if !r.AutoscaleSettings.PeakLogOffAction.IsNull() {
+		r.AutoscaleSettings.PeakLogOffAction = types.StringValue(reflect.ValueOf(deliveryGroup.GetPeakLogOffAction()).String())
+	}
+
+	if !r.AutoscaleSettings.PeakDisconnectAction.IsNull() {
+		r.AutoscaleSettings.PeakDisconnectAction = types.StringValue(reflect.ValueOf(deliveryGroup.GetPeakDisconnectAction()).String())
+	}
+
+	if !r.AutoscaleSettings.PeakExtendedDisconnectAction.IsNull() {
+		r.AutoscaleSettings.PeakExtendedDisconnectAction = types.StringValue(reflect.ValueOf(deliveryGroup.GetPeakExtendedDisconnectAction()).String())
+	}
+
+	if !r.AutoscaleSettings.PeakExtendedDisconnectTimeoutMinutes.IsNull() {
+		r.AutoscaleSettings.PeakExtendedDisconnectTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetPeakExtendedDisconnectTimeoutMinutes()))
+	}
+
+	if !r.AutoscaleSettings.OffPeakDisconnectTimeoutMinutes.IsNull() {
+		r.AutoscaleSettings.OffPeakDisconnectTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetOffPeakDisconnectTimeoutMinutes()))
+	}
+
+	if !r.AutoscaleSettings.OffPeakLogOffAction.IsNull() {
+		r.AutoscaleSettings.OffPeakLogOffAction = types.StringValue(reflect.ValueOf(deliveryGroup.GetOffPeakLogOffAction()).String())
+	}
+
+	if !r.AutoscaleSettings.OffPeakDisconnectAction.IsNull() {
+		r.AutoscaleSettings.OffPeakDisconnectAction = types.StringValue(reflect.ValueOf(deliveryGroup.GetOffPeakExtendedDisconnectAction()).String())
+	}
+
+	if !r.AutoscaleSettings.OffPeakExtendedDisconnectAction.IsNull() {
+		r.AutoscaleSettings.OffPeakExtendedDisconnectAction = types.StringValue(reflect.ValueOf(deliveryGroup.GetOffPeakExtendedDisconnectAction()).String())
+	}
+
+	if !r.AutoscaleSettings.OffPeakExtendedDisconnectTimeoutMinutes.IsNull() {
+		r.AutoscaleSettings.OffPeakExtendedDisconnectTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetOffPeakExtendedDisconnectTimeoutMinutes()))
+	}
+
+	if !r.AutoscaleSettings.PeakBufferSizePercent.IsNull() {
+		r.AutoscaleSettings.PeakBufferSizePercent = types.Int64Value(int64(deliveryGroup.GetPeakBufferSizePercent()))
+	}
+
+	if !r.AutoscaleSettings.OffPeakBufferSizePercent.IsNull() {
+		r.AutoscaleSettings.OffPeakBufferSizePercent = types.Int64Value(int64(deliveryGroup.GetOffPeakBufferSizePercent()))
+	}
+
+	if !r.AutoscaleSettings.PowerOffDelayMinutes.IsNull() {
+		r.AutoscaleSettings.PowerOffDelayMinutes = types.Int64Value(int64(deliveryGroup.GetPowerOffDelayMinutes()))
+	}
+
+	if !r.AutoscaleSettings.DisconnectPeakIdleSessionAfterSeconds.IsNull() {
+		r.AutoscaleSettings.DisconnectPeakIdleSessionAfterSeconds = types.Int64Value(int64(deliveryGroup.GetDisconnectPeakIdleSessionAfterSeconds()))
+	}
+
+	if !r.AutoscaleSettings.DisconnectOffPeakIdleSessionAfterSeconds.IsNull() {
+		r.AutoscaleSettings.DisconnectOffPeakIdleSessionAfterSeconds = types.Int64Value(int64(deliveryGroup.GetDisconnectOffPeakIdleSessionAfterSeconds()))
+	}
+
+	if !r.AutoscaleSettings.LogoffPeakDisconnectedSessionAfterSeconds.IsNull() {
+		r.AutoscaleSettings.LogoffPeakDisconnectedSessionAfterSeconds = types.Int64Value(int64(deliveryGroup.GetLogoffPeakDisconnectedSessionAfterSeconds()))
+	}
+
+	if !r.AutoscaleSettings.LogoffOffPeakDisconnectedSessionAfterSeconds.IsNull() {
+		r.AutoscaleSettings.LogoffOffPeakDisconnectedSessionAfterSeconds = types.Int64Value(int64(deliveryGroup.GetLogoffOffPeakDisconnectedSessionAfterSeconds()))
 	}
 
 	return r

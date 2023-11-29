@@ -1,3 +1,5 @@
+// Copyright © 2023. Citrix Systems, Inc.
+
 package models
 
 import (
@@ -48,13 +50,21 @@ type MachineConfigModel struct {
 	ServiceOffering        types.String `tfsdk:"service_offering"`
 	MasterImage            types.String `tfsdk:"master_image"`
 	/** Azure Hypervisor **/
-	ResourceGroup  types.String `tfsdk:"resource_group"`
-	StorageAccount types.String `tfsdk:"storage_account"`
-	Container      types.String `tfsdk:"container"`
+	ResourceGroup  types.String       `tfsdk:"resource_group"`
+	StorageAccount types.String       `tfsdk:"storage_account"`
+	Container      types.String       `tfsdk:"container"`
+	GalleryImage   *GalleryImageModel `tfsdk:"gallery_image"`
 	/** AWS Hypervisor **/
 	ImageAmi types.String `tfsdk:"image_ami"`
 	/** GCP Hypervisor **/
-	MachineProfile types.String `tfsdk:"machine_profile"`
+	MachineProfile  types.String `tfsdk:"machine_profile"`
+	MachineSnapshot types.String `tfsdk:"machine_snapshot"`
+}
+
+type GalleryImageModel struct {
+	Gallery    types.String `tfsdk:"gallery"`
+	Definition types.String `tfsdk:"definition"`
+	Version    types.String `tfsdk:"version"`
 }
 
 // WritebackCacheModel maps the write back cacheconfiguration schema data.
@@ -126,23 +136,55 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 	if r.ProvisioningScheme.MachineConfig.HypervisorResourcePool == types.StringNull() {
 		r.ProvisioningScheme.MachineConfig.HypervisorResourcePool = types.StringValue(resourcePool.GetId())
 	}
-	if catalog.ProvisioningScheme.GetServiceOffering() != "" {
+	if catalog.ProvisioningScheme.GetServiceOffering() != "" && r.ProvisioningScheme.MachineConfig.ServiceOffering.ValueString() != "" {
 		r.ProvisioningScheme.MachineConfig.ServiceOffering = types.StringValue(provScheme.GetServiceOffering())
 	} else {
+		// For GCP, service offering will be nil in plan / state. Skip service offering refresh for GCP catalog.
 		r.ProvisioningScheme.MachineConfig.ServiceOffering = types.StringNull()
 	}
 
 	// Refresh Master Image
-	r.ProvisioningScheme.MachineConfig.MasterImage = types.StringValue(masterImage.GetName())
+	if r.ProvisioningScheme.MachineConfig.GalleryImage != nil {
+		/* For Azure Image Gallery image, the XDPath looks like:
+		 * XDHyp:\\HostingUnits\\{resource pool}\\image.folder\\{resource group}.resourcegroup\\{gallery name}.gallery\\{image name}.imagedefinition\\{image version}.imageversion
+		 * The Name property in MasterImage will be image version instead of image definition (name of the image)
+		 */
+		r.ProvisioningScheme.MachineConfig.GalleryImage.Version = types.StringValue(masterImage.GetName())
+	} else if r.ProvisioningScheme.MachineConfig.MachineSnapshot.ValueString() != "" {
+		/* For GCP snapshot image, the XDPath looks like:
+		 * XDHyp:\\HostingUnits\\{resource pool}\\{VM name}.vm\\{VM snapshot name}.snapshot
+		 * The Name property in MasterImage will be VM snapshot name instead of VM name
+		 */
+		r.ProvisioningScheme.MachineConfig.MachineSnapshot = types.StringValue(masterImage.GetName())
+		masterImageXdPath := masterImage.GetXDPath()
+		if masterImageXdPath != "" {
+			segments := strings.Split(masterImage.GetXDPath(), "\\")
+			lastIndex := len(segments)
+			// Snapshot or Managed Disk
+			r.ProvisioningScheme.MachineConfig.MasterImage = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
+		}
+	} else {
+		r.ProvisioningScheme.MachineConfig.MasterImage = types.StringValue(masterImage.GetName())
+	}
+
 	if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM {
 		masterImageXdPath := masterImage.GetXDPath()
 		if masterImageXdPath != "" {
 			segments := strings.Split(masterImage.GetXDPath(), "\\")
 			lastIndex := len(segments)
 			if lastIndex == 8 {
-				// VHD image
-				r.ProvisioningScheme.MachineConfig.Container = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
-				r.ProvisioningScheme.MachineConfig.StorageAccount = types.StringValue(strings.Split(segments[lastIndex-3], ".")[0])
+				resourceTag := strings.Split(segments[lastIndex-1], ".")
+				resourceType := resourceTag[len(resourceTag)-1]
+
+				if resourceType == "vhd" {
+					// VHD image
+					r.ProvisioningScheme.MachineConfig.Container = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
+					r.ProvisioningScheme.MachineConfig.StorageAccount = types.StringValue(strings.Split(segments[lastIndex-3], ".")[0])
+				} else if resourceType == "imageversion" {
+					// Gallery image
+					r.ProvisioningScheme.MachineConfig.GalleryImage.Definition = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
+					r.ProvisioningScheme.MachineConfig.GalleryImage.Gallery = types.StringValue(strings.Split(segments[lastIndex-3], ".")[0])
+				}
 				r.ProvisioningScheme.MachineConfig.ResourceGroup = types.StringValue(strings.Split(segments[lastIndex-4], ".")[0])
 			} else {
 				// Snapshot or Managed Disk
@@ -222,36 +264,28 @@ func (res *ProvisioningSchemeModel) RefreshProperties(stringPairs []citrixorches
 			res.UseManagedDisks = util.StringToTypeBool(stringPair.GetValue())
 		case "Zones":
 			res.AvailabilityZones = types.StringValue(stringPair.GetValue())
+		case "CatalogZones":
+			res.AvailabilityZones = types.StringValue(stringPair.GetValue())
 		case "ResourceGroups":
 			res.VdaResourceGroup = types.StringValue(stringPair.GetValue())
 		case "WBCDiskStorageType":
-			if res.WritebackCache == nil {
-				res.WritebackCache = &WritebackCacheModel{WBCDiskStorageType: types.StringValue(stringPair.GetValue())}
-			} else {
+			if res.WritebackCache != nil {
 				res.WritebackCache.WBCDiskStorageType = types.StringValue(stringPair.GetValue())
 			}
 		case "PersistWBC":
-			if res.WritebackCache == nil {
-				res.WritebackCache = &WritebackCacheModel{PersistWBC: util.StringToTypeBool(stringPair.GetValue())}
-			} else {
+			if res.WritebackCache != nil {
 				res.WritebackCache.PersistWBC = util.StringToTypeBool(stringPair.GetValue())
 			}
 		case "PersistOsDisk":
-			if res.WritebackCache == nil {
-				res.WritebackCache = &WritebackCacheModel{PersistOsDisk: util.StringToTypeBool(stringPair.GetValue())}
-			} else {
+			if res.WritebackCache != nil {
 				res.WritebackCache.PersistOsDisk = util.StringToTypeBool(stringPair.GetValue())
 			}
 		case "PersistVm":
-			if res.WritebackCache == nil {
-				res.WritebackCache = &WritebackCacheModel{PersistVm: util.StringToTypeBool(stringPair.GetValue())}
-			} else {
+			if res.WritebackCache != nil {
 				res.WritebackCache.PersistVm = util.StringToTypeBool(stringPair.GetValue())
 			}
 		case "StorageTypeAtShutdown":
-			if res.WritebackCache == nil {
-				res.WritebackCache = &WritebackCacheModel{StorageCostSaving: types.BoolValue(true)}
-			} else {
+			if res.WritebackCache != nil {
 				res.WritebackCache.StorageCostSaving = types.BoolValue(true)
 			}
 		default:
@@ -259,7 +293,7 @@ func (res *ProvisioningSchemeModel) RefreshProperties(stringPairs []citrixorches
 	}
 }
 
-func ParseCustomPropertiesToClientModel(provisioningScheme ProvisioningSchemeModel) *[]citrixorchestration.NameValueStringPairModel {
+func ParseCustomPropertiesToClientModel(provisioningScheme ProvisioningSchemeModel, connectionType citrixorchestration.HypervisorConnectionType) *[]citrixorchestration.NameValueStringPairModel {
 	var res = &[]citrixorchestration.NameValueStringPairModel{}
 	if !provisioningScheme.StorageType.IsNull() {
 		util.AppendNameValueStringPair(res, "StorageType", provisioningScheme.StorageType.ValueString())
@@ -275,7 +309,11 @@ func ParseCustomPropertiesToClientModel(provisioningScheme ProvisioningSchemeMod
 		}
 	}
 	if !provisioningScheme.AvailabilityZones.IsNull() {
-		util.AppendNameValueStringPair(res, "Zones", provisioningScheme.AvailabilityZones.ValueString())
+		if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS {
+			util.AppendNameValueStringPair(res, "Zones", provisioningScheme.AvailabilityZones.ValueString())
+		} else if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM {
+			util.AppendNameValueStringPair(res, "CatalogZones", provisioningScheme.AvailabilityZones.ValueString())
+		}
 	}
 	if provisioningScheme.WritebackCache != nil {
 		if !provisioningScheme.WritebackCache.WBCDiskStorageType.IsNull() {

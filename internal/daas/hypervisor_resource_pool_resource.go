@@ -1,3 +1,5 @@
+// Copyright © 2023. Citrix Systems, Inc.
+
 package daas
 
 import (
@@ -15,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -73,7 +76,7 @@ func (r *hypervisorResourcePoolResource) Schema(_ context.Context, _ resource.Sc
 				},
 			},
 			"virtual_network_resource_group": schema.StringAttribute{
-				Description: "The name of the resource group where the vnet resides. Required when connection type is Azure.",
+				Description: "**[Azure: Required]** The name of the resource group where the vnet resides.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -88,14 +91,14 @@ func (r *hypervisorResourcePoolResource) Schema(_ context.Context, _ resource.Sc
 			},
 			"subnets": schema.ListAttribute{
 				ElementType: types.StringType,
-				Description: "List of subnets to allocate VDAs within the virtual network. Required when connection type is Azure or GCP.",
+				Description: "**[Azure, GCP: Required]** List of subnets to allocate VDAs within the virtual network.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.RequiresReplaceIfConfigured(),
 				},
 			},
 			"region": schema.StringAttribute{
-				Description: "Cloud Region where the virtual network sits in. Required when connection type is Azure or GCP.",
+				Description: "**[Azure, GCP: Required]** Cloud Region where the virtual network sits in.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplaceIf(
@@ -109,17 +112,24 @@ func (r *hypervisorResourcePoolResource) Schema(_ context.Context, _ resource.Sc
 				},
 			},
 			"availability_zone": schema.StringAttribute{
-				Description: "The name of the availability zone resource to use for provisioning operations in this resource pool. Required when connection type is AWS.",
+				Description: "**[AWS: Required]** The name of the availability zone resource to use for provisioning operations in this resource pool.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplaceIfConfigured(),
 				},
 			},
 			"project_name": schema.StringAttribute{
-				Description: "GCP Project name. Required when connection type is GCP.",
+				Description: "**[GCP: Required]** GCP Project name.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplaceIfConfigured(),
+				},
+			},
+			"shared_vpc": schema.BoolAttribute{
+				Description: "**[GCP: Optional]** Indicate whether the GCP Virtual Private Cloud is a shared VPC.",
+				Optional:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.RequiresReplaceIfConfigured(),
 				},
 			},
 		},
@@ -252,6 +262,10 @@ func (r *hypervisorResourcePoolResource) Create(ctx context.Context, req resourc
 		regionPath := fmt.Sprintf("%s.project/%s.region", plan.ProjectName.ValueString(), plan.Region.ValueString())
 		resourcePoolDetails.SetRegion(regionPath)
 		vnetPath := fmt.Sprintf("%s/%s.virtualprivatecloud", regionPath, plan.VirtualNetwork.ValueString())
+		if plan.SharedVpc.ValueBool() {
+			// Support shared VPC if specified as true
+			vnetPath = fmt.Sprintf("%s/%s.sharedvirtualprivatecloud", regionPath, plan.VirtualNetwork.ValueString())
+		}
 		resourcePoolDetails.SetVirtualPrivateCloud(vnetPath)
 		//Checking the subnet
 		if len(plan.Subnets) == 0 {
@@ -294,7 +308,7 @@ func (r *hypervisorResourcePoolResource) Create(ctx context.Context, req resourc
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Resource Pool for Hypervisor "+hypervisorId,
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 		return
@@ -369,7 +383,7 @@ func (r *hypervisorResourcePoolResource) Update(ctx context.Context, req resourc
 	patchResourcePoolRequest := r.client.ApiClient.HypervisorsAPIsDAAS.HypervisorsPatchHypervisorResourcePool(ctx, plan.Hypervisor.ValueString(), plan.Id.ValueString())
 	patchResourcePoolRequest = patchResourcePoolRequest.EditHypervisorResourcePoolRequestModel(editHypervisorResourcePool).Async(true)
 	httpResp, err := citrixdaasclient.AddRequestData(patchResourcePoolRequest, r.client).Execute()
-	txId := util.GetTransactionIdFromHttpResponse(httpResp)
+	txId := citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating Resource Pool for Hypervisor "+plan.Hypervisor.ValueString(),
@@ -379,7 +393,7 @@ func (r *hypervisorResourcePoolResource) Update(ctx context.Context, req resourc
 		return
 	}
 
-	jobId := util.GetJobIdFromHttpResponse(*httpResp)
+	jobId := citrixdaasclient.GetJobIdFromHttpResponse(*httpResp)
 	jobResponseModel, err := r.client.WaitForJob(ctx, jobId, 5)
 
 	if err != nil {
@@ -455,7 +469,7 @@ func (r *hypervisorResourcePoolResource) Delete(ctx context.Context, req resourc
 	if err != nil && httpResp.StatusCode != http.StatusNotFound {
 		resp.Diagnostics.AddError(
 			"Error deleting Resource Pool for Hypervisor "+hypervisorId,
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 		return
@@ -468,7 +482,7 @@ func GetHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.Cit
 	if err != nil {
 		diagnostics.AddError(
 			"Error reading ResourcePool for Hypervisor "+hypervisorId,
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 	}

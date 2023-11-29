@@ -17,7 +17,7 @@ resource "citrix_daas_delivery_group" "example-delivery-group" {
     name = "example-delivery-group"
     associated_machine_catalogs = [
         {
-        machine_catalog = citrix_daas_machine_catalog.example-machine-catalog.id
+        machine_catalog = citrix_daas_machine_catalog.example-azure-mtsession.id
         machine_count = 1
         }
     ]

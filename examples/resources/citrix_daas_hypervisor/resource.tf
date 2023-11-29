@@ -24,7 +24,6 @@ resource "citrix_daas_hypervisor" "example-gcp-hypervisor" {
     name               = "example-gcp-hypervisor"
     connection_type    = "GoogleCloudPlatform"
     zone               = "{Zone Id}"
-    project_name       = "{GCP project name}"
     service_account_id = "{GCP service account Id}"
     service_account_credentials = "{GCP service account private key}"    
 }
