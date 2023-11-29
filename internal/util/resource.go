@@ -1,3 +1,5 @@
+// Copyright © 2023. Citrix Systems, Inc.
+
 package util
 
 import (
@@ -9,7 +11,7 @@ import (
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 )
 
-func GetSingleResourcePathFromHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName string) string {
+func GetSingleResourcePathFromHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName string) (string, error) {
 	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorResourcePoolResources(ctx, hypervisorName, hypervisorPoolName)
 	req = req.Children(1)
 
@@ -23,7 +25,7 @@ func GetSingleResourcePathFromHypervisor(ctx context.Context, client *citrixdaas
 
 	resources, _, err := citrixdaasclient.AddRequestData(req, client).Execute()
 	if err != nil {
-		return ""
+		return "", err
 	}
 
 	for _, child := range resources.Children {
@@ -32,17 +34,17 @@ func GetSingleResourcePathFromHypervisor(ctx context.Context, client *citrixdaas
 				// For vnet, ID is resourceGroup/vnetName. Match the resourceGroup as well
 				resourceGroupAndVnetName := strings.Split(child.GetId(), "/")
 				if resourceGroupAndVnetName[0] == resourceGroupName {
-					return child.GetXDPath()
+					return child.GetXDPath(), nil
 				} else {
 					continue
 				}
 			}
 
-			return child.GetXDPath()
+			return child.GetXDPath(), nil
 		}
 	}
 
-	return ""
+	return "", fmt.Errorf("could not find resource")
 }
 
 func GetSingleResourcePath(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorId, folderPath, resourceName, resourceType, resourceGroupName string) (string, error) {
@@ -77,7 +79,7 @@ func GetSingleResourcePath(ctx context.Context, client *citrixdaasclient.CitrixD
 		}
 	}
 
-	return "", fmt.Errorf("Could not find resource.")
+	return "", fmt.Errorf("could not find resource")
 }
 
 func GetAllResourcePathList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorId, folderPath, resourceType string) []string {

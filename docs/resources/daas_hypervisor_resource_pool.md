@@ -13,33 +13,33 @@ Manages a hypervisor resource pool.
 ## Example Usage
 
 ```terraform
-resource "citrix_daas_hypervisor_resource_pool" "example-azure-hypervisor-resource_pool" {
+resource "citrix_daas_hypervisor_resource_pool" "example-azure-hypervisor-resource-pool" {
     name                = "example-hypervisor-resource-pool"
     hypervisor          = citrix_daas_hypervisor.example-azure-hypervisor.id
     region              = "East US"
 	virtual_network_resource_group = "{Resource Group Name}"
     virtual_network     = "{VNet name}"
-    subnet     			= [
+    subnets     			= [
         "subnet 1",
         "subnet 2"
     ]
 }
 
-resource "citrix_daas_hypervisor_resource_pool" "example-aws-hypervisor-resource_pool" {
+resource "citrix_daas_hypervisor_resource_pool" "example-aws-hypervisor-resource-pool" {
     name                = "example-hypervisor-resource-pool"
     hypervisor          = citrix_daas_hypervisor.example-aws-hypervisor.id
-    subnet            = [
+    subnets            = [
         "10.0.1.0/24",
     ]
     virtual_network   = "{VPC name}"
     availability_zone = "us-east-2a"
 }
 
-resource "citrix_daas_hypervisor_resource_pool" "example-gcp-hypervisor-resource_pool" {
+resource "citrix_daas_hypervisor_resource_pool" "example-gcp-hypervisor-resource-pool" {
     name                = "example-hypervisor-resource-pool"
     hypervisor          = citrix_daas_hypervisor.example-gcp-hypervisor.id
     region             = "us-east1"
-    subnet             = [
+    subnets             = [
         "us-east1",
     ]
     virtual_network    = "{VPC name}"
@@ -57,11 +57,12 @@ resource "citrix_daas_hypervisor_resource_pool" "example-gcp-hypervisor-resource
 
 ### Optional
 
-- `availability_zone` (String) The name of the availability zone resource to use for provisioning operations in this resource pool. Required when connection type is AWS.
-- `project_name` (String) GCP Project name. Required when connection type is GCP.
-- `region` (String) Cloud Region where the virtual network sits in. Required when connection type is Azure or GCP.
-- `subnets` (List of String) List of subnets to allocate VDAs within the virtual network. Required when connection type is Azure or GCP.
-- `virtual_network_resource_group` (String) The name of the resource group where the vnet resides. Required when connection type is Azure.
+- `availability_zone` (String) **[AWS: Required]** The name of the availability zone resource to use for provisioning operations in this resource pool.
+- `project_name` (String) **[GCP: Required]** GCP Project name.
+- `region` (String) **[Azure, GCP: Required]** Cloud Region where the virtual network sits in.
+- `shared_vpc` (Boolean) **[GCP: Optional]** Indicate whether the GCP Virtual Private Cloud is a shared VPC.
+- `subnets` (List of String) **[Azure, GCP: Required]** List of subnets to allocate VDAs within the virtual network.
+- `virtual_network_resource_group` (String) **[Azure: Required]** The name of the resource group where the vnet resides.
 
 ### Read-Only
 

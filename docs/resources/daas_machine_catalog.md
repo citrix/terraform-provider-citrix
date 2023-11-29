@@ -23,8 +23,8 @@ resource "citrix_daas_machine_catalog" "example-azure-mtsession" {
 	session_support				= "MultiSession"
 	provisioning_scheme			= 	{
 		machine_config = {
-            hypervisor = citrix_daas_hypervisor.azure-hypervisor-1.id
-			hypervisor_resource_pool = citrix_daas_hypervisor_resource_pool.azure-hypervisor-resource-pool.id
+            hypervisor = citrix_daas_hypervisor.example-azure-hypervisor.id
+			hypervisor_resource_pool = citrix_daas_hypervisor_resource_pool.example-azure-hypervisor-resource-pool.id
             service_offering = "Standard_D2_v2"
             resource_group = "{Azure resource group name for image vhd}"
             storage_account = "{Azure storage account name for image vhd}"
@@ -37,7 +37,7 @@ resource "citrix_daas_machine_catalog" "example-azure-mtsession" {
         }
 		number_of_total_machines = 	1
 		machine_account_creation_rules ={
-			naming_scheme =     "multi-##"
+			naming_scheme =     "az-multi-##"
 			naming_scheme_type ="Numeric"
 			domain =            "{domain-fqdn}"
 		}
@@ -53,6 +53,41 @@ resource "citrix_daas_machine_catalog" "example-azure-mtsession" {
 			storage_cost_saving = true
 		}
 	}
+}
+
+resource "citrix_daas_machine_catalog" "example-gcp-mtsession" {
+    name                        = "example-gcp-mtsession"
+    description                 = "Example multi-session catalog on GCP hypervisor"
+   	zone						= "{zone Id}"
+	service_account				= "{domain-admin-account}"
+	service_account_password 	= "{domain-admin-password}"
+	allocation_type				= "Random"
+	session_support				= "MultiSession"
+    provisioning_scheme         = {
+        storage_type = "pd-standard"
+        availability_zones = "{project name}:{region}:{availability zone1},{project name}:{region}:{availability zone2},..."
+        machine_config = {
+            hypervisor = citrix_daas_hypervisor.example-gcp-hypervisor.id
+            hypervisor_resource_pool = citrix_daas_hypervisor_resource_pool.example-gcp-hypervisor-resource-pool.id
+            machine_profile = "{Machine profile template VM name}"
+            master_image = "{Image template VM name}"
+            machine_snapshot = "{Image template VM snapshot name}"
+        }
+        number_of_total_machines = 1
+        machine_account_creation_rules = {
+            naming_scheme = "gcp-multi-##"
+            naming_scheme_type = "Numeric"
+            domain = "serenity.local"
+        }
+		writeback_cache = {
+			wbc_disk_storage_type = "Standard_LRS"
+			persist_wbc = true
+			persist_os_disk = true
+			persist_vm = true
+			writeback_cache_disk_size_gb = 127
+			storage_cost_saving = true
+		}
+    }
 }
 ```
 
@@ -91,9 +126,9 @@ Optional:
 
 - `availability_zones` (String) The Azure Availability Zones containing provisioned virtual machines. Use a comma as a delimiter for multiple availability_zones.
 - `network_mapping` (Attributes) Specifies how the attached NICs are mapped to networks.  If this parameter is omitted, provisioned VMs are created with a single NIC, which is mapped to the default network in the hypervisor resource pool.  If this parameter is supplied, machines are created with the number of NICs specified in the map, and each NIC is attached to the specified network. (see [below for nested schema](#nestedatt--provisioning_scheme--network_mapping))
-- `storage_type` (String) Storage account type used for provisioned virtual machine disks on Azure. Storage account types include: Standard_LRS, StandardSSD_LRS and Premium_LRS. Only applicable to Azure hypervisor catalogs.
-- `use_managed_disks` (Boolean) Indicate whether to use Azure managed disks for the provisioned virtual machine. Only applicable to Azure hypervisor catalogs.
-- `vda_resource_group` (String) Designated resource group where the VDA VMs will be located on Azure.
+- `storage_type` (String) **[Azure, GCP: Required]** Storage account type used for provisioned virtual machine disks on Azure / GCP.<br />Azure storage types include: `Standard_LRS`, `StandardSSD_LRS` and `Premium_LRS`.<br />GCP storage types include: `pd-standar`, `pd-balanced`, `pd-ssd` and `pd-extreme`.
+- `use_managed_disks` (Boolean) **[Azure: Optional]** Indicate whether to use Azure managed disks for the provisioned virtual machine.
+- `vda_resource_group` (String) **[Azure: Optional]** Designated resource group where the VDA VMs will be located on Azure.
 - `writeback_cache` (Attributes) Write-back Cache config. Leave this empty to disable Write-back Cache. (see [below for nested schema](#nestedatt--provisioning_scheme--writeback_cache))
 
 <a id="nestedatt--provisioning_scheme--machine_account_creation_rules"></a>
@@ -117,16 +152,28 @@ Required:
 
 - `hypervisor` (String) Id of the hypervisor for creating the machines.
 - `hypervisor_resource_pool` (String) Id of the hypervisor resource pool that will be used for provisioning operations.
+- `master_image` (String) The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors.
 
 Optional:
 
-- `container` (String) The Azure Storage Account Container where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.
-- `image_ami` (String) AMI of the AWS image to be used as the template image for the machine catalog. Only applicable to AWS Hypervisor.
-- `machine_profile` (String) The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone. Only applicable to GCP Hypervisor.
-- `master_image` (String) The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors.
-- `resource_group` (String) The Azure Resource Group where the image VHD for creating machines is located. Only applicable to Azure Hypervisor.
-- `service_offering` (String) The VM Sku of a Cloud service offering to use when creating machines.
-- `storage_account` (String) The Azure Storage Account where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.
+- `container` (String) **[Azure: Optional]** The Azure Storage Account Container where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.
+- `gallery_image` (Attributes) **[Azure: Optional]** Details of the Azure Image Gallery image to use for creating machines. Only Applicable to Azure Image Gallery image. (see [below for nested schema](#nestedatt--provisioning_scheme--machine_config--gallery_image))
+- `image_ami` (String) **[AWS: Required]** AMI of the AWS image to be used as the template image for the machine catalog.
+- `machine_profile` (String) **[GCP: Optional]** The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone. If not specified, the VM specified in master_image will be used as template.
+- `machine_snapshot` (String) **[GCP: Optional]** The name of the virtual machine snapshot of a GCP VM that will be used as master image.
+- `resource_group` (String) **[Azure: Required]** The Azure Resource Group where the image VHD for creating machines is located.
+- `service_offering` (String) **[Azure, AWS: Required]** The VM Sku of a Cloud service offering to use when creating machines.
+- `storage_account` (String) **[Azure: Optional]** The Azure Storage Account where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.
+
+<a id="nestedatt--provisioning_scheme--machine_config--gallery_image"></a>
+### Nested Schema for `provisioning_scheme.machine_config.gallery_image`
+
+Required:
+
+- `definition` (String) The image definition for the image to be used in the Azure Image Gallery. Only applicable to Azure Image Gallery image.
+- `gallery` (String) The Azure Image Gallery where the image for creating machines is located. Only applicable to Azure Image Gallery image.
+- `version` (String) The image version for the image to be used in the Azure Image Gallery. Only applicable to Azure Image Gallery image.
+
 
 
 <a id="nestedatt--provisioning_scheme--network_mapping"></a>

@@ -1,3 +1,5 @@
+// Copyright © 2023. Citrix Systems, Inc.
+
 package util
 
 import (
@@ -6,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -68,7 +69,11 @@ func IsValidUUID(u string) bool {
 }
 
 func ReadClientError(err error) string {
-	msg := err.(*citrixorchestration.GenericOpenAPIError).Body()
+	genericOpenApiError, ok := err.(*citrixorchestration.GenericOpenAPIError)
+	if !ok {
+		return err.Error()
+	}
+	msg := genericOpenApiError.Body()
 	if msg != nil {
 		var msgObj citrixorchestration.ErrorData
 		unmarshalError := json.Unmarshal(msg, &msgObj)
@@ -99,21 +104,6 @@ func ConvertPrimitiveStringArrayToBaseStringArray(v []string) []types.String {
 	return res
 }
 
-func GetJobIdFromHttpResponse(httpResponse http.Response) string {
-	locationHeader := httpResponse.Header.Get("Location")
-	locationHeaderParts := strings.Split(locationHeader, "/")
-	jobId := locationHeaderParts[len(locationHeaderParts)-1]
-
-	return jobId
-}
-
-func GetTransactionIdFromHttpResponse(httpResponse *http.Response) string {
-	if httpResponse == nil {
-		return "failed before request was sent"
-	}
-	return httpResponse.Header.Get("Citrix-TransactionId")
-}
-
 func TypeBoolToString(from types.Bool) string {
 	return strconv.FormatBool(from.ValueBool())
 }
@@ -121,6 +111,15 @@ func TypeBoolToString(from types.Bool) string {
 func StringToTypeBool(from string) types.Bool {
 	result, _ := strconv.ParseBool(from)
 	return types.BoolValue(result)
+}
+
+func ConvertToString(model any) (string, error) {
+	body, err := json.Marshal(model)
+	if err != nil {
+		return "", err
+	}
+
+	return string(body), nil
 }
 
 func GetValidatorFromEnum[V ~string, T []V](enum T) validator.String {
@@ -146,7 +145,7 @@ func ReadResource[ResponseType any](request any, ctx context.Context, client *ci
 		} else {
 			resp.Diagnostics.AddError(
 				fmt.Sprintf("Error Reading %s %s", resourceType, resourceIdOrName),
-				"TransactionId: "+GetTransactionIdFromHttpResponse(httpResp)+
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+ReadClientError(err),
 			)
 		}

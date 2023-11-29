@@ -1,3 +1,5 @@
+// Copyright © 2023. Citrix Systems, Inc.
+
 package daas
 
 import (
@@ -138,7 +140,7 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Zone",
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 		return
@@ -222,7 +224,7 @@ func (r *zoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Updating Zone "+zoneName,
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 	}
@@ -266,7 +268,7 @@ func (r *zoneResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	if err != nil && httpResp.StatusCode != http.StatusNotFound {
 		resp.Diagnostics.AddError(
 			"Error Deleting Zone "+zoneName,
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 		return
@@ -315,7 +317,7 @@ func getZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, dia
 	if err != nil {
 		diagnostics.AddError(
 			"Error Reading Zone "+zoneId,
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 	}

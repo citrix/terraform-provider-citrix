@@ -1,3 +1,5 @@
+// Copyright © 2023. Citrix Systems, Inc.
+
 package daas
 
 import (
@@ -78,59 +80,137 @@ func (r *hypervisorResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				},
 			},
 			"application_id": schema.StringAttribute{
-				Description: "Application ID of the service principal used to access the Azure APIs. Required when connection type is AzureRM.",
+				Description: "**[Azure: Required]** Application ID of the service principal used to access the Azure APIs.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("application_secret"),
+					}...),
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("subscription_id"),
+					}...),
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("active_directory_id"),
+					}...),
+				},
 			},
 			"application_secret": schema.StringAttribute{
-				Description: "The Application Secret of the service principal used to access the Azure APIs. Required when connection type is AzureRM.",
+				Description: "**[Azure: Required]** The Application Secret of the service principal used to access the Azure APIs.",
 				Optional:    true,
 				Sensitive:   true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("application_id"),
+					}...),
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("subscription_id"),
+					}...),
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("active_directory_id"),
+					}...),
+				},
 			},
 			"application_secret_expiration_date": schema.StringAttribute{
-				Description: "The expiration date of the application secret of the service principal used to access the Azure APIs. Format is YYYY-MM-DD.",
+				Description: "**[Azure: Optional]** The expiration date of the application secret of the service principal used to access the Azure APIs. Format is YYYY-MM-DD.",
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(`^((?:19|20|21)\d\d)[-](0[1-9]|1[012])[-](0[1-9]|[12][0-9]|3[01])$`), "Ensure date is valid and is in the format YYYY-MM-DD"),
 				},
 			},
 			"subscription_id": schema.StringAttribute{
-				Description: "Azure Subscription ID. Required when connection type is AzureRM.",
+				Description: "**[Azure: Required]** Azure Subscription ID.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplaceIfConfigured(),
+				},
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("application_id"),
+					}...),
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("application_secret"),
+					}...),
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("active_directory_id"),
+					}...),
 				},
 			},
 			"active_directory_id": schema.StringAttribute{
-				Description: "Azure Active Directory ID. Required when connection type is AzureRM.",
+				Description: "**[Azure: Required]** Azure Active Directory ID.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplaceIfConfigured(),
+				},
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("application_id"),
+					}...),
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("application_secret"),
+					}...),
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("subscription_id"),
+					}...),
 				},
 			},
 			"aws_region": schema.StringAttribute{
-				Description: "AWS region to connect to. Required when connection type is AWS.",
+				Description: "**[AWS: Required]** AWS region to connect to.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplaceIfConfigured(),
 				},
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("api_key"),
+					}...),
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("secret_key"),
+					}...),
+				},
 			},
 			"api_key": schema.StringAttribute{
-				Description: "The API key used to authenticate with the AWS APIs. Required when connection type is AWS.",
+				Description: "**[AWS: Required]** The API key used to authenticate with the AWS APIs.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("aws_region"),
+					}...),
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("secret_key"),
+					}...),
+				},
 			},
 			"secret_key": schema.StringAttribute{
-				Description: "The secret key used to authenticate with the AWS APIs. Required when connection type is AWS.",
+				Description: "**[AWS: Required]** The secret key used to authenticate with the AWS APIs.",
 				Optional:    true,
 				Sensitive:   true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("aws_region"),
+					}...),
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("api_key"),
+					}...),
+				},
 			},
 			"service_account_id": schema.StringAttribute{
-				Description: "The service account ID used to access the Google Cloud APIs. Required when connection type is GCP.",
+				Description: "**[GCP: Required]** The service account ID used to access the Google Cloud APIs.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("service_account_credentials"),
+					}...),
+				},
 			},
 			"service_account_credentials": schema.StringAttribute{
-				Description: "The JSON-encoded service account credentials used to access the Google Cloud APIs. Required when connection type is GCP.",
+				Description: "**[GCP: Required]** The JSON-encoded service account credentials used to access the Google Cloud APIs.",
 				Optional:    true,
 				Sensitive:   true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("service_account_id"),
+					}...),
+				},
 			},
 		},
 	}
@@ -250,7 +330,7 @@ func (r *hypervisorResource) Create(ctx context.Context, req resource.CreateRequ
 
 	// Create new hypervisor
 	_, httpResp, err := citrixdaasclient.AddRequestData(createHypervisorRequest, r.client).Execute()
-	txId := util.GetTransactionIdFromHttpResponse(httpResp)
+	txId := citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor",
@@ -260,7 +340,7 @@ func (r *hypervisorResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	jobId := util.GetJobIdFromHttpResponse(*httpResp)
+	jobId := citrixdaasclient.GetJobIdFromHttpResponse(*httpResp)
 	jobResponseModel, err := r.client.WaitForJob(ctx, jobId, 10)
 
 	if err != nil {
@@ -388,7 +468,7 @@ func (r *hypervisorResource) Update(ctx context.Context, req resource.UpdateRequ
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating Hypervisor "+hypervisorName,
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 	}
@@ -427,7 +507,7 @@ func (r *hypervisorResource) Delete(ctx context.Context, req resource.DeleteRequ
 	if err != nil && httpResp.StatusCode != http.StatusNotFound {
 		resp.Diagnostics.AddError(
 			"Error deleting Hypervisor "+hypervisorName,
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 		return
@@ -447,7 +527,7 @@ func GetHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasClien
 	if err != nil {
 		diagnostics.AddError(
 			"Error reading Hypervisor "+hypervisorId,
-			"TransactionId: "+util.GetTransactionIdFromHttpResponse(httpResp)+
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 	}

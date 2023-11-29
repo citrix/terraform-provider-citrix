@@ -39,7 +39,6 @@ resource "citrix_daas_hypervisor" "example-gcp-hypervisor" {
     name               = "example-gcp-hypervisor"
     connection_type    = "GoogleCloudPlatform"
     zone               = "{Zone Id}"
-    project_name       = "{GCP project name}"
     service_account_id = "{GCP service account Id}"
     service_account_credentials = "{GCP service account private key}"    
 }
@@ -56,16 +55,16 @@ resource "citrix_daas_hypervisor" "example-gcp-hypervisor" {
 
 ### Optional
 
-- `active_directory_id` (String) Azure Active Directory ID. Required when connection type is AzureRM.
-- `api_key` (String) The API key used to authenticate with the AWS APIs. Required when connection type is AWS.
-- `application_id` (String) Application ID of the service principal used to access the Azure APIs. Required when connection type is AzureRM.
-- `application_secret` (String, Sensitive) The Application Secret of the service principal used to access the Azure APIs. Required when connection type is AzureRM.
-- `application_secret_expiration_date` (String) The expiration date of the application secret of the service principal used to access the Azure APIs. Format is YYYY-MM-DD.
-- `aws_region` (String) AWS region to connect to. Required when connection type is AWS.
-- `secret_key` (String, Sensitive) The secret key used to authenticate with the AWS APIs. Required when connection type is AWS.
-- `service_account_credentials` (String, Sensitive) The JSON-encoded service account credentials used to access the Google Cloud APIs. Required when connection type is GCP.
-- `service_account_id` (String) The service account ID used to access the Google Cloud APIs. Required when connection type is GCP.
-- `subscription_id` (String) Azure Subscription ID. Required when connection type is AzureRM.
+- `active_directory_id` (String) **[Azure: Required]** Azure Active Directory ID.
+- `api_key` (String) **[AWS: Required]** The API key used to authenticate with the AWS APIs.
+- `application_id` (String) **[Azure: Required]** Application ID of the service principal used to access the Azure APIs.
+- `application_secret` (String, Sensitive) **[Azure: Required]** The Application Secret of the service principal used to access the Azure APIs.
+- `application_secret_expiration_date` (String) **[Azure: Optional]** The expiration date of the application secret of the service principal used to access the Azure APIs. Format is YYYY-MM-DD.
+- `aws_region` (String) **[AWS: Required]** AWS region to connect to.
+- `secret_key` (String, Sensitive) **[AWS: Required]** The secret key used to authenticate with the AWS APIs.
+- `service_account_credentials` (String, Sensitive) **[GCP: Required]** The JSON-encoded service account credentials used to access the Google Cloud APIs.
+- `service_account_id` (String) **[GCP: Required]** The service account ID used to access the Google Cloud APIs.
+- `subscription_id` (String) **[Azure: Required]** Azure Subscription ID.
 
 ### Read-Only
 
