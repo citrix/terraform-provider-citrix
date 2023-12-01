@@ -139,8 +139,13 @@ func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequ
 								Optional:    true,
 							},
 							"master_image": schema.StringAttribute{
-								Description: "The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors.",
-								Required:    true,
+								Description: "**[AWS, GCP: Required | Azure: Optional]** The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors. For Azure, skip this if you want to use gallery_image.",
+								Optional:    true,
+								Validators: []validator.String{
+									stringvalidator.ExactlyOneOf(path.Expressions{
+										path.MatchRelative().AtParent().AtName("gallery_image"),
+									}...),
+								},
 							},
 							"resource_group": schema.StringAttribute{
 								Description: "**[Azure: Required]** The Azure Resource Group where the image VHD for creating machines is located.",
@@ -196,9 +201,6 @@ func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequ
 									}...),
 									objectvalidator.ConflictsWith(path.Expressions{
 										path.MatchRelative().AtParent().AtName("container"),
-									}...),
-									objectvalidator.ConflictsWith(path.Expressions{
-										path.MatchRelative().AtParent().AtName("master_image"),
 									}...),
 								},
 							},
