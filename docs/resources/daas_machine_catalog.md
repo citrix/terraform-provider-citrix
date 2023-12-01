@@ -152,7 +152,6 @@ Required:
 
 - `hypervisor` (String) Id of the hypervisor for creating the machines.
 - `hypervisor_resource_pool` (String) Id of the hypervisor resource pool that will be used for provisioning operations.
-- `master_image` (String) The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors.
 
 Optional:
 
@@ -161,6 +160,7 @@ Optional:
 - `image_ami` (String) **[AWS: Required]** AMI of the AWS image to be used as the template image for the machine catalog.
 - `machine_profile` (String) **[GCP: Optional]** The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone. If not specified, the VM specified in master_image will be used as template.
 - `machine_snapshot` (String) **[GCP: Optional]** The name of the virtual machine snapshot of a GCP VM that will be used as master image.
+- `master_image` (String) **[AWS, GCP: Required | Azure: Optional]** The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors. For Azure, skip this if you want to use gallery_image.
 - `resource_group` (String) **[Azure: Required]** The Azure Resource Group where the image VHD for creating machines is located.
 - `service_offering` (String) **[Azure, AWS: Required]** The VM Sku of a Cloud service offering to use when creating machines.
 - `storage_account` (String) **[Azure: Optional]** The Azure Storage Account where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.
