@@ -43,7 +43,7 @@ func TestZoneResource(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildZoneResource(t, zoneName, zoneDescription),
+				Config: BuildZoneResource(t, zone_testResource),
 				Check:  getAggregateTestFunc(isOnPremises, zoneName, zoneDescription),
 			},
 			// ImportState testing
@@ -57,12 +57,12 @@ func TestZoneResource(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: zone_testResource_updated,
+				Config: BuildZoneResource(t, zone_testResource_updated),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of zone
-					resource.TestCheckResourceAttr("citrix_daas_zone.test", "name", "second zone - updated"),
+					resource.TestCheckResourceAttr("citrix_daas_zone.test", "name", fmt.Sprintf("%s-updated", zoneName)),
 					// Verify description of zone
-					resource.TestCheckResourceAttr("citrix_daas_zone.test", "description", "updated description for go test zone"),
+					resource.TestCheckResourceAttr("citrix_daas_zone.test", "description", fmt.Sprintf("updated %s", zoneDescription)),
 					// Verify number of meta data of zone
 					resource.TestCheckResourceAttr("citrix_daas_zone.test", "metadata.#", "4"),
 					// Verify first meta data value
@@ -78,57 +78,61 @@ func TestZoneResource(t *testing.T) {
 
 var (
 	zone_testResource = `
-	resource "citrix_daas_zone" "test" {
-		name        = "%s"
-		description = "%s"
-		metadata    = [
-			{
-				name = "key1",
-				value = "value1"
-			},
-			{
-				name = "key2",
-				value = "value2"
-			},
-			{
-				name = "key3",
-				value = "value3"
-			}
-		]
-	}
-	`
+resource "citrix_daas_zone" "test" {
+	name        = "%s"
+	description = "%s"
+	metadata    = [
+		{
+			name = "key1",
+			value = "value1"
+		},
+		{
+			name = "key2",
+			value = "value2"
+		},
+		{
+			name = "key3",
+			value = "value3"
+		}
+	]
+}
+`
+
 	zone_testResource_updated = `
-	resource "citrix_daas_zone" "test" {
-		name        = "second zone - updated"
-		description = "updated description for go test zone"
-		metadata    = [
-			{
-				name = "key1",
-				value = "value1"
-			},
-			{
-				name = "key2",
-				value = "value2"
-			},
-			{
-				name = "key3",
-				value = "value3"
-			},
-			{
-				name = "key4",
-				value = "value4"
-			},
-		]
-	}
-	`
+resource "citrix_daas_zone" "test" {
+	name        = "%s-updated"
+	description = "updated %s"
+	metadata    = [
+		{
+			name = "key1",
+			value = "value1"
+		},
+		{
+			name = "key2",
+			value = "value2"
+		},
+		{
+			name = "key3",
+			value = "value3"
+		},
+		{
+			name = "key4",
+			value = "value4"
+		},
+	]
+}
+`
 )
 
-func BuildZoneResource(t *testing.T, zoneName string, zoneDescription string) string {
+func BuildZoneResource(t *testing.T, zone string) string {
+	zoneName := os.Getenv("TEST_ZONE_NAME")
+	zoneDescription := os.Getenv("TEST_ZONE_DESCRIPTION")
+
 	if zoneName == "" {
 		zoneName = "second zone"
 		zoneDescription = "description for go test zone"
 	}
-	return fmt.Sprintf(zone_testResource, zoneName, zoneDescription)
+	return fmt.Sprintf(zone, zoneName, zoneDescription)
 }
 
 func getSkipFunc(isOnPremises bool) func() (bool, error) {

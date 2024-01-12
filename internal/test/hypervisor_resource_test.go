@@ -13,6 +13,9 @@ import (
 // testHypervisorPreCheck validates the necessary env variable exist
 // in the testing environment
 func TestHypervisorPreCheck(t *testing.T) {
+	if v := os.Getenv("TEST_HYPERV_NAME"); v == "" {
+		t.Fatal("TEST_HYPERV_NAME must be set for acceptance tests")
+	}
 	if v := os.Getenv("TEST_HYPERV_AD_ID"); v == "" {
 		t.Fatal("TEST_HYPERV_AD_ID must be set for acceptance tests")
 	}
@@ -28,6 +31,8 @@ func TestHypervisorPreCheck(t *testing.T) {
 }
 
 func TestHypervisorResourceAzureRM(t *testing.T) {
+	name := os.Getenv("TEST_HYPERV_NAME")
+
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		PreCheck: func() {
@@ -39,24 +44,30 @@ func TestHypervisorResourceAzureRM(t *testing.T) {
 
 			// Create and Read testing
 			{
-				Config: BuildHypervisorResource(t),
+				Config: BuildHypervisorResource(t, hypervisor_testResources),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
-					resource.TestCheckResourceAttr("citrix_daas_hypervisor.testHypervisor", "name", "test-hypervisor"),
-					// Verify connection type
-					resource.TestCheckResourceAttr("citrix_daas_hypervisor.testHypervisor", "connection_type", "AzureRM"),
+					resource.TestCheckResourceAttr("citrix_daas_azure_hypervisor.testHypervisor", "name", name),
 				),
 			},
 
 			// ImportState testing
 			{
-				ResourceName:      "citrix_daas_hypervisor.testHypervisor",
+				ResourceName:      "citrix_daas_azure_hypervisor.testHypervisor",
 				ImportState:       true,
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
 				ImportStateVerifyIgnore: []string{"last_updated", "application_secret"},
+			},
+			// Update and Read testing
+			{
+				Config: BuildHypervisorResource(t, hypervisor_testResources_updated),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify name of hypervisor
+					resource.TestCheckResourceAttr("citrix_daas_azure_hypervisor.testHypervisor", "name", fmt.Sprintf("%s-updated", name)),
+				),
 			},
 		},
 	})
@@ -64,9 +75,19 @@ func TestHypervisorResourceAzureRM(t *testing.T) {
 
 var (
 	hypervisor_testResources = `
-resource "citrix_daas_hypervisor" "testHypervisor" {
-    name                = "test-hypervisor"
-    connection_type     = "AzureRM"
+resource "citrix_daas_azure_hypervisor" "testHypervisor" {
+    name                = "%s"
+    zone                = %s
+    active_directory_id = "%s"
+    subscription_id     = "%s"
+    application_secret  = "%s"
+    application_id      = "%s"
+}
+`
+
+	hypervisor_testResources_updated = `
+resource "citrix_daas_azure_hypervisor" "testHypervisor" {
+    name                = "%s-updated"
     zone                = %s
     active_directory_id = "%s"
     subscription_id     = "%s"
@@ -76,7 +97,8 @@ resource "citrix_daas_hypervisor" "testHypervisor" {
 `
 )
 
-func BuildHypervisorResource(t *testing.T) string {
+func BuildHypervisorResource(t *testing.T, hypervisor string) string {
+	name := os.Getenv("TEST_HYPERV_NAME")
 	tenantId := os.Getenv("TEST_HYPERV_AD_ID")
 	subscriptionId := os.Getenv("TEST_HYPERV_SUBSCRIPTION_ID")
 	applicationSecret := os.Getenv("TEST_HYPERV_APPLICATION_SECRET")
@@ -84,8 +106,5 @@ func BuildHypervisorResource(t *testing.T) string {
 
 	zoneValueForHypervisor := "citrix_daas_zone.test.id"
 
-	zoneName := os.Getenv("TEST_ZONE_NAME")
-	zoneDescription := os.Getenv("TEST_ZONE_DESCRIPTION")
-
-	return BuildZoneResource(t, zoneName, zoneDescription) + fmt.Sprintf(hypervisor_testResources, zoneValueForHypervisor, tenantId, subscriptionId, applicationSecret, applicationId)
+	return BuildZoneResource(t, zone_testResource) + fmt.Sprintf(hypervisor, name, zoneValueForHypervisor, tenantId, subscriptionId, applicationSecret, applicationId)
 }
