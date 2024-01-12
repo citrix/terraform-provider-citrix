@@ -14,21 +14,26 @@ import (
 )
 
 func TestHypervisorResourcePoolPreCheck(t *testing.T) {
-	if v := os.Getenv("TEST_HYPERV_REGION"); v == "" {
-		t.Fatal("TEST_HYPERV_REGION must be set for acceptance tests")
+	if v := os.Getenv("TEST_HYPERV_RP_NAME"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_NAME must be set for acceptance tests")
 	}
-	if v := os.Getenv("TEST_HYPERV_VIRTUAL_NETWORK_RESOURCE_GROUP"); v == "" {
-		t.Fatal("TEST_HYPERV_VIRTUAL_NETWORK_RESOURCE_GROUP must be set for acceptance tests")
+	if v := os.Getenv("TEST_HYPERV_RP_REGION"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_REGION must be set for acceptance tests")
 	}
-	if v := os.Getenv("TEST_HYPERV_VIRTUAL_NETWORK"); v == "" {
-		t.Fatal("TEST_HYPERV_VIRTUAL_NETWORK must be set for acceptance tests")
+	if v := os.Getenv("TEST_HYPERV_RP_VIRTUAL_NETWORK_RESOURCE_GROUP"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_VIRTUAL_NETWORK_RESOURCE_GROUP must be set for acceptance tests")
 	}
-	if v := os.Getenv("Test_HYPERV_SUBNETS"); v == "" {
-		t.Fatal("Test_HYPERV_SUBNETS must be set for acceptance tests")
+	if v := os.Getenv("TEST_HYPERV_RP_VIRTUAL_NETWORK"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_VIRTUAL_NETWORK must be set for acceptance tests")
+	}
+	if v := os.Getenv("Test_HYPERV_RP_SUBNETS"); v == "" {
+		t.Fatal("Test_HYPERV_RP_SUBNETS must be set for acceptance tests")
 	}
 }
 
 func TestHypervisorResourcePoolAzureRM(t *testing.T) {
+	name := os.Getenv("TEST_HYPERV_RP_NAME")
+
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		PreCheck: func() {
@@ -43,20 +48,20 @@ func TestHypervisorResourcePoolAzureRM(t *testing.T) {
 				Config: BuildHypervisorResourcePoolResource(t, hypervisor_resource_pool_testResource),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("citrix_daas_hypervisor_resource_pool.testHypervisorResourcePool", "name", "test-hypervisor-resource-pool"),
+					resource.TestCheckResourceAttr("citrix_daas_azure_hypervisor_resource_pool.testHypervisorResourcePool", "name", name),
 					// Verify name of virtual network resource group name
-					resource.TestCheckResourceAttr("citrix_daas_hypervisor_resource_pool.testHypervisorResourcePool", "virtual_network_resource_group", os.Getenv("TEST_HYPERV_VIRTUAL_NETWORK_RESOURCE_GROUP")),
+					resource.TestCheckResourceAttr("citrix_daas_azure_hypervisor_resource_pool.testHypervisorResourcePool", "virtual_network_resource_group", os.Getenv("TEST_HYPERV_RP_VIRTUAL_NETWORK_RESOURCE_GROUP")),
 					// Verify name of virtual network
-					resource.TestCheckResourceAttr("citrix_daas_hypervisor_resource_pool.testHypervisorResourcePool", "virtual_network", os.Getenv("TEST_HYPERV_VIRTUAL_NETWORK")),
+					resource.TestCheckResourceAttr("citrix_daas_azure_hypervisor_resource_pool.testHypervisorResourcePool", "virtual_network", os.Getenv("TEST_HYPERV_RP_VIRTUAL_NETWORK")),
 					// Verify name of the region
-					resource.TestCheckResourceAttr("citrix_daas_hypervisor_resource_pool.testHypervisorResourcePool", "region", os.Getenv("TEST_HYPERV_REGION")),
+					resource.TestCheckResourceAttr("citrix_daas_azure_hypervisor_resource_pool.testHypervisorResourcePool", "region", os.Getenv("TEST_HYPERV_RP_REGION")),
 					// Verify subnets
-					resource.TestCheckResourceAttr("citrix_daas_hypervisor_resource_pool.testHypervisorResourcePool", "subnets.#", strconv.Itoa(len(strings.Split(os.Getenv("Test_HYPERV_SUBNETS"), ",")))),
+					resource.TestCheckResourceAttr("citrix_daas_azure_hypervisor_resource_pool.testHypervisorResourcePool", "subnets.#", strconv.Itoa(len(strings.Split(os.Getenv("Test_HYPERV_RP_SUBNETS"), ",")))),
 				),
 			},
 			// ImportState testing
 			{
-				ResourceName:      "citrix_daas_hypervisor_resource_pool.testHypervisorResourcePool",
+				ResourceName:      "citrix_daas_azure_hypervisor_resource_pool.testHypervisorResourcePool",
 				ImportState:       true,
 				ImportStateIdFunc: generateImportStateId,
 				ImportStateVerify: true,
@@ -66,7 +71,7 @@ func TestHypervisorResourcePoolAzureRM(t *testing.T) {
 			{
 				Config: BuildHypervisorResourcePoolResource(t, hypervisor_resource_pool_updated_testResource),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("citrix_daas_hypervisor_resource_pool.testHypervisorResourcePool", "name", "test-hypervisor-resource-pool-updated"),
+					resource.TestCheckResourceAttr("citrix_daas_azure_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
 				),
 			},
 		},
@@ -74,7 +79,7 @@ func TestHypervisorResourcePoolAzureRM(t *testing.T) {
 }
 
 func generateImportStateId(state *terraform.State) (string, error) {
-	resourceName := "citrix_daas_hypervisor_resource_pool.testHypervisorResourcePool"
+	resourceName := "citrix_daas_azure_hypervisor_resource_pool.testHypervisorResourcePool"
 	var rawState map[string]string
 	for _, m := range state.Modules {
 		if len(m.Resources) > 0 {
@@ -89,22 +94,20 @@ func generateImportStateId(state *terraform.State) (string, error) {
 
 var (
 	hypervisor_resource_pool_testResource = `
-resource "citrix_daas_hypervisor_resource_pool" "testHypervisorResourcePool" {
-    name = "test-hypervisor-resource-pool"
-	hypervisor = citrix_daas_hypervisor.testHypervisor.id
+resource "citrix_daas_azure_hypervisor_resource_pool" "testHypervisorResourcePool" {
+    name = "%s"
+	hypervisor = citrix_daas_azure_hypervisor.testHypervisor.id
     region = "%s"
 	virtual_network_resource_group = "%s"
 	virtual_network = "%s"
 	subnets = %s
 }
 `
-)
 
-var (
 	hypervisor_resource_pool_updated_testResource = `
-resource "citrix_daas_hypervisor_resource_pool" "testHypervisorResourcePool" {
-    name = "test-hypervisor-resource-pool-updated"
-	hypervisor = citrix_daas_hypervisor.testHypervisor.id
+resource "citrix_daas_azure_hypervisor_resource_pool" "testHypervisorResourcePool" {
+    name = "%s-updated"
+	hypervisor = citrix_daas_azure_hypervisor.testHypervisor.id
     region = "%s"
 	virtual_network_resource_group = "%s"
 	virtual_network = "%s"
@@ -114,10 +117,11 @@ resource "citrix_daas_hypervisor_resource_pool" "testHypervisorResourcePool" {
 )
 
 func BuildHypervisorResourcePoolResource(t *testing.T, hypervisor string) string {
-	region := os.Getenv("TEST_HYPERV_REGION")
-	virtualNetworkResourceGroup := os.Getenv("TEST_HYPERV_VIRTUAL_NETWORK_RESOURCE_GROUP")
-	virtualNetwork := os.Getenv("TEST_HYPERV_VIRTUAL_NETWORK")
-	subnet := os.Getenv("Test_HYPERV_SUBNETS")
+	name := os.Getenv("TEST_HYPERV_RP_NAME")
+	region := os.Getenv("TEST_HYPERV_RP_REGION")
+	virtualNetworkResourceGroup := os.Getenv("TEST_HYPERV_RP_VIRTUAL_NETWORK_RESOURCE_GROUP")
+	virtualNetwork := os.Getenv("TEST_HYPERV_RP_VIRTUAL_NETWORK")
+	subnet := os.Getenv("Test_HYPERV_RP_SUBNETS")
 
-	return BuildHypervisorResource(t) + fmt.Sprintf(hypervisor, region, virtualNetworkResourceGroup, virtualNetwork, subnet)
+	return BuildHypervisorResource(t, hypervisor_testResources) + fmt.Sprintf(hypervisor, name, region, virtualNetworkResourceGroup, virtualNetwork, subnet)
 }

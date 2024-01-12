@@ -65,10 +65,11 @@ resource "citrix_daas_delivery_group" "example-delivery-group" {
 
 ### Optional
 
-- `autoscale_enabled` (Boolean) Whether auto-scale is enabled for the delivery group.
+- `allow_anonymous_access` (Boolean) Give access to unauthenticated (anonymous) users; no credentials are required to access StoreFront. This feature requires a StoreFront store for unauthenticated users.
 - `autoscale_settings` (Attributes) The power management settings governing the machine(s) in the delivery group. (see [below for nested schema](#nestedatt--autoscale_settings))
 - `description` (String) Description of the delivery group.
-- `users` (List of String) The users and groups who are explicitly granted access to the published desktop.
+- `desktops` (Attributes List) A list of Desktop resources to publish on the delivery group. Only 1 desktop can be added to a Remote PC Delivery Group. (see [below for nested schema](#nestedatt--desktops))
+- `restricted_access_users` (Attributes) Restrict access to this Delivery Group by specifying users and groups in the allow and block list. If no value is specified, all authenticated users will have access to this Delivery Group. To give access to unauthenticated users, use the `allow_anonymous_access` property. (see [below for nested schema](#nestedatt--restricted_access_users))
 
 ### Read-Only
 
@@ -89,6 +90,7 @@ Required:
 
 Required:
 
+- `autoscale_enabled` (Boolean) Whether auto-scale is enabled for the delivery group.
 - `power_time_schemes` (Attributes List) Power management time schemes.  No two schemes for the same delivery group may cover the same day of the week. (see [below for nested schema](#nestedatt--autoscale_settings--power_time_schemes))
 
 Optional:
@@ -130,6 +132,47 @@ Required:
 
 - `pool_size` (Number) The number of machines (either as an absolute number or a percentage of the machines in the delivery group, depending on the value of PoolUsingPercentage) that are to be maintained in a running state, whether they are in use or not.
 - `time_range` (String) Time range during which the pool size applies.
+
+
+
+
+<a id="nestedatt--desktops"></a>
+### Nested Schema for `desktops`
+
+Required:
+
+- `enable_session_roaming` (Boolean) When enabled, if the user launches this desktop and then moves to another device, the same session is used, and applications are available on both devices. When disabled, the session no longer roams between devices. Should be set to false for Remote PC Delivery Group.
+- `enabled` (Boolean) Specify whether to enable the delivery of this desktop.
+- `published_name` (String) A display name for the desktop.
+
+Optional:
+
+- `description` (String) A description for the published desktop. The name and description are shown in Citrix Workspace app.
+- `restricted_access_users` (Attributes) Restrict access to this Desktop by specifying users and groups in the allow and block list. If no value is specified, all users that have access to this Delivery Group will have access to the Desktop. Required for Remote PC Delivery Groups. (see [below for nested schema](#nestedatt--desktops--restricted_access_users))
+
+<a id="nestedatt--desktops--restricted_access_users"></a>
+### Nested Schema for `desktops.restricted_access_users`
+
+Required:
+
+- `allow_list` (List of String) Users who can use this Desktop.
+
+Optional:
+
+- `block_list` (List of String) Users who cannot use this Desktop. A block list is meaningful only when used to block users in the allow list.
+
+
+
+<a id="nestedatt--restricted_access_users"></a>
+### Nested Schema for `restricted_access_users`
+
+Required:
+
+- `allow_list` (List of String) Users who can use this Delivery Group.
+
+Optional:
+
+- `block_list` (List of String) Users who cannot use this Delivery Group. A block list is meaningful only when used to block users in the allow list.
 
 ## Import
 

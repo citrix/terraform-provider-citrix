@@ -13,11 +13,20 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
-	citrixdaas "github.com/citrix/terraform-provider-citrix/internal/daas"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/data_sources/vda"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/resources/delivery_group"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/resources/hypervisor"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/resources/hypervisor_resource_pool"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/resources/machine_catalog"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/resources/zone"
+	"github.com/citrix/terraform-provider-citrix/internal/util"
+
 	"github.com/google/uuid"
 	"golang.org/x/mod/semver"
 
@@ -77,13 +86,13 @@ func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 		Attributes: map[string]schema.Attribute{
 			"hostname": schema.StringAttribute{
 				Description: "Host name / base URL of Citrix DaaS service. " + "<br />" +
-					"For Citrix On-Premises customers (Required): Use this to specify Delivery Controller hostname. " + "<br />" +
+					"For Citrix on-premises customers (Required): Use this to specify Delivery Controller hostname. " + "<br />" +
 					"For Citrix Cloud customers (Optional): Use this to force override the Citrix DaaS service hostname." + "<br />" +
 					"Can be set via Environment Variable **CITRIX_HOSTNAME**.",
 				Optional: true,
 			},
 			"environment": schema.StringAttribute{
-				Description: "Citrix Cloud environment of the customer. Only applicable for Citrix Cloud customers. Available options: `Production`, `Staging`, `Japan`, `JapanStaging`. " + "<br />" +
+				Description: "Citrix Cloud environment of the customer. Only applicable for Citrix Cloud customers. Available options: `Production`, `Staging`, `Japan`, `JapanStaging`, `Gov`, `GovStaging`. " + "<br />" +
 					"Can be set via Environment Variable **CITRIX_ENVIRONMENT**.",
 				Optional: true,
 				Validators: []validator.String{
@@ -92,6 +101,8 @@ func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 						"Staging",
 						"Japan",
 						"JapanStaging",
+						"Gov",
+						"GovStaging",
 					),
 				},
 			},
@@ -102,14 +113,14 @@ func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 			},
 			"client_id": schema.StringAttribute{
 				Description: "Client Id for Citrix DaaS service authentication. " + "<br />" +
-					"For Citrix On-Premises customers: Use this to specify Doamin Admin Username. " + "<br />" +
+					"For Citrix On-Premises customers: Use this to specify Domain Admin Username. " + "<br />" +
 					"For Citrix Cloud customers: Use this to specify Cloud API Key Client Id." + "<br />" +
 					"Can be set via Environment Variable **CITRIX_CLIENT_ID**.",
 				Optional: true,
 			},
 			"client_secret": schema.StringAttribute{
 				Description: "Client Secret for Citrix DaaS service authentication. " + "<br />" +
-					"For Citrix On-Premises customers: Use this to specify Doamin Admin Password. " + "<br />" +
+					"For Citrix on-premises customers: Use this to specify Domain Admin Password. " + "<br />" +
 					"For Citrix Cloud customers: Use this to specify Cloud API Key Client Secret." + "<br />" +
 					"Can be set via Environment Variable **CITRIX_CLIENT_SECRET**.",
 				Optional:  true,
@@ -156,40 +167,73 @@ type RegistryResponse struct {
 	Version string `json:"version"`
 }
 
-func (p *citrixProvider) versionCheck(resp *provider.ConfigureResponse) {
-	if !semver.IsValid("v" + p.version) {
-		return
-	}
+func getVersionFromTerraformRegistry() (string, error) {
 	httpResp, err := http.Get("https://registry.terraform.io/v1/providers/citrix/citrix")
 	if err != nil {
-		return
+		return "", err
 	}
 	defer httpResp.Body.Close()
 	if httpResp.StatusCode != 200 {
-		return
+		return "", err
 	}
 
 	body, err := io.ReadAll(httpResp.Body)
 	if err != nil {
-		return
+		return "", err
 	}
 	registryResp := RegistryResponse{}
 	err = json.Unmarshal(body, &registryResp)
 	if err != nil {
+		return "", err
+	}
+
+	return registryResp.Version, nil
+}
+
+// best effort version check, if anything goes wrong just bail out
+func (p *citrixProvider) versionCheck(resp *provider.ConfigureResponse) {
+	if !semver.IsValid("v" + p.version) {
 		return
 	}
 
-	if semver.Compare("v"+registryResp.Version, "v"+p.version) > 0 {
+	var registryVersion string
+	updateVersionFile := false
+
+	versionCheckFilePath := filepath.Join(os.TempDir(), "citrix_provider_version_check.txt")
+	info, err := os.Stat(versionCheckFilePath)
+	if err == nil && info != nil && time.Now().Before(info.ModTime().Add(time.Hour*time.Duration(24))) {
+		// use cached version for version check
+		txt, err := os.ReadFile(versionCheckFilePath)
+		if err != nil {
+			return
+		}
+		registryVersion = string(txt)
+	} else {
+		registryVersion, err = getVersionFromTerraformRegistry()
+		if err != nil {
+			return
+		}
+		updateVersionFile = true
+	}
+
+	if semver.Compare("v"+registryVersion, "v"+p.version) > 0 {
 		resp.Diagnostics.AddWarning(
 			"New version of the citrix/citrix provider is available",
-			fmt.Sprintf("Please update the provider version in terraform configuration to >=%s and then run `terraform init --upgrade` to get the latest version.", registryResp.Version))
+			fmt.Sprintf("Please update the provider version in terraform configuration to >=%s and then run `terraform init --upgrade` to get the latest version.", registryVersion))
 	}
-	return
+
+	if updateVersionFile {
+		err = os.WriteFile(versionCheckFilePath, []byte(registryVersion), 0660)
+		if err != nil {
+			return
+		}
+	}
 }
 
 // Configure prepares a Citrixdaas API client for data sources and resources.
 func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 	tflog.Info(ctx, "Configuring Citrix Cloud client")
+	defer util.PanicHandler(&resp.Diagnostics)
 
 	p.versionCheck(resp)
 
@@ -302,7 +346,7 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	// If any of the expected configurations are missing, return
 	// errors with provider-specific guidance.
 
-	// On-premises customer must specify hostname with DDC hostname / IP address
+	// On-Premises customer must specify hostname with DDC hostname / IP address
 	if onPremises && hostname == "" {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("hostname"),
@@ -343,19 +387,33 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		return
 	}
 
-	if !onPremises && hostname == "" {
-		if environment == "Production" {
-			hostname = "api.cloud.com"
-		} else if environment == "Staging" {
-			hostname = "api.cloudburrito.com"
-		} else if environment == "Japan" {
-			hostname = "api.citrixcloud.jp"
-		} else if environment == "JapanStaging" {
-			hostname = "api.citrixcloudstaging.jp"
+	// Indicate whether Citrix Cloud requests should go through API Gateway
+	apiGateway := true
+	if !onPremises {
+		if hostname == "" {
+			if environment == "Production" {
+				hostname = "api.cloud.com"
+			} else if environment == "Staging" {
+				hostname = "api.cloudburrito.com"
+			} else if environment == "Japan" {
+				hostname = "api.citrixcloud.jp"
+			} else if environment == "JapanStaging" {
+				hostname = "api.citrixcloudstaging.jp"
+			} else if environment == "Gov" {
+				hostname = fmt.Sprintf("%s.xendesktop.us", customerId)
+				apiGateway = false
+			} else if environment == "GovStaging" {
+				hostname = fmt.Sprintf("%s.xdstaging.us", customerId)
+				apiGateway = false
+			}
+		} else if !strings.HasPrefix(hostname, "api.") {
+			// When a cloud customer sets explicit hostname to the cloud DDC, bypass API Gateway
+			apiGateway = false
 		}
 	}
 
 	authUrl := ""
+	isGov := false
 	if onPremises {
 		authUrl = fmt.Sprintf("https://%s/citrix/orchestration/api/techpreview/tokens", hostname)
 	} else {
@@ -367,6 +425,12 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 			authUrl = fmt.Sprintf("https://api.citrixcloud.jp/cctrustoauth2/%s/tokens/clients", customerId)
 		} else if environment == "JapanStaging" {
 			authUrl = fmt.Sprintf("https://api.citrixcloudstaging.jp/cctrustoauth2/%s/tokens/clients", customerId)
+		} else if environment == "Gov" {
+			authUrl = fmt.Sprintf("https://trust.citrixworkspacesapi.us/%s/tokens/clients", customerId)
+			isGov = true
+		} else if environment == "GovStaging" {
+			authUrl = fmt.Sprintf("https://trust.ctxwsstgapi.us/%s/tokens/clients", customerId)
+			isGov = true
 		} else {
 			authUrl = fmt.Sprintf("https://%s/cctrustoauth2/%s/tokens/clients", hostname, customerId)
 		}
@@ -384,9 +448,8 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	tflog.Debug(ctx, "Creating Citrix API client")
 
 	userAgent := "citrix-terraform-provider/" + p.version + " (https://github.com/citrix/terraform-provider-citrix)"
-
 	// Create a new Citrix API client using the configuration values
-	client, httpResp, err := citrixclient.NewCitrixDaasClient(ctx, authUrl, hostname, customerId, clientId, clientSecret, onPremises, disableSslVerification, &userAgent, middlewareAuthFunc)
+	client, httpResp, err := citrixclient.NewCitrixDaasClient(ctx, authUrl, hostname, customerId, clientId, clientSecret, onPremises, apiGateway, isGov, disableSslVerification, &userAgent, middlewareAuthFunc)
 	if err != nil {
 		if httpResp != nil {
 			if httpResp.StatusCode == 401 {
@@ -471,17 +534,21 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 // DataSources defines the data sources implemented in the provider.
 func (p *citrixProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
-		citrixdaas.NewVdaDataSource,
+		vda.NewVdaDataSource,
 	}
 }
 
 // Resources defines the resources implemented in the provider.
 func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		citrixdaas.NewMachineCatalogResource,
-		citrixdaas.NewZoneResource,
-		citrixdaas.NewHypervisorResource,
-		citrixdaas.NewDeliveryGroupResource,
-		citrixdaas.NewHypervisorResourcePoolResource,
+		zone.NewZoneResource,
+		hypervisor.NewAzureHypervisorResource,
+		hypervisor.NewAwsHypervisorResource,
+		hypervisor.NewGcpHypervisorResource,
+		hypervisor_resource_pool.NewAzureHypervisorResourcePoolResource,
+		hypervisor_resource_pool.NewAwsHypervisorResourcePoolResource,
+		hypervisor_resource_pool.NewGcpHypervisorResourcePoolResource,
+		machine_catalog.NewMachineCatalogResource,
+		delivery_group.NewDeliveryGroupResource,
 	}
 }

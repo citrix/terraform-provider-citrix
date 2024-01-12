@@ -23,7 +23,7 @@ resource "citrix_daas_machine_catalog" "example-azure-mtsession" {
 	session_support				= "MultiSession"
 	provisioning_scheme			= 	{
 		machine_config = {
-            hypervisor = citrix_daas_hypervisor.example-azure-hypervisor.id
+            hypervisor = citrix_daas_azure_hypervisor.example-azure-hypervisor.id
 			hypervisor_resource_pool = citrix_daas_hypervisor_resource_pool.example-azure-hypervisor-resource-pool.id
             service_offering = "Standard_D2_v2"
             resource_group = "{Azure resource group name for image vhd}"
@@ -67,7 +67,7 @@ resource "citrix_daas_machine_catalog" "example-gcp-mtsession" {
         storage_type = "pd-standard"
         availability_zones = "{project name}:{region}:{availability zone1},{project name}:{region}:{availability zone2},..."
         machine_config = {
-            hypervisor = citrix_daas_hypervisor.example-gcp-hypervisor.id
+            hypervisor = citrix_daas_gcp_hypervisor.example-gcp-hypervisor.id
             hypervisor_resource_pool = citrix_daas_hypervisor_resource_pool.example-gcp-hypervisor-resource-pool.id
             machine_profile = "{Machine profile template VM name}"
             master_image = "{Image template VM name}"
@@ -97,21 +97,51 @@ resource "citrix_daas_machine_catalog" "example-gcp-mtsession" {
 ### Required
 
 - `allocation_type` (String) Denotes how the machines in the catalog are allocated to a user. Choose between `Static` and `Random`.
+- `is_power_managed` (Boolean) Specify if the machines in the machine catalog will be power managed.
+- `is_remote_pc` (Boolean) Specify if this catalog is for Remote PC access.
 - `name` (String) Name of the machine catalog.
-- `provisioning_scheme` (Attributes) Machine catalog provisioning scheme. (see [below for nested schema](#nestedatt--provisioning_scheme))
-- `service_account` (String) Service account for the domain.
-- `service_account_password` (String, Sensitive) Service account password for the domain.
-- `session_support` (String) Session support type. Choose between `SingleSession` and `MultiSession`.
+- `provisioning_type` (String) Specifies how the machines are provisioned in the catalog.
+- `session_support` (String) Session support type. Choose between `SingleSession` and `MultiSession`. Session support should be SingleSession when `is_remote_pc = true`
 - `zone` (String) Id of the zone the machine catalog is associated with.
 
 ### Optional
 
 - `description` (String) Description of the machine catalog.
-- `vda_upgrade_type` (String) Type of Vda Upgrade. Choose between LTSR and CR
+- `machine_accounts` (Attributes List) List of machine accounts to add to the catalog. Only to be used when using `provisioning_type = MANUAL` (see [below for nested schema](#nestedatt--machine_accounts))
+- `provisioning_scheme` (Attributes) Machine catalog provisioning scheme. Required when `provisioning_type = MCS` (see [below for nested schema](#nestedatt--provisioning_scheme))
+- `remote_pc_ous` (Attributes List) Organizational Units to be included in the Remote PC machine catalog. Only to be used when `is_remote_pc = true`. For adding machines, use `machine_accounts`. (see [below for nested schema](#nestedatt--remote_pc_ous))
+- `vda_upgrade_type` (String) Type of Vda Upgrade. Choose between LTSR and CR. When omitted, Vda Upgrade is disabled.
 
 ### Read-Only
 
 - `id` (String) GUID identifier of the machine catalog.
+
+<a id="nestedatt--machine_accounts"></a>
+### Nested Schema for `machine_accounts`
+
+Required:
+
+- `machines` (Attributes List) List of machines (see [below for nested schema](#nestedatt--machine_accounts--machines))
+
+Optional:
+
+- `hypervisor` (String) The Id of the hypervisor in which the machines reside. Required only if `is_power_managed = true`
+
+<a id="nestedatt--machine_accounts--machines"></a>
+### Nested Schema for `machine_accounts.machines`
+
+Required:
+
+- `machine_name` (String) The name of the machine. Must be in format DOMAIN\MACHINE.
+
+Optional:
+
+- `availability_zone` (String) **[AWS: Required]** The availability zone in which the machine resides. Required only if `is_power_managed = true`
+- `project_name` (String) **[GCP: Required]** The project name in which the machine resides. Required only if `is_power_managed = true`
+- `region` (String) **[Azure, GCP: Required]** The region in which the machine resides. Required only if `is_power_managed = true`
+- `resource_group_name` (String) **[Azure: Required]** The resource group in which the machine resides. Required only if `is_power_managed = true`
+
+
 
 <a id="nestedatt--provisioning_scheme"></a>
 ### Nested Schema for `provisioning_scheme`
@@ -150,8 +180,10 @@ Optional:
 
 Required:
 
-- `hypervisor` (String) Id of the hypervisor for creating the machines.
+- `hypervisor` (String) Id of the hypervisor for creating the machines. Required only if using power managed machines.
 - `hypervisor_resource_pool` (String) Id of the hypervisor resource pool that will be used for provisioning operations.
+- `service_account` (String) Service account for the domain.
+- `service_account_password` (String, Sensitive) Service account password for the domain.
 
 Optional:
 
@@ -200,6 +232,16 @@ Required:
 Optional:
 
 - `writeback_cache_memory_size_mb` (Number) The size of the in-memory write back cache in MB.
+
+
+
+<a id="nestedatt--remote_pc_ous"></a>
+### Nested Schema for `remote_pc_ous`
+
+Required:
+
+- `include_subfolders` (Boolean) Specify if subfolders should be included.
+- `ou_name` (String) Name of the OU.
 
 ## Import
 

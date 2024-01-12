@@ -6,7 +6,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"runtime"
+	"runtime/debug"
 	"strconv"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
@@ -14,11 +17,16 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
+
+const DomainFqdnRegex string = `^(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}$`
+const UpnRegex string = `^[^@]+@\b(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}$`
+const GuidRegex string = `^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}[}]?$`
 
 type NameValueStringPairModel struct {
 	Name  types.String `tfsdk:"name"`
@@ -152,4 +160,64 @@ func ReadResource[ResponseType any](request any, ctx context.Context, client *ci
 	}
 
 	return response, httpResp, err
+}
+
+func ProcessAsyncJobResponse(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int) (err error) {
+	txId := citrixdaasclient.GetTransactionIdFromHttpResponse(jobResp)
+
+	jobId := citrixdaasclient.GetJobIdFromHttpResponse(*jobResp)
+	jobResponseModel, err := client.WaitForJob(ctx, jobId, maxTimeout)
+
+	if err != nil {
+		diagnostics.AddError(
+			errContext,
+			"TransactionId: "+txId+
+				"\nJobId: "+jobResponseModel.GetId()+
+				"\nError message: "+jobResponseModel.GetErrorString(),
+		)
+		return err
+	}
+
+	if jobResponseModel.GetStatus() != citrixorchestration.JOBSTATUS_COMPLETE {
+		errorDetail := "TransactionId: " + txId +
+			"\nJobId: " + jobResponseModel.GetId()
+
+		if jobResponseModel.GetStatus() == citrixorchestration.JOBSTATUS_FAILED {
+			errorDetail = errorDetail + "\nError message: " + jobResponseModel.GetErrorString()
+		}
+
+		diagnostics.AddError(
+			errContext,
+			errorDetail,
+		)
+	}
+
+	return nil
+}
+
+func PanicHandler(diagnostics *diag.Diagnostics) {
+	if r := recover(); r != nil {
+		pc, _, _, ok := runtime.Caller(2) // 1=the panic, 2=who called the panic
+		f := runtime.FuncForPC(pc)
+		if !ok {
+			panic(r)
+		}
+		msg := fmt.Sprintf("An unexpected error occurred in %s.\n\n%v", f.Name(), r)
+
+		// write stack trace to disk so we don't dump on the console
+		fileContents := fmt.Sprintf("%s\n\n%s", f.Name(), debug.Stack())
+		file, err := ioutil.TempFile("", "citrix_provider_crash_stack.*.txt")
+		if err == nil {
+			defer file.Close()
+			_, err := file.WriteString(fileContents)
+			if err == nil {
+				msg += "\n\nPlease report this issue to the project maintainers and include this file if present: " + file.Name()
+			}
+		}
+
+		diagnostics.AddError(
+			"Unexpected error in the Citrix provider",
+			msg,
+		)
+	}
 }

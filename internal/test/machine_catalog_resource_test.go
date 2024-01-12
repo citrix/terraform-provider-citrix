@@ -11,6 +11,9 @@ import (
 )
 
 func TestMachineCatalogPreCheck(t *testing.T) {
+	if v := os.Getenv("TEST_MC_NAME"); v == "" {
+		t.Fatal("TEST_MC_NAME must be set for acceptance tests")
+	}
 	if v := os.Getenv("TEST_MC_SERVICE_OFFERING"); v == "" {
 		t.Fatal("TEST_MC_SERVICE_OFFERING must be set for acceptance tests")
 	}
@@ -35,6 +38,8 @@ func TestMachineCatalogPreCheck(t *testing.T) {
 }
 
 func TestMachineCatalogResource(t *testing.T) {
+	name := os.Getenv("TEST_MC_NAME")
+
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		PreCheck: func() {
@@ -50,11 +55,11 @@ func TestMachineCatalogResource(t *testing.T) {
 				Config: BuildMachineCatalogResource(t, machinecatalog_testResources),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
-					resource.TestCheckResourceAttr("citrix_daas_machine_catalog.testMachineCatalog", "name", "test-catalog"),
+					resource.TestCheckResourceAttr("citrix_daas_machine_catalog.testMachineCatalog", "name", name),
 					// Verify domain FQDN
 					resource.TestCheckResourceAttr("citrix_daas_machine_catalog.testMachineCatalog", "session_support", "MultiSession"),
 					// Verify domain admin username
-					resource.TestCheckResourceAttr("citrix_daas_machine_catalog.testMachineCatalog", "service_account", os.Getenv("TEST_MC_SERVICE_ACCOUNT")),
+					resource.TestCheckResourceAttr("citrix_daas_machine_catalog.testMachineCatalog", "provisioning_scheme.machine_config.service_account", os.Getenv("TEST_MC_SERVICE_ACCOUNT")),
 					// Verify nic network
 					resource.TestCheckResourceAttr("citrix_daas_machine_catalog.testMachineCatalog", "provisioning_scheme.network_mapping.network", os.Getenv("TEST_MC_SUBNET")),
 				),
@@ -66,14 +71,14 @@ func TestMachineCatalogResource(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"service_account", "service_account_password", "provisioning_scheme.network_mapping", "provisioning_scheme.writeback_cache", "provisioning_scheme.machine_config.service_offering"},
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.writeback_cache", "provisioning_scheme.machine_config.service_offering", "provisioning_scheme.machine_config.service_account", "provisioning_scheme.machine_config.service_account_password"},
 			},
 			//Update description, master image and add machine test
 			{
 				Config: BuildMachineCatalogResource(t, machinecatalog_testResources_updated),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
-					resource.TestCheckResourceAttr("citrix_daas_machine_catalog.testMachineCatalog", "name", "test-catalog"),
+					resource.TestCheckResourceAttr("citrix_daas_machine_catalog.testMachineCatalog", "name", name),
 					// Verify updated description
 					resource.TestCheckResourceAttr("citrix_daas_machine_catalog.testMachineCatalog", "description", "updatedCatalog"),
 					// Verify updated image
@@ -87,7 +92,7 @@ func TestMachineCatalogResource(t *testing.T) {
 				Config: BuildMachineCatalogResource(t, machinecatalog_testResources_delete_machine),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
-					resource.TestCheckResourceAttr("citrix_daas_machine_catalog.testMachineCatalog", "name", "test-catalog"),
+					resource.TestCheckResourceAttr("citrix_daas_machine_catalog.testMachineCatalog", "name", name),
 					// Verify total number of machines
 					resource.TestCheckResourceAttr("citrix_daas_machine_catalog.testMachineCatalog", "provisioning_scheme.number_of_total_machines", "1"),
 				),
@@ -100,16 +105,19 @@ func TestMachineCatalogResource(t *testing.T) {
 var (
 	machinecatalog_testResources = `
 resource "citrix_daas_machine_catalog" "testMachineCatalog" {
-	name                		= "test-catalog"
+	name                		= "%s"
 	description					= "on prem catalog for import testing"
-	service_account				= "%s"
-	service_account_password 	= "%s"
 	allocation_type				= "Random"
 	session_support				= "MultiSession"
+	provisioning_type			= "MCS"
+	is_power_managed			= true
+	is_remote_pc			    = false
 	provisioning_scheme			= 	{
 		machine_config = {
-			hypervisor			 = citrix_daas_hypervisor.testHypervisor.id
-			hypervisor_resource_pool = citrix_daas_hypervisor_resource_pool.testHypervisorResourcePool.id
+			hypervisor			 = citrix_daas_azure_hypervisor.testHypervisor.id
+			hypervisor_resource_pool = citrix_daas_azure_hypervisor_resource_pool.testHypervisorResourcePool.id
+			service_account				= "%s"
+			service_account_password 	= "%s"
 			service_offering 	 = "%s"
 			resource_group 		 = "%s"
             storage_account 	 = "%s"
@@ -143,16 +151,19 @@ resource "citrix_daas_machine_catalog" "testMachineCatalog" {
 `
 	machinecatalog_testResources_updated = `
 	resource "citrix_daas_machine_catalog" "testMachineCatalog" {
-		name                		= "test-catalog"
+		name                		= "%s"
 		description					= "updatedCatalog"
-		service_account				= "%s"
-		service_account_password 	= "%s"
 		allocation_type				= "Random"
 		session_support				= "MultiSession"
+		provisioning_type			= "MCS"
+		is_power_managed			= true
+		is_remote_pc			    = false
 		provisioning_scheme			= 	{
 			machine_config = {
-				hypervisor			 = citrix_daas_hypervisor.testHypervisor.id
-				hypervisor_resource_pool = citrix_daas_hypervisor_resource_pool.testHypervisorResourcePool.id
+				hypervisor			 = citrix_daas_azure_hypervisor.testHypervisor.id
+				hypervisor_resource_pool = citrix_daas_azure_hypervisor_resource_pool.testHypervisorResourcePool.id
+				service_account			 = "%s"
+				service_account_password = "%s"
 				service_offering 	 = "%s"
 				resource_group 		 = "%s"
 				storage_account 	 = "%s"
@@ -187,21 +198,24 @@ resource "citrix_daas_machine_catalog" "testMachineCatalog" {
 
 	machinecatalog_testResources_delete_machine = `
 	resource "citrix_daas_machine_catalog" "testMachineCatalog" {
-		name                		= "test-catalog"
-		description					= "updatedCatalog"
-		service_account				= "%s"
-		service_account_password 	= "%s"
+		name                		= "%s"
+		description					= "updatedCatalog"		
 		allocation_type				= "Random"
 		session_support				= "MultiSession"
+		provisioning_type			= "MCS"
+		is_power_managed			= true
+		is_remote_pc			    = false
 		provisioning_scheme			= 	{
 			machine_config = {
-				hypervisor			 = citrix_daas_hypervisor.testHypervisor.id
-				hypervisor_resource_pool = citrix_daas_hypervisor_resource_pool.testHypervisorResourcePool.id
-				service_offering 	 = "%s"
-				resource_group 		 = "%s"
-				storage_account 	 = "%s"
-				container 			 = "%s"
-				master_image		 = "%s"
+				hypervisor			 	 = citrix_daas_azure_hypervisor.testHypervisor.id
+				hypervisor_resource_pool = citrix_daas_azure_hypervisor_resource_pool.testHypervisorResourcePool.id
+				service_account			 = "%s"
+				service_account_password = "%s"
+				service_offering 	 	 = "%s"
+				resource_group 		 	 = "%s"
+				storage_account 	 	 = "%s"
+				container 			 	 = "%s"
+				master_image		 	 = "%s"
 			}
 			network_mapping = {
 				network_device = "0"
@@ -231,6 +245,7 @@ resource "citrix_daas_machine_catalog" "testMachineCatalog" {
 )
 
 func BuildMachineCatalogResource(t *testing.T, machineResource string) string {
+	name := os.Getenv("TEST_MC_NAME")
 	service_account := os.Getenv("TEST_MC_SERVICE_ACCOUNT")
 	service_account_pass := os.Getenv("TEST_MC_SERVICE_ACCOUNT_PASS")
 	service_offering := os.Getenv("TEST_MC_SERVICE_OFFERING")
@@ -246,5 +261,5 @@ func BuildMachineCatalogResource(t *testing.T, machineResource string) string {
 	//machine account
 	domain := os.Getenv("TEST_MC_DOMAIN")
 
-	return BuildHypervisorResourcePoolResource(t, hypervisor_resource_pool_testResource) + fmt.Sprintf(machineResource, service_account, service_account_pass, service_offering, resource_group, storage_account, container, master_image, subnet, domain)
+	return BuildHypervisorResourcePoolResource(t, hypervisor_resource_pool_testResource) + fmt.Sprintf(machineResource, name, service_account, service_account_pass, service_offering, resource_group, storage_account, container, master_image, subnet, domain)
 }
