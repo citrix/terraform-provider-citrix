@@ -15,6 +15,8 @@ Citrix has developed a custom Terraform provider for automating Citrix product d
     - [Start writing Terraform for managing your Citrix DaaS site](#start-writing-terraform-for-managing-your-citrix-daas-site)
     - [Create a Zone in Citrix DaaS as the first step](#create-a-zone-in-citrix-daas-as-the-first-step)
   - [Frequently Asked Questions](#frequently-asked-questions)
+      - [What resource is supported for different connection types?](#what-resource-is-supported-for-different-connection-types)
+      - [What provisioning types are supported for machine catalog?](#what-provisioning-types-are-supported-for-machine-catalog)
   - [Attributions](#attributions)
   - [License](#license)
 
@@ -115,7 +117,25 @@ To find all the Citrix DaaS resources manageable via Terraform, understand all t
 Refer the [DaaS Zone documentation](docs/resources/daas_zone.md) to configure a zone via terraform. 
 
 ## Frequently Asked Questions
+#### What resource is supported for different connection types?
 
+| Connection Type |   Hypervisor     |   Resource Pool  |   Machine Catalog   | 
+|-----------------|------------------|------------------|---------------------|
+| AzureRM         |:heavy_check_mark:|:heavy_check_mark:|  :heavy_check_mark:
+| AWS EC2         |:heavy_check_mark:|:heavy_check_mark:|  in progress 
+| GCP             |:heavy_check_mark:|:heavy_check_mark:|  :heavy_check_mark:
+
+
+#### What provisioning types are supported for machine catalog? 
+- MCS provisioning
+  - Azure
+  - AWS EC2 (in progress)
+  - GCP
+- Manual Power Managed
+  - Azure
+  - GCP
+  - AWS EC2
+- Manual / Remote PC
 
 ## Attributions
 The code in this repository makes use of the following packages:
