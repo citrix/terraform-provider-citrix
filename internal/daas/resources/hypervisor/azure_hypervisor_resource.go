@@ -39,12 +39,12 @@ type azureHypervisorResource struct {
 	client *citrixdaasclient.CitrixDaasClient
 }
 
-// Metadata returns the data source type name.
+// Metadata returns the resource type name.
 func (r *azureHypervisorResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_daas_azure_hypervisor"
 }
 
-// Schema defines the schema for the data source.
+// Schema defines the schema for the resource.
 func (r *azureHypervisorResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Manages an Azure hypervisor.",
@@ -104,7 +104,7 @@ func (r *azureHypervisorResource) Schema(_ context.Context, _ resource.SchemaReq
 	}
 }
 
-// Configure adds the provider configured client to the data source.
+// Configure adds the provider configured client to the resource.
 func (r *azureHypervisorResource) Configure(_ context.Context, req resource.ConfigureRequest, _ *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return

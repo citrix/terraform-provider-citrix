@@ -19,7 +19,14 @@ import (
 	"time"
 
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/data_sources/application_folder_details"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/data_sources/vda"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/resources/admin_role"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/resources/application"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/resources/application_folder"
+
+	admin_scope_data_source "github.com/citrix/terraform-provider-citrix/internal/daas/data_sources/admin_scope"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/resources/admin_scope"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/resources/delivery_group"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/resources/hypervisor"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/resources/hypervisor_resource_pool"
@@ -82,7 +89,7 @@ func (p *citrixProvider) Metadata(_ context.Context, _ provider.MetadataRequest,
 // Schema defines the provider-level schema for configuration data.
 func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manage and deploy Citrix resources easily using the Citrix Terraform provider. The provider currently supports both Citrix Virtual Apps & Desktops(CVAD) and Citrix Desktop as a Service (DaaS) solutions. You can automate creation of site setup including host connections, machine catalogs and delivery groups etc for both CVAD and Citrix DaaS. You can deploy resources in Azure, AWS and GCP. The provider is developed and maintained by Citrix. Please note that this provider is still in **tech preview**.",
+		Description: "Manage and deploy Citrix resources easily using the Citrix Terraform provider. The provider currently supports both Citrix Virtual Apps & Desktops(CVAD) and Citrix Desktop as a Service (DaaS) solutions. You can automate creation of site setup including host connections, machine catalogs and delivery groups etc for both CVAD and Citrix DaaS. You can deploy resources in Azure, AWS and GCP. You can also use Manual provisioning or RemotePC to add workloads. The provider is developed and maintained by Citrix. Please note that this provider is still in **tech preview**.",
 		Attributes: map[string]schema.Attribute{
 			"hostname": schema.StringAttribute{
 				Description: "Host name / base URL of Citrix DaaS service. " + "<br />" +
@@ -535,6 +542,8 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 func (p *citrixProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		vda.NewVdaDataSource,
+		application_folder_details.NewApplicationDataSourceSource,
+		admin_scope_data_source.NewAdminScopeDataSource,
 	}
 }
 
@@ -550,5 +559,10 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		hypervisor_resource_pool.NewGcpHypervisorResourcePoolResource,
 		machine_catalog.NewMachineCatalogResource,
 		delivery_group.NewDeliveryGroupResource,
+		application.NewApplicationResource,
+		application_folder.NewApplicationFolderResource,
+		admin_scope.NewAdminScopeResource,
+		admin_role.NewAdminRoleResource,
+		//Add resource here
 	}
 }

@@ -13,6 +13,7 @@ import (
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/go-azure-helpers/resourcemanager/location"
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -42,7 +43,7 @@ type gcpHypervisorResourcePoolResource struct {
 	client *citrixdaasclient.CitrixDaasClient
 }
 
-// Metadata returns the data source type name.
+// Metadata returns the resource type name.
 func (r *gcpHypervisorResourcePoolResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_daas_gcp_hypervisor_resource_pool"
 }
@@ -86,6 +87,9 @@ func (r *gcpHypervisorResourcePoolResource) Schema(_ context.Context, _ resource
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.RequiresReplaceIfConfigured(),
 				},
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
 			},
 			"region": schema.StringAttribute{
 				Description: "Cloud Region where the virtual network sits in.",
@@ -119,7 +123,7 @@ func (r *gcpHypervisorResourcePoolResource) Schema(_ context.Context, _ resource
 	}
 }
 
-// Configure adds the provider configured client to the data source.
+// Configure adds the provider configured client to the resource.
 func (r *gcpHypervisorResourcePoolResource) Configure(_ context.Context, req resource.ConfigureRequest, _ *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return

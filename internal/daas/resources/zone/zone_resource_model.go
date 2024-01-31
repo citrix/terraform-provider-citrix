@@ -11,10 +11,10 @@ import (
 
 // ZoneResourceModel maps the resource schema data.
 type ZoneResourceModel struct {
-	Id          types.String                     `tfsdk:"id"`
-	Name        types.String                     `tfsdk:"name"`
-	Description types.String                     `tfsdk:"description"`
-	Metadata    *[]util.NameValueStringPairModel `tfsdk:"metadata"`
+	Id          types.String                    `tfsdk:"id"`
+	Name        types.String                    `tfsdk:"name"`
+	Description types.String                    `tfsdk:"description"`
+	Metadata    []util.NameValueStringPairModel `tfsdk:"metadata"`
 }
 
 func (r ZoneResourceModel) RefreshPropertyValues(zone *citrixorchestration.ZoneDetailResponseModel, onpremises bool) ZoneResourceModel {

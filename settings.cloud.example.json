@@ -1,0 +1,88 @@
+{
+    "markdown.extension.toc.updateOnSave": false,
+    "diffEditor.ignoreTrimWhitespace": false,
+    "github.copilot.advanced": {},
+    "go.testEnvVars": {
+
+        "TF_ACC": "1",
+        "CITRIX_CUSTOMER_ID": "{customer_id}",
+        "CITRIX_CLIENT_ID": "{client_id}",
+        "CITRIX_CLIENT_SECRET": "{client_secret}",
+
+        // Zone Go Tests
+        "TEST_ZONE_NAME" :"test-zone",
+        "TEST_ZONE_DESCRIPTION" :"test zone description",
+        
+        // Hypervisor Go Tests
+        "TEST_HYPERV_NAME"              :"{hypervisor_name}",
+        "TEST_HYPERV_AD_ID"             :"{hypervisor_id}",
+        "TEST_HYPERV_SUBSCRIPTION_ID"   :"{hypervisor_subscription_id}",
+        "TEST_HYPERV_APPLICATION_ID"    :"{hyperviso_application_id}",
+        "TEST_HYPERV_APPLICATION_SECRET":"{hypervisor_application_secret}",
+        "TEST_HYPERV_APPLICATION_SECRET_EXPIRATION_DATE": "2030-12-31",
+        "TEST_HYPERV_RP_NAME"           : "{hypervisor_resource_pool_name}",
+        "TEST_HYPERV_RP_REGION"            :"East US",
+        "TEST_HYPERV_RP_VIRTUAL_NETWORK_RESOURCE_GROUP" :"{hypervisor_resource_pool_network_resource_group_name}",
+        "TEST_HYPERV_RP_VIRTUAL_NETWORK"   :"{hypervisor_resource_pool_vnet_name}",
+        "Test_HYPERV_RP_SUBNETS"           :"[\"{hypervisor_resource_pool_subnet_name}\"]",
+
+        // Machine Catalog Go Tests - Azure
+        "TEST_MC_NAME"                  :"azure-onprem-catalog-1",
+        "TEST_MC_SERVICE_ACCOUNT"       :"{admin_username}",
+        "TEST_MC_SERVICE_ACCOUNT_PASS"  :"{admin_password}",
+        "TEST_MC_SERVICE_OFFERING"      :"Standard_D2_v2",
+        "TEST_MC_MASTER_IMAGE"          :"m19g1-2305-1-vda.vhd",
+        "TEST_MC_MASTER_IMAGE_UPDATED"  :"m19g1-2305-1-vda.vhd",
+        "TEST_MC_IMAGE_RESOUCE_GROUP"   :"ctx-rg",
+        "TEST_MC_IMAGE_STORAGE_ACCOUNT" :"{storage_account}",
+        "TEST_MC_IMAGE_CONTAINER"       :"vda-images",
+        "TEST_MC_SUBNET"                :"ctx-cvad-subnet",
+
+        // Machine Catalog Go Tests - GCP
+        "TEST_MC_NAME_GCP"              :"gcp-onprem-catalog-1",
+        "TEST_MC_SERVICE_ACCOUNT_GCP"   :"{admin_username}",
+        "TEST_MC_SERVICE_ACCOUNT_PASS_GCP" :"{admin_password}",
+        "TEST_MC_STORAGE_TYPE_GCP"      :"pd-standard",
+        "TEST_MC_AVAILABILITY_ZONES_GCP":"{gcp_availibity_zone}",
+        "TEST_MC_MACHINE_PROFILE_GCP"   :"gcp-test-img-vm",
+        "TEST_MC_MASTER_IMAGE_GCP"      :"gcp-test-img-vm",
+        "TEST_MC_MACHINE_SNAPSHOT_GCP"  :"gcp-test-img-vm-snapshot",
+        "TEST_MC_DOMAIN_GCP"            :"ctx-ad.local",
+        "TEST_MC_Subnet_GCP"            :"us-east1",
+
+        //Machine Catalog Go Tests - Azure Manual Power Managed
+        "TEST_MC_NAME_MANUAL"                           :"azure-manual-catalog-1",
+        "TEST_MC_ALLOCATION_TYPE_MANUAL_POWER_MANAGED"  :"Static",
+        "TEST_MC_SESSION_SUPPORT_MANUAL_POWER_MANAGED"  :"SingleSession",
+        "TEST_MC_REGION_MANUAL_POWER_MANAGED"           :"East US",
+        "TEST_MC_RESOURCE_GROUP_MANUAL_POWER_MANAGED"   :"{resource_group_name}",
+        "TEST_MC_MACHINE_NAME_MANUAL_Azure"             :"{machine_domain_name}\\\\manual-01",
+
+        //Machine Catalog Go Tests - GCP Manual Power Managed
+        "TEST_MC_MACHINE_NAME_MANUAL_GCP"               :"{machine_domain_name}\\\\instance-1",
+        "TEST_MC_PROJECT_NAME_MANUAL_POWER_MANAGED"     :"{GCP_Project_Name}",
+
+        //Machine Catalog Go Tests -  Non Power Managed
+        "TEST_MC_MACHINE_NAME_MANUAL_NON_POWER_MANAGED"     : "{machine_domain_name}\\\\manual-02",
+        "TEST_MC_ALLOCATION_TYPE_MANUAL_NON_POWER_MANAGED"  : "Static",
+        "TEST_MC_SESSION_SUPPORT_MANUAL_NON_POWER_MANAGED"  : "SingleSession",
+ 
+        //Machine Catalog Go Tests -  Remote PC
+        "TEST_MC_NAME_REMOTE_PC"        :"azure-onprem-remote-pc",
+        "TEST_MC_MACHINE_NAME_REMOTE_PC" :"{machine_domain_name}\\\\manual-01",
+        "TEST_MC_ALLOCATION_TYPE_REMOTE_PC" :"Static",
+        "TEST_MC_INCLUDE_SUBFOLDERS_REMOTE_PC" :"false",
+        "TEST_MC_OU_REMOTE_PC"        :"{OU}",
+
+        //machine account env variable
+        "TEST_MC_DOMAIN"                :"ctx-ad.local",
+        "TEST_MC_DOMAIN_OU"             :"",
+
+        //Delivery Group Testing Env Variables
+        "TEST_DG_NAME"                :"ctx-test-delivery-group",
+
+        // Admin role env variable
+        "TEST_ROLE_NAME"                :"ctx-test-role"
+    },
+    "go.testTimeout": "30m"
+}

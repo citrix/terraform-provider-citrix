@@ -31,13 +31,13 @@ type MachineCatalogResourceModel struct {
 	VdaUpgradeType     types.String             `tfsdk:"vda_upgrade_type"`
 	ProvisioningType   types.String             `tfsdk:"provisioning_type"`
 	ProvisioningScheme *ProvisioningSchemeModel `tfsdk:"provisioning_scheme"`
-	MachineAccounts    *[]MachineAccountsModel  `tfsdk:"machine_accounts"`
-	RemotePcOus        *[]RemotePcOuModel       `tfsdk:"remote_pc_ous"`
+	MachineAccounts    []MachineAccountsModel   `tfsdk:"machine_accounts"`
+	RemotePcOus        []RemotePcOuModel        `tfsdk:"remote_pc_ous"`
 }
 
 type MachineAccountsModel struct {
-	Hypervisor types.String                  `tfsdk:"hypervisor"`
-	Machines   *[]MachineCatalogMachineModel `tfsdk:"machines"`
+	Hypervisor types.String                 `tfsdk:"hypervisor"`
+	Machines   []MachineCatalogMachineModel `tfsdk:"machines"`
 }
 
 type MachineCatalogMachineModel struct {
@@ -50,34 +50,29 @@ type MachineCatalogMachineModel struct {
 
 // ProvisioningSchemeModel maps the nested provisioning scheme resource schema data.
 type ProvisioningSchemeModel struct {
-	MachineConfig               *MachineConfigModel               `tfsdk:"machine_config"`
+	Hypervisor                  types.String                      `tfsdk:"hypervisor"`
+	HypervisorResourcePool      types.String                      `tfsdk:"hypervisor_resource_pool"`
+	AzureMachineConfig          *AzureMachineConfigModel          `tfsdk:"azure_machine_config"`
+	AwsMachineConfig            *AwsMachineConfigModel            `tfsdk:"aws_machine_config"`
+	GcpMachineConfig            *GcpMachineConfigModel            `tfsdk:"gcp_machine_config"`
 	NumTotalMachines            types.Int64                       `tfsdk:"number_of_total_machines"`
 	NetworkMapping              *NetworkMappingModel              `tfsdk:"network_mapping"`
-	MachineAccountCreationRules *MachineAccountCreationRulesModel `tfsdk:"machine_account_creation_rules"`
 	AvailabilityZones           types.String                      `tfsdk:"availability_zones"`
-	StorageType                 types.String                      `tfsdk:"storage_type"`
-	VdaResourceGroup            types.String                      `tfsdk:"vda_resource_group"`
-	UseManagedDisks             types.Bool                        `tfsdk:"use_managed_disks"`
-	WritebackCache              *WritebackCacheModel              `tfsdk:"writeback_cache"`
+	IdentityType                types.String                      `tfsdk:"identity_type"`
+	MachineDomainIdentity       *MachineDomainIdentityModel       `tfsdk:"machine_domain_identity"`
+	MachineAccountCreationRules *MachineAccountCreationRulesModel `tfsdk:"machine_account_creation_rules"`
 }
 
-type MachineConfigModel struct {
-	Hypervisor             types.String `tfsdk:"hypervisor"`
-	HypervisorResourcePool types.String `tfsdk:"hypervisor_resource_pool"`
+type MachineProfileModel struct {
+	MachineProfileVmName        types.String `tfsdk:"machine_profile_vm_name"`
+	MachineProfileResourceGroup types.String `tfsdk:"machine_profile_resource_group"`
+}
+
+type MachineDomainIdentityModel struct {
+	Domain                 types.String `tfsdk:"domain"`
+	Ou                     types.String `tfsdk:"domain_ou"`
 	ServiceAccount         types.String `tfsdk:"service_account"`
 	ServiceAccountPassword types.String `tfsdk:"service_account_password"`
-	ServiceOffering        types.String `tfsdk:"service_offering"`
-	MasterImage            types.String `tfsdk:"master_image"`
-	/** Azure Hypervisor **/
-	ResourceGroup  types.String       `tfsdk:"resource_group"`
-	StorageAccount types.String       `tfsdk:"storage_account"`
-	Container      types.String       `tfsdk:"container"`
-	GalleryImage   *GalleryImageModel `tfsdk:"gallery_image"`
-	/** AWS Hypervisor **/
-	ImageAmi types.String `tfsdk:"image_ami"`
-	/** GCP Hypervisor **/
-	MachineProfile  types.String `tfsdk:"machine_profile"`
-	MachineSnapshot types.String `tfsdk:"machine_snapshot"`
 }
 
 type GalleryImageModel struct {
@@ -101,8 +96,6 @@ type WritebackCacheModel struct {
 type MachineAccountCreationRulesModel struct {
 	NamingScheme     types.String `tfsdk:"naming_scheme"`
 	NamingSchemeType types.String `tfsdk:"naming_scheme_type"`
-	Domain           types.String `tfsdk:"domain"`
-	Ou               types.String `tfsdk:"domain_ou"`
 }
 
 // NetworkMappingModel maps the nested network mapping resource schema data.
@@ -141,8 +134,11 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 		r.VdaUpgradeType = types.StringNull()
 	}
 
-	r.IsPowerManaged = types.BoolValue(catalog.GetIsPowerManaged())
-	r.ProvisioningType = types.StringValue(string(catalog.GetProvisioningType()))
+	provtype := catalog.GetProvisioningType()
+	r.ProvisioningType = types.StringValue(string(provtype))
+	if provtype == citrixorchestration.PROVISIONINGTYPE_MANUAL || !r.IsPowerManaged.IsNull() {
+		r.IsPowerManaged = types.BoolValue(catalog.GetIsPowerManaged())
+	}
 
 	if catalog.ProvisioningType == citrixorchestration.PROVISIONINGTYPE_MANUAL {
 		// Handle machines
@@ -160,95 +156,72 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 
 	if r.ProvisioningScheme == nil {
 		r.ProvisioningScheme = &ProvisioningSchemeModel{}
-		r.ProvisioningScheme.MachineConfig = &MachineConfigModel{}
 	}
 
 	provScheme := catalog.GetProvisioningScheme()
 	resourcePool := provScheme.GetResourcePool()
 	hypervisor := resourcePool.GetHypervisor()
-	machineProfile := provScheme.GetMachineProfile()
-	masterImage := provScheme.GetMasterImage()
 	machineAccountCreateRules := provScheme.GetMachineAccountCreationRules()
 	domain := machineAccountCreateRules.GetDomain()
+	customProperties := provScheme.GetCustomProperties()
 
-	// Refresh Machine Config Properties
-	if r.ProvisioningScheme.MachineConfig.Hypervisor == types.StringNull() {
-		r.ProvisioningScheme.MachineConfig.Hypervisor = types.StringValue(hypervisor.GetId())
-	}
+	// Refresh Hypervisor and Resource Pool
+	r.ProvisioningScheme.Hypervisor = types.StringValue(hypervisor.GetId())
+	r.ProvisioningScheme.HypervisorResourcePool = types.StringValue(resourcePool.GetId())
 
-	if r.ProvisioningScheme.MachineConfig.HypervisorResourcePool == types.StringNull() {
-		r.ProvisioningScheme.MachineConfig.HypervisorResourcePool = types.StringValue(resourcePool.GetId())
-	}
-	if catalog.ProvisioningScheme.GetServiceOffering() != "" && r.ProvisioningScheme.MachineConfig.ServiceOffering.ValueString() != "" {
-		r.ProvisioningScheme.MachineConfig.ServiceOffering = types.StringValue(provScheme.GetServiceOffering())
-	} else {
-		// For GCP, service offering will be nil in plan / state. Skip service offering refresh for GCP catalog.
-		r.ProvisioningScheme.MachineConfig.ServiceOffering = types.StringNull()
-	}
-
-	// Refresh Master Image
-	if r.ProvisioningScheme.MachineConfig.GalleryImage != nil {
-		/* For Azure Image Gallery image, the XDPath looks like:
-		 * XDHyp:\\HostingUnits\\{resource pool}\\image.folder\\{resource group}.resourcegroup\\{gallery name}.gallery\\{image name}.imagedefinition\\{image version}.imageversion
-		 * The Name property in MasterImage will be image version instead of image definition (name of the image)
-		 */
-		r.ProvisioningScheme.MachineConfig.GalleryImage.Version = types.StringValue(masterImage.GetName())
-	} else if r.ProvisioningScheme.MachineConfig.MachineSnapshot.ValueString() != "" {
-		/* For GCP snapshot image, the XDPath looks like:
-		 * XDHyp:\\HostingUnits\\{resource pool}\\{VM name}.vm\\{VM snapshot name}.snapshot
-		 * The Name property in MasterImage will be VM snapshot name instead of VM name
-		 */
-		r.ProvisioningScheme.MachineConfig.MachineSnapshot = types.StringValue(masterImage.GetName())
-		masterImageXdPath := masterImage.GetXDPath()
-		if masterImageXdPath != "" {
-			segments := strings.Split(masterImage.GetXDPath(), "\\")
-			lastIndex := len(segments)
-			// Snapshot or Managed Disk
-			r.ProvisioningScheme.MachineConfig.MasterImage = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
+	switch *connectionType {
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
+		if r.ProvisioningScheme.AzureMachineConfig == nil {
+			r.ProvisioningScheme.AzureMachineConfig = &AzureMachineConfigModel{}
 		}
-	} else {
-		r.ProvisioningScheme.MachineConfig.MasterImage = types.StringValue(masterImage.GetName())
-	}
 
-	if *connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM {
-		masterImageXdPath := masterImage.GetXDPath()
-		if masterImageXdPath != "" {
-			segments := strings.Split(masterImage.GetXDPath(), "\\")
-			lastIndex := len(segments)
-			if lastIndex == 8 {
-				resourceTag := strings.Split(segments[lastIndex-1], ".")
-				resourceType := resourceTag[len(resourceTag)-1]
+		r.ProvisioningScheme.AzureMachineConfig.RefreshProperties(*catalog)
 
-				if resourceType == "vhd" {
-					// VHD image
-					r.ProvisioningScheme.MachineConfig.Container = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
-					r.ProvisioningScheme.MachineConfig.StorageAccount = types.StringValue(strings.Split(segments[lastIndex-3], ".")[0])
-				} else if resourceType == "imageversion" {
-					// Gallery image
-					r.ProvisioningScheme.MachineConfig.GalleryImage.Definition = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
-					r.ProvisioningScheme.MachineConfig.GalleryImage.Gallery = types.StringValue(strings.Split(segments[lastIndex-3], ".")[0])
-				}
-				r.ProvisioningScheme.MachineConfig.ResourceGroup = types.StringValue(strings.Split(segments[lastIndex-4], ".")[0])
-			} else {
-				// Snapshot or Managed Disk
-				r.ProvisioningScheme.MachineConfig.ResourceGroup = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
+		for _, stringPair := range customProperties {
+			if stringPair.GetName() == "Zones" && !r.ProvisioningScheme.AvailabilityZones.IsNull() {
+				r.ProvisioningScheme.AvailabilityZones = types.StringValue(stringPair.GetValue())
 			}
 		}
-	}
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
+		if r.ProvisioningScheme.AwsMachineConfig == nil {
+			r.ProvisioningScheme.AwsMachineConfig = &AwsMachineConfigModel{}
+		}
+		r.ProvisioningScheme.AwsMachineConfig.RefreshProperties(*catalog)
 
-	if machineProfileName := machineProfile.GetName(); machineProfileName != "" {
-		r.ProvisioningScheme.MachineConfig.MachineProfile = types.StringValue(machineProfileName)
-	} else {
-		r.ProvisioningScheme.MachineConfig.MachineProfile = types.StringNull()
+		for _, stringPair := range customProperties {
+			if stringPair.GetName() == "Zones" {
+				r.ProvisioningScheme.AvailabilityZones = types.StringValue(stringPair.GetValue())
+			}
+		}
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
+		if r.ProvisioningScheme.GcpMachineConfig == nil {
+			r.ProvisioningScheme.GcpMachineConfig = &GcpMachineConfigModel{}
+		}
+
+		r.ProvisioningScheme.GcpMachineConfig.RefreshProperties(*catalog)
+
+		for _, stringPair := range customProperties {
+			if stringPair.GetName() == "CatalogZones" && !r.ProvisioningScheme.AvailabilityZones.IsNull() {
+				r.ProvisioningScheme.AvailabilityZones = types.StringValue(stringPair.GetValue())
+			}
+		}
 	}
 
 	// Refresh Total Machine Count
 	r.ProvisioningScheme.NumTotalMachines = types.Int64Value(int64(provScheme.GetMachineCount()))
 
+	// Refresh Total Machine Count
+	if identityType := types.StringValue(reflect.ValueOf(provScheme.GetIdentityType()).String()); identityType.ValueString() != "" {
+		r.ProvisioningScheme.IdentityType = identityType
+	} else {
+		r.ProvisioningScheme.IdentityType = types.StringNull()
+	}
+
 	// Refresh Network Mapping
-	networkMaps := catalog.ProvisioningScheme.GetNetworkMaps()
+	networkMaps := provScheme.GetNetworkMaps()
 
 	if len(networkMaps) > 0 && r.ProvisioningScheme.NetworkMapping != nil {
+		r.ProvisioningScheme.NetworkMapping = &NetworkMappingModel{}
 		r.ProvisioningScheme.NetworkMapping.NetworkDevice = types.StringValue(networkMaps[0].GetDeviceId())
 		network := networkMaps[0].GetNetwork()
 		segments := strings.Split(network.GetXDPath(), "\\")
@@ -258,17 +231,6 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 		r.ProvisioningScheme.NetworkMapping = nil
 	}
 
-	//Refresh custom properties
-	customProperties := provScheme.GetCustomProperties()
-	r.ProvisioningScheme.RefreshProperties(customProperties)
-
-	if r.ProvisioningScheme.WritebackCache != nil {
-		r.ProvisioningScheme.WritebackCache.WriteBackCacheDiskSizeGB = types.Int64Value(int64(provScheme.GetWriteBackCacheDiskSizeGB()))
-		if !r.ProvisioningScheme.WritebackCache.WriteBackCacheMemorySizeMB.IsNull() {
-			r.ProvisioningScheme.WritebackCache.WriteBackCacheMemorySizeMB = types.Int64Value(int64(provScheme.GetWriteBackCacheMemorySizeMB()))
-		}
-	}
-
 	// Identity Pool Properties
 	if r.ProvisioningScheme.MachineAccountCreationRules == nil {
 		r.ProvisioningScheme.MachineAccountCreationRules = &MachineAccountCreationRulesModel{}
@@ -276,9 +238,17 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 	r.ProvisioningScheme.MachineAccountCreationRules.NamingScheme = types.StringValue(machineAccountCreateRules.GetNamingScheme())
 	namingSchemeType := machineAccountCreateRules.GetNamingSchemeType()
 	r.ProvisioningScheme.MachineAccountCreationRules.NamingSchemeType = types.StringValue(reflect.ValueOf(namingSchemeType).String())
-	r.ProvisioningScheme.MachineAccountCreationRules.Domain = types.StringValue(domain.GetName())
+
+	// Domain Identity Properties
+	if r.ProvisioningScheme.MachineDomainIdentity == nil {
+		r.ProvisioningScheme.MachineDomainIdentity = &MachineDomainIdentityModel{}
+	}
+
+	if domain.GetName() != "" {
+		r.ProvisioningScheme.MachineDomainIdentity.Domain = types.StringValue(domain.GetName())
+	}
 	if machineAccountCreateRules.GetOU() != "" {
-		r.ProvisioningScheme.MachineAccountCreationRules.Ou = types.StringValue(machineAccountCreateRules.GetOU())
+		r.ProvisioningScheme.MachineDomainIdentity.Ou = types.StringValue(machineAccountCreateRules.GetOU())
 	}
 
 	return r
@@ -297,88 +267,73 @@ func allocationTypeEnumToString(conn citrixorchestration.AllocationType) string 
 	}
 }
 
-func (res *ProvisioningSchemeModel) RefreshProperties(stringPairs []citrixorchestration.NameValueStringPairModel) {
-
-	for _, stringPair := range stringPairs {
-		switch stringPair.GetName() {
-		case "StorageType":
-			res.StorageType = types.StringValue(stringPair.GetValue())
-		case "UseManagedDisks":
-			res.UseManagedDisks = util.StringToTypeBool(stringPair.GetValue())
-		case "Zones":
-			res.AvailabilityZones = types.StringValue(stringPair.GetValue())
-		case "CatalogZones":
-			res.AvailabilityZones = types.StringValue(stringPair.GetValue())
-		case "ResourceGroups":
-			res.VdaResourceGroup = types.StringValue(stringPair.GetValue())
-		case "WBCDiskStorageType":
-			if res.WritebackCache != nil {
-				res.WritebackCache.WBCDiskStorageType = types.StringValue(stringPair.GetValue())
-			}
-		case "PersistWBC":
-			if res.WritebackCache != nil {
-				res.WritebackCache.PersistWBC = util.StringToTypeBool(stringPair.GetValue())
-			}
-		case "PersistOsDisk":
-			if res.WritebackCache != nil {
-				res.WritebackCache.PersistOsDisk = util.StringToTypeBool(stringPair.GetValue())
-			}
-		case "PersistVm":
-			if res.WritebackCache != nil {
-				res.WritebackCache.PersistVm = util.StringToTypeBool(stringPair.GetValue())
-			}
-		case "StorageTypeAtShutdown":
-			if res.WritebackCache != nil {
-				res.WritebackCache.StorageCostSaving = types.BoolValue(true)
-			}
-		default:
-		}
-	}
-}
-
-func ParseCustomPropertiesToClientModel(provisioningScheme ProvisioningSchemeModel, connectionType citrixorchestration.HypervisorConnectionType) *[]citrixorchestration.NameValueStringPairModel {
+func ParseCustomPropertiesToClientModel(provisioningScheme ProvisioningSchemeModel, connectionType citrixorchestration.HypervisorConnectionType) []citrixorchestration.NameValueStringPairModel {
 	var res = &[]citrixorchestration.NameValueStringPairModel{}
-	if !provisioningScheme.StorageType.IsNull() {
-		util.AppendNameValueStringPair(res, "StorageType", provisioningScheme.StorageType.ValueString())
-	}
-	if !provisioningScheme.VdaResourceGroup.IsNull() {
-		util.AppendNameValueStringPair(res, "ResourceGroups", provisioningScheme.VdaResourceGroup.ValueString())
-	}
-	if !provisioningScheme.UseManagedDisks.IsNull() {
-		if provisioningScheme.UseManagedDisks.ValueBool() {
-			util.AppendNameValueStringPair(res, "UseManagedDisks", "true")
-		} else {
-			util.AppendNameValueStringPair(res, "UseManagedDisks", "false")
-		}
-	}
-	if !provisioningScheme.AvailabilityZones.IsNull() {
-		if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS {
+	switch connectionType {
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
+		if !provisioningScheme.AvailabilityZones.IsNull() {
 			util.AppendNameValueStringPair(res, "Zones", provisioningScheme.AvailabilityZones.ValueString())
-		} else if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM {
+		} else {
+			util.AppendNameValueStringPair(res, "Zones", "")
+		}
+		if !provisioningScheme.AzureMachineConfig.StorageType.IsNull() {
+			util.AppendNameValueStringPair(res, "StorageType", provisioningScheme.AzureMachineConfig.StorageType.ValueString())
+		}
+		if !provisioningScheme.AzureMachineConfig.VdaResourceGroup.IsNull() {
+			util.AppendNameValueStringPair(res, "ResourceGroups", provisioningScheme.AzureMachineConfig.VdaResourceGroup.ValueString())
+		}
+		if !provisioningScheme.AzureMachineConfig.UseManagedDisks.IsNull() {
+			if provisioningScheme.AzureMachineConfig.UseManagedDisks.ValueBool() {
+				util.AppendNameValueStringPair(res, "UseManagedDisks", "true")
+			} else {
+				util.AppendNameValueStringPair(res, "UseManagedDisks", "false")
+			}
+		}
+		if provisioningScheme.AzureMachineConfig.WritebackCache != nil {
+			if !provisioningScheme.AzureMachineConfig.WritebackCache.WBCDiskStorageType.IsNull() {
+				util.AppendNameValueStringPair(res, "WBCDiskStorageType", provisioningScheme.AzureMachineConfig.WritebackCache.WBCDiskStorageType.ValueString())
+			}
+			if provisioningScheme.AzureMachineConfig.WritebackCache.PersistWBC.ValueBool() {
+				util.AppendNameValueStringPair(res, "PersistWBC", "true")
+				if provisioningScheme.AzureMachineConfig.WritebackCache.StorageCostSaving.ValueBool() {
+					util.AppendNameValueStringPair(res, "StorageTypeAtShutdown", "Standard_LRS")
+				}
+			}
+			if provisioningScheme.AzureMachineConfig.WritebackCache.PersistOsDisk.ValueBool() {
+				util.AppendNameValueStringPair(res, "PersistOsDisk", "true")
+				if provisioningScheme.AzureMachineConfig.WritebackCache.PersistVm.ValueBool() {
+					util.AppendNameValueStringPair(res, "PersistVm", "true")
+				}
+			}
+		}
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
+		if !provisioningScheme.AvailabilityZones.IsNull() {
+			util.AppendNameValueStringPair(res, "Zones", provisioningScheme.AvailabilityZones.ValueString())
+		}
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
+		if !provisioningScheme.AvailabilityZones.IsNull() {
 			util.AppendNameValueStringPair(res, "CatalogZones", provisioningScheme.AvailabilityZones.ValueString())
 		}
-	}
-	if provisioningScheme.WritebackCache != nil {
-		if !provisioningScheme.WritebackCache.WBCDiskStorageType.IsNull() {
-			util.AppendNameValueStringPair(res, "WBCDiskStorageType", provisioningScheme.WritebackCache.WBCDiskStorageType.ValueString())
+		if !provisioningScheme.GcpMachineConfig.StorageType.IsNull() {
+			util.AppendNameValueStringPair(res, "StorageType", provisioningScheme.GcpMachineConfig.StorageType.ValueString())
 		}
-		if provisioningScheme.WritebackCache.PersistWBC.ValueBool() {
-			util.AppendNameValueStringPair(res, "PersistWBC", "true")
-		}
-		if provisioningScheme.WritebackCache.PersistOsDisk.ValueBool() {
-			util.AppendNameValueStringPair(res, "PersistOsDisk", "true")
-			if provisioningScheme.WritebackCache.PersistOsDisk.ValueBool() {
-				util.AppendNameValueStringPair(res, "PersistVm", "true")
+		if provisioningScheme.GcpMachineConfig.WritebackCache != nil {
+			if !provisioningScheme.GcpMachineConfig.WritebackCache.WBCDiskStorageType.IsNull() {
+				util.AppendNameValueStringPair(res, "WBCDiskStorageType", provisioningScheme.GcpMachineConfig.WritebackCache.WBCDiskStorageType.ValueString())
 			}
-			if provisioningScheme.WritebackCache.StorageCostSaving.ValueBool() {
-				util.AppendNameValueStringPair(res, "StorageTypeAtShutdown", "Standard_LRS")
+			if provisioningScheme.GcpMachineConfig.WritebackCache.PersistWBC.ValueBool() {
+				util.AppendNameValueStringPair(res, "PersistWBC", "true")
+			}
+			if provisioningScheme.GcpMachineConfig.WritebackCache.PersistOsDisk.ValueBool() {
+				util.AppendNameValueStringPair(res, "PersistOsDisk", "true")
 			}
 		}
 	}
-	return res
+
+	return *res
 }
 
-func ParseNetworkMappingToClientModel(networkMapping NetworkMappingModel, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) []citrixorchestration.NetworkMapRequestModel {
+func ParseNetworkMappingToClientModel(networkMapping NetworkMappingModel, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) ([]citrixorchestration.NetworkMapRequestModel, error) {
 	var networks []citrixorchestration.HypervisorResourceRefResponseModel
 	if resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM {
 		networks = resourcePool.Subnets
@@ -394,11 +349,15 @@ func ParseNetworkMappingToClientModel(networkMapping NetworkMappingModel, resour
 		networkName = fmt.Sprintf("%s (%s)", networkMapping.Network.ValueString(), resourcePool.GetResourcePoolRootId())
 	}
 	network := slices.IndexFunc(networks, func(c citrixorchestration.HypervisorResourceRefResponseModel) bool { return c.GetName() == networkName })
+	if network == -1 {
+		return res, fmt.Errorf("network %s not found", networkName)
+	}
+
 	res = append(res, citrixorchestration.NetworkMapRequestModel{
 		NetworkDeviceNameOrId: *citrixorchestration.NewNullableString(networkMapping.NetworkDevice.ValueStringPointer()),
 		NetworkPath:           networks[network].GetXDPath(),
 	})
-	return res
+	return res, nil
 }
 
 func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Context, client *citrixclient.CitrixDaasClient, machines *citrixorchestration.MachineResponseModelCollection) MachineCatalogResourceModel {
@@ -414,8 +373,8 @@ func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Conte
 
 	if r.MachineAccounts != nil {
 		machinesNotPresetInRemote := map[string]bool{}
-		for _, machineAccount := range *r.MachineAccounts {
-			for _, machineFromPlan := range *machineAccount.Machines {
+		for _, machineAccount := range r.MachineAccounts {
+			for _, machineFromPlan := range machineAccount.Machines {
 				machineFromPlanName := machineFromPlan.MachineName.ValueString()
 				machineFromRemote, exists := machineMapFromRemote[strings.ToLower(machineFromPlanName)]
 				if !exists {
@@ -456,9 +415,6 @@ func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Conte
 				case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
 					if hostedMachineId != "" {
 						machineIdArray := strings.Split(hostedMachineId, ":") // hosted machine id is projectname:region:vmname
-						if !strings.EqualFold(machineFromPlan.ProjectName.ValueString(), machineIdArray[0]) {
-							machineFromPlan.ProjectName = types.StringValue(machineIdArray[0])
-						}
 						if !strings.EqualFold(machineFromPlan.Region.ValueString(), machineIdArray[1]) {
 							machineFromPlan.Region = types.StringValue(machineIdArray[1])
 						}
@@ -471,19 +427,19 @@ func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Conte
 		}
 
 		machineAccounts := []MachineAccountsModel{}
-		for _, machineAccount := range *r.MachineAccounts {
+		for _, machineAccount := range r.MachineAccounts {
 			machines := []MachineCatalogMachineModel{}
-			for _, machine := range *machineAccount.Machines {
+			for _, machine := range machineAccount.Machines {
 				if machinesNotPresetInRemote[strings.ToLower(machine.MachineName.ValueString())] {
 					continue
 				}
 				machines = append(machines, machine)
 			}
-			machineAccount.Machines = &machines
+			machineAccount.Machines = machines
 			machineAccounts = append(machineAccounts, machineAccount)
 		}
 
-		r.MachineAccounts = &machineAccounts
+		r.MachineAccounts = machineAccounts
 	}
 
 	// go over any machines that are in remote but were not in plan
@@ -530,86 +486,53 @@ func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Conte
 	}
 
 	if len(newMachines) > 0 && r.MachineAccounts == nil {
-		r.MachineAccounts = &[]MachineAccountsModel{}
+		r.MachineAccounts = []MachineAccountsModel{}
 	}
 
 	machineAccountMap := map[string]int{}
-	for index, machineAccount := range *r.MachineAccounts {
+	for index, machineAccount := range r.MachineAccounts {
 		machineAccountMap[machineAccount.Hypervisor.ValueString()] = index
 	}
 
 	for hypId, machines := range newMachines {
 		machineAccIndex, exists := machineAccountMap[hypId]
 		if exists {
-			machAccounts := *r.MachineAccounts
+			machAccounts := r.MachineAccounts
 			machineAccount := machAccounts[machineAccIndex]
 			if machineAccount.Machines == nil {
-				machineAccount.Machines = &[]MachineCatalogMachineModel{}
+				machineAccount.Machines = []MachineCatalogMachineModel{}
 			}
-			machineAccountMachines := *machineAccount.Machines
+			machineAccountMachines := machineAccount.Machines
 			machineAccountMachines = append(machineAccountMachines, machines...)
-			machineAccount.Machines = &machineAccountMachines
+			machineAccount.Machines = machineAccountMachines
 			machAccounts[machineAccIndex] = machineAccount
-			r.MachineAccounts = &machAccounts
+			r.MachineAccounts = machAccounts
 			continue
 		}
 		var machineAccount MachineAccountsModel
 		machineAccount.Hypervisor = types.StringValue(hypId)
-		machineAccount.Machines = &machines
-		machAccounts := *r.MachineAccounts
+		machineAccount.Machines = machines
+		machAccounts := r.MachineAccounts
 		machAccounts = append(machAccounts, machineAccount)
 		machineAccountMap[hypId] = len(machAccounts) - 1
-		r.MachineAccounts = &machAccounts
+		r.MachineAccounts = machAccounts
 	}
 
 	return r
 }
 
 func (r MachineCatalogResourceModel) updateCatalogWithRemotePcConfig(catalog *citrixorchestration.MachineCatalogDetailResponseModel) MachineCatalogResourceModel {
-	r.IsRemotePc = types.BoolValue(catalog.GetIsRemotePC())
-	remotePcEnrollemntScopes := catalog.GetRemotePCEnrollmentScopes()
-	if len(remotePcEnrollemntScopes) == 0 {
-		if r.RemotePcOus != nil && len(*r.RemotePcOus) > 0 {
-			r.RemotePcOus = nil
-		}
-		return r
+	if catalog.GetProvisioningType() == citrixorchestration.PROVISIONINGTYPE_MANUAL || !r.IsRemotePc.IsNull() {
+		r.IsRemotePc = types.BoolValue(catalog.GetIsRemotePC())
 	}
-
-	if r.RemotePcOus == nil {
-		r.RemotePcOus = &[]RemotePcOuModel{}
-	}
-
-	existingEnrollmentScopes := map[string]int{}
-	for index, ou := range *r.RemotePcOus {
-		existingEnrollmentScopes[ou.OUName.ValueString()] = index
-	}
-
-	remotePCOUs := *r.RemotePcOus
-	for _, enrollmentScope := range catalog.GetRemotePCEnrollmentScopes() {
-		ouName := enrollmentScope.GetOU()
-		index, exists := existingEnrollmentScopes[ouName]
-		if exists {
-			existingEnrollmentScope := remotePCOUs[index]
-			existingEnrollmentScope.IncludeSubFolders = types.BoolValue(enrollmentScope.GetIncludeSubfolders())
-			remotePCOUs[index] = existingEnrollmentScope
-		} else {
-			var remotePCOU RemotePcOuModel
-			remotePCOU.IncludeSubFolders = types.BoolValue(enrollmentScope.GetIncludeSubfolders())
-			remotePCOU.OUName = types.StringValue(ouName)
-			remotePCOUs = append(remotePCOUs, remotePCOU)
-		}
-
-		existingEnrollmentScopes[ouName] = -1 // Mark as visited. The ones not visited should be removed.
-	}
-	r.RemotePcOus = &remotePCOUs
-
-	rpcOUs := []RemotePcOuModel{}
-	for _, ou := range *r.RemotePcOus {
-		if existingEnrollmentScopes[ou.OUName.ValueString()] == -1 {
-			rpcOUs = append(rpcOUs, ou) // if visited, include. Not visited ones will not be included.
-		}
-	}
-
-	r.RemotePcOus = &rpcOUs
+	rpcOUs := util.RefreshListProperties[RemotePcOuModel, citrixorchestration.RemotePCEnrollmentScopeResponseModel](r.RemotePcOus, "OUName", catalog.GetRemotePCEnrollmentScopes(), "OU", "RefreshListItem")
+	r.RemotePcOus = rpcOUs
 	return r
+}
+
+func (scope RemotePcOuModel) RefreshListItem(remote citrixorchestration.RemotePCEnrollmentScopeResponseModel) RemotePcOuModel {
+	scope.OUName = types.StringValue(remote.GetOU())
+	scope.IncludeSubFolders = types.BoolValue(remote.GetIncludeSubfolders())
+
+	return scope
 }

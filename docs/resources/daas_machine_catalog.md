@@ -16,41 +16,48 @@ Manages a machine catalog.
 resource "citrix_daas_machine_catalog" "example-azure-mtsession" {
 	name                		= "example-azure-mtsession"
 	description					= "Example multi-session catalog on Azure hypervisor"
-	zone						= "{zone Id}"
-	service_account				= "{domain-admin-account}"
-	service_account_password 	= "{domain-admin-password}"
+	zone						= "<zone Id>"
 	allocation_type				= "Random"
 	session_support				= "MultiSession"
+	is_power_managed			= true
+	is_remote_pc 			  	= false
+	provisioning_type 			= "MCS"
 	provisioning_scheme			= 	{
-		machine_config = {
-            hypervisor = citrix_daas_azure_hypervisor.example-azure-hypervisor.id
-			hypervisor_resource_pool = citrix_daas_hypervisor_resource_pool.example-azure-hypervisor-resource-pool.id
+		hypervisor = citrix_daas_azure_hypervisor.example-azure-hypervisor.id
+		hypervisor_resource_pool = citrix_daas_hypervisor_resource_pool.example-azure-hypervisor-resource-pool.id
+		identity_type      = "ActiveDirectory"
+		machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+			domain_ou				 = "<DomainOU>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+		azure_machine_config = {
+			storage_type = "Standard_LRS"
+			use_managed_disks = true
             service_offering = "Standard_D2_v2"
-            resource_group = "{Azure resource group name for image vhd}"
-            storage_account = "{Azure storage account name for image vhd}"
-            container = "{Azure storage container for image vhd}"
-            master_image = "{Image vhd blob name}"
+            resource_group = "<Azure resource group name for image vhd>"
+            storage_account = "<Azure storage account name for image vhd>"
+            container = "<Azure storage container for image vhd>"
+            master_image = "<Image vhd blob name>"
+			writeback_cache = {
+				wbc_disk_storage_type = "pd-standard"
+				persist_wbc = true
+				persist_os_disk = true
+				persist_vm = true
+				writeback_cache_disk_size_gb = 127
+				storage_cost_saving = true
+			}
         }
 		network_mapping = {
             network_device = "0"
-            network = "{Azure Subnet for machine}"
+            network = "<Azure Subnet for machine>"
         }
+		availability_zones = "1,2,..."
 		number_of_total_machines = 	1
 		machine_account_creation_rules ={
 			naming_scheme =     "az-multi-##"
 			naming_scheme_type ="Numeric"
-			domain =            "{domain-fqdn}"
-		}
-		os_type = "Windows"
-		storage_type = "Standard_LRS"
-		use_managed_disks = true
-		writeback_cache = {
-			wbc_disk_storage_type = "Standard_LRS"
-			persist_wbc = true
-			persist_os_disk = true
-			persist_vm = true
-			writeback_cache_disk_size_gb = 127
-			storage_cost_saving = true
 		}
 	}
 }
@@ -58,36 +65,117 @@ resource "citrix_daas_machine_catalog" "example-azure-mtsession" {
 resource "citrix_daas_machine_catalog" "example-gcp-mtsession" {
     name                        = "example-gcp-mtsession"
     description                 = "Example multi-session catalog on GCP hypervisor"
-   	zone						= "{zone Id}"
-	service_account				= "{domain-admin-account}"
-	service_account_password 	= "{domain-admin-password}"
+   	zone						= "<zone Id>"
 	allocation_type				= "Random"
 	session_support				= "MultiSession"
+	is_power_managed			= true
+	is_remote_pc 			  	= false
+	provisioning_type 			= "MCS"
     provisioning_scheme         = {
-        storage_type = "pd-standard"
-        availability_zones = "{project name}:{region}:{availability zone1},{project name}:{region}:{availability zone2},..."
-        machine_config = {
-            hypervisor = citrix_daas_gcp_hypervisor.example-gcp-hypervisor.id
-            hypervisor_resource_pool = citrix_daas_hypervisor_resource_pool.example-gcp-hypervisor-resource-pool.id
-            machine_profile = "{Machine profile template VM name}"
-            master_image = "{Image template VM name}"
-            machine_snapshot = "{Image template VM snapshot name}"
+		hypervisor = citrix_daas_gcp_hypervisor.example-gcp-hypervisor.id
+		hypervisor_resource_pool = citrix_daas_hypervisor_resource_pool.example-gcp-hypervisor-resource-pool.id
+		identity_type      = "ActiveDirectory"
+		machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+			domain_ou				 = "<DomainOU>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
         }
+        gcp_machine_config = {
+            
+            machine_profile = "<Machine profile template VM name>"
+            master_image = "<Image template VM name>"
+            machine_snapshot = "<Image template VM snapshot name>"
+			storage_type = "pd-standard"
+			writeback_cache = {
+				wbc_disk_storage_type = "pd-standard"
+				persist_wbc = true
+				persist_os_disk = true
+				writeback_cache_disk_size_gb = 127
+			}
+        }
+		availability_zones = "{project name}:{region}:{availability zone1},{project name}:{region}:{availability zone2},..."
         number_of_total_machines = 1
         machine_account_creation_rules = {
             naming_scheme = "gcp-multi-##"
             naming_scheme_type = "Numeric"
-            domain = "serenity.local"
         }
-		writeback_cache = {
-			wbc_disk_storage_type = "Standard_LRS"
-			persist_wbc = true
-			persist_os_disk = true
-			persist_vm = true
-			writeback_cache_disk_size_gb = 127
-			storage_cost_saving = true
-		}
     }
+}
+
+resource "citrix_daas_machine_catalog" "example-manual-power-managed-mtsession" {
+	name                		= "example-manual-power-managed-mtsession"
+	description					= "Example manual power managed multi-session catalog"
+	zone						= "<zone Id>"
+	allocation_type				= "Random"
+	session_support				= "MultiSession"
+	is_power_managed			= true
+	is_remote_pc 			  	= false
+	provisioning_type 			= "Manual"
+	machine_accounts = [
+        {
+            hypervisor = citrix_daas_azure_hypervisor.example-azure-hypervisor.id
+            machines = [
+                {
+                    region = "East US"
+                    resource_group_name = "machine-resource-group-name"
+                    machine_name = "Domain\\MachineName"
+                }
+            ]
+        }
+    ]
+}
+
+resource "citrix_daas_machine_catalog" "example-manual-non-power-managed-mtsession" {
+	name                		= "example-manual-non-power-managed-mtsession"
+	description					= "Example manual non power managed multi-session catalog"
+	zone						= "<zone Id>"
+	allocation_type				= "Random"
+	session_support				= "MultiSession"
+	is_power_managed			= false
+	is_remote_pc 			  	= false
+	provisioning_type 			= "Manual"
+	machine_accounts = [
+        {
+            machines = [
+                {
+                    machine_name = "Domain\\MachineName1"
+                },
+				{
+                    machine_name = "Domain\\MachineName2"
+                }
+            ]
+        }
+    ]
+}
+
+resource "citrix_daas_machine_catalog" "example-remote-pc" {
+	name                		= "example-remote-pc-catalog"
+	description					= "Example Remote PC catalog"
+	zone						= "<zone Id>"
+	allocation_type				= "Static"
+	session_support				= "SingleSession"
+	is_power_managed			= false
+	is_remote_pc 			  	= true
+	provisioning_type 			= "Manual"
+	machine_accounts = [
+        {
+            machines = [
+                {
+                    machine_name = "Domain\\MachineName1"
+                },
+				{
+                    machine_name = "Domain\\MachineName2"
+                }
+            ]
+        }
+    ]
+	remote_pc_ous = [
+        {
+            include_subfolders = false
+            ou_name = "OU=Example OU,DC=domain,DC=com"
+        }
+    ]
 }
 ```
 
@@ -97,8 +185,6 @@ resource "citrix_daas_machine_catalog" "example-gcp-mtsession" {
 ### Required
 
 - `allocation_type` (String) Denotes how the machines in the catalog are allocated to a user. Choose between `Static` and `Random`.
-- `is_power_managed` (Boolean) Specify if the machines in the machine catalog will be power managed.
-- `is_remote_pc` (Boolean) Specify if this catalog is for Remote PC access.
 - `name` (String) Name of the machine catalog.
 - `provisioning_type` (String) Specifies how the machines are provisioned in the catalog.
 - `session_support` (String) Session support type. Choose between `SingleSession` and `MultiSession`. Session support should be SingleSession when `is_remote_pc = true`
@@ -107,6 +193,8 @@ resource "citrix_daas_machine_catalog" "example-gcp-mtsession" {
 ### Optional
 
 - `description` (String) Description of the machine catalog.
+- `is_power_managed` (Boolean) Specify if the machines in the machine catalog will be power managed.
+- `is_remote_pc` (Boolean) Specify if this catalog is for Remote PC access.
 - `machine_accounts` (Attributes List) List of machine accounts to add to the catalog. Only to be used when using `provisioning_type = MANUAL` (see [below for nested schema](#nestedatt--machine_accounts))
 - `provisioning_scheme` (Attributes) Machine catalog provisioning scheme. Required when `provisioning_type = MCS` (see [below for nested schema](#nestedatt--provisioning_scheme))
 - `remote_pc_ous` (Attributes List) Organizational Units to be included in the Remote PC machine catalog. Only to be used when `is_remote_pc = true`. For adding machines, use `machine_accounts`. (see [below for nested schema](#nestedatt--remote_pc_ous))
@@ -148,57 +236,62 @@ Optional:
 
 Required:
 
+- `hypervisor` (String) Id of the hypervisor for creating the machines. Required only if using power managed machines.
+- `hypervisor_resource_pool` (String) Id of the hypervisor resource pool that will be used for provisioning operations.
+- `identity_type` (String) The identity type of the machines to be created. Supported values are`ActiveDirectory` and `AzureAD`.
 - `machine_account_creation_rules` (Attributes) Rules specifying how Active Directory machine accounts should be created when machines are provisioned. (see [below for nested schema](#nestedatt--provisioning_scheme--machine_account_creation_rules))
-- `machine_config` (Attributes) Machine Configuration (see [below for nested schema](#nestedatt--provisioning_scheme--machine_config))
 - `number_of_total_machines` (Number) Number of VDA machines allocated in the catalog.
 
 Optional:
 
-- `availability_zones` (String) The Azure Availability Zones containing provisioned virtual machines. Use a comma as a delimiter for multiple availability_zones.
-- `network_mapping` (Attributes) Specifies how the attached NICs are mapped to networks.  If this parameter is omitted, provisioned VMs are created with a single NIC, which is mapped to the default network in the hypervisor resource pool.  If this parameter is supplied, machines are created with the number of NICs specified in the map, and each NIC is attached to the specified network. (see [below for nested schema](#nestedatt--provisioning_scheme--network_mapping))
-- `storage_type` (String) **[Azure, GCP: Required]** Storage account type used for provisioned virtual machine disks on Azure / GCP.<br />Azure storage types include: `Standard_LRS`, `StandardSSD_LRS` and `Premium_LRS`.<br />GCP storage types include: `pd-standar`, `pd-balanced`, `pd-ssd` and `pd-extreme`.
-- `use_managed_disks` (Boolean) **[Azure: Optional]** Indicate whether to use Azure managed disks for the provisioned virtual machine.
-- `vda_resource_group` (String) **[Azure: Optional]** Designated resource group where the VDA VMs will be located on Azure.
-- `writeback_cache` (Attributes) Write-back Cache config. Leave this empty to disable Write-back Cache. (see [below for nested schema](#nestedatt--provisioning_scheme--writeback_cache))
+- `availability_zones` (String) The Availability Zones for provisioning virtual machines. Use a comma as a delimiter for multiple availability_zones.
+- `aws_machine_config` (Attributes) Machine Configuration For AWS EC2 MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--aws_machine_config))
+- `azure_machine_config` (Attributes) Machine Configuration For Azure MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config))
+- `gcp_machine_config` (Attributes) Machine Configuration For GCP MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--gcp_machine_config))
+- `machine_domain_identity` (Attributes) The domain identity for machines in the machine catalog.<br />Required when identity_type is set to `ActiveDirectory` (see [below for nested schema](#nestedatt--provisioning_scheme--machine_domain_identity))
+- `network_mapping` (Attributes) Specifies how the attached NICs are mapped to networks. If this parameter is omitted, provisioned VMs are created with a single NIC, which is mapped to the default network in the hypervisor resource pool.  If this parameter is supplied, machines are created with the number of NICs specified in the map, and each NIC is attached to the specified network.<br />Required when `provisioning_scheme.identity_type` is `AzureAD`. (see [below for nested schema](#nestedatt--provisioning_scheme--network_mapping))
 
 <a id="nestedatt--provisioning_scheme--machine_account_creation_rules"></a>
 ### Nested Schema for `provisioning_scheme.machine_account_creation_rules`
 
 Required:
 
-- `domain` (String) The AD domain name for the pool. Specify this in FQDN format; for example, MyDomain.com.
 - `naming_scheme` (String) Defines the template name for AD accounts created in the identity pool.
 - `naming_scheme_type` (String) Type of naming scheme. This defines the format of the variable part of the AD account names that will be created. Choose between `Numeric`, `Alphabetic` and `Unicode`.
 
-Optional:
 
-- `domain_ou` (String) The organization unit that computer accounts will be created into.
-
-
-<a id="nestedatt--provisioning_scheme--machine_config"></a>
-### Nested Schema for `provisioning_scheme.machine_config`
+<a id="nestedatt--provisioning_scheme--aws_machine_config"></a>
+### Nested Schema for `provisioning_scheme.aws_machine_config`
 
 Required:
 
-- `hypervisor` (String) Id of the hypervisor for creating the machines. Required only if using power managed machines.
-- `hypervisor_resource_pool` (String) Id of the hypervisor resource pool that will be used for provisioning operations.
-- `service_account` (String) Service account for the domain.
-- `service_account_password` (String, Sensitive) Service account password for the domain.
+- `image_ami` (String) AMI of the AWS image to be used as the template image for the machine catalog.
+- `master_image` (String) The name of the virtual machine image that will be used.
+- `service_offering` (String) The AWS VM Sku to use when creating machines.
+
+
+<a id="nestedatt--provisioning_scheme--azure_machine_config"></a>
+### Nested Schema for `provisioning_scheme.azure_machine_config`
+
+Required:
+
+- `resource_group` (String) The Azure Resource Group where the image VHD / managed disk / snapshot for creating machines is located.
+- `service_offering` (String) The Azure VM Sku to use when creating machines.
+- `storage_type` (String) Storage account type used for provisioned virtual machine disks on Azure. Storage types include: `Standard_LRS`, `StandardSSD_LRS` and `Premium_LRS`.
 
 Optional:
 
-- `container` (String) **[Azure: Optional]** The Azure Storage Account Container where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.
-- `gallery_image` (Attributes) **[Azure: Optional]** Details of the Azure Image Gallery image to use for creating machines. Only Applicable to Azure Image Gallery image. (see [below for nested schema](#nestedatt--provisioning_scheme--machine_config--gallery_image))
-- `image_ami` (String) **[AWS: Required]** AMI of the AWS image to be used as the template image for the machine catalog.
-- `machine_profile` (String) **[GCP: Optional]** The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone. If not specified, the VM specified in master_image will be used as template.
-- `machine_snapshot` (String) **[GCP: Optional]** The name of the virtual machine snapshot of a GCP VM that will be used as master image.
-- `master_image` (String) **[AWS, GCP: Required | Azure: Optional]** The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors. For Azure, skip this if you want to use gallery_image.
-- `resource_group` (String) **[Azure: Required]** The Azure Resource Group where the image VHD for creating machines is located.
-- `service_offering` (String) **[Azure, AWS: Required]** The VM Sku of a Cloud service offering to use when creating machines.
-- `storage_account` (String) **[Azure: Optional]** The Azure Storage Account where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.
+- `container` (String) The Azure Storage Account Container where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.
+- `gallery_image` (Attributes) Details of the Azure Image Gallery image to use for creating machines. Only Applicable to Azure Image Gallery image. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--gallery_image))
+- `machine_profile` (Attributes) The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone.<br />Required when identity_type is set to `AzureAD` (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--machine_profile))
+- `master_image` (String) The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors. Omit this field if you want to use gallery_image.
+- `storage_account` (String) The Azure Storage Account where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.
+- `use_managed_disks` (Boolean) Indicate whether to use Azure managed disks for the provisioned virtual machine.
+- `vda_resource_group` (String) Designated resource group where the VDA VMs will be located on Azure.
+- `writeback_cache` (Attributes) Write-back Cache config. Leave this empty to disable Write-back Cache. Write-back Cache requires Machine image with Write-back Cache plugin installed. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--writeback_cache))
 
-<a id="nestedatt--provisioning_scheme--machine_config--gallery_image"></a>
-### Nested Schema for `provisioning_scheme.machine_config.gallery_image`
+<a id="nestedatt--provisioning_scheme--azure_machine_config--gallery_image"></a>
+### Nested Schema for `provisioning_scheme.azure_machine_config.gallery_image`
 
 Required:
 
@@ -207,18 +300,17 @@ Required:
 - `version` (String) The image version for the image to be used in the Azure Image Gallery. Only applicable to Azure Image Gallery image.
 
 
-
-<a id="nestedatt--provisioning_scheme--network_mapping"></a>
-### Nested Schema for `provisioning_scheme.network_mapping`
+<a id="nestedatt--provisioning_scheme--azure_machine_config--machine_profile"></a>
+### Nested Schema for `provisioning_scheme.azure_machine_config.machine_profile`
 
 Required:
 
-- `network` (String) The name of the virtual network that the device should be attached to. This must be a subnet within a Virtual Private Cloud item in the resource pool to which the Machine Catalog is associated.<br />For AWS, please specify the network mask of the network you want to use within the VPC.
-- `network_device` (String) Name or Id of the network device.
+- `machine_profile_resource_group` (String) The resource group name where machine profile VM is located in.
+- `machine_profile_vm_name` (String) The name of the machine profile virtual machine.
 
 
-<a id="nestedatt--provisioning_scheme--writeback_cache"></a>
-### Nested Schema for `provisioning_scheme.writeback_cache`
+<a id="nestedatt--provisioning_scheme--azure_machine_config--writeback_cache"></a>
+### Nested Schema for `provisioning_scheme.azure_machine_config.writeback_cache`
 
 Required:
 
@@ -232,6 +324,65 @@ Required:
 Optional:
 
 - `writeback_cache_memory_size_mb` (Number) The size of the in-memory write back cache in MB.
+
+
+
+<a id="nestedatt--provisioning_scheme--gcp_machine_config"></a>
+### Nested Schema for `provisioning_scheme.gcp_machine_config`
+
+Required:
+
+- `master_image` (String) The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors.
+- `storage_type` (String) Storage type used for provisioned virtual machine disks on GCP. Storage types include: `pd-standar`, `pd-balanced`, `pd-ssd` and `pd-extreme`.
+
+Optional:
+
+- `machine_profile` (String) The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone. If not specified, the VM specified in master_image will be used as template.
+- `machine_snapshot` (String) The name of the virtual machine snapshot of a GCP VM that will be used as master image.
+- `writeback_cache` (Attributes) Write-back Cache config. Leave this empty to disable Write-back Cache. (see [below for nested schema](#nestedatt--provisioning_scheme--gcp_machine_config--writeback_cache))
+
+<a id="nestedatt--provisioning_scheme--gcp_machine_config--writeback_cache"></a>
+### Nested Schema for `provisioning_scheme.gcp_machine_config.writeback_cache`
+
+Required:
+
+- `persist_os_disk` (Boolean) Persist the OS disk when power cycling the non-persistent provisioned virtual machine.
+- `persist_wbc` (Boolean) Persist Write-back Cache
+- `wbc_disk_storage_type` (String) Type of naming scheme. Choose between Numeric and Alphabetic.
+- `writeback_cache_disk_size_gb` (Number) The size in GB of any temporary storage disk used by the write back cache.
+
+Optional:
+
+- `writeback_cache_memory_size_mb` (Number) The size of the in-memory write back cache in MB.
+
+Read-Only:
+
+- `persist_vm` (Boolean) Not supported for GCP.
+- `storage_cost_saving` (Boolean) Not supported for GCP.
+
+
+
+<a id="nestedatt--provisioning_scheme--machine_domain_identity"></a>
+### Nested Schema for `provisioning_scheme.machine_domain_identity`
+
+Required:
+
+- `domain` (String) The AD domain name for the pool. Specify this in FQDN format; for example, MyDomain.com.
+- `service_account` (String) Service account for the domain. Only the username is required; do not include the domain name.
+- `service_account_password` (String, Sensitive) Service account password for the domain.
+
+Optional:
+
+- `domain_ou` (String) The organization unit that computer accounts will be created into.
+
+
+<a id="nestedatt--provisioning_scheme--network_mapping"></a>
+### Nested Schema for `provisioning_scheme.network_mapping`
+
+Required:
+
+- `network` (String) The name of the virtual network that the device should be attached to. This must be a subnet within a Virtual Private Cloud item in the resource pool to which the Machine Catalog is associated.<br />For AWS, please specify the network mask of the network you want to use within the VPC.
+- `network_device` (String) Name or Id of the network device.
 
 
 

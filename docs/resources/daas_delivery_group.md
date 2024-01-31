@@ -17,15 +17,29 @@ resource "citrix_daas_delivery_group" "example-delivery-group" {
     name = "example-delivery-group"
     associated_machine_catalogs = [
         {
-        machine_catalog = citrix_daas_machine_catalog.example-azure-mtsession.id
-        machine_count = 1
+            machine_catalog = citrix_daas_machine_catalog.example-azure-mtsession.id
+            machine_count = 1
         }
     ]
-    autoscale_enabled = true 
-    users = [
-        "user@example.com",
-    ]
+    desktops = [
+        {
+            published_name = "Example Desktop"
+            description = "Desription for example desktop"
+            restricted_access_users = {
+                allow_list = [
+                    "user1@example.com"
+                ]
+                block_list = [
+                    "user2@example.com",
+                ]
+            }
+            enabled = true
+            enable_session_roaming = false
+        }
+        
+    ] 
     autoscale_settings = {
+        autoscale_enabled = true
         disconnect_peak_idle_session_after_seconds = 3600
         log_off_peak_disconnected_session_after_seconds = 3600
         peak_log_off_action = "Nothing"
@@ -38,20 +52,68 @@ resource "citrix_daas_delivery_group" "example-delivery-group" {
                     "Thursday",
                     "Friday"
                 ]
+                name = "weekdays test"
                 display_name = "weekdays schedule"
                 peak_time_ranges = [
                     "09:00-17:00"
                 ]
                 pool_size_schedules = [
                     {
-                        "time_range": "00:00-00:00",
-                        "pool_size": 1
+                        time_range = "00:00-00:00",
+                        pool_size = 1
                     }
-                ],
+                ]
                 pool_using_percentage = false
             },
         ]
     }
+    restricted_access_users = {
+        allow_list = [
+            "user1@example.com"
+        ]
+        block_list = [
+            "user2@example.com",
+        ]
+    }
+    reboot_schedules = [
+		{
+			name = "example_reboot_schedule_weekly"
+			reboot_schedule_enabled = true
+			frequency = "Weekly"
+			frequency_factor = 1
+			days_in_week = [
+				"Monday",
+				"Tuesday",
+				"Wednesday"
+				]
+			start_time = "12:12"
+			start_date = "2024-05-25"
+			reboot_duration_minutes = 0
+			ignore_maintenance_mode = true
+			natural_reboot_schedule = false
+		},
+		{
+			name = "example_reboot_schedule_monthly"
+			description = "example reboot schedule"
+			reboot_schedule_enabled = true
+			frequency = "Monthly"
+			frequency_factor = 2
+			week_in_month = "First"
+			day_in_month = "Monday"
+			start_time = "12:12"
+			start_date = "2024-04-21"
+			ignore_maintenance_mode = true
+			reboot_duration_minutes = 120
+			natural_reboot_schedule = false
+			reboot_notification_to_users = {
+				notification_duration_minutes = 15
+				notification_message = "test message"
+				notification_title = "test title"
+				notification_repeat_every_5_minutes = true
+			}
+		}
+	]
+	
 }
 ```
 
@@ -69,6 +131,7 @@ resource "citrix_daas_delivery_group" "example-delivery-group" {
 - `autoscale_settings` (Attributes) The power management settings governing the machine(s) in the delivery group. (see [below for nested schema](#nestedatt--autoscale_settings))
 - `description` (String) Description of the delivery group.
 - `desktops` (Attributes List) A list of Desktop resources to publish on the delivery group. Only 1 desktop can be added to a Remote PC Delivery Group. (see [below for nested schema](#nestedatt--desktops))
+- `reboot_schedules` (Attributes List) The reboot schedule for the delivery group. (see [below for nested schema](#nestedatt--reboot_schedules))
 - `restricted_access_users` (Attributes) Restrict access to this Delivery Group by specifying users and groups in the allow and block list. If no value is specified, all authenticated users will have access to this Delivery Group. To give access to unauthenticated users, use the `allow_anonymous_access` property. (see [below for nested schema](#nestedatt--restricted_access_users))
 
 ### Read-Only
@@ -111,7 +174,7 @@ Optional:
 - `peak_extended_disconnect_action` (String) The action to be performed after a second configurable period of a user session disconnecting in peak hours.
 - `peak_extended_disconnect_timeout_minutes` (Number) The number of minutes before the second configured action should be performed after a user session disconnects in peak hours.
 - `peak_log_off_action` (String) The action to be performed after a configurable period of a user session ending in peak hours.
-- `power_off_delay_minutes` (Number) Delay before machines are powered off, when scaling down. Specified in minutes. Applies only to multi-session machines.
+- `power_off_delay_minutes` (Number) Delay before machines are powered off, when scaling down. Specified in minutes. By default, the power-off delay is 30 minutes. You can set it in a range of 0 to 60 minutes. Applies only to multi-session machines.
 - `timezone` (String) The time zone in which this delivery group's machines reside.
 
 <a id="nestedatt--autoscale_settings--power_time_schemes"></a>
@@ -122,8 +185,11 @@ Required:
 - `days_of_week` (List of String) The pattern of days of the week that the power time scheme covers.
 - `display_name` (String) The name of the power time scheme as displayed in the console.
 - `peak_time_ranges` (List of String) List of peak time ranges during the day. e.g. 09:00-17:00
-- `pool_size_schedules` (Attributes List) List of pool size schedules during the day. Each is specified as a time range and an indicator of the number of machines that should be powered on during that time range. (see [below for nested schema](#nestedatt--autoscale_settings--power_time_schemes--pool_size_schedules))
 - `pool_using_percentage` (Boolean) Indicates whether the integer values in the pool size array are to be treated as absolute values (if this value is `false`) or as percentages of the number of machines in the delivery group (if this value is `true`).
+
+Optional:
+
+- `pool_size_schedules` (Attributes List) List of pool size schedules during the day. Each is specified as a time range and an indicator of the number of machines that should be powered on during that time range. Do not specify schedules when no machines should be powered on. (see [below for nested schema](#nestedatt--autoscale_settings--power_time_schemes--pool_size_schedules))
 
 <a id="nestedatt--autoscale_settings--power_time_schemes--pool_size_schedules"></a>
 ### Nested Schema for `autoscale_settings.power_time_schemes.pool_size_schedules`
@@ -131,7 +197,7 @@ Required:
 Required:
 
 - `pool_size` (Number) The number of machines (either as an absolute number or a percentage of the machines in the delivery group, depending on the value of PoolUsingPercentage) that are to be maintained in a running state, whether they are in use or not.
-- `time_range` (String) Time range during which the pool size applies.
+- `time_range` (String) Time range during which the pool size applies. Format is HH:mm-HH:mm. e.g. 09:00-17:00
 
 
 
@@ -153,26 +219,59 @@ Optional:
 <a id="nestedatt--desktops--restricted_access_users"></a>
 ### Nested Schema for `desktops.restricted_access_users`
 
+Optional:
+
+- `allow_list` (List of String) Users who can use this Desktop. Must be in `Domain\UserOrGroupName` format
+- `block_list` (List of String) Users who cannot use this Desktop. A block list is meaningful only when used to block users in the allow list. Must be in `Domain\UserOrGroupName` format
+
+
+
+<a id="nestedatt--reboot_schedules"></a>
+### Nested Schema for `reboot_schedules`
+
 Required:
 
-- `allow_list` (List of String) Users who can use this Desktop.
+- `frequency` (String) The frequency of the reboot schedule. Can only be set to `Daily`, `Weekly`, `Monthly`, or `Once`.
+- `frequency_factor` (Number) Repeats every X days/weeks/months. Minimum value is 1.
+- `ignore_maintenance_mode` (Boolean) Whether the reboot schedule ignores machines in the maintenance mode.
+- `name` (String) The name of the reboot schedule.
+- `natural_reboot_schedule` (Boolean) Indicates whether the reboot will be a natural reboot, where the machines will be rebooted when they have no sessions. This should set to false for reboot_duration_minutes to work. Once UseNaturalReboot is set to true, RebootDurationMinutes won't have any effect.
+- `reboot_duration_minutes` (Number) Restart all machines within x minutes. 0 means restarting all machines at the same time. To restart machines after draining sessions, set natural_reboot_schedule to true instead.
+- `reboot_schedule_enabled` (Boolean) Whether the reboot schedule is enabled.
+- `start_date` (String) The date on which the reboot schedule starts. The date format is `YYYY-MM-DD`.
+- `start_time` (String) The time at which the reboot schedule starts. The time format is `HH:MM`.
 
 Optional:
 
-- `block_list` (List of String) Users who cannot use this Desktop. A block list is meaningful only when used to block users in the allow list.
+- `day_in_month` (String) The day in the month on which the reboot schedule runs monthly. Can only be set to `Sunday`, `Monday`, `Tuesday`, `Wednesday`, `Thursday`, `Friday`, or `Saturday`.
+- `days_in_week` (List of String) The days of the week on which the reboot schedule runs weekly. Can only be set to `Sunday`, `Monday`, `Tuesday`, `Wednesday`, `Thursday`, `Friday`, or `Saturday`.
+- `description` (String) The description of the reboot schedule.
+- `reboot_notification_to_users` (Attributes) The reboot notification for the reboot schedule. Not available for natural reboot. (see [below for nested schema](#nestedatt--reboot_schedules--reboot_notification_to_users))
+- `restrict_to_tag` (String) The tag to which the reboot schedule is restricted.
+- `week_in_month` (String) The week in the month on which the reboot schedule runs monthly. Can only be set to `First`, `Second`, `Third`, `Fourth`, or `Last`.
+
+<a id="nestedatt--reboot_schedules--reboot_notification_to_users"></a>
+### Nested Schema for `reboot_schedules.reboot_notification_to_users`
+
+Required:
+
+- `notification_duration_minutes` (Number) Send notification to users X minutes before user is logged off. Can only be 0, 1, 5 or 15. 0 means no notification.
+- `notification_message` (String) The message to be displayed to users before they are logged off.
+- `notification_title` (String) The title to be displayed to users before they are logged off.
+
+Optional:
+
+- `notification_repeat_every_5_minutes` (Boolean) Repeat notification every 5 minutes, only available for 15 minutes notification duration.
 
 
 
 <a id="nestedatt--restricted_access_users"></a>
 ### Nested Schema for `restricted_access_users`
 
-Required:
-
-- `allow_list` (List of String) Users who can use this Delivery Group.
-
 Optional:
 
-- `block_list` (List of String) Users who cannot use this Delivery Group. A block list is meaningful only when used to block users in the allow list.
+- `allow_list` (List of String) Users who can use this Delivery Group. Must be in `Domain\UserOrGroupName` format
+- `block_list` (List of String) Users who cannot use this Delivery Group. A block list is meaningful only when used to block users in the allow list. Must be in `Domain\UserOrGroupName` format
 
 ## Import
 

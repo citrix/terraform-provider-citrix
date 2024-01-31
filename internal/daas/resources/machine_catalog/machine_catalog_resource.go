@@ -14,6 +14,7 @@ import (
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
+	"github.com/citrix/terraform-provider-citrix/internal/validators"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
@@ -27,6 +28,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -47,12 +49,12 @@ type machineCatalogResource struct {
 	client *citrixdaasclient.CitrixDaasClient
 }
 
-// Metadata returns the data source type name.
+// Metadata returns the resource type name.
 func (r *machineCatalogResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_daas_machine_catalog"
 }
 
-// Schema defines the schema for the data source.
+// Schema defines the schema for the resource.
 func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Manages a machine catalog.",
@@ -77,14 +79,14 @@ func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequ
 			},
 			"is_power_managed": schema.BoolAttribute{
 				Description: "Specify if the machines in the machine catalog will be power managed.",
-				Required:    true,
+				Optional:    true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.RequiresReplace(),
 				},
 			},
 			"is_remote_pc": schema.BoolAttribute{
 				Description: "Specify if this catalog is for Remote PC access.",
-				Required:    true,
+				Optional:    true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.RequiresReplace(),
 				},
@@ -153,6 +155,9 @@ func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequ
 									"machine_name": schema.StringAttribute{
 										Description: "The name of the machine. Must be in format DOMAIN\\MACHINE.",
 										Required:    true,
+										Validators: []validator.String{
+											stringvalidator.RegexMatches(regexp.MustCompile(util.SamRegex), "must be in format DOMAIN\\MACHINE"),
+										},
 									},
 									"region": schema.StringAttribute{
 										Description: "**[Azure, GCP: Required]** The region in which the machine resides. Required only if `is_power_managed = true`",
@@ -172,8 +177,14 @@ func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequ
 									},
 								},
 							},
+							Validators: []validator.List{
+								listvalidator.SizeAtLeast(1),
+							},
 						},
 					},
+				},
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
 				},
 			},
 			"remote_pc_ous": schema.ListNestedAttribute{
@@ -199,47 +210,38 @@ func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequ
 				Description: "Machine catalog provisioning scheme. Required when `provisioning_type = MCS`",
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
-					"machine_config": schema.SingleNestedAttribute{
-						Description: "Machine Configuration",
+					"hypervisor": schema.StringAttribute{
+						Description: "Id of the hypervisor for creating the machines. Required only if using power managed machines.",
 						Required:    true,
+						Validators: []validator.String{
+							stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
+						},
+					},
+					"hypervisor_resource_pool": schema.StringAttribute{
+						Description: "Id of the hypervisor resource pool that will be used for provisioning operations.",
+						Required:    true,
+						Validators: []validator.String{
+							stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
+						},
+					},
+					"azure_machine_config": schema.SingleNestedAttribute{
+						Description: "Machine Configuration For Azure MCS catalog.",
+						Optional:    true,
 						Attributes: map[string]schema.Attribute{
-							"hypervisor": schema.StringAttribute{
-								Description: "Id of the hypervisor for creating the machines. Required only if using power managed machines.",
-								Required:    true,
-								Validators: []validator.String{
-									stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
-								},
-							},
-							"hypervisor_resource_pool": schema.StringAttribute{
-								Description: "Id of the hypervisor resource pool that will be used for provisioning operations.",
-								Required:    true,
-								Validators: []validator.String{
-									stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
-								},
-							},
-							"service_account": schema.StringAttribute{
-								Description: "Service account for the domain.",
-								Required:    true,
-							},
-							"service_account_password": schema.StringAttribute{
-								Description: "Service account password for the domain.",
-								Required:    true,
-								Sensitive:   true,
-							},
 							"service_offering": schema.StringAttribute{
-								Description: "**[Azure, AWS: Required]** The VM Sku of a Cloud service offering to use when creating machines.",
-								Optional:    true,
-							},
-							"master_image": schema.StringAttribute{
-								Description: "**[AWS, GCP: Required | Azure: Optional]** The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors. For Azure, skip this if you want to use gallery_image.",
-								Optional:    true,
+								Description: "The Azure VM Sku to use when creating machines.",
+								Required:    true,
 							},
 							"resource_group": schema.StringAttribute{
-								Description: "**[Azure: Required]** The Azure Resource Group where the image VHD for creating machines is located.",
+								Description: "The Azure Resource Group where the image VHD / managed disk / snapshot for creating machines is located.",
+								Required:    true,
+							},
+							"master_image": schema.StringAttribute{
+								Description: "The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors. Omit this field if you want to use gallery_image.",
 								Optional:    true,
 							},
 							"storage_account": schema.StringAttribute{
-								Description: "**[Azure: Optional]** The Azure Storage Account where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.",
+								Description: "The Azure Storage Account where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.",
 								Optional:    true,
 								Validators: []validator.String{
 									stringvalidator.AlsoRequires(path.Expressions{
@@ -251,7 +253,7 @@ func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequ
 								},
 							},
 							"container": schema.StringAttribute{
-								Description: "**[Azure: Optional]** The Azure Storage Account Container where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.",
+								Description: "The Azure Storage Account Container where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.",
 								Optional:    true,
 								Validators: []validator.String{
 									stringvalidator.AlsoRequires(path.Expressions{
@@ -263,7 +265,7 @@ func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequ
 								},
 							},
 							"gallery_image": schema.SingleNestedAttribute{
-								Description: "**[Azure: Optional]** Details of the Azure Image Gallery image to use for creating machines. Only Applicable to Azure Image Gallery image.",
+								Description: "Details of the Azure Image Gallery image to use for creating machines. Only Applicable to Azure Image Gallery image.",
 								Optional:    true,
 								Attributes: map[string]schema.Attribute{
 									"gallery": schema.StringAttribute{
@@ -294,17 +296,250 @@ func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequ
 									}...),
 								},
 							},
-							"image_ami": schema.StringAttribute{
-								Description: "**[AWS: Required]** AMI of the AWS image to be used as the template image for the machine catalog.",
+							"storage_type": schema.StringAttribute{
+								Description: "Storage account type used for provisioned virtual machine disks on Azure. Storage types include: `Standard_LRS`, `StandardSSD_LRS` and `Premium_LRS`.",
+								Required:    true,
+								Validators: []validator.String{
+									stringvalidator.OneOf(
+										"Standard_LRS",
+										"StandardSSD_LRS",
+										"Premium_LRS",
+									),
+								},
+							},
+							"vda_resource_group": schema.StringAttribute{
+								Description: "Designated resource group where the VDA VMs will be located on Azure.",
 								Optional:    true,
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.RequiresReplace(),
+								},
+							},
+							"use_managed_disks": schema.BoolAttribute{
+								Description: "Indicate whether to use Azure managed disks for the provisioned virtual machine.",
+								Optional:    true,
+								PlanModifiers: []planmodifier.Bool{
+									boolplanmodifier.RequiresReplace(),
+								},
+							},
+							"machine_profile": schema.SingleNestedAttribute{
+								Description: "The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone." + "<br />" +
+									"Required when identity_type is set to `AzureAD`",
+								Optional: true,
+								Attributes: map[string]schema.Attribute{
+									"machine_profile_vm_name": schema.StringAttribute{
+										Description: "The name of the machine profile virtual machine.",
+										Required:    true,
+									},
+									"machine_profile_resource_group": schema.StringAttribute{
+										Description: "The resource group name where machine profile VM is located in.",
+										Required:    true,
+									},
+								},
+							},
+							"writeback_cache": schema.SingleNestedAttribute{
+								Description: "Write-back Cache config. Leave this empty to disable Write-back Cache. Write-back Cache requires Machine image with Write-back Cache plugin installed.",
+								Optional:    true,
+								Attributes: map[string]schema.Attribute{
+									"persist_wbc": schema.BoolAttribute{
+										Description: "Persist Write-back Cache",
+										Required:    true,
+									},
+									"wbc_disk_storage_type": schema.StringAttribute{
+										Description: "Type of naming scheme. Choose between Numeric and Alphabetic.",
+										Required:    true,
+										Validators: []validator.String{
+											stringvalidator.OneOf(
+												"StandardSSD_LRS",
+												"Standard_LRS",
+												"Premium_LRS",
+											),
+										},
+										PlanModifiers: []planmodifier.String{
+											stringplanmodifier.RequiresReplace(),
+										},
+									},
+									"persist_os_disk": schema.BoolAttribute{
+										Description: "Persist the OS disk when power cycling the non-persistent provisioned virtual machine.",
+										Required:    true,
+										PlanModifiers: []planmodifier.Bool{
+											boolplanmodifier.RequiresReplace(),
+										},
+									},
+									"persist_vm": schema.BoolAttribute{
+										Description: "Persist the non-persistent provisioned virtual machine in Azure environments when power cycling. This property only applies when the PersistOsDisk property is set to True.",
+										Required:    true,
+										PlanModifiers: []planmodifier.Bool{
+											boolplanmodifier.RequiresReplace(),
+										},
+									},
+									"storage_cost_saving": schema.BoolAttribute{
+										Description: "Save storage cost by downgrading the storage type of the disk to Standard HDD when VM shut down.",
+										Required:    true,
+										PlanModifiers: []planmodifier.Bool{
+											boolplanmodifier.RequiresReplace(),
+										},
+									},
+									"writeback_cache_disk_size_gb": schema.Int64Attribute{
+										Description: "The size in GB of any temporary storage disk used by the write back cache.",
+										Required:    true,
+										Validators: []validator.Int64{
+											int64validator.AtLeast(0),
+										},
+										PlanModifiers: []planmodifier.Int64{
+											int64planmodifier.RequiresReplace(),
+										},
+									},
+									"writeback_cache_memory_size_mb": schema.Int64Attribute{
+										Description: "The size of the in-memory write back cache in MB.",
+										Optional:    true,
+										Validators: []validator.Int64{
+											int64validator.AtLeast(0),
+										},
+										PlanModifiers: []planmodifier.Int64{ // TO DO - Allow updating master image
+											int64planmodifier.RequiresReplace(),
+										},
+									},
+								},
+							},
+						},
+					},
+					"aws_machine_config": schema.SingleNestedAttribute{
+						Description: "Machine Configuration For AWS EC2 MCS catalog.",
+						Optional:    true,
+						Attributes: map[string]schema.Attribute{
+							"service_offering": schema.StringAttribute{
+								Description: "The AWS VM Sku to use when creating machines.",
+								Required:    true,
+							},
+							"master_image": schema.StringAttribute{
+								Description: "The name of the virtual machine image that will be used.",
+								Required:    true,
+							},
+							"image_ami": schema.StringAttribute{
+								Description: "AMI of the AWS image to be used as the template image for the machine catalog.",
+								Required:    true,
+							},
+						},
+					},
+					"gcp_machine_config": schema.SingleNestedAttribute{
+						Description: "Machine Configuration For GCP MCS catalog.",
+						Optional:    true,
+						Attributes: map[string]schema.Attribute{
+							"master_image": schema.StringAttribute{
+								Description: "The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors.",
+								Required:    true,
 							},
 							"machine_profile": schema.StringAttribute{
-								Description: "**[GCP: Optional]** The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone. If not specified, the VM specified in master_image will be used as template.",
+								Description: "The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone. If not specified, the VM specified in master_image will be used as template.",
 								Optional:    true,
 							},
 							"machine_snapshot": schema.StringAttribute{
-								Description: "**[GCP: Optional]** The name of the virtual machine snapshot of a GCP VM that will be used as master image.",
+								Description: "The name of the virtual machine snapshot of a GCP VM that will be used as master image.",
 								Optional:    true,
+							},
+							"storage_type": schema.StringAttribute{
+								Description: "Storage type used for provisioned virtual machine disks on GCP. Storage types include: `pd-standar`, `pd-balanced`, `pd-ssd` and `pd-extreme`.",
+								Required:    true,
+								Validators: []validator.String{
+									stringvalidator.OneOf(
+										"pd-standard",
+										"pd-balanced",
+										"pd-ssd",
+										"pd-extreme",
+									),
+								},
+							},
+							"writeback_cache": schema.SingleNestedAttribute{
+								Description: "Write-back Cache config. Leave this empty to disable Write-back Cache.",
+								Optional:    true,
+								Attributes: map[string]schema.Attribute{
+									"persist_wbc": schema.BoolAttribute{
+										Description: "Persist Write-back Cache",
+										Required:    true,
+									},
+									"wbc_disk_storage_type": schema.StringAttribute{
+										Description: "Type of naming scheme. Choose between Numeric and Alphabetic.",
+										Required:    true,
+										Validators: []validator.String{
+											stringvalidator.OneOf(
+												"pd-standard",
+												"pd-balanced",
+												"pd-ssd",
+											),
+										},
+										PlanModifiers: []planmodifier.String{
+											stringplanmodifier.RequiresReplace(),
+										},
+									},
+									"persist_os_disk": schema.BoolAttribute{
+										Description: "Persist the OS disk when power cycling the non-persistent provisioned virtual machine.",
+										Required:    true,
+										PlanModifiers: []planmodifier.Bool{
+											boolplanmodifier.RequiresReplace(),
+										},
+									},
+									"writeback_cache_disk_size_gb": schema.Int64Attribute{
+										Description: "The size in GB of any temporary storage disk used by the write back cache.",
+										Required:    true,
+										Validators: []validator.Int64{
+											int64validator.AtLeast(0),
+										},
+										PlanModifiers: []planmodifier.Int64{
+											int64planmodifier.RequiresReplace(),
+										},
+									},
+									"writeback_cache_memory_size_mb": schema.Int64Attribute{
+										Description: "The size of the in-memory write back cache in MB.",
+										Optional:    true,
+										Validators: []validator.Int64{
+											int64validator.AtLeast(0),
+										},
+										PlanModifiers: []planmodifier.Int64{ // TO DO - Allow updating master image
+											int64planmodifier.RequiresReplace(),
+										},
+									},
+									"persist_vm": schema.BoolAttribute{
+										Description: "Not supported for GCP.",
+										Computed:    true,
+										PlanModifiers: []planmodifier.Bool{
+											boolplanmodifier.RequiresReplace(),
+										},
+									},
+									"storage_cost_saving": schema.BoolAttribute{
+										Description: "Not supported for GCP.",
+										Computed:    true,
+										PlanModifiers: []planmodifier.Bool{
+											boolplanmodifier.RequiresReplace(),
+										},
+									},
+								},
+							},
+						},
+					},
+					"machine_domain_identity": schema.SingleNestedAttribute{
+						Description: "The domain identity for machines in the machine catalog." + "<br />" +
+							"Required when identity_type is set to `ActiveDirectory`",
+						Optional: true,
+						Attributes: map[string]schema.Attribute{
+							"domain": schema.StringAttribute{
+								Description: "The AD domain name for the pool. Specify this in FQDN format; for example, MyDomain.com.",
+								Required:    true,
+								Validators: []validator.String{
+									stringvalidator.RegexMatches(regexp.MustCompile(util.DomainFqdnRegex), "must be in FQDN format"),
+								},
+							},
+							"domain_ou": schema.StringAttribute{
+								Description: "The organization unit that computer accounts will be created into.",
+								Optional:    true,
+							},
+							"service_account": schema.StringAttribute{
+								Description: "Service account for the domain. Only the username is required; do not include the domain name.",
+								Required:    true,
+							},
+							"service_account_password": schema.StringAttribute{
+								Description: "Service account password for the domain.",
+								Required:    true,
+								Sensitive:   true,
 							},
 						},
 					},
@@ -316,8 +551,9 @@ func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequ
 						},
 					},
 					"network_mapping": schema.SingleNestedAttribute{
-						Description: "Specifies how the attached NICs are mapped to networks.  If this parameter is omitted, provisioned VMs are created with a single NIC, which is mapped to the default network in the hypervisor resource pool.  If this parameter is supplied, machines are created with the number of NICs specified in the map, and each NIC is attached to the specified network.",
-						Optional:    true,
+						Description: "Specifies how the attached NICs are mapped to networks. If this parameter is omitted, provisioned VMs are created with a single NIC, which is mapped to the default network in the hypervisor resource pool.  If this parameter is supplied, machines are created with the number of NICs specified in the map, and each NIC is attached to the specified network." + "<br />" +
+							"Required when `provisioning_scheme.identity_type` is `AzureAD`.",
+						Optional: true,
 						Attributes: map[string]schema.Attribute{
 							"network_device": schema.StringAttribute{
 								Description: "Name or Id of the network device.",
@@ -340,6 +576,37 @@ func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequ
 							},
 						},
 					},
+					"availability_zones": schema.StringAttribute{
+						Description: "The Availability Zones for provisioning virtual machines. Use a comma as a delimiter for multiple availability_zones.",
+						Optional:    true,
+					},
+					"identity_type": schema.StringAttribute{
+						Description: "The identity type of the machines to be created. Supported values are`ActiveDirectory` and `AzureAD`.",
+						Required:    true,
+						Validators: []validator.String{
+							stringvalidator.OneOf(
+								string(citrixorchestration.IDENTITYTYPE_ACTIVE_DIRECTORY),
+								string(citrixorchestration.IDENTITYTYPE_AZURE_AD),
+							),
+							validators.AlsoRequiresOnValues(
+								[]string{
+									string(citrixorchestration.IDENTITYTYPE_ACTIVE_DIRECTORY),
+								},
+								path.MatchRelative().AtParent().AtName("machine_domain_identity"),
+							),
+							validators.AlsoRequiresOnValues(
+								[]string{
+									string(citrixorchestration.IDENTITYTYPE_AZURE_AD),
+								},
+								path.MatchRelative().AtParent().AtName("azure_machine_config"),
+								path.MatchRelative().AtParent().AtName("azure_machine_config").AtName("machine_profile"),
+								path.MatchRelative().AtParent().AtName("network_mapping"),
+							),
+						},
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
+					},
 					"machine_account_creation_rules": schema.SingleNestedAttribute{
 						Description: "Rules specifying how Active Directory machine accounts should be created when machines are provisioned.",
 						Required:    true,
@@ -355,117 +622,6 @@ func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequ
 									util.GetValidatorFromEnum(citrixorchestration.AllowedAccountNamingSchemeTypeEnumValues),
 								},
 							},
-							"domain": schema.StringAttribute{
-								Description: "The AD domain name for the pool. Specify this in FQDN format; for example, MyDomain.com.",
-								Required:    true,
-								Validators: []validator.String{
-									stringvalidator.RegexMatches(regexp.MustCompile(util.DomainFqdnRegex), "must be in FQDN format"),
-								},
-							},
-							"domain_ou": schema.StringAttribute{
-								Description: "The organization unit that computer accounts will be created into.",
-								Optional:    true,
-							},
-						},
-					},
-					"availability_zones": schema.StringAttribute{
-						Description: "The Azure Availability Zones containing provisioned virtual machines. Use a comma as a delimiter for multiple availability_zones.",
-						Optional:    true,
-					},
-					"storage_type": schema.StringAttribute{
-						Description: "**[Azure, GCP: Required]** Storage account type used for provisioned virtual machine disks on Azure / GCP." + "<br />" +
-							"Azure storage types include: `Standard_LRS`, `StandardSSD_LRS` and `Premium_LRS`." + "<br />" +
-							"GCP storage types include: `pd-standar`, `pd-balanced`, `pd-ssd` and `pd-extreme`.",
-						Optional: true,
-						Validators: []validator.String{
-							stringvalidator.OneOf(
-								"Standard_LRS",
-								"StandardSSD_LRS",
-								"Premium_LRS",
-								"pd-standard",
-								"pd-balanced",
-								"pd-ssd",
-								"pd-extreme",
-							),
-						},
-					},
-					"vda_resource_group": schema.StringAttribute{
-						Description: "**[Azure: Optional]** Designated resource group where the VDA VMs will be located on Azure.",
-						Optional:    true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.RequiresReplace(),
-						},
-					},
-					"use_managed_disks": schema.BoolAttribute{
-						Description: "**[Azure: Optional]** Indicate whether to use Azure managed disks for the provisioned virtual machine.",
-						Optional:    true,
-						PlanModifiers: []planmodifier.Bool{
-							boolplanmodifier.RequiresReplace(),
-						},
-					},
-					"writeback_cache": schema.SingleNestedAttribute{
-						Description: "Write-back Cache config. Leave this empty to disable Write-back Cache.",
-						Optional:    true,
-						Attributes: map[string]schema.Attribute{
-							"persist_wbc": schema.BoolAttribute{
-								Description: "Persist Write-back Cache",
-								Required:    true,
-							},
-							"wbc_disk_storage_type": schema.StringAttribute{
-								Description: "Type of naming scheme. Choose between Numeric and Alphabetic.",
-								Required:    true,
-								Validators: []validator.String{
-									stringvalidator.OneOf(
-										"StandardSSD_LRS",
-										"Standard_LRS",
-										"Premium_LRS",
-									),
-								},
-								PlanModifiers: []planmodifier.String{
-									stringplanmodifier.RequiresReplace(),
-								},
-							},
-							"persist_os_disk": schema.BoolAttribute{
-								Description: "Persist the OS disk when power cycling the non-persistent provisioned virtual machine.",
-								Required:    true,
-								PlanModifiers: []planmodifier.Bool{
-									boolplanmodifier.RequiresReplace(),
-								},
-							},
-							"persist_vm": schema.BoolAttribute{
-								Description: "Persist the non-persistent provisioned virtual machine in Azure environments when power cycling. This property only applies when the PersistOsDisk property is set to True.",
-								Required:    true,
-								PlanModifiers: []planmodifier.Bool{
-									boolplanmodifier.RequiresReplace(),
-								},
-							},
-							"storage_cost_saving": schema.BoolAttribute{
-								Description: "Save storage cost by downgrading the storage type of the disk to Standard HDD when VM shut down.",
-								Required:    true,
-								PlanModifiers: []planmodifier.Bool{
-									boolplanmodifier.RequiresReplace(),
-								},
-							},
-							"writeback_cache_disk_size_gb": schema.Int64Attribute{
-								Description: "The size in GB of any temporary storage disk used by the write back cache.",
-								Required:    true,
-								Validators: []validator.Int64{
-									int64validator.AtLeast(0),
-								},
-								PlanModifiers: []planmodifier.Int64{
-									int64planmodifier.RequiresReplace(),
-								},
-							},
-							"writeback_cache_memory_size_mb": schema.Int64Attribute{
-								Description: "The size of the in-memory write back cache in MB.",
-								Optional:    true,
-								Validators: []validator.Int64{
-									int64validator.AtLeast(0),
-								},
-								PlanModifiers: []planmodifier.Int64{ // TO DO - Allow updating master image
-									int64planmodifier.RequiresReplace(),
-								},
-							},
 						},
 					},
 				},
@@ -474,7 +630,7 @@ func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequ
 	}
 }
 
-// Configure adds the provider configured client to the data source.
+// Configure adds the provider configured client to the resource.
 func (r *machineCatalogResource) Configure(_ context.Context, req resource.ConfigureRequest, _ *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
@@ -514,15 +670,26 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 	isRemotePcCatalog := plan.IsRemotePc.ValueBool()
 
 	if *provisioningType == citrixorchestration.PROVISIONINGTYPE_MCS {
+		if plan.ProvisioningScheme.IdentityType.ValueString() == string(citrixorchestration.IDENTITYTYPE_AZURE_AD) {
+			if r.client.AuthConfig.OnPremises {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("identity_type"),
+					"Unsupported Machine Catalog Configuration",
+					fmt.Sprintf("Identity type %s is not supported in OnPremises environment. ", string(citrixorchestration.IDENTITYTYPE_AZURE_AD)),
+				)
 
-		hypervisor, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, plan.ProvisioningScheme.MachineConfig.Hypervisor.ValueString())
+				return
+			}
+		}
+
+		hypervisor, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, plan.ProvisioningScheme.Hypervisor.ValueString())
 		if err != nil {
 			return
 		}
 
 		connectionType = hypervisor.GetConnectionType().Ptr()
 
-		hypervisorResourcePool, err := util.GetHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, plan.ProvisioningScheme.MachineConfig.Hypervisor.ValueString(), plan.ProvisioningScheme.MachineConfig.HypervisorResourcePool.ValueString())
+		hypervisorResourcePool, err := util.GetHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, plan.ProvisioningScheme.Hypervisor.ValueString(), plan.ProvisioningScheme.HypervisorResourcePool.ValueString())
 		if err != nil {
 			return
 		}
@@ -583,7 +750,7 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Machine Catalog",
-			"Unsupported allocation type.",
+			"Unsupported session support.",
 		)
 		return
 	}
@@ -603,7 +770,7 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 	createMachineCatalogRequest := r.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsCreateMachineCatalog(ctx)
 
 	// Add domain credential header
-	if plan.ProvisioningType.ValueString() == string(citrixorchestration.PROVISIONINGTYPE_MCS) {
+	if plan.ProvisioningType.ValueString() == string(citrixorchestration.PROVISIONINGTYPE_MCS) && plan.ProvisioningScheme.MachineDomainIdentity != nil {
 		header := generateAdminCredentialHeader(plan)
 		createMachineCatalogRequest = createMachineCatalogRequest.XAdminCredential(header)
 	}
@@ -757,15 +924,26 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 	}
 
 	if *provisioningType == citrixorchestration.PROVISIONINGTYPE_MCS {
+		if plan.ProvisioningScheme.IdentityType.ValueString() == string(citrixorchestration.IDENTITYTYPE_AZURE_AD) {
+			if r.client.AuthConfig.OnPremises {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("identity_type"),
+					"Unsupported Machine Catalog Configuration",
+					fmt.Sprintf("Identity type %s is not supported in OnPremises environment. ", string(citrixorchestration.IDENTITYTYPE_AZURE_AD)),
+				)
 
-		hypervisor, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, plan.ProvisioningScheme.MachineConfig.Hypervisor.ValueString())
+				return
+			}
+		}
+
+		hypervisor, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, plan.ProvisioningScheme.Hypervisor.ValueString())
 		if err != nil {
 			return
 		}
 
 		connectionType = hypervisor.GetConnectionType().Ptr()
 
-		hypervisorResourcePool, err := util.GetHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, plan.ProvisioningScheme.MachineConfig.Hypervisor.ValueString(), plan.ProvisioningScheme.MachineConfig.HypervisorResourcePool.ValueString())
+		hypervisorResourcePool, err := util.GetHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, plan.ProvisioningScheme.Hypervisor.ValueString(), plan.ProvisioningScheme.HypervisorResourcePool.ValueString())
 		if err != nil {
 			return
 		}
@@ -793,10 +971,9 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		}
 
 		// Resolve resource path for service offering and master image
-		serviceOffering := plan.ProvisioningScheme.MachineConfig.ServiceOffering.ValueString()
-
 		switch hypervisor.GetConnectionType() {
 		case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
+			serviceOffering := plan.ProvisioningScheme.AzureMachineConfig.ServiceOffering.ValueString()
 			queryPath := "serviceoffering.folder"
 			serviceOfferingPath, err := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, serviceOffering, "serviceoffering", "")
 			if err != nil {
@@ -807,7 +984,24 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 				return
 			}
 			body.SetServiceOfferingPath(serviceOfferingPath)
+			if machineProfile := plan.ProvisioningScheme.AzureMachineConfig.MachineProfile; machineProfile != nil {
+				machineProfileName := machineProfile.MachineProfileVmName.ValueString()
+				if machineProfileName != "" {
+					machineProfileResourceGroup := plan.ProvisioningScheme.AzureMachineConfig.MachineProfile.MachineProfileResourceGroup.ValueString()
+					queryPath = fmt.Sprintf("machineprofile.folder\\%s.resourcegroup", machineProfileResourceGroup)
+					machineProfilePath, err := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, machineProfileName, "vm", "")
+					if err != nil {
+						resp.Diagnostics.AddError(
+							"Error updating Machine Catalog",
+							fmt.Sprintf("Failed to locate machine profile %s on Azure, error: %s", plan.ProvisioningScheme.AzureMachineConfig.MachineProfile.MachineProfileVmName.ValueString(), err.Error()),
+						)
+						return
+					}
+					body.SetMachineProfilePath(machineProfilePath)
+				}
+			}
 		case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
+			serviceOffering := plan.ProvisioningScheme.AwsMachineConfig.ServiceOffering.ValueString()
 			serviceOfferingPath, err := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", serviceOffering, "serviceoffering", "")
 			if err != nil {
 				resp.Diagnostics.AddError(
@@ -818,20 +1012,13 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 			}
 			body.SetServiceOfferingPath(serviceOfferingPath)
 		case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
-			if serviceOffering != "" {
-				resp.Diagnostics.AddError(
-					"Error updating Machine Catalog",
-					"GCP machine catalog does not support service_offering. Please use master_image (and optionally with machine_snapshot) or machine_profile to specify the GCP VM you want to use as a template for the VM SKU.",
-				)
-				return
-			}
-			machineProfile := plan.ProvisioningScheme.MachineConfig.MachineProfile.ValueString()
+			machineProfile := plan.ProvisioningScheme.GcpMachineConfig.MachineProfile.ValueString()
 			if machineProfile != "" {
-				machineProfilePath, err := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", plan.ProvisioningScheme.MachineConfig.MachineProfile.ValueString(), "vm", "")
+				machineProfilePath, err := util.GetSingleResourcePathFromHypervisor(ctx, r.client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", plan.ProvisioningScheme.GcpMachineConfig.MachineProfile.ValueString(), "vm", "")
 				if err != nil {
 					resp.Diagnostics.AddError(
 						"Error updating Machine Catalog",
-						fmt.Sprintf("Failed to locate machine profile %s on GCP, error: %s", plan.ProvisioningScheme.MachineConfig.MachineProfile.ValueString(), err.Error()),
+						fmt.Sprintf("Failed to locate machine profile %s on GCP, error: %s", plan.ProvisioningScheme.GcpMachineConfig.MachineProfile.ValueString(), err.Error()),
 					)
 					return
 				}
@@ -840,22 +1027,19 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		}
 
 		if plan.ProvisioningScheme.NetworkMapping != nil {
-			networkMapping := ParseNetworkMappingToClientModel(*plan.ProvisioningScheme.NetworkMapping, hypervisorResourcePool)
-			body.SetNetworkMapping(networkMapping)
-		} else {
-			var state MachineCatalogResourceModel
-			req.State.Get(ctx, &state)
-			if state.ProvisioningScheme.NetworkMapping != nil {
+			networkMapping, err := ParseNetworkMappingToClientModel(*plan.ProvisioningScheme.NetworkMapping, hypervisorResourcePool)
+			if err != nil {
 				resp.Diagnostics.AddError(
-					"Error updating Machine Catalog "+catalogName,
-					"Machine catalog created with explicit Network Mapping in Provisioning Scheme must be updated with explicit Network Mapping",
+					"Error updating Machine Catalog",
+					fmt.Sprintf("Failed to parse network mapping, error: %s", err.Error()),
 				)
 				return
 			}
+			body.SetNetworkMapping(networkMapping)
 		}
 
 		customProperties := ParseCustomPropertiesToClientModel(*plan.ProvisioningScheme, hypervisor.ConnectionType)
-		body.SetCustomProperties(*customProperties)
+		body.SetCustomProperties(customProperties)
 	} else {
 		// For manual, compare state and plan to find machines to add and delete
 		addMachinesList, deleteMachinesMap := createAddAndRemoveMachinesListForManualCatalogs(state, plan)
@@ -938,9 +1122,13 @@ func (r *machineCatalogResource) Delete(ctx context.Context, req resource.Delete
 	deleteAccountOption := citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE
 	deleteVmOption := false
 	if catalog.ProvisioningType == citrixorchestration.PROVISIONINGTYPE_MCS {
-		// Add domain credential header
-		header := generateAdminCredentialHeader(state)
-		deleteMachineCatalogRequest = deleteMachineCatalogRequest.XAdminCredential(header)
+		// If there's no provisioning scheme in state, there will not be any machines create by MCS.
+		// Therefore we will just omit credential for removing machine accounts.
+		if catalog.ProvisioningScheme != nil {
+			// Add domain credential header
+			header := generateAdminCredentialHeader(state)
+			deleteMachineCatalogRequest = deleteMachineCatalogRequest.XAdminCredential(header)
+		}
 
 		deleteAccountOption = citrixorchestration.MACHINEACCOUNTDELETEOPTION_DELETE
 		deleteVmOption = true
@@ -977,36 +1165,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 	}
 
 	provisioningTypeMcs := string(citrixorchestration.PROVISIONINGTYPE_MCS)
-
-	if data.IsPowerManaged.ValueBool() {
-		if data.MachineAccounts != nil {
-			for _, machineAccount := range *data.MachineAccounts {
-				if machineAccount.Hypervisor.IsNull() {
-					resp.Diagnostics.AddAttributeError(
-						path.Root("machine_accounts"),
-						"Missing Attribute Configuration",
-						"Expected hypervisor to be configured when machines are power managed.",
-					)
-				}
-			}
-		}
-
-		if data.IsRemotePc.ValueBool() {
-			resp.Diagnostics.AddAttributeError(
-				path.Root("is_remote_pc"),
-				"Incorrect Attribute Configuration",
-				"Remote PC Access catalog cannot be power managed.",
-			)
-		}
-	}
-
-	if !data.IsPowerManaged.ValueBool() && data.ProvisioningType.ValueString() == provisioningTypeMcs {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("is_power_managed"),
-			"Incorrect Attribute Configuration",
-			fmt.Sprintf("Machines have to be power managed when value of provisioning_type is %s.", provisioningTypeMcs),
-		)
-	}
+	provisioningTypeManual := string(citrixorchestration.PROVISIONINGTYPE_MANUAL)
 
 	if data.ProvisioningType.ValueString() == provisioningTypeMcs {
 		if data.ProvisioningScheme == nil {
@@ -1015,6 +1174,25 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 				"Missing Attribute Configuration",
 				fmt.Sprintf("Expected provisioning_scheme to be configured when value of provisioning_type is %s.", provisioningTypeMcs),
 			)
+		}
+
+		if data.ProvisioningScheme != nil && data.ProvisioningScheme.AzureMachineConfig != nil && data.ProvisioningScheme.AzureMachineConfig.WritebackCache != nil {
+			wbc := data.ProvisioningScheme.AzureMachineConfig.WritebackCache
+			if !wbc.PersistOsDisk.ValueBool() && wbc.PersistVm.ValueBool() {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("persist_vm"),
+					"Incorrect Attribute Configuration",
+					"persist_os_disk must be enabled to enable persist_vm.",
+				)
+			}
+
+			if !wbc.PersistWBC.ValueBool() && wbc.StorageCostSaving.ValueBool() {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("storage_cost_saving"),
+					"Incorrect Attribute Configuration",
+					"persist_wbc must be enabled to enable storage_cost_saving.",
+				)
+			}
 		}
 
 		if data.MachineAccounts != nil {
@@ -1032,14 +1210,63 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 				fmt.Sprintf("Remote PC access catalog cannot be created when provisioning_type is %s.", provisioningTypeMcs),
 			)
 		}
-	}
 
-	if data.ProvisioningType.ValueString() != provisioningTypeMcs && data.ProvisioningScheme != nil {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("provisioning_scheme"),
-			"Incorrect Attribute Configuration",
-			fmt.Sprintf("provisioning_scheme cannot be configured when provisioning_type is not %s.", provisioningTypeMcs),
-		)
+		if !data.IsPowerManaged.IsNull() && !data.IsPowerManaged.ValueBool() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("is_power_managed"),
+				"Incorrect Attribute Configuration",
+				fmt.Sprintf("Machines have to be power managed when provisioning_type is %s.", provisioningTypeMcs),
+			)
+		}
+
+		data.IsPowerManaged = types.BoolValue(true) // set power managed to true for MCS catalog
+	} else {
+		// Manual provisioning type
+		if data.IsPowerManaged.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("is_power_managed"),
+				"Missing Attribute Configuration",
+				fmt.Sprintf("expected is_power_managed to be defined when provisioning_type is %s.", provisioningTypeManual),
+			)
+		}
+
+		if data.IsRemotePc.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("is_remote_pc"),
+				"Missing Attribute Configuration",
+				fmt.Sprintf(" expected is_remote_pc to be defined when provisioning_type is %s.", provisioningTypeManual),
+			)
+		}
+
+		if data.ProvisioningScheme != nil {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("provisioning_scheme"),
+				"Incorrect Attribute Configuration",
+				fmt.Sprintf("provisioning_scheme cannot be configured when provisioning_type is not %s.", provisioningTypeMcs),
+			)
+		}
+
+		if data.IsPowerManaged.ValueBool() {
+			if data.MachineAccounts != nil {
+				for _, machineAccount := range data.MachineAccounts {
+					if machineAccount.Hypervisor.IsNull() {
+						resp.Diagnostics.AddAttributeError(
+							path.Root("machine_accounts"),
+							"Missing Attribute Configuration",
+							"Expected hypervisor to be configured when machines are power managed.",
+						)
+					}
+				}
+			}
+
+			if data.IsRemotePc.ValueBool() {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("is_remote_pc"),
+					"Incorrect Attribute Configuration",
+					"Remote PC Access catalog cannot be power managed.",
+				)
+			}
+		}
 	}
 
 	if data.IsRemotePc.ValueBool() {
@@ -1048,7 +1275,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 			resp.Diagnostics.AddAttributeError(
 				path.Root("session_support"),
 				"Incorrect Attribute Configuration",
-				"Unsupported allocation type.",
+				"Unsupported session support.",
 			)
 			return
 		}
@@ -1060,11 +1287,10 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 			)
 		}
 	}
-
 }
 
 func generateAdminCredentialHeader(plan MachineCatalogResourceModel) string {
-	credential := fmt.Sprintf("%s\\%s:%s", plan.ProvisioningScheme.MachineAccountCreationRules.Domain.ValueString(), plan.ProvisioningScheme.MachineConfig.ServiceAccount.ValueString(), plan.ProvisioningScheme.MachineConfig.ServiceAccountPassword.ValueString())
+	credential := fmt.Sprintf("%s\\%s:%s", plan.ProvisioningScheme.MachineDomainIdentity.Domain.ValueString(), plan.ProvisioningScheme.MachineDomainIdentity.ServiceAccount.ValueString(), plan.ProvisioningScheme.MachineDomainIdentity.ServiceAccountPassword.ValueString())
 	encodedData := base64.StdEncoding.EncodeToString([]byte(credential))
 	header := fmt.Sprintf("Basic %s", encodedData)
 
@@ -1088,7 +1314,7 @@ func generateBatchApiHeaders(client *citrixdaasclient.CitrixDaasClient, plan Mac
 		headers = append(headers, header)
 	}
 
-	if generateCredentialHeader {
+	if generateCredentialHeader && plan.ProvisioningScheme.MachineDomainIdentity != nil {
 		adminCredentialHeader := generateAdminCredentialHeader(plan)
 		var header citrixorchestration.NameValueStringPairModel
 		header.SetName("X-AdminCredential")
@@ -1121,11 +1347,11 @@ func updateCatalogImage(ctx context.Context, client *citrixdaasclient.CitrixDaas
 	var err error
 	switch hypervisor.GetConnectionType() {
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
-		newImage := plan.ProvisioningScheme.MachineConfig.MasterImage.ValueString()
-		resourceGroup := plan.ProvisioningScheme.MachineConfig.ResourceGroup.ValueString()
+		newImage := plan.ProvisioningScheme.AzureMachineConfig.MasterImage.ValueString()
+		resourceGroup := plan.ProvisioningScheme.AzureMachineConfig.ResourceGroup.ValueString()
 		if newImage != "" {
-			storageAccount := plan.ProvisioningScheme.MachineConfig.StorageAccount.ValueString()
-			container := plan.ProvisioningScheme.MachineConfig.Container.ValueString()
+			storageAccount := plan.ProvisioningScheme.AzureMachineConfig.StorageAccount.ValueString()
+			container := plan.ProvisioningScheme.AzureMachineConfig.Container.ValueString()
 			if storageAccount != "" && container != "" {
 				queryPath := fmt.Sprintf(
 					"image.folder\\%s.resourcegroup\\%s.storageaccount\\%s.container",
@@ -1153,10 +1379,10 @@ func updateCatalogImage(ctx context.Context, client *citrixdaasclient.CitrixDaas
 					return err
 				}
 			}
-		} else if plan.ProvisioningScheme.MachineConfig.GalleryImage != nil {
-			gallery := plan.ProvisioningScheme.MachineConfig.GalleryImage.Gallery.ValueString()
-			definition := plan.ProvisioningScheme.MachineConfig.GalleryImage.Definition.ValueString()
-			version := plan.ProvisioningScheme.MachineConfig.GalleryImage.Version.ValueString()
+		} else if plan.ProvisioningScheme.AzureMachineConfig.GalleryImage != nil {
+			gallery := plan.ProvisioningScheme.AzureMachineConfig.GalleryImage.Gallery.ValueString()
+			definition := plan.ProvisioningScheme.AzureMachineConfig.GalleryImage.Definition.ValueString()
+			version := plan.ProvisioningScheme.AzureMachineConfig.GalleryImage.Version.ValueString()
 			if gallery != "" && definition != "" {
 				queryPath := fmt.Sprintf(
 					"image.folder\\%s.resourcegroup\\%s.gallery\\%s.imagedefinition",
@@ -1174,25 +1400,25 @@ func updateCatalogImage(ctx context.Context, client *citrixdaasclient.CitrixDaas
 			}
 		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
-		imageId := fmt.Sprintf("%s (%s)", plan.ProvisioningScheme.MachineConfig.MasterImage.ValueString(), plan.ProvisioningScheme.MachineConfig.ImageAmi.ValueString())
+		imageId := fmt.Sprintf("%s (%s)", plan.ProvisioningScheme.AwsMachineConfig.MasterImage.ValueString(), plan.ProvisioningScheme.AwsMachineConfig.ImageAmi.ValueString())
 		imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", imageId, "template", "")
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating Machine Catalog",
-				fmt.Sprintf("Failed to locate AWS image %s with AMI %s, error: %s", plan.ProvisioningScheme.MachineConfig.MasterImage.ValueString(), plan.ProvisioningScheme.MachineConfig.ImageAmi.ValueString(), err.Error()),
+				fmt.Sprintf("Failed to locate AWS image %s with AMI %s, error: %s", plan.ProvisioningScheme.AwsMachineConfig.MasterImage.ValueString(), plan.ProvisioningScheme.AwsMachineConfig.ImageAmi.ValueString(), err.Error()),
 			)
 			return err
 		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
-		newImage := plan.ProvisioningScheme.MachineConfig.MasterImage.ValueString()
-		snapshot := plan.ProvisioningScheme.MachineConfig.MachineSnapshot.ValueString()
+		newImage := plan.ProvisioningScheme.GcpMachineConfig.MasterImage.ValueString()
+		snapshot := plan.ProvisioningScheme.GcpMachineConfig.MachineSnapshot.ValueString()
 		if snapshot != "" {
 			queryPath := fmt.Sprintf("%s.vm", newImage)
-			imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, plan.ProvisioningScheme.MachineConfig.MachineSnapshot.ValueString(), "snapshot", "")
+			imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, plan.ProvisioningScheme.GcpMachineConfig.MachineSnapshot.ValueString(), "snapshot", "")
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating Machine Catalog",
-					fmt.Sprintf("Failed to locate master image snapshot %s on GCP, error: %s", plan.ProvisioningScheme.MachineConfig.MachineProfile.ValueString(), err.Error()),
+					fmt.Sprintf("Failed to locate master image snapshot %s on GCP, error: %s", plan.ProvisioningScheme.GcpMachineConfig.MachineProfile.ValueString(), err.Error()),
 				)
 				return err
 			}
@@ -1201,7 +1427,7 @@ func updateCatalogImage(ctx context.Context, client *citrixdaasclient.CitrixDaas
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating Machine Catalog",
-					fmt.Sprintf("Failed to locate master image machine %s on GCP, error: %s", plan.ProvisioningScheme.MachineConfig.MachineProfile.ValueString(), err.Error()),
+					fmt.Sprintf("Failed to locate master image machine %s on GCP, error: %s", plan.ProvisioningScheme.GcpMachineConfig.MachineProfile.ValueString(), err.Error()),
 				)
 				return err
 			}
@@ -1453,8 +1679,11 @@ func addMachinesToMcsCatalog(ctx context.Context, client *citrixdaasclient.Citri
 		return err
 	}
 	updateMachineAccountCreationRule.SetNamingSchemeType(*namingScheme)
-	updateMachineAccountCreationRule.SetDomain(plan.ProvisioningScheme.MachineAccountCreationRules.Domain.ValueString())
-	updateMachineAccountCreationRule.SetOU(plan.ProvisioningScheme.MachineAccountCreationRules.Ou.ValueString())
+	if plan.ProvisioningScheme.MachineDomainIdentity != nil {
+		updateMachineAccountCreationRule.SetDomain(plan.ProvisioningScheme.MachineDomainIdentity.Domain.ValueString())
+		updateMachineAccountCreationRule.SetOU(plan.ProvisioningScheme.MachineDomainIdentity.Ou.ValueString())
+	}
+
 	var addMachineRequestBody citrixorchestration.AddMachineToMachineCatalogDetailRequestModel
 	addMachineRequestBody.SetMachineAccountCreationRules(updateMachineAccountCreationRule)
 
@@ -1524,7 +1753,7 @@ func addMachinesToManualCatalog(ctx context.Context, client *citrixdaasclient.Ci
 		return nil
 	}
 
-	addMachinesRequest, err := getMachinesForManualCatalogs(ctx, client, &addMachinesList)
+	addMachinesRequest, err := getMachinesForManualCatalogs(ctx, client, addMachinesList)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error adding machines(s) to Machine Catalog "+catalogIdOrName,
@@ -1602,21 +1831,25 @@ func getProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Citri
 	}
 
 	machineAccountCreationRules.SetNamingSchemeType(*namingScheme)
-	machineAccountCreationRules.SetDomain(plan.ProvisioningScheme.MachineAccountCreationRules.Domain.ValueString())
-	machineAccountCreationRules.SetOU(plan.ProvisioningScheme.MachineAccountCreationRules.Ou.ValueString())
+	if plan.ProvisioningScheme.MachineDomainIdentity != nil {
+		machineAccountCreationRules.SetDomain(plan.ProvisioningScheme.MachineDomainIdentity.Domain.ValueString())
+		machineAccountCreationRules.SetOU(plan.ProvisioningScheme.MachineDomainIdentity.Ou.ValueString())
+	}
 
 	var provisioningScheme citrixorchestration.CreateMachineCatalogProvisioningSchemeRequestModel
 	provisioningScheme.SetNumTotalMachines(int32(plan.ProvisioningScheme.NumTotalMachines.ValueInt64()))
-	provisioningScheme.SetIdentityType(citrixorchestration.IDENTITYTYPE_ACTIVE_DIRECTORY) // Non-Managed setup does not support non-domain joined
-	provisioningScheme.SetWorkGroupMachines(false)                                        // Non-Managed setup does not support non-domain joined
+	identityType := citrixorchestration.IdentityType(plan.ProvisioningScheme.IdentityType.ValueString())
+	provisioningScheme.SetIdentityType(identityType)
+	provisioningScheme.SetWorkGroupMachines(false) // Non-Managed setup does not support non-domain joined
+	if identityType == citrixorchestration.IDENTITYTYPE_AZURE_AD {
+		provisioningScheme.SetWorkGroupMachines(true)
+	}
 	provisioningScheme.SetMachineAccountCreationRules(machineAccountCreationRules)
-	provisioningScheme.SetResourcePool(plan.ProvisioningScheme.MachineConfig.HypervisorResourcePool.ValueString())
-
-	serviceOffering := plan.ProvisioningScheme.MachineConfig.ServiceOffering.ValueString()
-	masterImage := plan.ProvisioningScheme.MachineConfig.MasterImage.ValueString()
+	provisioningScheme.SetResourcePool(plan.ProvisioningScheme.HypervisorResourcePool.ValueString())
 
 	switch hypervisor.GetConnectionType() {
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
+		serviceOffering := plan.ProvisioningScheme.AzureMachineConfig.ServiceOffering.ValueString()
 		queryPath := "serviceoffering.folder"
 		serviceOfferingPath, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, serviceOffering, "serviceoffering", "")
 		if err != nil {
@@ -1624,11 +1857,12 @@ func getProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Citri
 		}
 		provisioningScheme.SetServiceOfferingPath(serviceOfferingPath)
 
-		resourceGroup := plan.ProvisioningScheme.MachineConfig.ResourceGroup.ValueString()
+		resourceGroup := plan.ProvisioningScheme.AzureMachineConfig.ResourceGroup.ValueString()
+		masterImage := plan.ProvisioningScheme.AzureMachineConfig.MasterImage.ValueString()
 		imagePath := ""
 		if masterImage != "" {
-			storageAccount := plan.ProvisioningScheme.MachineConfig.StorageAccount.ValueString()
-			container := plan.ProvisioningScheme.MachineConfig.Container.ValueString()
+			storageAccount := plan.ProvisioningScheme.AzureMachineConfig.StorageAccount.ValueString()
+			container := plan.ProvisioningScheme.AzureMachineConfig.Container.ValueString()
 			if storageAccount != "" && container != "" {
 				queryPath = fmt.Sprintf(
 					"image.folder\\%s.resourcegroup\\%s.storageaccount\\%s.container",
@@ -1648,10 +1882,10 @@ func getProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Citri
 					return nil, fmt.Sprintf("Failed to resolve master image Managed Disk or Snapshot %s, error: %s", masterImage, err.Error())
 				}
 			}
-		} else if plan.ProvisioningScheme.MachineConfig.GalleryImage != nil {
-			gallery := plan.ProvisioningScheme.MachineConfig.GalleryImage.Gallery.ValueString()
-			definition := plan.ProvisioningScheme.MachineConfig.GalleryImage.Definition.ValueString()
-			version := plan.ProvisioningScheme.MachineConfig.GalleryImage.Version.ValueString()
+		} else if plan.ProvisioningScheme.AzureMachineConfig.GalleryImage != nil {
+			gallery := plan.ProvisioningScheme.AzureMachineConfig.GalleryImage.Gallery.ValueString()
+			definition := plan.ProvisioningScheme.AzureMachineConfig.GalleryImage.Definition.ValueString()
+			version := plan.ProvisioningScheme.AzureMachineConfig.GalleryImage.Version.ValueString()
 			if gallery != "" && definition != "" {
 				queryPath = fmt.Sprintf(
 					"image.folder\\%s.resourcegroup\\%s.gallery\\%s.imagedefinition",
@@ -1666,80 +1900,105 @@ func getProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Citri
 		}
 
 		provisioningScheme.SetMasterImagePath(imagePath)
+
+		machineProfile := plan.ProvisioningScheme.AzureMachineConfig.MachineProfile
+		if machineProfile != nil {
+			machine := machineProfile.MachineProfileVmName.ValueString()
+			machineProfileResourceGroup := machineProfile.MachineProfileResourceGroup.ValueString()
+			queryPath = fmt.Sprintf("machineprofile.folder\\%s.resourcegroup", machineProfileResourceGroup)
+			machineProfilePath, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, machine, "vm", "")
+			if err != nil {
+				return nil, fmt.Sprintf("Failed to locate machine profile %s on Azure, error: %s", plan.ProvisioningScheme.AzureMachineConfig.MachineProfile.MachineProfileVmName.ValueString(), err.Error())
+			}
+			provisioningScheme.SetMachineProfilePath(machineProfilePath)
+		}
+
+		if plan.ProvisioningScheme.AzureMachineConfig.WritebackCache != nil {
+			provisioningScheme.SetUseWriteBackCache(true)
+			provisioningScheme.SetWriteBackCacheDiskSizeGB(int32(plan.ProvisioningScheme.AzureMachineConfig.WritebackCache.WriteBackCacheDiskSizeGB.ValueInt64()))
+			if !plan.ProvisioningScheme.AzureMachineConfig.WritebackCache.WriteBackCacheMemorySizeMB.IsNull() {
+				provisioningScheme.SetWriteBackCacheMemorySizeMB(int32(plan.ProvisioningScheme.AzureMachineConfig.WritebackCache.WriteBackCacheMemorySizeMB.ValueInt64()))
+			}
+			if plan.ProvisioningScheme.AzureMachineConfig.WritebackCache.PersistVm.ValueBool() && !plan.ProvisioningScheme.AzureMachineConfig.WritebackCache.PersistOsDisk.ValueBool() {
+				return nil, "Could not set persist_vm attribute, which can only be set when persist_os_disk = true"
+			}
+		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
+		serviceOffering := plan.ProvisioningScheme.AwsMachineConfig.ServiceOffering.ValueString()
 		serviceOfferingPath, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", serviceOffering, "serviceoffering", "")
 		if err != nil {
 			return nil, fmt.Sprintf("Failed to resolve service offering %s on AWS, error: %s", serviceOffering, err.Error())
 		}
 		provisioningScheme.SetServiceOfferingPath(serviceOfferingPath)
 
-		imageId := fmt.Sprintf("%s (%s)", masterImage, plan.ProvisioningScheme.MachineConfig.ImageAmi.ValueString())
+		masterImage := plan.ProvisioningScheme.AwsMachineConfig.MasterImage.ValueString()
+		imageId := fmt.Sprintf("%s (%s)", masterImage, plan.ProvisioningScheme.AwsMachineConfig.ImageAmi.ValueString())
 		imagePath, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", imageId, "template", "")
 		if err != nil {
-			return nil, fmt.Sprintf("Failed to locate AWS image %s with AMI %s, error: %s", masterImage, plan.ProvisioningScheme.MachineConfig.ImageAmi.ValueString(), err.Error())
+			return nil, fmt.Sprintf("Failed to locate AWS image %s with AMI %s, error: %s", masterImage, plan.ProvisioningScheme.AwsMachineConfig.ImageAmi.ValueString(), err.Error())
 		}
 		provisioningScheme.SetMasterImagePath(imagePath)
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
-		if serviceOffering != "" {
-			return nil, "GCP machine catalog does not support service_offering. Please use master_image (and optionally with machine_snapshot) or machine_profile to specify the GCP VM you want to use as a template for the VM SKU."
-		}
 		imagePath := ""
-		snapshot := plan.ProvisioningScheme.MachineConfig.MachineSnapshot.ValueString()
+		snapshot := plan.ProvisioningScheme.GcpMachineConfig.MachineSnapshot.ValueString()
 		if snapshot != "" {
-			queryPath := fmt.Sprintf("%s.vm", plan.ProvisioningScheme.MachineConfig.MasterImage.ValueString())
-			imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, plan.ProvisioningScheme.MachineConfig.MachineSnapshot.ValueString(), "snapshot", "")
+			queryPath := fmt.Sprintf("%s.vm", plan.ProvisioningScheme.GcpMachineConfig.MasterImage.ValueString())
+			imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, plan.ProvisioningScheme.GcpMachineConfig.MachineSnapshot.ValueString(), "snapshot", "")
 			if err != nil {
-				return nil, fmt.Sprintf("Failed to locate master image snapshot %s on GCP, error: %s", plan.ProvisioningScheme.MachineConfig.MachineProfile.ValueString(), err.Error())
+				return nil, fmt.Sprintf("Failed to locate master image snapshot %s on GCP, error: %s", plan.ProvisioningScheme.GcpMachineConfig.MachineProfile.ValueString(), err.Error())
 			}
 		} else {
-			imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", plan.ProvisioningScheme.MachineConfig.MasterImage.ValueString(), "vm", "")
+			imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", plan.ProvisioningScheme.GcpMachineConfig.MasterImage.ValueString(), "vm", "")
 			if err != nil {
-				return nil, fmt.Sprintf("Failed to locate master image machine %s on GCP, error: %s", plan.ProvisioningScheme.MachineConfig.MachineProfile.ValueString(), err.Error())
+				return nil, fmt.Sprintf("Failed to locate master image machine %s on GCP, error: %s", plan.ProvisioningScheme.GcpMachineConfig.MachineProfile.ValueString(), err.Error())
 			}
 		}
 
 		provisioningScheme.SetMasterImagePath(imagePath)
 
-		machineProfile := plan.ProvisioningScheme.MachineConfig.MachineProfile.ValueString()
+		machineProfile := plan.ProvisioningScheme.GcpMachineConfig.MachineProfile.ValueString()
 		if machineProfile != "" {
 			machineProfilePath, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", machineProfile, "vm", "")
 			if err != nil {
-				return nil, fmt.Sprintf("Failed to locate machine profile %s on GCP, error: %s", plan.ProvisioningScheme.MachineConfig.MachineProfile.ValueString(), err.Error())
+				return nil, fmt.Sprintf("Failed to locate machine profile %s on GCP, error: %s", plan.ProvisioningScheme.GcpMachineConfig.MachineProfile.ValueString(), err.Error())
 			}
 			provisioningScheme.SetMachineProfilePath(machineProfilePath)
+		}
+
+		if plan.ProvisioningScheme.GcpMachineConfig.WritebackCache != nil {
+			provisioningScheme.SetUseWriteBackCache(true)
+			provisioningScheme.SetWriteBackCacheDiskSizeGB(int32(plan.ProvisioningScheme.GcpMachineConfig.WritebackCache.WriteBackCacheDiskSizeGB.ValueInt64()))
+			if !plan.ProvisioningScheme.GcpMachineConfig.WritebackCache.WriteBackCacheMemorySizeMB.IsNull() {
+				provisioningScheme.SetWriteBackCacheMemorySizeMB(int32(plan.ProvisioningScheme.GcpMachineConfig.WritebackCache.WriteBackCacheMemorySizeMB.ValueInt64()))
+			}
+			if plan.ProvisioningScheme.GcpMachineConfig.WritebackCache.PersistVm.ValueBool() && !plan.ProvisioningScheme.GcpMachineConfig.WritebackCache.PersistOsDisk.ValueBool() {
+				return nil, "Could not set persist_vm attribute, which can only be set when persist_os_disk = true"
+			}
+
 		}
 	}
 
 	if plan.ProvisioningScheme.NetworkMapping != nil {
-		networkMapping := ParseNetworkMappingToClientModel(*plan.ProvisioningScheme.NetworkMapping, hypervisorResourcePool)
+		networkMapping, err := ParseNetworkMappingToClientModel(*plan.ProvisioningScheme.NetworkMapping, hypervisorResourcePool)
+		if err != nil {
+			return nil, err.Error()
+		}
 		provisioningScheme.SetNetworkMapping(networkMapping)
 	}
 
-	if plan.ProvisioningScheme.WritebackCache != nil {
-		provisioningScheme.SetUseWriteBackCache(true)
-		provisioningScheme.SetWriteBackCacheDiskSizeGB(int32(plan.ProvisioningScheme.WritebackCache.WriteBackCacheDiskSizeGB.ValueInt64()))
-		if !plan.ProvisioningScheme.WritebackCache.WriteBackCacheMemorySizeMB.IsNull() {
-			provisioningScheme.SetWriteBackCacheMemorySizeMB(int32(plan.ProvisioningScheme.WritebackCache.WriteBackCacheMemorySizeMB.ValueInt64()))
-		}
-		if plan.ProvisioningScheme.WritebackCache.PersistVm.ValueBool() && !plan.ProvisioningScheme.WritebackCache.PersistOsDisk.ValueBool() {
-			return nil, "Could not set persist_vm attribute, which can only be set when persist_os_disk = true"
-		}
-
-	}
-
 	customProperties := ParseCustomPropertiesToClientModel(*plan.ProvisioningScheme, hypervisor.ConnectionType)
-	provisioningScheme.SetCustomProperties(*customProperties)
+	provisioningScheme.SetCustomProperties(customProperties)
 
 	return &provisioningScheme, ""
 }
 
-func getMachinesForManualCatalogs(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, machineAccounts *[]MachineAccountsModel) ([]citrixorchestration.AddMachineToMachineCatalogRequestModel, error) {
+func getMachinesForManualCatalogs(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, machineAccounts []MachineAccountsModel) ([]citrixorchestration.AddMachineToMachineCatalogRequestModel, error) {
 	if machineAccounts == nil {
 		return nil, nil
 	}
 
 	addMachineRequestList := []citrixorchestration.AddMachineToMachineCatalogRequestModel{}
-	for _, machineAccount := range *machineAccounts {
+	for _, machineAccount := range machineAccounts {
 		hypervisorId := machineAccount.Hypervisor.ValueString()
 		var hypervisor *citrixorchestration.HypervisorDetailResponseModel
 		var err error
@@ -1751,7 +2010,7 @@ func getMachinesForManualCatalogs(ctx context.Context, client *citrixdaasclient.
 			}
 		}
 
-		for _, machine := range *machineAccount.Machines {
+		for _, machine := range machineAccount.Machines {
 			addMachineRequest := citrixorchestration.AddMachineToMachineCatalogRequestModel{}
 			addMachineRequest.SetMachineName(machine.MachineName.ValueString())
 
@@ -1793,7 +2052,7 @@ func getMachinesForManualCatalogs(ctx context.Context, client *citrixdaasclient.
 					return nil, err
 				}
 				vmId = vm.GetId()
-			case citrixorchestration.HYPERVISORCONNECTIONTYPE_CLOUD_PLATFORM:
+			case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
 				if machine.Region.IsNull() || machine.ProjectName.IsNull() {
 					return nil, fmt.Errorf("region and project_name are required for GCP")
 				}
@@ -1802,7 +2061,7 @@ func getMachinesForManualCatalogs(ctx context.Context, client *citrixdaasclient.
 					return nil, err
 				}
 				projectNamePath := projectName.GetXDPath()
-				vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, fmt.Sprintf("%s\\%s", projectNamePath, machine.Region), machineName, "Vm", "", connectionType)
+				vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, fmt.Sprintf("%s\\%s.region", projectNamePath, machine.Region.ValueString()), machineName, "Vm", "", connectionType)
 				if err != nil {
 					return nil, err
 				}
@@ -1825,8 +2084,8 @@ func createAddAndRemoveMachinesListForManualCatalogs(state, plan MachineCatalogR
 
 	// create map for existing machines marking all machines for deletion
 	if state.MachineAccounts != nil {
-		for _, machineAccount := range *state.MachineAccounts {
-			for _, machine := range *machineAccount.Machines {
+		for _, machineAccount := range state.MachineAccounts {
+			for _, machine := range machineAccount.Machines {
 				machineMap, exists := existingMachineAccounts[machineAccount.Hypervisor.ValueString()]
 				if !exists {
 					existingMachineAccounts[machineAccount.Hypervisor.ValueString()] = map[string]bool{}
@@ -1839,9 +2098,9 @@ func createAddAndRemoveMachinesListForManualCatalogs(state, plan MachineCatalogR
 
 	// iterate over plan and if machine already exists, mark false for deletion. If not, add it to the addMachineList
 	if plan.MachineAccounts != nil {
-		for _, machineAccount := range *plan.MachineAccounts {
+		for _, machineAccount := range plan.MachineAccounts {
 			machineAccountMachines := []MachineCatalogMachineModel{}
-			for _, machine := range *machineAccount.Machines {
+			for _, machine := range machineAccount.Machines {
 				if existingMachineAccounts[machineAccount.Hypervisor.ValueString()][strings.ToLower(machine.MachineName.ValueString())] {
 					// Machine exists. Mark false for deletion
 					existingMachineAccounts[machineAccount.Hypervisor.ValueString()][strings.ToLower(machine.MachineName.ValueString())] = false
@@ -1854,7 +2113,7 @@ func createAddAndRemoveMachinesListForManualCatalogs(state, plan MachineCatalogR
 			if len(machineAccountMachines) > 0 {
 				var addMachineAccount MachineAccountsModel
 				addMachineAccount.Hypervisor = machineAccount.Hypervisor
-				addMachineAccount.Machines = &machineAccountMachines
+				addMachineAccount.Machines = machineAccountMachines
 				addMachinesList = append(addMachinesList, addMachineAccount)
 			}
 		}
@@ -1876,7 +2135,7 @@ func createAddAndRemoveMachinesListForManualCatalogs(state, plan MachineCatalogR
 func getRemotePcEnrollmentScopes(plan MachineCatalogResourceModel, includeMachines bool) []citrixorchestration.RemotePCEnrollmentScopeRequestModel {
 	remotePCEnrollmentScopes := []citrixorchestration.RemotePCEnrollmentScopeRequestModel{}
 	if plan.RemotePcOus != nil {
-		for _, ou := range *plan.RemotePcOus {
+		for _, ou := range plan.RemotePcOus {
 			var remotePCEnrollmentScope citrixorchestration.RemotePCEnrollmentScopeRequestModel
 			remotePCEnrollmentScope.SetIncludeSubfolders(ou.IncludeSubFolders.ValueBool())
 			remotePCEnrollmentScope.SetOU(ou.OUName.ValueString())
@@ -1886,8 +2145,8 @@ func getRemotePcEnrollmentScopes(plan MachineCatalogResourceModel, includeMachin
 	}
 
 	if includeMachines && plan.MachineAccounts != nil {
-		for _, machineAccount := range *plan.MachineAccounts {
-			for _, machine := range *machineAccount.Machines {
+		for _, machineAccount := range plan.MachineAccounts {
+			for _, machine := range machineAccount.Machines {
 				var remotePCEnrollmentScope citrixorchestration.RemotePCEnrollmentScopeRequestModel
 				remotePCEnrollmentScope.SetIncludeSubfolders(false)
 				remotePCEnrollmentScope.SetOU(machine.MachineName.ValueString())
