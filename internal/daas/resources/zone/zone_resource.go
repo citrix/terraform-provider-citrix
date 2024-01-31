@@ -10,12 +10,14 @@ import (
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -36,12 +38,12 @@ type zoneResource struct {
 	client *citrixdaasclient.CitrixDaasClient
 }
 
-// Metadata returns the data source type name.
+// Metadata returns the resource type name.
 func (r *zoneResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_daas_zone"
 }
 
-// Schema defines the schema for the data source.
+// Schema defines the schema for the resource.
 func (r *zoneResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Manages a zone.\nFor cloud DDC, Zones and Cloud Connectors are managed only by Citrix Cloud. Ensure you have a resource location manually created and connectors deployed in it. You may then apply or import the zone using the zone Id.",
@@ -76,12 +78,15 @@ func (r *zoneResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 						},
 					},
 				},
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
 			},
 		},
 	}
 }
 
-// Configure adds the provider configured client to the data source.
+// Configure adds the provider configured client to the resource.
 func (r *zoneResource) Configure(_ context.Context, req resource.ConfigureRequest, _ *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
@@ -129,8 +134,8 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 	body.SetName(plan.Name.ValueString())
 	body.SetDescription(plan.Description.ValueString())
 	if plan.Metadata != nil {
-		metadata := util.ParseNameValueStringPairToClientModel(*plan.Metadata)
-		body.SetMetadata(*metadata)
+		metadata := util.ParseNameValueStringPairToClientModel(plan.Metadata)
+		body.SetMetadata(metadata)
 	}
 
 	createZoneRequest := r.client.ApiClient.ZonesAPIsDAAS.ZonesCreateZone(ctx)
@@ -140,7 +145,7 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 	httpResp, err := citrixdaasclient.AddRequestData(createZoneRequest, r.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Creating Zone",
+			"Error creating Zone",
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
@@ -218,8 +223,8 @@ func (r *zoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	editZoneRequestBody.SetDescription(plan.Description.ValueString())
 
 	if plan.Metadata != nil {
-		metadata := util.ParseNameValueStringPairToClientModel(*plan.Metadata)
-		editZoneRequestBody.SetMetadata(*metadata)
+		metadata := util.ParseNameValueStringPairToClientModel(plan.Metadata)
+		editZoneRequestBody.SetMetadata(metadata)
 	}
 
 	// Update zone
@@ -228,7 +233,7 @@ func (r *zoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	httpResp, err := citrixdaasclient.AddRequestData(editZoneRequest, r.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error Updating Zone "+zoneName,
+			"Error updating Zone "+zoneName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
@@ -274,7 +279,7 @@ func (r *zoneResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	httpResp, err := citrixdaasclient.AddRequestData(deleteZoneRequest, r.client).Execute()
 	if err != nil && httpResp.StatusCode != http.StatusNotFound {
 		resp.Diagnostics.AddError(
-			"Error Deleting Zone "+zoneName,
+			"Error deleting Zone "+zoneName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
@@ -325,7 +330,7 @@ func getZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, dia
 	zone, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ZoneDetailResponseModel](getZoneRequest, client)
 	if err != nil {
 		diagnostics.AddError(
-			"Error Reading Zone "+zoneId,
+			"Error reading Zone "+zoneId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)

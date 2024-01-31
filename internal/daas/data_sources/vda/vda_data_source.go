@@ -16,7 +16,9 @@ import (
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ datasource.DataSource = &VdaDataSource{}
+var (
+	_ datasource.DataSource = &VdaDataSource{}
+)
 
 func NewVdaDataSource() datasource.DataSource {
 	return &VdaDataSource{}
@@ -41,19 +43,12 @@ func (d *VdaDataSource) Schema(ctx context.Context, req datasource.SchemaRequest
 				MarkdownDescription: "The machine catalog which the VDAs are associated with.",
 				Optional:            true,
 				Validators: []validator.String{
-					stringvalidator.ConflictsWith(path.Expressions{
-						path.MatchRelative().AtParent().AtName("delivery_group"),
-					}...),
+					stringvalidator.ExactlyOneOf(path.MatchRoot("machine_catalog"), path.MatchRoot("delivery_group")), // Ensures that only one of either machine_catalog or delivery_group is provided. It will also cause a validation error if none are specified.,
 				},
 			},
 			"delivery_group": schema.StringAttribute{
 				MarkdownDescription: "The delivery group which the VDAs are associated with.",
 				Optional:            true,
-				Validators: []validator.String{
-					stringvalidator.ConflictsWith(path.Expressions{
-						path.MatchRelative().AtParent().AtName("machine_catalog"),
-					}...),
-				},
 			},
 			"vdas": schema.ListNestedAttribute{
 				Description: "The VDAs associated with the specified machine catalog or delivery group.",

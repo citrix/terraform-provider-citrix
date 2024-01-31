@@ -75,9 +75,9 @@ Now you are good to run terraform jobs to debug the provider code. Make sure to 
 
 ## Debugging with citrix-daas-rest-go client code in Visual Studio Code
 
-Optionally, you can also debug `citrix-daas-rest-go` client, which is the Citrix DaaS Rest client for Go. By debugging with the go client, you can inspect the raw response and error message from Citrix DaaS APIs by setting up breakpoints in provider. You can also check the function implementation and models the provider server uses.
+Optionally, you can also debug [citrix-daas-rest-go](https://github.com/citrix/citrix-daas-rest-go) client, which is the Citrix DaaS Rest client for Go. By debugging with the go client, you can inspect the raw response and error message from Citrix DaaS APIs by setting up breakpoints in provider. You can also check the function implementation and models the provider server uses.
 
-Clone Go client from <https://github.com/citrix/citrix-daas-rest-go>. Go to `terraform-provider-citrix/go.mod` and uncomment the following line to intercept `citrix-daas-rest-go` client with local package:
+Clone the Go client from <https://github.com/citrix/citrix-daas-rest-go>. Go to `terraform-provider-citrix/go.mod` and uncomment the following line to intercept `citrix-daas-rest-go` client with local package:
 
     replace github.com/citrix/citrix-daas-rest-go => {your local repo directory}/citrix-daas-rest-go
 
@@ -86,6 +86,23 @@ Run [Debugging Provider code in Visual Studio Code](#debugging-provider-code-in-
 Set a breakpoint in `terraform-provider-citrix/internal/provider/provider.go::Configure`
 
 ## Running the tests
+
+Before running the tests, you need to provide values for environment variables required by the test files. 
+The environment parameters that need to be specified can be found in the following template files:
+1. To Run Tests for the Cloud Environment: `settings.cloud.example.json`
+2. To Run Tests for the On-Premise environment: `setings.onprem.example.json`
+
+Copy the environment parameters from the appropriate template file and paste them in the GO `settings.json` file.
+To navigate to `settings.json` file, follow the steps below:
+1. Click on the `Extensions` icon on the left panel of VS Code.
+2. Search for the `Go` extension and click on the `gear` icon next to it. 
+
+    ![Go Extension in VS Code](./images/go-extension.png "Go Extension in VS Code")
+
+3. In the search bar, type in `go.testEnvVars`. From the search result, click on `Edit in settings.json` under `Go: Test Env Vars`.
+4. Paste the contents of the template file that you copied earlier.
+5. Update the missing values in the file and run the commands mentioned below
+
 ```powershell
 ➥ cd {Root of repo}/terraform-provider-citrix
 ➥ $env:TF_ACC = 1

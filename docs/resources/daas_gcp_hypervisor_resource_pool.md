@@ -21,7 +21,7 @@ resource "citrix_daas_gcp_hypervisor_resource_pool" "example-gcp-hypervisor-reso
     subnets             = [
         "us-east1",
     ]
-    vpc    = "{VPC name}"
+    vpc    = "<VPC name>"
 }
 ```
 

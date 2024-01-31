@@ -26,9 +26,9 @@ func TestDeliveryGroupResourceAzureRM(t *testing.T) {
 		PreCheck: func() {
 			TestProviderPreCheck(t)
 			TestZonePreCheck(t)
-			TestHypervisorPreCheck(t)
-			TestHypervisorResourcePoolPreCheck(t)
-			TestMachineCatalogPreCheck(t)
+			TestHypervisorPreCheck_Azure(t)
+			TestHypervisorResourcePoolPreCheck_Azure(t)
+			TestMachineCatalogPreCheck_Azure(t)
 		},
 		Steps: []resource.TestStep{
 
@@ -43,6 +43,8 @@ func TestDeliveryGroupResourceAzureRM(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_daas_delivery_group.testDeliveryGroup", "description", "Delivery Group for testing"),
 					// Verify number of desktops
 					resource.TestCheckResourceAttr("citrix_daas_delivery_group.testDeliveryGroup", "desktops.#", "2"),
+					// Verify number of reboot schedules
+					resource.TestCheckResourceAttr("citrix_daas_delivery_group.testDeliveryGroup", "reboot_schedules.#", "2"),
 					// Verify total number of machines in delivery group
 					resource.TestCheckResourceAttr("citrix_daas_delivery_group.testDeliveryGroup", "total_machines", "1"),
 				),
@@ -55,7 +57,7 @@ func TestDeliveryGroupResourceAzureRM(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"last_updated", "autoscale_settings", "associated_machine_catalogs"},
+				ImportStateVerifyIgnore: []string{"last_updated", "autoscale_settings", "associated_machine_catalogs", "reboot_schedules"},
 			},
 
 			// Update name, description and add machine testing
@@ -69,6 +71,8 @@ func TestDeliveryGroupResourceAzureRM(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_daas_delivery_group.testDeliveryGroup", "description", "Delivery Group for testing updated"),
 					// Verify number of desktops
 					resource.TestCheckResourceAttr("citrix_daas_delivery_group.testDeliveryGroup", "desktops.#", "1"),
+					// Verify number of reboot schedules
+					resource.TestCheckResourceAttr("citrix_daas_delivery_group.testDeliveryGroup", "reboot_schedules.#", "1"),
 					// Verify total number of machines in delivery group
 					resource.TestCheckResourceAttr("citrix_daas_delivery_group.testDeliveryGroup", "total_machines", "2"),
 				),
@@ -136,6 +140,47 @@ resource "citrix_daas_delivery_group" "testDeliveryGroup" {
         	},
     	]	
 	}
+	reboot_schedules = [
+		{
+			name = "test_reboot_schedule"
+			reboot_schedule_enabled = true
+			frequency = "Weekly"
+			frequency_factor = 1
+			days_in_week = [
+				"Monday",
+				"Tuesday"
+				]
+			start_time = "12:12"
+			start_date = "2024-05-25"
+			reboot_duration_minutes = 0
+			ignore_maintenance_mode = true
+			natural_reboot_schedule = false
+			reboot_notification_to_users = {
+				notification_duration_minutes = 5
+				notification_message = "test message"
+				notification_title = "test title"
+			}
+		},
+		{
+			name = "test_2"
+			reboot_schedule_enabled = true
+			frequency = "Monthly"
+			frequency_factor = 2
+			week_in_month = "First"
+			day_in_month = "Monday"
+			start_time = "12:12"
+			start_date = "2024-04-21"
+			ignore_maintenance_mode = true
+			reboot_duration_minutes = 120
+			natural_reboot_schedule = false
+			reboot_notification_to_users = {
+				notification_duration_minutes = 15
+				notification_message = "test message"
+				notification_title = "test title"
+				notification_repeat_every_5_minutes = true
+			}
+		}
+	]
 	
 }
 `
@@ -182,6 +227,24 @@ resource "citrix_daas_delivery_group" "testDeliveryGroup" {
         	},
     	]	
 	}
+	reboot_schedules = [
+		{
+			name = "test_reboot_schedule"
+			reboot_schedule_enabled = true
+			frequency = "Weekly"
+			frequency_factor = 1
+			days_in_week = [
+				"Monday",
+				"Tuesday",
+				"Wednesday"
+				]
+			start_time = "12:12"
+			start_date = "2024-05-25"
+			reboot_duration_minutes = 0
+			ignore_maintenance_mode = true
+			natural_reboot_schedule = false
+		}
+	]
 	
 }
 
@@ -191,5 +254,5 @@ resource "citrix_daas_delivery_group" "testDeliveryGroup" {
 func BuildDeliveryGroupResource(t *testing.T, deliveryGroup string) string {
 	name := os.Getenv("TEST_DG_NAME")
 
-	return BuildMachineCatalogResource(t, machinecatalog_testResources_updated) + fmt.Sprintf(deliveryGroup, name)
+	return BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated) + fmt.Sprintf(deliveryGroup, name)
 }
