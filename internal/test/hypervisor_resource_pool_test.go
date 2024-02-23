@@ -38,7 +38,6 @@ func TestHypervisorResourcePoolAzureRM(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		PreCheck: func() {
 			TestProviderPreCheck(t)
-			TestZonePreCheck(t)
 			TestHypervisorPreCheck_Azure(t)
 			TestHypervisorResourcePoolPreCheck_Azure(t)
 		},
@@ -48,20 +47,20 @@ func TestHypervisorResourcePoolAzureRM(t *testing.T) {
 				Config: BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("citrix_daas_azure_hypervisor_resource_pool.testHypervisorResourcePool", "name", name),
+					resource.TestCheckResourceAttr("citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool", "name", name),
 					// Verify name of virtual network resource group name
-					resource.TestCheckResourceAttr("citrix_daas_azure_hypervisor_resource_pool.testHypervisorResourcePool", "virtual_network_resource_group", os.Getenv("TEST_HYPERV_RP_VIRTUAL_NETWORK_RESOURCE_GROUP")),
+					resource.TestCheckResourceAttr("citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool", "virtual_network_resource_group", os.Getenv("TEST_HYPERV_RP_VIRTUAL_NETWORK_RESOURCE_GROUP")),
 					// Verify name of virtual network
-					resource.TestCheckResourceAttr("citrix_daas_azure_hypervisor_resource_pool.testHypervisorResourcePool", "virtual_network", os.Getenv("TEST_HYPERV_RP_VIRTUAL_NETWORK")),
+					resource.TestCheckResourceAttr("citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool", "virtual_network", os.Getenv("TEST_HYPERV_RP_VIRTUAL_NETWORK")),
 					// Verify name of the region
-					resource.TestCheckResourceAttr("citrix_daas_azure_hypervisor_resource_pool.testHypervisorResourcePool", "region", os.Getenv("TEST_HYPERV_RP_REGION")),
+					resource.TestCheckResourceAttr("citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool", "region", os.Getenv("TEST_HYPERV_RP_REGION")),
 					// Verify subnets
-					resource.TestCheckResourceAttr("citrix_daas_azure_hypervisor_resource_pool.testHypervisorResourcePool", "subnets.#", strconv.Itoa(len(strings.Split(os.Getenv("Test_HYPERV_RP_SUBNETS"), ",")))),
+					resource.TestCheckResourceAttr("citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool", "subnets.#", strconv.Itoa(len(strings.Split(os.Getenv("Test_HYPERV_RP_SUBNETS"), ",")))),
 				),
 			},
 			// ImportState testing
 			{
-				ResourceName:      "citrix_daas_azure_hypervisor_resource_pool.testHypervisorResourcePool",
+				ResourceName:      "citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool",
 				ImportState:       true,
 				ImportStateIdFunc: generateImportStateId,
 				ImportStateVerify: true,
@@ -71,7 +70,7 @@ func TestHypervisorResourcePoolAzureRM(t *testing.T) {
 			{
 				Config: BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("citrix_daas_azure_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
+					resource.TestCheckResourceAttr("citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
 				),
 			},
 		},
@@ -103,7 +102,6 @@ func TestHypervisorResourcePoolGCP(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		PreCheck: func() {
 			TestProviderPreCheck(t)
-			TestZonePreCheck(t)
 			TestHypervisorPreCheck_GCP(t)
 			TestHypervisorResourcePoolPreCheck_GCP(t)
 		},
@@ -113,20 +111,20 @@ func TestHypervisorResourcePoolGCP(t *testing.T) {
 				Config: BuildHypervisorResourcePoolResourceGCP(t, hypervisor_resource_pool_testResource_gcp),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("citrix_daas_gcp_hypervisor_resource_pool.testHypervisorResourcePool", "name", name),
+					resource.TestCheckResourceAttr("citrix_gcp_hypervisor_resource_pool.testHypervisorResourcePool", "name", name),
 					// Verify name of the region
-					resource.TestCheckResourceAttr("citrix_daas_gcp_hypervisor_resource_pool.testHypervisorResourcePool", "region", os.Getenv("TEST_HYPERV_RP_REGION_GCP")),
+					resource.TestCheckResourceAttr("citrix_gcp_hypervisor_resource_pool.testHypervisorResourcePool", "region", os.Getenv("TEST_HYPERV_RP_REGION_GCP")),
 					// Verify subnets
-					resource.TestCheckResourceAttr("citrix_daas_gcp_hypervisor_resource_pool.testHypervisorResourcePool", "subnets.#", strconv.Itoa(len(strings.Split(os.Getenv("Test_HYPERV_RP_SUBNETS_GCP"), ",")))),
+					resource.TestCheckResourceAttr("citrix_gcp_hypervisor_resource_pool.testHypervisorResourcePool", "subnets.#", strconv.Itoa(len(strings.Split(os.Getenv("Test_HYPERV_RP_SUBNETS_GCP"), ",")))),
 					// Verify name of the project
-					resource.TestCheckResourceAttr("citrix_daas_gcp_hypervisor_resource_pool.testHypervisorResourcePool", "project_name", os.Getenv("TEST_HYPERV_RP_PROJECT_NAME_GCP")),
+					resource.TestCheckResourceAttr("citrix_gcp_hypervisor_resource_pool.testHypervisorResourcePool", "project_name", os.Getenv("TEST_HYPERV_RP_PROJECT_NAME_GCP")),
 					// Verify name of the vpc
-					resource.TestCheckResourceAttr("citrix_daas_gcp_hypervisor_resource_pool.testHypervisorResourcePool", "vpc", os.Getenv("TEST_HYPERV_RP_VPC_GCP")),
+					resource.TestCheckResourceAttr("citrix_gcp_hypervisor_resource_pool.testHypervisorResourcePool", "vpc", os.Getenv("TEST_HYPERV_RP_VPC_GCP")),
 				),
 			},
 			// ImportState testing
 			{
-				ResourceName:      "citrix_daas_gcp_hypervisor_resource_pool.testHypervisorResourcePool",
+				ResourceName:      "citrix_gcp_hypervisor_resource_pool.testHypervisorResourcePool",
 				ImportState:       true,
 				ImportStateIdFunc: generateImportStateId_GCP,
 				ImportStateVerify: true,
@@ -135,7 +133,72 @@ func TestHypervisorResourcePoolGCP(t *testing.T) {
 			{
 				Config: BuildHypervisorResourcePoolResourceGCP(t, hypervisor_resource_pool_updated_testResource_gcp),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("citrix_daas_gcp_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
+					resource.TestCheckResourceAttr("citrix_gcp_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
+				),
+			},
+		},
+	})
+}
+
+func TestHypervisorResourcePoolPreCheck_Xenserver(t *testing.T) {
+	if v := os.Getenv("TEST_HYPERV_RP_NAME_XENSERVER"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_NAME_XENSERVER must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_RP_NETWORK_1_XENSERVER"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_NETWORK_1_XENSERVER must be set for acceptance tests")
+	}
+	if v := os.Getenv("Test_HYPERV_RP_NETWORK_2_XENSERVER"); v == "" {
+		t.Fatal("Test_HYPERV_RP_NETWORK_2_XENSERVER must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_RP_STORAGE_XENSERVER"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_STORAGE_XENSERVER must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_RP_TEMP_STORAGE_XENSERVER"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_TEMP_STORAGE_XENSERVER must be set for acceptance tests")
+	}
+}
+
+func TestHypervisorResourcePoolXenserver(t *testing.T) {
+	name := os.Getenv("TEST_HYPERV_RP_NAME_XENSERVER")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck: func() {
+			TestProviderPreCheck(t)
+			TestHypervisorPreCheck_Xenserver(t)
+			TestHypervisorResourcePoolPreCheck_Xenserver(t)
+		},
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: BuildHypervisorResourcePoolResourceXenServer(t),
+
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool", "name", name),
+					// Verify name of the region
+					resource.TestCheckResourceAttr("citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool", "networks.#", "1"),
+					resource.TestCheckResourceAttr("citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool", "networks.0", os.Getenv("TEST_HYPERV_RP_NETWORK_1_XENSERVER")),
+					// Verify subnets
+					resource.TestCheckResourceAttr("citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool", "storage.#", "1"),
+					resource.TestCheckResourceAttr("citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool", "storage.0", os.Getenv("TEST_HYPERV_RP_STORAGE_XENSERVER")),
+					// Verify name of the project
+					resource.TestCheckResourceAttr("citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool", "temporary_storage.#", "1"),
+					resource.TestCheckResourceAttr("citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool", "temporary_storage.0", os.Getenv("TEST_HYPERV_RP_TEMP_STORAGE_XENSERVER")),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool",
+				ImportState:       true,
+				ImportStateIdFunc: generateImportStateId_XenServer,
+				ImportStateVerify: true,
+			},
+			// Update and Read
+			{
+				Config: BuildHypervisorResourcePoolResourceXenServerUpdated(t),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
+					resource.TestCheckResourceAttr("citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool", "networks.#", "2"),
 				),
 			},
 		},
@@ -143,7 +206,7 @@ func TestHypervisorResourcePoolGCP(t *testing.T) {
 }
 
 func generateImportStateId(state *terraform.State) (string, error) {
-	resourceName := "citrix_daas_azure_hypervisor_resource_pool.testHypervisorResourcePool"
+	resourceName := "citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool"
 	var rawState map[string]string
 	for _, m := range state.Modules {
 		if len(m.Resources) > 0 {
@@ -157,7 +220,21 @@ func generateImportStateId(state *terraform.State) (string, error) {
 }
 
 func generateImportStateId_GCP(state *terraform.State) (string, error) {
-	resourceName := "citrix_daas_gcp_hypervisor_resource_pool.testHypervisorResourcePool"
+	resourceName := "citrix_gcp_hypervisor_resource_pool.testHypervisorResourcePool"
+	var rawState map[string]string
+	for _, m := range state.Modules {
+		if len(m.Resources) > 0 {
+			if v, ok := m.Resources[resourceName]; ok {
+				rawState = v.Primary.Attributes
+			}
+		}
+	}
+
+	return fmt.Sprintf("%s,%s", rawState["hypervisor"], rawState["id"]), nil
+}
+
+func generateImportStateId_XenServer(state *terraform.State) (string, error) {
+	resourceName := "citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool"
 	var rawState map[string]string
 	for _, m := range state.Modules {
 		if len(m.Resources) > 0 {
@@ -172,9 +249,9 @@ func generateImportStateId_GCP(state *terraform.State) (string, error) {
 
 var (
 	hypervisor_resource_pool_testResource_azure = `
-resource "citrix_daas_azure_hypervisor_resource_pool" "testHypervisorResourcePool" {
+resource "citrix_azure_hypervisor_resource_pool" "testHypervisorResourcePool" {
     name = "%s"
-	hypervisor = citrix_daas_azure_hypervisor.testHypervisor.id
+	hypervisor = citrix_azure_hypervisor.testHypervisor.id
     region = "%s"
 	virtual_network_resource_group = "%s"
 	virtual_network = "%s"
@@ -183,9 +260,9 @@ resource "citrix_daas_azure_hypervisor_resource_pool" "testHypervisorResourcePoo
 `
 
 	hypervisor_resource_pool_updated_testResource_azure = `
-resource "citrix_daas_azure_hypervisor_resource_pool" "testHypervisorResourcePool" {
+resource "citrix_azure_hypervisor_resource_pool" "testHypervisorResourcePool" {
     name = "%s-updated"
-	hypervisor = citrix_daas_azure_hypervisor.testHypervisor.id
+	hypervisor = citrix_azure_hypervisor.testHypervisor.id
     region = "%s"
 	virtual_network_resource_group = "%s"
 	virtual_network = "%s"
@@ -193,9 +270,9 @@ resource "citrix_daas_azure_hypervisor_resource_pool" "testHypervisorResourcePoo
 }
 `
 	hypervisor_resource_pool_testResource_gcp = `
-resource "citrix_daas_gcp_hypervisor_resource_pool" "testHypervisorResourcePool" {
+resource "citrix_gcp_hypervisor_resource_pool" "testHypervisorResourcePool" {
 	name = "%s"
-	hypervisor = citrix_daas_gcp_hypervisor.testHypervisor.id
+	hypervisor = citrix_gcp_hypervisor.testHypervisor.id
 	project_name = "%s"
 	region = "%s"
 	subnets = %s
@@ -203,13 +280,32 @@ resource "citrix_daas_gcp_hypervisor_resource_pool" "testHypervisorResourcePool"
 }
 `
 	hypervisor_resource_pool_updated_testResource_gcp = `
-resource "citrix_daas_gcp_hypervisor_resource_pool" "testHypervisorResourcePool" {
+resource "citrix_gcp_hypervisor_resource_pool" "testHypervisorResourcePool" {
 	name = "%s-updated"
-	hypervisor = citrix_daas_gcp_hypervisor.testHypervisor.id
+	hypervisor = citrix_gcp_hypervisor.testHypervisor.id
 	project_name = "%s"
 	region = "%s"
 	subnets = %s
 	vpc = "%s"
+}	
+`
+
+	hypervisor_resource_pool_testResource_xenserver = `
+resource "citrix_xenserver_hypervisor_resource_pool" "testHypervisorResourcePool" {
+	name = "%s"
+	hypervisor = citrix_xenserver_hypervisor.testHypervisor.id
+	networks = ["%s"]
+	storage = ["%s"]
+	temporary_storage = ["%s"]
+}
+`
+	hypervisor_resource_pool_updated_testResource_xenserver = `
+resource "citrix_xenserver_hypervisor_resource_pool" "testHypervisorResourcePool" {
+	name = "%s-updated"
+	hypervisor = citrix_xenserver_hypervisor.testHypervisor.id
+	networks = ["%s", "%s"]
+	storage = ["%s"]
+	temporary_storage = ["%s"]
 }	
 `
 )
@@ -232,4 +328,23 @@ func BuildHypervisorResourcePoolResourceGCP(t *testing.T, hypervisorRP string) s
 	vpc := os.Getenv("TEST_HYPERV_RP_VPC_GCP")
 
 	return BuildHypervisorResourceGCP(t, hypervisor_testResources_gcp) + fmt.Sprintf(hypervisorRP, name, projectName, region, subnet, vpc)
+}
+
+func BuildHypervisorResourcePoolResourceXenServer(t *testing.T) string {
+	name := os.Getenv("TEST_HYPERV_RP_NAME_XENSERVER")
+	network1 := os.Getenv("TEST_HYPERV_RP_NETWORK_1_XENSERVER")
+	storage := os.Getenv("TEST_HYPERV_RP_STORAGE_XENSERVER")
+	tempStorage := os.Getenv("TEST_HYPERV_RP_TEMP_STORAGE_XENSERVER")
+
+	return BuildHypervisorResourceXenserver(t, hypervisor_testResources_xenserver) + fmt.Sprintf(hypervisor_resource_pool_testResource_xenserver, name, network1, storage, tempStorage)
+}
+
+func BuildHypervisorResourcePoolResourceXenServerUpdated(t *testing.T) string {
+	name := os.Getenv("TEST_HYPERV_RP_NAME_XENSERVER")
+	network1 := os.Getenv("TEST_HYPERV_RP_NETWORK_1_XENSERVER")
+	network2 := os.Getenv("TEST_HYPERV_RP_NETWORK_2_XENSERVER")
+	storage := os.Getenv("TEST_HYPERV_RP_STORAGE_XENSERVER")
+	tempStorage := os.Getenv("TEST_HYPERV_RP_TEMP_STORAGE_XENSERVER")
+
+	return BuildHypervisorResourceXenserver(t, hypervisor_testResources_xenserver) + fmt.Sprintf(hypervisor_resource_pool_updated_testResource_xenserver, name, network1, network2, storage, tempStorage)
 }

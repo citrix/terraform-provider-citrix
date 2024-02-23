@@ -16,6 +16,10 @@ func TestDeliveryGroupPreCheck(t *testing.T) {
 	if v := os.Getenv("TEST_DG_NAME"); v == "" {
 		t.Fatal("TEST_DG_NAME must be set for acceptance tests")
 	}
+
+	if v := os.Getenv("TEST_POLICY_SET_WITHOUT_DG_NAME"); v == "" {
+		t.Fatal("TEST_POLICY_SET_WITHOUT_DG_NAME must be set for acceptance tests")
+	}
 }
 
 func TestDeliveryGroupResourceAzureRM(t *testing.T) {
@@ -25,7 +29,6 @@ func TestDeliveryGroupResourceAzureRM(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		PreCheck: func() {
 			TestProviderPreCheck(t)
-			TestZonePreCheck(t)
 			TestHypervisorPreCheck_Azure(t)
 			TestHypervisorResourcePoolPreCheck_Azure(t)
 			TestMachineCatalogPreCheck_Azure(t)
@@ -38,21 +41,23 @@ func TestDeliveryGroupResourceAzureRM(t *testing.T) {
 
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of delivery group
-					resource.TestCheckResourceAttr("citrix_daas_delivery_group.testDeliveryGroup", "name", name),
+					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "name", name),
 					// Verify description of delivery group
-					resource.TestCheckResourceAttr("citrix_daas_delivery_group.testDeliveryGroup", "description", "Delivery Group for testing"),
+					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "description", "Delivery Group for testing"),
 					// Verify number of desktops
-					resource.TestCheckResourceAttr("citrix_daas_delivery_group.testDeliveryGroup", "desktops.#", "2"),
+					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "desktops.#", "2"),
 					// Verify number of reboot schedules
-					resource.TestCheckResourceAttr("citrix_daas_delivery_group.testDeliveryGroup", "reboot_schedules.#", "2"),
+					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "reboot_schedules.#", "2"),
 					// Verify total number of machines in delivery group
-					resource.TestCheckResourceAttr("citrix_daas_delivery_group.testDeliveryGroup", "total_machines", "1"),
+					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "total_machines", "1"),
+					// Verify the policy set id assigned to the delivery group
+					resource.TestCheckNoResourceAttr("citrix_delivery_group.testDeliveryGroup", "policy_set_id"),
 				),
 			},
 
 			// ImportState testing
 			{
-				ResourceName:      "citrix_daas_delivery_group.testDeliveryGroup",
+				ResourceName:      "citrix_delivery_group.testDeliveryGroup",
 				ImportState:       true,
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
@@ -66,15 +71,17 @@ func TestDeliveryGroupResourceAzureRM(t *testing.T) {
 
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of delivery group
-					resource.TestCheckResourceAttr("citrix_daas_delivery_group.testDeliveryGroup", "name", fmt.Sprintf("%s-updated", name)),
+					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "name", fmt.Sprintf("%s-updated", name)),
 					// Verify description of delivery group
-					resource.TestCheckResourceAttr("citrix_daas_delivery_group.testDeliveryGroup", "description", "Delivery Group for testing updated"),
+					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "description", "Delivery Group for testing updated"),
 					// Verify number of desktops
-					resource.TestCheckResourceAttr("citrix_daas_delivery_group.testDeliveryGroup", "desktops.#", "1"),
+					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "desktops.#", "1"),
 					// Verify number of reboot schedules
-					resource.TestCheckResourceAttr("citrix_daas_delivery_group.testDeliveryGroup", "reboot_schedules.#", "1"),
+					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "reboot_schedules.#", "1"),
 					// Verify total number of machines in delivery group
-					resource.TestCheckResourceAttr("citrix_daas_delivery_group.testDeliveryGroup", "total_machines", "2"),
+					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "total_machines", "2"),
+					// Verify the policy set id assigned to the delivery group
+					resource.TestCheckNoResourceAttr("citrix_delivery_group.testDeliveryGroup", "policy_set_id"),
 				),
 			},
 
@@ -84,7 +91,18 @@ func TestDeliveryGroupResourceAzureRM(t *testing.T) {
 
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify total number of machines in delivery group
-					resource.TestCheckResourceAttr("citrix_daas_delivery_group.testDeliveryGroup", "total_machines", "1"),
+					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "total_machines", "1"),
+					// Verify the policy set id assigned to the delivery group
+					resource.TestCheckNoResourceAttr("citrix_delivery_group.testDeliveryGroup", "policy_set_id"),
+				),
+			},
+			// Update policy set testing
+			{
+				Config: BuildDeliveryGroupResource(t, testDeliveryGroupResources_updatedWithPolicySetId),
+
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify the policy set id assigned to the delivery group
+					resource.TestCheckResourceAttrSet("citrix_delivery_group.testDeliveryGroup", "policy_set_id"),
 				),
 			},
 		},
@@ -93,12 +111,12 @@ func TestDeliveryGroupResourceAzureRM(t *testing.T) {
 
 var (
 	testDeliveryGroupResources = `
-resource "citrix_daas_delivery_group" "testDeliveryGroup" {
+resource "citrix_delivery_group" "testDeliveryGroup" {
     name        = "%s"
     description = "Delivery Group for testing"
 	associated_machine_catalogs = [
 		{
-			machine_catalog = citrix_daas_machine_catalog.testMachineCatalog.id
+			machine_catalog = citrix_machine_catalog.testMachineCatalog.id
 			machine_count = 1
 		}
 	]
@@ -181,16 +199,15 @@ resource "citrix_daas_delivery_group" "testDeliveryGroup" {
 			}
 		}
 	]
-	
 }
 `
 	testDeliveryGroupResources_updated = `
-resource "citrix_daas_delivery_group" "testDeliveryGroup" {
+resource "citrix_delivery_group" "testDeliveryGroup" {
     name        = "%s-updated"
     description = "Delivery Group for testing updated"
 	associated_machine_catalogs = [
 		{
-			machine_catalog = citrix_daas_machine_catalog.testMachineCatalog.id
+			machine_catalog = citrix_machine_catalog.testMachineCatalog.id
 			machine_count = 2
 		}
 	]
@@ -245,14 +262,110 @@ resource "citrix_daas_delivery_group" "testDeliveryGroup" {
 			natural_reboot_schedule = false
 		}
 	]
-	
 }
 
+`
+
+	testDeliveryGroupResources_updatedWithPolicySetId = `
+resource "citrix_delivery_group" "testDeliveryGroup" {
+    name        = "%s-updated"
+    description = "Delivery Group for testing updated"
+	associated_machine_catalogs = [
+		{
+			machine_catalog = citrix_machine_catalog.testMachineCatalog.id
+			machine_count = 2
+		}
+	]
+	desktops = [
+		{
+            published_name = "desktop-1"
+            enabled = true
+            enable_session_roaming = true
+        }
+	]
+	autoscale_settings = {
+		autoscale_enabled = true
+		power_time_schemes = [
+        	{
+        	    "days_of_week" = [
+        	        "Monday",
+        	        "Tuesday",
+        	        "Wednesday",
+        	        "Thursday",
+        	        "Friday"
+        	    ]
+        	    "name" = "weekdays test"
+        	    "display_name" = "weekdays schedule"
+        	    "peak_time_ranges" = [
+        	        "09:00-17:00"
+        	    ]
+        	    "pool_size_schedules": [
+        	        {
+        	            "time_range": "00:00-00:00",
+        	            "pool_size": 1
+        	        }
+        	    ],
+        	    "pool_using_percentage": false
+        	},
+    	]	
+	}
+	reboot_schedules = [
+		{
+			name = "test_reboot_schedule"
+			reboot_schedule_enabled = true
+			frequency = "Weekly"
+			frequency_factor = 1
+			days_in_week = [
+				"Monday",
+				"Tuesday",
+				"Wednesday"
+				]
+			start_time = "12:12"
+			start_date = "2024-05-25"
+			reboot_duration_minutes = 0
+			ignore_maintenance_mode = true
+			natural_reboot_schedule = false
+		}
+	]
+	policy_set_id = citrix_policy_set.testPolicySetWithoutDG.id
+}
+
+`
+
+	policy_set_no_delivery_group_testResource = `
+resource "citrix_policy_set" "testPolicySetWithoutDG" {
+    name = "%s"
+    description = "Test policy set description updated"
+    scopes = [ "All" ]
+    type = "DeliveryGroupPolicies"
+    policies = [
+        {
+            name = "first-test-policy"
+            description = "First test policy with priority 0"
+            is_enabled = true
+            policy_settings = [
+                {
+                    name = "AdvanceWarningPeriod"
+                    value = "13:00:00"
+                    use_default = false
+                },
+            ]
+            policy_filters = [
+            ]
+        }
+    ]
+}
 `
 )
 
 func BuildDeliveryGroupResource(t *testing.T, deliveryGroup string) string {
 	name := os.Getenv("TEST_DG_NAME")
 
-	return BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated) + fmt.Sprintf(deliveryGroup, name)
+	return BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "ActiveDirectory") + BuildPolicySetResourceWithoutDeliveryGroup(t) + fmt.Sprintf(deliveryGroup, name)
+}
+
+func BuildPolicySetResourceWithoutDeliveryGroup(t *testing.T) string {
+	policySetName := os.Getenv("TEST_POLICY_SET_WITHOUT_DG_NAME")
+
+	return fmt.Sprintf(policy_set_no_delivery_group_testResource, policySetName)
 }

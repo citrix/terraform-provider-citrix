@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -35,11 +36,26 @@ const SamRegex string = `^[a-zA-Z][a-zA-Z0-9\- ]{0,61}[a-zA-Z]\\\w[\w\.\- ]+$`
 // GUID
 const GuidRegex string = `^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}[}]?$`
 
+// IPv4
+const IPv4Regex string = `^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$`
+
+// IPv4 with https
+const IPv4RegexWithProtocol string = `^(http|https)://((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$`
+
 // Date YYYY-MM-DD
 const DateRegex string = `^\d{4}-\d{2}-\d{2}$`
 
 // Time HH:MM
 const TimeRegex string = `^([0-1][0-9]|2[0-3]):[0-5][0-9]$`
+
+// Name of the Default Site Policy Set
+const DefaultSitePolicySetName string = "DefaultSitePolicies"
+
+// ID of the Default Site Policy Set
+const DefaultSitePolicySetId string = "00000000-0000-0000-0000-000000000000"
+
+// SSL Thumbprint
+const SslThumbprintRegex string = `^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$`
 
 // Terraform model for name value string pair
 type NameValueStringPairModel struct {
@@ -217,6 +233,10 @@ func GetValidatorFromEnum[V ~string, T []V](enum T) validator.String {
 	)
 }
 
+type HttpErrorBody struct {
+	Detail string `json:"detail"`
+}
+
 // <summary>
 // Wrapper function for reading specific resource from remote with retries
 // </summary>
@@ -230,7 +250,18 @@ func GetValidatorFromEnum[V ~string, T []V](enum T) validator.String {
 func ReadResource[ResponseType any](request any, ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, resourceType, resourceIdOrName string) (ResponseType, *http.Response, error) {
 	response, httpResp, err := citrixdaasclient.ExecuteWithRetry[ResponseType](request, client)
 	if err != nil && resp != nil {
+		body, _ := io.ReadAll(httpResp.Body)
+		httpErrorBody := HttpErrorBody{}
+		json.Unmarshal(body, &httpErrorBody)
 		if httpResp.StatusCode == http.StatusNotFound {
+			resp.Diagnostics.AddWarning(
+				fmt.Sprintf("%s not found", resourceType),
+				fmt.Sprintf("%s %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", resourceType, resourceIdOrName),
+			)
+
+			resp.State.RemoveResource(ctx)
+		} else if httpResp.StatusCode == http.StatusInternalServerError && httpErrorBody.Detail == "Object does not exist." {
+
 			resp.Diagnostics.AddWarning(
 				fmt.Sprintf("%s not found", resourceType),
 				fmt.Sprintf("%s %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", resourceType, resourceIdOrName),
@@ -259,7 +290,7 @@ func ReadResource[ResponseType any](request any, ctx context.Context, client *ci
 // <param name="diagnostics">Terraform diagnostics from context</param>
 // <param name="maxTimeout">Maximum timeout threashold for job status polling</param>
 // <returns>Error if job polling failed or job itself ended in failed state</returns>
-func ProcessAsyncJobResponse(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int) (err error) {
+func ProcessAsyncJobResponse(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int, returnJobError bool) (err error) {
 	txId := citrixdaasclient.GetTransactionIdFromHttpResponse(jobResp)
 
 	jobId := citrixdaasclient.GetJobIdFromHttpResponse(*jobResp)
@@ -287,6 +318,10 @@ func ProcessAsyncJobResponse(ctx context.Context, client *citrixdaasclient.Citri
 			errContext,
 			errorDetail,
 		)
+
+		if returnJobError {
+			return fmt.Errorf(errorDetail)
+		}
 	}
 
 	return nil

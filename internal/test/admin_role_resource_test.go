@@ -31,22 +31,22 @@ func TestAdminRoleResource(t *testing.T) {
 				Config: fmt.Sprintf(adminRoleTestResource, name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the admin role
-					resource.TestCheckResourceAttr("citrix_daas_admin_role.test_role", "name", name),
+					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "name", name),
 					// Verify the description of the admin role
-					resource.TestCheckResourceAttr("citrix_daas_admin_role.test_role", "description", "Test role created via terraform"),
+					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "description", "Test role created via terraform"),
 					// Verify the value of the can_launch_manage flag (Set to true by default)
-					resource.TestCheckResourceAttr("citrix_daas_admin_role.test_role", "can_launch_manage", "true"),
+					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "can_launch_manage", "true"),
 					// Verify the value of the can_launch_monitor flag (Set to true by default)
-					resource.TestCheckResourceAttr("citrix_daas_admin_role.test_role", "can_launch_monitor", "true"),
+					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "can_launch_monitor", "true"),
 					// Verify the permissions list
-					resource.TestCheckResourceAttr("citrix_daas_admin_role.test_role", "permissions.#", "2"),
-					resource.TestCheckResourceAttr("citrix_daas_admin_role.test_role", "permissions.0", "Director_DismissAlerts"),
-					resource.TestCheckResourceAttr("citrix_daas_admin_role.test_role", "permissions.1", "DesktopGroup_AddApplicationGroup"),
+					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "permissions.#", "2"),
+					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "permissions.0", "Director_DismissAlerts"),
+					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "permissions.1", "DesktopGroup_AddApplicationGroup"),
 				),
 			},
 			// ImportState testing
 			{
-				ResourceName:      "citrix_daas_admin_role.test_role",
+				ResourceName:      "citrix_admin_role.test_role",
 				ImportState:       true,
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
@@ -58,18 +58,18 @@ func TestAdminRoleResource(t *testing.T) {
 				Config: fmt.Sprintf(adminRoleTestResource_updated, name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the admin role
-					resource.TestCheckResourceAttr("citrix_daas_admin_role.test_role", "name", fmt.Sprintf("%s-updated", name)),
+					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "name", fmt.Sprintf("%s-updated", name)),
 					// Verify the description of the admin role
-					resource.TestCheckResourceAttr("citrix_daas_admin_role.test_role", "description", "Updated description for test role"),
+					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "description", "Updated description for test role"),
 					// Verify the value of the can_launch_manage flag
-					resource.TestCheckResourceAttr("citrix_daas_admin_role.test_role", "can_launch_manage", "true"),
+					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "can_launch_manage", "true"),
 					// Verify the value of the can_launch_monitor flag
-					resource.TestCheckResourceAttr("citrix_daas_admin_role.test_role", "can_launch_monitor", "true"),
+					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "can_launch_monitor", "true"),
 					// Verify the permissions list
-					resource.TestCheckResourceAttr("citrix_daas_admin_role.test_role", "permissions.#", "3"),
-					resource.TestCheckResourceAttr("citrix_daas_admin_role.test_role", "permissions.0", "Director_DismissAlerts"),
-					resource.TestCheckResourceAttr("citrix_daas_admin_role.test_role", "permissions.1", "ApplicationGroup_AddScope"),
-					resource.TestCheckResourceAttr("citrix_daas_admin_role.test_role", "permissions.2", "AppLib_AddPackage"),
+					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "permissions.#", "3"),
+					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "permissions.0", "Director_DismissAlerts"),
+					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "permissions.1", "ApplicationGroup_AddScope"),
+					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "permissions.2", "AppLib_AddPackage"),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
@@ -79,14 +79,14 @@ func TestAdminRoleResource(t *testing.T) {
 
 var (
 	adminRoleTestResource = `
-	resource "citrix_daas_admin_role" "test_role" {
+	resource "citrix_admin_role" "test_role" {
 		name = "%s"
 		description = "Test role created via terraform"
 		permissions = ["Director_DismissAlerts", "DesktopGroup_AddApplicationGroup"]	
 	}
 	`
 	adminRoleTestResource_updated = `
-	resource "citrix_daas_admin_role" "test_role" {
+	resource "citrix_admin_role" "test_role" {
 		name = "%s-updated"
 		description = "Updated description for test role"
 		can_launch_manage = true

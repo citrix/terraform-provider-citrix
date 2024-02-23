@@ -23,7 +23,6 @@ func TestApplicationResource(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		PreCheck: func() {
 			TestProviderPreCheck(t)
-			TestZonePreCheck(t)
 			TestHypervisorPreCheck_Azure(t)
 			TestHypervisorResourcePoolPreCheck_Azure(t)
 			TestMachineCatalogPreCheck_Azure(t)
@@ -37,18 +36,18 @@ func TestApplicationResource(t *testing.T) {
 				Config: BuildApplicationResource(t, testApplicationResource),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of application
-					resource.TestCheckResourceAttr("citrix_daas_application.testApplication", "name", name),
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "name", name),
 					// Verify description of application
-					resource.TestCheckResourceAttr("citrix_daas_application.testApplication", "description", "Application for testing"),
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "description", "Application for testing"),
 					// Verify the number of delivery groups
-					resource.TestCheckResourceAttr("citrix_daas_application.testApplication", "delivery_groups.#", "1"),
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "delivery_groups.#", "1"),
 					// Verify the command line executable
-					resource.TestCheckResourceAttr("citrix_daas_application.testApplication", "installed_app_properties.command_line_executable", "test.exe"),
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "installed_app_properties.command_line_executable", "test.exe"),
 				),
 			},
 			// ImportState testing
 			{
-				ResourceName:      "citrix_daas_application.testApplication",
+				ResourceName:      "citrix_application.testApplication",
 				ImportState:       true,
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
@@ -60,15 +59,15 @@ func TestApplicationResource(t *testing.T) {
 				Config: BuildApplicationResource(t, testApplicationResource_updated),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of application
-					resource.TestCheckResourceAttr("citrix_daas_application.testApplication", "name", fmt.Sprintf("%s-updated", name)),
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "name", fmt.Sprintf("%s-updated", name)),
 					// Verify description of application
-					resource.TestCheckResourceAttr("citrix_daas_application.testApplication", "description", "Application for testing updated"),
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "description", "Application for testing updated"),
 					// Verify the command line arguments
-					resource.TestCheckResourceAttr("citrix_daas_application.testApplication", "installed_app_properties.command_line_arguments", "update test arguments"),
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "installed_app_properties.command_line_arguments", "update test arguments"),
 					// Verify the command line executable
-					resource.TestCheckResourceAttr("citrix_daas_application.testApplication", "installed_app_properties.command_line_executable", "updated_test.exe"),
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "installed_app_properties.command_line_executable", "updated_test.exe"),
 					// Verify the application folder path
-					resource.TestCheckResourceAttr("citrix_daas_application.testApplication", "application_folder_path", fmt.Sprintf("%s\\", updated_folder_name)),
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_folder_path", fmt.Sprintf("%s\\", updated_folder_name)),
 				),
 			},
 			// Delete testing
@@ -78,7 +77,7 @@ func TestApplicationResource(t *testing.T) {
 
 var (
 	testApplicationResource = `
-resource "citrix_daas_application" "testApplication" {
+resource "citrix_application" "testApplication" {
 	name                = "%s"
 	description         = "Application for testing"
 	published_name = "TestApplication"
@@ -86,10 +85,10 @@ resource "citrix_daas_application" "testApplication" {
 		command_line_executable = "test.exe"
 		working_directory       = "test directory"
 	}
-	delivery_groups = [citrix_daas_delivery_group.testDeliveryGroup.id]
+	delivery_groups = [citrix_delivery_group.testDeliveryGroup.id]
 }`
 	testApplicationResource_updated = `
-resource "citrix_daas_application" "testApplication" {
+resource "citrix_application" "testApplication" {
 	name                = "%s-updated"
 	description         = "Application for testing updated"
 	published_name = "TestApplication"
@@ -98,8 +97,8 @@ resource "citrix_daas_application" "testApplication" {
 		command_line_executable = "updated_test.exe"
 		working_directory       = "test directory"
 	}
-	delivery_groups = [citrix_daas_delivery_group.testDeliveryGroup.id]
-	application_folder_path = citrix_daas_application_folder.testApplicationFolder2.path
+	delivery_groups = [citrix_delivery_group.testDeliveryGroup.id]
+	application_folder_path = citrix_application_folder.testApplicationFolder2.path
 }`
 )
 

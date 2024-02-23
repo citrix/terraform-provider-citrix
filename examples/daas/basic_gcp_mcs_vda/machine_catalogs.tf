@@ -1,4 +1,4 @@
-resource "citrix_daas_machine_catalog" "example-catalog" {
+resource "citrix_machine_catalog" "example-catalog" {
     name                        = "example-gcp-catalog"
     description                 = "description for example catalog"
     allocation_type             = "Random"
@@ -6,10 +6,10 @@ resource "citrix_daas_machine_catalog" "example-catalog" {
     is_power_managed			= true
 	is_remote_pc 			  	= false
 	provisioning_type 			= "MCS"
-    zone                        = citrix_daas_zone.example-zone.id
+    zone                        = citrix_zone.example-zone.id
     provisioning_scheme         = {
-        hypervisor = citrix_daas_gcp_hypervisor.example-gcp-hypervisor.id
-        hypervisor_resource_pool = citrix_daas_gcp_hypervisor_resource_pool.example-gcp-rp.id
+        hypervisor = citrix_gcp_hypervisor.example-gcp-hypervisor.id
+        hypervisor_resource_pool = citrix_gcp_hypervisor_resource_pool.example-gcp-rp.id
         identity_type      = "ActiveDirectory"
         machine_domain_identity = {
             domain                   = "<DomainFQDN>"
