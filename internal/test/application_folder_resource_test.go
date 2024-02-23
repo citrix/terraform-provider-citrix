@@ -33,18 +33,18 @@ func TestApplicationFolderResource(t *testing.T) {
 				Config: BuildApplicationFolderResource(t, testApplicationFolderResource),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of application
-					resource.TestCheckResourceAttr("citrix_daas_application_folder.testApplicationFolder1", "name", folder_name_1),
+					resource.TestCheckResourceAttr("citrix_application_folder.testApplicationFolder1", "name", folder_name_1),
 					// Verify name of application
-					resource.TestCheckResourceAttr("citrix_daas_application_folder.testApplicationFolder2", "name", folder_name_2),
+					resource.TestCheckResourceAttr("citrix_application_folder.testApplicationFolder2", "name", folder_name_2),
 					// Verify parent path of application
-					resource.TestCheckResourceAttr("citrix_daas_application_folder.testApplicationFolder2", "parent_path", fmt.Sprintf("%s\\", folder_name_1)),
+					resource.TestCheckResourceAttr("citrix_application_folder.testApplicationFolder2", "parent_path", fmt.Sprintf("%s\\", folder_name_1)),
 					// Verify path of application
-					resource.TestCheckResourceAttr("citrix_daas_application_folder.testApplicationFolder2", "path", fmt.Sprintf("%s\\%s\\", folder_name_1, folder_name_2)),
+					resource.TestCheckResourceAttr("citrix_application_folder.testApplicationFolder2", "path", fmt.Sprintf("%s\\%s\\", folder_name_1, folder_name_2)),
 				),
 			},
 			// ImportState testing
 			{
-				ResourceName:      "citrix_daas_application_folder.testApplicationFolder2",
+				ResourceName:      "citrix_application_folder.testApplicationFolder2",
 				ImportState:       true,
 				ImportStateVerify: true,
 			},
@@ -53,9 +53,9 @@ func TestApplicationFolderResource(t *testing.T) {
 				Config: BuildApplicationFolderResource(t, testApplicationFolderResource_updated),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of application
-					resource.TestCheckResourceAttr("citrix_daas_application_folder.testApplicationFolder1", "name", fmt.Sprintf("%s-updated", folder_name_1)),
+					resource.TestCheckResourceAttr("citrix_application_folder.testApplicationFolder1", "name", fmt.Sprintf("%s-updated", folder_name_1)),
 					// Verify parent path of application
-					resource.TestCheckResourceAttr("citrix_daas_application_folder.testApplicationFolder2", "path", fmt.Sprintf("%s\\", folder_name_2)),
+					resource.TestCheckResourceAttr("citrix_application_folder.testApplicationFolder2", "path", fmt.Sprintf("%s\\", folder_name_2)),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
@@ -65,21 +65,21 @@ func TestApplicationFolderResource(t *testing.T) {
 
 var (
 	testApplicationFolderResource = `
-resource "citrix_daas_application_folder" "testApplicationFolder1" {
+resource "citrix_application_folder" "testApplicationFolder1" {
 	name = "%s"
 }
 
-resource "citrix_daas_application_folder" "testApplicationFolder2" {
+resource "citrix_application_folder" "testApplicationFolder2" {
 	name = "%s"
-	parent_path = citrix_daas_application_folder.testApplicationFolder1.path
+	parent_path = citrix_application_folder.testApplicationFolder1.path
 }
 `
 	testApplicationFolderResource_updated = `
-resource "citrix_daas_application_folder" "testApplicationFolder1" {
+resource "citrix_application_folder" "testApplicationFolder1" {
 	name = "%s-updated"
 }
 
-resource "citrix_daas_application_folder" "testApplicationFolder2" {
+resource "citrix_application_folder" "testApplicationFolder2" {
 	name = "%s"
 }
 `

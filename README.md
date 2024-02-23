@@ -21,6 +21,8 @@ Citrix has developed a custom Terraform provider for automating Citrix product d
     - [Create a Machine Catalog](#create-a-machine-catalog)
     - [Create a Delivery Group](#create-a-delivery-group)
   - [Frequently Asked Questions](#frequently-asked-questions)
+      - [What resource is supported for different connection types?](#what-resource-is-supported-for-different-connection-types)
+      - [What provisioning types are supported for machine catalog?](#what-provisioning-types-are-supported-for-machine-catalog)
   - [Attributions](#attributions)
   - [License](#license)
 
@@ -88,10 +90,10 @@ Below is a table to show the difference between on-premises and Cloud provider c
 
 Resources.tf can be used to configure the desired state of the resources that you want to create and manage in your Citrix Services. The example below shows how you can configure a Citrix DaaS Zone in Citrix DaaS service in resource.tf.
 
-**`citrix_daas_zone`**
+**`citrix_zone`**
 
 ```hcl
-resource "citrix_daas_zone" "example-zone" {
+resource "citrix_zone" "example-zone" {
     name                = "example-zone"
     description         = "zone example"
     metadata            = [
@@ -103,7 +105,7 @@ resource "citrix_daas_zone" "example-zone" {
 }
 ```
 
-Please refer the Plugin for Terraform Provider for Citrix DaaS™ documentation such as [docs/resources/daas_zone.md](docs/resources/daas_zone.md) to find out the configurable properties of each type of resources, understand what they do, and what option values are supported.
+Please refer the Plugin for Terraform Provider for Citrix DaaS™ documentation such as [docs/resources/zone.md](docs/resources/zone.md) to find out the configurable properties of each type of resources, understand what they do, and what option values are supported.
 
 ---------
 
@@ -127,25 +129,49 @@ To find all the Citrix DaaS resources manageable via Terraform, understand all t
 
 ### Create a Zone in Citrix DaaS as the first step
 
-Refer the [DaaS Zone documentation](docs/resources/daas_zone.md) to configure a zone via terraform. 
+Refer the [DaaS Zone documentation](docs/resources/zone.md) to configure a zone via terraform. 
 
 ### Create a Hypervisor
 
-Hypervisor is needed to use your preferred public cloud provider with Citrix DaaS. Refer the [DaaS Hypervisor documentation](docs/resources/daas_azure_hypervisor.md) to configure an Azure hypervisor in a zone via terraform.
+Hypervisor is needed to use your preferred public cloud provider with Citrix DaaS. Refer the [DaaS Hypervisor documentation](docs/resources/azure_hypervisor.md) to configure an Azure hypervisor in a zone via terraform.
 
 ### Create a Hypervisor Resource Pool
 
-The hypervisor resource pool defines the network configuration for a hypervisor connection. Refer the [DaaS Hypervisor Resource Pool documentaion](docs/resources/daas_hypervisor_resource_pool.md) to configure a hypervisr resource pool via terraform.
+The hypervisor resource pool defines the network configuration for a hypervisor connection. Refer the [DaaS Hypervisor Resource Pool documentaion](docs/resources/hypervisor_resource_pool.md) to configure a hypervisr resource pool via terraform.
 
 ### Create a Machine Catalog
 
-A machine catalog is a collection of machines managed as a single entity. Refer the [DaaS Machine Catalog documentation](docs/resources/daas_machine_catalog.md) to configure a machine catalog via terraform.
+A machine catalog is a collection of machines managed as a single entity. Refer the [DaaS Machine Catalog documentation](docs/resources/machine_catalog.md) to configure a machine catalog via terraform.
 
 ### Create a Delivery Group
-A delivery group is a collection of machines selected from one or more machine catalogs. The delivery group can also specify which users can use those machines, plus the applications and desktops available to those users. Refer the [DaaS Delivery Group documentation](docs/resources/daas_delivery_group.md) to configure a delivery group via terraform.
+A delivery group is a collection of machines selected from one or more machine catalogs. The delivery group can also specify which users can use those machines, plus the applications and desktops available to those users. Refer the [DaaS Delivery Group documentation](docs/resources/delivery_group.md) to configure a delivery group via terraform.
 
 ## Frequently Asked Questions
 
+#### What resource is supported for different connection types?
+
+| Connection Type |   Hypervisor     |   Resource Pool  |   Machine Catalog   | 
+|-----------------|------------------|------------------|---------------------|
+| AzureRM         |:heavy_check_mark:|:heavy_check_mark:| MCS / Power Managed |
+| AWS EC2         |:heavy_check_mark:|:heavy_check_mark:|  in progress        |
+| GCP             |:heavy_check_mark:|:heavy_check_mark:| MCS / Power Managed |
+| Vsphere         |:heavy_check_mark:|   in progress    |    Power Managed    |
+| XenServer       |:heavy_check_mark:|:heavy_check_mark:|    Power Managed    |
+| Nutanix         |:heavy_check_mark:|   in progress    |    Power Managed    |
+
+
+#### What provisioning types are supported for machine catalog? 
+- MCS provisioning
+  - Azure
+  - GCP
+- Manual Power Managed
+  - Azure
+  - GCP
+  - AWS EC2
+  - Vsphere
+  - XenServer
+  - Nutanix
+- Manual / Remote PC
 
 ## Attributions
 The code in this repository makes use of the following packages:

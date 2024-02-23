@@ -26,7 +26,6 @@ func TestAdminScopeResource(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		PreCheck: func() {
 			TestProviderPreCheck(t)
-			TestZonePreCheck(t)
 			TestHypervisorPreCheck_Azure(t)
 			TestHypervisorResourcePoolPreCheck_Azure(t)
 			TestMachineCatalogPreCheck_Azure(t)
@@ -39,19 +38,19 @@ func TestAdminScopeResource(t *testing.T) {
 				Config: BuildAdminScopeResource(t, adminScopeTestResource),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the admin scope
-					resource.TestCheckResourceAttr("citrix_daas_admin_scope.test_scope", "name", name),
+					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "name", name),
 					// Verify the description of the admin scope
-					resource.TestCheckResourceAttr("citrix_daas_admin_scope.test_scope", "description", "test scope created via terraform"),
+					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "description", "test scope created via terraform"),
 					// Verify number of scoped objects
-					resource.TestCheckResourceAttr("citrix_daas_admin_scope.test_scope", "scoped_objects.#", "1"),
+					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "scoped_objects.#", "1"),
 					// Verify the scoped objects data
-					resource.TestCheckResourceAttr("citrix_daas_admin_scope.test_scope", "scoped_objects.0.object_type", "DeliveryGroup"),
-					resource.TestCheckResourceAttr("citrix_daas_admin_scope.test_scope", "scoped_objects.0.object", dgName),
+					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "scoped_objects.0.object_type", "DeliveryGroup"),
+					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "scoped_objects.0.object", dgName),
 				),
 			},
 			// ImportState testing
 			{
-				ResourceName:      "citrix_daas_admin_scope.test_scope",
+				ResourceName:      "citrix_admin_scope.test_scope",
 				ImportState:       true,
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
@@ -63,16 +62,16 @@ func TestAdminScopeResource(t *testing.T) {
 				Config: BuildAdminScopeResource(t, adminScopeTestResource_updated),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the admin scope
-					resource.TestCheckResourceAttr("citrix_daas_admin_scope.test_scope", "name", fmt.Sprintf("%s-updated", name)),
+					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "name", fmt.Sprintf("%s-updated", name)),
 					// Verify the description of the admin scope
-					resource.TestCheckResourceAttr("citrix_daas_admin_scope.test_scope", "description", "Updated description for test scope"),
+					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "description", "Updated description for test scope"),
 					// Verify number of scoped objects
-					resource.TestCheckResourceAttr("citrix_daas_admin_scope.test_scope", "scoped_objects.#", "2"),
+					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "scoped_objects.#", "2"),
 					// Verify the scoped objects data
-					resource.TestCheckResourceAttr("citrix_daas_admin_scope.test_scope", "scoped_objects.0.object_type", "DeliveryGroup"),
-					resource.TestCheckResourceAttr("citrix_daas_admin_scope.test_scope", "scoped_objects.0.object", dgName),
-					resource.TestCheckResourceAttr("citrix_daas_admin_scope.test_scope", "scoped_objects.1.object_type", "MachineCatalog"),
-					resource.TestCheckResourceAttr("citrix_daas_admin_scope.test_scope", "scoped_objects.1.object", catalogName),
+					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "scoped_objects.0.object_type", "DeliveryGroup"),
+					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "scoped_objects.0.object", dgName),
+					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "scoped_objects.1.object_type", "MachineCatalog"),
+					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "scoped_objects.1.object", catalogName),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
@@ -82,29 +81,29 @@ func TestAdminScopeResource(t *testing.T) {
 
 var (
 	adminScopeTestResource = `
-	resource "citrix_daas_admin_scope" "test_scope" {
+	resource "citrix_admin_scope" "test_scope" {
 		name = "%s"
 		description = "test scope created via terraform"
 		scoped_objects = [
 			{
 				object_type = "DeliveryGroup",
-				object = citrix_daas_delivery_group.testDeliveryGroup.name
+				object = citrix_delivery_group.testDeliveryGroup.name
 			}
 		]
 	}
 	`
 	adminScopeTestResource_updated = `
-	resource "citrix_daas_admin_scope" "test_scope" {
+	resource "citrix_admin_scope" "test_scope" {
 		name        = "%s-updated"
 		description = "Updated description for test scope"
 		scoped_objects    = [
 			{
 				object_type = "DeliveryGroup",
-				object = citrix_daas_delivery_group.testDeliveryGroup.name
+				object = citrix_delivery_group.testDeliveryGroup.name
 			},
 			{
 				object_type = "MachineCatalog",
-				object = citrix_daas_machine_catalog.testMachineCatalog.name
+				object = citrix_machine_catalog.testMachineCatalog.name
 			}
 		]
 	}

@@ -19,19 +19,17 @@ import (
 	"time"
 
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
-	"github.com/citrix/terraform-provider-citrix/internal/daas/data_sources/application_folder_details"
-	"github.com/citrix/terraform-provider-citrix/internal/daas/data_sources/vda"
-	"github.com/citrix/terraform-provider-citrix/internal/daas/resources/admin_role"
-	"github.com/citrix/terraform-provider-citrix/internal/daas/resources/application"
-	"github.com/citrix/terraform-provider-citrix/internal/daas/resources/application_folder"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_role"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/application"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/vda"
 
-	admin_scope_data_source "github.com/citrix/terraform-provider-citrix/internal/daas/data_sources/admin_scope"
-	"github.com/citrix/terraform-provider-citrix/internal/daas/resources/admin_scope"
-	"github.com/citrix/terraform-provider-citrix/internal/daas/resources/delivery_group"
-	"github.com/citrix/terraform-provider-citrix/internal/daas/resources/hypervisor"
-	"github.com/citrix/terraform-provider-citrix/internal/daas/resources/hypervisor_resource_pool"
-	"github.com/citrix/terraform-provider-citrix/internal/daas/resources/machine_catalog"
-	"github.com/citrix/terraform-provider-citrix/internal/daas/resources/zone"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_scope"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/delivery_group"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/hypervisor"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/hypervisor_resource_pool"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/machine_catalog"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/policies"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/zone"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
 	"github.com/google/uuid"
@@ -542,8 +540,8 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 func (p *citrixProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		vda.NewVdaDataSource,
-		application_folder_details.NewApplicationDataSourceSource,
-		admin_scope_data_source.NewAdminScopeDataSource,
+		application.NewApplicationDataSourceSource,
+		admin_scope.NewAdminScopeDataSource,
 	}
 }
 
@@ -554,15 +552,19 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		hypervisor.NewAzureHypervisorResource,
 		hypervisor.NewAwsHypervisorResource,
 		hypervisor.NewGcpHypervisorResource,
+		hypervisor.NewVsphereHypervisorResource,
+		hypervisor.NewXenserverHypervisorResource,
+		hypervisor.NewNutanixHypervisorResource,
 		hypervisor_resource_pool.NewAzureHypervisorResourcePoolResource,
 		hypervisor_resource_pool.NewAwsHypervisorResourcePoolResource,
 		hypervisor_resource_pool.NewGcpHypervisorResourcePoolResource,
+		hypervisor_resource_pool.NewXenserverHypervisorResourcePoolResource,
 		machine_catalog.NewMachineCatalogResource,
 		delivery_group.NewDeliveryGroupResource,
 		application.NewApplicationResource,
-		application_folder.NewApplicationFolderResource,
+		application.NewApplicationFolderResource,
 		admin_scope.NewAdminScopeResource,
 		admin_role.NewAdminRoleResource,
-		//Add resource here
+		policies.NewPolicySetResource,
 	}
 }

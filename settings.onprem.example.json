@@ -8,24 +8,70 @@
         "CITRIX_DISABLE_SSL_VERIFICATION": "true",
 
         // Zone Go Tests
-        "TEST_ZONE_NAME" :"test-zone",
+        "TEST_ZONE_NAME": "zone-name", // for zone tests
+
+        // "TEST_ZONE_NAME_AZURE" :"test-zone", // Use the appropriate zone based on hypervisor for hypervisor and other tests
+        // "TEST_ZONE_NAME_GCP": "test-zone", 
+        // "TEST_ZONE_NAME_VSPHERE": "test-zone",
+        // "TEST_ZONE_NAME_XENSERVER": "test-zone",
         "TEST_ZONE_DESCRIPTION" :"test zone description",
         
-        // Hypervisor Go Tests
-        "TEST_HYPERV_NAME"              :"{hypervisor_name}",
-        "TEST_HYPERV_AD_ID"             :"{hypervisor_id}",
+        // Hypervisor Go Tests - Azure
+        "TEST_HYPERV_NAME_AZURE"        :"{hypervisor_name}",
+        "TEST_HYPERV_AD_ID"             :"{hypervisor_ad_id}",
         "TEST_HYPERV_SUBSCRIPTION_ID"   :"{hypervisor_subscription_id}",
         "TEST_HYPERV_APPLICATION_ID"    :"{hyperviso_application_id}",
         "TEST_HYPERV_APPLICATION_SECRET":"{hypervisor_application_secret}",
         "TEST_HYPERV_APPLICATION_SECRET_EXPIRATION_DATE": "2030-12-31",
+
+        // Hypervisor Go Tests - GCP
+        "TEST_HYPERV_NAME_GCP"          :"{hypervisor_name}",
+        "TEST_HYPERV_SERVICE_ACCOUNT_ID" :"{gcp_service_account_id}",
+        "TEST_HYPERV_SERVICE_ACCOUNT_CREDENTIAL":"{gcp_service_account_credential}",
+
+        // Hypervisor Go Tests - Vsphere
+        "TEST_HYPERV_NAME_VSPHERE": "{hypervisor_name}",
+        "TEST_HYPERV_USERNAME_VSPHERE": "{vsphere_hypervisor_user_name}",
+        "TEST_HYPERV_PASSWORD_PLAINTEXT_VSPHERE": "{vsphere_hypervisor_password}",
+        "TEST_HYPERV_ADDRESS_VSPHERE": "http://{vsphere_hypervisor_management_ip}",
+        "TEST_HYPERV_SSL_THUMBPRINT_VSPHERE": "{vsphere_hypervisor_ssl_thumbprint}",
+
+        // Hypervisor Go Tests - XenServer
+        "TEST_HYPERV_NAME_XENSERVER": "{hypervisor_name}",
+        "TEST_HYPERV_USERNAME_XENSERVER": "{xenserver_hypervisor_user_name}",
+        "TEST_HYPERV_PASSWORD_PLAINTEXT_XENSERVER": "{xenserver_hypervisor_password}",
+        "TEST_HYPERV_ADDRESS_XENSERVER": "http://{xenserver_hypervisor_management_ip}",
+        "TEST_HYPERV_SSL_THUMBPRINT_XENSERVER": "{xenserver_hypervisor_ssl_thumbprint}",
+
+        // Hypervisor Go Tests - Nutanix
+        "TEST_HYPERV_NAME_NUTANIX": "{hypervisor_name}",
+        "TEST_HYPERV_USERNAME_NUTANIX": "{vsphere_hypervisor_user_name}",
+        "TEST_HYPERV_PASSWORD_PLAINTEXT_NUTANIX": "{vsphere_hypervisor_password}",
+        "TEST_HYPERV_ADDRESS_NUTANIX": "{xenserver_hypervisor_management_ip}",
+
+        // Hypervisor Resource Pool Go Tests - Azure
         "TEST_HYPERV_RP_NAME"           : "{hypervisor_resource_pool_name}",
         "TEST_HYPERV_RP_REGION"            :"East US",
         "TEST_HYPERV_RP_VIRTUAL_NETWORK_RESOURCE_GROUP" :"{hypervisor_resource_pool_network_resource_group_name}",
         "TEST_HYPERV_RP_VIRTUAL_NETWORK"   :"{hypervisor_resource_pool_vnet_name}",
         "Test_HYPERV_RP_SUBNETS"           :"[\"{hypervisor_resource_pool_subnet_name}\"]",
+
+        // Hypervisor Resource Pool GCP Testing Env Variables
+        "TEST_HYPERV_RP_NAME_GCP"       :"{hypervisor_resource_pool_name}",
+        "TEST_HYPERV_RP_PROJECT_NAME_GCP":"{gcp_project_name}",
+        "TEST_HYPERV_RP_REGION_GCP"     :"{gcp_region}",
+        "TEST_HYPERV_RP_VPC_GCP"        :"{vpc_name}", 
+        "Test_HYPERV_RP_SUBNETS_GCP"    : "[\"{subnet_name}\"]",
+
+        // Hypervisor Resource Pool XenServer Testing Env Variables
+        "TEST_HYPERV_RP_NAME_XENSERVER"         :"{hypervisor_resource_pool_name}",
+        "TEST_HYPERV_RP_NETWORK_1_XENSERVER"    :"Network 0",
+        "TEST_HYPERV_RP_NETWORK_2_XENSERVER"    :"Network 1",
+        "TEST_HYPERV_RP_STORAGE_XENSERVER"      :"{local_or_shared_storage}",
+        "TEST_HYPERV_RP_TEMP_STORAGE_XENSERVER" :"{local_or_shared_storage}", 
  
         // Machine Catalog Go Tests - Azure
-        "TEST_MC_NAME"                  :"azure-onprem-catalog-1",
+        "TEST_MC_NAME"                  :"{catalog_name}",
         "TEST_MC_SERVICE_ACCOUNT"       :"{admin_username}",
         "TEST_MC_SERVICE_ACCOUNT_PASS"  :"{admin_password}",
         "TEST_MC_SERVICE_OFFERING"      :"Standard_D2_v2",
@@ -37,7 +83,7 @@
         "TEST_MC_SUBNET"                :"ctx-cvad-subnet",
 
         // Machine Catalog Go Tests - GCP
-        "TEST_MC_NAME_GCP"              :"gcp-onprem-catalog-1",
+        "TEST_MC_NAME_GCP"              :"{catalog_name}",
         "TEST_MC_SERVICE_ACCOUNT_GCP"   :"{admin_username}",
         "TEST_MC_SERVICE_ACCOUNT_PASS_GCP" :"{admin_password}",
         "TEST_MC_STORAGE_TYPE_GCP"      :"pd-standard",
@@ -48,38 +94,64 @@
         "TEST_MC_DOMAIN_GCP"            :"ctx-ad.local",
         "TEST_MC_Subnet_GCP"            :"us-east1",
 
-        //Machine Catalog Go Tests - Azure Manual Power Managed
-        "TEST_MC_NAME_MANUAL"                           :"azure-manual-catalog-1",
+        // Machine Catalog Go Tests - Azure Manual Power Managed
+        "TEST_MC_NAME_MANUAL"                           :"{catalog_name}",
         "TEST_MC_ALLOCATION_TYPE_MANUAL_POWER_MANAGED"  :"Static",
         "TEST_MC_SESSION_SUPPORT_MANUAL_POWER_MANAGED"  :"SingleSession",
         "TEST_MC_REGION_MANUAL_POWER_MANAGED"           :"East US",
         "TEST_MC_RESOURCE_GROUP_MANUAL_POWER_MANAGED"   :"{resource_group_name}",
-        "TEST_MC_MACHINE_NAME_MANUAL_Azure"             :"{machine_domain_name}\\\\manual-01",
+        "TEST_MC_MACHINE_NAME_MANUAL_AZURE"             :"manual-01",
+        "TEST_MC_MACHINE_ACCOUNT_MANUAL_AZURE"          :"{machine_domain_name}\\\\manual-01",
 
-        //Machine Catalog Go Tests - GCP Manual Power Managed
-        "TEST_MC_MACHINE_NAME_MANUAL_GCP"               :"{machine_domain_name}\\\\instance-1",
+        // Machine Catalog Go Tests - GCP Manual Power Managed
+        "TEST_MC_MACHINE_ACCOUNT_MANUAL_GCP"            :"{machine_domain_name}\\\\instance-1",
+        "TEST_MC_MACHINE_NAME_MANUAL_GCP"               :"instance-1",
         "TEST_MC_PROJECT_NAME_MANUAL_POWER_MANAGED"     :"{GCP_Project_Name}",
+        "TEST_MC_REGION_MANUAL_POWER_MANAGED_GCP"       :"us-east1",
 
-        //Machine Catalog Go Tests -  Non Power Managed
-        "TEST_MC_MACHINE_NAME_MANUAL_NON_POWER_MANAGED"     : "{machine_domain_name}\\\\manual-02",
+        // Machine Catalog Go Tests -  VSPHERE Manual Power Managed
+        "TEST_MC_DATACENTER_VSPHERE": "{datacenter_name}",
+        "TEST_MC_HOST_VSPHERE"      :"{host_ip_address}",
+        "TEST_MC_MACHINE_NAME_MANUAL_VSPHERE": "machine-vm-name",
+        "TEST_MC_MACHINE_ACCOUNT_MANUAL_VSPHERE": "{machine_domain_name}\\machine_name",
+
+        // Machine Catalog Go Tests -  Nutanix Manual Power Managed
+        "TEST_MC_MACHINE_NAME_MANUAL_NUTANIX": "machine-vm-name",
+        "TEST_MC_MACHINE_ACCOUNT_MANUAL_NUTANIX": "{machine_domain_name}}\\\\machine-name",
+
+        // Machine Catalog Go Tests -  Non Power Managed
+        "TEST_MC_MACHINE_ACCOUNT_MANUAL_NON_POWER_MANAGED"     : "{machine_domain_name}\\\\manual-02",
         "TEST_MC_ALLOCATION_TYPE_MANUAL_NON_POWER_MANAGED"  : "Static",
         "TEST_MC_SESSION_SUPPORT_MANUAL_NON_POWER_MANAGED"  : "SingleSession",
  
-        //Machine Catalog Go Tests -  Remote PC
-        "TEST_MC_NAME_REMOTE_PC"        :"azure-onprem-remote-pc",
-        "TEST_MC_MACHINE_NAME_REMOTE_PC" :"{machine_domain_name}\\\\manual-01",
+        // Machine Catalog Go Tests -  Remote PC
+        "TEST_MC_NAME_REMOTE_PC"        :"{catalog_name}",
+        "TEST_MC_MACHINE_ACCOUNT_REMOTE_PC" :"{machine_domain_name}\\\\manual-01",
         "TEST_MC_ALLOCATION_TYPE_REMOTE_PC" :"Static",
         "TEST_MC_INCLUDE_SUBFOLDERS_REMOTE_PC" :"false",
         "TEST_MC_OU_REMOTE_PC"        :"{OU}",
 
-        //machine account env variable
+        // Machine account env variable
         "TEST_MC_DOMAIN"                :"cmdlab.net",
         "TEST_MC_DOMAIN_OU"             :"",
 
-        //Delivery Group Testing Env Variables
-        "TEST_DG_NAME"                :"ak-test-delivery-group"
+        // Delivery Group Testing Env Variables
+        "TEST_DG_NAME"                :"ak-test-delivery-group",
+        "TEST_POLICY_SET_WITHOUT_DG_NAME" : "test-policy-set-without-dg",
+
+        // Application Go Tests
+        "TEST_APP_NAME"                 :"app-test",
+        // Application Folder Go Tests
+        "TEST_APP_FOLDER_NAME"          :"app-folder",
+
+        // Admin role env variable
+        "TEST_ROLE_NAME"                :"ctx-test-role",
+        // Admin Scope Go Tests
+        "TEST_ADMIN_SCOPE_NAME"         :"ctx-test-scope",
+
+        // Policy Set env variable
+        "TEST_POLICY_SET_NAME"          :"ctx-test-policy-set",
+        "CITRIX_DDC_HOST_NAME"          : "{ddcHostname}"
     },
-    "go.testTimeout": "30m",
-    "git.openRepositoryInParentFolders": "never",
-    "go.gopath": ""
+    "go.testTimeout": "30m"
 }

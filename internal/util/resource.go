@@ -12,6 +12,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 )
 
+const NUTANIX_PLUGIN_ID string = "AcropolisFactory"
+
 // Gets the hypervisor and logs any errors
 func GetHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId string) (*citrixorchestration.HypervisorDetailResponseModel, error) {
 	// Resolve resource path for service offering and master image
@@ -106,7 +108,7 @@ func GetSingleResourcePathFromHypervisor(ctx context.Context, client *citrixdaas
 	return "", fmt.Errorf("could not find resource")
 }
 
-func GetSingleHypervisorResource(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorId, folderPath, resourceName, resourceType, resourceGroupName string, connectionType citrixorchestration.HypervisorConnectionType) (*citrixorchestration.HypervisorResourceResponseModel, error) {
+func GetSingleHypervisorResource(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorId, folderPath, resourceName, resourceType, resourceGroupName string, hypervisor *citrixorchestration.HypervisorDetailResponseModel) (*citrixorchestration.HypervisorResourceResponseModel, error) {
 	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorAllResources(ctx, hypervisorId)
 	req = req.Children(1)
 	if folderPath != "" {
@@ -122,39 +124,41 @@ func GetSingleHypervisorResource(ctx context.Context, client *citrixdaasclient.C
 	}
 
 	for _, child := range resources.Children {
-		if resourceType == "Vm" {
-			switch connectionType {
-			case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
-				if strings.EqualFold(child.GetName(), resourceName) {
-					resourceGroupAndVmName := strings.Split(child.GetId(), "/")
-					if resourceGroupAndVmName[0] == resourceGroupName {
-						return &child, nil
-					}
-				}
-			case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
-				if strings.EqualFold(strings.Split(child.GetName(), " ")[0], resourceName) {
-					return &child, nil
-				}
-			case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
-				if strings.EqualFold(child.GetName(), resourceName) {
+		switch hypervisor.GetConnectionType() {
+		case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
+			if (resourceType == "Vm" || resourceType == "VirtualPrivateCloud") && strings.EqualFold(child.GetName(), resourceName) {
+				resourceGroupAndVmName := strings.Split(child.GetId(), "/")
+				if strings.EqualFold(resourceGroupAndVmName[0], resourceGroupName) {
 					return &child, nil
 				}
 			}
-		}
 
-		if strings.EqualFold(child.GetName(), resourceName) ||
-			(child.GetResourceType() == "Region" && strings.EqualFold(child.GetId(), resourceName)) { // support both Azure region name or id ("East US" and "eastus")
-			if resourceType == "VirtualPrivateCloud" {
-				// For vnet, ID is resourceGroup/vnetName. Match the resourceGroup as well
-				resourceGroupAndVnetName := strings.Split(child.GetId(), "/")
-				if resourceGroupAndVnetName[0] == resourceGroupName {
-					return &child, nil
-				} else {
-					continue
-				}
+			if resourceType == "Region" && (strings.EqualFold(child.GetName(), resourceName) || strings.EqualFold(child.GetId(), resourceName)) { // support both Azure region name or id ("East US" and "eastus")
+				return &child, nil
 			}
-
-			return &child, nil
+		case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
+			if resourceType == "Vm" && strings.EqualFold(strings.Split(child.GetName(), " ")[0], resourceName) {
+				return &child, nil
+			}
+			if strings.EqualFold(child.GetName(), resourceName) {
+				return &child, nil
+			}
+		case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
+			if strings.EqualFold(child.GetName(), resourceName) {
+				return &child, nil
+			}
+		case citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER:
+			if strings.EqualFold(child.GetName(), resourceName) {
+				return &child, nil
+			}
+		case citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER:
+			if strings.EqualFold(child.GetName(), resourceName) {
+				return &child, nil
+			}
+		case citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM:
+			if hypervisor.GetPluginId() == NUTANIX_PLUGIN_ID && strings.EqualFold(child.GetName(), resourceName) {
+				return &child, nil
+			}
 		}
 	}
 
