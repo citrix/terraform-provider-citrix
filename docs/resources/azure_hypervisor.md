@@ -39,6 +39,7 @@ resource "citrix_azure_hypervisor" "example-azure-hypervisor" {
 ### Optional
 
 - `application_secret_expiration_date` (String) The expiration date of the application secret of the service principal used to access the Azure APIs. Format is YYYY-MM-DD.
+- `enable_azure_ad_device_management` (Boolean) Enable Azure AD device management. Default is false.
 
 ### Read-Only
 

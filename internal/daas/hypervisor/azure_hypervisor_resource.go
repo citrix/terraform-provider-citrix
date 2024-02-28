@@ -4,6 +4,7 @@ package hypervisor
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -17,9 +18,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+)
+
+const (
+	EnableAzureADDeviceManagement_CustomProperty = "AzureAdDeviceManagement"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -100,6 +106,12 @@ func (r *azureHypervisorResource) Schema(_ context.Context, _ resource.SchemaReq
 					stringplanmodifier.RequiresReplaceIfConfigured(),
 				},
 			},
+			"enable_azure_ad_device_management": schema.BoolAttribute{
+				Description: "Enable Azure AD device management. Default is false.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
 		},
 	}
 }
@@ -144,6 +156,15 @@ func (r *azureHypervisorResource) Create(ctx context.Context, req resource.Creat
 	connectionDetails.SetMetadata(metadata)
 	connectionDetails.SetSubscriptionId(plan.SubscriptionId.ValueString())
 	connectionDetails.SetActiveDirectoryId(plan.ActiveDirectoryId.ValueString())
+
+	// Set custom properties for enabling AzureAD Device Management
+	customProperties := []citrixorchestration.NameValueStringPairModel{}
+	enableAADDeviceManagementProperty := citrixorchestration.NameValueStringPairModel{}
+	enableAADDeviceManagementProperty.SetName(EnableAzureADDeviceManagement_CustomProperty)
+	enableAADDeviceManagementProperty.SetValue(strconv.FormatBool(plan.EnableAzureADDeviceManagement.ValueBool()))
+	customProperties = append(customProperties, enableAADDeviceManagementProperty)
+	customPropertyString, _ := json.Marshal(customProperties)
+	connectionDetails.SetCustomProperties(string(customPropertyString))
 
 	// Generate API request body from plan
 	var body citrixorchestration.CreateHypervisorRequestModel
@@ -238,6 +259,30 @@ func (r *azureHypervisorResource) Update(ctx context.Context, req resource.Updat
 	editHypervisorRequestBody.SetApplicationSecret(plan.ApplicationSecret.ValueString())
 	metadata := getMetadataForAzureRmHypervisor(plan)
 	editHypervisorRequestBody.SetMetadata(metadata)
+
+	// Modify custom properties
+	customPropertiesString := hypervisor.GetCustomProperties()
+	var customProperties []citrixorchestration.NameValueStringPairModel
+	err = json.Unmarshal([]byte(customPropertiesString), &customProperties)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating Hypervisor",
+			"Hypervisor "+hypervisor.GetName()+" failed to be retrieved from remote.",
+		)
+		return
+	}
+
+	updatedCustomProperties := []*citrixorchestration.NameValueStringPairModel{}
+	for _, customProperty := range customProperties {
+		currentProperty := customProperty
+		if currentProperty.GetName() == EnableAzureADDeviceManagement_CustomProperty {
+			currentProperty.SetValue(strconv.FormatBool(plan.EnableAzureADDeviceManagement.ValueBool()))
+		}
+		updatedCustomProperties = append(updatedCustomProperties, &currentProperty)
+	}
+
+	customPropertiesByte, _ := json.Marshal(updatedCustomProperties)
+	editHypervisorRequestBody.SetCustomProperties(string(customPropertiesByte))
 
 	// Fetch updated hypervisor from GetHypervisor
 	updatedHypervisor, err := UpdateHypervisor(ctx, r.client, &resp.Diagnostics, hypervisor, editHypervisorRequestBody)
