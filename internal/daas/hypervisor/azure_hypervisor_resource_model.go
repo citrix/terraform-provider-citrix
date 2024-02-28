@@ -3,6 +3,9 @@
 package hypervisor
 
 import (
+	"encoding/json"
+	"strconv"
+
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -20,6 +23,7 @@ type AzureHypervisorResourceModel struct {
 	ApplicationSecretExpirationDate types.String `tfsdk:"application_secret_expiration_date"`
 	SubscriptionId                  types.String `tfsdk:"subscription_id"`
 	ActiveDirectoryId               types.String `tfsdk:"active_directory_id"`
+	EnableAzureADDeviceManagement   types.Bool   `tfsdk:"enable_azure_ad_device_management"`
 }
 
 func (r AzureHypervisorResourceModel) RefreshPropertyValues(hypervisor *citrixorchestration.HypervisorDetailResponseModel) AzureHypervisorResourceModel {
@@ -30,6 +34,20 @@ func (r AzureHypervisorResourceModel) RefreshPropertyValues(hypervisor *citrixor
 	r.ApplicationId = types.StringValue(hypervisor.GetApplicationId())
 	r.SubscriptionId = types.StringValue(hypervisor.GetSubscriptionId())
 	r.ActiveDirectoryId = types.StringValue(hypervisor.GetActiveDirectoryId())
+
+	customPropertiesString := hypervisor.GetCustomProperties()
+	var customProperties []citrixorchestration.NameValueStringPairModel
+	err := json.Unmarshal([]byte(customPropertiesString), &customProperties)
+	if err != nil {
+		return r
+	}
+
+	for _, customProperty := range customProperties {
+		if customProperty.GetName() == "AzureAdDeviceManagement" {
+			enabled, _ := strconv.ParseBool(customProperty.GetValue())
+			r.EnableAzureADDeviceManagement = types.BoolValue(enabled)
+		}
+	}
 
 	return r
 }
