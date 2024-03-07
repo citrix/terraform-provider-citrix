@@ -3,12 +3,12 @@
 page_title: "citrix_admin_role Resource - citrix"
 subcategory: ""
 description: |-
-  Manages an Administrator role.
+  Manages an administrator role.
 ---
 
 # citrix_admin_role (Resource)
 
-Manages an Administrator role.
+Manages an administrator role.
 
 ## Example Usage
 
@@ -37,18 +37,18 @@ resource "citrix_admin_role" "cloud_example_role" {
 
 ### Required
 
-- `name` (String) Name of the Admin Role.
-- `permissions` (List of String) List of permissions to be associated with the Admin Role. To get a list of supported permissions, please refer to [Admin Predefined Permissions for Cloud](https://developer-docs.citrix.com/en-us/citrix-daas-service-apis/citrix-daas-rest-apis/apis/#/Admin-APIs/Admin-GetPredefinedPermissions) and [Admin Predefined Permissions for On-Premise](https://developer-docs.citrix.com/en-us/citrix-virtual-apps-desktops/citrix-cvad-rest-apis/apis/#/Admin-APIs/Admin-GetPredefinedPermissions).
+- `name` (String) Name of the admin role.
+- `permissions` (List of String) List of permissions to be associated with the admin role. To get a list of supported permissions, please refer to [Admin Predefined Permissions for Cloud](https://developer-docs.citrix.com/en-us/citrix-daas-service-apis/citrix-daas-rest-apis/apis/#/Admin-APIs/Admin-GetPredefinedPermissions) and [Admin Predefined Permissions for On-Premise](https://developer-docs.citrix.com/en-us/citrix-virtual-apps-desktops/citrix-cvad-rest-apis/apis/#/Admin-APIs/Admin-GetPredefinedPermissions).
 
 ### Optional
 
-- `can_launch_manage` (Boolean) Flag to determine if the user will have access to the Manage tab on the console. This field is only applicable for Cloud customers. For On-Premise customers, the only acceptable value is `true`. Defaults to `true`.
-- `can_launch_monitor` (Boolean) Flag to determine if the user will have access to the Monitor tab on the console. This field is only applicable for Cloud customers. For On-Premise customers, the only acceptable value is `true`. Defaults to `true`.
-- `description` (String) Description of the Admin Role.
+- `can_launch_manage` (Boolean) Flag to determine if the user will have access to the Manage tab on the console. This field is only applicable for cloud admins. For on-premise admins, the only acceptable value is `true`. Defaults to `true`.
+- `can_launch_monitor` (Boolean) Flag to determine if the user will have access to the Monitor tab on the console. This field is only applicable for cloud admins. For on-premise admins, the only acceptable value is `true`. Defaults to `true`.
+- `description` (String) Description of the admin role.
 
 ### Read-Only
 
-- `id` (String) ID of the Admin Role.
+- `id` (String) ID of the admin role.
 - `is_built_in` (Boolean) Flag to determine if the role was built-in or user defined
 
 ## Import

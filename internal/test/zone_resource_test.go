@@ -136,16 +136,6 @@ func BuildZoneResource(t *testing.T, zone string, zoneName string) string {
 	return fmt.Sprintf(zone, zoneName, zoneDescription)
 }
 
-func getSkipFunc(isOnPremises bool) func() (bool, error) {
-	return func() (bool, error) {
-		if isOnPremises {
-			return false, nil
-		}
-
-		return true, nil
-	}
-}
-
 func getAggregateTestFunc(isOnPremises bool, zoneName string, zoneDescription string) resource.TestCheckFunc {
 	if isOnPremises {
 		return resource.ComposeAggregateTestCheckFunc(

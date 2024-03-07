@@ -3,12 +3,12 @@
 page_title: "citrix_admin_scope Resource - citrix"
 subcategory: ""
 description: |-
-  Manages an Administrator scope.
+  Manages an administrator scope.
 ---
 
 # citrix_admin_scope (Resource)
 
-Manages an Administrator scope.
+Manages an administrator scope.
 
 ## Example Usage
 
@@ -34,16 +34,16 @@ resource "citrix_admin_scope" "example-admin-scope" {
 
 ### Required
 
-- `name` (String) Name of the Admin Scope.
+- `name` (String) Name of the admin scope.
 
 ### Optional
 
-- `description` (String) Description of the Admin Scope.
-- `scoped_objects` (Attributes List) List of scoped objects to be associated with the Admin Scope. (see [below for nested schema](#nestedatt--scoped_objects))
+- `description` (String) Description of the admin scope.
+- `scoped_objects` (Attributes List) List of scoped objects to be associated with the admin scope. (see [below for nested schema](#nestedatt--scoped_objects))
 
 ### Read-Only
 
-- `id` (String) ID of the Admin Scope.
+- `id` (String) ID of the admin scope.
 
 <a id="nestedatt--scoped_objects"></a>
 ### Nested Schema for `scoped_objects`

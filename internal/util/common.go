@@ -234,7 +234,8 @@ func GetValidatorFromEnum[V ~string, T []V](enum T) validator.String {
 }
 
 type HttpErrorBody struct {
-	Detail string `json:"detail"`
+	ErrorMessage string `json:"errorMessage"`
+	Detail       string `json:"detail"`
 }
 
 // <summary>
@@ -261,6 +262,14 @@ func ReadResource[ResponseType any](request any, ctx context.Context, client *ci
 
 			resp.State.RemoveResource(ctx)
 		} else if httpResp.StatusCode == http.StatusInternalServerError && httpErrorBody.Detail == "Object does not exist." {
+
+			resp.Diagnostics.AddWarning(
+				fmt.Sprintf("%s not found", resourceType),
+				fmt.Sprintf("%s %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", resourceType, resourceIdOrName),
+			)
+
+			resp.State.RemoveResource(ctx)
+		} else if httpResp.StatusCode == http.StatusBadRequest && httpErrorBody.ErrorMessage == "Cannot find this administrator "+resourceIdOrName {
 
 			resp.Diagnostics.AddWarning(
 				fmt.Sprintf("%s not found", resourceType),

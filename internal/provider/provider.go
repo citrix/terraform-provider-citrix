@@ -20,6 +20,7 @@ import (
 
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_role"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_user"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/application"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/vda"
 
@@ -559,6 +560,7 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		hypervisor_resource_pool.NewAwsHypervisorResourcePoolResource,
 		hypervisor_resource_pool.NewGcpHypervisorResourcePoolResource,
 		hypervisor_resource_pool.NewXenserverHypervisorResourcePoolResource,
+		hypervisor_resource_pool.NewVsphereHypervisorResourcePoolResource,
 		machine_catalog.NewMachineCatalogResource,
 		delivery_group.NewDeliveryGroupResource,
 		application.NewApplicationResource,
@@ -566,5 +568,7 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		admin_scope.NewAdminScopeResource,
 		admin_role.NewAdminRoleResource,
 		policies.NewPolicySetResource,
+		admin_user.NewAdminUserResource,
+		//Add resource here
 	}
 }

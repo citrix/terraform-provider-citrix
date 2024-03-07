@@ -669,7 +669,11 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(catalog *citrix
 		network := networkMaps[0].GetNetwork()
 		segments := strings.Split(network.GetXDPath(), "\\")
 		lastIndex := len(segments)
-		r.ProvisioningScheme.NetworkMapping.Network = types.StringValue(strings.Split((strings.Split(segments[lastIndex-1], "."))[0], " ")[0])
+		/* For AWS Network, the XDPath looks like:
+		 * XDHyp:\\HostingUnits\\{resource pool}\\{availability zone}.availabilityzone\\{network ip}`/{prefix length} (vpc-{vpc-id}).network
+		 * The Network property should be set to {network ip}/{prefix length}
+		 */
+		r.ProvisioningScheme.NetworkMapping.Network = types.StringValue(strings.ReplaceAll(strings.Split((strings.Split(segments[lastIndex-1], ".network"))[0], " ")[0], "`/", "/"))
 	} else {
 		r.ProvisioningScheme.NetworkMapping = nil
 	}
@@ -758,6 +762,10 @@ func parseCustomPropertiesToClientModel(provisioningScheme ProvisioningSchemeMod
 				util.AppendNameValueStringPair(res, "PersistOsDisk", "true")
 			}
 		}
+	}
+
+	if len(*res) == 0 {
+		return nil
 	}
 
 	return *res
