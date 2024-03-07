@@ -50,22 +50,22 @@ func (r *adminRoleResource) Metadata(_ context.Context, req resource.MetadataReq
 func (r *adminRoleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		// This description is used by the documentation generator and the language server.
-		Description: "Manages an Administrator role.",
+		Description: "Manages an administrator role.",
 
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "ID of the Admin Role.",
+				Description: "ID of the admin role.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "Name of the Admin Role.",
+				Description: "Name of the admin role.",
 				Required:    true,
 			},
 			"description": schema.StringAttribute{
-				Description: "Description of the Admin Role.",
+				Description: "Description of the admin role.",
 				Optional:    true,
 			},
 			"is_built_in": schema.BoolAttribute{
@@ -73,20 +73,20 @@ func (r *adminRoleResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Computed:    true,
 			},
 			"can_launch_manage": schema.BoolAttribute{
-				Description: "Flag to determine if the user will have access to the Manage tab on the console. This field is only applicable for Cloud customers. For On-Premise customers, the only acceptable value is `true`. Defaults to `true`.",
+				Description: "Flag to determine if the user will have access to the Manage tab on the console. This field is only applicable for cloud admins. For on-premise admins, the only acceptable value is `true`. Defaults to `true`.",
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(true), // Default value gets set for an attribute after Validation and before applying configuration changes
 			},
 			"can_launch_monitor": schema.BoolAttribute{
-				Description: "Flag to determine if the user will have access to the Monitor tab on the console. This field is only applicable for Cloud customers. For On-Premise customers, the only acceptable value is `true`. Defaults to `true`.",
+				Description: "Flag to determine if the user will have access to the Monitor tab on the console. This field is only applicable for cloud admins. For on-premise admins, the only acceptable value is `true`. Defaults to `true`.",
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(true),
 			},
 			"permissions": schema.ListAttribute{
 				ElementType: types.StringType,
-				Description: "List of permissions to be associated with the Admin Role. To get a list of supported permissions, please refer to [Admin Predefined Permissions for Cloud](https://developer-docs.citrix.com/en-us/citrix-daas-service-apis/citrix-daas-rest-apis/apis/#/Admin-APIs/Admin-GetPredefinedPermissions) and [Admin Predefined Permissions for On-Premise](https://developer-docs.citrix.com/en-us/citrix-virtual-apps-desktops/citrix-cvad-rest-apis/apis/#/Admin-APIs/Admin-GetPredefinedPermissions).",
+				Description: "List of permissions to be associated with the admin role. To get a list of supported permissions, please refer to [Admin Predefined Permissions for Cloud](https://developer-docs.citrix.com/en-us/citrix-daas-service-apis/citrix-daas-rest-apis/apis/#/Admin-APIs/Admin-GetPredefinedPermissions) and [Admin Predefined Permissions for On-Premise](https://developer-docs.citrix.com/en-us/citrix-virtual-apps-desktops/citrix-cvad-rest-apis/apis/#/Admin-APIs/Admin-GetPredefinedPermissions).",
 				Required:    true,
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),

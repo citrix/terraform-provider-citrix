@@ -203,7 +203,11 @@ func GetFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.C
 				name = strings.Split(name, " ")[0]
 			}
 			if Contains(filter, name) {
-				result = append(result, child.GetXDPath())
+				if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER && strings.EqualFold(resourceType, "network") {
+					result = append(result, child.GetRelativePath())
+				} else {
+					result = append(result, child.GetXDPath())
+				}
 			}
 		}
 	} else {

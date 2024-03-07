@@ -40,7 +40,7 @@ The CUGC (Citrix User Group Community) maintains a combination Slack/Discord for
    * `daas` folder - Contains all the Citrix DaaS resources libraries that we support through Terraform.
    * `test` folder - Contains the Go tests for both `provider` and all `resources` that we have.
    * `util` folder - Contains general utility functions that can be reused.
-2. `examples` folder - Contains the examples for users to use various Citrix resources e.g [zone](examples/resources/citrix_daas_zone) folder contains the resources.tf that illustrates how citrix_daas_zone resource can be used to create a DaaS Zone on target Citrix DaaS site. There are also examples for [Citrix provider](examples/provider) configuration for both Citrix Cloud customer and Citrix on-premises customers. Users can use the examples as a starting point to configure their own Citrix Terraform script.
+2. `examples` folder - Contains the examples for users to use various Citrix resources e.g [zone](examples/resources/citrix_zone) folder contains the resources.tf that illustrates how citrix_zone resource can be used to create a DaaS Zone on target Citrix DaaS site. There are also examples for [Citrix provider](examples/provider) configuration for both Citrix Cloud customer and Citrix on-premises customers. Users can use the examples as a starting point to configure their own Citrix Terraform script.
 3. `docs` folder - [resources](docs/resources) - contains the documentation for all resource configurations supported through Terraform. Refer this to understand the properties, accepted values, and how various properties work together for each type of resource. 
 
 ### Provider Configuration
@@ -153,9 +153,9 @@ A delivery group is a collection of machines selected from one or more machine c
 | Connection Type |   Hypervisor     |   Resource Pool  |   Machine Catalog   | 
 |-----------------|------------------|------------------|---------------------|
 | AzureRM         |:heavy_check_mark:|:heavy_check_mark:| MCS / Power Managed |
-| AWS EC2         |:heavy_check_mark:|:heavy_check_mark:|  in progress        |
+| AWS EC2         |:heavy_check_mark:|:heavy_check_mark:| MCS / Power Managed |
 | GCP             |:heavy_check_mark:|:heavy_check_mark:| MCS / Power Managed |
-| Vsphere         |:heavy_check_mark:|   in progress    |    Power Managed    |
+| Vsphere         |:heavy_check_mark:|:heavy_check_mark:|    Power Managed    |
 | XenServer       |:heavy_check_mark:|:heavy_check_mark:|    Power Managed    |
 | Nutanix         |:heavy_check_mark:|   in progress    |    Power Managed    |
 
@@ -164,6 +164,7 @@ A delivery group is a collection of machines selected from one or more machine c
 - MCS provisioning
   - Azure
   - GCP
+  - AWS EC2
 - Manual Power Managed
   - Azure
   - GCP

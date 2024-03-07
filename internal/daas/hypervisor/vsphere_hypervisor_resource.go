@@ -104,9 +104,6 @@ func (r *vsphereHypervisorResource) Schema(_ context.Context, _ resource.SchemaR
 				Required:    true,
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
-					listvalidator.ValueStringsAre(
-						stringvalidator.RegexMatches(regexp.MustCompile(util.IPv4RegexWithProtocol), "must be a valid IPv4 address prefixed with protoccol (http:// or https://)"),
-					),
 				},
 			},
 			"ssl_thumbprints": schema.ListAttribute{

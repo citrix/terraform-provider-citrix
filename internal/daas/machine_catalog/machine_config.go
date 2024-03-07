@@ -145,7 +145,11 @@ func (mc *AwsMachineConfigModel) RefreshProperties(catalog citrixorchestration.M
 
 	// Refresh Master Image
 	masterImage := provScheme.GetMasterImage()
-	mc.MasterImage = types.StringValue(masterImage.GetName())
+	/* For AWS master image, the returned master image name looks like:
+	 * {Image Name} (ami-000123456789abcde)
+	 * The Name property in MasterImage will be image name without ami id appended
+	 */
+	mc.MasterImage = types.StringValue(strings.Split(masterImage.GetName(), " (ami-")[0])
 }
 
 func (mc *GcpMachineConfigModel) RefreshProperties(catalog citrixorchestration.MachineCatalogDetailResponseModel) {

@@ -105,7 +105,7 @@ func (r *xenserverHypervisorResource) Schema(_ context.Context, _ resource.Schem
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
 					listvalidator.ValueStringsAre(
-						stringvalidator.RegexMatches(regexp.MustCompile(util.IPv4RegexWithProtocol), "must be a valid IPv4 address prefixed with protoccol (http:// or https://)"),
+						stringvalidator.RegexMatches(regexp.MustCompile(util.IPv4RegexWithProtocol), "must be a valid IPv4 address prefixed with protocol (http:// or https://)"),
 					),
 				},
 			},

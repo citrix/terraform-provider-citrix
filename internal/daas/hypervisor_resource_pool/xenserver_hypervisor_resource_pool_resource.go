@@ -98,7 +98,7 @@ func (r *xenserverHypervisorResourcePoolResource) Schema(_ context.Context, _ re
 				},
 			},
 			"use_local_storage_caching": schema.BoolAttribute{
-				Description: "Indicate whether intellicache is enabled to reduce load on the shared storage device. Will only be affective when shared storage is used.",
+				Description: "Indicates whether intellicache is enabled to reduce load on the shared storage device. Will only be effective when shared storage is used. Default value is `false`.",
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
@@ -140,7 +140,7 @@ func (r *xenserverHypervisorResourcePoolResource) Create(ctx context.Context, re
 	hypervisorConnectionType := hypervisor.GetConnectionType()
 	if hypervisorConnectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER {
 		resp.Diagnostics.AddError(
-			"Error creating Azure Resource Pool for Hypervisor",
+			"Error creating Hypervisor Resource Pool for XenServer",
 			"Unsupported hypervisor connection type.",
 		)
 		return

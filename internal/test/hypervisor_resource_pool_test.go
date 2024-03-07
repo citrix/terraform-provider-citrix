@@ -205,6 +205,78 @@ func TestHypervisorResourcePoolXenserver(t *testing.T) {
 	})
 }
 
+func TestHypervisorResourcePoolPreCheck_Vsphere(t *testing.T) {
+	if v := os.Getenv("TEST_HYPERV_RP_NAME_VSPHERE"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_NAME_VSPHERE must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_RP_DATACENTER_VSPHERE"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_DATACENTER_VSPHERE must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_RP_HOST_VSPHERE"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_HOST_VSPHERE must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_RP_NETWORK_VSPHERE"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_NETWORK_VSPHERE must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_RP_STORAGE_1_VSPHERE"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_STORAGE_1_VSPHERE must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_RP_STORAGE_2_VSPHERE"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_STORAGE_2_VSPHERE must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_RP_TEMP_STORAGE_VSPHERE"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_TEMP_STORAGE_VSPHERE must be set for acceptance tests")
+	}
+}
+
+func TestHypervisorResourcePoolVsphere(t *testing.T) {
+	name := os.Getenv("TEST_HYPERV_RP_NAME_VSPHERE")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck: func() {
+			TestProviderPreCheck(t)
+			TestHypervisorPreCheck_Vsphere(t)
+			TestHypervisorResourcePoolPreCheck_Vsphere(t)
+		},
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: BuildHypervisorResourcePoolResourceVsphere(t),
+
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "name", name),
+					// Verify name of the region
+					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "networks.#", "1"),
+					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "networks.0", os.Getenv("TEST_HYPERV_RP_NETWORK_VSPHERE")),
+					// Verify subnets
+					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "storage.#", "2"),
+					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "storage.0.storage_name", os.Getenv("TEST_HYPERV_RP_STORAGE_1_VSPHERE")),
+					// Verify name of the project
+					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "temporary_storage.#", "1"),
+					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "temporary_storage.0.storage_name", os.Getenv("TEST_HYPERV_RP_TEMP_STORAGE_VSPHERE")),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:            "citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool",
+				ImportState:             true,
+				ImportStateIdFunc:       generateImportStateId_Vsphere,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"cluster"},
+			},
+			// Update and Read
+			{
+				Config: BuildHypervisorResourcePoolResourceVsphereUpdated(t),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
+					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "storage.#", "1"),
+				),
+			},
+		},
+	})
+}
+
 func generateImportStateId(state *terraform.State) (string, error) {
 	resourceName := "citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool"
 	var rawState map[string]string
@@ -235,6 +307,20 @@ func generateImportStateId_GCP(state *terraform.State) (string, error) {
 
 func generateImportStateId_XenServer(state *terraform.State) (string, error) {
 	resourceName := "citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool"
+	var rawState map[string]string
+	for _, m := range state.Modules {
+		if len(m.Resources) > 0 {
+			if v, ok := m.Resources[resourceName]; ok {
+				rawState = v.Primary.Attributes
+			}
+		}
+	}
+
+	return fmt.Sprintf("%s,%s", rawState["hypervisor"], rawState["id"]), nil
+}
+
+func generateImportStateId_Vsphere(state *terraform.State) (string, error) {
+	resourceName := "citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool"
 	var rawState map[string]string
 	for _, m := range state.Modules {
 		if len(m.Resources) > 0 {
@@ -308,6 +394,44 @@ resource "citrix_xenserver_hypervisor_resource_pool" "testHypervisorResourcePool
 	temporary_storage = ["%s"]
 }	
 `
+
+	hypervisor_resource_pool_testResource_vsphere = `
+resource "citrix_vsphere_hypervisor_resource_pool" "testHypervisorResourcePool" {
+	name = "%s"
+	hypervisor = citrix_vsphere_hypervisor.testHypervisor.id
+	cluster = {
+		datacenter = "%s"
+		host = "%s"
+	}
+	networks = ["%s"]
+	storage = [{
+		storage_name = "%s"
+	},
+	{
+		storage_name = "%s"
+	}]
+	temporary_storage = [{
+		storage_name = "%s"
+	}]
+}
+`
+	hypervisor_resource_pool_updated_testResource_vsphere = `
+resource "citrix_vsphere_hypervisor_resource_pool" "testHypervisorResourcePool" {
+	name = "%s-updated"
+	hypervisor = citrix_vsphere_hypervisor.testHypervisor.id
+	cluster = {
+		datacenter = "%s"
+		host = "%s"
+	}
+	networks = ["%s"]
+	storage = [{
+		storage_name = "%s"
+	}]
+	temporary_storage = [{
+		storage_name = "%s"
+	}]
+}	
+`
 )
 
 func BuildHypervisorResourcePoolResourceAzure(t *testing.T, hypervisorRP string) string {
@@ -347,4 +471,27 @@ func BuildHypervisorResourcePoolResourceXenServerUpdated(t *testing.T) string {
 	tempStorage := os.Getenv("TEST_HYPERV_RP_TEMP_STORAGE_XENSERVER")
 
 	return BuildHypervisorResourceXenserver(t, hypervisor_testResources_xenserver) + fmt.Sprintf(hypervisor_resource_pool_updated_testResource_xenserver, name, network1, network2, storage, tempStorage)
+}
+
+func BuildHypervisorResourcePoolResourceVsphere(t *testing.T) string {
+	name := os.Getenv("TEST_HYPERV_RP_NAME_VSPHERE")
+	datacenter := os.Getenv("TEST_HYPERV_RP_DATACENTER_VSPHERE")
+	host := os.Getenv("TEST_HYPERV_RP_HOST_VSPHERE")
+	network := os.Getenv("TEST_HYPERV_RP_NETWORK_VSPHERE")
+	storage_1 := os.Getenv("TEST_HYPERV_RP_STORAGE_1_VSPHERE")
+	storage_2 := os.Getenv("TEST_HYPERV_RP_STORAGE_2_VSPHERE")
+	tempStorage := os.Getenv("TEST_HYPERV_RP_TEMP_STORAGE_VSPHERE")
+
+	return BuildHypervisorResourceVsphere(t, hypervisor_testResources_vsphere) + fmt.Sprintf(hypervisor_resource_pool_testResource_vsphere, name, datacenter, host, network, storage_1, storage_2, tempStorage)
+}
+
+func BuildHypervisorResourcePoolResourceVsphereUpdated(t *testing.T) string {
+	name := os.Getenv("TEST_HYPERV_RP_NAME_VSPHERE")
+	datacenter := os.Getenv("TEST_HYPERV_RP_DATACENTER_VSPHERE")
+	host := os.Getenv("TEST_HYPERV_RP_HOST_VSPHERE")
+	network := os.Getenv("TEST_HYPERV_RP_NETWORK_VSPHERE")
+	storage_1 := os.Getenv("TEST_HYPERV_RP_STORAGE_1_VSPHERE")
+	tempStorage := os.Getenv("TEST_HYPERV_RP_TEMP_STORAGE_VSPHERE")
+
+	return BuildHypervisorResourceVsphere(t, hypervisor_testResources_vsphere) + fmt.Sprintf(hypervisor_resource_pool_updated_testResource_vsphere, name, datacenter, host, network, storage_1, tempStorage)
 }

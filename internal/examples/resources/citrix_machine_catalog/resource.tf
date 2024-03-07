@@ -47,6 +47,42 @@ resource "citrix_machine_catalog" "example-azure-mtsession" {
 	}
 }
 
+resource "citrix_machine_catalog" "example-aws-mtsession" {
+    name                        = "example-aws-mtsession"
+    description                 = "Example multi-session catalog on AWS hypervisor"
+   	zone						= "<zone Id>"
+	allocation_type				= "Random"
+	session_support				= "MultiSession"
+	is_power_managed			= true
+	is_remote_pc 			  	= false
+	provisioning_type 			= "MCS"
+    provisioning_scheme         = {
+		hypervisor = citrix_aws_hypervisor.example-aws-hypervisor.id
+		hypervisor_resource_pool = citrix_hypervisor_resource_pool.example-aws-hypervisor-resource-pool.id
+		identity_type      = "ActiveDirectory"
+		machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+			domain_ou				 = "<DomainOU>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+        aws_machine_config = {
+            image_ami = "<AMI ID for VDA>"
+			master_image = "<Image template AMI name>"
+			service_offering = "T2 Small Instance"
+        }
+		network_mapping = {
+            network_device = "0"
+            network = "10.0.128.0/20"
+        }
+		number_of_total_machines =  1
+    }
+	machine_account_creation_rules ={
+			naming_scheme 	   = "aws-multi-##"
+			naming_scheme_type = "Numeric"
+		}
+}
+
 resource "citrix_machine_catalog" "example-gcp-mtsession" {
     name                        = "example-gcp-mtsession"
     description                 = "Example multi-session catalog on GCP hypervisor"

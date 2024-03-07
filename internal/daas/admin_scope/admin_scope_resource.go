@@ -47,26 +47,26 @@ func (r *adminScopeResource) Metadata(_ context.Context, req resource.MetadataRe
 func (r *adminScopeResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		// This description is used by the documentation generator and the language server.
-		Description: "Manages an Administrator scope.",
+		Description: "Manages an administrator scope.",
 
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "ID of the Admin Scope.",
+				Description: "ID of the admin scope.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "Name of the Admin Scope.",
+				Description: "Name of the admin scope.",
 				Required:    true,
 			},
 			"description": schema.StringAttribute{
-				Description: "Description of the Admin Scope.",
+				Description: "Description of the admin scope.",
 				Optional:    true,
 			},
 			"scoped_objects": schema.ListNestedAttribute{
-				Description: "List of scoped objects to be associated with the Admin Scope.",
+				Description: "List of scoped objects to be associated with the admin scope.",
 				Optional:    true,
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),

@@ -28,7 +28,7 @@ func TestAdminRoleResource(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: fmt.Sprintf(adminRoleTestResource, name),
+				Config: BuildAdminRoleResource(t, adminRoleTestResource),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the admin role
 					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "name", name),
@@ -55,7 +55,7 @@ func TestAdminRoleResource(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: fmt.Sprintf(adminRoleTestResource_updated, name),
+				Config: BuildAdminRoleResource(t, adminRoleTestResource_updated),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the admin role
 					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "name", fmt.Sprintf("%s-updated", name)),
@@ -95,3 +95,7 @@ var (
 	}
 	`
 )
+
+func BuildAdminRoleResource(t *testing.T, adminRole string) string {
+	return fmt.Sprintf(adminRole, os.Getenv("TEST_ROLE_NAME"))
+}
