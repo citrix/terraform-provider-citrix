@@ -222,7 +222,7 @@ func buildProvSchemeForMcsCatalog(ctx context.Context, client *citrixdaasclient.
 		provisioningScheme.SetNetworkMapping(networkMapping)
 	}
 
-	customProperties := parseCustomPropertiesToClientModel(*plan.ProvisioningScheme, hypervisor.ConnectionType)
+	customProperties := parseCustomPropertiesToClientModel(*plan.ProvisioningScheme, hypervisor.ConnectionType, false)
 	provisioningScheme.SetCustomProperties(customProperties)
 
 	return &provisioningScheme, ""
@@ -307,7 +307,7 @@ func setProvSchemePropertiesForUpdateCatalog(plan MachineCatalogResourceModel, b
 		body.SetNetworkMapping(networkMapping)
 	}
 
-	customProperties := parseCustomPropertiesToClientModel(*plan.ProvisioningScheme, hypervisor.ConnectionType)
+	customProperties := parseCustomPropertiesToClientModel(*plan.ProvisioningScheme, hypervisor.ConnectionType, true)
 	body.SetCustomProperties(customProperties)
 
 	return body, nil
@@ -469,6 +469,8 @@ func updateCatalogImage(ctx context.Context, client *citrixdaasclient.CitrixDaas
 		return errResp
 	}
 
+	var customProperties = &[]citrixorchestration.NameValueStringPairModel{}
+
 	// Check if XDPath has changed for the image
 	imagePath := ""
 	var err error
@@ -526,6 +528,17 @@ func updateCatalogImage(ctx context.Context, client *citrixdaasclient.CitrixDaas
 				}
 			}
 		}
+		var provAzureUseSharedImageGallery bool
+		for _, stringPair := range provScheme.GetCustomProperties() {
+			if stringPair.GetName() == "UseSharedImageGallery" {
+				provAzureUseSharedImageGallery, _ = strconv.ParseBool(stringPair.GetValue())
+				break
+			}
+		}
+		planAzureUseSharedImageGallery := plan.ProvisioningScheme.AzureMachineConfig.PlaceImageInGallery != nil
+		if planAzureUseSharedImageGallery != provAzureUseSharedImageGallery {
+			util.AppendNameValueStringPair(customProperties, "UseSharedImageGallery", strconv.FormatBool(planAzureUseSharedImageGallery))
+		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
 		imageId := fmt.Sprintf("%s (%s)", plan.ProvisioningScheme.AwsMachineConfig.MasterImage.ValueString(), plan.ProvisioningScheme.AwsMachineConfig.ImageAmi.ValueString())
 		imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", imageId, "template", "")
@@ -561,7 +574,7 @@ func updateCatalogImage(ctx context.Context, client *citrixdaasclient.CitrixDaas
 		}
 	}
 
-	if masterImage.GetXDPath() == imagePath {
+	if len(*customProperties) == 0 && masterImage.GetXDPath() == imagePath {
 		return nil
 	}
 
@@ -577,6 +590,13 @@ func updateCatalogImage(ctx context.Context, client *citrixdaasclient.CitrixDaas
 	updateProvisioningSchemeModel.SetMasterImagePath(imagePath)
 	updateProvisioningSchemeModel.SetStoreOldImage(true)
 	updateProvisioningSchemeModel.SetMinimumFunctionalLevel("L7_20")
+	if len(*customProperties) > 0 {
+		/*
+			util.AppendNameValueStringPair(customProperties, "SharedImageGalleryReplicaRatio", util.TypeInt64ToString(plan.ProvisioningScheme.AzureMachineConfig.PlaceImageInGallery.ReplicaRatio))
+			util.AppendNameValueStringPair(customProperties, "SharedImageGalleryReplicaMaximum", util.TypeInt64ToString(plan.ProvisioningScheme.AzureMachineConfig.PlaceImageInGallery.ReplicaMaximum))
+		*/
+		updateProvisioningSchemeModel.SetCustomProperties(*customProperties)
+	}
 	updateMasterImageRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsUpdateMachineCatalogProvisioningScheme(ctx, catalogId)
 	updateMasterImageRequest = updateMasterImageRequest.UpdateMachineCatalogProvisioningSchemeRequestModel(updateProvisioningSchemeModel)
 	_, httpResp, err := citrixdaasclient.AddRequestData(updateMasterImageRequest, client).Async(true).Execute()
@@ -701,7 +721,7 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(catalog *citrix
 	return r
 }
 
-func parseCustomPropertiesToClientModel(provisioningScheme ProvisioningSchemeModel, connectionType citrixorchestration.HypervisorConnectionType) []citrixorchestration.NameValueStringPairModel {
+func parseCustomPropertiesToClientModel(provisioningScheme ProvisioningSchemeModel, connectionType citrixorchestration.HypervisorConnectionType, update bool) []citrixorchestration.NameValueStringPairModel {
 	var res = &[]citrixorchestration.NameValueStringPairModel{}
 	switch connectionType {
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
@@ -722,6 +742,28 @@ func parseCustomPropertiesToClientModel(provisioningScheme ProvisioningSchemeMod
 			} else {
 				util.AppendNameValueStringPair(res, "UseManagedDisks", "false")
 			}
+		}
+		if !provisioningScheme.AzureMachineConfig.UseEphemeralOsDisk.IsNull() {
+			if provisioningScheme.AzureMachineConfig.UseEphemeralOsDisk.ValueBool() {
+				util.AppendNameValueStringPair(res, "UseEphemeralOsDisk", "true")
+			} else {
+				util.AppendNameValueStringPair(res, "UseEphemeralOsDisk", "false")
+			}
+		}
+		if !provisioningScheme.AzureMachineConfig.LicenseType.IsNull() {
+			util.AppendNameValueStringPair(res, "LicenseType", provisioningScheme.AzureMachineConfig.LicenseType.ValueString())
+		} else {
+			util.AppendNameValueStringPair(res, "LicenseType", "")
+		}
+		if provisioningScheme.AzureMachineConfig.PlaceImageInGallery != nil {
+			if !update {
+				util.AppendNameValueStringPair(res, "UseSharedImageGallery", "true")
+			}
+			util.AppendNameValueStringPair(res, "SharedImageGalleryReplicaRatio", util.TypeInt64ToString(provisioningScheme.AzureMachineConfig.PlaceImageInGallery.ReplicaRatio))
+			util.AppendNameValueStringPair(res, "SharedImageGalleryReplicaMaximum", util.TypeInt64ToString(provisioningScheme.AzureMachineConfig.PlaceImageInGallery.ReplicaMaximum))
+		}
+		if !provisioningScheme.AzureMachineConfig.DiskEncryptionSetId.IsNull() {
+			util.AppendNameValueStringPair(res, "DiskEncryptionSetId", provisioningScheme.AzureMachineConfig.DiskEncryptionSetId.ValueString())
 		}
 		if provisioningScheme.AzureMachineConfig.WritebackCache != nil {
 			if !provisioningScheme.AzureMachineConfig.WritebackCache.WBCDiskStorageType.IsNull() {

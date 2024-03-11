@@ -79,6 +79,11 @@ type GalleryImageModel struct {
 	Version    types.String `tfsdk:"version"`
 }
 
+type PlaceImageInGalleryModel struct {
+	ReplicaRatio   types.Int64 `tfsdk:"replica_ratio"`
+	ReplicaMaximum types.Int64 `tfsdk:"replica_maximum"`
+}
+
 // WritebackCacheModel maps the write back cacheconfiguration schema data.
 type WritebackCacheModel struct {
 	PersistWBC                 types.Bool   `tfsdk:"persist_wbc"`
