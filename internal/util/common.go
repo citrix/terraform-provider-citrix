@@ -193,6 +193,15 @@ func TypeBoolToString(from types.Bool) string {
 }
 
 // <summary>
+// Helper function to convert terraform int64 value to string
+// </summary>
+// <param name="from">Integer value in terraform int64</param>
+// <returns>Integer value in string</returns>
+func TypeInt64ToString(from types.Int64) string {
+	return strconv.FormatInt(from.ValueInt64(), 10)
+}
+
+// <summary>
 // Helper function to convert string to terraform boolean value
 // </summary>
 // <param name="from">Boolean value in string</param>
@@ -200,6 +209,16 @@ func TypeBoolToString(from types.Bool) string {
 func StringToTypeBool(from string) types.Bool {
 	result, _ := strconv.ParseBool(from)
 	return types.BoolValue(result)
+}
+
+// <summary>
+// Helper function to convert string to terraform integer value
+// </summary>
+// <param name="from">Integer value in string</param>
+// <returns>Integer value in terraform types.Int64</returns>
+func StringToTypeInt64(from string) types.Int64 {
+	result, _ := strconv.ParseInt(from, 10, 64)
+	return types.Int64Value(result)
 }
 
 // <summary>

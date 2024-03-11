@@ -14,15 +14,19 @@ type AzureMachineConfigModel struct {
 	ServiceOffering types.String `tfsdk:"service_offering"`
 	MasterImage     types.String `tfsdk:"master_image"`
 	/** Azure Hypervisor **/
-	ResourceGroup    types.String         `tfsdk:"resource_group"`
-	StorageAccount   types.String         `tfsdk:"storage_account"`
-	Container        types.String         `tfsdk:"container"`
-	GalleryImage     *GalleryImageModel   `tfsdk:"gallery_image"`
-	VdaResourceGroup types.String         `tfsdk:"vda_resource_group"`
-	StorageType      types.String         `tfsdk:"storage_type"`
-	UseManagedDisks  types.Bool           `tfsdk:"use_managed_disks"`
-	MachineProfile   *MachineProfileModel `tfsdk:"machine_profile"`
-	WritebackCache   *WritebackCacheModel `tfsdk:"writeback_cache"`
+	ResourceGroup       types.String              `tfsdk:"resource_group"`
+	StorageAccount      types.String              `tfsdk:"storage_account"`
+	Container           types.String              `tfsdk:"container"`
+	GalleryImage        *GalleryImageModel        `tfsdk:"gallery_image"`
+	VdaResourceGroup    types.String              `tfsdk:"vda_resource_group"`
+	StorageType         types.String              `tfsdk:"storage_type"`
+	UseManagedDisks     types.Bool                `tfsdk:"use_managed_disks"`
+	UseEphemeralOsDisk  types.Bool                `tfsdk:"use_ephemeral_os_disk"`
+	LicenseType         types.String              `tfsdk:"license_type"`
+	PlaceImageInGallery *PlaceImageInGalleryModel `tfsdk:"place_image_in_gallery"`
+	DiskEncryptionSetId types.String              `tfsdk:"disk_encryption_set_id"`
+	MachineProfile      *MachineProfileModel      `tfsdk:"machine_profile"`
+	WritebackCache      *WritebackCacheModel      `tfsdk:"writeback_cache"`
 }
 
 type AwsMachineConfigModel struct {
@@ -109,6 +113,22 @@ func (mc *AzureMachineConfigModel) RefreshProperties(catalog citrixorchestration
 			mc.StorageType = types.StringValue(stringPair.GetValue())
 		case "UseManagedDisks":
 			mc.UseManagedDisks = util.StringToTypeBool(stringPair.GetValue())
+		case "UseEphemeralOsDisk":
+			mc.UseEphemeralOsDisk = util.StringToTypeBool(stringPair.GetValue())
+		case "LicenseType":
+			if !mc.LicenseType.IsNull() || stringPair.GetValue() != "" {
+				mc.LicenseType = types.StringValue(stringPair.GetValue())
+			}
+		case "SharedImageGalleryReplicaRatio":
+			if mc.PlaceImageInGallery != nil {
+				mc.PlaceImageInGallery.ReplicaRatio = util.StringToTypeInt64(stringPair.GetValue())
+			}
+		case "SharedImageGalleryReplicaMaximum":
+			if mc.PlaceImageInGallery != nil {
+				mc.PlaceImageInGallery.ReplicaMaximum = util.StringToTypeInt64(stringPair.GetValue())
+			}
+		case "DiskEncryptionSetId":
+			mc.DiskEncryptionSetId = types.StringValue(stringPair.GetValue())
 		case "ResourceGroups":
 			mc.VdaResourceGroup = types.StringValue(stringPair.GetValue())
 		case "WBCDiskStorageType":

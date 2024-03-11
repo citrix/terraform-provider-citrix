@@ -8,6 +8,7 @@ import (
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/citrix/terraform-provider-citrix/internal/validators"
+	"github.com/hashicorp/terraform-plugin-framework-validators/boolvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
@@ -15,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -280,13 +282,16 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 							},
 							"storage_type": schema.StringAttribute{
 								Description: "Storage account type used for provisioned virtual machine disks on Azure. Storage types include: `Standard_LRS`, `StandardSSD_LRS` and `Premium_LRS`.",
-								Required:    true,
+								Optional:    true,
 								Validators: []validator.String{
 									stringvalidator.OneOf(
 										"Standard_LRS",
 										"StandardSSD_LRS",
 										"Premium_LRS",
 									),
+									stringvalidator.ExactlyOneOf(path.Expressions{
+										path.MatchRelative().AtParent().AtName("use_ephemeral_os_disk"),
+									}...),
 								},
 							},
 							"vda_resource_group": schema.StringAttribute{
@@ -301,6 +306,62 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 								Optional:    true,
 								PlanModifiers: []planmodifier.Bool{
 									boolplanmodifier.RequiresReplace(),
+								},
+							},
+							"use_ephemeral_os_disk": schema.BoolAttribute{
+								Description: "Indicate whether to use ephemeral OS disks on local virtual machine storage. They incur no cost, but the VM size used must support them and the temporary disk associated must be greater than or equal to the size of the published image.",
+								Optional:    true,
+								Validators: []validator.Bool{
+									boolvalidator.AlsoRequires(path.Expressions{
+										path.MatchRelative().AtParent().AtName("use_managed_disks"),
+									}...),
+									boolvalidator.AlsoRequires(path.Expressions{
+										path.MatchRelative().AtParent().AtName("place_image_in_gallery"),
+									}...),
+								},
+								PlanModifiers: []planmodifier.Bool{
+									boolplanmodifier.RequiresReplace(),
+								},
+							},
+							"license_type": schema.StringAttribute{
+								Description: "Windows license type used to provision virtual machines in Azure at the base compute rate. License types include: `Windows_Client` and `Windows_Server`.",
+								Optional:    true,
+								Validators: []validator.String{
+									stringvalidator.OneOf(
+										"Windows_Client",
+										"Windows_Server",
+									),
+								},
+							},
+							"place_image_in_gallery": schema.SingleNestedAttribute{
+								Description: "Indicate whether to use the Azure Compute Gallery to store the published image.",
+								Optional:    true,
+								Attributes: map[string]schema.Attribute{
+									"replica_ratio": schema.Int64Attribute{
+										Description: "Defines the ratio of machines to gallery image version replicas.",
+										Optional:    true,
+										Computed:    true,
+										Default:     int64default.StaticInt64(40),
+										Validators: []validator.Int64{
+											int64validator.Between(1, 1000),
+										},
+									},
+									"replica_maximum": schema.Int64Attribute{
+										Description: "Defines the maximum number of replicas for each gallery image version. Azure currently supports up to 10 replicas for a gallery image single version.",
+										Optional:    true,
+										Computed:    true,
+										Default:     int64default.StaticInt64(10),
+										Validators: []validator.Int64{
+											int64validator.Between(1, 10),
+										},
+									},
+								},
+							},
+							"disk_encryption_set_id": schema.StringAttribute{
+								Description: "The Resource ID of the Disk Encryption Set (DES) representing the customer-managed key (CMK) for server-side encryption (SSE) of managed disks.",
+								Optional:    true,
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.RequiresReplace(),
 								},
 							},
 							"machine_profile": schema.SingleNestedAttribute{
