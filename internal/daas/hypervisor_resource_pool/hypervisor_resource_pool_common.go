@@ -11,7 +11,38 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 )
+
+type HypervisorStorageModel struct {
+	StorageName types.String `tfsdk:"storage_name"`
+	Superseded  types.Bool   `tfsdk:"superseded"`
+}
+
+func (v HypervisorStorageModel) RefreshListItem(remote citrixorchestration.HypervisorStorageResourceResponseModel) HypervisorStorageModel {
+	v.StorageName = types.StringValue(remote.GetName())
+	v.Superseded = types.BoolValue(remote.GetSuperseded())
+	return v
+}
+
+func GetNestedAttributeObjectSchmeaForStorege() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"storage_name": schema.StringAttribute{
+				Description: "The name of the storage.",
+				Required:    true,
+			},
+			"superseded": schema.BoolAttribute{
+				Description: "Indicates whether the storage has been superseded. Superseded storage may be used for existing virtual machines, but is not used when provisioning new virtual machines. Use only when updating the resource pool.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+		},
+	}
+}
 
 // Create creates the resource and sets the initial Terraform state.
 func CreateHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisor citrixorchestration.HypervisorDetailResponseModel, resourcePoolDetails citrixorchestration.CreateHypervisorResourcePoolRequestModel) (*citrixorchestration.HypervisorResourcePoolDetailResponseModel, error) {

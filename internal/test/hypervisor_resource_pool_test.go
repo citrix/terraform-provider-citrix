@@ -180,10 +180,10 @@ func TestHypervisorResourcePoolXenserver(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool", "networks.0", os.Getenv("TEST_HYPERV_RP_NETWORK_1_XENSERVER")),
 					// Verify subnets
 					resource.TestCheckResourceAttr("citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool", "storage.#", "1"),
-					resource.TestCheckResourceAttr("citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool", "storage.0", os.Getenv("TEST_HYPERV_RP_STORAGE_XENSERVER")),
+					resource.TestCheckResourceAttr("citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool", "storage.0.storage_name", os.Getenv("TEST_HYPERV_RP_STORAGE_XENSERVER")),
 					// Verify name of the project
 					resource.TestCheckResourceAttr("citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool", "temporary_storage.#", "1"),
-					resource.TestCheckResourceAttr("citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool", "temporary_storage.0", os.Getenv("TEST_HYPERV_RP_TEMP_STORAGE_XENSERVER")),
+					resource.TestCheckResourceAttr("citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool", "temporary_storage.0.storage_name", os.Getenv("TEST_HYPERV_RP_TEMP_STORAGE_XENSERVER")),
 				),
 			},
 			// ImportState testing
@@ -250,7 +250,7 @@ func TestHypervisorResourcePoolVsphere(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "networks.#", "1"),
 					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "networks.0", os.Getenv("TEST_HYPERV_RP_NETWORK_VSPHERE")),
 					// Verify subnets
-					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "storage.#", "2"),
+					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "storage.#", "1"),
 					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "storage.0.storage_name", os.Getenv("TEST_HYPERV_RP_STORAGE_1_VSPHERE")),
 					// Verify name of the project
 					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "temporary_storage.#", "1"),
@@ -270,7 +270,56 @@ func TestHypervisorResourcePoolVsphere(t *testing.T) {
 				Config: BuildHypervisorResourcePoolResourceVsphereUpdated(t),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
-					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "storage.#", "1"),
+					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "storage.#", "2"),
+				),
+			},
+		},
+	})
+}
+
+func TestHypervisorResourcePoolPreCheck_Nutanix(t *testing.T) {
+	if v := os.Getenv("TEST_HYPERV_RP_NAME_NUTANIX"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_NAME_NUTANIX must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_RP_NETWORK_NUTANIX"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_NETWORK_NUTANIX must be set for acceptance tests")
+	}
+}
+
+func TestHypervisorResourcePoolNutanix(t *testing.T) {
+	name := os.Getenv("TEST_HYPERV_RP_NAME_NUTANIX")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck: func() {
+			TestProviderPreCheck(t)
+			TestHypervisorPreCheck_Nutanix(t)
+			TestHypervisorResourcePoolPreCheck_Nutanix(t)
+		},
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: BuildHypervisorResourcePoolResourceNutanix(t, hypervisor_resource_pool_testResource_nutanix),
+
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("citrix_nutanix_hypervisor_resource_pool.testHypervisorResourcePool", "name", name),
+					// Verify name of the region
+					resource.TestCheckResourceAttr("citrix_nutanix_hypervisor_resource_pool.testHypervisorResourcePool", "networks.#", "1"),
+					resource.TestCheckResourceAttr("citrix_nutanix_hypervisor_resource_pool.testHypervisorResourcePool", "networks.0", os.Getenv("TEST_HYPERV_RP_NETWORK_NUTANIX")),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "citrix_nutanix_hypervisor_resource_pool.testHypervisorResourcePool",
+				ImportState:       true,
+				ImportStateIdFunc: generateImportStateId_Nutanix,
+				ImportStateVerify: true,
+			},
+			// Update and Read
+			{
+				Config: BuildHypervisorResourcePoolResourceNutanix(t, hypervisor_resource_pool_updated_testResource_nutanix),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("citrix_nutanix_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
 				),
 			},
 		},
@@ -333,6 +382,20 @@ func generateImportStateId_Vsphere(state *terraform.State) (string, error) {
 	return fmt.Sprintf("%s,%s", rawState["hypervisor"], rawState["id"]), nil
 }
 
+func generateImportStateId_Nutanix(state *terraform.State) (string, error) {
+	resourceName := "citrix_nutanix_hypervisor_resource_pool.testHypervisorResourcePool"
+	var rawState map[string]string
+	for _, m := range state.Modules {
+		if len(m.Resources) > 0 {
+			if v, ok := m.Resources[resourceName]; ok {
+				rawState = v.Primary.Attributes
+			}
+		}
+	}
+
+	return fmt.Sprintf("%s,%s", rawState["hypervisor"], rawState["id"]), nil
+}
+
 var (
 	hypervisor_resource_pool_testResource_azure = `
 resource "citrix_azure_hypervisor_resource_pool" "testHypervisorResourcePool" {
@@ -381,8 +444,13 @@ resource "citrix_xenserver_hypervisor_resource_pool" "testHypervisorResourcePool
 	name = "%s"
 	hypervisor = citrix_xenserver_hypervisor.testHypervisor.id
 	networks = ["%s"]
-	storage = ["%s"]
-	temporary_storage = ["%s"]
+	storage = [
+	{
+		storage_name = "%s"
+	}]
+	temporary_storage = [{
+		storage_name = "%s"
+	}]
 }
 `
 	hypervisor_resource_pool_updated_testResource_xenserver = `
@@ -390,8 +458,13 @@ resource "citrix_xenserver_hypervisor_resource_pool" "testHypervisorResourcePool
 	name = "%s-updated"
 	hypervisor = citrix_xenserver_hypervisor.testHypervisor.id
 	networks = ["%s", "%s"]
-	storage = ["%s"]
-	temporary_storage = ["%s"]
+	storage = [
+	{
+		storage_name = "%s"
+	}]
+	temporary_storage = [{
+		storage_name = "%s"
+	}]
 }	
 `
 
@@ -404,9 +477,7 @@ resource "citrix_vsphere_hypervisor_resource_pool" "testHypervisorResourcePool" 
 		host = "%s"
 	}
 	networks = ["%s"]
-	storage = [{
-		storage_name = "%s"
-	},
+	storage = [
 	{
 		storage_name = "%s"
 	}]
@@ -426,11 +497,29 @@ resource "citrix_vsphere_hypervisor_resource_pool" "testHypervisorResourcePool" 
 	networks = ["%s"]
 	storage = [{
 		storage_name = "%s"
+	},
+	{
+		storage_name = "%s"
 	}]
 	temporary_storage = [{
 		storage_name = "%s"
 	}]
 }	
+`
+	hypervisor_resource_pool_testResource_nutanix = `
+resource "citrix_nutanix_hypervisor_resource_pool" "testHypervisorResourcePool" {
+	name = "%s"
+	hypervisor = citrix_nutanix_hypervisor.testHypervisor.id
+	networks = ["%s"]
+}
+`
+
+	hypervisor_resource_pool_updated_testResource_nutanix = `
+resource "citrix_nutanix_hypervisor_resource_pool" "testHypervisorResourcePool" {
+	name = "%s-updated"
+	hypervisor = citrix_nutanix_hypervisor.testHypervisor.id
+	networks = ["%s"]
+}
 `
 )
 
@@ -479,10 +568,9 @@ func BuildHypervisorResourcePoolResourceVsphere(t *testing.T) string {
 	host := os.Getenv("TEST_HYPERV_RP_HOST_VSPHERE")
 	network := os.Getenv("TEST_HYPERV_RP_NETWORK_VSPHERE")
 	storage_1 := os.Getenv("TEST_HYPERV_RP_STORAGE_1_VSPHERE")
-	storage_2 := os.Getenv("TEST_HYPERV_RP_STORAGE_2_VSPHERE")
 	tempStorage := os.Getenv("TEST_HYPERV_RP_TEMP_STORAGE_VSPHERE")
 
-	return BuildHypervisorResourceVsphere(t, hypervisor_testResources_vsphere) + fmt.Sprintf(hypervisor_resource_pool_testResource_vsphere, name, datacenter, host, network, storage_1, storage_2, tempStorage)
+	return BuildHypervisorResourceVsphere(t, hypervisor_testResources_vsphere) + fmt.Sprintf(hypervisor_resource_pool_testResource_vsphere, name, datacenter, host, network, storage_1, tempStorage)
 }
 
 func BuildHypervisorResourcePoolResourceVsphereUpdated(t *testing.T) string {
@@ -491,7 +579,15 @@ func BuildHypervisorResourcePoolResourceVsphereUpdated(t *testing.T) string {
 	host := os.Getenv("TEST_HYPERV_RP_HOST_VSPHERE")
 	network := os.Getenv("TEST_HYPERV_RP_NETWORK_VSPHERE")
 	storage_1 := os.Getenv("TEST_HYPERV_RP_STORAGE_1_VSPHERE")
+	storage_2 := os.Getenv("TEST_HYPERV_RP_STORAGE_2_VSPHERE")
 	tempStorage := os.Getenv("TEST_HYPERV_RP_TEMP_STORAGE_VSPHERE")
 
-	return BuildHypervisorResourceVsphere(t, hypervisor_testResources_vsphere) + fmt.Sprintf(hypervisor_resource_pool_updated_testResource_vsphere, name, datacenter, host, network, storage_1, tempStorage)
+	return BuildHypervisorResourceVsphere(t, hypervisor_testResources_vsphere) + fmt.Sprintf(hypervisor_resource_pool_updated_testResource_vsphere, name, datacenter, host, network, storage_1, storage_2, tempStorage)
+}
+
+func BuildHypervisorResourcePoolResourceNutanix(t *testing.T, hypervisorRp string) string {
+	name := os.Getenv("TEST_HYPERV_RP_NAME_NUTANIX")
+	network := os.Getenv("TEST_HYPERV_RP_NETWORK_NUTANIX")
+
+	return BuildHypervisorResourceNutanix(t, hypervisor_testResources_nutanix) + fmt.Sprintf(hypervisorRp, name, network)
 }

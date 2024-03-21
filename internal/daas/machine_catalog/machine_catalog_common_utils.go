@@ -18,7 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, connectionType *citrixorchestration.HypervisorConnectionType, isOnPremises bool) (*citrixorchestration.CreateMachineCatalogRequestModel, error) {
+func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, isOnPremises bool) (*citrixorchestration.CreateMachineCatalogRequestModel, error) {
 	provisioningType, err := citrixorchestration.NewProvisioningTypeFromValue(plan.ProvisioningType.ValueString())
 	if err != nil {
 		diagnostics.AddError(
@@ -37,8 +37,7 @@ func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ct
 	// Generate API request body from plan
 	body.SetName(plan.Name.ValueString())
 	body.SetDescription(plan.Description.ValueString())
-	body.SetProvisioningType(*provisioningType)                               // Only support MCS and Manual. Block other types
-	body.SetMinimumFunctionalLevel(citrixorchestration.FUNCTIONALLEVEL_L7_20) // Hard-coding VDA feature level to be same as QCS
+	body.SetProvisioningType(*provisioningType) // Only support MCS and Manual. Block other types
 	allocationType, err := citrixorchestration.NewAllocationTypeFromValue(plan.AllocationType.ValueString())
 	if err != nil {
 		diagnostics.AddError(
@@ -68,6 +67,16 @@ func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ct
 	} else {
 		body.SetVdaUpgradeType(citrixorchestration.VDAUPGRADETYPE_NOT_SET)
 	}
+
+	functionalLevel, err := citrixorchestration.NewFunctionalLevelFromValue(plan.MinimumFunctionalLevel.ValueString())
+	if err != nil {
+		diagnostics.AddError(
+			"Error creating Machine Catalog",
+			fmt.Sprintf("Unsupported minimum functional level %s.", plan.MinimumFunctionalLevel.ValueString()),
+		)
+		return nil, err
+	}
+	body.SetMinimumFunctionalLevel(*functionalLevel)
 
 	if *provisioningType == citrixorchestration.PROVISIONINGTYPE_MCS {
 		provisioningScheme, err := getProvSchemeForMcsCatalog(plan, ctx, client, diagnostics, isOnPremises)
@@ -105,7 +114,7 @@ func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ct
 	return &body, nil
 }
 
-func getRequestModelForUpdateMachineCatalog(plan, state MachineCatalogResourceModel, catalog *citrixorchestration.MachineCatalogDetailResponseModel, ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, connectionType *citrixorchestration.HypervisorConnectionType, isOnPremises bool) (*citrixorchestration.UpdateMachineCatalogRequestModel, error) {
+func getRequestModelForUpdateMachineCatalog(plan MachineCatalogResourceModel, ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, isOnPremises bool) (*citrixorchestration.UpdateMachineCatalogRequestModel, error) {
 	// Generate API request body from plan
 	var body citrixorchestration.UpdateMachineCatalogRequestModel
 	body.SetName(plan.Name.ValueString())
@@ -116,6 +125,16 @@ func getRequestModelForUpdateMachineCatalog(plan, state MachineCatalogResourceMo
 	} else {
 		body.SetVdaUpgradeType(citrixorchestration.VDAUPGRADETYPE_NOT_SET)
 	}
+
+	functionalLevel, err := citrixorchestration.NewFunctionalLevelFromValue(plan.MinimumFunctionalLevel.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating Machine Catalog",
+			fmt.Sprintf("Unsupported minimum functional level %s.", plan.MinimumFunctionalLevel.ValueString()),
+		)
+		return nil, err
+	}
+	body.SetMinimumFunctionalLevel(*functionalLevel)
 
 	provisioningType, err := citrixorchestration.NewProvisioningTypeFromValue(plan.ProvisioningType.ValueString())
 	if err != nil {
@@ -149,7 +168,7 @@ func getRequestModelForUpdateMachineCatalog(plan, state MachineCatalogResourceMo
 		}
 	}
 
-	body, err = setProvSchemePropertiesForUpdateCatalog(plan, body, ctx, client, &resp.Diagnostics, connectionType)
+	body, err = setProvSchemePropertiesForUpdateCatalog(plan, body, ctx, client, &resp.Diagnostics)
 	if err != nil {
 		return nil, err
 	}
@@ -186,10 +205,8 @@ func generateBatchApiHeaders(client *citrixdaasclient.CitrixDaasClient, plan Mac
 }
 
 func readMachineCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, machineCatalogId string) (*citrixorchestration.MachineCatalogDetailResponseModel, *http.Response, error) {
-	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId).Fields("Id,Name,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes")
+	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId).Fields("Id,Name,Description,ProvisioningType,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC")
 	catalog, httpResp, err := util.ReadResource[*citrixorchestration.MachineCatalogDetailResponseModel](getMachineCatalogRequest, ctx, client, resp, "Machine Catalog", machineCatalogId)
-
-	client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogMachines(ctx, machineCatalogId).Execute()
 
 	return catalog, httpResp, err
 }

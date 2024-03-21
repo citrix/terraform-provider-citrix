@@ -8,11 +8,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type VsphereHypervisorStorageModel struct {
-	StorageName types.String `tfsdk:"storage_name"`
-	Superseded  types.Bool   `tfsdk:"superseded"`
-}
-
 type VsphereHypervisorClusterModel struct {
 	Datacenter  types.String `tfsdk:"datacenter"`
 	ClusterName types.String `tfsdk:"cluster_name"`
@@ -24,11 +19,11 @@ type VsphereHypervisorResourcePoolResourceModel struct {
 	Name       types.String `tfsdk:"name"`
 	Hypervisor types.String `tfsdk:"hypervisor"`
 	/**** Resource Pool Details ****/
-	Cluster                *VsphereHypervisorClusterModel  `tfsdk:"cluster"`
-	Networks               []types.String                  `tfsdk:"networks"`
-	Storage                []VsphereHypervisorStorageModel `tfsdk:"storage"`
-	TemporaryStorage       []VsphereHypervisorStorageModel `tfsdk:"temporary_storage"`
-	UseLocalStorageCaching types.Bool                      `tfsdk:"use_local_storage_caching"`
+	Cluster                *VsphereHypervisorClusterModel `tfsdk:"cluster"`
+	Networks               []types.String                 `tfsdk:"networks"`
+	Storage                []HypervisorStorageModel       `tfsdk:"storage"`
+	TemporaryStorage       []HypervisorStorageModel       `tfsdk:"temporary_storage"`
+	UseLocalStorageCaching types.Bool                     `tfsdk:"use_local_storage_caching"`
 }
 
 func (r VsphereHypervisorResourcePoolResourceModel) RefreshPropertyValues(resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) VsphereHypervisorResourcePoolResourceModel {
@@ -46,14 +41,8 @@ func (r VsphereHypervisorResourcePoolResourceModel) RefreshPropertyValues(resour
 		remoteNetwork = append(remoteNetwork, network.GetName())
 	}
 	r.Networks = util.RefreshList(r.Networks, remoteNetwork)
-	r.Storage = util.RefreshListProperties[VsphereHypervisorStorageModel, citrixorchestration.HypervisorStorageResourceResponseModel](r.Storage, "StorageName", resourcePool.GetStorage(), "Name", "RefreshListItem")
-	r.TemporaryStorage = util.RefreshListProperties[VsphereHypervisorStorageModel, citrixorchestration.HypervisorStorageResourceResponseModel](r.TemporaryStorage, "StorageName", resourcePool.GetTemporaryStorage(), "Name", "RefreshListItem")
+	r.Storage = util.RefreshListProperties[HypervisorStorageModel, citrixorchestration.HypervisorStorageResourceResponseModel](r.Storage, "StorageName", resourcePool.GetStorage(), "Name", "RefreshListItem")
+	r.TemporaryStorage = util.RefreshListProperties[HypervisorStorageModel, citrixorchestration.HypervisorStorageResourceResponseModel](r.TemporaryStorage, "StorageName", resourcePool.GetTemporaryStorage(), "Name", "RefreshListItem")
 
 	return r
-}
-
-func (v VsphereHypervisorStorageModel) RefreshListItem(remote citrixorchestration.HypervisorStorageResourceResponseModel) VsphereHypervisorStorageModel {
-	v.StorageName = types.StringValue(remote.GetName())
-	v.Superseded = types.BoolValue(remote.GetSuperseded())
-	return v
 }

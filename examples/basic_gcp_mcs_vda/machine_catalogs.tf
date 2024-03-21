@@ -7,6 +7,7 @@ resource "citrix_machine_catalog" "example-catalog" {
 	is_remote_pc 			  	= false
 	provisioning_type 			= "MCS"
     zone                        = citrix_zone.example-zone.id
+    minimum_functional_level    = "L7_20"
     provisioning_scheme         = {
         hypervisor = citrix_gcp_hypervisor.example-gcp-hypervisor.id
         hypervisor_resource_pool = citrix_gcp_hypervisor_resource_pool.example-gcp-rp.id

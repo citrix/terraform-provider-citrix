@@ -65,10 +65,7 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	var connectionType citrixorchestration.HypervisorConnectionType
-
-	body, err := getRequestModelForCreateMachineCatalog(plan, ctx, r.client, &resp.Diagnostics, &connectionType, r.client.AuthConfig.OnPremises)
-
+	body, err := getRequestModelForCreateMachineCatalog(plan, ctx, r.client, &resp.Diagnostics, r.client.AuthConfig.OnPremises)
 	if err != nil {
 		return
 	}
@@ -114,6 +111,18 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 
 	if err != nil {
 		return
+	}
+
+	hypervisorConnection := catalog.GetHypervisorConnection()
+	hypervisorId := hypervisorConnection.GetId()
+	var connectionType citrixorchestration.HypervisorConnectionType
+	if hypervisorId != "" {
+		hypervisor, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, hypervisorId)
+		if err != nil {
+			return
+		}
+
+		connectionType = hypervisor.GetConnectionType()
 	}
 
 	// Map response body to schema and populate Computed attribute values
@@ -206,9 +215,7 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	var connectionType citrixorchestration.HypervisorConnectionType
-
-	body, err := getRequestModelForUpdateMachineCatalog(plan, state, catalog, ctx, r.client, resp, &connectionType, r.client.AuthConfig.OnPremises)
+	body, err := getRequestModelForUpdateMachineCatalog(plan, ctx, r.client, resp, r.client.AuthConfig.OnPremises)
 	if err != nil {
 		return
 	}
@@ -240,9 +247,9 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		addMachinesList, deleteMachinesMap := createAddAndRemoveMachinesListForManualCatalogs(state, plan)
 
 		addMachinesToManualCatalog(ctx, r.client, resp, addMachinesList, catalogId)
-		deleteMachinesFromManualCatalog(ctx, r.client, resp, deleteMachinesMap, catalogId, catalog.GetIsPowerManaged())
+		deleteMachinesFromManualCatalog(ctx, r.client, resp, deleteMachinesMap, catalogId)
 	} else {
-		err = updateCatalogImage(ctx, r.client, resp, catalog, plan)
+		err = updateCatalogImageAndMachineProfile(ctx, r.client, resp, catalog, plan)
 
 		if err != nil {
 			return
@@ -274,6 +281,18 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 	machines, err := util.GetMachineCatalogMachines(ctx, r.client, &resp.Diagnostics, catalog.GetId())
 	if err != nil {
 		return
+	}
+
+	hypervisorConnection := catalog.GetHypervisorConnection()
+	hypervisorId := hypervisorConnection.GetId()
+	var connectionType citrixorchestration.HypervisorConnectionType
+	if hypervisorId != "" {
+		hypervisor, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, hypervisorId)
+		if err != nil {
+			return
+		}
+
+		connectionType = hypervisor.GetConnectionType()
 	}
 
 	// Update resource state with updated items and timestamp
@@ -322,15 +341,21 @@ func (r *machineCatalogResource) Delete(ctx context.Context, req resource.Delete
 	deleteAccountOption := citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE
 	deleteVmOption := false
 	if catalog.ProvisioningType == citrixorchestration.PROVISIONINGTYPE_MCS {
-		// If there's no provisioning scheme in state, there will not be any machines create by MCS.
-		// Therefore we will just omit credential for removing machine accounts.
-		if catalog.ProvisioningScheme != nil {
-			// Add domain credential header
-			header := generateAdminCredentialHeader(state)
-			deleteMachineCatalogRequest = deleteMachineCatalogRequest.XAdminCredential(header)
+		provScheme := catalog.GetProvisioningScheme()
+		identityType := provScheme.GetIdentityType()
+
+		if identityType == citrixorchestration.IDENTITYTYPE_ACTIVE_DIRECTORY || identityType == citrixorchestration.IDENTITYTYPE_HYBRID_AZURE_AD {
+			// If there's no provisioning scheme in state, there will not be any machines create by MCS.
+			// Therefore we will just omit credential for removing machine accounts.
+			if catalog.ProvisioningScheme != nil {
+				// Add domain credential header
+				header := generateAdminCredentialHeader(state)
+				deleteMachineCatalogRequest = deleteMachineCatalogRequest.XAdminCredential(header)
+			}
+
+			deleteAccountOption = citrixorchestration.MACHINEACCOUNTDELETEOPTION_DELETE
 		}
 
-		deleteAccountOption = citrixorchestration.MACHINEACCOUNTDELETEOPTION_DELETE
 		deleteVmOption = true
 	}
 
@@ -362,6 +387,16 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	sessionSupportMultiSession := string(citrixorchestration.SESSIONSUPPORT_MULTI_SESSION)
+	allocationTypeStatic := string(citrixorchestration.ALLOCATIONTYPE_STATIC)
+	if data.SessionSupport.ValueString() == sessionSupportMultiSession && data.AllocationType.ValueString() == allocationTypeStatic {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("allocation_type"),
+			"Incorrect Attribute Configuration",
+			"Static allocation type is not supported by MultiSession session type machine catalog.",
+		)
 	}
 
 	provisioningTypeMcs := string(citrixorchestration.PROVISIONINGTYPE_MCS)

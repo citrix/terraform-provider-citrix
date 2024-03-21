@@ -14,19 +14,20 @@ import (
 
 // MachineCatalogResourceModel maps the resource schema data.
 type MachineCatalogResourceModel struct {
-	Id                 types.String             `tfsdk:"id"`
-	Name               types.String             `tfsdk:"name"`
-	Description        types.String             `tfsdk:"description"`
-	IsPowerManaged     types.Bool               `tfsdk:"is_power_managed"`
-	IsRemotePc         types.Bool               `tfsdk:"is_remote_pc"`
-	AllocationType     types.String             `tfsdk:"allocation_type"`
-	SessionSupport     types.String             `tfsdk:"session_support"`
-	Zone               types.String             `tfsdk:"zone"`
-	VdaUpgradeType     types.String             `tfsdk:"vda_upgrade_type"`
-	ProvisioningType   types.String             `tfsdk:"provisioning_type"`
-	ProvisioningScheme *ProvisioningSchemeModel `tfsdk:"provisioning_scheme"`
-	MachineAccounts    []MachineAccountsModel   `tfsdk:"machine_accounts"`
-	RemotePcOus        []RemotePcOuModel        `tfsdk:"remote_pc_ous"`
+	Id                     types.String             `tfsdk:"id"`
+	Name                   types.String             `tfsdk:"name"`
+	Description            types.String             `tfsdk:"description"`
+	IsPowerManaged         types.Bool               `tfsdk:"is_power_managed"`
+	IsRemotePc             types.Bool               `tfsdk:"is_remote_pc"`
+	AllocationType         types.String             `tfsdk:"allocation_type"`
+	SessionSupport         types.String             `tfsdk:"session_support"`
+	Zone                   types.String             `tfsdk:"zone"`
+	VdaUpgradeType         types.String             `tfsdk:"vda_upgrade_type"`
+	ProvisioningType       types.String             `tfsdk:"provisioning_type"`
+	ProvisioningScheme     *ProvisioningSchemeModel `tfsdk:"provisioning_scheme"`
+	MachineAccounts        []MachineAccountsModel   `tfsdk:"machine_accounts"`
+	RemotePcOus            []RemotePcOuModel        `tfsdk:"remote_pc_ous"`
+	MinimumFunctionalLevel types.String             `tfsdk:"minimum_functional_level"`
 }
 
 type MachineAccountsModel struct {
@@ -53,6 +54,8 @@ type ProvisioningSchemeModel struct {
 	AzureMachineConfig          *AzureMachineConfigModel          `tfsdk:"azure_machine_config"`
 	AwsMachineConfig            *AwsMachineConfigModel            `tfsdk:"aws_machine_config"`
 	GcpMachineConfig            *GcpMachineConfigModel            `tfsdk:"gcp_machine_config"`
+	VsphereMachineConfig        *VsphereMachineConfigModel        `tfsdk:"vsphere_machine_config"`
+	XenserverMachineConfig      *XenserverMachineConfigModel      `tfsdk:"xenserver_machine_config"`
 	NumTotalMachines            types.Int64                       `tfsdk:"number_of_total_machines"`
 	NetworkMapping              *NetworkMappingModel              `tfsdk:"network_mapping"`
 	AvailabilityZones           types.String                      `tfsdk:"availability_zones"`
@@ -77,17 +80,6 @@ type GalleryImageModel struct {
 	Gallery    types.String `tfsdk:"gallery"`
 	Definition types.String `tfsdk:"definition"`
 	Version    types.String `tfsdk:"version"`
-}
-
-// WritebackCacheModel maps the write back cacheconfiguration schema data.
-type WritebackCacheModel struct {
-	PersistWBC                 types.Bool   `tfsdk:"persist_wbc"`
-	WBCDiskStorageType         types.String `tfsdk:"wbc_disk_storage_type"`
-	PersistOsDisk              types.Bool   `tfsdk:"persist_os_disk"`
-	PersistVm                  types.Bool   `tfsdk:"persist_vm"`
-	StorageCostSaving          types.Bool   `tfsdk:"storage_cost_saving"`
-	WriteBackCacheDiskSizeGB   types.Int64  `tfsdk:"writeback_cache_disk_size_gb"`
-	WriteBackCacheMemorySizeMB types.Int64  `tfsdk:"writeback_cache_memory_size_mb"`
 }
 
 // MachineAccountCreationRulesModel maps the nested machine account creation rules resource schema data.
@@ -121,6 +113,9 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 	sessionSupport := catalog.GetSessionSupport()
 	r.SessionSupport = types.StringValue(reflect.ValueOf(sessionSupport).String())
 
+	minimumFunctionalLevel := catalog.GetMinimumFunctionalLevel()
+	r.MinimumFunctionalLevel = types.StringValue(string(minimumFunctionalLevel))
+
 	catalogZone := catalog.GetZone()
 	r.Zone = types.StringValue(catalogZone.GetId())
 
@@ -151,7 +146,7 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 	}
 
 	// Provisioning Scheme Properties
-	r = r.updateCatalogWithProvScheme(catalog, connectionType)
+	r = r.updateCatalogWithProvScheme(ctx, client, catalog, connectionType)
 
 	return r
 }

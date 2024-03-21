@@ -6,10 +6,16 @@ resource "citrix_xenserver_hypervisor_resource_pool" "example-xenserver-hypervis
         "<network 2 name>"
     ]
     storage     = [
-        "<local or shared storage name>"
+        {
+            storage_name = "<local or shared storage name>"
+            superseded = false # Only to be used for updates
+        }
     ]
     temporary_storage = [
-        "<local or shared storage name>"
+        {
+            storage_name = "<local or shared storage name>"
+            superseded = false # Only to be used for updates
+        }
     ]
     use_local_storage_caching = false
 }

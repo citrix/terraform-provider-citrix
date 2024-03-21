@@ -21,10 +21,16 @@ resource "citrix_xenserver_hypervisor_resource_pool" "example-xenserver-hypervis
         "<network 2 name>"
     ]
     storage     = [
-        "<local or shared storage name>"
+        {
+            storage_name = "<local or shared storage name>"
+            superseded = false # Only to be used for updates
+        }
     ]
     temporary_storage = [
-        "<local or shared storage name>"
+        {
+            storage_name = "<local or shared storage name>"
+            superseded = false # Only to be used for updates
+        }
     ]
     use_local_storage_caching = false
 }
@@ -38,16 +44,39 @@ resource "citrix_xenserver_hypervisor_resource_pool" "example-xenserver-hypervis
 - `hypervisor` (String) Id of the hypervisor for which the resource pool needs to be created.
 - `name` (String) Name of the resource pool. Name should be unique across all hypervisors.
 - `networks` (List of String) List of networks for allocating resources.
-- `storage` (List of String) List of hypervisor storage to use for OS data.
-- `temporary_storage` (List of String) List of hypervisor storage to use for temporary data.
+- `storage` (Attributes List) List of hypervisor storage to use for OS data. (see [below for nested schema](#nestedatt--storage))
+- `temporary_storage` (Attributes List) List of hypervisor storage to use for temporary data. (see [below for nested schema](#nestedatt--temporary_storage))
 
 ### Optional
 
-- `use_local_storage_caching` (Boolean) Indicate whether intellicache is enabled to reduce load on the shared storage device. Will only be affective when shared storage is used.
+- `use_local_storage_caching` (Boolean) Indicates whether intellicache is enabled to reduce load on the shared storage device. Will only be effective when shared storage is used. Default value is `false`.
 
 ### Read-Only
 
 - `id` (String) GUID identifier of the resource pool.
+
+<a id="nestedatt--storage"></a>
+### Nested Schema for `storage`
+
+Required:
+
+- `storage_name` (String) The name of the storage.
+
+Optional:
+
+- `superseded` (Boolean) Indicates whether the storage has been superseded. Superseded storage may be used for existing virtual machines, but is not used when provisioning new virtual machines. Use only when updating the resource pool.
+
+
+<a id="nestedatt--temporary_storage"></a>
+### Nested Schema for `temporary_storage`
+
+Required:
+
+- `storage_name` (String) The name of the storage.
+
+Optional:
+
+- `superseded` (Boolean) Indicates whether the storage has been superseded. Superseded storage may be used for existing virtual machines, but is not used when provisioning new virtual machines. Use only when updating the resource pool.
 
 ## Import
 

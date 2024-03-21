@@ -114,6 +114,7 @@ var (
 resource "citrix_delivery_group" "testDeliveryGroup" {
     name        = "%s"
     description = "Delivery Group for testing"
+	minimum_functional_level = "L7_9"
 	associated_machine_catalogs = [
 		{
 			machine_catalog = citrix_machine_catalog.testMachineCatalog.id
@@ -205,6 +206,7 @@ resource "citrix_delivery_group" "testDeliveryGroup" {
 resource "citrix_delivery_group" "testDeliveryGroup" {
     name        = "%s-updated"
     description = "Delivery Group for testing updated"
+	minimum_functional_level = "L7_20"
 	associated_machine_catalogs = [
 		{
 			machine_catalog = citrix_machine_catalog.testMachineCatalog.id

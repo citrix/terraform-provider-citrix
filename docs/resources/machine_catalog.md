@@ -22,6 +22,7 @@ resource "citrix_machine_catalog" "example-azure-mtsession" {
 	is_power_managed			= true
 	is_remote_pc 			  	= false
 	provisioning_type 			= "MCS"
+	minimum_functional_level    = "L7_20"
 	provisioning_scheme			= 	{
 		hypervisor = citrix_azure_hypervisor.example-azure-hypervisor.id
 		hypervisor_resource_pool = citrix_hypervisor_resource_pool.example-azure-hypervisor-resource-pool.id
@@ -46,6 +47,7 @@ resource "citrix_machine_catalog" "example-azure-mtsession" {
 				persist_os_disk = true
 				persist_vm = true
 				writeback_cache_disk_size_gb = 127
+                writeback_cache_memory_size_mb = 256
 				storage_cost_saving = true
 			}
         }
@@ -84,18 +86,18 @@ resource "citrix_machine_catalog" "example-aws-mtsession" {
         aws_machine_config = {
             image_ami = "<AMI ID for VDA>"
 			master_image = "<Image template AMI name>"
-			service_offering = "T2 Small Instance"
+			service_offering = "t2.small"
         }
 		network_mapping = {
             network_device = "0"
             network = "10.0.128.0/20"
         }
 		number_of_total_machines =  1
-    }
-	machine_account_creation_rules ={
+        machine_account_creation_rules ={
 			naming_scheme 	   = "aws-multi-##"
 			naming_scheme_type = "Numeric"
-		}
+        }
+    }	
 }
 
 resource "citrix_machine_catalog" "example-gcp-mtsession" {
@@ -128,6 +130,7 @@ resource "citrix_machine_catalog" "example-gcp-mtsession" {
 				persist_wbc = true
 				persist_os_disk = true
 				writeback_cache_disk_size_gb = 127
+                writeback_cache_memory_size_mb = 256
 			}
         }
 		availability_zones = "{project name}:{region}:{availability zone1},{project name}:{region}:{availability zone2},..."
@@ -135,6 +138,66 @@ resource "citrix_machine_catalog" "example-gcp-mtsession" {
         machine_account_creation_rules = {
             naming_scheme = "gcp-multi-##"
             naming_scheme_type = "Numeric"
+        }
+    }
+}
+
+resource "citrix_machine_catalog" "example-vsphere-mtsession" {
+    name                        = "example-vsphere-mtsession"
+    description                 = "Example multi-session catalog on Vsphere hypervisor"
+    provisioning_type 			= "MCS"
+    allocation_type             = "Random"
+    session_support             = "MultiSession"
+    zone                        = "<zone Id>"
+    provisioning_scheme         = {
+        identity_type = "ActiveDirectory"
+        number_of_total_machines = 1
+        machine_account_creation_rules = {
+            naming_scheme = "catalog-##"
+            naming_scheme_type = "Numeric"
+        }
+        hypervisor = citrix_vsphere_hypervisor.vsphere-hypervisor-1.id
+        hypervisor_resource_pool = citrix_vsphere_hypervisor_resource_pool.vsphere-hypervisor-rp-1.id
+        vsphere_machine_config = {
+            master_image_vm = "<Image VM name>"
+            image_snapshot = "<Snapshot 1>/<Snapshot 2>/<Snapshot 3>/..."
+            cpu_count = 2
+            memory_mb = 4096
+        }
+        machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+    }
+}
+
+resource "citrix_machine_catalog" "example-xenserver-mtsession" {
+    name                        = "example-xenserver-mtsession"
+    description                 = "Example multi-session catalog on XenServer hypervisor"
+    provisioning_type 			= "MCS"
+    allocation_type             = "Random"
+    session_support             = "MultiSession"
+    zone                        = "<zone Id>"
+    provisioning_scheme         = {
+        identity_type = "ActiveDirectory"
+        number_of_total_machines = 1
+        machine_account_creation_rules = {
+            naming_scheme = "catalog-##"
+            naming_scheme_type = "Numeric"
+        }
+        hypervisor = citrix_xenserver_hypervisor.xenserver-hypervisor-1.id
+        hypervisor_resource_pool = citrix_xenserver_hypervisor_resource_pool.xenserver-hypervisor-rp-1.id
+        xenserver_machine_config = {
+            master_image_vm = "<Image VM name>"
+            image_snapshot = "<Snapshot 1>/<Snapshot 2>/<Snapshot 3>/..."
+            cpu_count = 2
+            memory_mb = 4096
+        }
+        machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
         }
     }
 }
@@ -220,10 +283,10 @@ resource "citrix_machine_catalog" "example-remote-pc" {
 
 ### Required
 
-- `allocation_type` (String) Denotes how the machines in the catalog are allocated to a user. Choose between `Static` and `Random`.
+- `allocation_type` (String) Denotes how the machines in the catalog are allocated to a user. Choose between `Static` and `Random`. Allocation type should be `Random` when `session_support = MultiSession`.
 - `name` (String) Name of the machine catalog.
 - `provisioning_type` (String) Specifies how the machines are provisioned in the catalog.
-- `session_support` (String) Session support type. Choose between `SingleSession` and `MultiSession`. Session support should be SingleSession when `is_remote_pc = true`
+- `session_support` (String) Session support type. Choose between `SingleSession` and `MultiSession`. Session support should be SingleSession when `is_remote_pc = true`.
 - `zone` (String) Id of the zone the machine catalog is associated with.
 
 ### Optional
@@ -232,6 +295,7 @@ resource "citrix_machine_catalog" "example-remote-pc" {
 - `is_power_managed` (Boolean) Specify if the machines in the machine catalog will be power managed.
 - `is_remote_pc` (Boolean) Specify if this catalog is for Remote PC access.
 - `machine_accounts` (Attributes List) List of machine accounts to add to the catalog. Only to be used when using `provisioning_type = MANUAL` (see [below for nested schema](#nestedatt--machine_accounts))
+- `minimum_functional_level` (String) Specifies the minimum functional level for the VDA machines in the catalog. Defaults to `L7_20`.
 - `provisioning_scheme` (Attributes) Machine catalog provisioning scheme. Required when `provisioning_type = MCS` (see [below for nested schema](#nestedatt--provisioning_scheme))
 - `remote_pc_ous` (Attributes List) Organizational Units to be included in the Remote PC machine catalog. Only to be used when `is_remote_pc = true`. For adding machines, use `machine_accounts`. (see [below for nested schema](#nestedatt--remote_pc_ous))
 - `vda_upgrade_type` (String) Type of Vda Upgrade. Choose between LTSR and CR. When omitted, Vda Upgrade is disabled.
@@ -290,6 +354,8 @@ Optional:
 - `gcp_machine_config` (Attributes) Machine Configuration For GCP MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--gcp_machine_config))
 - `machine_domain_identity` (Attributes) The domain identity for machines in the machine catalog.<br />Required when identity_type is set to `ActiveDirectory` (see [below for nested schema](#nestedatt--provisioning_scheme--machine_domain_identity))
 - `network_mapping` (Attributes) Specifies how the attached NICs are mapped to networks. If this parameter is omitted, provisioned VMs are created with a single NIC, which is mapped to the default network in the hypervisor resource pool.  If this parameter is supplied, machines are created with the number of NICs specified in the map, and each NIC is attached to the specified network.<br />Required when `provisioning_scheme.identity_type` is `AzureAD`. (see [below for nested schema](#nestedatt--provisioning_scheme--network_mapping))
+- `vsphere_machine_config` (Attributes) Machine Configuration For VSphere MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--vsphere_machine_config))
+- `xenserver_machine_config` (Attributes) Machine Configuration For XenServer MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--xenserver_machine_config))
 
 <a id="nestedatt--provisioning_scheme--machine_account_creation_rules"></a>
 ### Nested Schema for `provisioning_scheme.machine_account_creation_rules`
@@ -360,9 +426,6 @@ Required:
 - `storage_cost_saving` (Boolean) Save storage cost by downgrading the storage type of the disk to Standard HDD when VM shut down.
 - `wbc_disk_storage_type` (String) Type of naming scheme. Choose between Numeric and Alphabetic.
 - `writeback_cache_disk_size_gb` (Number) The size in GB of any temporary storage disk used by the write back cache.
-
-Optional:
-
 - `writeback_cache_memory_size_mb` (Number) The size of the in-memory write back cache in MB.
 
 
@@ -390,15 +453,7 @@ Required:
 - `persist_wbc` (Boolean) Persist Write-back Cache
 - `wbc_disk_storage_type` (String) Type of naming scheme. Choose between Numeric and Alphabetic.
 - `writeback_cache_disk_size_gb` (Number) The size in GB of any temporary storage disk used by the write back cache.
-
-Optional:
-
 - `writeback_cache_memory_size_mb` (Number) The size of the in-memory write back cache in MB.
-
-Read-Only:
-
-- `persist_vm` (Boolean) Not supported for GCP.
-- `storage_cost_saving` (Boolean) Not supported for GCP.
 
 
 
@@ -423,6 +478,58 @@ Required:
 
 - `network` (String) The name of the virtual network that the device should be attached to. This must be a subnet within a Virtual Private Cloud item in the resource pool to which the Machine Catalog is associated.<br />For AWS, please specify the network mask of the network you want to use within the VPC.
 - `network_device` (String) Name or Id of the network device.
+
+
+<a id="nestedatt--provisioning_scheme--vsphere_machine_config"></a>
+### Nested Schema for `provisioning_scheme.vsphere_machine_config`
+
+Required:
+
+- `cpu_count` (Number) The number of processors that virtual machines created from the provisioning scheme should use
+- `master_image_vm` (String) The name of the virtual machine that will be used as master image. This property is case sensitive.
+- `memory_mb` (Number) The maximum amount of memory that virtual machines created from the provisioning scheme should use.
+
+Optional:
+
+- `image_snapshot` (String) The Snapshot of the virtual machine specified in `master_image_vm`. Specify the relative path of the snapshot. Eg: snaphost-1/snapshot-2/snapshot-3. This property is case sensitive.
+- `writeback_cache` (Attributes) Write-back Cache config. Leave this empty to disable Write-back Cache. (see [below for nested schema](#nestedatt--provisioning_scheme--vsphere_machine_config--writeback_cache))
+
+<a id="nestedatt--provisioning_scheme--vsphere_machine_config--writeback_cache"></a>
+### Nested Schema for `provisioning_scheme.vsphere_machine_config.writeback_cache`
+
+Required:
+
+- `writeback_cache_disk_size_gb` (Number) The size in GB of any temporary storage disk used by the write back cache.
+- `writeback_cache_memory_size_mb` (Number) The size of the in-memory write back cache in MB.
+
+Optional:
+
+- `writeback_cache_drive_letter` (String) The drive letter assigned for write back cache disk.
+
+
+
+<a id="nestedatt--provisioning_scheme--xenserver_machine_config"></a>
+### Nested Schema for `provisioning_scheme.xenserver_machine_config`
+
+Required:
+
+- `cpu_count` (Number) Number of CPU cores for the VDA VMs.
+- `master_image_vm` (String) The name of the virtual machine that will be used as master image. This property is case sensitive.
+- `memory_mb` (Number) Size of the memory in MB for the VDA VMs.
+
+Optional:
+
+- `image_snapshot` (String) The Snapshot of the virtual machine specified in `master_image_vm`. Specify the relative path of the snapshot. Eg: snaphost-1/snapshot-2/snapshot-3. This property is case sensitive.
+- `writeback_cache` (Attributes) Write-back Cache config. Leave this empty to disable Write-back Cache. (see [below for nested schema](#nestedatt--provisioning_scheme--xenserver_machine_config--writeback_cache))
+
+<a id="nestedatt--provisioning_scheme--xenserver_machine_config--writeback_cache"></a>
+### Nested Schema for `provisioning_scheme.xenserver_machine_config.writeback_cache`
+
+Required:
+
+- `writeback_cache_disk_size_gb` (Number) The size in GB of any temporary storage disk used by the write back cache.
+- `writeback_cache_memory_size_mb` (Number) The size of the in-memory write back cache in MB.
+
 
 
 

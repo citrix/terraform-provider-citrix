@@ -45,7 +45,7 @@ func GetHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.Cit
 }
 
 func GetMachineCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, machineCatalogId string, addErrorToDiagnostics bool) (*citrixorchestration.MachineCatalogDetailResponseModel, error) {
-	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId).Fields("Id,Name,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes")
+	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId).Fields("Id,Name,Description,ProvisioningType,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC")
 	catalog, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.MachineCatalogDetailResponseModel](getMachineCatalogRequest, client)
 	if err != nil && addErrorToDiagnostics {
 		diagnostics.AddError(
@@ -72,7 +72,7 @@ func GetMachineCatalogMachines(ctx context.Context, client *citrixdaasclient.Cit
 	return machines, err
 }
 
-func GetSingleResourcePathFromHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName string) (string, error) {
+func GetSingleResourceFromHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName string) (*citrixorchestration.HypervisorResourceResponseModel, error) {
 	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorResourcePoolResources(ctx, hypervisorName, hypervisorPoolName)
 	req = req.Children(1)
 
@@ -86,26 +86,39 @@ func GetSingleResourcePathFromHypervisor(ctx context.Context, client *citrixdaas
 
 	resources, _, err := citrixdaasclient.AddRequestData(req, client).Execute()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	for _, child := range resources.Children {
-		if child.GetName() == resourceName {
-			if resourceType == "VirtualPrivateCloud" {
-				// For vnet, ID is resourceGroup/vnetName. Match the resourceGroup as well
+		if strings.EqualFold(child.GetName(), resourceName) {
+			if strings.EqualFold(resourceType, VirtualPrivateCloudResourceType) {
+				// For vnet, ID is resourceGroup/vnetName. Match the resourceGroup as wells
 				resourceGroupAndVnetName := strings.Split(child.GetId(), "/")
-				if resourceGroupAndVnetName[0] == resourceGroupName {
-					return child.GetXDPath(), nil
+				if strings.EqualFold(resourceGroupAndVnetName[0], resourceGroupName) {
+					return &child, nil
 				} else {
 					continue
 				}
 			}
-
-			return child.GetXDPath(), nil
+			return &child, nil
+		} else if strings.EqualFold(resourceType, ServiceOfferingResourceType) {
+			if strings.EqualFold(child.GetName(), resourceName) ||
+				strings.EqualFold(child.GetId(), resourceName) {
+				return &child, nil
+			}
 		}
 	}
 
-	return "", fmt.Errorf("could not find resource")
+	return nil, fmt.Errorf("could not find resource %s", resourceName)
+}
+
+func GetSingleResourcePathFromHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName string) (string, error) {
+	resource, err := GetSingleResourceFromHypervisor(ctx, client, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName)
+	if err != nil {
+		return "", fmt.Errorf("could not find resource")
+	}
+
+	return resource.GetXDPath(), nil
 }
 
 func GetSingleHypervisorResource(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorId, folderPath, resourceName, resourceType, resourceGroupName string, hypervisor *citrixorchestration.HypervisorDetailResponseModel) (*citrixorchestration.HypervisorResourceResponseModel, error) {
@@ -126,18 +139,18 @@ func GetSingleHypervisorResource(ctx context.Context, client *citrixdaasclient.C
 	for _, child := range resources.Children {
 		switch hypervisor.GetConnectionType() {
 		case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
-			if (resourceType == "Vm" || resourceType == "VirtualPrivateCloud") && strings.EqualFold(child.GetName(), resourceName) {
+			if (strings.EqualFold(resourceType, VirtualMachineResourceType) || strings.EqualFold(resourceType, VirtualPrivateCloudResourceType)) && strings.EqualFold(child.GetName(), resourceName) {
 				resourceGroupAndVmName := strings.Split(child.GetId(), "/")
 				if strings.EqualFold(resourceGroupAndVmName[0], resourceGroupName) {
 					return &child, nil
 				}
 			}
 
-			if resourceType == "Region" && (strings.EqualFold(child.GetName(), resourceName) || strings.EqualFold(child.GetId(), resourceName)) { // support both Azure region name or id ("East US" and "eastus")
+			if strings.EqualFold(resourceType, RegionResourceType) && (strings.EqualFold(child.GetName(), resourceName) || strings.EqualFold(child.GetId(), resourceName)) { // support both Azure region name or id ("East US" and "eastus")
 				return &child, nil
 			}
 		case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
-			if resourceType == "Vm" && strings.EqualFold(strings.Split(child.GetName(), " ")[0], resourceName) {
+			if strings.EqualFold(resourceType, VirtualMachineResourceType) && (strings.EqualFold(strings.Split(child.GetName(), " ")[0], resourceName) || strings.EqualFold(child.GetId(), resourceName)) {
 				return &child, nil
 			}
 			if strings.EqualFold(child.GetName(), resourceName) {
@@ -184,7 +197,7 @@ func GetAllResourcePathList(ctx context.Context, client *citrixdaasclient.Citrix
 	return result
 }
 
-func GetFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorId, folderPath, resourceType string, filter []string, connectionType citrixorchestration.HypervisorConnectionType) ([]string, error) {
+func GetFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorId, folderPath, resourceType string, filter []string, connectionType citrixorchestration.HypervisorConnectionType, pluginId string) ([]string, error) {
 	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorAllResources(ctx, hypervisorId)
 	req = req.Children(1)
 	req = req.Path(folderPath)
@@ -205,6 +218,8 @@ func GetFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.C
 			if Contains(filter, name) {
 				if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER && strings.EqualFold(resourceType, "network") {
 					result = append(result, child.GetRelativePath())
+				} else if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && strings.EqualFold(pluginId, NUTANIX_PLUGIN_ID) && strings.EqualFold(resourceType, "network") {
+					result = append(result, child.GetFullName())
 				} else {
 					result = append(result, child.GetXDPath())
 				}

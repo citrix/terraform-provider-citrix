@@ -114,7 +114,8 @@ resource "citrix_delivery_group" "example-delivery-group" {
 		}
 	]
 	
-    policy_set_id = citrix_policy_set.example-policy-set.id
+    policy_set_id            = citrix_policy_set.example-policy-set.id
+    minimum_functional_level = "L7_20"
 }
 ```
 
@@ -132,6 +133,7 @@ resource "citrix_delivery_group" "example-delivery-group" {
 - `autoscale_settings` (Attributes) The power management settings governing the machine(s) in the delivery group. (see [below for nested schema](#nestedatt--autoscale_settings))
 - `description` (String) Description of the delivery group.
 - `desktops` (Attributes List) A list of Desktop resources to publish on the delivery group. Only 1 desktop can be added to a Remote PC Delivery Group. (see [below for nested schema](#nestedatt--desktops))
+- `minimum_functional_level` (String) Specifies the minimum functional level for the VDA machines in the delivery group. Defaults to `L7_20`.
 - `policy_set_id` (String) GUID identifier of the policy set.
 - `reboot_schedules` (Attributes List) The reboot schedule for the delivery group. (see [below for nested schema](#nestedatt--reboot_schedules))
 - `restricted_access_users` (Attributes) Restrict access to this Delivery Group by specifying users and groups in the allow and block list. If no value is specified, all authenticated users will have access to this Delivery Group. To give access to unauthenticated users, use the `allow_anonymous_access` property. (see [below for nested schema](#nestedatt--restricted_access_users))

@@ -489,6 +489,15 @@ func (r *deliveryGroupResource) Schema(_ context.Context, _ resource.SchemaReque
 					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
 				},
 			},
+			"minimum_functional_level": schema.StringAttribute{
+				Description: "Specifies the minimum functional level for the VDA machines in the delivery group. Defaults to `L7_20`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("L7_20"),
+				Validators: []validator.String{
+					util.GetValidatorFromEnum(citrixorchestration.AllowedFunctionalLevelEnumValues),
+				},
+			},
 		},
 	}
 }
@@ -545,7 +554,10 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 		}
 	}
 
-	body := getRequestModelForDeliveryGroupCreate(plan, catalogSessionSupport, identityType)
+	body, err := getRequestModelForDeliveryGroupCreate(&resp.Diagnostics, plan, catalogSessionSupport, identityType)
+	if err != nil {
+		return
+	}
 
 	createDeliveryGroupRequest := r.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsCreateDeliveryGroup(ctx)
 	createDeliveryGroupRequest = createDeliveryGroupRequest.CreateDeliveryGroupRequestModel(body)
@@ -691,7 +703,10 @@ func (r *deliveryGroupResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
-	editDeliveryGroupRequestBody := getRequestModelForDeliveryGroupUpdate(plan, currentDeliveryGroup)
+	editDeliveryGroupRequestBody, err := getRequestModelForDeliveryGroupUpdate(&resp.Diagnostics, plan, currentDeliveryGroup)
+	if err != nil {
+		return
+	}
 
 	updateDeliveryGroupRequest := r.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsPatchDeliveryGroup(ctx, deliveryGroupId)
 	updateDeliveryGroupRequest = updateDeliveryGroupRequest.EditDeliveryGroupRequestModel(editDeliveryGroupRequestBody)

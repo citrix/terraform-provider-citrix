@@ -59,7 +59,7 @@ func (r *policySetResource) Configure(_ context.Context, req resource.ConfigureR
 // Schema implements resource.Resource.
 func (*policySetResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages",
+		Description: "Manages a policy set and the policies within it. The order of the policies specified in this resource reflect the policy priority. This feature will be officially supported for On-Premises with DDC version 2402 and above and will be made available for Cloud soon.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the policy set.",
@@ -96,7 +96,7 @@ func (*policySetResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Required:    true,
 			},
 			"policies": schema.ListNestedAttribute{
-				Description: "Ordered list of policies.",
+				Description: "Ordered list of policies. The order of policies in the list determines the priority of the policies.",
 				Required:    true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{

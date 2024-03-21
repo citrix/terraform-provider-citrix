@@ -1,5 +1,6 @@
 resource "citrix_delivery_group" "example-delivery-group" {
     name = "example-delivery-group"
+    minimum_functional_level    = "L7_20"
     associated_machine_catalogs = [
         {
             machine_catalog = citrix_machine_catalog.example-catalog.id
@@ -12,10 +13,10 @@ resource "citrix_delivery_group" "example-delivery-group" {
             description = "Desription for example desktop"
             restricted_access_users = {
                 allow_list = [
-                    "user1@example.com"
+                    "example\\user1"
                 ]
                 block_list = [
-                    "user2@example.com",
+                    "example\\user2",
                 ]
             }
             enabled = true
@@ -51,10 +52,10 @@ resource "citrix_delivery_group" "example-delivery-group" {
     }
     restricted_access_users = {
         allow_list = [
-            "user1@example.com"
+            "example\\user1"
         ]
         block_list = [
-            "user2@example.com",
+            "example\\user2",
         ]
     }
 }

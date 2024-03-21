@@ -561,6 +561,7 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		hypervisor_resource_pool.NewGcpHypervisorResourcePoolResource,
 		hypervisor_resource_pool.NewXenserverHypervisorResourcePoolResource,
 		hypervisor_resource_pool.NewVsphereHypervisorResourcePoolResource,
+		hypervisor_resource_pool.NewNutanixHypervisorResourcePoolResource,
 		machine_catalog.NewMachineCatalogResource,
 		delivery_group.NewDeliveryGroupResource,
 		application.NewApplicationResource,
