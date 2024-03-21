@@ -99,6 +99,7 @@ type DeliveryGroupResourceModel struct {
 	RebootSchedules           []DeliveryGroupRebootSchedule         `tfsdk:"reboot_schedules"`
 	TotalMachines             types.Int64                           `tfsdk:"total_machines"`
 	PolicySetId               types.String                          `tfsdk:"policy_set_id"`
+	MinimumFunctionalLevel    types.String                          `tfsdk:"minimum_functional_level"`
 }
 
 func (r DeliveryGroupResourceModel) RefreshPropertyValues(deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, dgDesktops *citrixorchestration.DesktopResponseModelCollection, dgPowerTimeSchemes *citrixorchestration.PowerTimeSchemeResponseModelCollection, dgMachines *citrixorchestration.MachineResponseModelCollection, dgRebootSchedule *citrixorchestration.RebootScheduleResponseModelCollection) DeliveryGroupResourceModel {
@@ -120,6 +121,9 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(deliveryGroup *citrixo
 	} else {
 		r.PolicySetId = types.StringNull()
 	}
+
+	minimumFunctionalLevel := deliveryGroup.GetMinimumFunctionalLevel()
+	r.MinimumFunctionalLevel = types.StringValue(string(minimumFunctionalLevel))
 
 	r = r.updatePlanWithRestrictedAccessUsers(deliveryGroup)
 	r = r.updatePlanWithDesktops(dgDesktops)

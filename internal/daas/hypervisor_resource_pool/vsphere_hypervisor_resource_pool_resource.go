@@ -151,7 +151,7 @@ func (r *vsphereHypervisorResourcePoolResource) Schema(_ context.Context, _ reso
 			"storage": schema.ListNestedAttribute{
 				Description:  "List of hypervisor storage to use for OS data.",
 				Required:     true,
-				NestedObject: getNestedAttributeObjectSchmeaForStorege(),
+				NestedObject: GetNestedAttributeObjectSchmeaForStorege(),
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
 				},
@@ -159,7 +159,7 @@ func (r *vsphereHypervisorResourcePoolResource) Schema(_ context.Context, _ reso
 			"temporary_storage": schema.ListNestedAttribute{
 				Description:  "List of hypervisor storage to use for temporary data.",
 				Required:     true,
-				NestedObject: getNestedAttributeObjectSchmeaForStorege(),
+				NestedObject: GetNestedAttributeObjectSchmeaForStorege(),
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
 				},
@@ -256,8 +256,8 @@ func (r *vsphereHypervisorResourcePoolResource) Create(ctx context.Context, req 
 	resourcePoolDetails.SetName(plan.Name.ValueString())
 	resourcePoolDetails.SetConnectionType(hypervisorConnectionType)
 	resourcePoolDetails.SetRootPath(relativePath)
-	storages, tempStorages := getStorageList(ctx, r.client, &resp.Diagnostics, hypervisor, plan, true, false)
-	networks := getNetworksList(ctx, r.client, &resp.Diagnostics, hypervisor, plan, true)
+	storages, tempStorages := plan.GetStorageList(ctx, r.client, &resp.Diagnostics, hypervisor, true, false)
+	networks := plan.GetNetworksList(ctx, r.client, &resp.Diagnostics, hypervisor, true)
 	if len(storages) == 0 || len(tempStorages) == 0 || len(networks) == 0 {
 		// Error handled in helper function.
 		return
@@ -282,7 +282,6 @@ func (r *vsphereHypervisorResourcePoolResource) Create(ctx context.Context, req 
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 func (r *vsphereHypervisorResourcePoolResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -313,7 +312,6 @@ func (r *vsphereHypervisorResourcePoolResource) Read(ctx context.Context, req re
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 func (r *vsphereHypervisorResourcePoolResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -336,7 +334,7 @@ func (r *vsphereHypervisorResourcePoolResource) Update(ctx context.Context, req 
 	hypervisorConnectionType := hypervisor.GetConnectionType()
 	if hypervisorConnectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER {
 		resp.Diagnostics.AddError(
-			"Error creating Resource Pool for Hypervisor",
+			"Error updating Resource Pool for Hypervisor",
 			"Unsupported hypervisor connection type.",
 		)
 		return
@@ -353,10 +351,10 @@ func (r *vsphereHypervisorResourcePoolResource) Update(ctx context.Context, req 
 	editHypervisorResourcePool.SetName(plan.Name.ValueString())
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER)
 
-	storagesToBeIncluded, tempStoragesToBeIncluded := getStorageList(ctx, r.client, &resp.Diagnostics, hypervisor, plan, false, false)
-	storagesToBeSuperseded, tempStoragesToBeSuperseded := getStorageList(ctx, r.client, &resp.Diagnostics, hypervisor, plan, false, true)
-	networks := getNetworksList(ctx, r.client, &resp.Diagnostics, hypervisor, plan, false)
-	if (storagesToBeIncluded == nil && storagesToBeSuperseded == nil) || (tempStoragesToBeIncluded == nil && tempStoragesToBeSuperseded == nil) || networks == nil {
+	storagesToBeIncluded, tempStoragesToBeIncluded := plan.GetStorageList(ctx, r.client, &resp.Diagnostics, hypervisor, false, false)
+	storagesToBeSuperseded, tempStoragesToBeSuperseded := plan.GetStorageList(ctx, r.client, &resp.Diagnostics, hypervisor, false, true)
+	networks := plan.GetNetworksList(ctx, r.client, &resp.Diagnostics, hypervisor, false)
+	if (len(storagesToBeIncluded) == 0 && len(storagesToBeSuperseded) == 0) || (len(tempStoragesToBeIncluded) == 0 && len(tempStoragesToBeSuperseded) == 0) || len(networks) == 0 {
 		// Error handled in helper function.
 		return
 	}
@@ -449,7 +447,7 @@ func (r *vsphereHypervisorResourcePoolResource) Delete(ctx context.Context, req 
 	}
 }
 
-func getStorageList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diags *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel, plan VsphereHypervisorResourcePoolResourceModel, isCreate bool, forSuperseded bool) ([]string, []string) {
+func (plan VsphereHypervisorResourcePoolResourceModel) GetStorageList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diags *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel, isCreate bool, forSuperseded bool) ([]string, []string) {
 	action := "updating"
 	if isCreate {
 		action = "creating"
@@ -472,7 +470,7 @@ func getStorageList(ctx context.Context, client *citrixdaasclient.CitrixDaasClie
 	if !plan.Cluster.Host.IsNull() {
 		folderPath = fmt.Sprintf("%s\\%s.computeresource", folderPath, plan.Cluster.Host.ValueString())
 	}
-	storages, err := util.GetFilteredResourcePathList(ctx, client, hypervisorId, folderPath, "storage", storageNames, hypervisorConnectionType)
+	storages, err := util.GetFilteredResourcePathList(ctx, client, hypervisorId, folderPath, "storage", storageNames, hypervisorConnectionType, "")
 
 	if len(storage) > 0 && len(storages) == 0 {
 		errDetail := "No storage found for the given storage names"
@@ -493,7 +491,7 @@ func getStorageList(ctx context.Context, client *citrixdaasclient.CitrixDaasClie
 		}
 	}
 	tempStorageNames := util.ConvertBaseStringArrayToPrimitiveStringArray(tempStorage)
-	tempStorages, err := util.GetFilteredResourcePathList(ctx, client, hypervisorId, folderPath, "storage", tempStorageNames, hypervisorConnectionType)
+	tempStorages, err := util.GetFilteredResourcePathList(ctx, client, hypervisorId, folderPath, "storage", tempStorageNames, hypervisorConnectionType, "")
 	if len(tempStorage) > 0 && len(tempStorages) == 0 {
 		errDetail := "No storage found for the given temporary storage names"
 		if err != nil {
@@ -509,24 +507,7 @@ func getStorageList(ctx context.Context, client *citrixdaasclient.CitrixDaasClie
 	return storages, tempStorages
 }
 
-func getNestedAttributeObjectSchmeaForStorege() schema.NestedAttributeObject {
-	return schema.NestedAttributeObject{
-		Attributes: map[string]schema.Attribute{
-			"storage_name": schema.StringAttribute{
-				Description: "The name of the storage.",
-				Required:    true,
-			},
-			"superseded": schema.BoolAttribute{
-				Description: "Indicates whether the storage has been superseded. Superseded storage may be used for existing virtual machines, but is not used when provisioning new virtual machines. Use only when updating the resource pool.",
-				Optional:    true,
-				Computed:    true,
-				Default:     booldefault.StaticBool(false),
-			},
-		},
-	}
-}
-
-func getNetworksList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diags *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel, plan VsphereHypervisorResourcePoolResourceModel, isCreate bool) []string {
+func (plan VsphereHypervisorResourcePoolResourceModel) GetNetworksList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diags *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel, isCreate bool) []string {
 	hypervisorId := hypervisor.GetId()
 	hypervisorConnectionType := hypervisor.GetConnectionType()
 	action := "updating"
@@ -544,7 +525,7 @@ func getNetworksList(ctx context.Context, client *citrixdaasclient.CitrixDaasCli
 	}
 
 	networkNames := util.ConvertBaseStringArrayToPrimitiveStringArray(plan.Networks)
-	networks, err := util.GetFilteredResourcePathList(ctx, client, hypervisorId, folderPath, "network", networkNames, hypervisorConnectionType)
+	networks, err := util.GetFilteredResourcePathList(ctx, client, hypervisorId, folderPath, "network", networkNames, hypervisorConnectionType, "")
 	if len(networks) == 0 {
 		errDetail := "No network found for the given network names"
 		if err != nil {

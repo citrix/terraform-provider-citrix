@@ -48,14 +48,23 @@ const DateRegex string = `^\d{4}-\d{2}-\d{2}$`
 // Time HH:MM
 const TimeRegex string = `^([0-1][0-9]|2[0-3]):[0-5][0-9]$`
 
-// Name of the Default Site Policy Set
-const DefaultSitePolicySetName string = "DefaultSitePolicies"
-
 // ID of the Default Site Policy Set
 const DefaultSitePolicySetId string = "00000000-0000-0000-0000-000000000000"
 
 // SSL Thumbprint
 const SslThumbprintRegex string = `^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$`
+
+// AWS EC2 Instance Type
+const AwsEc2InstanceTypeRegex string = `^[a-z0-9]{1,15}\.[a-z0-9]{1,15}$`
+
+// Resource Types
+const ImageVersionResourceType string = "ImageVersion"
+const RegionResourceType string = "Region"
+const ServiceOfferingResourceType string = "ServiceOffering"
+const SnapshotResourceType string = "Snapshot"
+const VhdResourceType string = "Vhd"
+const VirtualPrivateCloudResourceType string = "VirtualPrivateCloud"
+const VirtualMachineResourceType string = "Vm"
 
 // Terraform model for name value string pair
 type NameValueStringPairModel struct {

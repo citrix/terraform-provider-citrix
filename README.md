@@ -155,8 +155,8 @@ A delivery group is a collection of machines selected from one or more machine c
 | AzureRM         |:heavy_check_mark:|:heavy_check_mark:| MCS / Power Managed |
 | AWS EC2         |:heavy_check_mark:|:heavy_check_mark:| MCS / Power Managed |
 | GCP             |:heavy_check_mark:|:heavy_check_mark:| MCS / Power Managed |
-| Vsphere         |:heavy_check_mark:|:heavy_check_mark:|    Power Managed    |
-| XenServer       |:heavy_check_mark:|:heavy_check_mark:|    Power Managed    |
+| Vsphere         |:heavy_check_mark:|:heavy_check_mark:| MCS / Power Managed |
+| XenServer       |:heavy_check_mark:|:heavy_check_mark:| MCS / Power Managed |
 | Nutanix         |:heavy_check_mark:|   in progress    |    Power Managed    |
 
 
@@ -165,6 +165,8 @@ A delivery group is a collection of machines selected from one or more machine c
   - Azure
   - GCP
   - AWS EC2
+  - Vsphere
+  - XenServer
 - Manual Power Managed
   - Azure
   - GCP

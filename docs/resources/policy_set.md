@@ -3,12 +3,12 @@
 page_title: "citrix_policy_set Resource - citrix"
 subcategory: ""
 description: |-
-  Manages
+  Manages a policy set and the policies within it. The order of the policies specified in this resource reflect the policy priority. This feature will be officially supported for On-Premises with DDC version 2402 and above and will be made available for Cloud soon.
 ---
 
 # citrix_policy_set (Resource)
 
-Manages
+Manages a policy set and the policies within it. The order of the policies specified in this resource reflect the policy priority. This feature will be officially supported for On-Premises with DDC version 2402 and above and will be made available for Cloud soon.
 
 ## Example Usage
 
@@ -59,7 +59,7 @@ resource "citrix_policy_set" "example-policy-set" {
 ### Required
 
 - `name` (String) Name of the policy set.
-- `policies` (Attributes List) Ordered list of policies. (see [below for nested schema](#nestedatt--policies))
+- `policies` (Attributes List) Ordered list of policies. The order of policies in the list determines the priority of the policies. (see [below for nested schema](#nestedatt--policies))
 - `scopes` (Set of String) The names of the scopes for the policy set to apply on.
 - `type` (String) Type of the policy set. Type can be one of `SitePolicies`, `DeliveryGroupPolicies`, `SiteTemplates`, or `CustomTemplates`.
 

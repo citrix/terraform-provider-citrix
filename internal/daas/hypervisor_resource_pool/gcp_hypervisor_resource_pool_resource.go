@@ -186,7 +186,7 @@ func (r *gcpHypervisorResourcePoolResource) Create(ctx context.Context, req reso
 		return
 	}
 	planSubnet := util.ConvertBaseStringArrayToPrimitiveStringArray(plan.Subnets)
-	subnets, err := util.GetFilteredResourcePathList(ctx, r.client, hypervisorId, vnetPath, "Network", planSubnet, hypervisorConnectionType)
+	subnets, err := util.GetFilteredResourcePathList(ctx, r.client, hypervisorId, vnetPath, "Network", planSubnet, hypervisorConnectionType, "")
 
 	if err != nil {
 		resp.Diagnostics.AddError(

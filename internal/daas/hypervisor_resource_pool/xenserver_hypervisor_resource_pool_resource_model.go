@@ -13,10 +13,10 @@ type XenserverHypervisorResourcePoolResourceModel struct {
 	Name       types.String `tfsdk:"name"`
 	Hypervisor types.String `tfsdk:"hypervisor"`
 	/**** Resource Pool Details ****/
-	Networks               []types.String `tfsdk:"networks"`
-	Storage                []types.String `tfsdk:"storage"`
-	TemporaryStorage       []types.String `tfsdk:"temporary_storage"`
-	UseLocalStorageCaching types.Bool     `tfsdk:"use_local_storage_caching"`
+	Networks               []types.String           `tfsdk:"networks"`
+	Storage                []HypervisorStorageModel `tfsdk:"storage"`
+	TemporaryStorage       []HypervisorStorageModel `tfsdk:"temporary_storage"`
+	UseLocalStorageCaching types.Bool               `tfsdk:"use_local_storage_caching"`
 }
 
 func (r XenserverHypervisorResourcePoolResourceModel) RefreshPropertyValues(resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) XenserverHypervisorResourcePoolResourceModel {
@@ -35,17 +35,8 @@ func (r XenserverHypervisorResourcePoolResourceModel) RefreshPropertyValues(reso
 	}
 	r.Networks = util.RefreshList(r.Networks, remoteNetwork)
 
-	remoteStorage := []string{}
-	for _, storage := range resourcePool.GetStorage() {
-		remoteStorage = append(remoteStorage, storage.GetName())
-	}
-	r.Storage = util.RefreshList(r.Storage, remoteStorage)
-
-	remoteTempStorage := []string{}
-	for _, storage := range resourcePool.GetTemporaryStorage() {
-		remoteTempStorage = append(remoteTempStorage, storage.GetName())
-	}
-	r.TemporaryStorage = util.RefreshList(r.TemporaryStorage, remoteTempStorage)
+	r.Storage = util.RefreshListProperties[HypervisorStorageModel, citrixorchestration.HypervisorStorageResourceResponseModel](r.Storage, "StorageName", resourcePool.GetStorage(), "Name", "RefreshListItem")
+	r.TemporaryStorage = util.RefreshListProperties[HypervisorStorageModel, citrixorchestration.HypervisorStorageResourceResponseModel](r.TemporaryStorage, "StorageName", resourcePool.GetTemporaryStorage(), "Name", "RefreshListItem")
 
 	return r
 }

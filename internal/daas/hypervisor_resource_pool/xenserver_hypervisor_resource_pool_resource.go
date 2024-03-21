@@ -24,6 +24,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -81,18 +82,18 @@ func (r *xenserverHypervisorResourcePoolResource) Schema(_ context.Context, _ re
 					listvalidator.SizeAtLeast(1),
 				},
 			},
-			"storage": schema.ListAttribute{
-				ElementType: types.StringType,
-				Description: "List of hypervisor storage to use for OS data.",
-				Required:    true,
+			"storage": schema.ListNestedAttribute{
+				Description:  "List of hypervisor storage to use for OS data.",
+				Required:     true,
+				NestedObject: GetNestedAttributeObjectSchmeaForStorege(),
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
 				},
 			},
-			"temporary_storage": schema.ListAttribute{
-				ElementType: types.StringType,
-				Description: "List of hypervisor storage to use for temporary data.",
-				Required:    true,
+			"temporary_storage": schema.ListNestedAttribute{
+				Description:  "List of hypervisor storage to use for temporary data.",
+				Required:     true,
+				NestedObject: GetNestedAttributeObjectSchmeaForStorege(),
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
 				},
@@ -149,8 +150,12 @@ func (r *xenserverHypervisorResourcePoolResource) Create(ctx context.Context, re
 	resourcePoolDetails.SetName(plan.Name.ValueString())
 	resourcePoolDetails.SetConnectionType(hypervisorConnectionType)
 
-	storages, tempStorages, networks := SetResourceList(ctx, r.client, &resp.Diagnostics, hypervisorId, hypervisorConnectionType, plan)
-	if storages == nil || tempStorages == nil || networks == nil {
+	// storages, tempStorages, networks := SetResourceList(ctx, r.client, &resp.Diagnostics, hypervisorId, hypervisorConnectionType, plan)
+
+	storages, tempStorages := plan.GetStorageList(ctx, r.client, &resp.Diagnostics, hypervisor, true, false)
+	networks := plan.GetNetworksList(ctx, r.client, &resp.Diagnostics, hypervisor, true)
+
+	if len(storages) == 0 || len(tempStorages) == 0 || len(networks) == 0 {
 		// Error handled in helper function.
 		return
 	}
@@ -245,24 +250,38 @@ func (r *xenserverHypervisorResourcePoolResource) Update(ctx context.Context, re
 	editHypervisorResourcePool.SetName(plan.Name.ValueString())
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER)
 
-	storages, tempStorages, networks := SetResourceList(ctx, r.client, &resp.Diagnostics, hypervisorId, hypervisorConnectionType, plan)
-	if storages == nil || tempStorages == nil || networks == nil {
+	storagesToBeIncluded, tempStoragesToBeIncluded := plan.GetStorageList(ctx, r.client, &resp.Diagnostics, hypervisor, false, false)
+	storagesToBeSuperseded, tempStoragesToBeSuperseded := plan.GetStorageList(ctx, r.client, &resp.Diagnostics, hypervisor, false, true)
+	networks := plan.GetNetworksList(ctx, r.client, &resp.Diagnostics, hypervisor, false)
+	if (len(storagesToBeIncluded) == 0 && len(storagesToBeSuperseded) == 0) || (len(tempStoragesToBeIncluded) == 0 && len(tempStoragesToBeSuperseded) == 0) || len(networks) == 0 {
 		// Error handled in helper function.
 		return
 	}
 
 	storageRequests := []citrixorchestration.HypervisorResourcePoolStorageRequestModel{}
-	for _, storage := range storages {
+	for _, storage := range storagesToBeIncluded {
 		request := &citrixorchestration.HypervisorResourcePoolStorageRequestModel{}
 		request.SetStoragePath(storage)
+		storageRequests = append(storageRequests, *request)
+	}
+	for _, storage := range storagesToBeSuperseded {
+		request := &citrixorchestration.HypervisorResourcePoolStorageRequestModel{}
+		request.SetStoragePath(storage)
+		request.SetSuperseded(true)
 		storageRequests = append(storageRequests, *request)
 	}
 	editHypervisorResourcePool.SetStorage(storageRequests)
 
 	tempStorageRequests := []citrixorchestration.HypervisorResourcePoolStorageRequestModel{}
-	for _, storage := range tempStorages {
+	for _, storage := range tempStoragesToBeIncluded {
 		request := &citrixorchestration.HypervisorResourcePoolStorageRequestModel{}
 		request.SetStoragePath(storage)
+		tempStorageRequests = append(tempStorageRequests, *request)
+	}
+	for _, storage := range tempStoragesToBeSuperseded {
+		request := &citrixorchestration.HypervisorResourcePoolStorageRequestModel{}
+		request.SetStoragePath(storage)
+		request.SetSuperseded(true)
 		tempStorageRequests = append(tempStorageRequests, *request)
 	}
 	editHypervisorResourcePool.SetTemporaryStorage(tempStorageRequests)
@@ -327,36 +346,79 @@ func (r *xenserverHypervisorResourcePoolResource) Delete(ctx context.Context, re
 	}
 }
 
-func SetResourceList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diags *diag.Diagnostics, hypervisorId string, hypervisorConnectionType citrixorchestration.HypervisorConnectionType, plan XenserverHypervisorResourcePoolResourceModel) ([]string, []string, []string) {
-	storageNames := util.ConvertBaseStringArrayToPrimitiveStringArray(plan.Storage)
-	storages, err := util.GetFilteredResourcePathList(ctx, client, hypervisorId, "", "storage", storageNames, hypervisorConnectionType)
-	if err != nil {
-		diags.AddError(
-			"Error creating Hypervisor Resource Pool for XenServer",
-			"Error message: "+util.ReadClientError(err),
-		)
-		return nil, nil, nil
+func (plan XenserverHypervisorResourcePoolResourceModel) GetStorageList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diags *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel, isCreate bool, forSuperseded bool) ([]string, []string) {
+	action := "updating"
+	if isCreate {
+		action = "creating"
 	}
 
-	tempStorageNames := util.ConvertBaseStringArrayToPrimitiveStringArray(plan.TemporaryStorage)
-	tempStorages, err := util.GetFilteredResourcePathList(ctx, client, hypervisorId, "", "storage", tempStorageNames, hypervisorConnectionType)
-	if err != nil {
+	storage := []basetypes.StringValue{}
+	for _, storageModel := range plan.Storage {
+		if storageModel.Superseded.ValueBool() == forSuperseded {
+			storage = append(storage, storageModel.StorageName)
+		}
+	}
+	storageNames := util.ConvertBaseStringArrayToPrimitiveStringArray(storage)
+	hypervisorId := hypervisor.GetId()
+	hypervisorConnectionType := hypervisor.GetConnectionType()
+	storages, err := util.GetFilteredResourcePathList(ctx, client, hypervisorId, "", "storage", storageNames, hypervisorConnectionType, "")
+
+	if len(storage) > 0 && len(storages) == 0 {
+		errDetail := "No storage found for the given storage names"
+		if err != nil {
+			errDetail = util.ReadClientError(err)
+		}
 		diags.AddError(
-			"Error creating Hypervisor Resource Pool for XenServer",
-			"Error message: "+util.ReadClientError(err),
+			fmt.Sprintf("Error %s Hypervisor Resource Pool for Xenserver", action),
+			errDetail,
 		)
-		return nil, nil, nil
+		return nil, nil
+	}
+
+	tempStorage := []basetypes.StringValue{}
+	for _, storageModel := range plan.TemporaryStorage {
+		if storageModel.Superseded.ValueBool() == forSuperseded {
+			tempStorage = append(tempStorage, storageModel.StorageName)
+		}
+	}
+	tempStorageNames := util.ConvertBaseStringArrayToPrimitiveStringArray(tempStorage)
+	tempStorages, err := util.GetFilteredResourcePathList(ctx, client, hypervisorId, "", "storage", tempStorageNames, hypervisorConnectionType, "")
+	if len(tempStorage) > 0 && len(tempStorages) == 0 {
+		errDetail := "No storage found for the given temporary storage names"
+		if err != nil {
+			errDetail = util.ReadClientError(err)
+		}
+		diags.AddError(
+			fmt.Sprintf("Error %s Hypervisor Resource Pool for Xenserver", action),
+			errDetail,
+		)
+		return nil, nil
+	}
+
+	return storages, tempStorages
+}
+
+func (plan XenserverHypervisorResourcePoolResourceModel) GetNetworksList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diags *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel, isCreate bool) []string {
+	hypervisorId := hypervisor.GetId()
+	hypervisorConnectionType := hypervisor.GetConnectionType()
+	action := "updating"
+	if isCreate {
+		action = "creating"
 	}
 
 	networkNames := util.ConvertBaseStringArrayToPrimitiveStringArray(plan.Networks)
-	networks, err := util.GetFilteredResourcePathList(ctx, client, hypervisorId, "", "network", networkNames, hypervisorConnectionType)
-	if err != nil {
+	networks, err := util.GetFilteredResourcePathList(ctx, client, hypervisorId, "", "network", networkNames, hypervisorConnectionType, "")
+	if len(networks) == 0 {
+		errDetail := "No network found for the given network names"
+		if err != nil {
+			errDetail = util.ReadClientError(err)
+		}
 		diags.AddError(
-			"Error creating Hypervisor Resource Pool for XenServer",
-			"Error message: "+util.ReadClientError(err),
+			fmt.Sprintf("Error %s Hypervisor Resource Pool for Xenserver", action),
+			errDetail,
 		)
-		return nil, nil, nil
+		return nil
 	}
 
-	return storages, tempStorages, networks
+	return networks
 }

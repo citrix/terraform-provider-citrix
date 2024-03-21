@@ -5,5 +5,5 @@ resource "citrix_aws_hypervisor_resource_pool" "example-aws-rp" {
         "<AWS Subnet Mask>",
     ]
     vpc   = "<AWS VPC Name>"
-    availability_zone = "<AWS Availability Zone>"
+    availability_zone = "us-east-1a"
 }

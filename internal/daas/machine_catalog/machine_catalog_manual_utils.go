@@ -57,7 +57,7 @@ func getMachinesForManualCatalogs(ctx context.Context, client *citrixdaasclient.
 					return nil, err
 				}
 				regionPath := region.GetXDPath()
-				vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, fmt.Sprintf("%s\\vm.folder", regionPath), machineName, "Vm", machine.ResourceGroupName.ValueString(), hypervisor)
+				vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, fmt.Sprintf("%s\\vm.folder", regionPath), machineName, util.VirtualMachineResourceType, machine.ResourceGroupName.ValueString(), hypervisor)
 				if err != nil {
 					return nil, err
 				}
@@ -71,7 +71,7 @@ func getMachinesForManualCatalogs(ctx context.Context, client *citrixdaasclient.
 					return nil, err
 				}
 				availabilityZonePath := availabilityZone.GetXDPath()
-				vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, availabilityZonePath, machineName, "Vm", "", hypervisor)
+				vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, availabilityZonePath, machineName, util.VirtualMachineResourceType, "", hypervisor)
 				if err != nil {
 					return nil, err
 				}
@@ -85,7 +85,7 @@ func getMachinesForManualCatalogs(ctx context.Context, client *citrixdaasclient.
 					return nil, err
 				}
 				projectNamePath := projectName.GetXDPath()
-				vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, fmt.Sprintf("%s\\%s.region", projectNamePath, machine.Region.ValueString()), machineName, "Vm", "", hypervisor)
+				vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, fmt.Sprintf("%s\\%s.region", projectNamePath, machine.Region.ValueString()), machineName, util.VirtualMachineResourceType, "", hypervisor)
 				if err != nil {
 					return nil, err
 				}
@@ -116,13 +116,13 @@ func getMachinesForManualCatalogs(ctx context.Context, client *citrixdaasclient.
 					return nil, err
 				}
 				hostPath := host.GetXDPath()
-				vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, hostPath, machineName, "Vm", "", hypervisor)
+				vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, hostPath, machineName, util.VirtualMachineResourceType, "", hypervisor)
 				if err != nil {
 					return nil, err
 				}
 				vmId = vm.GetId()
 			case citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER:
-				vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, "", machineName, "Vm", "", hypervisor)
+				vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, "", machineName, util.VirtualMachineResourceType, "", hypervisor)
 				if err != nil {
 					return nil, err
 				}
@@ -130,7 +130,7 @@ func getMachinesForManualCatalogs(ctx context.Context, client *citrixdaasclient.
 			case citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM:
 				if hypervisor.GetPluginId() == util.NUTANIX_PLUGIN_ID {
 					hypervisorXdPath := hypervisor.GetXDPath()
-					vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, fmt.Sprintf("%s\\VirtualMachines.folder", hypervisorXdPath), machineName, "Vm", "", hypervisor)
+					vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, fmt.Sprintf("%s\\VirtualMachines.folder", hypervisorXdPath), machineName, util.VirtualMachineResourceType, "", hypervisor)
 					if err != nil {
 						return nil, err
 					}
@@ -148,7 +148,7 @@ func getMachinesForManualCatalogs(ctx context.Context, client *citrixdaasclient.
 	return addMachineRequestList, nil
 }
 
-func deleteMachinesFromManualCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, deleteMachinesList map[string]bool, catalogNameOrId string, isCatalogPowerManaged bool) error {
+func deleteMachinesFromManualCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, deleteMachinesList map[string]bool, catalogNameOrId string) error {
 
 	if len(deleteMachinesList) < 1 {
 		// nothing to delete

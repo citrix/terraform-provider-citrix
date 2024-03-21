@@ -171,7 +171,7 @@ func (r *azureHypervisorResourcePoolResource) Create(ctx context.Context, req re
 		return
 	}
 	resourcePoolDetails.SetRegion(regionPath)
-	vnet, err := util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, fmt.Sprintf("%s/virtualprivatecloud.folder", regionPath), plan.VirtualNetwork.ValueString(), "VirtualPrivateCloud", plan.VirtualNetworkResourceGroup.ValueString(), hypervisor)
+	vnet, err := util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, fmt.Sprintf("%s/virtualprivatecloud.folder", regionPath), plan.VirtualNetwork.ValueString(), util.VirtualPrivateCloudResourceType, plan.VirtualNetworkResourceGroup.ValueString(), hypervisor)
 	vnetPath := vnet.GetXDPath()
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -190,7 +190,7 @@ func (r *azureHypervisorResourcePoolResource) Create(ctx context.Context, req re
 		return
 	}
 	planSubnet := util.ConvertBaseStringArrayToPrimitiveStringArray(plan.Subnets)
-	subnets, err := util.GetFilteredResourcePathList(ctx, r.client, hypervisorId, fmt.Sprintf("%s/virtualprivatecloud.folder/%s", regionPath, vnetPath), "Network", planSubnet, hypervisorConnectionType)
+	subnets, err := util.GetFilteredResourcePathList(ctx, r.client, hypervisorId, fmt.Sprintf("%s/virtualprivatecloud.folder/%s", regionPath, vnetPath), "Network", planSubnet, hypervisorConnectionType, "")
 
 	if err != nil {
 		resp.Diagnostics.AddError(

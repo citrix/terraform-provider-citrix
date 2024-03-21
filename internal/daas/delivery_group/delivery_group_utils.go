@@ -5,7 +5,6 @@ package delivery_group
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -414,6 +413,9 @@ func validatePowerTimeSchemes(diagnostics *diag.Diagnostics, powerTimeSchemes []
 		hoursArray := make([]bool, 24)
 		minutesArray := make([]bool, 24)
 
+		hoursPoolSizeArray := make([]int, 24)
+		minutesPoolSizeArray := make([]int, 24)
+
 		for _, schedule := range powerTimeScheme.PoolSizeSchedule {
 			timeRanges := strings.Split(schedule.TimeRange.ValueString(), "-")
 
@@ -447,19 +449,19 @@ func validatePowerTimeSchemes(diagnostics *diag.Diagnostics, powerTimeSchemes []
 
 			for i := startHour; i < endHour; i++ {
 
-				if i == startHour && hoursArray[i] {
+				if i == startHour && hoursArray[i] && hoursPoolSizeArray[i] == int(schedule.PoolSize.ValueInt64()) {
 					diagnostics.AddAttributeError(
 						path.Root("time_range"),
 						"Incorrect Attribute Value",
-						fmt.Sprintf("Unexpected time_range value %s. Contiguous time ranges should be combined.", schedule.TimeRange.ValueString()),
+						fmt.Sprintf("Unexpected time_range value %s. Contiguous time ranges with the same pool size should be combined.", schedule.TimeRange.ValueString()),
 					)
 				}
 
-				if i != 23 && hoursArray[i+1] {
+				if i != 23 && hoursArray[i+1] && hoursPoolSizeArray[i+1] == int(schedule.PoolSize.ValueInt64()) {
 					diagnostics.AddAttributeError(
 						path.Root("time_range"),
 						"Incorrect Attribute Value",
-						fmt.Sprintf("Unexpected time_range value %s. Contiguous time ranges should be combined.", schedule.TimeRange.ValueString()),
+						fmt.Sprintf("Unexpected time_range value %s. Contiguous time ranges with the same pool size should be combined.", schedule.TimeRange.ValueString()),
 					)
 				}
 
@@ -472,15 +474,16 @@ func validatePowerTimeSchemes(diagnostics *diag.Diagnostics, powerTimeSchemes []
 				}
 
 				minutesArray[i] = true
+				minutesPoolSizeArray[i] = int(schedule.PoolSize.ValueInt64())
 				if startMinutes == 30 {
 					continue
 				}
 
-				if i == startHour && startHour != 0 && minutesArray[i-1] {
+				if i == startHour && startHour != 0 && minutesArray[i-1] && minutesPoolSizeArray[i-1] == int(schedule.PoolSize.ValueInt64()) {
 					diagnostics.AddAttributeError(
 						path.Root("time_range"),
 						"Incorrect Attribute Value",
-						fmt.Sprintf("Unexpected time_range value %s. Contiguous time ranges should be combined.", schedule.TimeRange.ValueString()),
+						fmt.Sprintf("Unexpected time_range value %s. Contiguous time ranges with the same pool size should be combined.", schedule.TimeRange.ValueString()),
 					)
 				}
 
@@ -492,14 +495,15 @@ func validatePowerTimeSchemes(diagnostics *diag.Diagnostics, powerTimeSchemes []
 					)
 				}
 				hoursArray[i] = true
+				hoursPoolSizeArray[i] = int(schedule.PoolSize.ValueInt64())
 			}
 
 			if endMinutes == 30 {
-				if minutesArray[endHour] {
+				if minutesArray[endHour] && minutesPoolSizeArray[endHour] == int(schedule.PoolSize.ValueInt64()) {
 					diagnostics.AddAttributeError(
 						path.Root("time_range"),
 						"Incorrect Attribute Value",
-						fmt.Sprintf("Unexpected time_range value %s. Contiguous time ranges should be combined.", schedule.TimeRange.ValueString()),
+						fmt.Sprintf("Unexpected time_range value %s. Contiguous time ranges with the same pool size should be combined.", schedule.TimeRange.ValueString()),
 					)
 				}
 
@@ -512,6 +516,7 @@ func validatePowerTimeSchemes(diagnostics *diag.Diagnostics, powerTimeSchemes []
 				}
 
 				hoursArray[endHour] = true
+				hoursPoolSizeArray[endHour] = int(schedule.PoolSize.ValueInt64())
 			}
 		}
 	}
@@ -566,7 +571,7 @@ func validateRebootSchedules(diagnostics *diag.Diagnostics, rebootSchedules []De
 	}
 }
 
-func getRequestModelForDeliveryGroupCreate(plan DeliveryGroupResourceModel, catalogSessionSupport *citrixorchestration.SessionSupport, identityType citrixorchestration.IdentityType) citrixorchestration.CreateDeliveryGroupRequestModel {
+func getRequestModelForDeliveryGroupCreate(diagnostics *diag.Diagnostics, plan DeliveryGroupResourceModel, catalogSessionSupport *citrixorchestration.SessionSupport, identityType citrixorchestration.IdentityType) (citrixorchestration.CreateDeliveryGroupRequestModel, error) {
 	deliveryGroupMachineCatalogsArray := getDeliveryGroupAddMachinesRequest(plan.AssociatedMachineCatalogs)
 	deliveryGroupDesktopsArray := parseDeliveryGroupDesktopsToClientModel(plan.Desktops)
 	deliveryGroupRebootScheduleArray := parseDeliveryGroupRebootScheduleToClientModel(plan.RebootSchedules)
@@ -597,7 +602,17 @@ func getRequestModelForDeliveryGroupCreate(plan DeliveryGroupResourceModel, cata
 	body.SetDescription(plan.Description.ValueString())
 	body.SetMachineCatalogs(deliveryGroupMachineCatalogsArray)
 	body.SetRebootSchedules(deliveryGroupRebootScheduleArray)
-	body.SetMinimumFunctionalLevel(citrixorchestration.FUNCTIONALLEVEL_L7_20)
+
+	functionalLevel, err := citrixorchestration.NewFunctionalLevelFromValue(plan.MinimumFunctionalLevel.ValueString())
+	if err != nil {
+		diagnostics.AddError(
+			"Error creating Delivery Group",
+			fmt.Sprintf("Unsupported minimum functional level %s.", plan.MinimumFunctionalLevel.ValueString()),
+		)
+		return body, err
+	}
+	body.SetMinimumFunctionalLevel(*functionalLevel)
+
 	deliveryKind := citrixorchestration.DELIVERYKIND_DESKTOPS_AND_APPS
 	if *catalogSessionSupport != citrixorchestration.SESSIONSUPPORT_MULTI_SESSION {
 		deliveryKind = citrixorchestration.DELIVERYKIND_DESKTOPS_ONLY
@@ -638,10 +653,10 @@ func getRequestModelForDeliveryGroupCreate(plan DeliveryGroupResourceModel, cata
 		body.SetPowerTimeSchemes(powerTimeSchemes)
 	}
 
-	return body
+	return body, nil
 }
 
-func getRequestModelForDeliveryGroupUpdate(plan DeliveryGroupResourceModel, currentDeliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel) citrixorchestration.EditDeliveryGroupRequestModel {
+func getRequestModelForDeliveryGroupUpdate(diagnostics *diag.Diagnostics, plan DeliveryGroupResourceModel, currentDeliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel) (citrixorchestration.EditDeliveryGroupRequestModel, error) {
 	deliveryGroupDesktopsArray := parseDeliveryGroupDesktopsToClientModel(plan.Desktops)
 	deliveryGroupRebootScheduleArray := parseDeliveryGroupRebootScheduleToClientModel(plan.RebootSchedules)
 
@@ -728,7 +743,17 @@ func getRequestModelForDeliveryGroupUpdate(plan DeliveryGroupResourceModel, curr
 		editDeliveryGroupRequestBody.SetPowerTimeSchemes(powerTimeSchemes)
 	}
 
-	return editDeliveryGroupRequestBody
+	functionalLevel, err := citrixorchestration.NewFunctionalLevelFromValue(plan.MinimumFunctionalLevel.ValueString())
+	if err != nil {
+		diagnostics.AddError(
+			"Error updating Delivery Group",
+			fmt.Sprintf("Unsupported minimum functional level %s.", plan.MinimumFunctionalLevel.ValueString()),
+		)
+		return editDeliveryGroupRequestBody, err
+	}
+	editDeliveryGroupRequestBody.SetMinimumFunctionalLevel(*functionalLevel)
+
+	return editDeliveryGroupRequestBody, nil
 }
 
 func parsePowerTimeSchemesPluginToClientModel(powerTimeSchemes []DeliveryGroupPowerTimeScheme) []citrixorchestration.PowerTimeSchemeRequestModel {
@@ -1207,20 +1232,4 @@ func preserveOrderInPoolSizeSchedule(poolSizeScheduleInPlan, poolSizeScheduleInR
 	}
 
 	return poolSizeSchedules
-}
-
-func getDefaultPolicySetId(client *citrixdaasclient.CitrixDaasClient, ctx context.Context) (string, *http.Response, error) {
-	var policySetId string
-	getDefaultPolicySetRequest := client.ApiClient.GpoDAAS.GpoReadGpoPolicySets(ctx)
-	policySetsResponse, httpResp, err := citrixdaasclient.AddRequestData(getDefaultPolicySetRequest, client).Execute()
-	if err != nil {
-		return "", httpResp, err
-	}
-	for _, policySet := range policySetsResponse.Items {
-		if policySet.GetName() == util.DefaultSitePolicySetName {
-			policySetId = policySet.GetPolicySetGuid()
-			break
-		}
-	}
-	return policySetId, httpResp, nil
 }

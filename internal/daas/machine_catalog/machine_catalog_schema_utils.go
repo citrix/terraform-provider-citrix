@@ -15,8 +15,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
@@ -58,7 +59,7 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 				},
 			},
 			"allocation_type": schema.StringAttribute{
-				Description: "Denotes how the machines in the catalog are allocated to a user. Choose between `Static` and `Random`.",
+				Description: "Denotes how the machines in the catalog are allocated to a user. Choose between `Static` and `Random`. Allocation type should be `Random` when `session_support = MultiSession`.",
 				Required:    true,
 				Validators: []validator.String{
 					util.GetValidatorFromEnum(citrixorchestration.AllowedAllocationTypeEnumValues),
@@ -68,7 +69,7 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 				},
 			},
 			"session_support": schema.StringAttribute{
-				Description: "Session support type. Choose between `SingleSession` and `MultiSession`. Session support should be SingleSession when `is_remote_pc = true`",
+				Description: "Session support type. Choose between `SingleSession` and `MultiSession`. Session support should be SingleSession when `is_remote_pc = true`.",
 				Required:    true,
 				Validators: []validator.String{
 					util.GetValidatorFromEnum(citrixorchestration.AllowedSessionSupportEnumValues),
@@ -186,6 +187,15 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 				},
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
+				},
+			},
+			"minimum_functional_level": schema.StringAttribute{
+				Description: "Specifies the minimum functional level for the VDA machines in the catalog. Defaults to `L7_20`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("L7_20"),
+				Validators: []validator.String{
+					util.GetValidatorFromEnum(citrixorchestration.AllowedFunctionalLevelEnumValues),
 				},
 			},
 			"provisioning_scheme": schema.SingleNestedAttribute{
@@ -321,6 +331,9 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 							"writeback_cache": schema.SingleNestedAttribute{
 								Description: "Write-back Cache config. Leave this empty to disable Write-back Cache. Write-back Cache requires Machine image with Write-back Cache plugin installed.",
 								Optional:    true,
+								PlanModifiers: []planmodifier.Object{
+									objectplanmodifier.RequiresReplace(),
+								},
 								Attributes: map[string]schema.Attribute{
 									"persist_wbc": schema.BoolAttribute{
 										Description: "Persist Write-back Cache",
@@ -336,30 +349,18 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 												"Premium_LRS",
 											),
 										},
-										PlanModifiers: []planmodifier.String{
-											stringplanmodifier.RequiresReplace(),
-										},
 									},
 									"persist_os_disk": schema.BoolAttribute{
 										Description: "Persist the OS disk when power cycling the non-persistent provisioned virtual machine.",
 										Required:    true,
-										PlanModifiers: []planmodifier.Bool{
-											boolplanmodifier.RequiresReplace(),
-										},
 									},
 									"persist_vm": schema.BoolAttribute{
 										Description: "Persist the non-persistent provisioned virtual machine in Azure environments when power cycling. This property only applies when the PersistOsDisk property is set to True.",
 										Required:    true,
-										PlanModifiers: []planmodifier.Bool{
-											boolplanmodifier.RequiresReplace(),
-										},
 									},
 									"storage_cost_saving": schema.BoolAttribute{
 										Description: "Save storage cost by downgrading the storage type of the disk to Standard HDD when VM shut down.",
 										Required:    true,
-										PlanModifiers: []planmodifier.Bool{
-											boolplanmodifier.RequiresReplace(),
-										},
 									},
 									"writeback_cache_disk_size_gb": schema.Int64Attribute{
 										Description: "The size in GB of any temporary storage disk used by the write back cache.",
@@ -367,18 +368,12 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 										Validators: []validator.Int64{
 											int64validator.AtLeast(0),
 										},
-										PlanModifiers: []planmodifier.Int64{
-											int64planmodifier.RequiresReplace(),
-										},
 									},
 									"writeback_cache_memory_size_mb": schema.Int64Attribute{
 										Description: "The size of the in-memory write back cache in MB.",
-										Optional:    true,
+										Required:    true,
 										Validators: []validator.Int64{
 											int64validator.AtLeast(0),
-										},
-										PlanModifiers: []planmodifier.Int64{ // TO DO - Allow updating master image
-											int64planmodifier.RequiresReplace(),
 										},
 									},
 								},
@@ -392,6 +387,12 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 							"service_offering": schema.StringAttribute{
 								Description: "The AWS VM Sku to use when creating machines.",
 								Required:    true,
+								Validators: []validator.String{
+									stringvalidator.RegexMatches(
+										regexp.MustCompile(util.AwsEc2InstanceTypeRegex),
+										"must follow AWS EC2 instance type naming convention in lower case. Eg: t2.micro, m5.large, etc.",
+									),
+								},
 							},
 							"master_image": schema.StringAttribute{
 								Description: "The name of the virtual machine image that will be used.",
@@ -406,6 +407,9 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 					"gcp_machine_config": schema.SingleNestedAttribute{
 						Description: "Machine Configuration For GCP MCS catalog.",
 						Optional:    true,
+						PlanModifiers: []planmodifier.Object{
+							objectplanmodifier.RequiresReplace(),
+						},
 						Attributes: map[string]schema.Attribute{
 							"master_image": schema.StringAttribute{
 								Description: "The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors.",
@@ -449,16 +453,10 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 												"pd-ssd",
 											),
 										},
-										PlanModifiers: []planmodifier.String{
-											stringplanmodifier.RequiresReplace(),
-										},
 									},
 									"persist_os_disk": schema.BoolAttribute{
 										Description: "Persist the OS disk when power cycling the non-persistent provisioned virtual machine.",
 										Required:    true,
-										PlanModifiers: []planmodifier.Bool{
-											boolplanmodifier.RequiresReplace(),
-										},
 									},
 									"writeback_cache_disk_size_gb": schema.Int64Attribute{
 										Description: "The size in GB of any temporary storage disk used by the write back cache.",
@@ -466,32 +464,117 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 										Validators: []validator.Int64{
 											int64validator.AtLeast(0),
 										},
-										PlanModifiers: []planmodifier.Int64{
-											int64planmodifier.RequiresReplace(),
+									},
+									"writeback_cache_memory_size_mb": schema.Int64Attribute{
+										Description: "The size of the in-memory write back cache in MB.",
+										Required:    true,
+										Validators: []validator.Int64{
+											int64validator.AtLeast(0),
+										},
+									},
+								},
+							},
+						},
+					},
+					"vsphere_machine_config": schema.SingleNestedAttribute{
+						Description: "Machine Configuration For VSphere MCS catalog.",
+						Optional:    true,
+						Attributes: map[string]schema.Attribute{
+							"master_image_vm": schema.StringAttribute{
+								Description: "The name of the virtual machine that will be used as master image. This property is case sensitive.",
+								Required:    true,
+							},
+							"image_snapshot": schema.StringAttribute{
+								Description: "The Snapshot of the virtual machine specified in `master_image_vm`. Specify the relative path of the snapshot. Eg: snaphost-1/snapshot-2/snapshot-3. This property is case sensitive.",
+								Optional:    true,
+								Computed:    true,
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.UseStateForUnknown(),
+								},
+							},
+							"cpu_count": schema.Int64Attribute{
+								Description: "The number of processors that virtual machines created from the provisioning scheme should use",
+								Required:    true,
+							},
+							"memory_mb": schema.Int64Attribute{
+								Description: "The maximum amount of memory that virtual machines created from the provisioning scheme should use.",
+								Required:    true,
+							},
+							"writeback_cache": schema.SingleNestedAttribute{
+								Description: "Write-back Cache config. Leave this empty to disable Write-back Cache.",
+								Optional:    true,
+								PlanModifiers: []planmodifier.Object{
+									objectplanmodifier.RequiresReplace(),
+								},
+								Attributes: map[string]schema.Attribute{
+									"writeback_cache_disk_size_gb": schema.Int64Attribute{
+										Description: "The size in GB of any temporary storage disk used by the write back cache.",
+										Required:    true,
+										Validators: []validator.Int64{
+											int64validator.AtLeast(0),
 										},
 									},
 									"writeback_cache_memory_size_mb": schema.Int64Attribute{
 										Description: "The size of the in-memory write back cache in MB.",
-										Optional:    true,
+										Required:    true,
 										Validators: []validator.Int64{
 											int64validator.AtLeast(0),
 										},
-										PlanModifiers: []planmodifier.Int64{ // TO DO - Allow updating master image
-											int64planmodifier.RequiresReplace(),
+									},
+									"writeback_cache_drive_letter": schema.StringAttribute{
+										Description: "The drive letter assigned for write back cache disk.",
+										Optional:    true,
+										Validators: []validator.String{
+											stringvalidator.LengthBetween(1, 1),
 										},
 									},
-									"persist_vm": schema.BoolAttribute{
-										Description: "Not supported for GCP.",
-										Computed:    true,
-										PlanModifiers: []planmodifier.Bool{
-											boolplanmodifier.RequiresReplace(),
+								},
+							},
+						},
+					},
+					"xenserver_machine_config": schema.SingleNestedAttribute{
+						Description: "Machine Configuration For XenServer MCS catalog.",
+						Optional:    true,
+						Attributes: map[string]schema.Attribute{
+							"master_image_vm": schema.StringAttribute{
+								Description: "The name of the virtual machine that will be used as master image. This property is case sensitive.",
+								Required:    true,
+							},
+							"image_snapshot": schema.StringAttribute{
+								Description: "The Snapshot of the virtual machine specified in `master_image_vm`. Specify the relative path of the snapshot. Eg: snaphost-1/snapshot-2/snapshot-3. This property is case sensitive.",
+								Optional:    true,
+								Computed:    true,
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.UseStateForUnknown(),
+								},
+							},
+							"cpu_count": schema.Int64Attribute{
+								Description: "Number of CPU cores for the VDA VMs.",
+								Required:    true,
+							},
+							"memory_mb": schema.Int64Attribute{
+								Description: "Size of the memory in MB for the VDA VMs.",
+								Required:    true,
+							},
+							"writeback_cache": schema.SingleNestedAttribute{
+								Description: "Write-back Cache config. Leave this empty to disable Write-back Cache.",
+								Optional:    true,
+								PlanModifiers: []planmodifier.Object{
+									objectplanmodifier.RequiresReplace(),
+								},
+								Attributes: map[string]schema.Attribute{
+									"writeback_cache_disk_size_gb": schema.Int64Attribute{
+										Description: "The size in GB of any temporary storage disk used by the write back cache.",
+										Required:    true,
+										Validators: []validator.Int64{
+											int64validator.AtLeast(0),
 										},
 									},
-									"storage_cost_saving": schema.BoolAttribute{
-										Description: "Not supported for GCP.",
-										Computed:    true,
-										PlanModifiers: []planmodifier.Bool{
-											boolplanmodifier.RequiresReplace(),
+									"writeback_cache_memory_size_mb": schema.Int64Attribute{
+										Description: "The size of the in-memory write back cache in MB.",
+										Required:    true,
+										Validators: []validator.Int64{
+											int64validator.AtLeast(0),
 										},
 									},
 								},

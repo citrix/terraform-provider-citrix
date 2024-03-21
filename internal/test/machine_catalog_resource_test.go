@@ -14,6 +14,9 @@ func TestMachineCatalogPreCheck_Azure(t *testing.T) {
 	if v := os.Getenv("TEST_MC_NAME"); v == "" {
 		t.Fatal("TEST_MC_NAME must be set for acceptance tests")
 	}
+	if v := os.Getenv("TEST_MC_DOMAIN"); v == "" {
+		t.Fatal("TEST_MC_DOMAIN must be set for acceptance tests")
+	}
 	if v := os.Getenv("TEST_MC_SERVICE_ACCOUNT"); v == "" {
 		t.Fatal("TEST_MC_SERVICE_ACCOUNT must be set for acceptance tests")
 	}
@@ -42,7 +45,6 @@ func TestMachineCatalogPreCheck_Azure(t *testing.T) {
 		t.Fatal("TEST_MC_SUBNET must be set for acceptance tests")
 	}
 }
-
 func TestActiveDirectoryMachineCatalogResourceAzure(t *testing.T) {
 	name := os.Getenv("TEST_MC_NAME")
 
@@ -171,6 +173,95 @@ func TestHybridAzureADMachineCatalogResourceAzure(t *testing.T) {
 	})
 }
 
+func TestMachineCatalogPreCheck_AzureAd(t *testing.T) {
+	if v := os.Getenv("TEST_MC_NAME"); v == "" {
+		t.Fatal("TEST_MC_NAME must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_SERVICE_OFFERING"); v == "" {
+		t.Fatal("TEST_MC_SERVICE_OFFERING must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_MASTER_IMAGE"); v == "" {
+		t.Fatal("TEST_MC_MASTER_IMAGE must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED"); v == "" {
+		t.Fatal("TEST_MC_MASTER_IMAGE_UPDATED must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_IMAGE_RESOUCE_GROUP"); v == "" {
+		t.Fatal("TEST_MC_IMAGE_RESOUCE_GROUP must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_IMAGE_STORAGE_ACCOUNT"); v == "" {
+		t.Fatal("TEST_MC_IMAGE_STORAGE_ACCOUNT must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_IMAGE_CONTAINER"); v == "" {
+		t.Fatal("TEST_MC_IMAGE_CONTAINER must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_SUBNET"); v == "" {
+		t.Fatal("TEST_MC_SUBNET must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_MACHINE_PROFILE_VM_NAME"); v == "" {
+		t.Fatal("TEST_MC_MACHINE_PROFILE_VM_NAME must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_MACHINE_PROFILE_RESOURCE_GROUP"); v == "" {
+		t.Fatal("TEST_MC_MACHINE_PROFILE_RESOURCE_GROUP must be set for acceptance tests")
+	}
+}
+
+func TestAzureADMachineCatalogResourceAzure(t *testing.T) {
+	name := os.Getenv("TEST_MC_NAME") + "-AAD"
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck: func() {
+			TestProviderPreCheck(t)
+			TestHypervisorPreCheck_Azure(t)
+			TestHypervisorResourcePoolPreCheck_Azure(t)
+			TestMachineCatalogPreCheck_AzureAd(t)
+		},
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: BuildMachineCatalogResourceAzureAd(t, machinecatalog_testResources_azure_ad),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify name of catalog
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
+					// Verify domain FQDN
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "session_support", "MultiSession"),
+					// Verify machine catalog identity type
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.identity_type", "AzureAD"),
+					// Verify nic network
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.network_mapping.network", os.Getenv("TEST_MC_SUBNET")),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "citrix_machine_catalog.testMachineCatalog",
+				ImportState:       true,
+				ImportStateVerify: true,
+				// The last_updated attribute does not exist in the Orchestration
+				// API, therefore there is no value for it during import.
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache"},
+			},
+			// Update description, master image and add machine test
+			{
+				Config: BuildMachineCatalogResourceAzureAd(t, machinecatalog_testResources_azure_ad_updated),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify updated name of catalog
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
+					// Verify updated description
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "description", "updatedCatalog"),
+					// Verify updated image
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.azure_machine_config.master_image", os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")),
+					// Verify machine catalog identity type
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.identity_type", "AzureAD"),
+					// Verify total number of machines
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.number_of_total_machines", "2"),
+				),
+			},
+			//Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
 func TestMachineCatalogPreCheck_GCP(t *testing.T) {
 	if v := os.Getenv("TEST_MC_NAME_GCP"); v == "" {
 		t.Fatal("TEST_MC_NAME_GCP must be set for acceptance tests")
@@ -243,6 +334,158 @@ func TestMachineCatalogResourceGCP(t *testing.T) {
 			//Update description, master image and add machine test
 			{
 				Config: BuildMachineCatalogResourceGCP(t, machinecatalog_testResources_gcp_updated),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify updated name of catalog
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
+					// Verify updated description
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "description", "updatedCatalog"),
+					// Verify total number of machines
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.number_of_total_machines", "2"),
+				),
+			},
+			//Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
+func TestMachineCatalogPreCheck_Vsphere(t *testing.T) {
+	if v := os.Getenv("TEST_MC_NAME_VSPHERE"); v == "" {
+		t.Fatal("TEST_MC_NAME_VSPHERE must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_SERVICE_ACCOUNT_VSPHERE"); v == "" {
+		t.Fatal("TEST_MC_SERVICE_ACCOUNT_VSPHERE must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_SERVICE_ACCOUNT_PASS_VSPHERE"); v == "" {
+		t.Fatal("TEST_MC_SERVICE_ACCOUNT_PASS_VSPHERE must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_MASTER_IMAGE_VSPHERE"); v == "" {
+		t.Fatal("TEST_MC_MASTER_IMAGE_VSPHERE must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_DOMAIN_VSPHERE"); v == "" {
+		t.Fatal("TEST_MC_DOMAIN_VSPHERE must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_MEMORY_MB_VSPHERE"); v == "" {
+		t.Fatal("TEST_MC_MEMORY_MB_VSPHERE must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_CPU_COUNT_VSPHERE"); v == "" {
+		t.Fatal("TEST_MC_CPU_COUNT_VSPHERE must be set for acceptance tests")
+	}
+}
+
+func TestMachineCatalogResourceVsphere(t *testing.T) {
+	name := os.Getenv("TEST_MC_NAME_VSPHERE")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck: func() {
+			TestProviderPreCheck(t)
+			TestHypervisorPreCheck_Vsphere(t)
+			TestHypervisorResourcePoolPreCheck_Vsphere(t)
+			TestMachineCatalogPreCheck_Vsphere(t)
+		},
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: BuildMachineCatalogResourceVsphere(t, machine_catalog_testResources_vsphere),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify name of catalog
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
+					// Verify domain FQDN
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "session_support", "MultiSession"),
+					// Verify domain admin username
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.machine_domain_identity.service_account", os.Getenv("TEST_MC_SERVICE_ACCOUNT_VSPHERE")),
+					// Verify total number of machines
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.number_of_total_machines", "1"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "citrix_machine_catalog.testMachineCatalog",
+				ImportState:       true,
+				ImportStateVerify: true,
+				// The last_updated attribute does not exist in the Orchestration
+				// API, therefore there is no value for it during import.
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.vsphere_machine_config.master_image", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_domain_identity.service_account_password"},
+			},
+			//Update description, master image and add machine test
+			{
+				Config: BuildMachineCatalogResourceVsphere(t, machine_catalog_testResources_vsphere_updated),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify updated name of catalog
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
+					// Verify updated description
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "description", "updatedCatalog"),
+					// Verify total number of machines
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.number_of_total_machines", "2"),
+				),
+			},
+			//Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
+func TestMachineCatalogPreCheck_Xenserver(t *testing.T) {
+	if v := os.Getenv("TEST_MC_NAME_XENSERVER"); v == "" {
+		t.Fatal("TEST_MC_NAME_XENSERVER must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_SERVICE_ACCOUNT_XENSERVER"); v == "" {
+		t.Fatal("TEST_MC_SERVICE_ACCOUNT_XENSERVER must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_SERVICE_ACCOUNT_PASS_XENSERVER"); v == "" {
+		t.Fatal("TEST_MC_SERVICE_ACCOUNT_PASS_XENSERVER must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_MASTER_IMAGE_XENSERVER"); v == "" {
+		t.Fatal("TEST_MC_MASTER_IMAGE_XENSERVER must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_DOMAIN_XENSERVER"); v == "" {
+		t.Fatal("TEST_MC_DOMAIN_XENSERVER must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_MEMORY_MB_XENSERVER"); v == "" {
+		t.Fatal("TEST_MC_MEMORY_MB_XENSERVER must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_CPU_COUNT_XENSERVER"); v == "" {
+		t.Fatal("TEST_MC_CPU_COUNT_XENSERVER must be set for acceptance tests")
+	}
+}
+
+func TestMachineCatalogResourceXenserver(t *testing.T) {
+	name := os.Getenv("TEST_MC_NAME_XENSERVER")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck: func() {
+			TestProviderPreCheck(t)
+			TestHypervisorPreCheck_Xenserver(t)
+			TestHypervisorResourcePoolPreCheck_Xenserver(t)
+			TestMachineCatalogPreCheck_Xenserver(t)
+		},
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: BuildMachineCatalogResourceXenserver(t, machine_catalog_testResources_xenserver),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify name of catalog
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
+					// Verify domain FQDN
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "session_support", "MultiSession"),
+					// Verify domain admin username
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.machine_domain_identity.service_account", os.Getenv("TEST_MC_SERVICE_ACCOUNT_XENSERVER")),
+					// Verify total number of machines
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.number_of_total_machines", "1"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "citrix_machine_catalog.testMachineCatalog",
+				ImportState:       true,
+				ImportStateVerify: true,
+				// The last_updated attribute does not exist in the Orchestration
+				// API, therefore there is no value for it during import.
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.xenserver_machine_config.master_image", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_domain_identity.service_account_password"},
+			},
+			//Update description, master image and add machine test
+			{
+				Config: BuildMachineCatalogResourceXenserver(t, machine_catalog_testResources_xenserver_updated),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
@@ -651,6 +894,7 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 	allocation_type				= "Random"
 	session_support				= "MultiSession"
 	provisioning_type			= "MCS"
+	minimum_functional_level    = "L7_9"
 	provisioning_scheme			= 	{
 		hypervisor			 = citrix_azure_hypervisor.testHypervisor.id
 		hypervisor_resource_pool = citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool.id
@@ -674,6 +918,7 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 				persist_os_disk = true
 				persist_vm = true
 				writeback_cache_disk_size_gb = 127
+				writeback_cache_memory_size_mb = 256
 				storage_cost_saving = true
 			}
 		}
@@ -698,6 +943,7 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 		allocation_type				= "Random"
 		session_support				= "MultiSession"
 		provisioning_type			= "MCS"
+		minimum_functional_level    = "L7_20"
 		provisioning_scheme			= 	{
 			hypervisor			 = citrix_azure_hypervisor.testHypervisor.id
 			hypervisor_resource_pool = citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool.id
@@ -721,6 +967,7 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 					persist_os_disk = true
 					persist_vm = true
 					writeback_cache_disk_size_gb = 127
+					writeback_cache_memory_size_mb = 256
 					storage_cost_saving = true
 				}
 			}
@@ -770,6 +1017,7 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 					persist_os_disk = true
 					persist_vm = true
 					writeback_cache_disk_size_gb = 127
+					writeback_cache_memory_size_mb = 256
 					storage_cost_saving = true
 				}
 			}
@@ -787,6 +1035,100 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 		zone						= citrix_zone.test.id
 	}
 	`
+	machinecatalog_testResources_azure_ad = `
+	resource "citrix_machine_catalog" "testMachineCatalog" {
+		name                		= "%s"
+		description					= "on prem catalog for import testing"
+		allocation_type				= "Random"
+		session_support				= "MultiSession"
+		provisioning_type			= "MCS"
+		provisioning_scheme			= 	{
+			hypervisor			 = citrix_azure_hypervisor.testHypervisor.id
+			hypervisor_resource_pool = citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool.id
+			identity_type = "AzureAD"
+			azure_machine_config = {
+				service_offering 	 = "%s"
+				resource_group 		 = "%s"
+	            storage_account 	 = "%s"
+	            container 			 = "%s"
+				master_image		 = "%s"
+				machine_profile = {
+					machine_profile_vm_name = "%s"
+					machine_profile_resource_group = "%s"
+				}
+				storage_type = "Standard_LRS"
+				use_managed_disks = true
+				writeback_cache = {
+					wbc_disk_storage_type = "Standard_LRS"
+					persist_wbc = true
+					persist_os_disk = true
+					persist_vm = true
+					writeback_cache_disk_size_gb = 127
+					writeback_cache_memory_size_mb = 256
+					storage_cost_saving = true
+				}
+			}
+			network_mapping = {
+				network_device = "0"
+				network 	   = "%s"
+			}
+			number_of_total_machines = 	1
+			machine_account_creation_rules ={
+				naming_scheme =     "test-machine-##"
+				naming_scheme_type ="Numeric"
+			}
+		}
+
+		zone						= citrix_zone.test.id
+	}
+	`
+	machinecatalog_testResources_azure_ad_updated = `
+	resource "citrix_machine_catalog" "testMachineCatalog" {
+		name                		= "%s"
+		description					= "updatedCatalog"
+		allocation_type				= "Random"
+		session_support				= "MultiSession"
+		provisioning_type			= "MCS"
+		provisioning_scheme			= 	{
+			hypervisor			 = citrix_azure_hypervisor.testHypervisor.id
+			hypervisor_resource_pool = citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool.id
+			identity_type = "AzureAD"
+			azure_machine_config = {
+				service_offering 	 = "%s"
+				resource_group 		 = "%s"
+				storage_account 	 = "%s"
+				container 			 = "%s"
+				master_image		 = "%s"
+				machine_profile = {
+					machine_profile_vm_name = "%s"
+					machine_profile_resource_group = "%s"
+				}
+				storage_type = "Standard_LRS"
+				use_managed_disks = true
+				writeback_cache = {
+					wbc_disk_storage_type = "Standard_LRS"
+					persist_wbc = true
+					persist_os_disk = true
+					persist_vm = true
+					writeback_cache_disk_size_gb = 127
+					writeback_cache_memory_size_mb = 256
+					storage_cost_saving = true
+				}
+			}
+			network_mapping = {
+				network_device = "0"
+				network 	   = "%s"
+			}
+			availability_zones = "1,3"
+			number_of_total_machines = 	2
+			machine_account_creation_rules ={
+				naming_scheme =     "test-machine-##"
+				naming_scheme_type ="Numeric"
+			}
+		}
+		zone						= citrix_zone.test.id
+	}
+	`
 
 	machinecatalog_testResources_gcp = `
 	resource "citrix_machine_catalog" "testMachineCatalog" {
@@ -795,6 +1137,7 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 		allocation_type				= "Random"
 		session_support				= "MultiSession"
 		provisioning_type			= "MCS"
+		minimum_functional_level    = "L7_9"
 		provisioning_scheme			= 	{
 			hypervisor			 = citrix_gcp_hypervisor.testHypervisor.id
 			hypervisor_resource_pool = citrix_gcp_hypervisor_resource_pool.testHypervisorResourcePool.id
@@ -828,6 +1171,7 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 		allocation_type				= "Random"
 		session_support				= "MultiSession"
 		provisioning_type			= "MCS"
+		minimum_functional_level    = "L7_20"
 		provisioning_scheme			= 	{
 			hypervisor			 = citrix_gcp_hypervisor.testHypervisor.id
 			hypervisor_resource_pool = citrix_gcp_hypervisor_resource_pool.testHypervisorResourcePool.id
@@ -851,6 +1195,129 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 			}
 		}
 		zone						= citrix_zone.test.id
+	}
+	`
+	machine_catalog_testResources_vsphere = `
+	resource "citrix_machine_catalog" "testMachineCatalog" {
+		name                        = "%s"
+    	description                 = "vsphere catalog for acceptance testing"
+    	provisioning_type = "MCS"
+    	allocation_type             = "Random"
+    	session_support             = "MultiSession"
+    	zone                        = citrix_zone.test.id
+    	provisioning_scheme         = {
+    	    identity_type = "ActiveDirectory"
+    	    number_of_total_machines = 1
+    	    machine_account_creation_rules = {
+    	        naming_scheme = "test-machine-##"
+    	        naming_scheme_type = "Numeric"
+    	    }
+    	    hypervisor = citrix_vsphere_hypervisor.testHypervisor.id
+    	    hypervisor_resource_pool = citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool.id
+    	    vsphere_machine_config = {
+    	        master_image_vm = "%s"
+    	        memory_mb = "%s"
+				cpu_count = "%s"
+    	    }
+    	    machine_domain_identity = {
+    	        service_account             = "%s"
+			    domain = "%s"
+    	        service_account_password    = "%s"
+    	    }
+    	}
+	}
+	`
+
+	machine_catalog_testResources_vsphere_updated = `
+	resource "citrix_machine_catalog" "testMachineCatalog" {
+		name                        = "%s"
+    	description                 = "updatedCatalog"
+    	provisioning_type = "MCS"
+    	allocation_type             = "Random"
+    	session_support             = "MultiSession"
+    	zone                        = citrix_zone.test.id
+    	provisioning_scheme         = {
+    	    identity_type = "ActiveDirectory"
+    	    number_of_total_machines = 2
+    	    machine_account_creation_rules = {
+    	        naming_scheme = "test-machine-##"
+    	        naming_scheme_type = "Numeric"
+    	    }
+    	    hypervisor = citrix_vsphere_hypervisor.testHypervisor.id
+    	    hypervisor_resource_pool = citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool.id
+    	    vsphere_machine_config = {
+    	        master_image_vm = "%s"
+    	        memory_mb = "%s"
+				cpu_count = "%s"
+    	    }
+    	    machine_domain_identity = {
+    	        service_account             = "%s"
+			    domain = "%s"
+    	        service_account_password    = "%s"
+    	    }
+    	}
+	}
+	`
+
+	machine_catalog_testResources_xenserver = `
+	resource "citrix_machine_catalog" "testMachineCatalog" {
+		name                        = "%s"
+    	description                 = "xenserver catalog for acceptance testing"
+    	provisioning_type = "MCS"
+    	allocation_type             = "Random"
+    	session_support             = "MultiSession"
+    	zone                        = citrix_zone.test.id
+    	provisioning_scheme         = {
+    	    identity_type = "ActiveDirectory"
+    	    number_of_total_machines = 1
+    	    machine_account_creation_rules = {
+    	        naming_scheme = "test-machine-##"
+    	        naming_scheme_type = "Numeric"
+    	    }
+    	    hypervisor = citrix_xenserver_hypervisor.testHypervisor.id
+    	    hypervisor_resource_pool = citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool.id
+    	    xenserver_machine_config = {
+    	        master_image_vm = "%s"
+    	        memory_mb = "%s"
+				cpu_count = "%s"
+    	    }
+    	    machine_domain_identity = {
+    	        service_account             = "%s"
+			    domain = "%s"
+    	        service_account_password    = "%s"
+    	    }
+    	}
+	}
+	`
+
+	machine_catalog_testResources_xenserver_updated = `
+	resource "citrix_machine_catalog" "testMachineCatalog" {
+		name                        = "%s"
+    	description                 = "updatedCatalog"
+    	provisioning_type = "MCS"
+    	allocation_type             = "Random"
+    	session_support             = "MultiSession"
+    	zone                        = citrix_zone.test.id
+    	provisioning_scheme         = {
+    	    identity_type = "ActiveDirectory"
+    	    number_of_total_machines = 2
+    	    machine_account_creation_rules = {
+    	        naming_scheme = "test-machine-##"
+    	        naming_scheme_type = "Numeric"
+    	    }
+    	    hypervisor = citrix_xenserver_hypervisor.testHypervisor.id
+    	    hypervisor_resource_pool = citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool.id
+    	    xenserver_machine_config = {
+    	        master_image_vm = "%s"
+    	        memory_mb = "%s"
+				cpu_count = "%s"
+    	    }
+    	    machine_domain_identity = {
+    	        service_account             = "%s"
+			    domain = "%s"
+    	        service_account_password    = "%s"
+    	    }
+    	}
 	}
 	`
 
@@ -1035,6 +1502,9 @@ func BuildMachineCatalogResourceAzure(t *testing.T, machineResource string, iden
 	if identityType == "HybridAzureAD" {
 		name += "-HybAAD"
 	}
+	if identityType == "AzureAD" {
+		name += "-AAD"
+	}
 	service_account := os.Getenv("TEST_MC_SERVICE_ACCOUNT")
 	service_account_pass := os.Getenv("TEST_MC_SERVICE_ACCOUNT_PASS")
 	service_offering := os.Getenv("TEST_MC_SERVICE_OFFERING")
@@ -1053,6 +1523,24 @@ func BuildMachineCatalogResourceAzure(t *testing.T, machineResource string, iden
 	return BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure) + fmt.Sprintf(machineResource, name, identityType, domain, service_account, service_account_pass, service_offering, resource_group, storage_account, container, master_image, subnet)
 }
 
+func BuildMachineCatalogResourceAzureAd(t *testing.T, machineResource string) string {
+	name := os.Getenv("TEST_MC_NAME") + "-AAD"
+	service_offering := os.Getenv("TEST_MC_SERVICE_OFFERING")
+	master_image := os.Getenv("TEST_MC_MASTER_IMAGE")
+	resource_group := os.Getenv("TEST_MC_IMAGE_RESOUCE_GROUP")
+	storage_account := os.Getenv("TEST_MC_IMAGE_STORAGE_ACCOUNT")
+	container := os.Getenv("TEST_MC_IMAGE_CONTAINER")
+	subnet := os.Getenv("TEST_MC_SUBNET")
+
+	machine_profile_vm_name := os.Getenv("TEST_MC_MACHINE_PROFILE_VM_NAME")
+	machine_profile_resource_group := os.Getenv("TEST_MC_MACHINE_PROFILE_RESOURCE_GROUP")
+	if machineResource == machinecatalog_testResources_azure_ad_updated {
+		master_image = os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")
+	}
+
+	return BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure) + fmt.Sprintf(machineResource, name, service_offering, resource_group, storage_account, container, master_image, machine_profile_vm_name, machine_profile_resource_group, subnet)
+}
+
 func BuildMachineCatalogResourceGCP(t *testing.T, machineResource string) string {
 	name := os.Getenv("TEST_MC_NAME_GCP")
 	identityType := "ActiveDirectory"
@@ -1068,6 +1556,30 @@ func BuildMachineCatalogResourceGCP(t *testing.T, machineResource string) string
 	domain := os.Getenv("TEST_MC_DOMAIN_GCP")
 
 	return BuildHypervisorResourcePoolResourceGCP(t, hypervisor_resource_pool_testResource_gcp) + fmt.Sprintf(machineResource, name, identityType, domain, service_account, service_account_pass, storage_type, machine_profile, master_image, machine_snapshot, availability_zones)
+}
+
+func BuildMachineCatalogResourceVsphere(t *testing.T, machineResource string) string {
+	name := os.Getenv("TEST_MC_NAME_VSPHERE")
+	master_image := os.Getenv("TEST_MC_MASTER_IMAGE_VSPHERE")
+	memory_mb := os.Getenv("TEST_MC_MEMORY_MB_VSPHERE")
+	cpu_count := os.Getenv("TEST_MC_CPU_COUNT_VSPHERE")
+	domain := os.Getenv("TEST_MC_DOMAIN_VSPHERE")
+	service_account := os.Getenv("TEST_MC_SERVICE_ACCOUNT_VSPHERE")
+	service_account_pass := os.Getenv("TEST_MC_SERVICE_ACCOUNT_PASS_VSPHERE")
+
+	return BuildHypervisorResourcePoolResourceVsphere(t) + fmt.Sprintf(machineResource, name, master_image, memory_mb, cpu_count, service_account, domain, service_account_pass)
+}
+
+func BuildMachineCatalogResourceXenserver(t *testing.T, machineResource string) string {
+	name := os.Getenv("TEST_MC_NAME_XENSERVER")
+	master_image := os.Getenv("TEST_MC_MASTER_IMAGE_XENSERVER")
+	memory_mb := os.Getenv("TEST_MC_MEMORY_MB_XENSERVER")
+	cpu_count := os.Getenv("TEST_MC_CPU_COUNT_XENSERVER")
+	domain := os.Getenv("TEST_MC_DOMAIN_XENSERVER")
+	service_account := os.Getenv("TEST_MC_SERVICE_ACCOUNT_XENSERVER")
+	service_account_pass := os.Getenv("TEST_MC_SERVICE_ACCOUNT_PASS_XENSERVER")
+
+	return BuildHypervisorResourcePoolResourceXenServer(t) + fmt.Sprintf(machineResource, name, master_image, memory_mb, cpu_count, service_account, domain, service_account_pass)
 }
 
 func BuildMachineCatalogResourceManualPowerManagedAzure(t *testing.T, machineResource string) string {
