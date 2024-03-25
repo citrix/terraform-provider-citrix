@@ -150,14 +150,14 @@ A delivery group is a collection of machines selected from one or more machine c
 
 #### What resource is supported for different connection types?
 
-| Connection Type |   Hypervisor     |   Resource Pool  |   Machine Catalog   | 
-|-----------------|------------------|------------------|---------------------|
-| AzureRM         |:heavy_check_mark:|:heavy_check_mark:| MCS / Power Managed |
-| AWS EC2         |:heavy_check_mark:|:heavy_check_mark:| MCS / Power Managed |
-| GCP             |:heavy_check_mark:|:heavy_check_mark:| MCS / Power Managed |
-| Vsphere         |:heavy_check_mark:|:heavy_check_mark:| MCS / Power Managed |
-| XenServer       |:heavy_check_mark:|:heavy_check_mark:| MCS / Power Managed |
-| Nutanix         |:heavy_check_mark:|   in progress    |    Power Managed    |
+| Connection Type |   Hypervisor     |   Resource Pool  |   MCS Power Managed |MCS Provisioning  |
+|-----------------|------------------|------------------|---------------------|------------------|
+| AzureRM         |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  |:heavy_check_mark:|
+| AWS EC2         |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  |:heavy_check_mark:|
+| GCP             |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  |:heavy_check_mark:|
+| Vsphere         |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  |:heavy_check_mark:|
+| XenServer       |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  |:heavy_check_mark:|
+| Nutanix         |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  |   In Progress    | 
 
 
 #### What provisioning types are supported for machine catalog? 
