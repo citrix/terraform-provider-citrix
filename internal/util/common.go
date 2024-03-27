@@ -65,6 +65,7 @@ const SnapshotResourceType string = "Snapshot"
 const VhdResourceType string = "Vhd"
 const VirtualPrivateCloudResourceType string = "VirtualPrivateCloud"
 const VirtualMachineResourceType string = "Vm"
+const TemplateSpecVersionResourceType string = "TemplateSpecVersion"
 
 // Terraform model for name value string pair
 type NameValueStringPairModel struct {

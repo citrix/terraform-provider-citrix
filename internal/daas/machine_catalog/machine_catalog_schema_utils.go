@@ -320,11 +320,32 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 								Attributes: map[string]schema.Attribute{
 									"machine_profile_vm_name": schema.StringAttribute{
 										Description: "The name of the machine profile virtual machine.",
-										Required:    true,
+										Optional:    true,
 									},
 									"machine_profile_resource_group": schema.StringAttribute{
 										Description: "The resource group name where machine profile VM is located in.",
 										Required:    true,
+									},
+									"azure_template_spec_name": schema.StringAttribute{
+										Description: "The name of the Azure template spec.",
+										Optional:    true,
+										Validators: []validator.String{
+											stringvalidator.ExactlyOneOf(path.Expressions{
+												path.MatchRelative().AtParent().AtName("machine_profile_vm_name"),
+											}...),
+											stringvalidator.AlsoRequires(path.Expressions{
+												path.MatchRelative().AtParent().AtName("azure_template_spec_version"),
+											}...),
+										},
+									},
+									"azure_template_spec_version": schema.StringAttribute{
+										Description: "The version of the Azure template spec.",
+										Optional:    true,
+										Validators: []validator.String{
+											stringvalidator.ConflictsWith(path.Expressions{
+												path.MatchRelative().AtParent().AtName("machine_profile_vm_name"),
+											}...),
+										},
 									},
 								},
 							},
