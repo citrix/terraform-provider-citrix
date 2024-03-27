@@ -151,7 +151,7 @@ func (r *awsHypervisorResourcePoolResource) Create(ctx context.Context, req reso
 	availabilityZonePath := fmt.Sprintf("%s/%s.availabilityzone", vpcPath, plan.AvailabilityZone.ValueString())
 	resourcePoolDetails.SetAvailabilityZone(availabilityZonePath)
 	planSubnet := util.ConvertBaseStringArrayToPrimitiveStringArray(plan.Subnets)
-	subnets, err := util.GetFilteredResourcePathList(ctx, r.client, hypervisorId, availabilityZonePath, "Network", planSubnet, hypervisorConnectionType, "")
+	subnets, err := util.GetFilteredResourcePathList(ctx, r.client, hypervisorId, availabilityZonePath, util.NetworkResourceType, planSubnet, hypervisorConnectionType, hypervisor.GetPluginId())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor Resource Pool for AWS",

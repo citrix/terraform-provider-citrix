@@ -190,7 +190,7 @@ func buildProvSchemeForMcsCatalog(ctx context.Context, client *citrixdaasclient.
 
 		masterImage := plan.ProvisioningScheme.AwsMachineConfig.MasterImage.ValueString()
 		imageId := fmt.Sprintf("%s (%s)", masterImage, plan.ProvisioningScheme.AwsMachineConfig.ImageAmi.ValueString())
-		imagePath, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", imageId, "template", "")
+		imagePath, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", imageId, util.TemplateResourceType, "")
 		if err != nil {
 			diag.AddError(
 				"Error creating Machine Catalog",
@@ -252,7 +252,7 @@ func buildProvSchemeForMcsCatalog(ctx context.Context, client *citrixdaasclient.
 
 		image := plan.ProvisioningScheme.VsphereMachineConfig.MasterImageVm.ValueString()
 		snapshot := plan.ProvisioningScheme.VsphereMachineConfig.ImageSnapshot.ValueString()
-		imagePath, err := getOnPremImagePath(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), image, snapshot, "Creating")
+		imagePath, err := getOnPremImagePath(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), image, snapshot, "creating")
 		if err != nil {
 			return nil, err
 		}
@@ -274,7 +274,7 @@ func buildProvSchemeForMcsCatalog(ctx context.Context, client *citrixdaasclient.
 
 		image := plan.ProvisioningScheme.XenserverMachineConfig.MasterImageVm.ValueString()
 		snapshot := plan.ProvisioningScheme.XenserverMachineConfig.ImageSnapshot.ValueString()
-		imagePath, err := getOnPremImagePath(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), image, snapshot, "Creating")
+		imagePath, err := getOnPremImagePath(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), image, snapshot, "creating")
 		if err != nil {
 			return nil, err
 		}
@@ -287,10 +287,45 @@ func buildProvSchemeForMcsCatalog(ctx context.Context, client *citrixdaasclient.
 				provisioningScheme.SetWriteBackCacheMemorySizeMB(int32(plan.ProvisioningScheme.XenserverMachineConfig.WritebackCache.WriteBackCacheMemorySizeMB.ValueInt64()))
 			}
 		}
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM:
+		if hypervisor.GetPluginId() != util.NUTANIX_PLUGIN_ID {
+			return nil, fmt.Errorf("unsupported hypervisor plugin %s", hypervisor.GetPluginId())
+		}
+
+		provisioningScheme.SetMemoryMB(int32(plan.ProvisioningScheme.NutanixMachineConfigModel.MemoryMB.ValueInt64()))
+		provisioningScheme.SetCpuCount(int32(plan.ProvisioningScheme.NutanixMachineConfigModel.CpuCount.ValueInt64()))
+		provisioningScheme.SetCoresPerCpuCount(int32(plan.ProvisioningScheme.NutanixMachineConfigModel.CoresPerCpuCount.ValueInt64()))
+
+		imagePath, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", plan.ProvisioningScheme.NutanixMachineConfigModel.MasterImage.ValueString(), util.TemplateResourceType, "")
+
+		if err != nil {
+			diag.AddError(
+				"Error creating Machine Catalog",
+				fmt.Sprintf("Failed to locate master image %s on NUTANIX, error: %s", plan.ProvisioningScheme.NutanixMachineConfigModel.MasterImage.ValueString(), err.Error()),
+			)
+			return nil, err
+		}
+
+		containerId, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", plan.ProvisioningScheme.NutanixMachineConfigModel.Container.ValueString(), util.StorageResourceType, "")
+
+		if err != nil {
+			diag.AddError(
+				"Error creating Machine Catalog",
+				fmt.Sprintf("Failed to locate container %s on NUTANIX, error: %s", plan.ProvisioningScheme.NutanixMachineConfigModel.Container.ValueString(), err.Error()),
+			)
+			return nil, err
+		}
+
+		provisioningScheme.SetMasterImagePath(imagePath)
+		var customProperty citrixorchestration.NameValueStringPairModel
+		customProperty.SetName("NutanixContainerId")
+		customProperty.SetValue(containerId)
+		customProperties := []citrixorchestration.NameValueStringPairModel{customProperty}
+		provisioningScheme.SetCustomProperties(customProperties)
 	}
 
 	if plan.ProvisioningScheme.NetworkMapping != nil {
-		networkMapping, err := parseNetworkMappingToClientModel(*plan.ProvisioningScheme.NetworkMapping, hypervisorResourcePool)
+		networkMapping, err := parseNetworkMappingToClientModel(*plan.ProvisioningScheme.NetworkMapping, hypervisorResourcePool, hypervisor.GetPluginId())
 		if err != nil {
 			diag.AddError(
 				"Error creating Machine Catalog",
@@ -301,8 +336,10 @@ func buildProvSchemeForMcsCatalog(ctx context.Context, client *citrixdaasclient.
 		provisioningScheme.SetNetworkMapping(networkMapping)
 	}
 
-	customProperties := parseCustomPropertiesToClientModel(*plan.ProvisioningScheme, hypervisor.ConnectionType)
-	provisioningScheme.SetCustomProperties(customProperties)
+	if hypervisor.GetConnectionType() != citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM || hypervisor.GetPluginId() != util.NUTANIX_PLUGIN_ID {
+		customProperties := parseCustomPropertiesToClientModel(*plan.ProvisioningScheme, hypervisor.ConnectionType)
+		provisioningScheme.SetCustomProperties(customProperties)
+	}
 
 	return &provisioningScheme, nil
 }
@@ -354,7 +391,7 @@ func setProvSchemePropertiesForUpdateCatalog(plan MachineCatalogResourceModel, b
 	}
 
 	if plan.ProvisioningScheme.NetworkMapping != nil {
-		networkMapping, err := parseNetworkMappingToClientModel(*plan.ProvisioningScheme.NetworkMapping, hypervisorResourcePool)
+		networkMapping, err := parseNetworkMappingToClientModel(*plan.ProvisioningScheme.NetworkMapping, hypervisorResourcePool, hypervisor.GetPluginId())
 		if err != nil {
 			diagnostics.AddError(
 				"Error updating Machine Catalog",
@@ -628,7 +665,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
 		imageId := fmt.Sprintf("%s (%s)", plan.ProvisioningScheme.AwsMachineConfig.MasterImage.ValueString(), plan.ProvisioningScheme.AwsMachineConfig.ImageAmi.ValueString())
-		imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", imageId, "template", "")
+		imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", imageId, util.TemplateResourceType, "")
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating Machine Catalog",
@@ -674,16 +711,28 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER:
 		newImage := plan.ProvisioningScheme.VsphereMachineConfig.MasterImageVm.ValueString()
 		snapshot := plan.ProvisioningScheme.VsphereMachineConfig.ImageSnapshot.ValueString()
-		imagePath, err = getOnPremImagePath(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), newImage, snapshot, "Updating")
+		imagePath, err = getOnPremImagePath(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), newImage, snapshot, "updating")
 		if err != nil {
 			return err
 		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER:
 		newImage := plan.ProvisioningScheme.XenserverMachineConfig.MasterImageVm.ValueString()
 		snapshot := plan.ProvisioningScheme.XenserverMachineConfig.ImageSnapshot.ValueString()
-		imagePath, err = getOnPremImagePath(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), newImage, snapshot, "Updating")
+		imagePath, err = getOnPremImagePath(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), newImage, snapshot, "updating")
 		if err != nil {
 			return err
+		}
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM:
+		if hypervisor.GetPluginId() == util.NUTANIX_PLUGIN_ID {
+			imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", plan.ProvisioningScheme.NutanixMachineConfigModel.MasterImage.ValueString(), util.TemplateResourceType, "")
+
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error updating Machine Catalog",
+					fmt.Sprintf("Failed to locate master image %s on NUTANIX, error: %s", plan.ProvisioningScheme.NutanixMachineConfigModel.MasterImage.ValueString(), err.Error()),
+				)
+				return err
+			}
 		}
 	}
 
@@ -706,8 +755,18 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 	rebootOption.SetRebootDuration(60)
 	rebootOption.SetWarningDuration(15)
 	rebootOption.SetWarningMessage("Warning: An important update is about to be installed. To ensure that no loss of data occurs, save any outstanding work and close all applications.")
+
+	functionalLevel, err := citrixorchestration.NewFunctionalLevelFromValue(plan.MinimumFunctionalLevel.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating Machine Catalog "+catalogName,
+			fmt.Sprintf("Unsupported minimum functional level %s.", plan.MinimumFunctionalLevel.ValueString()),
+		)
+		return err
+	}
+
 	updateProvisioningSchemeModel.SetRebootOptions(rebootOption)
-	updateProvisioningSchemeModel.SetMinimumFunctionalLevel("L7_20")
+	updateProvisioningSchemeModel.SetMinimumFunctionalLevel(*functionalLevel)
 	updateProvisioningSchemeModel.SetMasterImagePath(imagePath)
 	updateProvisioningSchemeModel.SetStoreOldImage(true)
 
@@ -730,7 +789,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 	return nil
 }
 
-func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, catalog *citrixorchestration.MachineCatalogDetailResponseModel, connectionType *citrixorchestration.HypervisorConnectionType) MachineCatalogResourceModel {
+func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, catalog *citrixorchestration.MachineCatalogDetailResponseModel, connectionType *citrixorchestration.HypervisorConnectionType, pluginId string) MachineCatalogResourceModel {
 	if r.ProvisioningScheme == nil {
 		r.ProvisioningScheme = &ProvisioningSchemeModel{}
 	}
@@ -801,6 +860,14 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Con
 		}
 
 		r.ProvisioningScheme.XenserverMachineConfig.RefreshProperties(*catalog)
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM:
+		if pluginId == util.NUTANIX_PLUGIN_ID {
+			if r.ProvisioningScheme.NutanixMachineConfigModel == nil {
+				r.ProvisioningScheme.NutanixMachineConfigModel = &NutanixMachineConfigModel{}
+			}
+
+			r.ProvisioningScheme.NutanixMachineConfigModel.RefreshProperties(*catalog)
+		}
 	}
 
 	// Refresh Total Machine Count
@@ -935,17 +1002,23 @@ func parseCustomPropertiesToClientModel(provisioningScheme ProvisioningSchemeMod
 	return *res
 }
 
-func parseNetworkMappingToClientModel(networkMapping NetworkMappingModel, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) ([]citrixorchestration.NetworkMapRequestModel, error) {
+func parseNetworkMappingToClientModel(networkMapping NetworkMappingModel, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel, hypervisorPluginId string) ([]citrixorchestration.NetworkMapRequestModel, error) {
 	var networks []citrixorchestration.HypervisorResourceRefResponseModel
 	if resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM {
 		networks = resourcePool.Subnets
-	} else if resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS || resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM || resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER {
+	} else if resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS ||
+		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM ||
+		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER ||
+		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && hypervisorPluginId == util.NUTANIX_PLUGIN_ID {
 		networks = resourcePool.Networks
 	}
 
 	var res = []citrixorchestration.NetworkMapRequestModel{}
 	var networkName string
-	if resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM || resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM || resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER {
+	if resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM ||
+		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM ||
+		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER ||
+		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && hypervisorPluginId == util.NUTANIX_PLUGIN_ID {
 		networkName = networkMapping.Network.ValueString()
 	} else if resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS {
 		networkName = fmt.Sprintf("%s (%s)", networkMapping.Network.ValueString(), resourcePool.GetResourcePoolRootId())
@@ -962,7 +1035,7 @@ func parseNetworkMappingToClientModel(networkMapping NetworkMappingModel, resour
 		NetworkPath:           networks[network].GetXDPath(),
 	}
 
-	if resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER {
+	if resourcePool.GetConnectionType() == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER || (resourcePool.GetConnectionType() == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && hypervisorPluginId == util.NUTANIX_PLUGIN_ID) {
 		networkMapRequestModel.SetDeviceNameOrId(networks[network].GetId())
 	}
 

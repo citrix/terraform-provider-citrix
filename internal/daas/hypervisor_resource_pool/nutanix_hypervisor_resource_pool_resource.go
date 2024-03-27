@@ -287,7 +287,7 @@ func (plan NutanixHypervisorResourcePoolResourceModel) GetNetworksList(ctx conte
 	}
 
 	networkNames := util.ConvertBaseStringArrayToPrimitiveStringArray(plan.Networks)
-	networks, err := util.GetFilteredResourcePathList(ctx, client, hypervisorId, "", "network", networkNames, hypervisorConnectionType, pluginId)
+	networks, err := util.GetFilteredResourcePathList(ctx, client, hypervisorId, "", util.NetworkResourceType, networkNames, hypervisorConnectionType, pluginId)
 	if len(networks) == 0 {
 		errDetail := "No network found for the given network names"
 		if err != nil {

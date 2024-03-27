@@ -59,6 +59,14 @@ type XenserverMachineConfigModel struct {
 	WritebackCache *XenserverWritebackCacheModel `tfsdk:"writeback_cache"`
 }
 
+type NutanixMachineConfigModel struct {
+	Container        types.String `tfsdk:"container"`
+	MasterImage      types.String `tfsdk:"master_image"`
+	CpuCount         types.Int64  `tfsdk:"cpu_count"`
+	CoresPerCpuCount types.Int64  `tfsdk:"cores_per_cpu_count"`
+	MemoryMB         types.Int64  `tfsdk:"memory_mb"`
+}
+
 // WritebackCacheModel maps the write back cacheconfiguration schema data.
 type AzureWritebackCacheModel struct {
 	PersistWBC                 types.Bool   `tfsdk:"persist_wbc"`
@@ -322,6 +330,20 @@ func (mc *XenserverMachineConfigModel) RefreshProperties(catalog citrixorchestra
 			mc.WritebackCache.WriteBackCacheMemorySizeMB = types.Int64Value(int64(provScheme.GetWriteBackCacheMemorySizeMB()))
 		}
 	}
+}
+
+func (mc *NutanixMachineConfigModel) RefreshProperties(catalog citrixorchestration.MachineCatalogDetailResponseModel) {
+	provScheme := catalog.GetProvisioningScheme()
+
+	// Refresh Master Image
+	masterImage := provScheme.GetMasterImage()
+	mc.MasterImage = types.StringValue(masterImage.GetName())
+
+	// Refresh Memory
+	mc.MemoryMB = types.Int64Value(int64(provScheme.GetMemoryMB()))
+	mc.CpuCount = types.Int64Value(int64(provScheme.GetCpuCount()))
+	mc.CoresPerCpuCount = types.Int64Value(int64(provScheme.GetCoresPerCpuCount()))
+	mc.Container = types.StringValue(provScheme.GetNutanixContainer())
 }
 
 func parseAzureMachineProfileResponseToModel(machineProfileResponse citrixorchestration.HypervisorResourceRefResponseModel) *MachineProfileModel {

@@ -107,6 +107,10 @@ func GetSingleResourceFromHypervisor(ctx context.Context, client *citrixdaasclie
 				return &child, nil
 			}
 		}
+
+		if strings.EqualFold(resourceType, StorageResourceType) {
+			return &child, nil
+		}
 	}
 
 	return nil, fmt.Errorf("could not find resource %s", resourceName)
@@ -116,6 +120,10 @@ func GetSingleResourcePathFromHypervisor(ctx context.Context, client *citrixdaas
 	resource, err := GetSingleResourceFromHypervisor(ctx, client, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName)
 	if err != nil {
 		return "", fmt.Errorf("could not find resource")
+	}
+
+	if strings.EqualFold(resourceType, StorageResourceType) {
+		return resource.GetId(), nil
 	}
 
 	return resource.GetXDPath(), nil
@@ -216,9 +224,9 @@ func GetFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.C
 				name = strings.Split(name, " ")[0]
 			}
 			if Contains(filter, name) {
-				if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER && strings.EqualFold(resourceType, "network") {
+				if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER && strings.EqualFold(resourceType, NetworkResourceType) {
 					result = append(result, child.GetRelativePath())
-				} else if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && strings.EqualFold(pluginId, NUTANIX_PLUGIN_ID) && strings.EqualFold(resourceType, "network") {
+				} else if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && strings.EqualFold(pluginId, NUTANIX_PLUGIN_ID) && strings.EqualFold(resourceType, NetworkResourceType) {
 					result = append(result, child.GetFullName())
 				} else {
 					result = append(result, child.GetXDPath())

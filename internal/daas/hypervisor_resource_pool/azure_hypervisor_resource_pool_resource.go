@@ -190,7 +190,7 @@ func (r *azureHypervisorResourcePoolResource) Create(ctx context.Context, req re
 		return
 	}
 	planSubnet := util.ConvertBaseStringArrayToPrimitiveStringArray(plan.Subnets)
-	subnets, err := util.GetFilteredResourcePathList(ctx, r.client, hypervisorId, fmt.Sprintf("%s/virtualprivatecloud.folder/%s", regionPath, vnetPath), "Network", planSubnet, hypervisorConnectionType, "")
+	subnets, err := util.GetFilteredResourcePathList(ctx, r.client, hypervisorId, fmt.Sprintf("%s/virtualprivatecloud.folder/%s", regionPath, vnetPath), util.NetworkResourceType, planSubnet, hypervisorConnectionType, hypervisor.GetPluginId())
 
 	if err != nil {
 		resp.Diagnostics.AddError(

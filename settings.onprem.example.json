@@ -49,19 +49,26 @@
         "TEST_HYPERV_PASSWORD_PLAINTEXT_NUTANIX": "{vsphere_hypervisor_password}",
         "TEST_HYPERV_ADDRESS_NUTANIX": "{xenserver_hypervisor_management_ip}",
 
+        // Hypervisor Go Tests - AWS EC2
+        "TEST_ZONE_NAME_AWS_EC2": "{aws_ec2_hypervisor_zone_name}",
+        "TEST_HYPERV_NAME_AWS_EC2": "{aws_ec2_hypervisor_name}",
+        "TEST_HYPERV_API_KEY_AWS_EC2": "{aws_ec2_hypervisor_api_key}",
+        "TEST_HYPERV_SECRET_KEY_AWS_EC2": "{aws_ec2_hypervisor_secret_key}",
+        "TEST_HYPERV_REGION_AWS_EC2": "{aws_ec2_hypervisor_region}",
+
         // Hypervisor Resource Pool Go Tests - Azure
-        "TEST_HYPERV_RP_NAME"           : "{hypervisor_resource_pool_name}",
+        "TEST_HYPERV_RP_NAME"              : "{hypervisor_resource_pool_name}",
         "TEST_HYPERV_RP_REGION"            :"East US",
         "TEST_HYPERV_RP_VIRTUAL_NETWORK_RESOURCE_GROUP" :"{hypervisor_resource_pool_network_resource_group_name}",
         "TEST_HYPERV_RP_VIRTUAL_NETWORK"   :"{hypervisor_resource_pool_vnet_name}",
         "Test_HYPERV_RP_SUBNETS"           :"[\"{hypervisor_resource_pool_subnet_name}\"]",
 
         // Hypervisor Resource Pool GCP Testing Env Variables
-        "TEST_HYPERV_RP_NAME_GCP"       :"{hypervisor_resource_pool_name}",
-        "TEST_HYPERV_RP_PROJECT_NAME_GCP":"{gcp_project_name}",
-        "TEST_HYPERV_RP_REGION_GCP"     :"{gcp_region}",
-        "TEST_HYPERV_RP_VPC_GCP"        :"{vpc_name}", 
-        "Test_HYPERV_RP_SUBNETS_GCP"    : "[\"{subnet_name}\"]",
+        "TEST_HYPERV_RP_NAME_GCP"         :"{hypervisor_resource_pool_name}",
+        "TEST_HYPERV_RP_PROJECT_NAME_GCP" :"{gcp_project_name}",
+        "TEST_HYPERV_RP_REGION_GCP"       :"{gcp_region}",
+        "TEST_HYPERV_RP_VPC_GCP"          :"{vpc_name}", 
+        "Test_HYPERV_RP_SUBNETS_GCP"      : "[\"{subnet_name}\"]",
 
         // Hypervisor Resource Pool XenServer Testing Env Variables
         "TEST_HYPERV_RP_NAME_XENSERVER"         :"{hypervisor_resource_pool_name}",
@@ -82,6 +89,12 @@
         // Hypervisor Resource Pool Nutanix Testing Env Variables
         "TEST_HYPERV_RP_NAME_NUTANIX"   : "{hypervisor_resource_pool_name}",
         "TEST_HYPERV_RP_NETWORK_NUTANIX": "{network_name}",
+
+        // Hypervisor Resource Pool AWS EC2 Testing Env Variables
+        "TEST_HYPERV_RP_NAME_AWS_EC2"              :"{hypervisor_resource_pool_name}",
+        "TEST_HYPERV_RP_VPC_AWS_EC2"               :"{aws_ec2_vpc_name}",
+        "TEST_HYPERV_RP_AVAILABILITY_ZONE_AWS_EC2" :"{aws_ec2_availability_zone}",
+        "Test_HYPERV_RP_SUBNETS_AWS_EC2"           :"[\"{subnet_mask}\"]",
  
         // Machine Catalog Go Tests - Azure
         "TEST_MC_NAME"                  :"{catalog_name}",
@@ -110,20 +123,41 @@
         // Machine Catalog Go Tests - VSPHERE
         "TEST_MC_NAME_VSPHERE"                 :"{catalog_name}",
         "TEST_MC_SERVICE_ACCOUNT_VSPHERE"      :"{ad}",
-        "TEST_MC_SERVICE_ACCOUNT_PASS_VSPHERE" :"{admin_password]",
+        "TEST_MC_SERVICE_ACCOUNT_PASS_VSPHERE" :"{admin_password}",
         "TEST_MC_MASTER_IMAGE_VSPHERE"         :"{vm_or_snapshot_name}",
         "TEST_MC_DOMAIN_VSPHERE"               :"domain.local",
         "TEST_MC_MEMORY_MB_VSPHERE"            :"4096",
         "TEST_MC_CPU_COUNT_VSPHERE"            :"2",
 
+        // Nutanix Machine Catalog Testing Env Variables
+        "TEST_MC_NAME_NUTANIX"                :"{catalog_name}",
+        "TEST_MC_SERVICE_ACCOUNT_NUTANIX"     :"{admin_username}",
+        "TEST_MC_SERVICE_ACCOUNT_PASS_NUTANIX":"{admin_password}",
+        "TEST_MC_CONTAINER_NUTANIX"           :"{container_name}",
+        "TEST_MC_MASTER_IMAGE_NUTANIX"        :"{image_name}",
+        "TEST_MC_DOMAIN_NUTANIX"              : "domain.local",
+        "TEST_MC_MEMORY_MB_NUTANIX"           : "4096",
+        "TEST_MC_CPU_COUNT_NUTANIX"           : "2",
+        "TEST_MC_CORES_PER_CPU_COUNT_NUTANIX" : "2",
+
         // Machine Catalog Go Tests - XenServer
         "TEST_MC_NAME_XENSERVER"                    :"{catalog_name}",
-        "TEST_MC_SERVICE_ACCOUNT_XENSERVER"         :"{admin_username]",
-        "TEST_MC_SERVICE_ACCOUNT_PASS_XENSERVER"    :"{admin_password]",
+        "TEST_MC_SERVICE_ACCOUNT_XENSERVER"         :"{admin_username}",
+        "TEST_MC_SERVICE_ACCOUNT_PASS_XENSERVER"    :"{admin_password}",
         "TEST_MC_MASTER_IMAGE_XENSERVER"            :"{vm_name}",
         "TEST_MC_DOMAIN_XENSERVER"                  :"domain.local",
         "TEST_MC_MEMORY_MB_XENSERVER"               :"8192",
         "TEST_MC_CPU_COUNT_XENSERVER"               :"4",
+        
+        // Machine Catalog Go Tests - AWS EC2
+        "TEST_MC_NAME_AWS_EC2"                    :"{catalog_name}",
+        "TEST_MC_DOMAIN_AWS_EC2"                  :"domain.local",
+        "TEST_MC_SERVICE_ACCOUNT_AWS_EC2"         :"{admin_username}",
+        "TEST_MC_SERVICE_ACCOUNT_PASS_AWS_EC2"    :"{admin_password}",
+        "TEST_MC_IMAGE_AMI_AWS_EC2"               :"{image_ami_id}",
+        "TEST_MC_MASTER_IMAGE_AWS_EC2"            :"{image_name}",
+        "TEST_MC_SERVICE_OFFERING_AWS_EC2"        :"t2.small",
+        "TEST_MC_NETWORK_AWS_EC2"                 :"{subnet mask}",
 
         // Machine Catalog Go Tests - Azure Manual Power Managed
         "TEST_MC_NAME_MANUAL"                           :"{catalog_name}",
@@ -149,6 +183,11 @@
         // Machine Catalog Go Tests -  Nutanix Manual Power Managed
         "TEST_MC_MACHINE_NAME_MANUAL_NUTANIX": "machine-vm-name",
         "TEST_MC_MACHINE_ACCOUNT_MANUAL_NUTANIX": "{machine_domain_name}}\\\\machine-name",
+        
+        // Machine Catalog Go Tests -  AWS EC2 Manual Power Managed
+        "TEST_MC_MACHINE_NAME_MANUAL_AWS_EC2": "{aws_ec2_instance_name_or_id}",
+        "TEST_MC_MACHINE_ACCOUNT_MANUAL_AWS_EC2": "{machine_domain_name}}\\\\machine-name",
+        "TEST_MC_AVAILABILITY_ZONE_MANUAL_AWS_EC2": "{aws_ec2_instance_availability_zone}",
 
         // Machine Catalog Go Tests -  Non Power Managed
         "TEST_MC_MACHINE_ACCOUNT_MANUAL_NON_POWER_MANAGED"     : "{machine_domain_name}\\\\manual-02",

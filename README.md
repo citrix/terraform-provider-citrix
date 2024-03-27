@@ -29,8 +29,6 @@ Citrix has developed a custom Terraform provider for automating Citrix product d
 ## Contacting the Maintainers
 This project uses GitHub to track all issues. See [CONTRIBUTING.md](CONTRIBUTING.md) for more information.
 
-The CUGC (Citrix User Group Community) maintains a combination Slack/Discord for communication. Follow [this link](https://mycugc.org/resources/slack-discord/) to sign up. Provider discussion can be posted to the #community-support_automation channel.
-
 ## Plugin for Terraform Provider for Citrix® Documentation
 
 ### Navigating the repository
@@ -157,7 +155,7 @@ A delivery group is a collection of machines selected from one or more machine c
 | GCP             |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  |:heavy_check_mark:|
 | Vsphere         |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  |:heavy_check_mark:|
 | XenServer       |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  |:heavy_check_mark:|
-| Nutanix         |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  |   In Progress    | 
+| Nutanix         |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  |:heavy_check_mark:| 
 
 
 #### What provisioning types are supported for machine catalog? 

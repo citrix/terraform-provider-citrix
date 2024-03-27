@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
@@ -493,7 +494,7 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 								},
 							},
 							"cpu_count": schema.Int64Attribute{
-								Description: "The number of processors that virtual machines created from the provisioning scheme should use",
+								Description: "The number of processors that virtual machines created from the provisioning scheme should use.",
 								Required:    true,
 							},
 							"memory_mb": schema.Int64Attribute{
@@ -577,6 +578,38 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 											int64validator.AtLeast(0),
 										},
 									},
+								},
+							},
+						},
+					},
+					"nutanix_machine_config": schema.SingleNestedAttribute{
+						Description: "Machine Configuration For Nutanix MCS catalog.",
+						Optional:    true,
+						Attributes: map[string]schema.Attribute{
+							"container": schema.StringAttribute{
+								Description: "The name of the container where the virtual machines' identity disks will be placed.",
+								Required:    true,
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.RequiresReplace(),
+								},
+							},
+							"master_image": schema.StringAttribute{
+								Description: "The name of the master image that will be the template for all virtual machines in this catalog.",
+								Required:    true,
+							},
+							"cpu_count": schema.Int64Attribute{
+								Description: "The number of processors that virtual machines created from the provisioning scheme should use.",
+								Required:    true,
+							},
+							"cores_per_cpu_count": schema.Int64Attribute{
+								Description: "The number of cores per processor that virtual machines created from the provisioning scheme should use.",
+								Required:    true,
+							},
+							"memory_mb": schema.Int64Attribute{
+								Description: "The maximum amount of memory that virtual machines created from the provisioning scheme should use.",
+								Required:    true,
+								PlanModifiers: []planmodifier.Int64{
+									int64planmodifier.RequiresReplace(),
 								},
 							},
 						},
