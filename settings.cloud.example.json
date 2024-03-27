@@ -48,6 +48,13 @@
         "TEST_HYPERV_PASSWORD_PLAINTEXT_NUTANIX": "{vsphere_hypervisor_password}",
         "TEST_HYPERV_ADDRESS_NUTANIX": "{xenserver_hypervisor_management_ip}",
 
+        // Hypervisor Go Tests - AWS EC2
+        "TEST_ZONE_NAME_AWS_EC2": "{aws_ec2_hypervisor_zone_name}",
+        "TEST_HYPERV_NAME_AWS_EC2": "{aws_ec2_hypervisor_name}",
+        "TEST_HYPERV_API_KEY_AWS_EC2": "{aws_ec2_hypervisor_api_key}",
+        "TEST_HYPERV_SECRET_KEY_AWS_EC2": "{aws_ec2_hypervisor_secret_key}",
+        "TEST_HYPERV_REGION_AWS_EC2": "{aws_ec2_hypervisor_region}",
+
         // Hypervisor Resource Pool Go Tests - Azure
         "TEST_HYPERV_RP_NAME"           : "{hypervisor_resource_pool_name}",
         "TEST_HYPERV_RP_REGION"            :"East US",
@@ -70,59 +77,87 @@
         "TEST_HYPERV_RP_TEMP_STORAGE_XENSERVER" :"{local_or_shared_storage}",
 
         // Hypervisor Resource Pool VSphere Testing Env Variables
-        "TEST_HYPERV_RP_NAME_VSPHERE" : "{hypervisor_resource_pool_name}",
-        "TEST_HYPERV_RP_DATACENTER_VSPHERE" : "{datacenter_name}",
-        "TEST_HYPERV_RP_HOST_VSPHERE" : "{host_ip_pr_fqdn}",
-        "TEST_HYPERV_RP_NETWORK_VSPHERE" : "Network",
-        "TEST_HYPERV_RP_STORAGE_1_VSPHERE" : "{storage_name_0}",
-        "TEST_HYPERV_RP_STORAGE_2_VSPHERE" : "{storeage_name_1}",
+        "TEST_HYPERV_RP_NAME_VSPHERE"         : "{hypervisor_resource_pool_name}",
+        "TEST_HYPERV_RP_DATACENTER_VSPHERE"   : "{datacenter_name}",
+        "TEST_HYPERV_RP_HOST_VSPHERE"         : "{host_ip_pr_fqdn}",
+        "TEST_HYPERV_RP_NETWORK_VSPHERE"      : "Network",
+        "TEST_HYPERV_RP_STORAGE_1_VSPHERE"    : "{storage_name_0}",
+        "TEST_HYPERV_RP_STORAGE_2_VSPHERE"    : "{storeage_name_1}",
         "TEST_HYPERV_RP_TEMP_STORAGE_VSPHERE" : "{temp_storage_name}",
 
         // Hypervisor Resource Pool Nutanix Testing Env Variables
         "TEST_HYPERV_RP_NAME_NUTANIX"   : "{hypervisor_resource_pool_name}",
         "TEST_HYPERV_RP_NETWORK_NUTANIX": "{network_name}",
 
+        // Hypervisor Resource Pool AWS EC2 Testing Env Variables
+        "TEST_HYPERV_RP_NAME_AWS_EC2"              :"{hypervisor_resource_pool_name}",
+        "TEST_HYPERV_RP_VPC_AWS_EC2"               :"{aws_ec2_vpc_name}",
+        "TEST_HYPERV_RP_AVAILABILITY_ZONE_AWS_EC2" :"{aws_ec2_availability_zone}",
+        "Test_HYPERV_RP_SUBNETS_AWS_EC2"           :"[\"{subnet_mask}\"]",
+
         // Machine Catalog Go Tests - Azure
-        "TEST_MC_NAME"                  :"{catalog_name}",
-        "TEST_MC_SERVICE_ACCOUNT"       :"{admin_username}",
-        "TEST_MC_SERVICE_ACCOUNT_PASS"  :"{admin_password}",
-        "TEST_MC_SERVICE_OFFERING"      :"Standard_D2_v2",
-        "TEST_MC_MASTER_IMAGE"          :"m19g1-2305-1-vda.vhd",
-        "TEST_MC_MASTER_IMAGE_UPDATED"  :"m19g1-2305-1-vda.vhd",
-        "TEST_MC_IMAGE_RESOUCE_GROUP"   :"ctx-rg",
-        "TEST_MC_IMAGE_STORAGE_ACCOUNT" :"{storage_account}",
-        "TEST_MC_IMAGE_CONTAINER"       :"vda-images",
-        "TEST_MC_SUBNET"                :"ctx-cvad-subnet",
+        "TEST_MC_NAME"                    :"{catalog_name}",
+        "TEST_MC_SERVICE_ACCOUNT"         :"{admin_username}",
+        "TEST_MC_SERVICE_ACCOUNT_PASS"    :"{admin_password}",
+        "TEST_MC_SERVICE_OFFERING"        :"Standard_D2_v2",
+        "TEST_MC_MASTER_IMAGE"            :"m19g1-2305-1-vda.vhd",
+        "TEST_MC_MASTER_IMAGE_UPDATED"    :"m19g1-2305-1-vda.vhd",
+        "TEST_MC_IMAGE_RESOUCE_GROUP"     :"ctx-rg",
+        "TEST_MC_IMAGE_STORAGE_ACCOUNT"   :"{storage_account}",
+        "TEST_MC_IMAGE_CONTAINER"         :"vda-images",
+        "TEST_MC_SUBNET"                  :"ctx-cvad-subnet",
+        "TEST_MC_MACHINE_PROFILE_VM_NAME" :"{machine_vm_name}",
 
         // Machine Catalog Go Tests - GCP
-        "TEST_MC_NAME_GCP"              :"{catalog_name}",
-        "TEST_MC_SERVICE_ACCOUNT_GCP"   :"{admin_username}",
+        "TEST_MC_NAME_GCP"                 :"{catalog_name}",
+        "TEST_MC_SERVICE_ACCOUNT_GCP"      :"{admin_username}",
         "TEST_MC_SERVICE_ACCOUNT_PASS_GCP" :"{admin_password}",
-        "TEST_MC_STORAGE_TYPE_GCP"      :"pd-standard",
-        "TEST_MC_AVAILABILITY_ZONES_GCP":"{gcp_availibity_zone}",
-        "TEST_MC_MACHINE_PROFILE_GCP"   :"gcp-test-img-vm",
-        "TEST_MC_MASTER_IMAGE_GCP"      :"gcp-test-img-vm",
-        "TEST_MC_MACHINE_SNAPSHOT_GCP"  :"gcp-test-img-vm-snapshot",
-        "TEST_MC_DOMAIN_GCP"            :"ctx-ad.local",
-        "TEST_MC_Subnet_GCP"            :"us-east1",
+        "TEST_MC_STORAGE_TYPE_GCP"         :"pd-standard",
+        "TEST_MC_AVAILABILITY_ZONES_GCP"   :"{gcp_availibity_zone}",
+        "TEST_MC_MACHINE_PROFILE_GCP"      :"gcp-test-img-vm",
+        "TEST_MC_MASTER_IMAGE_GCP"         :"gcp-test-img-vm",
+        "TEST_MC_MACHINE_SNAPSHOT_GCP"     :"gcp-test-img-vm-snapshot",
+        "TEST_MC_DOMAIN_GCP"               :"ctx-ad.local",
+        "TEST_MC_Subnet_GCP"               :"us-east1",
 
         // Machine Catalog Go Tests - VSPHERE
         "TEST_MC_NAME_VSPHERE"                 :"{catalog_name}",
         "TEST_MC_SERVICE_ACCOUNT_VSPHERE"      :"{admin_username}",
-        "TEST_MC_SERVICE_ACCOUNT_PASS_VSPHERE" :"{admin_password]",
+        "TEST_MC_SERVICE_ACCOUNT_PASS_VSPHERE" :"{admin_password}",
         "TEST_MC_MASTER_IMAGE_VSPHERE"         :"{vm_name}",
         "TEST_MC_DOMAIN_VSPHERE"               :"domain.local",
         "TEST_MC_MEMORY_MB_VSPHERE"            :"4096",
         "TEST_MC_CPU_COUNT_VSPHERE"            : "2",
 
+        // Nutanix Machine Catalog Testing Env Variables
+        "TEST_MC_NAME_NUTANIX"                :"{catalog_name}",
+        "TEST_MC_SERVICE_ACCOUNT_NUTANIX"     :"{admin_username}",
+        "TEST_MC_SERVICE_ACCOUNT_PASS_NUTANIX":"{admin_password}",
+        "TEST_MC_CONTAINER_NUTANIX"           :"{container_name}",
+        "TEST_MC_MASTER_IMAGE_NUTANIX"        :"{image_name}",
+        "TEST_MC_DOMAIN_NUTANIX"              : "domain.local",
+        "TEST_MC_MEMORY_MB_NUTANIX"           : "4096",
+        "TEST_MC_CPU_COUNT_NUTANIX"           : "2",
+        "TEST_MC_CORES_PER_CPU_COUNT_NUTANIX" : "2",
+
         // Machine Catalog Go Tests - XenServer
         "TEST_MC_NAME_XENSERVER"                    :"{catalog_name}",
-        "TEST_MC_SERVICE_ACCOUNT_XENSERVER"         :"{admin_username]",
-        "TEST_MC_SERVICE_ACCOUNT_PASS_XENSERVER"    :"{admin_password]",
+        "TEST_MC_SERVICE_ACCOUNT_XENSERVER"         :"{admin_username}",
+        "TEST_MC_SERVICE_ACCOUNT_PASS_XENSERVER"    :"{admin_password}",
         "TEST_MC_MASTER_IMAGE_XENSERVER"            :"{vm_name}",
         "TEST_MC_DOMAIN_XENSERVER"                  :"domain.local",
         "TEST_MC_MEMORY_MB_XENSERVER"               :"8192",
         "TEST_MC_CPU_COUNT_XENSERVER"               :"4",
+
+        // Machine Catalog Go Tests - AWS EC2
+        "TEST_MC_NAME_AWS_EC2"                    :"{catalog_name}",
+        "TEST_MC_DOMAIN_AWS_EC2"                  :"domain.local",
+        "TEST_MC_SERVICE_ACCOUNT_AWS_EC2"         :"{admin_username}",
+        "TEST_MC_SERVICE_ACCOUNT_PASS_AWS_EC2"    :"{admin_password}",
+        "TEST_MC_IMAGE_AMI_AWS_EC2"               :"{image_ami_id}",
+        "TEST_MC_MASTER_IMAGE_AWS_EC2"            :"{image_name}",
+        "TEST_MC_SERVICE_OFFERING_AWS_EC2"        :"t2.small",
+        "TEST_MC_NETWORK_AWS_EC2"                 :"{subnet mask}",
 
         // Machine Catalog Go Tests - Azure Manual Power Managed
         "TEST_MC_NAME_MANUAL"                           :"{catalog_name}",
@@ -148,6 +183,11 @@
         // Machine Catalog Go Tests -  Nutanix Manual Power Managed
         "TEST_MC_MACHINE_NAME_MANUAL_NUTANIX": "machine-vm-name",
         "TEST_MC_MACHINE_ACCOUNT_MANUAL_NUTANIX": "{machine_domain_name}}\\\\machine-name",
+
+        // Machine Catalog Go Tests -  AWS EC2 Manual Power Managed
+        "TEST_MC_MACHINE_NAME_MANUAL_AWS_EC2": "{aws_ec2_instance_name_or_id}",
+        "TEST_MC_MACHINE_ACCOUNT_MANUAL_AWS_EC2": "{machine_domain_name}}\\\\machine-name",
+        "TEST_MC_AVAILABILITY_ZONE_MANUAL_AWS_EC2": "{aws_ec2_instance_availability_zone}",
 
         // Machine Catalog Go Tests -  Non Power Managed
         "TEST_MC_MACHINE_ACCOUNT_MANUAL_NON_POWER_MANAGED"     : "{machine_domain_name}\\\\manual-02",

@@ -646,6 +646,7 @@ func getPolicySets(ctx context.Context, client *citrixdaasclient.CitrixDaasClien
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return nil, err
 	}
 
 	return policySets.Items, err

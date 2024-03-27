@@ -323,6 +323,63 @@ func TestHypervisorResourceNutanix(t *testing.T) {
 	})
 }
 
+func TestHypervisorPreCheck_AWS_EC2(t *testing.T) {
+	if v := os.Getenv("TEST_ZONE_NAME_AWS_EC2"); v == "" {
+		t.Fatal("TEST_ZONE_NAME_AWS_EC2 must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_NAME_AWS_EC2"); v == "" {
+		t.Fatal("TEST_HYPERV_NAME_AWS_EC2 must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_API_KEY_AWS_EC2"); v == "" {
+		t.Fatal("TEST_HYPERV_API_KEY_AWS_EC2 must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_SECRET_KEY_AWS_EC2"); v == "" {
+		t.Fatal("TEST_HYPERV_SECRET_KEY_AWS_EC2 must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_REGION_AWS_EC2"); v == "" {
+		t.Fatal("TEST_HYPERV_REGION_AWS_EC2 must be set for acceptance tests")
+	}
+}
+
+func TestHypervisorResourceAwsEc2(t *testing.T) {
+	name := os.Getenv("TEST_HYPERV_NAME_AWS_EC2")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck: func() {
+			TestProviderPreCheck(t)
+			TestHypervisorPreCheck_AWS_EC2(t)
+		},
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: BuildHypervisorResourceAwsEc2(t, hypervisor_testResources_aws_ec2),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify name of hypervisor
+					resource.TestCheckResourceAttr("citrix_aws_hypervisor.testHypervisor", "name", name),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "citrix_aws_hypervisor.testHypervisor",
+				ImportState:       true,
+				ImportStateVerify: true,
+				// The last_updated attribute does not exist in the Orchestration
+				// API, therefore there is no value for it during import.
+				ImportStateVerifyIgnore: []string{"api_key", "secret_key"},
+			},
+			// Update and Read testing
+			{
+				Config: BuildHypervisorResourceAwsEc2(t, hypervisor_testResources_updated_aws_ec2),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify name of hypervisor
+					resource.TestCheckResourceAttr("citrix_aws_hypervisor.testHypervisor", "name", fmt.Sprintf("%s-updated", name)),
+				),
+			},
+		},
+	})
+}
+
 // test resources for AzureRM hypervisor
 var (
 	hypervisor_testResources = `
@@ -470,6 +527,29 @@ var (
 	`
 )
 
+// test resources for AWS EC2 hypervisor
+var (
+	hypervisor_testResources_aws_ec2 = `
+	resource citrix_aws_hypervisor "testHypervisor" {
+		name                = "%s"
+		zone                = %s
+    	api_key             = "%s"
+    	secret_key          = "%s"
+    	region              = "%s"
+	}
+	`
+
+	hypervisor_testResources_updated_aws_ec2 = `
+	resource citrix_aws_hypervisor "testHypervisor" {
+		name                = "%s-updated"
+		zone                = %s
+    	api_key             = "%s"
+    	secret_key          = "%s"
+    	region              = "%s"
+	}
+	`
+)
+
 func BuildHypervisorResourceAzure(t *testing.T, hypervisor string) string {
 	name := os.Getenv("TEST_HYPERV_NAME_AZURE")
 	tenantId := os.Getenv("TEST_HYPERV_AD_ID")
@@ -522,4 +602,14 @@ func BuildHypervisorResourceNutanix(t *testing.T, hypervisor string) string {
 	zoneValueForHypervisor := "citrix_zone.test.id"
 	zoneNameNutanix := os.Getenv("TEST_ZONE_NAME_NUTANIX")
 	return BuildZoneResource(t, zone_testResource, zoneNameNutanix) + fmt.Sprintf(hypervisor, name, zoneValueForHypervisor, username, password, address)
+}
+
+func BuildHypervisorResourceAwsEc2(t *testing.T, hypervisor string) string {
+	name := os.Getenv("TEST_HYPERV_NAME_AWS_EC2")
+	api_key := os.Getenv("TEST_HYPERV_API_KEY_AWS_EC2")
+	secret_key := os.Getenv("TEST_HYPERV_SECRET_KEY_AWS_EC2")
+	region := os.Getenv("TEST_HYPERV_REGION_AWS_EC2")
+	zoneNameAwsEc2 := os.Getenv("TEST_ZONE_NAME_AWS_EC2")
+	zoneValueForHypervisor := "citrix_zone.test.id"
+	return BuildZoneResource(t, zone_testResource, zoneNameAwsEc2) + fmt.Sprintf(hypervisor, name, zoneValueForHypervisor, api_key, secret_key, region)
 }

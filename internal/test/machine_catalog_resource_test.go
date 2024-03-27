@@ -500,6 +500,167 @@ func TestMachineCatalogResourceXenserver(t *testing.T) {
 	})
 }
 
+func TestMachineCatalogPreCheck_Nutanix(t *testing.T) {
+	if v := os.Getenv("TEST_MC_NAME_NUTANIX"); v == "" {
+		t.Fatal("TEST_MC_NAME_NUTANIX must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_SERVICE_ACCOUNT_NUTANIX"); v == "" {
+		t.Fatal("TEST_MC_SERVICE_ACCOUNT_NUTANIX must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_SERVICE_ACCOUNT_PASS_NUTANIX"); v == "" {
+		t.Fatal("TEST_MC_SERVICE_ACCOUNT_PASS_NUTANIX must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_CONTAINER_NUTANIX"); v == "" {
+		t.Fatal("TEST_MC_CONTAINER_NUTANIX must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_MASTER_IMAGE_NUTANIX"); v == "" {
+		t.Fatal("TEST_MC_MASTER_IMAGE_NUTANIX must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_DOMAIN_NUTANIX"); v == "" {
+		t.Fatal("TEST_MC_DOMAIN_NUTANIX must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_MEMORY_MB_NUTANIX"); v == "" {
+		t.Fatal("TEST_MC_MEMORY_MB_NUTANIX must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_CPU_COUNT_NUTANIX"); v == "" {
+		t.Fatal("TEST_MC_CPU_COUNT_NUTANIX must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_CORES_PER_CPU_COUNT_NUTANIX"); v == "" {
+		t.Fatal("TEST_MC_CORES_PER_CPU_COUNT_NUTANIX must be set for acceptance tests")
+	}
+}
+
+func TestMachineCatalogResourceNutanix(t *testing.T) {
+	name := os.Getenv("TEST_MC_NAME_NUTANIX")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck: func() {
+			TestProviderPreCheck(t)
+			TestHypervisorPreCheck_Nutanix(t)
+			TestHypervisorResourcePoolPreCheck_Nutanix(t)
+			TestMachineCatalogPreCheck_Nutanix(t)
+		},
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: BuildMachineCatalogResourceNutanix(t, machine_catalog_testResources_nutanix),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify name of catalog
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
+					// Verify domain FQDN
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "session_support", "MultiSession"),
+					// Verify domain admin username
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.nutanix_machine_config.master_image", os.Getenv("TEST_MC_MASTER_IMAGE_NUTANIX")),
+					// Verify total number of machines
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.number_of_total_machines", "1"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "citrix_machine_catalog.testMachineCatalog",
+				ImportState:       true,
+				ImportStateVerify: true,
+				// The last_updated attribute does not exist in the Orchestration
+				// API, therefore there is no value for it during import.
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_domain_identity.service_account_password"},
+			},
+			//Update description, master image and add machine test
+			{
+				Config: BuildMachineCatalogResourceNutanix(t, machine_catalog_testResources_nutanix_updated),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify updated name of catalog
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
+					// Verify updated description
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "description", "updatedCatalog"),
+					// Verify total number of machines
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.number_of_total_machines", "2"),
+				),
+			},
+			//Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
+func TestMachineCatalogPreCheck_Aws_Ec2(t *testing.T) {
+	if v := os.Getenv("TEST_MC_NAME_AWS_EC2"); v == "" {
+		t.Fatal("TEST_MC_NAME_AWS_EC2 must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_DOMAIN_AWS_EC2"); v == "" {
+		t.Fatal("TEST_MC_DOMAIN_AWS_EC2 must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_SERVICE_ACCOUNT_AWS_EC2"); v == "" {
+		t.Fatal("TEST_MC_SERVICE_ACCOUNT_AWS_EC2 must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_SERVICE_ACCOUNT_PASS_AWS_EC2"); v == "" {
+		t.Fatal("TEST_MC_SERVICE_ACCOUNT_PASS_AWS_EC2 must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_IMAGE_AMI_AWS_EC2"); v == "" {
+		t.Fatal("TEST_MC_IMAGE_AMI_AWS_EC2 must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_MASTER_IMAGE_AWS_EC2"); v == "" {
+		t.Fatal("TEST_MC_MASTER_IMAGE_AWS_EC2 must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_SERVICE_OFFERING_AWS_EC2"); v == "" {
+		t.Fatal("TEST_MC_SERVICE_OFFERING_AWS_EC2 must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_NETWORK_AWS_EC2"); v == "" {
+		t.Fatal("TEST_MC_NETWORK_AWS_EC2 must be set for acceptance tests")
+	}
+}
+
+func TestMachineCatalogResourceAwsEc2(t *testing.T) {
+	name := os.Getenv("TEST_MC_NAME_AWS_EC2")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck: func() {
+			TestProviderPreCheck(t)
+			TestHypervisorPreCheck_AWS_EC2(t)
+			TestHypervisorResourcePoolPreCheck_Aws_Ec2(t)
+			TestMachineCatalogPreCheck_Aws_Ec2(t)
+		},
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: BuildMachineCatalogResourceAwsEc2(t, machinecatalog_testResources_aws_ec2),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify name of catalog
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
+					// Verify domain FQDN
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "session_support", "MultiSession"),
+					// Verify domain admin username
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.machine_domain_identity.service_account", os.Getenv("TEST_MC_SERVICE_ACCOUNT_AWS_EC2")),
+					// Verify total number of machines
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.number_of_total_machines", "1"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "citrix_machine_catalog.testMachineCatalog",
+				ImportState:       true,
+				ImportStateVerify: true,
+				// The last_updated attribute does not exist in the Orchestration
+				// API, therefore there is no value for it during import.
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.aws_machine_config.image_ami", "provisioning_scheme.aws_machine_config.service_offering", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_domain_identity.service_account_password"},
+			},
+			//Update description, master image and add machine test
+			{
+				Config: BuildMachineCatalogResourceAwsEc2(t, machinecatalog_testResources_aws_ec2_updated),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify updated name of catalog
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
+					// Verify updated description
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "description", "Updated AWS EC2 MCS Machine Catalog"),
+					// Verify total number of machines
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.number_of_total_machines", "2"),
+				),
+			},
+			//Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
 func TestMachineCatalogPreCheck_Manual_Power_Managed_Azure(t *testing.T) {
 	if v := os.Getenv("TEST_MC_NAME_MANUAL"); v == "" {
 		t.Fatal("TEST_MC_NAME_MANUAL must be set for acceptance tests")
@@ -762,6 +923,62 @@ func TestMachineCatalogResource_Manual_Power_Managed_Nutanix(t *testing.T) {
 			// Create and Read testing
 			{
 				Config: BuildMachineCatalogResourceManualPowerManagedNutanix(t, machinecatalog_testResources_manual_power_managed_nutanix),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify name of catalog
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogManualPowerManaged", "name", name),
+					// Verify session support
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogManualPowerManaged", "session_support", os.Getenv("TEST_MC_SESSION_SUPPORT_MANUAL_POWER_MANAGED")),
+					// Verify total number of machines
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogManualPowerManaged", "machine_accounts.#", "1"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:            "citrix_machine_catalog.testMachineCatalogManualPowerManaged",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"machine_accounts", "is_remote_pc", "is_power_managed"},
+			},
+			//Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
+func TestMachineCatalogPreCheck_Manual_Power_Managed_AWS_EC2(t *testing.T) {
+	if v := os.Getenv("TEST_MC_NAME_MANUAL"); v == "" {
+		t.Fatal("TEST_MC_NAME_MANUAL must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_ALLOCATION_TYPE_MANUAL_POWER_MANAGED"); v == "" {
+		t.Fatal("TEST_MC_ALLOCATION_TYPE_MANUAL_POWER_MANAGED must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_SESSION_SUPPORT_MANUAL_POWER_MANAGED"); v == "" {
+		t.Fatal("TEST_MC_SESSION_SUPPORT_MANUAL_POWER_MANAGED must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_MACHINE_NAME_MANUAL_AWS_EC2"); v == "" {
+		t.Fatal("TEST_MC_MACHINE_NAME_MANUAL_AWS_EC2 must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_MACHINE_ACCOUNT_MANUAL_AWS_EC2"); v == "" {
+		t.Fatal("TEST_MC_MACHINE_ACCOUNT_MANUAL_AWS_EC2 must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_AVAILABILITY_ZONE_MANUAL_AWS_EC2"); v == "" {
+		t.Fatal("TEST_MC_AVAILABILITY_ZONE_MANUAL_AWS_EC2 must be set for acceptance tests")
+	}
+}
+
+func TestMachineCatalogResource_Manual_Power_Managed_Aws_Ec2(t *testing.T) {
+	name := os.Getenv("TEST_MC_NAME_MANUAL")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck: func() {
+			TestProviderPreCheck(t)
+			TestHypervisorPreCheck_AWS_EC2(t)
+			TestMachineCatalogPreCheck_Manual_Power_Managed_AWS_EC2(t)
+		},
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: BuildMachineCatalogResourceManualPowerManagedAwsEc2(t, machinecatalog_testResources_manual_power_managed_aws_ec2),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogManualPowerManaged", "name", name),
@@ -1321,6 +1538,142 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 	}
 	`
 
+	machine_catalog_testResources_nutanix = `
+	resource "citrix_machine_catalog" "testMachineCatalog" {
+		name                        = "%s"
+    	description                 = "nutanix catalog for acceptance testing"
+    	provisioning_type = "MCS"
+    	allocation_type             = "Random"
+    	session_support             = "MultiSession"
+    	zone                        = citrix_zone.test.id
+    	provisioning_scheme         = {
+    	    identity_type = "ActiveDirectory"
+    	    number_of_total_machines = 1
+    	    machine_account_creation_rules = {
+    	        naming_scheme = "test-machine-##"
+    	        naming_scheme_type = "Numeric"
+    	    }
+    	    hypervisor = citrix_nutanix_hypervisor.testHypervisor.id
+    	    hypervisor_resource_pool = citrix_nutanix_hypervisor_resource_pool.testHypervisorResourcePool.id
+    	    nutanix_machine_config = {
+				container = "%s"
+    	        master_image = "%s"
+    	        memory_mb = "%s"
+				cpu_count = "%s"
+				cores_per_cpu_count = "%s"
+    	    }
+    	    machine_domain_identity = {
+    	        service_account             = "%s"
+			    domain = "%s"
+    	        service_account_password    = "%s"
+    	    }
+    	}
+	}
+	`
+
+	machine_catalog_testResources_nutanix_updated = `
+	resource "citrix_machine_catalog" "testMachineCatalog" {
+		name                        = "%s"
+    	description                 = "updatedCatalog"
+    	provisioning_type = "MCS"
+    	allocation_type             = "Random"
+    	session_support             = "MultiSession"
+    	zone                        = citrix_zone.test.id
+    	provisioning_scheme         = {
+    	    identity_type = "ActiveDirectory"
+    	    number_of_total_machines = 2
+    	    machine_account_creation_rules = {
+    	        naming_scheme = "test-machine-##"
+    	        naming_scheme_type = "Numeric"
+    	    }
+    	    hypervisor = citrix_nutanix_hypervisor.testHypervisor.id
+    	    hypervisor_resource_pool = citrix_nutanix_hypervisor_resource_pool.testHypervisorResourcePool.id
+    	    nutanix_machine_config = {
+				container = "%s"
+    	        master_image = "%s"
+    	        memory_mb = "%s"
+				cpu_count = "%s"
+				cores_per_cpu_count = "%s"
+    	    }
+    	    machine_domain_identity = {
+    	        service_account             = "%s"
+			    domain = "%s"
+    	        service_account_password    = "%s"
+    	    }
+    	}
+	}
+	`
+
+	machinecatalog_testResources_aws_ec2 = `
+	resource "citrix_machine_catalog" "testMachineCatalog" {
+		name                        = "%s"
+		description                 = "AWS EC2 MCS Machine Catalog"
+		zone                        = citrix_zone.test.id
+		allocation_type             = "Random"
+		session_support             = "MultiSession"
+		provisioning_type           = "MCS"
+		provisioning_scheme         =   {
+    	    hypervisor = citrix_aws_hypervisor.testHypervisor.id
+    	    hypervisor_resource_pool = citrix_aws_hypervisor_resource_pool.testHypervisorResourcePool.id
+			identity_type      = "ActiveDirectory"
+    	    machine_domain_identity = {
+    	        service_account             = "%s"
+			    domain = "%s"
+    	        service_account_password    = "%s"
+    	    }
+			aws_machine_config = {
+				image_ami = "%s"
+				master_image = "%s"
+				service_offering = "%s"
+			}
+			network_mapping = {
+				network_device = "0"
+				network = "%s"
+			}
+			number_of_total_machines =  1
+			machine_account_creation_rules ={
+				naming_scheme =     "test-machine-##"
+				naming_scheme_type ="Numeric"
+			}
+		}
+	}
+	`
+
+	machinecatalog_testResources_aws_ec2_updated = `
+	resource "citrix_machine_catalog" "testMachineCatalog" {
+		name                        = "%s"
+		description                 = "Updated AWS EC2 MCS Machine Catalog"
+		zone                        = citrix_zone.test.id
+		allocation_type             = "Random"
+		session_support             = "MultiSession"
+		provisioning_type           = "MCS"
+		provisioning_scheme         =   {
+    	    hypervisor = citrix_aws_hypervisor.testHypervisor.id
+    	    hypervisor_resource_pool = citrix_aws_hypervisor_resource_pool.testHypervisorResourcePool.id
+			identity_type      = "ActiveDirectory"
+    	    machine_domain_identity = {
+    	        service_account             = "%s"
+			    domain = "%s"
+    	        service_account_password    = "%s"
+    	    }
+			aws_machine_config = {
+				image_ami = "%s"
+				master_image = "%s"
+				service_offering = "%s"
+			}
+			network_mapping = {
+				network_device = "0"
+				network = "%s"
+			}
+			number_of_total_machines =  2
+			machine_account_creation_rules ={
+				naming_scheme =     "test-machine-##"
+				naming_scheme_type ="Numeric"
+			}
+		}
+	}
+	`
+
 	machinecatalog_testResources_manual_power_managed_azure = `
 	resource "citrix_machine_catalog" "testMachineCatalogManualPowerManaged" {
 		name                		= "%s"
@@ -1440,6 +1793,31 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 					{
 						machine_name = "%s"
 						machine_account = "%s"
+					}
+				]
+			}
+		]
+	}
+	`
+
+	machinecatalog_testResources_manual_power_managed_aws_ec2 = `
+	resource "citrix_machine_catalog" "testMachineCatalogManualPowerManaged" {
+		name                        = "%s"
+		description                 = "manual power managed multi-session catalog testing"
+		is_power_managed 			= true
+		is_remote_pc 				= false
+		provisioning_type 			= "Manual"
+		allocation_type             = "%s"
+		session_support             = "%s"
+		zone                        = citrix_zone.test.id
+		machine_accounts = [
+			{
+				hypervisor = citrix_aws_hypervisor.testHypervisor.id
+				machines = [
+					{
+						machine_name = "%s"
+						machine_account = "%s"
+                    	availability_zone = "%s"
 					}
 				]
 			}
@@ -1582,6 +1960,33 @@ func BuildMachineCatalogResourceXenserver(t *testing.T, machineResource string) 
 	return BuildHypervisorResourcePoolResourceXenServer(t) + fmt.Sprintf(machineResource, name, master_image, memory_mb, cpu_count, service_account, domain, service_account_pass)
 }
 
+func BuildMachineCatalogResourceNutanix(t *testing.T, machineResource string) string {
+	name := os.Getenv("TEST_MC_NAME_NUTANIX")
+	container := os.Getenv("TEST_MC_CONTAINER_NUTANIX")
+	master_image := os.Getenv("TEST_MC_MASTER_IMAGE_NUTANIX")
+	memory_mb := os.Getenv("TEST_MC_MEMORY_MB_NUTANIX")
+	cpu_count := os.Getenv("TEST_MC_CPU_COUNT_NUTANIX")
+	cores_per_cpu_count := os.Getenv("TEST_MC_CORES_PER_CPU_COUNT_NUTANIX")
+	domain := os.Getenv("TEST_MC_DOMAIN_NUTANIX")
+	service_account := os.Getenv("TEST_MC_SERVICE_ACCOUNT_NUTANIX")
+	service_account_pass := os.Getenv("TEST_MC_SERVICE_ACCOUNT_PASS_NUTANIX")
+
+	return BuildHypervisorResourcePoolResourceNutanix(t, hypervisor_resource_pool_testResource_nutanix) + fmt.Sprintf(machineResource, name, container, master_image, memory_mb, cpu_count, cores_per_cpu_count, service_account, domain, service_account_pass)
+}
+
+func BuildMachineCatalogResourceAwsEc2(t *testing.T, machineResource string) string {
+	name := os.Getenv("TEST_MC_NAME_AWS_EC2")
+	domain := os.Getenv("TEST_MC_DOMAIN_AWS_EC2")
+	service_account := os.Getenv("TEST_MC_SERVICE_ACCOUNT_AWS_EC2")
+	service_account_pass := os.Getenv("TEST_MC_SERVICE_ACCOUNT_PASS_AWS_EC2")
+	image_ami := os.Getenv("TEST_MC_IMAGE_AMI_AWS_EC2")
+	master_image := os.Getenv("TEST_MC_MASTER_IMAGE_AWS_EC2")
+	service_offering := os.Getenv("TEST_MC_SERVICE_OFFERING_AWS_EC2")
+	network := os.Getenv("TEST_MC_NETWORK_AWS_EC2")
+
+	return BuildHypervisorResourcePoolResourceAwsEc2(t, hypervisor_resource_pool_testResource_aws_ec2) + fmt.Sprintf(machineResource, name, service_account, domain, service_account_pass, image_ami, master_image, service_offering, network)
+}
+
 func BuildMachineCatalogResourceManualPowerManagedAzure(t *testing.T, machineResource string) string {
 	name := os.Getenv("TEST_MC_NAME_MANUAL")
 	machine_name := os.Getenv("TEST_MC_MACHINE_NAME_MANUAL_AZURE")
@@ -1636,6 +2041,18 @@ func BuildMachineCatalogResourceManualPowerManagedNutanix(t *testing.T, machineR
 	session_support := os.Getenv("TEST_MC_SESSION_SUPPORT_MANUAL_POWER_MANAGED")
 
 	return BuildHypervisorResourceNutanix(t, hypervisor_testResources_nutanix) + fmt.Sprintf(machineResource, name, allocation_type, session_support, machine_name, machine_account)
+}
+
+func BuildMachineCatalogResourceManualPowerManagedAwsEc2(t *testing.T, machineResource string) string {
+	name := os.Getenv("TEST_MC_NAME_MANUAL")
+	allocation_type := os.Getenv("TEST_MC_ALLOCATION_TYPE_MANUAL_POWER_MANAGED")
+	session_support := os.Getenv("TEST_MC_SESSION_SUPPORT_MANUAL_POWER_MANAGED")
+	machine_name := os.Getenv("TEST_MC_MACHINE_NAME_MANUAL_AWS_EC2")
+	machine_account := os.Getenv("TEST_MC_MACHINE_ACCOUNT_MANUAL_AWS_EC2")
+	availability_zone := os.Getenv("TEST_MC_AVAILABILITY_ZONE_MANUAL_AWS_EC2")
+
+	str := BuildHypervisorResourceAwsEc2(t, hypervisor_testResources_aws_ec2) + fmt.Sprintf(machineResource, name, allocation_type, session_support, machine_name, machine_account, availability_zone)
+	return str
 }
 
 func BuildMachineCatalogResourceManualNonPowerManaged(t *testing.T, machineResource string) string {

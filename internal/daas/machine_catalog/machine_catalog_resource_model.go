@@ -56,6 +56,7 @@ type ProvisioningSchemeModel struct {
 	GcpMachineConfig            *GcpMachineConfigModel            `tfsdk:"gcp_machine_config"`
 	VsphereMachineConfig        *VsphereMachineConfigModel        `tfsdk:"vsphere_machine_config"`
 	XenserverMachineConfig      *XenserverMachineConfigModel      `tfsdk:"xenserver_machine_config"`
+	NutanixMachineConfigModel   *NutanixMachineConfigModel        `tfsdk:"nutanix_machine_config"`
 	NumTotalMachines            types.Int64                       `tfsdk:"number_of_total_machines"`
 	NetworkMapping              *NetworkMappingModel              `tfsdk:"network_mapping"`
 	AvailabilityZones           types.String                      `tfsdk:"availability_zones"`
@@ -99,7 +100,7 @@ type RemotePcOuModel struct {
 	OUName            types.String `tfsdk:"ou_name"`
 }
 
-func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, client *citrixclient.CitrixDaasClient, catalog *citrixorchestration.MachineCatalogDetailResponseModel, connectionType *citrixorchestration.HypervisorConnectionType, machines *citrixorchestration.MachineResponseModelCollection) MachineCatalogResourceModel {
+func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, client *citrixclient.CitrixDaasClient, catalog *citrixorchestration.MachineCatalogDetailResponseModel, connectionType *citrixorchestration.HypervisorConnectionType, machines *citrixorchestration.MachineResponseModelCollection, pluginId string) MachineCatalogResourceModel {
 	// Machine Catalog Properties
 	r.Id = types.StringValue(catalog.GetId())
 	r.Name = types.StringValue(catalog.GetName())
@@ -146,7 +147,7 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 	}
 
 	// Provisioning Scheme Properties
-	r = r.updateCatalogWithProvScheme(ctx, client, catalog, connectionType)
+	r = r.updateCatalogWithProvScheme(ctx, client, catalog, connectionType, pluginId)
 
 	return r
 }

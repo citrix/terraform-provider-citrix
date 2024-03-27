@@ -30,6 +30,3 @@ In general if the issue can be reproduced using another mechanism (via the UI, R
 
 ## Contributing Code
 This project is currently not accepting pull requests from the community. If you'd like to run the provider locally follow the steps in the [DEVELOPER.md](./DEVELOPER.md) document.
-
-## Contacting the Maintainers
-The CUGC (Citrix User Group Community) maintains a combination Slack/Discord for communication. Follow [this link](https://mycugc.org/resources/slack-discord/) to sign up. Provider discussion can be posted to the #community-support_automation channel.

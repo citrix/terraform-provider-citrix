@@ -116,6 +116,7 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 	hypervisorConnection := catalog.GetHypervisorConnection()
 	hypervisorId := hypervisorConnection.GetId()
 	var connectionType citrixorchestration.HypervisorConnectionType
+	var pluginId string
 	if hypervisorId != "" {
 		hypervisor, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, hypervisorId)
 		if err != nil {
@@ -123,10 +124,11 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 		}
 
 		connectionType = hypervisor.GetConnectionType()
+		pluginId = hypervisor.GetPluginId()
 	}
 
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(ctx, r.client, catalog, &connectionType, machines)
+	plan = plan.RefreshPropertyValues(ctx, r.client, catalog, &connectionType, machines, pluginId)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -168,16 +170,17 @@ func (r *machineCatalogResource) Read(ctx context.Context, req resource.ReadRequ
 	hypervisorName := hypervisor.GetName()
 
 	var connectionType *citrixorchestration.HypervisorConnectionType
-
+	var pluginId string
 	if hypervisorName != "" {
 		hypervisor, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, hypervisorName)
 		if err != nil {
 			return
 		}
 		connectionType = hypervisor.GetConnectionType().Ptr()
+		pluginId = hypervisor.GetPluginId()
 	}
 	// Overwrite items with refreshed state
-	state = state.RefreshPropertyValues(ctx, r.client, catalog, connectionType, machineCatalogMachines)
+	state = state.RefreshPropertyValues(ctx, r.client, catalog, connectionType, machineCatalogMachines, pluginId)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -286,6 +289,7 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 	hypervisorConnection := catalog.GetHypervisorConnection()
 	hypervisorId := hypervisorConnection.GetId()
 	var connectionType citrixorchestration.HypervisorConnectionType
+	var pluginId string
 	if hypervisorId != "" {
 		hypervisor, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, hypervisorId)
 		if err != nil {
@@ -293,10 +297,11 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		}
 
 		connectionType = hypervisor.GetConnectionType()
+		pluginId = hypervisor.GetPluginId()
 	}
 
 	// Update resource state with updated items and timestamp
-	plan = plan.RefreshPropertyValues(ctx, r.client, catalog, &connectionType, machines)
+	plan = plan.RefreshPropertyValues(ctx, r.client, catalog, &connectionType, machines, pluginId)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

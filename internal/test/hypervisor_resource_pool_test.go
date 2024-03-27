@@ -326,6 +326,62 @@ func TestHypervisorResourcePoolNutanix(t *testing.T) {
 	})
 }
 
+func TestHypervisorResourcePoolPreCheck_Aws_Ec2(t *testing.T) {
+	if v := os.Getenv("TEST_HYPERV_RP_NAME_AWS_EC2"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_NAME_AWS_EC2 must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_RP_VPC_AWS_EC2"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_VPC_AWS_EC2 must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_RP_AVAILABILITY_ZONE_AWS_EC2"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_AVAILABILITY_ZONE_AWS_EC2 must be set for acceptance tests")
+	}
+	if v := os.Getenv("Test_HYPERV_RP_SUBNETS_AWS_EC2"); v == "" {
+		t.Fatal("Test_HYPERV_RP_SUBNETS_AWS_EC2 must be set for acceptance tests")
+	}
+}
+
+func TestHypervisorResourcePoolAwsEc2(t *testing.T) {
+	name := os.Getenv("TEST_HYPERV_RP_NAME_AWS_EC2")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck: func() {
+			TestProviderPreCheck(t)
+			TestHypervisorPreCheck_AWS_EC2(t)
+			TestHypervisorResourcePoolPreCheck_Aws_Ec2(t)
+		},
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: BuildHypervisorResourcePoolResourceAwsEc2(t, hypervisor_resource_pool_testResource_aws_ec2),
+
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("citrix_aws_hypervisor_resource_pool.testHypervisorResourcePool", "name", name),
+					// Verify name of the region
+					resource.TestCheckResourceAttr("citrix_aws_hypervisor_resource_pool.testHypervisorResourcePool", "vpc", os.Getenv("TEST_HYPERV_RP_VPC_AWS_EC2")),
+					resource.TestCheckResourceAttr("citrix_aws_hypervisor_resource_pool.testHypervisorResourcePool", "availability_zone", os.Getenv("TEST_HYPERV_RP_AVAILABILITY_ZONE_AWS_EC2")),
+					resource.TestCheckResourceAttr("citrix_aws_hypervisor_resource_pool.testHypervisorResourcePool", "subnets.#", "1"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "citrix_aws_hypervisor_resource_pool.testHypervisorResourcePool",
+				ImportState:       true,
+				ImportStateIdFunc: generateImportStateId_Aws_Ec2,
+				ImportStateVerify: true,
+			},
+			// Update and Read
+			{
+				Config: BuildHypervisorResourcePoolResourceAwsEc2(t, hypervisor_resource_pool_updated_testResource_aws_ec2),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("citrix_aws_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
+				),
+			},
+		},
+	})
+}
+
 func generateImportStateId(state *terraform.State) (string, error) {
 	resourceName := "citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool"
 	var rawState map[string]string
@@ -384,6 +440,20 @@ func generateImportStateId_Vsphere(state *terraform.State) (string, error) {
 
 func generateImportStateId_Nutanix(state *terraform.State) (string, error) {
 	resourceName := "citrix_nutanix_hypervisor_resource_pool.testHypervisorResourcePool"
+	var rawState map[string]string
+	for _, m := range state.Modules {
+		if len(m.Resources) > 0 {
+			if v, ok := m.Resources[resourceName]; ok {
+				rawState = v.Primary.Attributes
+			}
+		}
+	}
+
+	return fmt.Sprintf("%s,%s", rawState["hypervisor"], rawState["id"]), nil
+}
+
+func generateImportStateId_Aws_Ec2(state *terraform.State) (string, error) {
+	resourceName := "citrix_aws_hypervisor_resource_pool.testHypervisorResourcePool"
 	var rawState map[string]string
 	for _, m := range state.Modules {
 		if len(m.Resources) > 0 {
@@ -521,6 +591,26 @@ resource "citrix_nutanix_hypervisor_resource_pool" "testHypervisorResourcePool" 
 	networks = ["%s"]
 }
 `
+
+	hypervisor_resource_pool_testResource_aws_ec2 = `
+resource "citrix_aws_hypervisor_resource_pool" "testHypervisorResourcePool" {
+    name = "%s"
+	hypervisor = citrix_aws_hypervisor.testHypervisor.id
+    vpc = "%s"
+	availability_zone = "%s"
+	subnets = %s
+}
+`
+
+	hypervisor_resource_pool_updated_testResource_aws_ec2 = `
+resource "citrix_aws_hypervisor_resource_pool" "testHypervisorResourcePool" {
+    name = "%s-updated"
+	hypervisor = citrix_aws_hypervisor.testHypervisor.id
+    vpc = "%s"
+	availability_zone = "%s"
+	subnets = %s
+}
+`
 )
 
 func BuildHypervisorResourcePoolResourceAzure(t *testing.T, hypervisorRP string) string {
@@ -590,4 +680,13 @@ func BuildHypervisorResourcePoolResourceNutanix(t *testing.T, hypervisorRp strin
 	network := os.Getenv("TEST_HYPERV_RP_NETWORK_NUTANIX")
 
 	return BuildHypervisorResourceNutanix(t, hypervisor_testResources_nutanix) + fmt.Sprintf(hypervisorRp, name, network)
+}
+
+func BuildHypervisorResourcePoolResourceAwsEc2(t *testing.T, hypervisorRp string) string {
+	name := os.Getenv("TEST_HYPERV_RP_NAME_AWS_EC2")
+	vpc := os.Getenv("TEST_HYPERV_RP_VPC_AWS_EC2")
+	availability_zone := os.Getenv("TEST_HYPERV_RP_AVAILABILITY_ZONE_AWS_EC2")
+	subnets := os.Getenv("Test_HYPERV_RP_SUBNETS_AWS_EC2")
+
+	return BuildHypervisorResourceAwsEc2(t, hypervisor_testResources_aws_ec2) + fmt.Sprintf(hypervisorRp, name, vpc, availability_zone, subnets)
 }

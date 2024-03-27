@@ -202,6 +202,37 @@ resource "citrix_machine_catalog" "example-xenserver-mtsession" {
     }
 }
 
+resource "citrix_machine_catalog" "example-nutanix-mtsession" {
+    name                        = "example-nutanix-mtsession"
+    description                 = "Example multi-session catalog on Nutanix hypervisor"
+    provisioning_type 			= "MCS"
+    allocation_type             = "Random"
+    session_support             = "MultiSession"
+    zone                        = citrix_zone.example-zone.id
+    provisioning_scheme         = {
+        identity_type = "ActiveDirectory"
+        number_of_total_machines = 1
+        machine_account_creation_rules = {
+            naming_scheme = "catalog-##"
+            naming_scheme_type = "Numeric"
+        }
+        hypervisor = citrix_nutanix_hypervisor.example-nutanix-hypervisor.id
+        hypervisor_resource_pool = citrix_nutanix_hypervisor_resource_pool.example-nutanix-rp.id
+        nutanix_machine_config = {
+            container = "<Container name>"
+            master_image = "<Image name>"
+            cpu_count = 2
+            memory_mb = 4096
+            cores_per_cpu_count = 2
+        }
+        machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+    }
+}
+
 resource "citrix_machine_catalog" "example-manual-power-managed-mtsession" {
 	name                		= "example-manual-power-managed-mtsession"
 	description					= "Example manual power managed multi-session catalog"
@@ -354,6 +385,7 @@ Optional:
 - `gcp_machine_config` (Attributes) Machine Configuration For GCP MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--gcp_machine_config))
 - `machine_domain_identity` (Attributes) The domain identity for machines in the machine catalog.<br />Required when identity_type is set to `ActiveDirectory` (see [below for nested schema](#nestedatt--provisioning_scheme--machine_domain_identity))
 - `network_mapping` (Attributes) Specifies how the attached NICs are mapped to networks. If this parameter is omitted, provisioned VMs are created with a single NIC, which is mapped to the default network in the hypervisor resource pool.  If this parameter is supplied, machines are created with the number of NICs specified in the map, and each NIC is attached to the specified network.<br />Required when `provisioning_scheme.identity_type` is `AzureAD`. (see [below for nested schema](#nestedatt--provisioning_scheme--network_mapping))
+- `nutanix_machine_config` (Attributes) Machine Configuration For Nutanix MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--nutanix_machine_config))
 - `vsphere_machine_config` (Attributes) Machine Configuration For VSphere MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--vsphere_machine_config))
 - `xenserver_machine_config` (Attributes) Machine Configuration For XenServer MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--xenserver_machine_config))
 
@@ -480,12 +512,24 @@ Required:
 - `network_device` (String) Name or Id of the network device.
 
 
+<a id="nestedatt--provisioning_scheme--nutanix_machine_config"></a>
+### Nested Schema for `provisioning_scheme.nutanix_machine_config`
+
+Required:
+
+- `container` (String) The name of the container where the virtual machines' identity disks will be placed.
+- `cores_per_cpu_count` (Number) The number of cores per processor that virtual machines created from the provisioning scheme should use.
+- `cpu_count` (Number) The number of processors that virtual machines created from the provisioning scheme should use.
+- `master_image` (String) The name of the master image that will be the template for all virtual machines in this catalog.
+- `memory_mb` (Number) The maximum amount of memory that virtual machines created from the provisioning scheme should use.
+
+
 <a id="nestedatt--provisioning_scheme--vsphere_machine_config"></a>
 ### Nested Schema for `provisioning_scheme.vsphere_machine_config`
 
 Required:
 
-- `cpu_count` (Number) The number of processors that virtual machines created from the provisioning scheme should use
+- `cpu_count` (Number) The number of processors that virtual machines created from the provisioning scheme should use.
 - `master_image_vm` (String) The name of the virtual machine that will be used as master image. This property is case sensitive.
 - `memory_mb` (Number) The maximum amount of memory that virtual machines created from the provisioning scheme should use.
 
