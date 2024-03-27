@@ -67,6 +67,8 @@ type ProvisioningSchemeModel struct {
 type MachineProfileModel struct {
 	MachineProfileVmName        types.String `tfsdk:"machine_profile_vm_name"`
 	MachineProfileResourceGroup types.String `tfsdk:"machine_profile_resource_group"`
+	AzureTemplateSpecName       types.String `tfsdk:"azure_template_spec_name"`
+	AzureTemplateSpecVersion    types.String `tfsdk:"azure_template_spec_version"`
 }
 
 type MachineDomainIdentityModel struct {

@@ -154,14 +154,20 @@ func buildProvSchemeForMcsCatalog(ctx context.Context, client *citrixdaasclient.
 
 		machineProfile := plan.ProvisioningScheme.AzureMachineConfig.MachineProfile
 		if machineProfile != nil {
-			machine := machineProfile.MachineProfileVmName.ValueString()
+			machineProfileType := util.VirtualMachineResourceType
+			machineProfileName := machineProfile.MachineProfileVmName.ValueString()
 			machineProfileResourceGroup := machineProfile.MachineProfileResourceGroup.ValueString()
 			queryPath = fmt.Sprintf("machineprofile.folder\\%s.resourcegroup", machineProfileResourceGroup)
-			machineProfilePath, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, machine, util.VirtualMachineResourceType, "")
+			if machineProfileName == "" {
+				machineProfileType = util.TemplateSpecVersionResourceType
+				machineProfileName = machineProfile.AzureTemplateSpecVersion.ValueString()
+				queryPath = queryPath + fmt.Sprintf("\\%s.templatespec", machineProfile.AzureTemplateSpecName.ValueString())
+			}
+			machineProfilePath, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, machineProfileName, machineProfileType, "")
 			if err != nil {
 				diag.AddError(
 					"Error creating Machine Catalog",
-					fmt.Sprintf("Failed to locate machine profile %s on Azure, error: %s", plan.ProvisioningScheme.AzureMachineConfig.MachineProfile.MachineProfileVmName.ValueString(), err.Error()),
+					fmt.Sprintf("Failed to locate machine profile %s on Azure, error: %s", machineProfileName, err.Error()),
 				)
 				return nil, err
 			}
@@ -614,14 +620,20 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 		}
 
 		if azureMachineProfile != nil {
+			machineProfileType := util.VirtualMachineResourceType
 			machineProfileName := azureMachineProfile.MachineProfileVmName.ValueString()
 			machineProfileResourceGroup := plan.ProvisioningScheme.AzureMachineConfig.MachineProfile.MachineProfileResourceGroup.ValueString()
 			queryPath := fmt.Sprintf("machineprofile.folder\\%s.resourcegroup", machineProfileResourceGroup)
-			machineProfilePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, machineProfileName, util.VirtualMachineResourceType, "")
+			if machineProfileName == "" {
+				machineProfileType = util.TemplateSpecVersionResourceType
+				machineProfileName = azureMachineProfile.AzureTemplateSpecVersion.ValueString()
+				queryPath = queryPath + fmt.Sprintf("\\%s.templatespec", azureMachineProfile.AzureTemplateSpecName.ValueString())
+			}
+			machineProfilePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, machineProfileName, machineProfileType, "")
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating Machine Catalog",
-					fmt.Sprintf("Failed to locate machine profile %s on Azure, error: %s", plan.ProvisioningScheme.AzureMachineConfig.MachineProfile.MachineProfileVmName.ValueString(), err.Error()),
+					fmt.Sprintf("Failed to locate machine profile %s on Azure, error: %s", machineProfileName, err.Error()),
 				)
 				return err
 			}

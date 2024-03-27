@@ -327,10 +327,18 @@ func (mc *XenserverMachineConfigModel) RefreshProperties(catalog citrixorchestra
 func parseAzureMachineProfileResponseToModel(machineProfileResponse citrixorchestration.HypervisorResourceRefResponseModel) *MachineProfileModel {
 	machineProfileModel := MachineProfileModel{}
 	if machineProfileName := machineProfileResponse.GetName(); machineProfileName != "" {
-		machineProfileModel.MachineProfileVmName = types.StringValue(machineProfileName)
 		machineProfileSegments := strings.Split(machineProfileResponse.GetXDPath(), "\\")
 		lastIndex := len(machineProfileSegments) - 1
+		machineProfile := machineProfileSegments[lastIndex]
 		machineProfileParent := machineProfileSegments[lastIndex-1]
+		if strings.HasSuffix(machineProfile, ".templatespecversion") {
+			templateSpecName := strings.Split(machineProfileParent, ".")[0]
+			machineProfileModel.AzureTemplateSpecName = types.StringValue(templateSpecName)
+			machineProfileModel.AzureTemplateSpecVersion = types.StringValue(machineProfileName)
+			machineProfileParent = machineProfileSegments[lastIndex-2]
+		} else {
+			machineProfileModel.MachineProfileVmName = types.StringValue(machineProfileName)
+		}
 		machineProfileParentType := strings.Split(machineProfileParent, ".")[1]
 		if machineProfileParentType == "resourcegroup" {
 			machineProfileModel.MachineProfileResourceGroup = types.StringValue(strings.Split(machineProfileParent, ".")[0])
@@ -338,6 +346,8 @@ func parseAzureMachineProfileResponseToModel(machineProfileResponse citrixorches
 	} else {
 		machineProfileModel.MachineProfileVmName = types.StringNull()
 		machineProfileModel.MachineProfileResourceGroup = types.StringNull()
+		machineProfileModel.AzureTemplateSpecName = types.StringNull()
+		machineProfileModel.AzureTemplateSpecVersion = types.StringNull()
 	}
 	return &machineProfileModel
 }
