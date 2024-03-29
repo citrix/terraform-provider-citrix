@@ -77,9 +77,9 @@ Below is a table to show the difference between on-premises and Cloud provider c
 
 |              | Cloud                             | On-Premises                           |
 |--------------|-----------------------------------|---------------------------------------|
-| region       | `US` / `EU` / `AP-S` / `JP`       | :x:                                   |
-| environment  | `Production` / `Staging`          | :x:                                   |
-| customerId   | Cloud Customer Id                 | :x:                                   |
+| region       | `US` / `EU` / `AP-S` / `JP`       | N/A                                   |
+| environment  | `Production` / `Staging`          | N/A                                   |
+| customerId   | Cloud Customer Id                 | N/A                                   |
 | hostname     | (Optional) Cloud DDC hostname     | On-Premises DDC Hostname / IP address |
 | clientId     | Citrix Cloud API Key clientId     | Domain Admin Username                 |
 | clientSecret | Citrix Cloud API Key clientSecret | Domain Admin Password                 |
@@ -165,6 +165,7 @@ A delivery group is a collection of machines selected from one or more machine c
   - AWS EC2
   - Vsphere
   - XenServer
+  - Nutanix
 - Manual Power Managed
   - Azure
   - GCP
