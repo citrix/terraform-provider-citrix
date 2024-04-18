@@ -7,7 +7,7 @@ resource "citrix_policy_set" "example-policy-set" {
         {
             name = "test-policy-with-priority-0"
             description = "Test policy in the example policy set with priority 0"
-            is_enabled = true
+            enabled = true
             policy_settings = [
                 {
                     name = "AdvanceWarningPeriod"
@@ -18,19 +18,19 @@ resource "citrix_policy_set" "example-policy-set" {
             policy_filters = [
                 {
                     type = "DesktopGroup"
-                    data = jsonencode({
-                        "server" = "20.185.46.142"
-                        "uuid" = citrix_policy_set.example-delivery-group.id
-                    })
-                    is_enabled = true
-                    is_allowed = true
+                    data = {
+                        server = "0.0.0.0"
+                        uuid = citrix_delivery_group.example-delivery-group.id
+                    }
+                    enabled = true
+                    allowed = true
                 },
             ]
         },
         {
             name = "test-policy-with-priority-1"
             description = "Test policy in the example policy set with priority 1"
-            is_enabled = false
+            enabled = false
             policy_settings = []
             policy_filters = []
         }

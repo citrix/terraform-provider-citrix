@@ -57,7 +57,7 @@ func (r *vsphereHypervisorResource) Configure(_ context.Context, req resource.Co
 // Schema implements resource.Resource.
 func (r *vsphereHypervisorResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a Vsphere hypervisor.",
+		Description: "Manages a VMware vSphere hypervisor.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the hypervisor.",
@@ -239,7 +239,7 @@ func (r *vsphereHypervisorResource) Read(ctx context.Context, req resource.ReadR
 	if hypervisor.GetConnectionType() != citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER {
 		resp.Diagnostics.AddError(
 			"Error reading Hypervisor",
-			"Hypervisor "+hypervisor.GetName()+" is not a Vsphere connection type hypervisor.",
+			"Hypervisor "+hypervisor.GetName()+" is not a vSphere connection type hypervisor.",
 		)
 		return
 	}
@@ -283,7 +283,7 @@ func (r *vsphereHypervisorResource) Update(ctx context.Context, req resource.Upd
 	pwdFormat, err := citrixorchestration.NewIdentityPasswordFormatFromValue(plan.PasswordFormat.ValueString())
 	if err != nil || pwdFormat == nil {
 		resp.Diagnostics.AddError(
-			"Error updating Hypervisor for Vsphere",
+			"Error updating Hypervisor for vSphere",
 			"Unsupported password format: "+plan.PasswordFormat.ValueString(),
 		)
 	}

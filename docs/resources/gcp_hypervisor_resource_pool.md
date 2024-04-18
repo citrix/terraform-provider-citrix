@@ -3,12 +3,12 @@
 page_title: "citrix_gcp_hypervisor_resource_pool Resource - citrix"
 subcategory: ""
 description: |-
-  Manages a hypervisor resource pool.
+  Manages a GCP hypervisor resource pool.
 ---
 
 # citrix_gcp_hypervisor_resource_pool (Resource)
 
-Manages a hypervisor resource pool.
+Manages a GCP hypervisor resource pool.
 
 ## Example Usage
 

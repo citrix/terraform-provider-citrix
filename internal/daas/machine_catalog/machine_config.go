@@ -3,33 +3,37 @@
 package machine_catalog
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"golang.org/x/exp/slices"
 )
 
 type AzureMachineConfigModel struct {
 	ServiceOffering types.String `tfsdk:"service_offering"`
-	MasterImage     types.String `tfsdk:"master_image"`
 	/** Azure Hypervisor **/
-	ResourceGroup    types.String              `tfsdk:"resource_group"`
-	StorageAccount   types.String              `tfsdk:"storage_account"`
-	Container        types.String              `tfsdk:"container"`
-	GalleryImage     *GalleryImageModel        `tfsdk:"gallery_image"`
-	VdaResourceGroup types.String              `tfsdk:"vda_resource_group"`
-	StorageType      types.String              `tfsdk:"storage_type"`
-	UseManagedDisks  types.Bool                `tfsdk:"use_managed_disks"`
-	MachineProfile   *MachineProfileModel      `tfsdk:"machine_profile"`
-	WritebackCache   *AzureWritebackCacheModel `tfsdk:"writeback_cache"`
+	AzureMasterImage       *AzureMasterImageModel       `tfsdk:"azure_master_image"`
+	VdaResourceGroup       types.String                 `tfsdk:"vda_resource_group"`
+	StorageType            types.String                 `tfsdk:"storage_type"`
+	UseAzureComputeGallery *AzureComputeGallerySettings `tfsdk:"use_azure_compute_gallery"`
+	LicenseType            types.String                 `tfsdk:"license_type"`
+	UseManagedDisks        types.Bool                   `tfsdk:"use_managed_disks"`
+	MachineProfile         *AzureMachineProfileModel    `tfsdk:"machine_profile"`
+	WritebackCache         *AzureWritebackCacheModel    `tfsdk:"writeback_cache"`
+	DiskEncryptionSet      *AzureDiskEncryptionSetModel `tfsdk:"disk_encryption_set"`
+	EnrollInIntune         types.Bool                   `tfsdk:"enroll_in_intune"`
 }
 
 type AwsMachineConfigModel struct {
 	ServiceOffering types.String `tfsdk:"service_offering"`
 	MasterImage     types.String `tfsdk:"master_image"`
 	/** AWS Hypervisor **/
-	ImageAmi types.String `tfsdk:"image_ami"`
+	ImageAmi       types.String   `tfsdk:"image_ami"`
+	SecurityGroups []types.String `tfsdk:"security_groups"`
+	TenancyType    types.String   `tfsdk:"tenancy_type"`
 }
 
 type GcpMachineConfigModel struct {
@@ -67,6 +71,26 @@ type NutanixMachineConfigModel struct {
 	MemoryMB         types.Int64  `tfsdk:"memory_mb"`
 }
 
+type GalleryImageModel struct {
+	Gallery    types.String `tfsdk:"gallery"`
+	Definition types.String `tfsdk:"definition"`
+	Version    types.String `tfsdk:"version"`
+}
+
+type AzureMasterImageModel struct {
+	ResourceGroup      types.String       `tfsdk:"resource_group"`
+	SharedSubscription types.String       `tfsdk:"shared_subscription"`
+	MasterImage        types.String       `tfsdk:"master_image"`
+	StorageAccount     types.String       `tfsdk:"storage_account"`
+	Container          types.String       `tfsdk:"container"`
+	GalleryImage       *GalleryImageModel `tfsdk:"gallery_image"`
+}
+
+type AzureMachineProfileModel struct {
+	MachineProfileVmName        types.String `tfsdk:"machine_profile_vm_name"`
+	MachineProfileResourceGroup types.String `tfsdk:"machine_profile_resource_group"`
+}
+
 // WritebackCacheModel maps the write back cacheconfiguration schema data.
 type AzureWritebackCacheModel struct {
 	PersistWBC                 types.Bool   `tfsdk:"persist_wbc"`
@@ -76,6 +100,11 @@ type AzureWritebackCacheModel struct {
 	StorageCostSaving          types.Bool   `tfsdk:"storage_cost_saving"`
 	WriteBackCacheDiskSizeGB   types.Int64  `tfsdk:"writeback_cache_disk_size_gb"`
 	WriteBackCacheMemorySizeMB types.Int64  `tfsdk:"writeback_cache_memory_size_mb"`
+}
+
+type AzureComputeGallerySettings struct {
+	ReplicaRatio   types.Int64 `tfsdk:"replica_ratio"`
+	ReplicaMaximum types.Int64 `tfsdk:"replica_maximum"`
 }
 
 type GcpWritebackCacheModel struct {
@@ -97,6 +126,11 @@ type VsphereWritebackCacheModel struct {
 	WriteBackCacheDriveLetter  types.String `tfsdk:"writeback_cache_drive_letter"`
 }
 
+type AzureDiskEncryptionSetModel struct {
+	DiskEncryptionSetName          types.String `tfsdk:"disk_encryption_set_name"`
+	DiskEncryptionSetResourceGroup types.String `tfsdk:"disk_encryption_set_resource_group"`
+}
+
 func (mc *AzureMachineConfigModel) RefreshProperties(catalog citrixorchestration.MachineCatalogDetailResponseModel) {
 	// Refresh Service Offering
 	provScheme := catalog.GetProvisioningScheme()
@@ -106,14 +140,18 @@ func (mc *AzureMachineConfigModel) RefreshProperties(catalog citrixorchestration
 
 	// Refresh Master Image
 	masterImage := provScheme.GetMasterImage()
-	if mc.GalleryImage != nil {
+	if mc.AzureMasterImage == nil {
+		mc.AzureMasterImage = &AzureMasterImageModel{}
+	}
+
+	if mc.AzureMasterImage.GalleryImage != nil {
 		/* For Azure Image Gallery image, the XDPath looks like:
 		 * XDHyp:\\HostingUnits\\{resource pool}\\image.folder\\{resource group}.resourcegroup\\{gallery name}.gallery\\{image name}.imagedefinition\\{image version}.imageversion
 		 * The Name property in MasterImage will be image version instead of image definition (name of the image)
 		 */
-		mc.GalleryImage.Version = types.StringValue(masterImage.GetName())
+		mc.AzureMasterImage.GalleryImage.Version = types.StringValue(masterImage.GetName())
 	} else {
-		mc.MasterImage = types.StringValue(masterImage.GetName())
+		mc.AzureMasterImage.MasterImage = types.StringValue(masterImage.GetName())
 	}
 
 	masterImageXdPath := masterImage.GetXDPath()
@@ -126,17 +164,17 @@ func (mc *AzureMachineConfigModel) RefreshProperties(catalog citrixorchestration
 
 			if strings.EqualFold(resourceType, util.VhdResourceType) {
 				// VHD image
-				mc.Container = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
-				mc.StorageAccount = types.StringValue(strings.Split(segments[lastIndex-3], ".")[0])
+				mc.AzureMasterImage.Container = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
+				mc.AzureMasterImage.StorageAccount = types.StringValue(strings.Split(segments[lastIndex-3], ".")[0])
 			} else if strings.EqualFold(resourceType, util.ImageVersionResourceType) {
 				// Gallery image
-				mc.GalleryImage.Definition = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
-				mc.GalleryImage.Gallery = types.StringValue(strings.Split(segments[lastIndex-3], ".")[0])
+				mc.AzureMasterImage.GalleryImage.Definition = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
+				mc.AzureMasterImage.GalleryImage.Gallery = types.StringValue(strings.Split(segments[lastIndex-3], ".")[0])
 			}
-			mc.ResourceGroup = types.StringValue(strings.Split(segments[lastIndex-4], ".")[0])
+			mc.AzureMasterImage.ResourceGroup = types.StringValue(strings.Split(segments[lastIndex-4], ".")[0])
 		} else {
 			// Snapshot or Managed Disk
-			mc.ResourceGroup = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
+			mc.AzureMasterImage.ResourceGroup = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
 		}
 	}
 
@@ -162,8 +200,17 @@ func (mc *AzureMachineConfigModel) RefreshProperties(catalog citrixorchestration
 		}
 	}
 
+	if provScheme.GetDeviceManagementType() == citrixorchestration.DEVICEMANAGEMENTTYPE_INTUNE {
+		mc.EnrollInIntune = types.BoolValue(true)
+	} else if mc.EnrollInIntune.ValueBool() {
+		mc.EnrollInIntune = types.BoolValue(false)
+	}
+
 	//Refresh custom properties
 	customProperties := provScheme.GetCustomProperties()
+	isLicenseTypeSet := false
+	isDesSet := false
+	isUseSharedImageGallerySet := false
 	for _, stringPair := range customProperties {
 		switch stringPair.GetName() {
 		case "StorageType":
@@ -192,8 +239,64 @@ func (mc *AzureMachineConfigModel) RefreshProperties(catalog citrixorchestration
 			if mc.WritebackCache != nil {
 				mc.WritebackCache.StorageCostSaving = types.BoolValue(true)
 			}
+		case "LicenseType":
+			licenseType := stringPair.GetValue()
+			if licenseType == "" {
+				mc.LicenseType = types.StringNull()
+			} else {
+				mc.LicenseType = types.StringValue(licenseType)
+			}
+			isLicenseTypeSet = true
+		case "DiskEncryptionSetId":
+			desId := stringPair.GetValue()
+			desArray := strings.Split(desId, "/")
+			desName := desArray[len(desArray)-1]
+			resourceGroupsIndex := slices.Index(desArray, "resourceGroups")
+			resourceGroupName := desArray[resourceGroupsIndex+1]
+			if mc.DiskEncryptionSet == nil {
+				mc.DiskEncryptionSet = &AzureDiskEncryptionSetModel{}
+			}
+			if !strings.EqualFold(mc.DiskEncryptionSet.DiskEncryptionSetName.ValueString(), desName) {
+				mc.DiskEncryptionSet.DiskEncryptionSetName = types.StringValue(desName)
+			}
+			if !strings.EqualFold(mc.DiskEncryptionSet.DiskEncryptionSetResourceGroup.ValueString(), resourceGroupName) {
+				mc.DiskEncryptionSet.DiskEncryptionSetResourceGroup = types.StringValue(resourceGroupName)
+			}
+			isDesSet = true
+		case "SharedImageGalleryReplicaRatio":
+			if stringPair.GetValue() != "" {
+				isUseSharedImageGallerySet = true
+				if mc.UseAzureComputeGallery == nil {
+					mc.UseAzureComputeGallery = &AzureComputeGallerySettings{}
+				}
+
+				replicaRatio, _ := strconv.Atoi(stringPair.GetValue())
+				mc.UseAzureComputeGallery.ReplicaRatio = types.Int64Value(int64(replicaRatio))
+			}
+		case "SharedImageGalleryReplicaMaximum":
+			if stringPair.GetValue() != "" {
+				isUseSharedImageGallerySet = true
+				if mc.UseAzureComputeGallery == nil {
+					mc.UseAzureComputeGallery = &AzureComputeGallerySettings{}
+				}
+
+				replicaMaximum, _ := strconv.Atoi(stringPair.GetValue())
+				mc.UseAzureComputeGallery.ReplicaMaximum = types.Int64Value(int64(replicaMaximum))
+			}
 		default:
 		}
+	}
+
+	if !isLicenseTypeSet && !mc.LicenseType.IsNull() {
+		mc.LicenseType = types.StringNull()
+	}
+
+	if !isDesSet && mc.DiskEncryptionSet != nil {
+		mc.DiskEncryptionSet = nil
+	}
+
+	if !isUseSharedImageGallerySet && mc.UseAzureComputeGallery != nil {
+		mc.UseAzureComputeGallery = nil
 	}
 }
 
@@ -211,6 +314,14 @@ func (mc *AwsMachineConfigModel) RefreshProperties(catalog citrixorchestration.M
 	 * The Name property in MasterImage will be image name without ami id appended
 	 */
 	mc.MasterImage = types.StringValue(strings.Split(masterImage.GetName(), " (ami-")[0])
+
+	// Refresh Security Group
+	securityGroups := provScheme.GetSecurityGroups()
+	mc.SecurityGroups = util.ConvertPrimitiveStringArrayToBaseStringArray(securityGroups)
+
+	// Refresh Tenancy Type
+	tenancyType := provScheme.GetTenancyType()
+	mc.TenancyType = types.StringValue(tenancyType)
 }
 
 func (mc *GcpMachineConfigModel) RefreshProperties(catalog citrixorchestration.MachineCatalogDetailResponseModel) {
@@ -346,8 +457,8 @@ func (mc *NutanixMachineConfigModel) RefreshProperties(catalog citrixorchestrati
 	mc.Container = types.StringValue(provScheme.GetNutanixContainer())
 }
 
-func parseAzureMachineProfileResponseToModel(machineProfileResponse citrixorchestration.HypervisorResourceRefResponseModel) *MachineProfileModel {
-	machineProfileModel := MachineProfileModel{}
+func parseAzureMachineProfileResponseToModel(machineProfileResponse citrixorchestration.HypervisorResourceRefResponseModel) *AzureMachineProfileModel {
+	machineProfileModel := AzureMachineProfileModel{}
 	if machineProfileName := machineProfileResponse.GetName(); machineProfileName != "" {
 		machineProfileModel.MachineProfileVmName = types.StringValue(machineProfileName)
 		machineProfileSegments := strings.Split(machineProfileResponse.GetXDPath(), "\\")

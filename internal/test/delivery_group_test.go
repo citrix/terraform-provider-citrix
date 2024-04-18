@@ -344,7 +344,7 @@ resource "citrix_policy_set" "testPolicySetWithoutDG" {
         {
             name = "first-test-policy"
             description = "First test policy with priority 0"
-            is_enabled = true
+            enabled = true
             policy_settings = [
                 {
                     name = "AdvanceWarningPeriod"

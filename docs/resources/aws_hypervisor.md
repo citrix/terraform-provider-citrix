@@ -3,12 +3,12 @@
 page_title: "citrix_aws_hypervisor Resource - citrix"
 subcategory: ""
 description: |-
-  Manages an AWS hypervisor.
+  Manages an AWS EC2 hypervisor.
 ---
 
 # citrix_aws_hypervisor (Resource)
 
-Manages an AWS hypervisor.
+Manages an AWS EC2 hypervisor.
 
 ## Example Usage
 

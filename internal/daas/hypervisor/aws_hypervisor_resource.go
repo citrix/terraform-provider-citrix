@@ -45,7 +45,7 @@ func (r *awsHypervisorResource) Metadata(_ context.Context, req resource.Metadat
 // Schema defines the schema for the resource.
 func (r *awsHypervisorResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages an AWS hypervisor.",
+		Description: "Manages an AWS EC2 hypervisor.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the hypervisor.",

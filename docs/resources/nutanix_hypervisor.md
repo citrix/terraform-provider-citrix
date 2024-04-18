@@ -3,12 +3,12 @@
 page_title: "citrix_nutanix_hypervisor Resource - citrix"
 subcategory: ""
 description: |-
-  Manages a Nutanix hypervisor.
+  Manages a Nutanix AHV hypervisor.
 ---
 
 # citrix_nutanix_hypervisor (Resource)
 
-Manages a Nutanix hypervisor.
+Manages a Nutanix AHV hypervisor.
 
 ## Example Usage
 

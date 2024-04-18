@@ -156,16 +156,8 @@ func getRequestModelForUpdateMachineCatalog(plan MachineCatalogResourceModel, ct
 		return &body, nil
 	}
 
-	if plan.ProvisioningScheme.IdentityType.ValueString() == string(citrixorchestration.IDENTITYTYPE_AZURE_AD) {
-		if isOnPremises {
-			resp.Diagnostics.AddAttributeError(
-				path.Root("identity_type"),
-				"Unsupported Machine Catalog Configuration",
-				fmt.Sprintf("Identity type %s is not supported in OnPremises environment. ", string(citrixorchestration.IDENTITYTYPE_AZURE_AD)),
-			)
-
-			return nil, err
-		}
+	if !checkIfProvSchemeIsCloudOnly(plan, isOnPremises, &resp.Diagnostics) {
+		return nil, fmt.Errorf("identity type %s is not supported in OnPremises environment. ", plan.ProvisioningScheme.IdentityType.ValueString())
 	}
 
 	body, err = setProvSchemePropertiesForUpdateCatalog(plan, body, ctx, client, &resp.Diagnostics)
@@ -174,6 +166,22 @@ func getRequestModelForUpdateMachineCatalog(plan MachineCatalogResourceModel, ct
 	}
 
 	return &body, nil
+}
+
+func checkIfProvSchemeIsCloudOnly(plan MachineCatalogResourceModel, isOnPremises bool, diagnostics *diag.Diagnostics) bool {
+	if plan.ProvisioningScheme.IdentityType.ValueString() == string(citrixorchestration.IDENTITYTYPE_AZURE_AD) ||
+		plan.ProvisioningScheme.IdentityType.ValueString() == string(citrixorchestration.IDENTITYTYPE_WORKGROUP) {
+		if isOnPremises {
+			diagnostics.AddAttributeError(
+				path.Root("identity_type"),
+				"Unsupported Machine Catalog Configuration",
+				fmt.Sprintf("Identity type %s is not supported in OnPremises environment. ", string(plan.ProvisioningScheme.IdentityType.ValueString())),
+			)
+
+			return false
+		}
+	}
+	return true
 }
 
 func generateBatchApiHeaders(client *citrixdaasclient.CitrixDaasClient, plan MachineCatalogResourceModel, generateCredentialHeader bool) ([]citrixorchestration.NameValueStringPairModel, *http.Response, error) {

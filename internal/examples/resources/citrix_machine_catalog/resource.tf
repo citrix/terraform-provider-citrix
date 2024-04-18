@@ -10,7 +10,7 @@ resource "citrix_machine_catalog" "example-azure-mtsession" {
 	minimum_functional_level    = "L7_20"
 	provisioning_scheme			= 	{
 		hypervisor = citrix_azure_hypervisor.example-azure-hypervisor.id
-		hypervisor_resource_pool = citrix_hypervisor_resource_pool.example-azure-hypervisor-resource-pool.id
+		hypervisor_resource_pool = citrix_azure_hypervisor_resource_pool.example-azure-hypervisor-resource-pool.id
 		identity_type      = "ActiveDirectory"
 		machine_domain_identity = {
             domain                   = "<DomainFQDN>"
@@ -22,10 +22,12 @@ resource "citrix_machine_catalog" "example-azure-mtsession" {
 			storage_type = "Standard_LRS"
 			use_managed_disks = true
             service_offering = "Standard_D2_v2"
-            resource_group = "<Azure resource group name for image vhd>"
-            storage_account = "<Azure storage account name for image vhd>"
-            container = "<Azure storage container for image vhd>"
-            master_image = "<Image vhd blob name>"
+            azure_machine_config = {
+                resource_group = "<Azure resource group name for image vhd>"
+                storage_account = "<Azure storage account name for image vhd>"
+                container = "<Azure storage container for image vhd>"
+                master_image = "<Image vhd blob name>"
+            }
 			writeback_cache = {
 				wbc_disk_storage_type = "pd-standard"
 				persist_wbc = true
@@ -60,7 +62,7 @@ resource "citrix_machine_catalog" "example-aws-mtsession" {
 	provisioning_type 			= "MCS"
     provisioning_scheme         = {
 		hypervisor = citrix_aws_hypervisor.example-aws-hypervisor.id
-		hypervisor_resource_pool = citrix_hypervisor_resource_pool.example-aws-hypervisor-resource-pool.id
+		hypervisor_resource_pool = citrix_aws_hypervisor_resource_pool.example-aws-hypervisor-resource-pool.id
 		identity_type      = "ActiveDirectory"
 		machine_domain_identity = {
             domain                   = "<DomainFQDN>"
@@ -72,6 +74,10 @@ resource "citrix_machine_catalog" "example-aws-mtsession" {
             image_ami = "<AMI ID for VDA>"
 			master_image = "<Image template AMI name>"
 			service_offering = "t2.small"
+            security_groups = [
+                "default"
+            ]
+            tenancy_type = "Shared"
         }
 		network_mapping = {
             network_device = "0"
@@ -96,7 +102,7 @@ resource "citrix_machine_catalog" "example-gcp-mtsession" {
 	provisioning_type 			= "MCS"
     provisioning_scheme         = {
 		hypervisor = citrix_gcp_hypervisor.example-gcp-hypervisor.id
-		hypervisor_resource_pool = citrix_hypervisor_resource_pool.example-gcp-hypervisor-resource-pool.id
+		hypervisor_resource_pool = citrix_gcp_hypervisor_resource_pool.example-gcp-hypervisor-resource-pool.id
 		identity_type      = "ActiveDirectory"
 		machine_domain_identity = {
             domain                   = "<DomainFQDN>"
@@ -291,4 +297,43 @@ resource "citrix_machine_catalog" "example-remote-pc" {
             ou_name = "OU=Example OU,DC=domain,DC=com"
         }
     ]
+}
+
+resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
+	name                		= "example-non-domain-joined-azure-mcs"
+	description					= "Example catalog on Azure without domain join"
+	zone						= "<zone Id>"
+	allocation_type				= "Random"
+	session_support				= "MultiSession"
+	provisioning_type 			= "MCS"
+	provisioning_scheme			= 	{
+		hypervisor = citrix_azure_hypervisor.example-azure-hypervisor.id
+		hypervisor_resource_pool = citrix_azure_hypervisor_resource_pool.example-azure-hypervisor-resource-pool.id
+		identity_type      = "Workgroup" # Workgroup specifies that the machines are not domain-joined
+		# Example using Azure, other hypervisors can be used as well
+        azure_machine_config = {
+			storage_type = "Standard_LRS"
+			use_managed_disks = true
+            service_offering = "Standard_D2_v2"
+            resource_group = "<Azure resource group name for image vhd>"
+            storage_account = "<Azure storage account name for image vhd>"
+            container = "<Azure storage container for image vhd>"
+            master_image = "<Image vhd blob name>"
+			writeback_cache = {
+				wbc_disk_storage_type = "pd-standard"
+				persist_wbc = true
+				persist_os_disk = true
+				persist_vm = true
+				writeback_cache_disk_size_gb = 127
+                writeback_cache_memory_size_mb = 256
+				storage_cost_saving = true
+			}
+        }
+		availability_zones = "1,2,..."
+		number_of_total_machines = 	1
+		machine_account_creation_rules ={
+			naming_scheme =     "ndj-multi-##"
+			naming_scheme_type ="Numeric"
+		}
+	}
 }

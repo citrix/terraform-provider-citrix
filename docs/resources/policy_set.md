@@ -3,12 +3,12 @@
 page_title: "citrix_policy_set Resource - citrix"
 subcategory: ""
 description: |-
-  Manages a policy set and the policies within it. The order of the policies specified in this resource reflect the policy priority. This feature will be officially supported for On-Premises with DDC version 2402 and above and will be made available for Cloud soon.
+  Manages a policy set and the policies within it. The order of the policies specified in this resource reflect the policy priority. This feature will be officially supported for On-Premises with DDC version 2402 and above and will be made available for Cloud soon. For detailed information about policy settings and filters, please refer to this document https://github.com/citrix/terraform-provider-citrix/blob/main/internal/daas/policies/policy_set_resource.md.
 ---
 
 # citrix_policy_set (Resource)
 
-Manages a policy set and the policies within it. The order of the policies specified in this resource reflect the policy priority. This feature will be officially supported for On-Premises with DDC version 2402 and above and will be made available for Cloud soon.
+Manages a policy set and the policies within it. The order of the policies specified in this resource reflect the policy priority. This feature will be officially supported for On-Premises with DDC version 2402 and above and will be made available for Cloud soon. For detailed information about policy settings and filters, please refer to [this document](https://github.com/citrix/terraform-provider-citrix/blob/main/internal/daas/policies/policy_set_resource.md).
 
 ## Example Usage
 
@@ -22,7 +22,7 @@ resource "citrix_policy_set" "example-policy-set" {
         {
             name = "test-policy-with-priority-0"
             description = "Test policy in the example policy set with priority 0"
-            is_enabled = true
+            enabled = true
             policy_settings = [
                 {
                     name = "AdvanceWarningPeriod"
@@ -33,19 +33,19 @@ resource "citrix_policy_set" "example-policy-set" {
             policy_filters = [
                 {
                     type = "DesktopGroup"
-                    data = jsonencode({
-                        "server" = "20.185.46.142"
-                        "uuid" = citrix_policy_set.example-delivery-group.id
-                    })
-                    is_enabled = true
-                    is_allowed = true
+                    data = {
+                        server = "0.0.0.0"
+                        uuid = citrix_delivery_group.example-delivery-group.id
+                    }
+                    enabled = true
+                    allowed = true
                 },
             ]
         },
         {
             name = "test-policy-with-priority-1"
             description = "Test policy in the example policy set with priority 1"
-            is_enabled = false
+            enabled = false
             policy_settings = []
             policy_filters = []
         }
@@ -60,12 +60,12 @@ resource "citrix_policy_set" "example-policy-set" {
 
 - `name` (String) Name of the policy set.
 - `policies` (Attributes List) Ordered list of policies. The order of policies in the list determines the priority of the policies. (see [below for nested schema](#nestedatt--policies))
-- `scopes` (Set of String) The names of the scopes for the policy set to apply on.
 - `type` (String) Type of the policy set. Type can be one of `SitePolicies`, `DeliveryGroupPolicies`, `SiteTemplates`, or `CustomTemplates`.
 
 ### Optional
 
 - `description` (String) Description of the policy set.
+- `scopes` (List of String) The names of the scopes for the policy set to apply on.
 
 ### Read-Only
 
@@ -77,10 +77,10 @@ resource "citrix_policy_set" "example-policy-set" {
 
 Required:
 
-- `is_enabled` (Boolean) Indicate whether the policy is being enabled.
+- `enabled` (Boolean) Indicate whether the policy is being enabled.
 - `name` (String) Name of the policy.
-- `policy_filters` (Attributes Set) Set of policy filters. (see [below for nested schema](#nestedatt--policies--policy_filters))
-- `policy_settings` (Attributes Set) Set of policy settings. (see [below for nested schema](#nestedatt--policies--policy_settings))
+- `policy_filters` (Attributes List) Set of policy filters. (see [below for nested schema](#nestedatt--policies--policy_filters))
+- `policy_settings` (Attributes List) Set of policy settings. (see [below for nested schema](#nestedatt--policies--policy_settings))
 
 Optional:
 
@@ -91,13 +91,26 @@ Optional:
 
 Required:
 
-- `is_allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
-- `is_enabled` (Boolean) Indicate whether the policy is being enabled.
+- `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
+- `enabled` (Boolean) Indicate whether the policy is being enabled.
 - `type` (String) Type of the policy filter. Type can be one of `AccessControl`, `BranchRepeater`, `ClientIP`, `ClientName`, `DesktopGroup`, `DesktopKind`, `OU`, `User`, and `DesktopTag`
 
 Optional:
 
-- `data` (String) Data of the policy filter.
+- `data` (Attributes) Data of the policy filter. (see [below for nested schema](#nestedatt--policies--policy_filters--data))
+
+<a id="nestedatt--policies--policy_filters--data"></a>
+### Nested Schema for `policies.policy_filters.data`
+
+Optional:
+
+- `condition` (String) Gateway condition for the policy filter data.
+- `connection` (String) Gateway connection for the policy filter data.
+- `gateway` (String) Gateway for the policy filter data.
+- `server` (String) Server address for the policy filter data.
+- `uuid` (String) Resource UUID for the policy filter data.
+- `value` (String) Va;ie for the policy filter data.
+
 
 
 <a id="nestedatt--policies--policy_settings"></a>
@@ -107,6 +120,10 @@ Required:
 
 - `name` (String) Name of the policy setting name.
 - `use_default` (Boolean) Indicate whether using default value for the policy setting.
+
+Optional:
+
+- `enabled` (Boolean) Whether of the policy setting has enabled or allowed value.
 - `value` (String) Value of the policy setting.
 
 ## Import

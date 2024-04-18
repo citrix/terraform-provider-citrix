@@ -92,7 +92,7 @@ func getMachinesForManualCatalogs(ctx context.Context, client *citrixdaasclient.
 				vmId = vm.GetId()
 			case citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER:
 				if machine.Datacenter.IsNull() || machine.Host.IsNull() {
-					return nil, fmt.Errorf("datacenter and host are required for Vsphere")
+					return nil, fmt.Errorf("datacenter and host are required for vSphere")
 				}
 
 				folderPath := hypervisor.GetXDPath()

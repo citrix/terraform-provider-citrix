@@ -225,8 +225,8 @@ Optional:
 
 Optional:
 
-- `allow_list` (List of String) Users who can use this Desktop. Must be in `Domain\UserOrGroupName` format
-- `block_list` (List of String) Users who cannot use this Desktop. A block list is meaningful only when used to block users in the allow list. Must be in `Domain\UserOrGroupName` format
+- `allow_list` (List of String) Users who can use this Desktop. Must be in `Domain\UserOrGroupName` or `user@domain.com` format
+- `block_list` (List of String) Users who cannot use this Desktop. A block list is meaningful only when used to block users in the allow list. Must be in `Domain\UserOrGroupName` or `user@domain.com` format
 
 
 
@@ -274,8 +274,8 @@ Optional:
 
 Optional:
 
-- `allow_list` (List of String) Users who can use this Delivery Group. Must be in `Domain\UserOrGroupName` format
-- `block_list` (List of String) Users who cannot use this Delivery Group. A block list is meaningful only when used to block users in the allow list. Must be in `Domain\UserOrGroupName` format
+- `allow_list` (List of String) Users who can use this Delivery Group. Must be in `Domain\UserOrGroupName` or `user@domain.com` format
+- `block_list` (List of String) Users who cannot use this Delivery Group. A block list is meaningful only when used to block users in the allow list. Must be in `Domain\UserOrGroupName` or `user@domain.com` format
 
 ## Import
 

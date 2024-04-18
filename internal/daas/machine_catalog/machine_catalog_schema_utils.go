@@ -21,6 +21,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 func getSchemaForMachineCatalogResource() schema.Schema {
@@ -148,15 +149,15 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 										Optional:    true,
 									},
 									"datacenter": schema.StringAttribute{
-										Description: "**[VSphere: Required]** The datacenter in which the machine resides. Required only if `is_power_managed = true`",
+										Description: "**[vSphere: Required]** The datacenter in which the machine resides. Required only if `is_power_managed = true`",
 										Optional:    true,
 									},
 									"cluster": schema.StringAttribute{
-										Description: "**[VSphere: Optional]** The cluster in which the machine resides. To be used only if `is_power_managed = true`",
+										Description: "**[vSphere: Optional]** The cluster in which the machine resides. To be used only if `is_power_managed = true`",
 										Optional:    true,
 									},
 									"host": schema.StringAttribute{
-										Description: "**[VSphere: Required]** The IP address or FQDN of the host in which the machine resides. Required only if `is_power_managed = true`",
+										Description: "**[vSphere: Required]** The IP address or FQDN of the host in which the machine resides. Required only if `is_power_managed = true`",
 										Optional:    true,
 									},
 								},
@@ -225,68 +226,78 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 								Description: "The Azure VM Sku to use when creating machines.",
 								Required:    true,
 							},
-							"resource_group": schema.StringAttribute{
-								Description: "The Azure Resource Group where the image VHD / managed disk / snapshot for creating machines is located.",
+							"azure_master_image": schema.SingleNestedAttribute{
+								Description: "Details of the Azure Image to use for creating machines.",
 								Required:    true,
-							},
-							"master_image": schema.StringAttribute{
-								Description: "The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors. Omit this field if you want to use gallery_image.",
-								Optional:    true,
-							},
-							"storage_account": schema.StringAttribute{
-								Description: "The Azure Storage Account where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.",
-								Optional:    true,
-								Validators: []validator.String{
-									stringvalidator.AlsoRequires(path.Expressions{
-										path.MatchRelative().AtParent().AtName("container"),
-									}...),
-									stringvalidator.AlsoRequires(path.Expressions{
-										path.MatchRelative().AtParent().AtName("resource_group"),
-									}...),
-								},
-							},
-							"container": schema.StringAttribute{
-								Description: "The Azure Storage Account Container where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.",
-								Optional:    true,
-								Validators: []validator.String{
-									stringvalidator.AlsoRequires(path.Expressions{
-										path.MatchRelative().AtParent().AtName("storage_account"),
-									}...),
-									stringvalidator.AlsoRequires(path.Expressions{
-										path.MatchRelative().AtParent().AtName("resource_group"),
-									}...),
-								},
-							},
-							"gallery_image": schema.SingleNestedAttribute{
-								Description: "Details of the Azure Image Gallery image to use for creating machines. Only Applicable to Azure Image Gallery image.",
-								Optional:    true,
 								Attributes: map[string]schema.Attribute{
-									"gallery": schema.StringAttribute{
-										Description: "The Azure Image Gallery where the image for creating machines is located. Only applicable to Azure Image Gallery image.",
+									"resource_group": schema.StringAttribute{
+										Description: "The Azure Resource Group where the image VHD / managed disk / snapshot for creating machines is located.",
 										Required:    true,
 									},
-									"definition": schema.StringAttribute{
-										Description: "The image definition for the image to be used in the Azure Image Gallery. Only applicable to Azure Image Gallery image.",
-										Required:    true,
+									"shared_subscription": schema.StringAttribute{
+										Description: "The Azure Subscription ID where the image VHD / managed disk / snapshot for creating machines is located. Only required if the image is not in the same subscription of the hypervisor.",
+										Optional:    true,
 									},
-									"version": schema.StringAttribute{
-										Description: "The image version for the image to be used in the Azure Image Gallery. Only applicable to Azure Image Gallery image.",
-										Required:    true,
+									"master_image": schema.StringAttribute{
+										Description: "The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors. Omit this field if you want to use gallery_image.",
+										Optional:    true,
 									},
-								},
-								Validators: []validator.Object{
-									objectvalidator.AlsoRequires(path.Expressions{
-										path.MatchRelative().AtParent().AtName("resource_group"),
-									}...),
-									objectvalidator.ConflictsWith(path.Expressions{
-										path.MatchRelative().AtParent().AtName("storage_account"),
-									}...),
-									objectvalidator.ConflictsWith(path.Expressions{
-										path.MatchRelative().AtParent().AtName("container"),
-									}...),
-									objectvalidator.ConflictsWith(path.Expressions{
-										path.MatchRelative().AtParent().AtName("master_image"),
-									}...),
+									"storage_account": schema.StringAttribute{
+										Description: "The Azure Storage Account where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.",
+										Optional:    true,
+										Validators: []validator.String{
+											stringvalidator.AlsoRequires(path.Expressions{
+												path.MatchRelative().AtParent().AtName("container"),
+											}...),
+											stringvalidator.AlsoRequires(path.Expressions{
+												path.MatchRelative().AtParent().AtName("resource_group"),
+											}...),
+										},
+									},
+									"container": schema.StringAttribute{
+										Description: "The Azure Storage Account Container where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.",
+										Optional:    true,
+										Validators: []validator.String{
+											stringvalidator.AlsoRequires(path.Expressions{
+												path.MatchRelative().AtParent().AtName("storage_account"),
+											}...),
+											stringvalidator.AlsoRequires(path.Expressions{
+												path.MatchRelative().AtParent().AtName("resource_group"),
+											}...),
+										},
+									},
+									"gallery_image": schema.SingleNestedAttribute{
+										Description: "Details of the Azure Image Gallery image to use for creating machines. Only Applicable to Azure Image Gallery image.",
+										Optional:    true,
+										Attributes: map[string]schema.Attribute{
+											"gallery": schema.StringAttribute{
+												Description: "The Azure Image Gallery where the image for creating machines is located. Only applicable to Azure Image Gallery image.",
+												Required:    true,
+											},
+											"definition": schema.StringAttribute{
+												Description: "The image definition for the image to be used in the Azure Image Gallery. Only applicable to Azure Image Gallery image.",
+												Required:    true,
+											},
+											"version": schema.StringAttribute{
+												Description: "The image version for the image to be used in the Azure Image Gallery. Only applicable to Azure Image Gallery image.",
+												Required:    true,
+											},
+										},
+										Validators: []validator.Object{
+											objectvalidator.AlsoRequires(path.Expressions{
+												path.MatchRelative().AtParent().AtName("resource_group"),
+											}...),
+											objectvalidator.ConflictsWith(path.Expressions{
+												path.MatchRelative().AtParent().AtName("storage_account"),
+											}...),
+											objectvalidator.ConflictsWith(path.Expressions{
+												path.MatchRelative().AtParent().AtName("container"),
+											}...),
+											objectvalidator.ConflictsWith(path.Expressions{
+												path.MatchRelative().AtParent().AtName("master_image"),
+											}...),
+										},
+									},
 								},
 							},
 							"storage_type": schema.StringAttribute{
@@ -294,10 +305,59 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 								Required:    true,
 								Validators: []validator.String{
 									stringvalidator.OneOf(
-										"Standard_LRS",
-										"StandardSSD_LRS",
-										"Premium_LRS",
+										util.StandardLRS,
+										util.StandardSSDLRS,
+										util.Premium_LRS,
+										util.AzureEphemeralOSDisk,
 									),
+								},
+							},
+							"use_azure_compute_gallery": schema.SingleNestedAttribute{
+								Description: "Use this to place prepared image in Azure Compute Gallery. Required when `storage_type = Azure_Ephemeral_OS_Disk`.",
+								Optional:    true,
+								Attributes: map[string]schema.Attribute{
+									"replica_ratio": schema.Int64Attribute{
+										Description: "The ratio of virtual machines to image replicas that you want Azure to keep.",
+										Required:    true,
+									},
+									"replica_maximum": schema.Int64Attribute{
+										Description: "The maximum number of image replicas that you want Azure to keep.",
+										Required:    true,
+									},
+								},
+							},
+							"license_type": schema.StringAttribute{
+								Description: "Windows license type used to provision virtual machines in Azure at the base compute rate. License types include: `Windows_Client` and `Windows_Server`.",
+								Optional:    true,
+								Validators: []validator.String{
+									stringvalidator.OneOf(
+										util.WindowsClientLicenseType,
+										util.WindowsServerLicenseType,
+									),
+								},
+							},
+							"enroll_in_intune": schema.BoolAttribute{
+								Description: "Specify whether to enroll machines in Microsoft Intune. Use this property only when `identity_type` is set to `AzureAD`.",
+								Optional:    true,
+								PlanModifiers: []planmodifier.Bool{
+									boolplanmodifier.RequiresReplace(),
+								},
+							},
+							"disk_encryption_set": schema.SingleNestedAttribute{
+								Description: "The configuration for Disk Encryption Set (DES). The DES must be in the same subscription and region as your resources. If your master image is encrypted with a DES, use the same DES when creating this machine catalog. When using a DES, if you later disable the key with which the corresponding DES is associated in Azure, you can no longer power on the machines in this catalog or add machines to it.",
+								Optional:    true,
+								PlanModifiers: []planmodifier.Object{
+									objectplanmodifier.RequiresReplace(),
+								},
+								Attributes: map[string]schema.Attribute{
+									"disk_encryption_set_name": schema.StringAttribute{
+										Description: "The name of the disk encryption set.",
+										Required:    true,
+									},
+									"disk_encryption_set_resource_group": schema.StringAttribute{
+										Description: "The name of the resource group in which the disk encryption set resides.",
+										Required:    true,
+									},
 								},
 							},
 							"vda_resource_group": schema.StringAttribute{
@@ -403,6 +463,28 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 								Description: "AMI of the AWS image to be used as the template image for the machine catalog.",
 								Required:    true,
 							},
+							"security_groups": schema.ListAttribute{
+								ElementType: types.StringType,
+								Description: "List of security groups to associate with the machine. When omitted, the default security group of the VPC will be used by default.",
+								Required:    true,
+								Validators: []validator.List{
+									listvalidator.SizeAtLeast(1),
+								},
+							},
+							"tenancy_type": schema.StringAttribute{
+								Description: "Tenancy type of the machine. Choose between `Shared`, `Instance` and `Host`.",
+								Required:    true,
+								Validators: []validator.String{
+									stringvalidator.OneOf(
+										"Shared",
+										"Instance",
+										"Host",
+									),
+								},
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.RequiresReplace(),
+								},
+							},
 						},
 					},
 					"gcp_machine_config": schema.SingleNestedAttribute{
@@ -478,7 +560,7 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 						},
 					},
 					"vsphere_machine_config": schema.SingleNestedAttribute{
-						Description: "Machine Configuration For VSphere MCS catalog.",
+						Description: "Machine Configuration for vSphere MCS catalog.",
 						Optional:    true,
 						Attributes: map[string]schema.Attribute{
 							"master_image_vm": schema.StringAttribute{
@@ -686,6 +768,7 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 								string(citrixorchestration.IDENTITYTYPE_ACTIVE_DIRECTORY),
 								string(citrixorchestration.IDENTITYTYPE_AZURE_AD),
 								string(citrixorchestration.IDENTITYTYPE_HYBRID_AZURE_AD),
+								string(citrixorchestration.IDENTITYTYPE_WORKGROUP),
 							),
 							validators.AlsoRequiresOnValues(
 								[]string{
@@ -725,6 +808,22 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 								Required:    true,
 								Validators: []validator.String{
 									util.GetValidatorFromEnum(citrixorchestration.AllowedAccountNamingSchemeTypeEnumValues),
+								},
+							},
+						},
+					},
+					"custom_properties": schema.ListNestedAttribute{
+						Description: "**This is an advanced feature. Use with caution.** Custom properties to be set for the machine catalog. For properties that are already supported as a terraform configuration field, please use terraform field instead.",
+						Optional:    true,
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"name": schema.StringAttribute{
+									Description: "Name of the custom property.",
+									Required:    true,
+								},
+								"value": schema.StringAttribute{
+									Description: "Value of the custom property.",
+									Required:    true,
 								},
 							},
 						},

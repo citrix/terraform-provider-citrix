@@ -19,10 +19,12 @@ resource "citrix_machine_catalog" "example-catalog" {
             }
         azure_machine_config     = {
             service_offering    = "Standard_D2_v2"
-            resource_group      = "<Resource Group for VDA image>"
-            storage_account     = "<Storage account for VDA image>"
-            container           = "<Container for VDA image>"
-            master_image        = "<Blob name for VDA image>"
+            azure_master_image  = {
+                resource_group      = "<Resource Group for VDA image>"
+                storage_account     = "<Storage account for VDA image>"
+                container           = "<Container for VDA image>"
+                master_image        = "<Blob name for VDA image>"
+            }
             storage_type        = "Standard_LRS"
             use_managed_disks   = true
         }

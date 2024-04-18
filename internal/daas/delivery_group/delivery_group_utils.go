@@ -21,6 +21,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 func getDeliveryGroup(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string) (*citrixorchestration.DeliveryGroupDetailResponseModel, error) {
@@ -377,12 +378,12 @@ func getSchemaForRestrictedAccessUsers(forDeliveryGroup bool) schema.NestedAttri
 		Attributes: map[string]schema.Attribute{
 			"allow_list": schema.ListAttribute{
 				ElementType: types.StringType,
-				Description: fmt.Sprintf("Users who can use this %s. Must be in `Domain\\UserOrGroupName` format", resource),
+				Description: fmt.Sprintf("Users who can use this %s. Must be in `Domain\\UserOrGroupName` or `user@domain.com` format", resource),
 				Optional:    true,
 				Validators: []validator.List{
 					listvalidator.ValueStringsAre(
 						validator.String(
-							stringvalidator.RegexMatches(regexp.MustCompile(util.SamRegex), "must be in Domain\\UserOrGroupName format"),
+							stringvalidator.RegexMatches(regexp.MustCompile(fmt.Sprintf("%s|%s", util.SamRegex, util.UpnRegex)), "must be in `Domain\\UserOrGroupName` or `user@domain.com` format"),
 						),
 					),
 					listvalidator.SizeAtLeast(1),
@@ -390,12 +391,12 @@ func getSchemaForRestrictedAccessUsers(forDeliveryGroup bool) schema.NestedAttri
 			},
 			"block_list": schema.ListAttribute{
 				ElementType: types.StringType,
-				Description: fmt.Sprintf("Users who cannot use this %s. A block list is meaningful only when used to block users in the allow list. Must be in `Domain\\UserOrGroupName` format", resource),
+				Description: fmt.Sprintf("Users who cannot use this %s. A block list is meaningful only when used to block users in the allow list. Must be in `Domain\\UserOrGroupName` or `user@domain.com` format", resource),
 				Optional:    true,
 				Validators: []validator.List{
 					listvalidator.ValueStringsAre(
 						validator.String(
-							stringvalidator.RegexMatches(regexp.MustCompile(util.SamRegex), "must be in Domain\\UserOrGroupName format"),
+							stringvalidator.RegexMatches(regexp.MustCompile(util.SamRegex), "must be in `Domain\\UserOrGroupName` or `user@domain.com` format"),
 						),
 					),
 				},
@@ -624,6 +625,8 @@ func getRequestModelForDeliveryGroupCreate(diagnostics *diag.Diagnostics, plan D
 	body.SetPolicySetGuid(plan.PolicySetId.ValueString())
 	if identityType == citrixorchestration.IDENTITYTYPE_AZURE_AD {
 		body.SetMachineLogOnType(citrixorchestration.MACHINELOGONTYPE_AZURE_AD)
+	} else if identityType == citrixorchestration.IDENTITYTYPE_WORKGROUP {
+		body.SetMachineLogOnType(citrixorchestration.MACHINELOGONTYPE_LOCAL_MAPPED_ACCOUNT)
 	} else {
 		body.SetMachineLogOnType(citrixorchestration.MACHINELOGONTYPE_ACTIVE_DIRECTORY)
 	}
@@ -963,16 +966,14 @@ func (dgDesktop DeliveryGroupDesktop) RefreshListItem(desktop citrixorchestratio
 	if len(includedUsers) == 0 {
 		dgDesktop.RestrictedAccessUsers.AllowList = nil
 	} else {
-		allowedUsers := getSamNameForUserFromIdentityResponseModel(includedUsers)
-		updatedAllowedUsers := util.RefreshList(dgDesktop.RestrictedAccessUsers.AllowList, allowedUsers)
+		updatedAllowedUsers := refreshUsersList(dgDesktop.RestrictedAccessUsers.AllowList, includedUsers)
 		dgDesktop.RestrictedAccessUsers.AllowList = updatedAllowedUsers
 	}
 
 	if len(excludedUsers) == 0 {
 		dgDesktop.RestrictedAccessUsers.BlockList = nil
 	} else {
-		blockedUsers := getSamNameForUserFromIdentityResponseModel(excludedUsers)
-		updatedBlockedUsers := util.RefreshList(dgDesktop.RestrictedAccessUsers.BlockList, blockedUsers)
+		updatedBlockedUsers := refreshUsersList(dgDesktop.RestrictedAccessUsers.BlockList, excludedUsers)
 		dgDesktop.RestrictedAccessUsers.BlockList = updatedBlockedUsers
 	}
 
@@ -1124,13 +1125,11 @@ func (r DeliveryGroupResourceModel) updatePlanWithRestrictedAccessUsers(delivery
 		r.RestrictedAccessUsers = &RestrictedAccessUsers{}
 	}
 
-	includedUsers := getSamNameForUserFromIdentityResponseModel(simpleAccessPolicy.GetIncludedUsers())
-	updatedAllowList := util.RefreshList(r.RestrictedAccessUsers.AllowList, includedUsers)
+	updatedAllowList := refreshUsersList(r.RestrictedAccessUsers.AllowList, simpleAccessPolicy.GetIncludedUsers())
 	r.RestrictedAccessUsers.AllowList = updatedAllowList
 
 	if simpleAccessPolicy.GetExcludedUserFilterEnabled() {
-		excludedUsers := getSamNameForUserFromIdentityResponseModel(simpleAccessPolicy.GetExcludedUsers())
-		updatedBlockList := util.RefreshList(r.RestrictedAccessUsers.BlockList, excludedUsers)
+		updatedBlockList := refreshUsersList(r.RestrictedAccessUsers.BlockList, simpleAccessPolicy.GetExcludedUsers())
 		r.RestrictedAccessUsers.BlockList = updatedBlockList
 	}
 
@@ -1169,14 +1168,6 @@ func (r DeliveryGroupResourceModel) updatePlanWithAutoscaleSettings(deliveryGrou
 	r.AutoscaleSettings.PowerTimeSchemes = preserveOrderInPowerTimeSchemes(r.AutoscaleSettings.PowerTimeSchemes, parsedPowerTimeSchemes)
 
 	return r
-}
-
-func getSamNameForUserFromIdentityResponseModel(users []citrixorchestration.IdentityUserResponseModel) []string {
-	var res []string
-	for _, user := range users {
-		res = append(res, user.GetSamName())
-	}
-	return res
 }
 
 func preserveOrderInPowerTimeSchemes(powerTimeSchemeInPlan, powerTimeSchemesInRemote []DeliveryGroupPowerTimeScheme) []DeliveryGroupPowerTimeScheme {
@@ -1232,4 +1223,64 @@ func preserveOrderInPoolSizeSchedule(poolSizeScheduleInPlan, poolSizeScheduleInR
 	}
 
 	return poolSizeSchedules
+}
+
+func refreshUsersList(users []basetypes.StringValue, usersInRemote []citrixorchestration.IdentityUserResponseModel) []basetypes.StringValue {
+	samNamesMap := map[string]int{}
+	upnMap := map[string]int{}
+
+	for index, userInRemote := range usersInRemote {
+		userSamName := userInRemote.GetSamName()
+		userPrincipalName := userInRemote.GetPrincipalName()
+		if userSamName != "" {
+			samNamesMap[userSamName] = index
+		}
+		if userPrincipalName != "" {
+			upnMap[userPrincipalName] = index
+		}
+	}
+
+	res := []basetypes.StringValue{}
+	for _, user := range users {
+		userStringValue := user.ValueString()
+		samRegex, _ := regexp.Compile(util.SamRegex)
+		if samRegex.MatchString(userStringValue) {
+			index, exists := samNamesMap[userStringValue]
+			if !exists {
+				continue
+			}
+			res = append(res, user)
+			samNamesMap[userStringValue] = -1
+			userPrincipalName := usersInRemote[index].GetPrincipalName()
+			_, exists = upnMap[userPrincipalName]
+			if exists {
+				upnMap[userPrincipalName] = -1
+			}
+
+			continue
+		}
+
+		upnRegex, _ := regexp.Compile(util.UpnRegex)
+		if upnRegex.MatchString(userStringValue) {
+			index, exists := upnMap[userStringValue]
+			if !exists {
+				continue
+			}
+			res = append(res, user)
+			upnMap[userStringValue] = -1
+			samName := usersInRemote[index].GetSamName()
+			_, exists = samNamesMap[samName]
+			if exists {
+				samNamesMap[samName] = -1
+			}
+		}
+	}
+
+	for samName, index := range samNamesMap {
+		if index != -1 { // Users that are only in remote
+			res = append(res, types.StringValue(samName))
+		}
+	}
+
+	return res
 }

@@ -3,12 +3,12 @@
 page_title: "citrix_aws_hypervisor_resource_pool Resource - citrix"
 subcategory: ""
 description: |-
-  Manages a hypervisor resource pool.
+  Manages an AWS EC2 hypervisor resource pool.
 ---
 
 # citrix_aws_hypervisor_resource_pool (Resource)
 
-Manages a hypervisor resource pool.
+Manages an AWS EC2 hypervisor resource pool.
 
 ## Example Usage
 
