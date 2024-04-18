@@ -5,6 +5,7 @@ package util
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
@@ -100,15 +101,19 @@ func GetSingleResourceFromHypervisor(ctx context.Context, client *citrixdaasclie
 					continue
 				}
 			}
-			return &child, nil
-		} else if strings.EqualFold(resourceType, ServiceOfferingResourceType) {
-			if strings.EqualFold(child.GetName(), resourceName) ||
-				strings.EqualFold(child.GetId(), resourceName) {
-				return &child, nil
-			}
-		}
 
-		if strings.EqualFold(resourceType, StorageResourceType) {
+			if strings.Contains(folderPath, "diskencryptionset") {
+				// For diskencryptionset, The ID is the Azure Resource Id of the format subscriptions/{subId}/resourceGroups/{rgName}/providers/.../
+				desIdArray := strings.Split(child.GetId(), "/")
+				resourceGroupsIndex := slices.Index(desIdArray, "resourceGroups")
+				rgName := desIdArray[resourceGroupsIndex+1]
+
+				if strings.EqualFold(rgName, resourceGroupName) {
+					return &child, nil
+				}
+			}
+			return &child, nil
+		} else if strings.EqualFold(child.GetId(), resourceName) && strings.EqualFold(resourceType, ServiceOfferingResourceType) {
 			return &child, nil
 		}
 	}

@@ -91,7 +91,7 @@ func TestActiveDirectoryMachineCatalogResourceAzure(t *testing.T) {
 					// Verify updated description
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "description", "updatedCatalog"),
 					// Verify updated image
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.azure_machine_config.master_image", os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.azure_machine_config.azure_master_image.master_image", os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")),
 					// Verify machine catalog identity type
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.identity_type", "ActiveDirectory"),
 					// Verify total number of machines
@@ -161,7 +161,7 @@ func TestHybridAzureADMachineCatalogResourceAzure(t *testing.T) {
 					// Verify updated description
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "description", "updatedCatalog"),
 					// Verify updated image
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.azure_machine_config.master_image", os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.azure_machine_config.azure_master_image.master_image", os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")),
 					// Verify machine catalog identity type
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.identity_type", "HybridAzureAD"),
 					// Verify total number of machines
@@ -250,9 +250,87 @@ func TestAzureADMachineCatalogResourceAzure(t *testing.T) {
 					// Verify updated description
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "description", "updatedCatalog"),
 					// Verify updated image
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.azure_machine_config.master_image", os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.azure_machine_config.azure_master_image.master_image", os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")),
 					// Verify machine catalog identity type
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.identity_type", "AzureAD"),
+					// Verify total number of machines
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.number_of_total_machines", "2"),
+				),
+			},
+			//Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
+func TestMachineCatalogPreCheck_Workgroup(t *testing.T) {
+	if v := os.Getenv("TEST_MC_NAME"); v == "" {
+		t.Fatal("TEST_MC_NAME must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_SERVICE_OFFERING"); v == "" {
+		t.Fatal("TEST_MC_SERVICE_OFFERING must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_MASTER_IMAGE"); v == "" {
+		t.Fatal("TEST_MC_MASTER_IMAGE must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED"); v == "" {
+		t.Fatal("TEST_MC_MASTER_IMAGE_UPDATED must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_IMAGE_RESOUCE_GROUP"); v == "" {
+		t.Fatal("TEST_MC_IMAGE_RESOUCE_GROUP must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_IMAGE_STORAGE_ACCOUNT"); v == "" {
+		t.Fatal("TEST_MC_IMAGE_STORAGE_ACCOUNT must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_IMAGE_CONTAINER"); v == "" {
+		t.Fatal("TEST_MC_IMAGE_CONTAINER must be set for acceptance tests")
+	}
+}
+
+func TestWorkgroupMachineCatalogResourceAzure(t *testing.T) {
+	name := os.Getenv("TEST_MC_NAME") + "-WRKGRP"
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck: func() {
+			TestProviderPreCheck(t)
+			TestHypervisorPreCheck_Azure(t)
+			TestHypervisorResourcePoolPreCheck_Azure(t)
+			TestMachineCatalogPreCheck_Workgroup(t)
+		},
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: BuildMachineCatalogResourceWorkgroup(t, machinecatalog_testResources_workgroup),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify name of catalog
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
+					// Verify domain FQDN
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "session_support", "MultiSession"),
+					// Verify machine catalog identity type
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.identity_type", "Workgroup"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "citrix_machine_catalog.testMachineCatalog",
+				ImportState:       true,
+				ImportStateVerify: true,
+				// The last_updated attribute does not exist in the Orchestration
+				// API, therefore there is no value for it during import.
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache"},
+			},
+			// Update description, master image and add machine test
+			{
+				Config: BuildMachineCatalogResourceWorkgroup(t, machinecatalog_testResources_workgroup_updated),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify updated name of catalog
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
+					// Verify updated description
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "description", "updatedCatalog"),
+					// Verify updated image
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.azure_machine_config.azure_master_image.master_image", os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")),
+					// Verify machine catalog identity type
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.identity_type", "Workgroup"),
 					// Verify total number of machines
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.number_of_total_machines", "2"),
 				),
@@ -633,6 +711,8 @@ func TestMachineCatalogResourceAwsEc2(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.machine_domain_identity.service_account", os.Getenv("TEST_MC_SERVICE_ACCOUNT_AWS_EC2")),
 					// Verify total number of machines
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.number_of_total_machines", "1"),
+					// Verify security groups
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.aws_machine_config.security_groups.#", "1"),
 				),
 			},
 			// ImportState testing
@@ -1123,10 +1203,12 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 		}
 		azure_machine_config = {
 			service_offering 	 = "%s"
-			resource_group 		 = "%s"
-            storage_account 	 = "%s"
-            container 			 = "%s"
-			master_image		 = "%s"
+			azure_master_image 	 = {
+				resource_group 		 = "%s"
+				storage_account 	 = "%s"
+				container 			 = "%s"
+				master_image		 = "%s"
+			}
 			storage_type = "Standard_LRS"
 			use_managed_disks = true
 			writeback_cache = {
@@ -1172,10 +1254,12 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 			}
 			azure_machine_config = {
 				service_offering 	 = "%s"
-				resource_group 		 = "%s"
-				storage_account 	 = "%s"
-				container 			 = "%s"
-				master_image		 = "%s"
+				azure_master_image 	 = {
+					resource_group 		 = "%s"
+					storage_account 	 = "%s"
+					container 			 = "%s"
+					master_image		 = "%s"
+				}
 				storage_type = "Standard_LRS"
 				use_managed_disks = true
 				writeback_cache = {
@@ -1221,10 +1305,12 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 			}
 			azure_machine_config = {
 				service_offering 	 	 = "%s"
-				resource_group 		 	 = "%s"
-				storage_account 	 	 = "%s"
-				container 			 	 = "%s"
-				master_image		 	 = "%s"
+				azure_master_image 	 = {
+					resource_group 		 = "%s"
+					storage_account 	 = "%s"
+					container 			 = "%s"
+					master_image		 = "%s"
+				}
 				storage_type = "Standard_LRS"
 				use_managed_disks = true
 				
@@ -1265,10 +1351,12 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 			identity_type = "AzureAD"
 			azure_machine_config = {
 				service_offering 	 = "%s"
-				resource_group 		 = "%s"
-	            storage_account 	 = "%s"
-	            container 			 = "%s"
-				master_image		 = "%s"
+				azure_master_image 	 = {
+					resource_group 		 = "%s"
+					storage_account 	 = "%s"
+					container 			 = "%s"
+					master_image		 = "%s"
+				}
 				machine_profile = {
 					machine_profile_vm_name = "%s"
 					machine_profile_resource_group = "%s"
@@ -1312,10 +1400,12 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 			identity_type = "AzureAD"
 			azure_machine_config = {
 				service_offering 	 = "%s"
-				resource_group 		 = "%s"
-				storage_account 	 = "%s"
-				container 			 = "%s"
-				master_image		 = "%s"
+				azure_master_image 	 = {
+					resource_group 		 = "%s"
+					storage_account 	 = "%s"
+					container 			 = "%s"
+					master_image		 = "%s"
+				}
 				machine_profile = {
 					machine_profile_vm_name = "%s"
 					machine_profile_resource_group = "%s"
@@ -1335,6 +1425,89 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 			network_mapping = {
 				network_device = "0"
 				network 	   = "%s"
+			}
+			availability_zones = "1,3"
+			number_of_total_machines = 	2
+			machine_account_creation_rules ={
+				naming_scheme =     "test-machine-##"
+				naming_scheme_type ="Numeric"
+			}
+		}
+		zone						= citrix_zone.test.id
+	}
+	`
+
+	machinecatalog_testResources_workgroup = `
+	resource "citrix_machine_catalog" "testMachineCatalog" {
+		name                		= "%s"
+		description					= "on prem catalog for import testing"
+		allocation_type				= "Random"
+		session_support				= "MultiSession"
+		provisioning_type			= "MCS"
+		provisioning_scheme			= 	{
+			hypervisor			 = citrix_azure_hypervisor.testHypervisor.id
+			hypervisor_resource_pool = citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool.id
+			identity_type = "Workgroup"
+			azure_machine_config = {
+				service_offering 	 = "%s"
+				azure_master_image 	 = {
+					resource_group 		 = "%s"
+					storage_account 	 = "%s"
+					container 			 = "%s"
+					master_image		 = "%s"
+				}
+				storage_type = "Standard_LRS"
+				use_managed_disks = true
+				writeback_cache = {
+					wbc_disk_storage_type = "Standard_LRS"
+					persist_wbc = true
+					persist_os_disk = true
+					persist_vm = true
+					writeback_cache_disk_size_gb = 127
+					writeback_cache_memory_size_mb = 256
+					storage_cost_saving = true
+				}
+			}
+			number_of_total_machines = 	1
+			machine_account_creation_rules ={
+				naming_scheme =     "test-machine-##"
+				naming_scheme_type ="Numeric"
+			}
+		}
+
+		zone						= citrix_zone.test.id
+	}
+	`
+	machinecatalog_testResources_workgroup_updated = `
+	resource "citrix_machine_catalog" "testMachineCatalog" {
+		name                		= "%s"
+		description					= "updatedCatalog"
+		allocation_type				= "Random"
+		session_support				= "MultiSession"
+		provisioning_type			= "MCS"
+		provisioning_scheme			= 	{
+			hypervisor			 = citrix_azure_hypervisor.testHypervisor.id
+			hypervisor_resource_pool = citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool.id
+			identity_type = "Workgroup"
+			azure_machine_config = {
+				service_offering 	 = "%s"
+				azure_master_image 	 = {
+					resource_group 		 = "%s"
+					storage_account 	 = "%s"
+					container 			 = "%s"
+					master_image		 = "%s"
+				}
+				storage_type = "Standard_LRS"
+				use_managed_disks = true
+				writeback_cache = {
+					wbc_disk_storage_type = "Standard_LRS"
+					persist_wbc = true
+					persist_os_disk = true
+					persist_vm = true
+					writeback_cache_disk_size_gb = 127
+					writeback_cache_memory_size_mb = 256
+					storage_cost_saving = true
+				}
 			}
 			availability_zones = "1,3"
 			number_of_total_machines = 	2
@@ -1625,6 +1798,10 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 				image_ami = "%s"
 				master_image = "%s"
 				service_offering = "%s"
+				security_groups = [
+					"default"
+				]
+				tenancy_type = "Shared"
 			}
 			network_mapping = {
 				network_device = "0"
@@ -1660,6 +1837,10 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 				image_ami = "%s"
 				master_image = "%s"
 				service_offering = "%s"
+				security_groups = [
+					"default"
+				]
+				tenancy_type = "Shared"
 			}
 			network_mapping = {
 				network_device = "0"
@@ -1917,6 +2098,21 @@ func BuildMachineCatalogResourceAzureAd(t *testing.T, machineResource string) st
 	}
 
 	return BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure) + fmt.Sprintf(machineResource, name, service_offering, resource_group, storage_account, container, master_image, machine_profile_vm_name, machine_profile_resource_group, subnet)
+}
+
+func BuildMachineCatalogResourceWorkgroup(t *testing.T, machineResource string) string {
+	name := os.Getenv("TEST_MC_NAME") + "-WRKGRP"
+	service_offering := os.Getenv("TEST_MC_SERVICE_OFFERING")
+	master_image := os.Getenv("TEST_MC_MASTER_IMAGE")
+	resource_group := os.Getenv("TEST_MC_IMAGE_RESOUCE_GROUP")
+	storage_account := os.Getenv("TEST_MC_IMAGE_STORAGE_ACCOUNT")
+	container := os.Getenv("TEST_MC_IMAGE_CONTAINER")
+
+	if machineResource == machinecatalog_testResources_workgroup_updated {
+		master_image = os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")
+	}
+
+	return BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure) + fmt.Sprintf(machineResource, name, service_offering, resource_group, storage_account, container, master_image)
 }
 
 func BuildMachineCatalogResourceGCP(t *testing.T, machineResource string) string {

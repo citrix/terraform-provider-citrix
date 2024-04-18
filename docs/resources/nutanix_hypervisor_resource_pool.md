@@ -3,12 +3,12 @@
 page_title: "citrix_nutanix_hypervisor_resource_pool Resource - citrix"
 subcategory: ""
 description: |-
-  Manages a Nutanix hypervisor resource pool.
+  Manages a Nutanix AHV hypervisor resource pool.
 ---
 
 # citrix_nutanix_hypervisor_resource_pool (Resource)
 
-Manages a Nutanix hypervisor resource pool.
+Manages a Nutanix AHV hypervisor resource pool.
 
 ## Example Usage
 

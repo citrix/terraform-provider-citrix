@@ -63,11 +63,12 @@ type ProvisioningSchemeModel struct {
 	IdentityType                types.String                      `tfsdk:"identity_type"`
 	MachineDomainIdentity       *MachineDomainIdentityModel       `tfsdk:"machine_domain_identity"`
 	MachineAccountCreationRules *MachineAccountCreationRulesModel `tfsdk:"machine_account_creation_rules"`
+	CustomProperties            []CustomPropertyModel             `tfsdk:"custom_properties"`
 }
 
-type MachineProfileModel struct {
-	MachineProfileVmName        types.String `tfsdk:"machine_profile_vm_name"`
-	MachineProfileResourceGroup types.String `tfsdk:"machine_profile_resource_group"`
+type CustomPropertyModel struct {
+	Name  types.String `tfsdk:"name"`
+	Value types.String `tfsdk:"value"`
 }
 
 type MachineDomainIdentityModel struct {
@@ -75,12 +76,6 @@ type MachineDomainIdentityModel struct {
 	Ou                     types.String `tfsdk:"domain_ou"`
 	ServiceAccount         types.String `tfsdk:"service_account"`
 	ServiceAccountPassword types.String `tfsdk:"service_account_password"`
-}
-
-type GalleryImageModel struct {
-	Gallery    types.String `tfsdk:"gallery"`
-	Definition types.String `tfsdk:"definition"`
-	Version    types.String `tfsdk:"version"`
 }
 
 // MachineAccountCreationRulesModel maps the nested machine account creation rules resource schema data.

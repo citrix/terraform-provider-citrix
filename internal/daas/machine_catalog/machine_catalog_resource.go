@@ -407,6 +407,8 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 	provisioningTypeMcs := string(citrixorchestration.PROVISIONINGTYPE_MCS)
 	provisioningTypeManual := string(citrixorchestration.PROVISIONINGTYPE_MANUAL)
 
+	azureAD := string(citrixorchestration.IDENTITYTYPE_AZURE_AD)
+
 	if data.ProvisioningType.ValueString() == provisioningTypeMcs {
 		if data.ProvisioningScheme == nil {
 			resp.Diagnostics.AddAttributeError(
@@ -457,6 +459,45 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 				"Incorrect Attribute Configuration",
 				fmt.Sprintf("Machines have to be power managed when provisioning_type is %s.", provisioningTypeMcs),
 			)
+		}
+
+		if data.ProvisioningScheme.IdentityType.ValueString() != azureAD &&
+			data.ProvisioningScheme.AzureMachineConfig != nil &&
+			!data.ProvisioningScheme.AzureMachineConfig.EnrollInIntune.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("enroll_in_intune"),
+				"Incorrect Attribute Configuration",
+				"enroll_in_intune can only be configured when identity_type is Azure AD.",
+			)
+		}
+
+		if data.AllocationType.ValueString() != allocationTypeStatic &&
+			data.ProvisioningScheme.AzureMachineConfig != nil &&
+			data.ProvisioningScheme.AzureMachineConfig.EnrollInIntune.ValueBool() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("enroll_in_intune"),
+				"Incorrect Attribute Configuration",
+				fmt.Sprintf("Azure Intune auto enrollment is only supported when `allocation_type` is %s.", allocationTypeStatic),
+			)
+		}
+
+		if data.ProvisioningScheme.AzureMachineConfig != nil &&
+			data.ProvisioningScheme.AzureMachineConfig.StorageType.ValueString() == util.AzureEphemeralOSDisk {
+			if !data.ProvisioningScheme.AzureMachineConfig.UseManagedDisks.ValueBool() {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("use_managed_disks"),
+					"Incorrect Attribute Configuration",
+					fmt.Sprintf("use_managed_disks must be set to true when storage_type is %s.", util.AzureEphemeralOSDisk),
+				)
+			}
+
+			if data.ProvisioningScheme.AzureMachineConfig.UseAzureComputeGallery == nil {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("use_azure_compute_gallery"),
+					"Missing Attribute Configuration",
+					fmt.Sprintf("use_azure_compute_gallery must be set when storage_type is %s.", util.AzureEphemeralOSDisk),
+				)
+			}
 		}
 
 		data.IsPowerManaged = types.BoolValue(true) // set power managed to true for MCS catalog
@@ -535,6 +576,19 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 				"Incorrect Attribute Configuration",
 				"Only Single Session is supported for Remote PC Access catalog.",
 			)
+		}
+	}
+
+	if data.ProvisioningScheme != nil && data.ProvisioningScheme.CustomProperties != nil {
+		for _, customProperty := range data.ProvisioningScheme.CustomProperties {
+			propertyName := customProperty.Name.ValueString()
+			if val, ok := MappedCustomProperties[propertyName]; ok {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("custom_properties"),
+					"Duplicated Custom Property",
+					fmt.Sprintf("Use Terraform field \"%s\" for customer property \"%s\".", val, propertyName),
+				)
+			}
 		}
 	}
 }

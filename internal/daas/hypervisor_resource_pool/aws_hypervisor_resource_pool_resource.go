@@ -48,7 +48,7 @@ func (r *awsHypervisorResourcePoolResource) Metadata(_ context.Context, req reso
 
 func (r *awsHypervisorResourcePoolResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a hypervisor resource pool.",
+		Description: "Manages an AWS EC2 hypervisor resource pool.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the resource pool.",

@@ -47,7 +47,7 @@ func (*nutanixHypervisorResourcePoolResource) Metadata(_ context.Context, req re
 
 func (*nutanixHypervisorResourcePoolResource) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a Nutanix hypervisor resource pool.",
+		Description: "Manages a Nutanix AHV hypervisor resource pool.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the resource pool.",

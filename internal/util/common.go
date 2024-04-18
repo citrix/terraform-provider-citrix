@@ -33,6 +33,9 @@ const DomainFqdnRegex string = `^(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}$`
 // SAM
 const SamRegex string = `^[a-zA-Z][a-zA-Z0-9\- ]{0,61}[a-zA-Z0-9]\\\w[\w\.\- ]+$`
 
+// UPN
+const UpnRegex string = `^[^@]+@\b(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}$`
+
 // GUID
 const GuidRegex string = `^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}[}]?$`
 
@@ -68,6 +71,17 @@ const VirtualMachineResourceType string = "Vm"
 const TemplateResourceType string = "Template"
 const StorageResourceType string = "Storage"
 const NetworkResourceType string = "Network"
+const SecurityGroupResourceType = "SecurityGroup"
+
+// Azure Storage Types
+const StandardLRS = "Standard_LRS"
+const StandardSSDLRS = "StandardSSD_LRS"
+const Premium_LRS = "Premium_LRS"
+const AzureEphemeralOSDisk = "Azure_Ephemeral_OS_Disk"
+
+// Azure License Types
+const WindowsClientLicenseType string = "Windows_Client"
+const WindowsServerLicenseType string = "Windows_Server"
 
 // Terraform model for name value string pair
 type NameValueStringPairModel struct {

@@ -94,7 +94,7 @@ func (r *vsphereHypervisorResourcePoolResource) Metadata(_ context.Context, req 
 
 func (r *vsphereHypervisorResourcePoolResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a Vsphere hypervisor resource pool.",
+		Description: "Manages a VMware vSphere hypervisor resource pool.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the resource pool.",
@@ -209,7 +209,7 @@ func (r *vsphereHypervisorResourcePoolResource) Create(ctx context.Context, req 
 	resource, err := util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, folderPath, plan.Cluster.Datacenter.ValueString(), "datacenter", "", hypervisor)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error creating Hypervisor Resource Pool for Vsphere",
+			"Error creating Hypervisor Resource Pool for vSphere",
 			fmt.Sprintf("Failed to resolve resource %s, error: %s", plan.Cluster.Datacenter.ValueString(), err.Error()),
 		)
 		return
@@ -221,7 +221,7 @@ func (r *vsphereHypervisorResourcePoolResource) Create(ctx context.Context, req 
 		resource, err = util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, folderPath, plan.Cluster.ClusterName.ValueString(), "cluster", "", hypervisor)
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error creating Hypervisor Resource Pool for Vsphere",
+				"Error creating Hypervisor Resource Pool for vSphere",
 				fmt.Sprintf("Failed to resolve resource %s, error: %s", plan.Cluster.ClusterName.ValueString(), err.Error()),
 			)
 			return
@@ -234,7 +234,7 @@ func (r *vsphereHypervisorResourcePoolResource) Create(ctx context.Context, req 
 		resource, err = util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, folderPath, plan.Cluster.Host.ValueString(), "computeresource", "", hypervisor)
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error creating Hypervisor Resource Pool for Vsphere",
+				"Error creating Hypervisor Resource Pool for vSphere",
 				fmt.Sprintf("Failed to resolve resource %s, error: %s", plan.Cluster.Host.ValueString(), err.Error()),
 			)
 			return
@@ -247,7 +247,7 @@ func (r *vsphereHypervisorResourcePoolResource) Create(ctx context.Context, req 
 	hypervisorConnectionType := hypervisor.GetConnectionType()
 	if hypervisorConnectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER {
 		resp.Diagnostics.AddError(
-			"Error creating Hypervisor Resource Pool for Vsphere",
+			"Error creating Hypervisor Resource Pool for vSphere",
 			"Unsupported hypervisor connection type.",
 		)
 		return
@@ -478,7 +478,7 @@ func (plan VsphereHypervisorResourcePoolResourceModel) GetStorageList(ctx contex
 			errDetail = util.ReadClientError(err)
 		}
 		diags.AddError(
-			fmt.Sprintf("Error %s Hypervisor Resource Pool for Vsphere", action),
+			fmt.Sprintf("Error %s Hypervisor Resource Pool for vSphere", action),
 			errDetail,
 		)
 		return nil, nil
@@ -498,7 +498,7 @@ func (plan VsphereHypervisorResourcePoolResourceModel) GetStorageList(ctx contex
 			errDetail = util.ReadClientError(err)
 		}
 		diags.AddError(
-			fmt.Sprintf("Error %s Hypervisor Resource Pool for Vsphere", action),
+			fmt.Sprintf("Error %s Hypervisor Resource Pool for vSphere", action),
 			errDetail,
 		)
 		return nil, nil
@@ -532,7 +532,7 @@ func (plan VsphereHypervisorResourcePoolResourceModel) GetNetworksList(ctx conte
 			errDetail = util.ReadClientError(err)
 		}
 		diags.AddError(
-			fmt.Sprintf("Error %s Hypervisor Resource Pool for Vsphere", action),
+			fmt.Sprintf("Error %s Hypervisor Resource Pool for vSphere", action),
 			errDetail,
 		)
 		return nil

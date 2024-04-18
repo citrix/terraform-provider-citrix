@@ -1,4 +1,4 @@
-
+﻿
 # Copyright © 2024. Citrix Systems, Inc. All Rights Reserved.
 <#
 This script is a template for creating custom scripts to notify the user about configuration drift.

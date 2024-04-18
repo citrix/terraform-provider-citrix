@@ -3,12 +3,12 @@
 page_title: "citrix_vsphere_hypervisor Resource - citrix"
 subcategory: ""
 description: |-
-  Manages a Vsphere hypervisor.
+  Manages a VMware vSphere hypervisor.
 ---
 
 # citrix_vsphere_hypervisor (Resource)
 
-Manages a Vsphere hypervisor.
+Manages a VMware vSphere hypervisor.
 
 ## Example Usage
 

@@ -13,7 +13,7 @@ import (
 var (
 	policy_set_testResource = `
 resource "citrix_policy_set" "testPolicySet" {
-    name = "%s"
+    name = "%s-1"
     description = "Test policy set description"
     scopes = [ "All" ]
     type = "DeliveryGroupPolicies"
@@ -21,30 +21,35 @@ resource "citrix_policy_set" "testPolicySet" {
         {
             name = "first-test-policy"
             description = "First test policy with priority 0"
-            is_enabled = true
+            enabled = true
             policy_settings = [
                 {
                     name = "AdvanceWarningPeriod"
                     value = "13:00:00"
                     use_default = false
                 },
+                {
+                    name = "AllowFileDownload"
+                    enabled = true
+                    use_default = false
+                }
             ]
             policy_filters = [
                 {
                     type = "DesktopGroup"
-                    data = jsonencode({
-                        "server" = "%s"
-                        "uuid" = citrix_delivery_group.testDeliveryGroup.id
-                    })
-                    is_enabled = true
-                    is_allowed = true
+                    data = {
+                        server = "%s"
+                        uuid = citrix_delivery_group.testDeliveryGroup.id
+                    }
+                    enabled = true
+                    allowed = true
                 },
             ]
         },
         {
             name = "second-test-policy"
             description = "Second test policy with priority 1"
-            is_enabled = false
+            enabled = false
             policy_settings = [
                 {
                     name = "AdvanceWarningPeriod"
@@ -60,15 +65,15 @@ resource "citrix_policy_set" "testPolicySet" {
 
 	policy_set_reordered_testResource = `
 resource "citrix_policy_set" "testPolicySet" {
-    name = "%s"
+    name = "%s-2"
     description = "Test policy set description"
     scopes = [ "All" ]
     type = "DeliveryGroupPolicies"
     policies = [
 		{
             name = "second-test-policy"
-            description = "Second test policy with priority 1"
-            is_enabled = false
+            description = "Second test policy with priority 0"
+            enabled = false
             policy_settings = [
                 {
                     name = "AdvanceWarningPeriod"
@@ -80,8 +85,8 @@ resource "citrix_policy_set" "testPolicySet" {
         },
         {
             name = "first-test-policy"
-            description = "First test policy with priority 0"
-            is_enabled = true
+            description = "First test policy with priority 1"
+            enabled = true
             policy_settings = [
                 {
                     name = "AdvanceWarningPeriod"
@@ -92,12 +97,12 @@ resource "citrix_policy_set" "testPolicySet" {
             policy_filters = [
                 {
                     type = "DesktopGroup"
-                    data = jsonencode({
-                        "server" = "%s"
-                        "uuid" = citrix_delivery_group.testDeliveryGroup.id
-                    })
-                    is_enabled = true
-                    is_allowed = true
+                    data = {
+                        server = "%s"
+                        uuid = citrix_delivery_group.testDeliveryGroup.id
+                    }
+                    enabled = true
+                    allowed = true
                 },
             ]
         }
@@ -107,7 +112,7 @@ resource "citrix_policy_set" "testPolicySet" {
 
 	policy_set_updated_testResource = `
 resource "citrix_policy_set" "testPolicySet" {
-    name = "%s"
+    name = "%s-3"
     description = "Test policy set description updated"
     scopes = [ "All" ]
     type = "DeliveryGroupPolicies"
@@ -115,7 +120,7 @@ resource "citrix_policy_set" "testPolicySet" {
         {
             name = "first-test-policy"
             description = "First test policy with priority 0"
-            is_enabled = true
+            enabled = true
             policy_settings = [
                 {
                     name = "AdvanceWarningPeriod"
@@ -126,12 +131,12 @@ resource "citrix_policy_set" "testPolicySet" {
             policy_filters = [
                 {
                     type = "DesktopGroup"
-                    data = jsonencode({
-                        "server" = "%s"
-                        "uuid" = citrix_delivery_group.testDeliveryGroup.id
-                    })
-                    is_enabled = true
-                    is_allowed = true
+                    data = {
+                        server = "%s"
+                        uuid = citrix_delivery_group.testDeliveryGroup.id
+                    }
+                    enabled = true
+                    allowed = true
                 },
             ]
         }
@@ -174,7 +179,7 @@ func TestPolicySetResource(t *testing.T) {
 				Config: BuildPolicySetResource(t, policy_set_testResource),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "name", os.Getenv("TEST_POLICY_SET_NAME")),
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "name", os.Getenv("TEST_POLICY_SET_NAME")+"-1"),
 					// Verify description of the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "description", "Test policy set description"),
 					// Verify type of the policy set
@@ -187,6 +192,12 @@ func TestPolicySetResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.#", "2"),
 					// Verify name of the first policy in the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.name", "first-test-policy"),
+					// Verify policy settings of the first policy in the policy set
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.policy_settings.#", "2"),
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.policy_settings.0.name", "AdvanceWarningPeriod"),
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.policy_settings.0.value", "13:00:00"),
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.policy_settings.1.name", "AllowFileDownload"),
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.policy_settings.1.enabled", "true"),
 					// Verify name of the second policy in the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.1.name", "second-test-policy"),
 				),
@@ -196,7 +207,7 @@ func TestPolicySetResource(t *testing.T) {
 				Config: BuildPolicySetResource(t, policy_set_reordered_testResource),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "name", os.Getenv("TEST_POLICY_SET_NAME")),
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "name", os.Getenv("TEST_POLICY_SET_NAME")+"-2"),
 					// Verify description of the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "description", "Test policy set description"),
 					// Verify type of the policy set
@@ -227,7 +238,7 @@ func TestPolicySetResource(t *testing.T) {
 				Config: BuildPolicySetResource(t, policy_set_updated_testResource),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "name", os.Getenv("TEST_POLICY_SET_NAME")),
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "name", os.Getenv("TEST_POLICY_SET_NAME")+"-3"),
 					// Verify description of the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "description", "Test policy set description updated"),
 					// Verify type of the policy set

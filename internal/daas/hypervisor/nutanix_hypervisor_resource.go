@@ -56,7 +56,7 @@ func (r *nutanixHypervisorResource) Configure(_ context.Context, req resource.Co
 // Schema implements resource.Resource.
 func (r *nutanixHypervisorResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a Nutanix hypervisor.",
+		Description: "Manages a Nutanix AHV hypervisor.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the hypervisor.",

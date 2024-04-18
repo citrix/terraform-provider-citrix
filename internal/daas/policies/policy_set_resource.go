@@ -4,8 +4,11 @@ package policies
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -13,12 +16,15 @@ import (
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/boolvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -30,6 +36,7 @@ var (
 	_ resource.Resource                = &policySetResource{}
 	_ resource.ResourceWithConfigure   = &policySetResource{}
 	_ resource.ResourceWithImportState = &policySetResource{}
+	_ resource.ResourceWithModifyPlan  = &policySetResource{}
 )
 
 // NewPolicySetResource is a helper function to simplify the provider implementation.
@@ -40,6 +47,88 @@ func NewPolicySetResource() resource.Resource {
 // policySetResource is the resource implementation.
 type policySetResource struct {
 	client *citrixdaasclient.CitrixDaasClient
+}
+
+// ModifyPlan implements resource.ResourceWithModifyPlan.
+func (r *policySetResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	// Skip modify plan when doing destroy action
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+
+	create := req.State.Raw.IsNull()
+	operation := "updating"
+	if create {
+		operation = "creating"
+	}
+
+	// Retrieve values from plan
+	var plan PolicySetResourceModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	serverValue := ""
+	if r.client.AuthConfig.OnPremises {
+		serverValue = r.client.ApiClient.GetConfig().Host
+	} else {
+		serverValue = fmt.Sprintf("%s.xendesktop.net", r.client.ClientConfig.CustomerId)
+	}
+
+	allScopeContained := false
+	for _, scope := range plan.Scopes {
+		if strings.EqualFold(scope.ValueString(), "All") {
+			allScopeContained = true
+			break
+		}
+	}
+	if !allScopeContained {
+		plan.Scopes = append(plan.Scopes, types.StringValue("All"))
+	}
+
+	sort.Slice(plan.Scopes, func(i, j int) bool {
+		return plan.Scopes[i].ValueString() < plan.Scopes[j].ValueString()
+	})
+
+	for policyIndex, policy := range plan.Policies {
+		sort.Slice(policy.PolicySettings, func(i, j int) bool {
+			return policy.PolicySettings[i].Name.ValueString() < policy.PolicySettings[j].Name.ValueString()
+		})
+
+		for _, setting := range policy.PolicySettings {
+			if strings.EqualFold(setting.Value.ValueString(), "true") ||
+				strings.EqualFold(setting.Value.ValueString(), "1") ||
+				strings.EqualFold(setting.Value.ValueString(), "false") ||
+				strings.EqualFold(setting.Value.ValueString(), "0") {
+				resp.Diagnostics.AddError(
+					"Error "+operation+" Policy Set",
+					"Please specify boolean policy setting value with the 'enabled' attribute.",
+				)
+			}
+		}
+
+		sort.Slice(policy.PolicyFilters, func(i, j int) bool {
+			return policy.PolicyFilters[i].Type.ValueString() < policy.PolicyFilters[j].Type.ValueString()
+		})
+
+		for filterIndex, filter := range policy.PolicyFilters {
+			if filter.Data.Uuid.ValueString() != "" &&
+				filter.Data.Server.ValueString() == "" {
+				plan.Policies[policyIndex].PolicyFilters[filterIndex].Data.Server = types.StringValue(serverValue)
+			}
+		}
+	}
+
+	// Set state to fully populated data
+	diags = resp.Plan.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 }
 
 // Metadata returns the data source type name.
@@ -59,7 +148,7 @@ func (r *policySetResource) Configure(_ context.Context, req resource.ConfigureR
 // Schema implements resource.Resource.
 func (*policySetResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a policy set and the policies within it. The order of the policies specified in this resource reflect the policy priority. This feature will be officially supported for On-Premises with DDC version 2402 and above and will be made available for Cloud soon.",
+		Description: "Manages a policy set and the policies within it. The order of the policies specified in this resource reflect the policy priority. This feature will be officially supported for On-Premises with DDC version 2402 and above and will be made available for Cloud soon. For detailed information about policy settings and filters, please refer to [this document](https://github.com/citrix/terraform-provider-citrix/blob/main/internal/daas/policies/policy_set_resource.md).",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the policy set.",
@@ -89,11 +178,15 @@ func (*policySetResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"description": schema.StringAttribute{
 				Description: "Description of the policy set.",
 				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(""),
 			},
-			"scopes": schema.SetAttribute{
+			"scopes": schema.ListAttribute{
 				ElementType: types.StringType,
 				Description: "The names of the scopes for the policy set to apply on.",
-				Required:    true,
+				Optional:    true,
+				Computed:    true,
+				Default:     listdefault.StaticValue(types.ListNull(types.StringType)),
 			},
 			"policies": schema.ListNestedAttribute{
 				Description: "Ordered list of policies. The order of policies in the list determines the priority of the policies.",
@@ -107,12 +200,14 @@ func (*policySetResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 						"description": schema.StringAttribute{
 							Description: "Description of the policy.",
 							Optional:    true,
+							Computed:    true,
+							Default:     stringdefault.StaticString(""),
 						},
-						"is_enabled": schema.BoolAttribute{
+						"enabled": schema.BoolAttribute{
 							Description: "Indicate whether the policy is being enabled.",
 							Required:    true,
 						},
-						"policy_settings": schema.SetNestedAttribute{
+						"policy_settings": schema.ListNestedAttribute{
 							Description: "Set of policy settings.",
 							Required:    true,
 							NestedObject: schema.NestedAttributeObject{
@@ -127,12 +222,28 @@ func (*policySetResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 									},
 									"value": schema.StringAttribute{
 										Description: "Value of the policy setting.",
-										Required:    true,
+										Optional:    true,
+										Computed:    true,
+										Validators: []validator.String{
+											stringvalidator.ExactlyOneOf(
+												path.MatchRelative().AtParent().AtName("enabled"),
+												path.MatchRelative().AtParent().AtName("value")),
+										},
+									},
+									"enabled": schema.BoolAttribute{
+										Description: "Whether of the policy setting has enabled or allowed value.",
+										Optional:    true,
+										Computed:    true,
+										Validators: []validator.Bool{
+											boolvalidator.ExactlyOneOf(
+												path.MatchRelative().AtParent().AtName("enabled"),
+												path.MatchRelative().AtParent().AtName("value")),
+										},
 									},
 								},
 							},
 						},
-						"policy_filters": schema.SetNestedAttribute{
+						"policy_filters": schema.ListNestedAttribute{
 							Description: "Set of policy filters.",
 							Required:    true,
 							NestedObject: schema.NestedAttributeObject{
@@ -153,15 +264,46 @@ func (*policySetResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 												"DesktopTag"}...),
 										},
 									},
-									"data": schema.StringAttribute{
+									"data": schema.SingleNestedAttribute{
 										Description: "Data of the policy filter.",
 										Optional:    true,
+										Attributes: map[string]schema.Attribute{
+											"server": schema.StringAttribute{
+												Description: "Server address for the policy filter data.",
+												Optional:    true,
+												Computed:    true,
+												Default:     stringdefault.StaticString(""),
+											},
+											"uuid": schema.StringAttribute{
+												Description: "Resource UUID for the policy filter data.",
+												Optional:    true,
+												Validators: []validator.String{
+													stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with UUID in GUID format."),
+												},
+											},
+											"connection": schema.StringAttribute{
+												Description: "Gateway connection for the policy filter data.",
+												Optional:    true,
+											},
+											"condition": schema.StringAttribute{
+												Description: "Gateway condition for the policy filter data.",
+												Optional:    true,
+											},
+											"gateway": schema.StringAttribute{
+												Description: "Gateway for the policy filter data.",
+												Optional:    true,
+											},
+											"value": schema.StringAttribute{
+												Description: "Va;ie for the policy filter data.",
+												Optional:    true,
+											},
+										},
 									},
-									"is_enabled": schema.BoolAttribute{
+									"enabled": schema.BoolAttribute{
 										Description: "Indicate whether the policy is being enabled.",
 										Required:    true,
 									},
-									"is_allowed": schema.BoolAttribute{
+									"allowed": schema.BoolAttribute{
 										Description: "Indicate the filtered policy is allowed or denied if the filter condition is met.",
 										Required:    true,
 									},
@@ -736,7 +878,15 @@ func constructCreatePolicyBatchRequestModel(policiesToCreate []PolicyModel, poli
 			settingRequest := citrixorchestration.SettingRequest{}
 			settingRequest.SetSettingName(policySetting.Name.ValueString())
 			settingRequest.SetUseDefault(policySetting.UseDefault.ValueBool())
-			settingRequest.SetSettingValue(policySetting.Value.ValueString())
+			if policySetting.Value.ValueString() != "" {
+				settingRequest.SetSettingValue(policySetting.Value.ValueString())
+			} else {
+				if policySetting.Enabled.ValueBool() {
+					settingRequest.SetSettingValue("1")
+				} else {
+					settingRequest.SetSettingValue("0")
+				}
+			}
 			policySettings = append(policySettings, settingRequest)
 		}
 		createPolicyRequest.SetSettings(policySettings)
@@ -746,7 +896,26 @@ func constructCreatePolicyBatchRequestModel(policiesToCreate []PolicyModel, poli
 		for _, policyFilter := range policyToCreate.PolicyFilters {
 			filterRequest := citrixorchestration.FilterRequest{}
 			filterRequest.SetFilterType(policyFilter.Type.ValueString())
-			filterRequest.SetFilterData(policyFilter.Data.ValueString())
+			if policyFilter.Data.Value.ValueString() != "" {
+				filterRequest.SetFilterData(policyFilter.Data.Value.ValueString())
+			} else {
+				policyFilterDataClientModel := PolicyFilterDataClientModel{
+					Server:     policyFilter.Data.Server.ValueString(),
+					Uuid:       policyFilter.Data.Uuid.ValueString(),
+					Connection: policyFilter.Data.Connection.ValueString(),
+					Condition:  policyFilter.Data.Condition.ValueString(),
+					Gateway:    policyFilter.Data.Gateway.ValueString(),
+				}
+				policyFilterDataJson, err := json.Marshal(policyFilterDataClientModel)
+				if err != nil {
+					diagnostic.AddError(
+						"Error adding Policy Filter "+policyToCreate.Name.ValueString()+" to Policy Set "+policySetName,
+						"An unexpected error occurred: "+err.Error(),
+					)
+					return batchRequestModel, err
+				}
+				filterRequest.SetFilterData(string(policyFilterDataJson))
+			}
 			filterRequest.SetIsAllowed(policyFilter.IsAllowed.ValueBool())
 			filterRequest.SetIsEnabled(policyFilter.IsEnabled.ValueBool())
 			policyFilters = append(policyFilters, filterRequest)

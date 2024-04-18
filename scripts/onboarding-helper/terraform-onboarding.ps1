@@ -1,4 +1,4 @@
-
+﻿
 # Copyright © 2024. Citrix Systems, Inc. All Rights Reserved.
 <#
 Currently this script is still in TechPreview
@@ -123,7 +123,7 @@ function Invoke-WebRequestWithRetry {
         }
         catch {
             if ($attempt -ge $MaxRetries) {
-                Write-Host "Max retries reached. Throwing exception."
+                Write-Output "Max retries reached. Throwing exception."
                 throw
             }
             else {
@@ -132,7 +132,7 @@ function Invoke-WebRequestWithRetry {
                 # The jitter is a random number between 0 and 10% of the base delay.
                 $jitter = Get-Random -Minimum 0 -Maximum ([math]::Ceiling($baseDelay * $JitterFactor))
                 $delay = $baseDelay + $jitter
-                Write-Host "Error occurred, retrying $Method $Uri after $delay seconds..."
+                Write-Output "Error occurred, retrying $Method $Uri after $delay seconds..."
                 Start-Sleep -Seconds $delay
             }
         }
@@ -201,7 +201,7 @@ function New-RequiredFiles {
     # Create temporary import.tf for terraform import
     if (!(Test-Path ".\citrix.tf")) {
         New-Item -path ".\" -name "citrix.tf" -type "file" -Force
-        Write-Host "Created new file for terraform citrix provider configuration."
+        Write-Output "Created new file for terraform citrix provider configuration."
     }
     if ($script:onPremise) {
         $disable_ssl_verification = $script:disable_ssl.ToString().ToLower()
@@ -230,21 +230,21 @@ provider "citrix" {
 
     if (!(Test-Path ".\import.tf")) {
         New-Item -path ".\" -name "import.tf" -type "file" -Force
-        Write-Host "Created new file for terraform import."
+        Write-Output "Created new file for terraform import."
     }
     else {
         Clear-Content -path ".\import.tf"
-        Write-Host "Cleared content in terraform import file."
+        Write-Output "Cleared content in terraform import file."
     }
 
     # Create resource.tf for final terraform resources
     if (!(Test-Path ".\resource.tf")) {
         New-Item -path ".\" -name "resource.tf" -type "file" -Force
-        Write-Host "Created new file for terraform resource."
+        Write-Output "Created new file for terraform resource."
     }
     else {
         Clear-Content -path ".\resource.tf"
-        Write-Host "Cleared content in terraform resource file."
+        Write-Output "Cleared content in terraform resource file."
     }
 
 }

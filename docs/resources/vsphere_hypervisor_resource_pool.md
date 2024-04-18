@@ -3,12 +3,12 @@
 page_title: "citrix_vsphere_hypervisor_resource_pool Resource - citrix"
 subcategory: ""
 description: |-
-  Manages a Vsphere hypervisor resource pool.
+  Manages a VMware vSphere hypervisor resource pool.
 ---
 
 # citrix_vsphere_hypervisor_resource_pool (Resource)
 
-Manages a Vsphere hypervisor resource pool.
+Manages a VMware vSphere hypervisor resource pool.
 
 ## Example Usage
 

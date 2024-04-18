@@ -22,6 +22,10 @@ resource "citrix_machine_catalog" "example-aws-catalog" {
             image_ami        = "<AWS AMI ID>"
             master_image     = "<AWS AMI Name>"
             service_offering = "t2.small"
+            security_groups  = [
+                "default"
+            ]
+            tenancy_type     = "Shared"
         }
         number_of_total_machines =  1
         network_mapping = {
