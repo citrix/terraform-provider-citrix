@@ -190,7 +190,6 @@ function Start-GetRequest {
     }
     
     $contentType = 'application/json'
-    # $response = Invoke-WebRequest -Method GET -Uri $url -Headers $headers -ContentType $contentType
     $response = Invoke-WebRequestWithRetry -Uri $url -Method 'GET' -Headers $headers -ContentType $contentType
     $jsonObj = ConvertFrom-Json $([String]::new($response.Content))
     return $jsonObj
@@ -219,7 +218,7 @@ provider "citrix" {
         $config = @"
 provider "citrix" {
     customer_id                 = "$script:customerId"
-    client_id                   = "$script:domainFqdn\\$script:clientId"
+    client_id                   = "$script:clientId"
     client_secret               = "$script:clientSecret"
     hostname                    = "$script:hostname"
     environment                 = "$script:environment"
@@ -266,6 +265,12 @@ function Get-ResourceList {
     $resourceList = @()
     $pathMap = @{}
     foreach ($item in $items) {
+
+        # Handle special case for Machine Catalogs
+        if ($requestPath -eq "machinecatalogs" -and $item.provisioningType -ne "Manual" -and $item.provisioningType -ne "MCS") {
+            Write-Warning "Currently the citrix terraform provider only supports Manual and MCS Machine Catalogs. Ignoring the Machine Catalog with Name: $($item.name) and Type: $($item.provisioningType)"
+            continue;
+        }
 
         # Handle special case for hypervisors
         if ($requestPath -eq "hypervisors") {
