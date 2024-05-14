@@ -168,6 +168,9 @@ func (mc *AzureMachineConfigModel) RefreshProperties(catalog citrixorchestration
 				mc.AzureMasterImage.StorageAccount = types.StringValue(strings.Split(segments[lastIndex-3], ".")[0])
 			} else if strings.EqualFold(resourceType, util.ImageVersionResourceType) {
 				// Gallery image
+				if mc.AzureMasterImage.GalleryImage == nil {
+					mc.AzureMasterImage.GalleryImage = &GalleryImageModel{}
+				}
 				mc.AzureMasterImage.GalleryImage.Definition = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
 				mc.AzureMasterImage.GalleryImage.Gallery = types.StringValue(strings.Split(segments[lastIndex-3], ".")[0])
 			}
