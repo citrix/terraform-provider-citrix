@@ -387,6 +387,8 @@ func (r *machineCatalogResource) ImportState(ctx context.Context, req resource.I
 }
 
 func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
 	var data MachineCatalogResourceModel
 	diags := req.Config.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
@@ -416,24 +418,66 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 				"Missing Attribute Configuration",
 				fmt.Sprintf("Expected provisioning_scheme to be configured when value of provisioning_type is %s.", provisioningTypeMcs),
 			)
-		}
+		} else {
+			// Validate Provisioning Scheme
+			if data.ProvisioningScheme.AzureMachineConfig != nil {
+				// Validate Azure Machine Config
+				if data.ProvisioningScheme.AzureMachineConfig.WritebackCache != nil {
+					// Validate Writeback Cache
+					wbc := data.ProvisioningScheme.AzureMachineConfig.WritebackCache
+					if !wbc.PersistOsDisk.ValueBool() && wbc.PersistVm.ValueBool() {
+						resp.Diagnostics.AddAttributeError(
+							path.Root("persist_vm"),
+							"Incorrect Attribute Configuration",
+							"persist_os_disk must be enabled to enable persist_vm.",
+						)
+					}
 
-		if data.ProvisioningScheme != nil && data.ProvisioningScheme.AzureMachineConfig != nil && data.ProvisioningScheme.AzureMachineConfig.WritebackCache != nil {
-			wbc := data.ProvisioningScheme.AzureMachineConfig.WritebackCache
-			if !wbc.PersistOsDisk.ValueBool() && wbc.PersistVm.ValueBool() {
-				resp.Diagnostics.AddAttributeError(
-					path.Root("persist_vm"),
-					"Incorrect Attribute Configuration",
-					"persist_os_disk must be enabled to enable persist_vm.",
-				)
-			}
+					if !wbc.PersistWBC.ValueBool() && wbc.StorageCostSaving.ValueBool() {
+						resp.Diagnostics.AddAttributeError(
+							path.Root("storage_cost_saving"),
+							"Incorrect Attribute Configuration",
+							"persist_wbc must be enabled to enable storage_cost_saving.",
+						)
+					}
+				}
 
-			if !wbc.PersistWBC.ValueBool() && wbc.StorageCostSaving.ValueBool() {
-				resp.Diagnostics.AddAttributeError(
-					path.Root("storage_cost_saving"),
-					"Incorrect Attribute Configuration",
-					"persist_wbc must be enabled to enable storage_cost_saving.",
-				)
+				// Validate Azure Intune Enrollment
+				if data.ProvisioningScheme.IdentityType.ValueString() != azureAD &&
+					!data.ProvisioningScheme.AzureMachineConfig.EnrollInIntune.IsNull() {
+					resp.Diagnostics.AddAttributeError(
+						path.Root("enroll_in_intune"),
+						"Incorrect Attribute Configuration",
+						"enroll_in_intune can only be configured when identity_type is Azure AD.",
+					)
+				}
+				if data.AllocationType.ValueString() != allocationTypeStatic &&
+					data.ProvisioningScheme.AzureMachineConfig.EnrollInIntune.ValueBool() {
+					resp.Diagnostics.AddAttributeError(
+						path.Root("enroll_in_intune"),
+						"Incorrect Attribute Configuration",
+						fmt.Sprintf("Azure Intune auto enrollment is only supported when `allocation_type` is %s.", allocationTypeStatic),
+					)
+				}
+
+				if data.ProvisioningScheme.AzureMachineConfig.StorageType.ValueString() == util.AzureEphemeralOSDisk {
+					// Validate Azure Ephemeral OS Disk
+					if !data.ProvisioningScheme.AzureMachineConfig.UseManagedDisks.ValueBool() {
+						resp.Diagnostics.AddAttributeError(
+							path.Root("use_managed_disks"),
+							"Incorrect Attribute Configuration",
+							fmt.Sprintf("use_managed_disks must be set to true when storage_type is %s.", util.AzureEphemeralOSDisk),
+						)
+					}
+
+					if data.ProvisioningScheme.AzureMachineConfig.UseAzureComputeGallery == nil {
+						resp.Diagnostics.AddAttributeError(
+							path.Root("use_azure_compute_gallery"),
+							"Missing Attribute Configuration",
+							fmt.Sprintf("use_azure_compute_gallery must be set when storage_type is %s.", util.AzureEphemeralOSDisk),
+						)
+					}
+				}
 			}
 		}
 
@@ -459,45 +503,6 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 				"Incorrect Attribute Configuration",
 				fmt.Sprintf("Machines have to be power managed when provisioning_type is %s.", provisioningTypeMcs),
 			)
-		}
-
-		if data.ProvisioningScheme.IdentityType.ValueString() != azureAD &&
-			data.ProvisioningScheme.AzureMachineConfig != nil &&
-			!data.ProvisioningScheme.AzureMachineConfig.EnrollInIntune.IsNull() {
-			resp.Diagnostics.AddAttributeError(
-				path.Root("enroll_in_intune"),
-				"Incorrect Attribute Configuration",
-				"enroll_in_intune can only be configured when identity_type is Azure AD.",
-			)
-		}
-
-		if data.AllocationType.ValueString() != allocationTypeStatic &&
-			data.ProvisioningScheme.AzureMachineConfig != nil &&
-			data.ProvisioningScheme.AzureMachineConfig.EnrollInIntune.ValueBool() {
-			resp.Diagnostics.AddAttributeError(
-				path.Root("enroll_in_intune"),
-				"Incorrect Attribute Configuration",
-				fmt.Sprintf("Azure Intune auto enrollment is only supported when `allocation_type` is %s.", allocationTypeStatic),
-			)
-		}
-
-		if data.ProvisioningScheme.AzureMachineConfig != nil &&
-			data.ProvisioningScheme.AzureMachineConfig.StorageType.ValueString() == util.AzureEphemeralOSDisk {
-			if !data.ProvisioningScheme.AzureMachineConfig.UseManagedDisks.ValueBool() {
-				resp.Diagnostics.AddAttributeError(
-					path.Root("use_managed_disks"),
-					"Incorrect Attribute Configuration",
-					fmt.Sprintf("use_managed_disks must be set to true when storage_type is %s.", util.AzureEphemeralOSDisk),
-				)
-			}
-
-			if data.ProvisioningScheme.AzureMachineConfig.UseAzureComputeGallery == nil {
-				resp.Diagnostics.AddAttributeError(
-					path.Root("use_azure_compute_gallery"),
-					"Missing Attribute Configuration",
-					fmt.Sprintf("use_azure_compute_gallery must be set when storage_type is %s.", util.AzureEphemeralOSDisk),
-				)
-			}
 		}
 
 		data.IsPowerManaged = types.BoolValue(true) // set power managed to true for MCS catalog
