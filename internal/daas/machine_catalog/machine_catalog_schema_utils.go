@@ -727,7 +727,7 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 						Description: "Number of VDA machines allocated in the catalog.",
 						Required:    true,
 						Validators: []validator.Int64{
-							int64validator.AtLeast(1),
+							int64validator.AtLeast(0),
 						},
 					},
 					"network_mapping": schema.SingleNestedAttribute{
