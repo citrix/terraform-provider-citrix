@@ -389,10 +389,6 @@ function Get-ExistingCVADResources {
             "resourceApi"          = "Admin/Scopes"
             "resourceProviderName" = "admin_scope"
         }
-        "policy_set" = @{
-            "resourceApi" = "gpo/policySets"
-            "resourceProviderName" = "policy_set"
-        } 
     }
 
     $script:cvadResourcesMap = @{}
