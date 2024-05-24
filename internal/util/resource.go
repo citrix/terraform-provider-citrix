@@ -214,7 +214,12 @@ func GetFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.C
 	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorAllResources(ctx, hypervisorId)
 	req = req.Children(1)
 	req = req.Path(folderPath)
-	req = req.Type_([]string{resourceType})
+	// Skip resource type filter for on-prem hypervisors to avoid server side filtering timeout
+	if connectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM &&
+		connectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER &&
+		connectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER {
+		req = req.Type_([]string{resourceType})
+	}
 
 	resources, _, err := citrixdaasclient.AddRequestData(req, client).Execute()
 	if err != nil {
@@ -224,24 +229,28 @@ func GetFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.C
 	result := []string{}
 	if filter != nil {
 		for _, child := range resources.Children {
-			name := child.GetName()
-			if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS {
-				name = strings.Split(name, " ")[0]
-			}
-			if Contains(filter, name) {
-				if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER && strings.EqualFold(resourceType, NetworkResourceType) {
-					result = append(result, child.GetRelativePath())
-				} else if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && strings.EqualFold(pluginId, NUTANIX_PLUGIN_ID) && strings.EqualFold(resourceType, NetworkResourceType) {
-					result = append(result, child.GetFullName())
-				} else {
-					result = append(result, child.GetXDPath())
+			if strings.EqualFold(child.ResourceType, resourceType) {
+				name := child.GetName()
+				if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS {
+					name = strings.Split(name, " ")[0]
+				}
+				if Contains(filter, name) {
+					if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER && strings.EqualFold(resourceType, NetworkResourceType) {
+						result = append(result, child.GetRelativePath())
+					} else if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && strings.EqualFold(pluginId, NUTANIX_PLUGIN_ID) && strings.EqualFold(resourceType, NetworkResourceType) {
+						result = append(result, child.GetFullName())
+					} else {
+						result = append(result, child.GetXDPath())
+					}
 				}
 			}
 		}
 	} else {
 		//when the filter is empty
 		for _, child := range resources.Children {
-			result = append(result, child.GetXDPath())
+			if strings.EqualFold(child.ResourceType, resourceType) {
+				result = append(result, child.GetXDPath())
+			}
 		}
 	}
 
@@ -255,4 +264,33 @@ func Contains[T comparable](s []T, e T) bool {
 		}
 	}
 	return false
+}
+
+func ValidateHypervisorResource(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorName, hypervisorPoolName, resourcePath string) (bool, string) {
+	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsValidateHypervisorResourcePoolResource(ctx, hypervisorName, hypervisorPoolName)
+	var validationRequestModel citrixorchestration.HypervisorResourceValidationRequestModel
+	validationRequestModel.SetPath(resourcePath)
+	req = req.HypervisorResourceValidationRequestModel(validationRequestModel)
+
+	responseModel, _, err := citrixdaasclient.AddRequestData(req, client).Execute()
+	if err != nil {
+		return false, ReadClientError(err)
+	}
+
+	reports := responseModel.GetReports()
+	index := slices.IndexFunc(reports, func(report citrixorchestration.ResourceValidationReportModel) bool {
+		return report.GetCategory() == citrixorchestration.RESOURCEVALIDATIONCATEGORY_MACHINE_PROFILE
+	})
+
+	report := reports[index]
+	if report.GetResult() == citrixorchestration.RESOURCEVALIDATIONRESULT_FAILED {
+		violations := report.GetViolations()
+		errIndex := slices.IndexFunc(violations, func(violation citrixorchestration.ResourceValidationViolationModel) bool {
+			return violation.GetLevel() == citrixorchestration.RESOURCEVIOLATIONLEVEL_ERROR
+		})
+		violation := violations[errIndex]
+		return false, violation.GetMessage()
+	}
+
+	return true, ""
 }

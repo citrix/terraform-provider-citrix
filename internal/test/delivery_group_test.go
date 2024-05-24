@@ -37,7 +37,14 @@ func TestDeliveryGroupResourceAzureRM(t *testing.T) {
 
 			// Create and Read testing
 			{
-				Config: BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+				Config: composeTestResourceTf(
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildPolicySetResourceWithoutDeliveryGroup(t),
+					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of delivery group
@@ -67,7 +74,14 @@ func TestDeliveryGroupResourceAzureRM(t *testing.T) {
 
 			// Update name, description and add machine testing
 			{
-				Config: BuildDeliveryGroupResource(t, testDeliveryGroupResources_updated),
+				Config: composeTestResourceTf(
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updated),
+					BuildPolicySetResourceWithoutDeliveryGroup(t),
+					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of delivery group
@@ -87,7 +101,14 @@ func TestDeliveryGroupResourceAzureRM(t *testing.T) {
 
 			// Remove machine testing
 			{
-				Config: BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+				Config: composeTestResourceTf(
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildPolicySetResourceWithoutDeliveryGroup(t),
+					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify total number of machines in delivery group
@@ -98,7 +119,14 @@ func TestDeliveryGroupResourceAzureRM(t *testing.T) {
 			},
 			// Update policy set testing
 			{
-				Config: BuildDeliveryGroupResource(t, testDeliveryGroupResources_updatedWithPolicySetId),
+				Config: composeTestResourceTf(
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updatedWithPolicySetId),
+					BuildPolicySetResourceWithoutDeliveryGroup(t),
+					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the policy set id assigned to the delivery group
@@ -363,7 +391,7 @@ resource "citrix_policy_set" "testPolicySetWithoutDG" {
 func BuildDeliveryGroupResource(t *testing.T, deliveryGroup string) string {
 	name := os.Getenv("TEST_DG_NAME")
 
-	return BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "ActiveDirectory") + BuildPolicySetResourceWithoutDeliveryGroup(t) + fmt.Sprintf(deliveryGroup, name)
+	return fmt.Sprintf(deliveryGroup, name)
 }
 
 func BuildPolicySetResourceWithoutDeliveryGroup(t *testing.T) string {

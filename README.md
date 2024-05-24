@@ -20,6 +20,11 @@ Citrix has developed a custom Terraform provider for automating Citrix product d
     - [Create a Hypervisor Resource Pool](#create-a-hypervisor-resource-pool)
     - [Create a Machine Catalog](#create-a-machine-catalog)
     - [Create a Delivery Group](#create-a-delivery-group)
+  - [Using the Plugin for Terraform Provider for other Citrix resources](#using-the-plugin-for-terraform-provider-for-other-citrix-resources)
+    - [Configure Global App Configuration (GAC) Settings](#configure-global-app-configuration-gac-settings)
+    - [Create Citrix Cloud Resource Locations](#create-citrix-cloud-resource-locations)
+    - [Managing StoreFront resources](#managing-storefront-resources)
+  - [Deployment Guides](#deployment-guides)
   - [Frequently Asked Questions](#frequently-asked-questions)
       - [What resource is supported for different connection types?](#what-resource-is-supported-for-different-connection-types)
       - [What provisioning types are supported for machine catalog?](#what-provisioning-types-are-supported-for-machine-catalog)
@@ -123,7 +128,7 @@ Refer section [Understanding Provider Configuration](#understanding-provider-con
 
 ### Start writing Terraform for managing your Citrix DaaS site
 
-To find all the Citrix DaaS resources manageable via Terraform, understand all the configurable properties for each resource and how they work together, refer documentations for DaaS resources that has `daas_` as resource name prefix in [Citrix Terraform resource documentation](docs/resources). To better understand how the resource is managed via Citrix DaaS Rest API, you can refer the [Citrix DaaS Rest API documentation](https://developer.cloud.com/citrixworkspace/citrix-daas/citrix-daas-rest-apis/docs/overview).
+To find all the Citrix DaaS resources manageable via Terraform, understand all the configurable properties for each resource and how they work together, refer documentations for resources in [Citrix Terraform resource documentation](docs/resources). To better understand how the resource is managed via Citrix DaaS Rest API, you can refer the [Citrix DaaS Rest API documentation](https://developer.cloud.com/citrixworkspace/citrix-daas/citrix-daas-rest-apis/docs/overview).
 
 ### Create a Zone in Citrix DaaS as the first step
 
@@ -135,7 +140,7 @@ Hypervisor is needed to use your preferred public cloud provider with Citrix Daa
 
 ### Create a Hypervisor Resource Pool
 
-The hypervisor resource pool defines the network configuration for a hypervisor connection. Refer the [DaaS Hypervisor Resource Pool documentaion](docs/resources/hypervisor_resource_pool.md) to configure a hypervisr resource pool via terraform.
+The hypervisor resource pool defines the network configuration for a hypervisor connection. Refer the [DaaS Hypervisor Resource Pool documentaion](docs/resources/azure_hypervisor_resource_pool.md) to configure an Azure hypervisr resource pool via terraform.
 
 ### Create a Machine Catalog
 
@@ -144,18 +149,39 @@ A machine catalog is a collection of machines managed as a single entity. Refer 
 ### Create a Delivery Group
 A delivery group is a collection of machines selected from one or more machine catalogs. The delivery group can also specify which users can use those machines, plus the applications and desktops available to those users. Refer the [DaaS Delivery Group documentation](docs/resources/delivery_group.md) to configure a delivery group via terraform.
 
+## Using the Plugin for Terraform Provider for other Citrix resources
+
+### Configure Global App Configuration (GAC) Settings
+
+The Global App Configuration service provides a centralized setup for IT admins to easily configure Citrix Workspace app settings on Windows, Mac, Android, iOS, HTML5, Chrome OS platforms. Currently, configuration of GAC settings is only supported for citrix cloud customers. Please refer to [Global App Configuration settings documentation](docs/resources/gac_settings.md) to configure GAC settings via terraform.
+
+### Create Citrix Cloud Resource Locations
+
+Resource locations contain the resources (e.g. cloud connectors) required to deliver applications and desktops to users. Resource locations are only supported for Cloud customers. On-premises customers can use the zone resource directly. Please refer to [Citrix Resource Location](docs/resources/resource_location.md) documentation to configure citrix cloud resource locations via terraform.
+
+### Managing StoreFront resources
+Please refer to the [StoreFront.md](StoreFront.md) to configure StoreFront resources via terraform.
+
+## Deployment Guides
+Detailed instructions on setting up deployments on different cloud providers.
+
+- [AWS EC2](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-aws/)
+- [Azure](https://community.citrix.com/tech-zone/build/deployment-guides/citrix-daas-terraform-azure/)
+- [GCP](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-gcp/)
+
 ## Frequently Asked Questions
 
 #### What resource is supported for different connection types?
 
-| Connection Type |   Hypervisor     |   Resource Pool  |   MCS Power Managed |MCS Provisioning  |
-|-----------------|------------------|------------------|---------------------|------------------|
-| AzureRM         |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  |:heavy_check_mark:|
-| AWS EC2         |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  |:heavy_check_mark:|
-| GCP             |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  |:heavy_check_mark:|
-| Vsphere         |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  |:heavy_check_mark:|
-| XenServer       |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  |:heavy_check_mark:|
-| Nutanix         |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  |:heavy_check_mark:| 
+| Connection Type |   Hypervisor     |   Resource Pool  |  MCS Power Managed  | MCS Provisioning  |          PVS           |
+|-----------------|------------------|------------------|---------------------|-------------------|------------------------|
+| AzureRM         |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  | :heavy_check_mark:|In Progress             |
+| AWS EC2         |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  | :heavy_check_mark:|:heavy_multiplication_x:|
+| GCP             |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  | :heavy_check_mark:|:heavy_multiplication_x:|
+| Vsphere         |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  | :heavy_check_mark:|:heavy_multiplication_x:|
+| XenServer       |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  | :heavy_check_mark:|:heavy_multiplication_x:|
+| Nutanix         |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  | :heavy_check_mark:|:heavy_multiplication_x:|
+| SCVMM           |In Progress       |In Progress       | In Progress         | In Progress       |:heavy_multiplication_x:|
 
 
 #### What provisioning types are supported for machine catalog? 

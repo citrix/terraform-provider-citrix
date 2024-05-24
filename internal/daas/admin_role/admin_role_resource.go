@@ -300,6 +300,8 @@ func readAdminRole(ctx context.Context, client *citrixdaasclient.CitrixDaasClien
 }
 
 func (r *adminRoleResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
 	var data AdminRoleResourceModel
 	diags := req.Config.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)

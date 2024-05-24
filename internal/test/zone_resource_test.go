@@ -71,7 +71,7 @@ func TestZoneResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_zone.test", "metadata.3.name", "key4"),
 					resource.TestCheckResourceAttr("citrix_zone.test", "metadata.3.value", "value4"),
 				),
-				SkipFunc: getSkipFunc(isOnPremises),
+				SkipFunc: skipForCloud(isOnPremises),
 			},
 			// Delete testing automatically occurs in TestCase
 		},

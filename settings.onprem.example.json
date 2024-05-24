@@ -224,7 +224,17 @@
 
         // Policy Set env variable
         "TEST_POLICY_SET_NAME"          :"ctx-test-policy-set",
-        "CITRIX_DDC_HOST_NAME"          : "{ddcHostname}"
+        "CITRIX_DDC_HOST_NAME"          : "{ddcHostname}",
+
+        // StoreFront env variable
+        "SF_COMPUTER_NAME"              : "{storefront_computer_name}",
+        "SF_AD_ADMAIN_USERNAME"         : "{storefront_admin_username}",
+        "SF_AD_ADMIN_PASSWORD"          : "{storefront_admin_password}",
+        "TEST_STF_SITE_ID"              :"1",
+        "TEST_STF_SITE_ID_UPDATED"      :"2",
+        "TEST_STF_Auth_Virtual_Path" : "/Citrix/Auth" ,
+        "TEST_STF_Store_Virtual_Path" : "/Citrix/Store",
+        "TEST_STF_WEBRECEIVER_VIRTUAL_PATH" : "/Citrix/StoreWeb"
     },
     "go.testTimeout": "30m"
 }

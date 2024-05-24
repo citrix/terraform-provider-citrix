@@ -408,6 +408,8 @@ func (r *vsphereHypervisorResourcePoolResource) Update(ctx context.Context, req 
 }
 
 func (r *vsphereHypervisorResourcePoolResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
 	idParts := strings.Split(req.ID, ",")
 
 	if len(idParts) != 2 || idParts[0] == "" || idParts[1] == "" {

@@ -35,6 +35,7 @@ var MappedCustomProperties = map[string]string{
 	"UseSharedImageGallery":            "use_azure_compute_gallery",
 	"SharedImageGalleryReplicaRatio":   "replica_ratio",
 	"SharedImageGalleryReplicaMaximum": "replica_maximum",
+	"UseEphemeralOsDisk":               "storage_type",
 }
 
 func getProvSchemeForMcsCatalog(plan MachineCatalogResourceModel, ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, isOnPremises bool) (*citrixorchestration.CreateMachineCatalogProvisioningSchemeRequestModel, error) {
@@ -176,15 +177,8 @@ func buildProvSchemeForMcsCatalog(ctx context.Context, client *citrixdaasclient.
 
 		machineProfile := plan.ProvisioningScheme.AzureMachineConfig.MachineProfile
 		if machineProfile != nil {
-			machine := machineProfile.MachineProfileVmName.ValueString()
-			machineProfileResourceGroup := machineProfile.MachineProfileResourceGroup.ValueString()
-			queryPath = fmt.Sprintf("machineprofile.folder\\%s.resourcegroup", machineProfileResourceGroup)
-			machineProfilePath, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, machine, util.VirtualMachineResourceType, "")
+			machineProfilePath, err := handleMachineProfileForAzureMcsCatalog(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), *machineProfile, "creating")
 			if err != nil {
-				diag.AddError(
-					"Error creating Machine Catalog",
-					fmt.Sprintf("Failed to locate machine profile %s on Azure, error: %s", plan.ProvisioningScheme.AzureMachineConfig.MachineProfile.MachineProfileVmName.ValueString(), err.Error()),
-				)
 				return nil, err
 			}
 			provisioningScheme.SetMachineProfilePath(machineProfilePath)
@@ -389,7 +383,7 @@ func buildProvSchemeForMcsCatalog(ctx context.Context, client *citrixdaasclient.
 	}
 
 	if plan.ProvisioningScheme.NetworkMapping != nil {
-		networkMapping, err := parseNetworkMappingToClientModel(*plan.ProvisioningScheme.NetworkMapping, hypervisorResourcePool, hypervisor.GetPluginId())
+		networkMapping, err := parseNetworkMappingToClientModel(plan.ProvisioningScheme.NetworkMapping, hypervisorResourcePool, hypervisor.GetPluginId())
 		if err != nil {
 			diag.AddError(
 				"Error creating Machine Catalog",
@@ -466,7 +460,7 @@ func setProvSchemePropertiesForUpdateCatalog(plan MachineCatalogResourceModel, b
 	}
 
 	if plan.ProvisioningScheme.NetworkMapping != nil {
-		networkMapping, err := parseNetworkMappingToClientModel(*plan.ProvisioningScheme.NetworkMapping, hypervisorResourcePool, hypervisor.GetPluginId())
+		networkMapping, err := parseNetworkMappingToClientModel(plan.ProvisioningScheme.NetworkMapping, hypervisorResourcePool, hypervisor.GetPluginId())
 		if err != nil {
 			diagnostics.AddError(
 				"Error updating Machine Catalog",
@@ -727,15 +721,8 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 		}
 
 		if azureMachineProfile != nil {
-			machineProfileName := azureMachineProfile.MachineProfileVmName.ValueString()
-			machineProfileResourceGroup := plan.ProvisioningScheme.AzureMachineConfig.MachineProfile.MachineProfileResourceGroup.ValueString()
-			queryPath := fmt.Sprintf("machineprofile.folder\\%s.resourcegroup", machineProfileResourceGroup)
-			machineProfilePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, machineProfileName, util.VirtualMachineResourceType, "")
+			machineProfilePath, err = handleMachineProfileForAzureMcsCatalog(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), *azureMachineProfile, "updating")
 			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error updating Machine Catalog",
-					fmt.Sprintf("Failed to locate machine profile %s on Azure, error: %s", plan.ProvisioningScheme.AzureMachineConfig.MachineProfile.MachineProfileVmName.ValueString(), err.Error()),
-				)
 				return err
 			}
 		}
@@ -994,21 +981,7 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Con
 	networkMaps := provScheme.GetNetworkMaps()
 
 	if len(networkMaps) > 0 && r.ProvisioningScheme.NetworkMapping != nil {
-		r.ProvisioningScheme.NetworkMapping = &NetworkMappingModel{}
-		r.ProvisioningScheme.NetworkMapping.NetworkDevice = types.StringValue(networkMaps[0].GetDeviceId())
-		network := networkMaps[0].GetNetwork()
-		segments := strings.Split(network.GetXDPath(), "\\")
-		lastIndex := len(segments)
-
-		networkName := (strings.Split(segments[lastIndex-1], "."))[0]
-		if *connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS {
-			/* For AWS Network, the XDPath looks like:
-			 * XDHyp:\\HostingUnits\\{resource pool}\\{availability zone}.availabilityzone\\{network ip}`/{prefix length} (vpc-{vpc-id}).network
-			 * The Network property should be set to {network ip}/{prefix length}
-			 */
-			networkName = strings.ReplaceAll(strings.Split((strings.Split(segments[lastIndex-1], ".network"))[0], " ")[0], "`/", "/")
-		}
-		r.ProvisioningScheme.NetworkMapping.Network = types.StringValue(networkName)
+		r.ProvisioningScheme.NetworkMapping = util.RefreshListProperties[NetworkMappingModel, citrixorchestration.NetworkMapResponseModel](r.ProvisioningScheme.NetworkMapping, "NetworkDevice", networkMaps, "DeviceId", "RefreshListItem")
 	} else {
 		r.ProvisioningScheme.NetworkMapping = nil
 	}
@@ -1051,7 +1024,11 @@ func parseCustomPropertiesToClientModel(provisioningScheme ProvisioningSchemeMod
 			util.AppendNameValueStringPair(res, "Zones", "")
 		}
 		if !provisioningScheme.AzureMachineConfig.StorageType.IsNull() {
-			util.AppendNameValueStringPair(res, "StorageType", provisioningScheme.AzureMachineConfig.StorageType.ValueString())
+			if provisioningScheme.AzureMachineConfig.StorageType.ValueString() == util.AzureEphemeralOSDisk {
+				util.AppendNameValueStringPair(res, "UseEphemeralOsDisk", "true")
+			} else {
+				util.AppendNameValueStringPair(res, "StorageType", provisioningScheme.AzureMachineConfig.StorageType.ValueString())
+			}
 		}
 		if !provisioningScheme.AzureMachineConfig.VdaResourceGroup.IsNull() {
 			util.AppendNameValueStringPair(res, "ResourceGroups", provisioningScheme.AzureMachineConfig.VdaResourceGroup.ValueString())
@@ -1126,44 +1103,49 @@ func parseCustomPropertiesToClientModel(provisioningScheme ProvisioningSchemeMod
 	return *res
 }
 
-func parseNetworkMappingToClientModel(networkMapping NetworkMappingModel, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel, hypervisorPluginId string) ([]citrixorchestration.NetworkMapRequestModel, error) {
+func parseNetworkMappingToClientModel(networkMappings []NetworkMappingModel, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel, hypervisorPluginId string) ([]citrixorchestration.NetworkMapRequestModel, error) {
 	var networks []citrixorchestration.HypervisorResourceRefResponseModel
 	if resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM {
 		networks = resourcePool.Subnets
 	} else if resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS ||
 		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM ||
 		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER ||
+		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER ||
 		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && hypervisorPluginId == util.NUTANIX_PLUGIN_ID {
 		networks = resourcePool.Networks
 	}
 
 	var res = []citrixorchestration.NetworkMapRequestModel{}
-	var networkName string
-	if resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM ||
-		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM ||
-		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER ||
-		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && hypervisorPluginId == util.NUTANIX_PLUGIN_ID {
-		networkName = networkMapping.Network.ValueString()
-	} else if resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS {
-		networkName = fmt.Sprintf("%s (%s)", networkMapping.Network.ValueString(), resourcePool.GetResourcePoolRootId())
-	}
-	network := slices.IndexFunc(networks, func(c citrixorchestration.HypervisorResourceRefResponseModel) bool {
-		return strings.EqualFold(c.GetName(), networkName)
-	})
-	if network == -1 {
-		return res, fmt.Errorf("network %s not found", networkName)
+	for _, networkMapping := range networkMappings {
+		var networkName string
+		if resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM ||
+			resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM ||
+			resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER ||
+			resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER ||
+			resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && hypervisorPluginId == util.NUTANIX_PLUGIN_ID {
+			networkName = networkMapping.Network.ValueString()
+		} else if resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS {
+			networkName = fmt.Sprintf("%s (%s)", networkMapping.Network.ValueString(), resourcePool.GetResourcePoolRootId())
+		}
+		network := slices.IndexFunc(networks, func(c citrixorchestration.HypervisorResourceRefResponseModel) bool {
+			return strings.EqualFold(c.GetName(), networkName)
+		})
+		if network == -1 {
+			return res, fmt.Errorf("network %s not found", networkName)
+		}
+
+		networkMapRequestModel := citrixorchestration.NetworkMapRequestModel{
+			NetworkDeviceNameOrId: *citrixorchestration.NewNullableString(networkMapping.NetworkDevice.ValueStringPointer()),
+			NetworkPath:           networks[network].GetXDPath(),
+		}
+
+		if resourcePool.GetConnectionType() == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER || (resourcePool.GetConnectionType() == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && hypervisorPluginId == util.NUTANIX_PLUGIN_ID) {
+			networkMapRequestModel.SetDeviceNameOrId(networks[network].GetId())
+		}
+
+		res = append(res, networkMapRequestModel)
 	}
 
-	networkMapRequestModel := citrixorchestration.NetworkMapRequestModel{
-		NetworkDeviceNameOrId: *citrixorchestration.NewNullableString(networkMapping.NetworkDevice.ValueStringPointer()),
-		NetworkPath:           networks[network].GetXDPath(),
-	}
-
-	if resourcePool.GetConnectionType() == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER || (resourcePool.GetConnectionType() == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && hypervisorPluginId == util.NUTANIX_PLUGIN_ID) {
-		networkMapRequestModel.SetDeviceNameOrId(networks[network].GetId())
-	}
-
-	res = append(res, networkMapRequestModel)
 	return res, nil
 }
 
@@ -1195,4 +1177,41 @@ func getOnPremImagePath(ctx context.Context, client *citrixdaasclient.CitrixDaas
 	}
 
 	return imagePath, nil
+}
+
+func handleMachineProfileForAzureMcsCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diag *diag.Diagnostics, hypervisorName, resourcePoolName string, machineProfile AzureMachineProfileModel, action string) (string, error) {
+	machineProfileResourceGroup := machineProfile.MachineProfileResourceGroup.ValueString()
+	machineProfileVmOrTemplateSpecVersion := machineProfile.MachineProfileVmName.ValueString()
+	resourceType := util.VirtualMachineResourceType
+	queryPath := fmt.Sprintf("machineprofile.folder\\%s.resourcegroup", machineProfileResourceGroup)
+	errorMessage := fmt.Sprintf("Failed to locate machine profile vm %s on Azure", machineProfile.MachineProfileVmName.ValueString())
+	isUsingTemplateSpec := false
+	if machineProfile.MachineProfileVmName.IsNull() {
+		isUsingTemplateSpec = true
+		machineProfileVmOrTemplateSpecVersion = machineProfile.MachineProfileTemplateSpecVersion.ValueString()
+		queryPath = fmt.Sprintf("%s\\%s.templatespec", queryPath, machineProfile.MachineProfileTemplateSpecName.ValueString())
+		resourceType = ""
+		errorMessage = fmt.Sprintf("Failed to locate machine profile template spec %s with version %s on Azure", machineProfile.MachineProfileTemplateSpecName.ValueString(), machineProfile.MachineProfileTemplateSpecVersion.ValueString())
+	}
+	machineProfileResource, err := util.GetSingleResourceFromHypervisor(ctx, client, hypervisorName, resourcePoolName, queryPath, machineProfileVmOrTemplateSpecVersion, resourceType, "")
+	if err != nil {
+		diag.AddError(
+			fmt.Sprintf("Error %s Machine Catalog", action),
+			fmt.Sprintf("%s, error: %s", errorMessage, err.Error()),
+		)
+		return "", err
+	}
+	if isUsingTemplateSpec {
+		// validate the template spec
+		isValid, errorMsg := util.ValidateHypervisorResource(ctx, client, hypervisorName, resourcePoolName, machineProfileResource.GetRelativePath())
+		if !isValid {
+			diag.AddError(
+				fmt.Sprintf("Error %s Machine Catalog", action),
+				fmt.Sprintf("Failed to validate template spec %s with version %s, %s", machineProfile.MachineProfileTemplateSpecName.ValueString(), machineProfileVmOrTemplateSpecVersion, errorMsg),
+			)
+			return "", fmt.Errorf("failed to validate template spec %s with version %s, %s", machineProfile.MachineProfileTemplateSpecName.ValueString(), machineProfileVmOrTemplateSpecVersion, errorMsg)
+		}
+	}
+
+	return machineProfileResource.GetXDPath(), nil
 }

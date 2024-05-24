@@ -103,6 +103,8 @@ func (d *ApplicationDataSource) Configure(ctx context.Context, req datasource.Co
 }
 
 func (d *ApplicationDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
 	var data ApplicationFolderDetailsDataSourceModel
 
 	// Read Terraform configuration data into the model

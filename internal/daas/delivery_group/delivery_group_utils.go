@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -378,12 +379,12 @@ func getSchemaForRestrictedAccessUsers(forDeliveryGroup bool) schema.NestedAttri
 		Attributes: map[string]schema.Attribute{
 			"allow_list": schema.ListAttribute{
 				ElementType: types.StringType,
-				Description: fmt.Sprintf("Users who can use this %s. Must be in `Domain\\UserOrGroupName` or `user@domain.com` format", resource),
+				Description: fmt.Sprintf("Users who can use this %s. Must be in `DOMAIN\\UserOrGroupName` or `user@domain.com` format", resource),
 				Optional:    true,
 				Validators: []validator.List{
 					listvalidator.ValueStringsAre(
 						validator.String(
-							stringvalidator.RegexMatches(regexp.MustCompile(fmt.Sprintf("%s|%s", util.SamRegex, util.UpnRegex)), "must be in `Domain\\UserOrGroupName` or `user@domain.com` format"),
+							stringvalidator.RegexMatches(regexp.MustCompile(fmt.Sprintf("%s|%s", util.SamRegex, util.UpnRegex)), "must be in `DOMAIN\\UserOrGroupName` or `user@domain.com` format"),
 						),
 					),
 					listvalidator.SizeAtLeast(1),
@@ -396,9 +397,10 @@ func getSchemaForRestrictedAccessUsers(forDeliveryGroup bool) schema.NestedAttri
 				Validators: []validator.List{
 					listvalidator.ValueStringsAre(
 						validator.String(
-							stringvalidator.RegexMatches(regexp.MustCompile(util.SamRegex), "must be in `Domain\\UserOrGroupName` or `user@domain.com` format"),
+							stringvalidator.RegexMatches(regexp.MustCompile(fmt.Sprintf("%s|%s", util.SamRegex, util.UpnRegex)), "must be in `DOMAIN\\UserOrGroupName` or `user@domain.com` format"),
 						),
 					),
+					listvalidator.SizeAtLeast(1),
 				},
 			},
 		},
@@ -760,7 +762,7 @@ func getRequestModelForDeliveryGroupUpdate(diagnostics *diag.Diagnostics, plan D
 }
 
 func parsePowerTimeSchemesPluginToClientModel(powerTimeSchemes []DeliveryGroupPowerTimeScheme) []citrixorchestration.PowerTimeSchemeRequestModel {
-	var res []citrixorchestration.PowerTimeSchemeRequestModel
+	res := []citrixorchestration.PowerTimeSchemeRequestModel{}
 	for _, powerTimeScheme := range powerTimeSchemes {
 		var powerTimeSchemeRequest citrixorchestration.PowerTimeSchemeRequestModel
 
@@ -828,7 +830,7 @@ func parsePowerTimeSchemesClientToPluginModel(powerTimeSchemesResponse []citrixo
 }
 
 func parseDeliveryGroupRebootScheduleToClientModel(rebootSchedules []DeliveryGroupRebootSchedule) []citrixorchestration.RebootScheduleRequestModel {
-	var res []citrixorchestration.RebootScheduleRequestModel
+	res := []citrixorchestration.RebootScheduleRequestModel{}
 	if rebootSchedules == nil {
 		return res
 	}
@@ -1107,6 +1109,125 @@ func (r DeliveryGroupResourceModel) updatePlanWithDesktops(deliveryGroupDesktops
 	desktops := util.RefreshListProperties[DeliveryGroupDesktop, citrixorchestration.DesktopResponseModel](r.Desktops, "PublishedName", deliveryGroupDesktops.GetItems(), "PublishedName", "RefreshListItem")
 	r.Desktops = desktops
 	return r
+}
+
+func updateDeliveryGroupUserAccessDetails(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, deliveryGroupDesktops *citrixorchestration.DesktopResponseModelCollection) (*citrixorchestration.DeliveryGroupDetailResponseModel, *citrixorchestration.DesktopResponseModelCollection, error) {
+	simpleAccessPolicy := deliveryGroup.GetSimpleAccessPolicy()
+	updatedIncludedUsers, updatedExcludedUsers, err := updateIdentityUserDetails(ctx, client, diagnostics, simpleAccessPolicy.GetIncludedUsers(), simpleAccessPolicy.GetExcludedUsers())
+	if err != nil {
+		return deliveryGroup, deliveryGroupDesktops, err
+	}
+
+	simpleAccessPolicy.SetIncludedUsers(updatedIncludedUsers)
+	simpleAccessPolicy.SetExcludedUsers(updatedExcludedUsers)
+	deliveryGroup.SetSimpleAccessPolicy(simpleAccessPolicy)
+
+	updatedDeliveryGroupDesktops := []citrixorchestration.DesktopResponseModel{}
+	for _, desktop := range deliveryGroupDesktops.GetItems() {
+		updatedIncludedUsers, updatedExcludedUsers, err := updateIdentityUserDetails(ctx, client, diagnostics, desktop.GetIncludedUsers(), desktop.GetExcludedUsers())
+		if err != nil {
+			return deliveryGroup, deliveryGroupDesktops, err
+		}
+		desktop.SetIncludedUsers(updatedIncludedUsers)
+		desktop.SetExcludedUsers(updatedExcludedUsers)
+		updatedDeliveryGroupDesktops = append(updatedDeliveryGroupDesktops, desktop)
+	}
+	deliveryGroupDesktops.SetItems(updatedDeliveryGroupDesktops)
+
+	return deliveryGroup, deliveryGroupDesktops, nil
+}
+
+func verifyIdentityUserListCompleteness(inputUserNames []string, remoteUsers []citrixorchestration.IdentityUserResponseModel) error {
+	if len(remoteUsers) < len(inputUserNames) {
+		missingUsers := []string{}
+		for _, includedUser := range inputUserNames {
+			userIndex := slices.IndexFunc(remoteUsers, func(i citrixorchestration.IdentityUserResponseModel) bool {
+				return includedUser == i.GetSamName() || includedUser == i.GetPrincipalName()
+			})
+			if userIndex == -1 {
+				missingUsers = append(missingUsers, includedUser)
+			}
+		}
+
+		return fmt.Errorf("The following users could not be found: " + strings.Join(missingUsers, ", "))
+	}
+	return nil
+}
+
+func updateIdentityUserDetails(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, includedUsers []citrixorchestration.IdentityUserResponseModel, excludedUsers []citrixorchestration.IdentityUserResponseModel) ([]citrixorchestration.IdentityUserResponseModel, []citrixorchestration.IdentityUserResponseModel, error) {
+	includedUserNames := []string{}
+	for _, includedUser := range includedUsers {
+		if includedUser.GetSamName() != "" {
+			includedUserNames = append(includedUserNames, includedUser.GetSamName())
+		} else if includedUser.GetPrincipalName() != "" {
+			includedUserNames = append(includedUserNames, includedUser.GetPrincipalName())
+		}
+	}
+
+	if len(includedUserNames) > 0 {
+		getIncludedUsersRequest := client.ApiClient.IdentityAPIsDAAS.IdentityGetUsers(ctx)
+		getIncludedUsersRequest = getIncludedUsersRequest.User(includedUserNames)
+		getIncludedUsersRequest = getIncludedUsersRequest.Provider(citrixorchestration.IDENTITYPROVIDERTYPE_ALL)
+		includedUsersResponse, httpResp, err := citrixdaasclient.AddRequestData(getIncludedUsersRequest, client).Execute()
+		if err != nil {
+			diagnostics.AddError(
+				"Error fetching delivery group user details",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return nil, nil, err
+		}
+
+		err = verifyIdentityUserListCompleteness(includedUserNames, includedUsersResponse.GetItems())
+		if err != nil {
+			diagnostics.AddError(
+				"Error fetching delivery group user details",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+err.Error(),
+			)
+			return nil, nil, err
+		}
+
+		includedUsers = includedUsersResponse.GetItems()
+	}
+
+	excludedUserNames := []string{}
+	for _, excludedUser := range excludedUsers {
+		if excludedUser.GetSamName() != "" {
+			excludedUserNames = append(excludedUserNames, excludedUser.GetSamName())
+		} else if excludedUser.GetPrincipalName() != "" {
+			excludedUserNames = append(excludedUserNames, excludedUser.GetPrincipalName())
+		}
+	}
+
+	if len(excludedUserNames) > 0 {
+		getExcludedUsersRequest := client.ApiClient.IdentityAPIsDAAS.IdentityGetUsers(ctx)
+		getExcludedUsersRequest = getExcludedUsersRequest.User(excludedUserNames)
+		getExcludedUsersRequest = getExcludedUsersRequest.Provider(citrixorchestration.IDENTITYPROVIDERTYPE_ALL)
+		excludedUsersResponse, httpResp, err := citrixdaasclient.AddRequestData(getExcludedUsersRequest, client).Execute()
+		if err != nil {
+			diagnostics.AddError(
+				"Error fetching delivery group user details",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return nil, nil, err
+		}
+
+		err = verifyIdentityUserListCompleteness(excludedUserNames, excludedUsersResponse.GetItems())
+		if err != nil {
+			diagnostics.AddError(
+				"Error fetching delivery group user details",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+err.Error(),
+			)
+			return nil, nil, err
+		}
+
+		excludedUsers = excludedUsersResponse.GetItems()
+	}
+
+	return includedUsers, excludedUsers, nil
 }
 
 func (r DeliveryGroupResourceModel) updatePlanWithRestrictedAccessUsers(deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel) DeliveryGroupResourceModel {

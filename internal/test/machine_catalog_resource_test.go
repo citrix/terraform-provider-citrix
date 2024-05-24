@@ -59,23 +59,28 @@ func TestActiveDirectoryMachineCatalogResourceAzure(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "ActiveDirectory"),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "-AD", "ActiveDirectory"),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AD", "name", name),
 					// Verify domain FQDN
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "session_support", "MultiSession"),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AD", "session_support", "MultiSession"),
 					// Verify domain admin username
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.machine_domain_identity.service_account", os.Getenv("TEST_MC_SERVICE_ACCOUNT")),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AD", "provisioning_scheme.machine_domain_identity.service_account", os.Getenv("TEST_MC_SERVICE_ACCOUNT")),
 					// Verify machine catalog identity type
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.identity_type", "ActiveDirectory"),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AD", "provisioning_scheme.identity_type", "ActiveDirectory"),
 					// Verify nic network
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.network_mapping.network", os.Getenv("TEST_MC_SUBNET")),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AD", "provisioning_scheme.network_mapping.network", os.Getenv("TEST_MC_SUBNET")),
 				),
 			},
 			// ImportState testing
 			{
-				ResourceName:      "citrix_machine_catalog.testMachineCatalog",
+				ResourceName:      "citrix_machine_catalog.testMachineCatalog-AD",
 				ImportState:       true,
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
@@ -84,30 +89,40 @@ func TestActiveDirectoryMachineCatalogResourceAzure(t *testing.T) {
 			},
 			//Update description, master image and add machine test
 			{
-				Config: BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "ActiveDirectory"),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "-AD", "ActiveDirectory"),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AD", "name", name),
 					// Verify updated description
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "description", "updatedCatalog"),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AD", "description", "updatedCatalog"),
 					// Verify updated image
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.azure_machine_config.azure_master_image.master_image", os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AD", "provisioning_scheme.azure_machine_config.azure_master_image.master_image", os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")),
 					// Verify machine catalog identity type
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.identity_type", "ActiveDirectory"),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AD", "provisioning_scheme.identity_type", "ActiveDirectory"),
 					// Verify total number of machines
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.number_of_total_machines", "2"),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AD", "provisioning_scheme.number_of_total_machines", "2"),
 				),
 			},
 			// Delete machine test
 			{
-				Config: BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "ActiveDirectory"),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "-AD", "ActiveDirectory"),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AD", "name", name),
 					// Verify total number of machines
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.number_of_total_machines", "1"),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AD", "provisioning_scheme.number_of_total_machines", "1"),
 					// Verify machine catalog identity type
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.identity_type", "ActiveDirectory"),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AD", "provisioning_scheme.identity_type", "ActiveDirectory"),
 				),
 			},
 			//Delete testing automatically occurs in TestCase
@@ -129,23 +144,28 @@ func TestHybridAzureADMachineCatalogResourceAzure(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "HybridAzureAD"),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "-HybAAD", "HybridAzureAD"),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "name", name),
 					// Verify domain FQDN
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "session_support", "MultiSession"),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "session_support", "MultiSession"),
 					// Verify machine catalog identity type
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.identity_type", "HybridAzureAD"),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "provisioning_scheme.identity_type", "HybridAzureAD"),
 					// Verify domain admin username
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.machine_domain_identity.service_account", os.Getenv("TEST_MC_SERVICE_ACCOUNT")),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "provisioning_scheme.machine_domain_identity.service_account", os.Getenv("TEST_MC_SERVICE_ACCOUNT")),
 					// Verify nic network
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.network_mapping.network", os.Getenv("TEST_MC_SUBNET")),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "provisioning_scheme.network_mapping.network", os.Getenv("TEST_MC_SUBNET")),
 				),
 			},
 			// ImportState testing
 			{
-				ResourceName:      "citrix_machine_catalog.testMachineCatalog",
+				ResourceName:      "citrix_machine_catalog.testMachineCatalog-HybAAD",
 				ImportState:       true,
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
@@ -154,18 +174,23 @@ func TestHybridAzureADMachineCatalogResourceAzure(t *testing.T) {
 			},
 			// Update description, master image and add machine test
 			{
-				Config: BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "HybridAzureAD"),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "-HybAAD", "HybridAzureAD"),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "name", name),
 					// Verify updated description
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "description", "updatedCatalog"),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "description", "updatedCatalog"),
 					// Verify updated image
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.azure_machine_config.azure_master_image.master_image", os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "provisioning_scheme.azure_machine_config.azure_master_image.master_image", os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")),
 					// Verify machine catalog identity type
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.identity_type", "HybridAzureAD"),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "provisioning_scheme.identity_type", "HybridAzureAD"),
 					// Verify total number of machines
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.number_of_total_machines", "2"),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "provisioning_scheme.number_of_total_machines", "2"),
 				),
 			},
 			//Delete testing automatically occurs in TestCase
@@ -220,21 +245,26 @@ func TestAzureADMachineCatalogResourceAzure(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildMachineCatalogResourceAzureAd(t, machinecatalog_testResources_azure_ad),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceAzureAd(t, machinecatalog_testResources_azure_ad),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AAD", "name", name),
 					// Verify domain FQDN
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "session_support", "MultiSession"),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AAD", "session_support", "MultiSession"),
 					// Verify machine catalog identity type
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.identity_type", "AzureAD"),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AAD", "provisioning_scheme.identity_type", "AzureAD"),
 					// Verify nic network
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.network_mapping.network", os.Getenv("TEST_MC_SUBNET")),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AAD", "provisioning_scheme.network_mapping.network", os.Getenv("TEST_MC_SUBNET")),
 				),
 			},
 			// ImportState testing
 			{
-				ResourceName:      "citrix_machine_catalog.testMachineCatalog",
+				ResourceName:      "citrix_machine_catalog.testMachineCatalog-AAD",
 				ImportState:       true,
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
@@ -243,18 +273,23 @@ func TestAzureADMachineCatalogResourceAzure(t *testing.T) {
 			},
 			// Update description, master image and add machine test
 			{
-				Config: BuildMachineCatalogResourceAzureAd(t, machinecatalog_testResources_azure_ad_updated),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceAzureAd(t, machinecatalog_testResources_azure_ad_updated),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AAD", "name", name),
 					// Verify updated description
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "description", "updatedCatalog"),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AAD", "description", "updatedCatalog"),
 					// Verify updated image
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.azure_machine_config.azure_master_image.master_image", os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AAD", "provisioning_scheme.azure_machine_config.azure_master_image.master_image", os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")),
 					// Verify machine catalog identity type
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.identity_type", "AzureAD"),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AAD", "provisioning_scheme.identity_type", "AzureAD"),
 					// Verify total number of machines
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.number_of_total_machines", "2"),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AAD", "provisioning_scheme.number_of_total_machines", "2"),
 				),
 			},
 			//Delete testing automatically occurs in TestCase
@@ -300,19 +335,24 @@ func TestWorkgroupMachineCatalogResourceAzure(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildMachineCatalogResourceWorkgroup(t, machinecatalog_testResources_workgroup),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceWorkgroup(t, machinecatalog_testResources_workgroup),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-WG", "name", name),
 					// Verify domain FQDN
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "session_support", "MultiSession"),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-WG", "session_support", "MultiSession"),
 					// Verify machine catalog identity type
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.identity_type", "Workgroup"),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-WG", "provisioning_scheme.identity_type", "Workgroup"),
 				),
 			},
 			// ImportState testing
 			{
-				ResourceName:      "citrix_machine_catalog.testMachineCatalog",
+				ResourceName:      "citrix_machine_catalog.testMachineCatalog-WG",
 				ImportState:       true,
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
@@ -321,18 +361,23 @@ func TestWorkgroupMachineCatalogResourceAzure(t *testing.T) {
 			},
 			// Update description, master image and add machine test
 			{
-				Config: BuildMachineCatalogResourceWorkgroup(t, machinecatalog_testResources_workgroup_updated),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceWorkgroup(t, machinecatalog_testResources_workgroup_updated),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-WG", "name", name),
 					// Verify updated description
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "description", "updatedCatalog"),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-WG", "description", "updatedCatalog"),
 					// Verify updated image
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.azure_machine_config.azure_master_image.master_image", os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-WG", "provisioning_scheme.azure_machine_config.azure_master_image.master_image", os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")),
 					// Verify machine catalog identity type
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.identity_type", "Workgroup"),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-WG", "provisioning_scheme.identity_type", "Workgroup"),
 					// Verify total number of machines
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.number_of_total_machines", "2"),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-WG", "provisioning_scheme.number_of_total_machines", "2"),
 				),
 			},
 			//Delete testing automatically occurs in TestCase
@@ -388,7 +433,12 @@ func TestMachineCatalogResourceGCP(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildMachineCatalogResourceGCP(t, machinecatalog_testResources_gcp),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceGCP(t, machinecatalog_testResources_gcp),
+					BuildHypervisorResourcePoolResourceGCP(t, hypervisor_resource_pool_testResource_gcp),
+					BuildHypervisorResourceGCP(t, hypervisor_testResources_gcp),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_GCP")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
@@ -411,7 +461,12 @@ func TestMachineCatalogResourceGCP(t *testing.T) {
 			},
 			//Update description, master image and add machine test
 			{
-				Config: BuildMachineCatalogResourceGCP(t, machinecatalog_testResources_gcp_updated),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceGCP(t, machinecatalog_testResources_gcp_updated),
+					BuildHypervisorResourcePoolResourceGCP(t, hypervisor_resource_pool_testResource_gcp),
+					BuildHypervisorResourceGCP(t, hypervisor_testResources_gcp),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_GCP")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
@@ -464,7 +519,12 @@ func TestMachineCatalogResourceVsphere(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildMachineCatalogResourceVsphere(t, machine_catalog_testResources_vsphere),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceVsphere(t, machine_catalog_testResources_vsphere),
+					BuildHypervisorResourcePoolResourceVsphere(t, hypervisor_resource_pool_testResource_vsphere),
+					BuildHypervisorResourceVsphere(t, hypervisor_testResources_vsphere),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_VSPHERE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
@@ -487,7 +547,12 @@ func TestMachineCatalogResourceVsphere(t *testing.T) {
 			},
 			//Update description, master image and add machine test
 			{
-				Config: BuildMachineCatalogResourceVsphere(t, machine_catalog_testResources_vsphere_updated),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceVsphere(t, machine_catalog_testResources_vsphere_updated),
+					BuildHypervisorResourcePoolResourceVsphere(t, hypervisor_resource_pool_testResource_vsphere),
+					BuildHypervisorResourceVsphere(t, hypervisor_testResources_vsphere),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_VSPHERE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
@@ -540,7 +605,12 @@ func TestMachineCatalogResourceXenserver(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildMachineCatalogResourceXenserver(t, machine_catalog_testResources_xenserver),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceXenserver(t, machine_catalog_testResources_xenserver),
+					BuildHypervisorResourcePoolResourceXenServer(t, hypervisor_resource_pool_testResource_xenserver),
+					BuildHypervisorResourceXenserver(t, hypervisor_testResources_xenserver),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_XENSERVER")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
@@ -563,7 +633,12 @@ func TestMachineCatalogResourceXenserver(t *testing.T) {
 			},
 			//Update description, master image and add machine test
 			{
-				Config: BuildMachineCatalogResourceXenserver(t, machine_catalog_testResources_xenserver_updated),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceXenserver(t, machine_catalog_testResources_xenserver_updated),
+					BuildHypervisorResourcePoolResourceXenServer(t, hypervisor_resource_pool_testResource_xenserver),
+					BuildHypervisorResourceXenserver(t, hypervisor_testResources_xenserver),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_XENSERVER")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
@@ -622,7 +697,12 @@ func TestMachineCatalogResourceNutanix(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildMachineCatalogResourceNutanix(t, machine_catalog_testResources_nutanix),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceNutanix(t, machine_catalog_testResources_nutanix),
+					BuildHypervisorResourcePoolResourceNutanix(t, hypervisor_resource_pool_testResource_nutanix),
+					BuildHypervisorResourceNutanix(t, hypervisor_testResources_nutanix),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_NUTANIX")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
@@ -645,7 +725,12 @@ func TestMachineCatalogResourceNutanix(t *testing.T) {
 			},
 			//Update description, master image and add machine test
 			{
-				Config: BuildMachineCatalogResourceNutanix(t, machine_catalog_testResources_nutanix_updated),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceNutanix(t, machine_catalog_testResources_nutanix_updated),
+					BuildHypervisorResourcePoolResourceNutanix(t, hypervisor_resource_pool_testResource_nutanix),
+					BuildHypervisorResourceNutanix(t, hypervisor_testResources_nutanix),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_NUTANIX")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
@@ -701,7 +786,12 @@ func TestMachineCatalogResourceAwsEc2(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildMachineCatalogResourceAwsEc2(t, machinecatalog_testResources_aws_ec2),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceAwsEc2(t, machinecatalog_testResources_aws_ec2),
+					BuildHypervisorResourcePoolResourceAwsEc2(t, hypervisor_resource_pool_testResource_aws_ec2),
+					BuildHypervisorResourceAwsEc2(t, hypervisor_testResources_aws_ec2),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AWS_EC2")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
@@ -726,7 +816,12 @@ func TestMachineCatalogResourceAwsEc2(t *testing.T) {
 			},
 			//Update description, master image and add machine test
 			{
-				Config: BuildMachineCatalogResourceAwsEc2(t, machinecatalog_testResources_aws_ec2_updated),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceAwsEc2(t, machinecatalog_testResources_aws_ec2_updated),
+					BuildHypervisorResourcePoolResourceAwsEc2(t, hypervisor_resource_pool_testResource_aws_ec2),
+					BuildHypervisorResourceAwsEc2(t, hypervisor_testResources_aws_ec2),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AWS_EC2")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
@@ -778,7 +873,11 @@ func TestMachineCatalogResource_Manual_Power_Managed_Azure(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildMachineCatalogResourceManualPowerManagedAzure(t, machinecatalog_testResources_manual_power_managed_azure),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceManualPowerManagedAzure(t, machinecatalog_testResources_manual_power_managed_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogManualPowerManaged", "name", name),
@@ -837,7 +936,11 @@ func TestMachineCatalogResource_Manual_Power_Managed_GCP(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildMachineCatalogResourceManualPowerManagedGCP(t, machinecatalog_testResources_manual_power_managed_gcp),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceManualPowerManagedGCP(t, machinecatalog_testResources_manual_power_managed_gcp),
+					BuildHypervisorResourceGCP(t, hypervisor_testResources_gcp),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_GCP")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogManualPowerManaged", "name", name),
@@ -896,7 +999,11 @@ func TestMachineCatalogResource_Manual_Power_Managed_Vsphere(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildMachineCatalogResourceManualPowerManagedVsphere(t, machinecatalog_testResources_manual_power_managed_vsphere),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceManualPowerManagedVsphere(t, machinecatalog_testResources_manual_power_managed_vsphere),
+					BuildHypervisorResourceVsphere(t, hypervisor_testResources_vsphere),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_VSPHERE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogManualPowerManaged", "name", name),
@@ -949,7 +1056,11 @@ func TestMachineCatalogResource_Manual_Power_Managed_Xenserver(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildMachineCatalogResourceManualPowerManagedXenserver(t, machinecatalog_testResources_manual_power_managed_xenserver),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceManualPowerManagedXenserver(t, machinecatalog_testResources_manual_power_managed_xenserver),
+					BuildHypervisorResourceXenserver(t, hypervisor_testResources_xenserver),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_XENSERVER")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogManualPowerManaged", "name", name),
@@ -1002,7 +1113,11 @@ func TestMachineCatalogResource_Manual_Power_Managed_Nutanix(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildMachineCatalogResourceManualPowerManagedNutanix(t, machinecatalog_testResources_manual_power_managed_nutanix),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceManualPowerManagedNutanix(t, machinecatalog_testResources_manual_power_managed_nutanix),
+					BuildHypervisorResourceNutanix(t, hypervisor_testResources_nutanix),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_NUTANIX")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogManualPowerManaged", "name", name),
@@ -1025,7 +1140,7 @@ func TestMachineCatalogResource_Manual_Power_Managed_Nutanix(t *testing.T) {
 }
 
 func TestMachineCatalogPreCheck_Manual_Power_Managed_AWS_EC2(t *testing.T) {
-	if v := os.Getenv("TEST_MC_NAME_MANUAL"); v == "" {
+	if v := os.Getenv("TEST_MC_NAME_MANUAL_AWS_EC2"); v == "" {
 		t.Fatal("TEST_MC_NAME_MANUAL must be set for acceptance tests")
 	}
 	if v := os.Getenv("TEST_MC_ALLOCATION_TYPE_MANUAL_POWER_MANAGED"); v == "" {
@@ -1058,7 +1173,11 @@ func TestMachineCatalogResource_Manual_Power_Managed_Aws_Ec2(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildMachineCatalogResourceManualPowerManagedAwsEc2(t, machinecatalog_testResources_manual_power_managed_aws_ec2),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceManualPowerManagedAwsEc2(t, machinecatalog_testResources_manual_power_managed_aws_ec2),
+					BuildHypervisorResourceAwsEc2(t, hypervisor_testResources_aws_ec2),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AWS_EC2")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogManualPowerManaged", "name", name),
@@ -1108,7 +1227,10 @@ func TestMachineCatalogResource_Manual_Non_Power_Managed(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildMachineCatalogResourceManualNonPowerManaged(t, machinecatalog_testResources_manual_non_power_managed),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceManualNonPowerManaged(t, machinecatalog_testResources_manual_non_power_managed),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogNonManualPowerManaged", "name", name),
@@ -1163,7 +1285,10 @@ func TestMachineCatalogResource_RemotePC(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildMachineCatalogResourceRemotePC(t, machinecatalog_testResources_remote_pc),
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceRemotePC(t, machinecatalog_testResources_remote_pc),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
@@ -1185,7 +1310,7 @@ func TestMachineCatalogResource_RemotePC(t *testing.T) {
 
 var (
 	machinecatalog_testResources_azure = `
-resource "citrix_machine_catalog" "testMachineCatalog" {
+resource "citrix_machine_catalog" "testMachineCatalog%s" {
 	name                		= "%s"
 	description					= "on prem catalog for import testing"
 	allocation_type				= "Random"
@@ -1221,10 +1346,12 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 				storage_cost_saving = true
 			}
 		}
-		network_mapping = {
-			network_device = "0"
-			network 	   = "%s"
-		}
+		network_mapping = [
+			{
+				network_device = "0"
+				network 	   = "%s"
+			}
+		]
 		number_of_total_machines = 	1
 		machine_account_creation_rules ={
 			naming_scheme =     "test-machine-##"
@@ -1236,7 +1363,7 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 }
 `
 	machinecatalog_testResources_azure_updated = `
-	resource "citrix_machine_catalog" "testMachineCatalog" {
+	resource "citrix_machine_catalog" "testMachineCatalog%s" {
 		name                		= "%s"
 		description					= "updatedCatalog"
 		allocation_type				= "Random"
@@ -1272,10 +1399,12 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 					storage_cost_saving = true
 				}
 			}
-			network_mapping = {
-				network_device = "0"
-				network 	   = "%s"
-			}
+			network_mapping = [
+				{
+					network_device = "0"
+					network 	   = "%s"
+				}
+			]
 			availability_zones = "1,3"
 			number_of_total_machines = 	2
 			machine_account_creation_rules ={
@@ -1288,7 +1417,7 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 	`
 
 	machinecatalog_testResources_azure_delete_machine = `
-	resource "citrix_machine_catalog" "testMachineCatalog" {
+	resource "citrix_machine_catalog" "testMachineCatalog%s" {
 		name                		= "%s"
 		description					= "updatedCatalog"		
 		allocation_type				= "Random"
@@ -1324,10 +1453,12 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 					storage_cost_saving = true
 				}
 			}
-			network_mapping = {
-				network_device = "0"
-				network 	   = "%s"
-			}
+			network_mapping = [
+				{
+					network_device = "0"
+					network 	   = "%s"
+				}
+			]
 			availability_zones = "1,3"
 			number_of_total_machines = 	1
 			machine_account_creation_rules ={
@@ -1339,7 +1470,7 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 	}
 	`
 	machinecatalog_testResources_azure_ad = `
-	resource "citrix_machine_catalog" "testMachineCatalog" {
+	resource "citrix_machine_catalog" "testMachineCatalog%s" {
 		name                		= "%s"
 		description					= "on prem catalog for import testing"
 		allocation_type				= "Random"
@@ -1373,10 +1504,12 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 					storage_cost_saving = true
 				}
 			}
-			network_mapping = {
-				network_device = "0"
-				network 	   = "%s"
-			}
+			network_mapping = [
+				{
+					network_device = "0"
+					network 	   = "%s"
+				}
+			]
 			number_of_total_machines = 	1
 			machine_account_creation_rules ={
 				naming_scheme =     "test-machine-##"
@@ -1388,7 +1521,7 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 	}
 	`
 	machinecatalog_testResources_azure_ad_updated = `
-	resource "citrix_machine_catalog" "testMachineCatalog" {
+	resource "citrix_machine_catalog" "testMachineCatalog%s" {
 		name                		= "%s"
 		description					= "updatedCatalog"
 		allocation_type				= "Random"
@@ -1422,10 +1555,12 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 					storage_cost_saving = true
 				}
 			}
-			network_mapping = {
-				network_device = "0"
-				network 	   = "%s"
-			}
+			network_mapping = [
+				{
+					network_device = "0"
+					network 	   = "%s"
+				}
+			]
 			availability_zones = "1,3"
 			number_of_total_machines = 	2
 			machine_account_creation_rules ={
@@ -1438,7 +1573,7 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 	`
 
 	machinecatalog_testResources_workgroup = `
-	resource "citrix_machine_catalog" "testMachineCatalog" {
+	resource "citrix_machine_catalog" "testMachineCatalog%s" {
 		name                		= "%s"
 		description					= "on prem catalog for import testing"
 		allocation_type				= "Random"
@@ -1479,7 +1614,7 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 	}
 	`
 	machinecatalog_testResources_workgroup_updated = `
-	resource "citrix_machine_catalog" "testMachineCatalog" {
+	resource "citrix_machine_catalog" "testMachineCatalog%s" {
 		name                		= "%s"
 		description					= "updatedCatalog"
 		allocation_type				= "Random"
@@ -1803,10 +1938,12 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 				]
 				tenancy_type = "Shared"
 			}
-			network_mapping = {
-				network_device = "0"
-				network = "%s"
-			}
+			network_mapping = [
+				{
+					network_device = "0"
+					network = "%s"
+				}
+			]
 			number_of_total_machines =  1
 			machine_account_creation_rules ={
 				naming_scheme =     "test-machine-##"
@@ -1842,10 +1979,12 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 				]
 				tenancy_type = "Shared"
 			}
-			network_mapping = {
-				network_device = "0"
-				network = "%s"
-			}
+			network_mapping = [
+				{
+					network_device = "0"
+					network = "%s"
+				}
+			]
 			number_of_total_machines =  2
 			machine_account_creation_rules ={
 				naming_scheme =     "test-machine-##"
@@ -2056,7 +2195,7 @@ resource "citrix_machine_catalog" "testMachineCatalog" {
 	`
 )
 
-func BuildMachineCatalogResourceAzure(t *testing.T, machineResource string, identityType string) string {
+func BuildMachineCatalogResourceAzure(t *testing.T, machineResource, catalogNameSuffix, identityType string) string {
 	name := os.Getenv("TEST_MC_NAME")
 	if identityType == "HybridAzureAD" {
 		name += "-HybAAD"
@@ -2079,7 +2218,7 @@ func BuildMachineCatalogResourceAzure(t *testing.T, machineResource string, iden
 	//machine account
 	domain := os.Getenv("TEST_MC_DOMAIN")
 
-	return BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure) + fmt.Sprintf(machineResource, name, identityType, domain, service_account, service_account_pass, service_offering, resource_group, storage_account, container, master_image, subnet)
+	return fmt.Sprintf(machineResource, catalogNameSuffix, name, identityType, domain, service_account, service_account_pass, service_offering, resource_group, storage_account, container, master_image, subnet)
 }
 
 func BuildMachineCatalogResourceAzureAd(t *testing.T, machineResource string) string {
@@ -2097,7 +2236,7 @@ func BuildMachineCatalogResourceAzureAd(t *testing.T, machineResource string) st
 		master_image = os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")
 	}
 
-	return BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure) + fmt.Sprintf(machineResource, name, service_offering, resource_group, storage_account, container, master_image, machine_profile_vm_name, machine_profile_resource_group, subnet)
+	return fmt.Sprintf(machineResource, "-AAD", name, service_offering, resource_group, storage_account, container, master_image, machine_profile_vm_name, machine_profile_resource_group, subnet)
 }
 
 func BuildMachineCatalogResourceWorkgroup(t *testing.T, machineResource string) string {
@@ -2112,7 +2251,7 @@ func BuildMachineCatalogResourceWorkgroup(t *testing.T, machineResource string) 
 		master_image = os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")
 	}
 
-	return BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure) + fmt.Sprintf(machineResource, name, service_offering, resource_group, storage_account, container, master_image)
+	return fmt.Sprintf(machineResource, "-WG", name, service_offering, resource_group, storage_account, container, master_image)
 }
 
 func BuildMachineCatalogResourceGCP(t *testing.T, machineResource string) string {
@@ -2129,7 +2268,7 @@ func BuildMachineCatalogResourceGCP(t *testing.T, machineResource string) string
 	//machine account
 	domain := os.Getenv("TEST_MC_DOMAIN_GCP")
 
-	return BuildHypervisorResourcePoolResourceGCP(t, hypervisor_resource_pool_testResource_gcp) + fmt.Sprintf(machineResource, name, identityType, domain, service_account, service_account_pass, storage_type, machine_profile, master_image, machine_snapshot, availability_zones)
+	return fmt.Sprintf(machineResource, name, identityType, domain, service_account, service_account_pass, storage_type, machine_profile, master_image, machine_snapshot, availability_zones)
 }
 
 func BuildMachineCatalogResourceVsphere(t *testing.T, machineResource string) string {
@@ -2141,7 +2280,7 @@ func BuildMachineCatalogResourceVsphere(t *testing.T, machineResource string) st
 	service_account := os.Getenv("TEST_MC_SERVICE_ACCOUNT_VSPHERE")
 	service_account_pass := os.Getenv("TEST_MC_SERVICE_ACCOUNT_PASS_VSPHERE")
 
-	return BuildHypervisorResourcePoolResourceVsphere(t) + fmt.Sprintf(machineResource, name, master_image, memory_mb, cpu_count, service_account, domain, service_account_pass)
+	return fmt.Sprintf(machineResource, name, master_image, memory_mb, cpu_count, service_account, domain, service_account_pass)
 }
 
 func BuildMachineCatalogResourceXenserver(t *testing.T, machineResource string) string {
@@ -2153,7 +2292,7 @@ func BuildMachineCatalogResourceXenserver(t *testing.T, machineResource string) 
 	service_account := os.Getenv("TEST_MC_SERVICE_ACCOUNT_XENSERVER")
 	service_account_pass := os.Getenv("TEST_MC_SERVICE_ACCOUNT_PASS_XENSERVER")
 
-	return BuildHypervisorResourcePoolResourceXenServer(t) + fmt.Sprintf(machineResource, name, master_image, memory_mb, cpu_count, service_account, domain, service_account_pass)
+	return fmt.Sprintf(machineResource, name, master_image, memory_mb, cpu_count, service_account, domain, service_account_pass)
 }
 
 func BuildMachineCatalogResourceNutanix(t *testing.T, machineResource string) string {
@@ -2167,7 +2306,7 @@ func BuildMachineCatalogResourceNutanix(t *testing.T, machineResource string) st
 	service_account := os.Getenv("TEST_MC_SERVICE_ACCOUNT_NUTANIX")
 	service_account_pass := os.Getenv("TEST_MC_SERVICE_ACCOUNT_PASS_NUTANIX")
 
-	return BuildHypervisorResourcePoolResourceNutanix(t, hypervisor_resource_pool_testResource_nutanix) + fmt.Sprintf(machineResource, name, container, master_image, memory_mb, cpu_count, cores_per_cpu_count, service_account, domain, service_account_pass)
+	return fmt.Sprintf(machineResource, name, container, master_image, memory_mb, cpu_count, cores_per_cpu_count, service_account, domain, service_account_pass)
 }
 
 func BuildMachineCatalogResourceAwsEc2(t *testing.T, machineResource string) string {
@@ -2180,7 +2319,7 @@ func BuildMachineCatalogResourceAwsEc2(t *testing.T, machineResource string) str
 	service_offering := os.Getenv("TEST_MC_SERVICE_OFFERING_AWS_EC2")
 	network := os.Getenv("TEST_MC_NETWORK_AWS_EC2")
 
-	return BuildHypervisorResourcePoolResourceAwsEc2(t, hypervisor_resource_pool_testResource_aws_ec2) + fmt.Sprintf(machineResource, name, service_account, domain, service_account_pass, image_ami, master_image, service_offering, network)
+	return fmt.Sprintf(machineResource, name, service_account, domain, service_account_pass, image_ami, master_image, service_offering, network)
 }
 
 func BuildMachineCatalogResourceManualPowerManagedAzure(t *testing.T, machineResource string) string {
@@ -2192,7 +2331,7 @@ func BuildMachineCatalogResourceManualPowerManagedAzure(t *testing.T, machineRes
 	allocation_type := os.Getenv("TEST_MC_ALLOCATION_TYPE_MANUAL_POWER_MANAGED")
 	session_support := os.Getenv("TEST_MC_SESSION_SUPPORT_MANUAL_POWER_MANAGED")
 
-	return BuildHypervisorResourceAzure(t, hypervisor_testResources) + fmt.Sprintf(machineResource, name, allocation_type, session_support, region, resource_group, machine_name, machine_account)
+	return fmt.Sprintf(machineResource, name, allocation_type, session_support, region, resource_group, machine_name, machine_account)
 }
 
 func BuildMachineCatalogResourceManualPowerManagedGCP(t *testing.T, machineResource string) string {
@@ -2204,7 +2343,7 @@ func BuildMachineCatalogResourceManualPowerManagedGCP(t *testing.T, machineResou
 	allocation_type := os.Getenv("TEST_MC_ALLOCATION_TYPE_MANUAL_POWER_MANAGED")
 	session_support := os.Getenv("TEST_MC_SESSION_SUPPORT_MANUAL_POWER_MANAGED")
 
-	return BuildHypervisorResourceGCP(t, hypervisor_testResources_gcp) + fmt.Sprintf(machineResource, name, allocation_type, session_support, region, project_name, machine_name, machine_account)
+	return fmt.Sprintf(machineResource, name, allocation_type, session_support, region, project_name, machine_name, machine_account)
 }
 
 func BuildMachineCatalogResourceManualPowerManagedVsphere(t *testing.T, machineResource string) string {
@@ -2216,7 +2355,7 @@ func BuildMachineCatalogResourceManualPowerManagedVsphere(t *testing.T, machineR
 	allocation_type := os.Getenv("TEST_MC_ALLOCATION_TYPE_MANUAL_POWER_MANAGED")
 	session_support := os.Getenv("TEST_MC_SESSION_SUPPORT_MANUAL_POWER_MANAGED")
 
-	return BuildHypervisorResourceVsphere(t, hypervisor_testResources_vsphere) + fmt.Sprintf(machineResource, name, allocation_type, session_support, datacenter, host, machine_name, machine_account)
+	return fmt.Sprintf(machineResource, name, allocation_type, session_support, datacenter, host, machine_name, machine_account)
 }
 
 func BuildMachineCatalogResourceManualPowerManagedXenserver(t *testing.T, machineResource string) string {
@@ -2226,7 +2365,7 @@ func BuildMachineCatalogResourceManualPowerManagedXenserver(t *testing.T, machin
 	allocation_type := os.Getenv("TEST_MC_ALLOCATION_TYPE_MANUAL_POWER_MANAGED")
 	session_support := os.Getenv("TEST_MC_SESSION_SUPPORT_MANUAL_POWER_MANAGED")
 
-	return BuildHypervisorResourceXenserver(t, hypervisor_testResources_xenserver) + fmt.Sprintf(machineResource, name, allocation_type, session_support, machine_name, machine_account)
+	return fmt.Sprintf(machineResource, name, allocation_type, session_support, machine_name, machine_account)
 }
 
 func BuildMachineCatalogResourceManualPowerManagedNutanix(t *testing.T, machineResource string) string {
@@ -2236,7 +2375,7 @@ func BuildMachineCatalogResourceManualPowerManagedNutanix(t *testing.T, machineR
 	allocation_type := os.Getenv("TEST_MC_ALLOCATION_TYPE_MANUAL_POWER_MANAGED")
 	session_support := os.Getenv("TEST_MC_SESSION_SUPPORT_MANUAL_POWER_MANAGED")
 
-	return BuildHypervisorResourceNutanix(t, hypervisor_testResources_nutanix) + fmt.Sprintf(machineResource, name, allocation_type, session_support, machine_name, machine_account)
+	return fmt.Sprintf(machineResource, name, allocation_type, session_support, machine_name, machine_account)
 }
 
 func BuildMachineCatalogResourceManualPowerManagedAwsEc2(t *testing.T, machineResource string) string {
@@ -2247,8 +2386,7 @@ func BuildMachineCatalogResourceManualPowerManagedAwsEc2(t *testing.T, machineRe
 	machine_account := os.Getenv("TEST_MC_MACHINE_ACCOUNT_MANUAL_AWS_EC2")
 	availability_zone := os.Getenv("TEST_MC_AVAILABILITY_ZONE_MANUAL_AWS_EC2")
 
-	str := BuildHypervisorResourceAwsEc2(t, hypervisor_testResources_aws_ec2) + fmt.Sprintf(machineResource, name, allocation_type, session_support, machine_name, machine_account, availability_zone)
-	return str
+	return fmt.Sprintf(machineResource, name, allocation_type, session_support, machine_name, machine_account, availability_zone)
 }
 
 func BuildMachineCatalogResourceManualNonPowerManaged(t *testing.T, machineResource string) string {
@@ -2257,9 +2395,7 @@ func BuildMachineCatalogResourceManualNonPowerManaged(t *testing.T, machineResou
 	allocation_type := os.Getenv("TEST_MC_ALLOCATION_TYPE_MANUAL_NON_POWER_MANAGED")
 	session_support := os.Getenv("TEST_MC_SESSION_SUPPORT_MANUAL_NON_POWER_MANAGED")
 
-	zoneName := os.Getenv("TEST_ZONE_NAME")
-
-	return BuildZoneResource(t, zone_testResource, zoneName) + fmt.Sprintf(machineResource, name, allocation_type, session_support, machine_account)
+	return fmt.Sprintf(machineResource, name, allocation_type, session_support, machine_account)
 }
 
 func BuildMachineCatalogResourceRemotePC(t *testing.T, machineResource string) string {
@@ -2269,7 +2405,5 @@ func BuildMachineCatalogResourceRemotePC(t *testing.T, machineResource string) s
 	ou := os.Getenv("TEST_MC_OU_REMOTE_PC")
 	include_subfolders := os.Getenv("TEST_MC_INCLUDE_SUBFOLDERS_REMOTE_PC")
 
-	zoneName := os.Getenv("TEST_ZONE_NAME")
-
-	return BuildZoneResource(t, zone_testResource, zoneName) + fmt.Sprintf(machineResource, name, allocation_type, machine_account, include_subfolders, ou)
+	return fmt.Sprintf(machineResource, name, allocation_type, machine_account, include_subfolders, ou)
 }

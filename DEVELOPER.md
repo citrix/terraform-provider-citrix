@@ -15,7 +15,7 @@ This documentation will guide you through the process of setting up your dev env
   - [Debugging with citrix-daas-rest-go client code in Visual Studio Code](#debugging-with-citrix-daas-rest-go-client-code-in-visual-studio-code)
   - [Running the tests](#running-the-tests)
   - [Commonly faced errors](#commonly-faced-errors)
-
+  - [Plugin for Terraform Provider for StoreFront Developer Guide](#plugin-for-terraform-provider-for-storefront-developer-guide)
 ## Install Dependencies
 * Install Go on your local system: https://go.dev/doc/install
   * `choco install golang`
@@ -120,3 +120,7 @@ To solve this issue, run the following command at the root of the repository:
 ```powershell
     git config --global --add safe.directory [path to dir/repo]
 ```
+
+## Plugin for Terraform Provider for StoreFront Developer Guide
+
+The test running process is the same as  [Running the tests](#running-the-tests) with additional parameter in the settings.cloud.example.json or settings.onprem.example.json  `StoreFront env variable` section

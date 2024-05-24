@@ -88,6 +88,8 @@ func (d *VdaDataSource) Configure(ctx context.Context, req datasource.ConfigureR
 }
 
 func (d *VdaDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
 	var data VdaDataSourceModel
 
 	// Read Terraform configuration data into the model

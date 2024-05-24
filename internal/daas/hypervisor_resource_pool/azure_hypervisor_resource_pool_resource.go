@@ -18,7 +18,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -90,9 +89,6 @@ func (r *azureHypervisorResourcePoolResource) Schema(_ context.Context, _ resour
 				ElementType: types.StringType,
 				Description: "List of subnets to allocate VDAs within the virtual network.",
 				Required:    true,
-				PlanModifiers: []planmodifier.List{
-					listplanmodifier.RequiresReplaceIfConfigured(),
-				},
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
 				},
@@ -278,6 +274,16 @@ func (r *azureHypervisorResourcePoolResource) Update(ctx context.Context, req re
 	editHypervisorResourcePool.SetName(plan.Name.ValueString())
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM)
 
+	planSubnet := util.ConvertBaseStringArrayToPrimitiveStringArray(plan.Subnets)
+	regionPath := fmt.Sprintf("%s.region", plan.Region.ValueString())
+	resourceGroupPath := fmt.Sprintf("%s.resourcegroup", plan.VirtualNetworkResourceGroup.ValueString())
+	vnetPath := fmt.Sprintf("%s.virtualprivatecloud", plan.VirtualNetwork.ValueString())
+	subnets, err := util.GetFilteredResourcePathList(ctx, r.client, plan.Hypervisor.ValueString(), fmt.Sprintf("%s/virtualprivatecloud.folder/%s/%s", regionPath, resourceGroupPath, vnetPath), util.NetworkResourceType, planSubnet, citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM, "")
+	if err != nil {
+		return
+	}
+	editHypervisorResourcePool.SetSubnets(subnets)
+
 	updatedResourcePool, err := UpdateHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, plan.Hypervisor.ValueString(), plan.Id.ValueString(), editHypervisorResourcePool)
 	if err != nil {
 		return
@@ -295,6 +301,8 @@ func (r *azureHypervisorResourcePoolResource) Update(ctx context.Context, req re
 }
 
 func (r *azureHypervisorResourcePoolResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
 	idParts := strings.Split(req.ID, ",")
 
 	if len(idParts) != 2 || idParts[0] == "" || idParts[1] == "" {

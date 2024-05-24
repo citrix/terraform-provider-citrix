@@ -28,10 +28,6 @@ resource "citrix_machine_catalog" "example-aws-catalog" {
             tenancy_type     = "Shared"
         }
         number_of_total_machines =  1
-        network_mapping = {
-            network_device = "0"
-            network        = "<AWS Subnet Mask>"
-        }
         machine_account_creation_rules = {
             naming_scheme      = "ctx-aws-###"
             naming_scheme_type = "Numeric"

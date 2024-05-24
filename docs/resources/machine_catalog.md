@@ -53,10 +53,12 @@ resource "citrix_machine_catalog" "example-azure-mtsession" {
 				storage_cost_saving = true
 			}
         }
-		network_mapping = {
-            network_device = "0"
-            network = "<Azure Subnet for machine>"
-        }
+		network_mapping = [
+            {
+                network_device = "0"
+                network = "<Azure Subnet for machine>"
+            }
+        ]
 		availability_zones = "1,2,..."
 		number_of_total_machines = 	1
 		machine_account_creation_rules ={
@@ -94,10 +96,12 @@ resource "citrix_machine_catalog" "example-aws-mtsession" {
             ]
             tenancy_type = "Shared"
         }
-		network_mapping = {
-            network_device = "0"
-            network = "10.0.128.0/20"
-        }
+		network_mapping = [
+            {
+                network_device = "0"
+                network = "10.0.128.0/20"
+            }
+        ]
 		number_of_total_machines =  1
         machine_account_creation_rules ={
 			naming_scheme 	   = "aws-multi-##"
@@ -330,10 +334,12 @@ resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
 			storage_type = "Standard_LRS"
 			use_managed_disks = true
             service_offering = "Standard_D2_v2"
-            resource_group = "<Azure resource group name for image vhd>"
-            storage_account = "<Azure storage account name for image vhd>"
-            container = "<Azure storage container for image vhd>"
-            master_image = "<Image vhd blob name>"
+            azure_master_image = {
+                resource_group 		 = "<Azure resource group name for image vhd>"
+				storage_account 	 = "<Azure storage account name for image vhd>"
+				container 			 = "<Azure storage container for image vhd>"
+                master_image = "<Image vhd blob name>"
+            }
 			writeback_cache = {
 				wbc_disk_storage_type = "pd-standard"
 				persist_wbc = true
@@ -430,7 +436,7 @@ Optional:
 - `custom_properties` (Attributes List) **This is an advanced feature. Use with caution.** Custom properties to be set for the machine catalog. For properties that are already supported as a terraform configuration field, please use terraform field instead. (see [below for nested schema](#nestedatt--provisioning_scheme--custom_properties))
 - `gcp_machine_config` (Attributes) Machine Configuration For GCP MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--gcp_machine_config))
 - `machine_domain_identity` (Attributes) The domain identity for machines in the machine catalog.<br />Required when identity_type is set to `ActiveDirectory` (see [below for nested schema](#nestedatt--provisioning_scheme--machine_domain_identity))
-- `network_mapping` (Attributes) Specifies how the attached NICs are mapped to networks. If this parameter is omitted, provisioned VMs are created with a single NIC, which is mapped to the default network in the hypervisor resource pool.  If this parameter is supplied, machines are created with the number of NICs specified in the map, and each NIC is attached to the specified network.<br />Required when `provisioning_scheme.identity_type` is `AzureAD`. (see [below for nested schema](#nestedatt--provisioning_scheme--network_mapping))
+- `network_mapping` (Attributes List) Specifies how the attached NICs are mapped to networks. If this parameter is omitted, provisioned VMs are created with a single NIC, which is mapped to the default network in the hypervisor resource pool.  If this parameter is supplied, machines are created with the number of NICs specified in the map, and each NIC is attached to the specified network.<br />Required when `provisioning_scheme.identity_type` is `AzureAD`. (see [below for nested schema](#nestedatt--provisioning_scheme--network_mapping))
 - `nutanix_machine_config` (Attributes) Machine Configuration For Nutanix MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--nutanix_machine_config))
 - `vsphere_machine_config` (Attributes) Machine Configuration for vSphere MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--vsphere_machine_config))
 - `xenserver_machine_config` (Attributes) Machine Configuration For XenServer MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--xenserver_machine_config))
@@ -470,7 +476,7 @@ Optional:
 - `disk_encryption_set` (Attributes) The configuration for Disk Encryption Set (DES). The DES must be in the same subscription and region as your resources. If your master image is encrypted with a DES, use the same DES when creating this machine catalog. When using a DES, if you later disable the key with which the corresponding DES is associated in Azure, you can no longer power on the machines in this catalog or add machines to it. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--disk_encryption_set))
 - `enroll_in_intune` (Boolean) Specify whether to enroll machines in Microsoft Intune. Use this property only when `identity_type` is set to `AzureAD`.
 - `license_type` (String) Windows license type used to provision virtual machines in Azure at the base compute rate. License types include: `Windows_Client` and `Windows_Server`.
-- `machine_profile` (Attributes) The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone.<br />Required when identity_type is set to `AzureAD` (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--machine_profile))
+- `machine_profile` (Attributes) The name of the virtual machine or template spec that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone.<br />Required when identity_type is set to `AzureAD` (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--machine_profile))
 - `use_azure_compute_gallery` (Attributes) Use this to place prepared image in Azure Compute Gallery. Required when `storage_type = Azure_Ephemeral_OS_Disk`. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--use_azure_compute_gallery))
 - `use_managed_disks` (Boolean) Indicate whether to use Azure managed disks for the provisioned virtual machine.
 - `vda_resource_group` (String) Designated resource group where the VDA VMs will be located on Azure.
@@ -516,7 +522,12 @@ Required:
 
 Required:
 
-- `machine_profile_resource_group` (String) The resource group name where machine profile VM is located in.
+- `machine_profile_resource_group` (String) The name of the resource group where the machine profile VM or template spec is located.
+
+Optional:
+
+- `machine_profile_template_spec_name` (String) The name of the machine profile template spec.
+- `machine_profile_template_spec_version` (String) The version of the machine profile template spec.
 - `machine_profile_vm_name` (String) The name of the machine profile virtual machine.
 
 

@@ -3,6 +3,7 @@
 package machine_catalog
 
 import (
+	"context"
 	"regexp"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
@@ -197,7 +198,7 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 				Computed:    true,
 				Default:     stringdefault.StaticString("L7_20"),
 				Validators: []validator.String{
-					util.GetValidatorFromEnum(citrixorchestration.AllowedFunctionalLevelEnumValues),
+					stringvalidator.OneOfCaseInsensitive(util.GetAllowedFunctionalLevelValues()...),
 				},
 			},
 			"provisioning_scheme": schema.SingleNestedAttribute{
@@ -311,6 +312,15 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 										util.AzureEphemeralOSDisk,
 									),
 								},
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.RequiresReplaceIf(
+										func(_ context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+											resp.RequiresReplace = req.StateValue.ValueString() == util.AzureEphemeralOSDisk || req.PlanValue.ValueString() == util.AzureEphemeralOSDisk
+										},
+										"Updating storage_type is not allowed when using Azure Ephemeral OS Disk.",
+										"Updating storage_type is not allowed when using Azure Ephemeral OS Disk.",
+									),
+								},
 							},
 							"use_azure_compute_gallery": schema.SingleNestedAttribute{
 								Description: "Use this to place prepared image in Azure Compute Gallery. Required when `storage_type = Azure_Ephemeral_OS_Disk`.",
@@ -375,18 +385,48 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 								},
 							},
 							"machine_profile": schema.SingleNestedAttribute{
-								Description: "The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone." + "<br />" +
+								Description: "The name of the virtual machine or template spec that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone." + "<br />" +
 									"Required when identity_type is set to `AzureAD`",
 								Optional: true,
 								Attributes: map[string]schema.Attribute{
 									"machine_profile_vm_name": schema.StringAttribute{
 										Description: "The name of the machine profile virtual machine.",
-										Required:    true,
+										Optional:    true,
+									},
+									"machine_profile_template_spec_name": schema.StringAttribute{
+										Description: "The name of the machine profile template spec.",
+										Optional:    true,
+										Validators: []validator.String{
+											stringvalidator.AlsoRequires(path.Expressions{
+												path.MatchRelative().AtParent().AtName("machine_profile_template_spec_version"),
+											}...),
+											stringvalidator.ExactlyOneOf(path.Expressions{
+												path.MatchRelative().AtParent().AtName("machine_profile_vm_name"),
+											}...),
+										},
+									},
+									"machine_profile_template_spec_version": schema.StringAttribute{
+										Description: "The version of the machine profile template spec.",
+										Optional:    true,
+										Validators: []validator.String{
+											stringvalidator.AlsoRequires(path.Expressions{
+												path.MatchRelative().AtParent().AtName("machine_profile_template_spec_name"),
+											}...),
+										},
 									},
 									"machine_profile_resource_group": schema.StringAttribute{
-										Description: "The resource group name where machine profile VM is located in.",
+										Description: "The name of the resource group where the machine profile VM or template spec is located.",
 										Required:    true,
 									},
+								},
+								PlanModifiers: []planmodifier.Object{
+									objectplanmodifier.RequiresReplaceIf(
+										func(_ context.Context, req planmodifier.ObjectRequest, resp *objectplanmodifier.RequiresReplaceIfFuncResponse) {
+											resp.RequiresReplace = req.ConfigValue.IsNull() != req.StateValue.IsNull()
+										},
+										"Force replace when machine_profile is added or removed. Update is allowed only if previously set.",
+										"Force replace when machine_profile is added or removed. Update is allowed only if previously set.",
+									),
 								},
 							},
 							"writeback_cache": schema.SingleNestedAttribute{
@@ -730,28 +770,30 @@ func getSchemaForMachineCatalogResource() schema.Schema {
 							int64validator.AtLeast(0),
 						},
 					},
-					"network_mapping": schema.SingleNestedAttribute{
+					"network_mapping": schema.ListNestedAttribute{
 						Description: "Specifies how the attached NICs are mapped to networks. If this parameter is omitted, provisioned VMs are created with a single NIC, which is mapped to the default network in the hypervisor resource pool.  If this parameter is supplied, machines are created with the number of NICs specified in the map, and each NIC is attached to the specified network." + "<br />" +
 							"Required when `provisioning_scheme.identity_type` is `AzureAD`.",
 						Optional: true,
-						Attributes: map[string]schema.Attribute{
-							"network_device": schema.StringAttribute{
-								Description: "Name or Id of the network device.",
-								Required:    true,
-								Validators: []validator.String{
-									stringvalidator.AlsoRequires(path.Expressions{
-										path.MatchRelative().AtParent().AtName("network"),
-									}...),
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								"network_device": schema.StringAttribute{
+									Description: "Name or Id of the network device.",
+									Required:    true,
+									Validators: []validator.String{
+										stringvalidator.AlsoRequires(path.Expressions{
+											path.MatchRelative().AtParent().AtName("network"),
+										}...),
+									},
 								},
-							},
-							"network": schema.StringAttribute{
-								Description: "The name of the virtual network that the device should be attached to. This must be a subnet within a Virtual Private Cloud item in the resource pool to which the Machine Catalog is associated." + "<br />" +
-									"For AWS, please specify the network mask of the network you want to use within the VPC.",
-								Required: true,
-								Validators: []validator.String{
-									stringvalidator.AlsoRequires(path.Expressions{
-										path.MatchRelative().AtParent().AtName("network_device"),
-									}...),
+								"network": schema.StringAttribute{
+									Description: "The name of the virtual network that the device should be attached to. This must be a subnet within a Virtual Private Cloud item in the resource pool to which the Machine Catalog is associated." + "<br />" +
+										"For AWS, please specify the network mask of the network you want to use within the VPC.",
+									Required: true,
+									Validators: []validator.String{
+										stringvalidator.AlsoRequires(path.Expressions{
+											path.MatchRelative().AtParent().AtName("network_device"),
+										}...),
+									},
 								},
 							},
 						},

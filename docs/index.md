@@ -39,3 +39,13 @@ provider "citrix" {
 - `disable_ssl_verification` (Boolean) Disable SSL verification against the target DDC. <br />Only applicable to on-premises customers. Citrix Cloud customers should omit this option. Set to true to skip SSL verification only when the target DDC does not have a valid SSL certificate issued by a trusted CA. <br />When set to true, please make sure that your provider config is set for a known DDC hostname. <br />[It is recommended to configure a valid certificate for the target DDC](https://docs.citrix.com/en-us/citrix-virtual-apps-desktops/install-configure/install-core/secure-web-studio-deployment) <br />Can be set via Environment Variable **CITRIX_DISABLE_SSL_VERIFICATION**.
 - `environment` (String) Citrix Cloud environment of the customer. Only applicable for Citrix Cloud customers. Available options: `Production`, `Staging`, `Japan`, `JapanStaging`, `Gov`, `GovStaging`. <br />Can be set via Environment Variable **CITRIX_ENVIRONMENT**.
 - `hostname` (String) Host name / base URL of Citrix DaaS service. <br />For Citrix on-premises customers (Required): Use this to specify Delivery Controller hostname. <br />For Citrix Cloud customers (Optional): Use this to force override the Citrix DaaS service hostname.<br />Can be set via Environment Variable **CITRIX_HOSTNAME**.
+- `storefront_remote_host` (Attributes) StoreFront Remote Host for Citrix DaaS service. <br />Only applicable for Citrix on-premises StoreFront. Use this to specify StoreFront Remote Host. <br /> (see [below for nested schema](#nestedatt--storefront_remote_host))
+
+<a id="nestedatt--storefront_remote_host"></a>
+### Nested Schema for `storefront_remote_host`
+
+Required:
+
+- `ad_admin_password` (String) Active Directory Admin Password to connect to storefront server <br />Only applicable for Citrix on-premises customers. Use this to specify AD admin password<br />Can be set via Environment Variable **SF_AD_ADMAIN_PASSWORD**.
+- `ad_admin_username` (String) Active Directory Admin Username to connect to storefront server <br />Only applicable for Citrix on-premises customers. Use this to specify AD admin username <br />Can be set via Environment Variable **SF_AD_ADMAIN_USERNAME**.
+- `computer_name` (String) StoreFront server computer Name <br />Only applicable for Citrix on-premises customers. Use this to specify StoreFront server computer name <br />Can be set via Environment Variable **SF_COMPUTER_NAME**.

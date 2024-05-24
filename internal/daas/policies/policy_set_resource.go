@@ -79,6 +79,12 @@ func (r *policySetResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 		serverValue = fmt.Sprintf("%s.xendesktop.net", r.client.ClientConfig.CustomerId)
 	}
 
+	// Validate DDC Version
+	isDdcVersionSupported := util.CheckProductVersion(r.client, &resp.Diagnostics, 118, 7, 41, "policy set")
+	if !isDdcVersionSupported {
+		return
+	}
+
 	allScopeContained := false
 	for _, scope := range plan.Scopes {
 		if strings.EqualFold(scope.ValueString(), "All") {

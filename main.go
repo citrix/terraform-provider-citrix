@@ -12,7 +12,7 @@ import (
 )
 
 // Provider documentation generation.
-//go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-name citrix
+//go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-name citrix --examples-dir internal/examples
 
 var (
 	// these will be set by the goreleaser configuration

@@ -591,7 +591,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 				resp.Diagnostics.AddAttributeError(
 					path.Root("custom_properties"),
 					"Duplicated Custom Property",
-					fmt.Sprintf("Use Terraform field \"%s\" for customer property \"%s\".", val, propertyName),
+					fmt.Sprintf("Use Terraform field \"%s\" for custom property \"%s\".", val, propertyName),
 				)
 			}
 		}
