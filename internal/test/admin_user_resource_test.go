@@ -47,7 +47,16 @@ func TestAdminUserResource(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildAdminUserResource(t, adminUserTestResource),
+				Config: composeTestResourceTf(
+					BuildAdminUserResource(t, adminUserTestResource),
+					BuildAdminScopeResource(t, adminScopeTestResource),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildPolicySetResourceWithoutDeliveryGroup(t),
+					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the admin user
 					resource.TestCheckResourceAttr("citrix_admin_user.test_admin_user", "name", userName),
@@ -60,7 +69,7 @@ func TestAdminUserResource(t *testing.T) {
 					// Verify the is_enabled flag
 					resource.TestCheckResourceAttr("citrix_admin_user.test_admin_user", "is_enabled", "true"),
 				),
-				SkipFunc: getSkipFunc(isOnPremises),
+				SkipFunc: skipForCloud(isOnPremises),
 			},
 			// ImportState testing
 			{
@@ -73,7 +82,16 @@ func TestAdminUserResource(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: BuildAdminUserResource(t, adminUserTestResource_updated),
+				Config: composeTestResourceTf(
+					BuildAdminUserResource(t, adminUserTestResource_updated),
+					BuildAdminScopeResource(t, adminScopeTestResource),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildPolicySetResourceWithoutDeliveryGroup(t),
+					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the admin user
 					resource.TestCheckResourceAttr("citrix_admin_user.test_admin_user", "name", userName),
@@ -88,7 +106,7 @@ func TestAdminUserResource(t *testing.T) {
 					// Verify the is_enabled flag
 					resource.TestCheckResourceAttr("citrix_admin_user.test_admin_user", "is_enabled", "true"),
 				),
-				SkipFunc: getSkipFunc(isOnPremises),
+				SkipFunc: skipForCloud(isOnPremises),
 			},
 			// Delete testing automatically occurs in TestCase
 		},
@@ -131,5 +149,5 @@ var (
 func BuildAdminUserResource(t *testing.T, adminUser string) string {
 	adminName := os.Getenv("TEST_ADMIN_USER_NAME")
 	adminDomain := os.Getenv("TEST_ADMIN_USER_DOMAIN")
-	return BuildAdminScopeResource(t, adminScopeTestResource) + BuildAdminRoleResource(t, adminRoleTestResource) + fmt.Sprintf(adminUser, adminName, adminDomain)
+	return fmt.Sprintf(adminUser, adminName, adminDomain)
 }

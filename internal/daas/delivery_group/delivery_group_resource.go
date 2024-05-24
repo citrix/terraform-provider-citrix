@@ -32,7 +32,6 @@ var (
 	_ resource.ResourceWithImportState    = &deliveryGroupResource{}
 	_ resource.ResourceWithValidateConfig = &deliveryGroupResource{}
 	_ resource.ResourceWithModifyPlan     = &deliveryGroupResource{}
-	_ resource.ResourceWithValidateConfig = &deliveryGroupResource{}
 )
 
 // NewDeliveryGroupResource is a helper function to simplify the provider implementation.
@@ -107,6 +106,9 @@ func (r *deliveryGroupResource) Schema(_ context.Context, _ resource.SchemaReque
 						},
 						"restricted_access_users": getSchemaForRestrictedAccessUsers(false),
 					},
+				},
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
 				},
 			},
 			"associated_machine_catalogs": schema.ListNestedAttribute{
@@ -332,6 +334,9 @@ func (r *deliveryGroupResource) Schema(_ context.Context, _ resource.SchemaReque
 								},
 							},
 						},
+						Validators: []validator.List{
+							listvalidator.SizeAtLeast(1),
+						},
 					},
 				},
 			},
@@ -477,6 +482,9 @@ func (r *deliveryGroupResource) Schema(_ context.Context, _ resource.SchemaReque
 						},
 					},
 				},
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
 			},
 			"total_machines": schema.Int64Attribute{
 				Description: "The total number of machines in the delivery group.",
@@ -495,7 +503,7 @@ func (r *deliveryGroupResource) Schema(_ context.Context, _ resource.SchemaReque
 				Computed:    true,
 				Default:     stringdefault.StaticString("L7_20"),
 				Validators: []validator.String{
-					util.GetValidatorFromEnum(citrixorchestration.AllowedFunctionalLevelEnumValues),
+					stringvalidator.OneOfCaseInsensitive(util.GetAllowedFunctionalLevelValues()...),
 				},
 			},
 		},
@@ -621,6 +629,11 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 		deliveryGroup.SetPolicySetGuid(types.StringNull().ValueString())
 	}
 
+	deliveryGroup, deliveryGroupDesktops, err = updateDeliveryGroupUserAccessDetails(ctx, r.client, &resp.Diagnostics, deliveryGroup, deliveryGroupDesktops)
+	if err != nil {
+		return
+	}
+
 	plan = plan.RefreshPropertyValues(deliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule)
 
 	// Set state to fully populated data
@@ -673,6 +686,11 @@ func (r *deliveryGroupResource) Read(ctx context.Context, req resource.ReadReque
 
 	if deliveryGroup.GetPolicySetGuid() == util.DefaultSitePolicySetId {
 		deliveryGroup.SetPolicySetGuid("")
+	}
+
+	deliveryGroup, deliveryGroupDesktops, err = updateDeliveryGroupUserAccessDetails(ctx, r.client, &resp.Diagnostics, deliveryGroup, deliveryGroupDesktops)
+	if err != nil {
+		return
 	}
 
 	state = state.RefreshPropertyValues(deliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule)
@@ -767,6 +785,11 @@ func (r *deliveryGroupResource) Update(ctx context.Context, req resource.UpdateR
 		updatedDeliveryGroup.SetPolicySetGuid(types.StringNull().ValueString())
 	}
 
+	updatedDeliveryGroup, deliveryGroupDesktops, err = updateDeliveryGroupUserAccessDetails(ctx, r.client, &resp.Diagnostics, updatedDeliveryGroup, deliveryGroupDesktops)
+	if err != nil {
+		return
+	}
+
 	plan = plan.RefreshPropertyValues(updatedDeliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule)
 
 	diags = resp.State.Set(ctx, plan)
@@ -809,6 +832,8 @@ func (r *deliveryGroupResource) ImportState(ctx context.Context, req resource.Im
 }
 
 func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
 	var data DeliveryGroupResourceModel
 	diags := req.Config.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)

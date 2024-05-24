@@ -33,7 +33,16 @@ func TestApplicationResource(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildApplicationResource(t, testApplicationResource),
+				Config: composeTestResourceTf(
+					BuildApplicationResource(t, testApplicationResource),
+					BuildApplicationFolderResource(t, testApplicationFolderResource_updated),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildPolicySetResourceWithoutDeliveryGroup(t),
+					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of application
 					resource.TestCheckResourceAttr("citrix_application.testApplication", "name", name),
@@ -56,7 +65,16 @@ func TestApplicationResource(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: BuildApplicationResource(t, testApplicationResource_updated),
+				Config: composeTestResourceTf(
+					BuildApplicationResource(t, testApplicationResource_updated),
+					BuildApplicationFolderResource(t, testApplicationFolderResource_updated),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildPolicySetResourceWithoutDeliveryGroup(t),
+					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of application
 					resource.TestCheckResourceAttr("citrix_application.testApplication", "name", fmt.Sprintf("%s-updated", name)),
@@ -104,5 +122,5 @@ resource "citrix_application" "testApplication" {
 
 func BuildApplicationResource(t *testing.T, applicationResource string) string {
 	name := os.Getenv("TEST_APP_NAME")
-	return BuildDeliveryGroupResource(t, testDeliveryGroupResources_updated) + BuildApplicationFolderResource(t, testApplicationFolderResource_updated) + fmt.Sprintf(applicationResource, name)
+	return fmt.Sprintf(applicationResource, name)
 }

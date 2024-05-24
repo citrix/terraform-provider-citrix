@@ -29,10 +29,6 @@ resource "citrix_machine_catalog" "example-catalog" {
             use_managed_disks   = true
         }
         number_of_total_machines = 1
-        network_mapping = {
-            network_device = "0"
-            network = "<Azure Subnet for machine>"
-        }
         machine_account_creation_rules = {
             naming_scheme = "ctx-pvdr-##"
             naming_scheme_type = "Numeric"

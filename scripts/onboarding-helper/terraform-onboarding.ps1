@@ -118,12 +118,13 @@ function Invoke-WebRequestWithRetry {
     while ($true) {
         try {
             $attempt++
+            Write-Verbose "Attempting $Method $Uri..."
             $response = Invoke-WebRequest -Uri $Uri -Method $Method -Headers $Headers -ContentType $ContentType -Body $Body
             return $response
         }
         catch {
             if ($attempt -ge $MaxRetries) {
-                Write-Output "Max retries reached. Throwing exception."
+                Write-Verbose "Max retries reached. Throwing exception."
                 throw
             }
             else {
@@ -132,7 +133,7 @@ function Invoke-WebRequestWithRetry {
                 # The jitter is a random number between 0 and 10% of the base delay.
                 $jitter = Get-Random -Minimum 0 -Maximum ([math]::Ceiling($baseDelay * $JitterFactor))
                 $delay = $baseDelay + $jitter
-                Write-Output "Error occurred, retrying $Method $Uri after $delay seconds..."
+                Write-Verbose "Error occurred, retrying $Method $Uri after $delay seconds..."
                 Start-Sleep -Seconds $delay
             }
         }
@@ -200,7 +201,7 @@ function New-RequiredFiles {
     # Create temporary import.tf for terraform import
     if (!(Test-Path ".\citrix.tf")) {
         New-Item -path ".\" -name "citrix.tf" -type "file" -Force
-        Write-Output "Created new file for terraform citrix provider configuration."
+        Write-Verbose "Created new file for terraform citrix provider configuration."
     }
     if ($script:onPremise) {
         $disable_ssl_verification = $script:disable_ssl.ToString().ToLower()
@@ -208,7 +209,7 @@ function New-RequiredFiles {
 provider "citrix" {
     hostname                    = "$script:hostname"
     client_id                   = "$script:domainFqdn\\$script:clientId"
-    client_secret               = "$script:clientSecret"
+    # client_secret               = "<Input client secret value>"
     disable_ssl_verification    = $disable_ssl_verification
 }
 "@
@@ -218,8 +219,8 @@ provider "citrix" {
         $config = @"
 provider "citrix" {
     customer_id                 = "$script:customerId"
-    client_id                   = "$script:clientId"
-    client_secret               = "$script:clientSecret"
+    client_id                   = "$script:domainFqdn\\$script:clientId"
+    # client_secret               = "<Input client secret value>"
     hostname                    = "$script:hostname"
     environment                 = "$script:environment"
 }
@@ -229,21 +230,21 @@ provider "citrix" {
 
     if (!(Test-Path ".\import.tf")) {
         New-Item -path ".\" -name "import.tf" -type "file" -Force
-        Write-Output "Created new file for terraform import."
+        Write-Verbose "Created new file for terraform import."
     }
     else {
         Clear-Content -path ".\import.tf"
-        Write-Output "Cleared content in terraform import file."
+        Write-Verbose "Cleared content in terraform import file."
     }
 
     # Create resource.tf for final terraform resources
     if (!(Test-Path ".\resource.tf")) {
         New-Item -path ".\" -name "resource.tf" -type "file" -Force
-        Write-Output "Created new file for terraform resource."
+        Write-Verbose "Created new file for terraform resource."
     }
     else {
         Clear-Content -path ".\resource.tf"
-        Write-Output "Cleared content in terraform resource file."
+        Write-Verbose "Cleared content in terraform resource file."
     }
 
 }
@@ -542,6 +543,18 @@ function PostProcessTerraformOutput {
     Set-Content -Path ".\resource.tf" -Value $content
 }
 
+function PostProcessProviderConfig {
+
+    # Post-process the provider config output in citrix.tf
+    $content = Get-Content -Path ".\citrix.tf" -Raw
+
+    # Uncomment field for client secret in provider config
+    $content =$content -replace "# ", ""
+
+    # Overwrite provider config with processed value
+    Set-Content -Path ".\citrix.tf" -Value $content
+}
+
 if ($DisableSSLValidation) {
     $code = @"
 using System.Net;
@@ -574,27 +587,38 @@ $script:hypervisorResourceMap = @{
 }
 $script:applicationFolderPathMap = @{}
 
-Get-Site
-Get-RequestBaseUrl
-New-RequiredFiles
+# Set environment variables for client secret
+$env:CITRIX_CLIENT_SECRET = $ClientSecret
 
-# Get CVAD resources from existing site
-Get-ExistingCVADResources
+try {
+    Get-Site
+    Get-RequestBaseUrl
+    New-RequiredFiles
 
-# Initialize terraform
-terraform init
+    # Get CVAD resources from existing site
+    Get-ExistingCVADResources
 
-# Import terraform resources into state
-Import-ResourcesToState
+    # Initialize terraform
+    terraform init
 
-# Export terraform resources
-terraform show >> ".\resource.tf"
+    # Import terraform resources into state
+    Import-ResourcesToState
 
-# Post-process terraform output
-PostProcessTerraformOutput
+    # Export terraform resources
+    terraform show >> ".\resource.tf"
 
-# Remove temporary TF file
-Remove-Item ".\import.tf"
+    # Post-process citrix.tf output
+    PostProcessProviderConfig
 
-# Format terraform files
-terraform fmt
+    # Post-process terraform output
+    PostProcessTerraformOutput
+
+    # Remove temporary TF file
+    Remove-Item ".\import.tf"
+
+    # Format terraform files
+    terraform fmt
+} finally {
+    # Clean up environment variables for client secret
+    $env:CITRIX_CLIENT_SECRET = ''
+}

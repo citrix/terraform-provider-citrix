@@ -35,7 +35,15 @@ func TestAdminScopeResource(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildAdminScopeResource(t, adminScopeTestResource),
+				Config: composeTestResourceTf(
+					BuildAdminScopeResource(t, adminScopeTestResource),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildPolicySetResourceWithoutDeliveryGroup(t),
+					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the admin scope
 					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "name", name),
@@ -59,7 +67,15 @@ func TestAdminScopeResource(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: BuildAdminScopeResource(t, adminScopeTestResource_updated),
+				Config: composeTestResourceTf(
+					BuildAdminScopeResource(t, adminScopeTestResource_updated),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildPolicySetResourceWithoutDeliveryGroup(t),
+					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the admin scope
 					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "name", fmt.Sprintf("%s-updated", name)),
@@ -111,5 +127,5 @@ var (
 )
 
 func BuildAdminScopeResource(t *testing.T, adminScope string) string {
-	return BuildDeliveryGroupResource(t, testDeliveryGroupResources) + fmt.Sprintf(adminScope, os.Getenv("TEST_ADMIN_SCOPE_NAME"))
+	return fmt.Sprintf(adminScope, os.Getenv("TEST_ADMIN_SCOPE_NAME"))
 }

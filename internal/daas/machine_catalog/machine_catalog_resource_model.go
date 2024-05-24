@@ -5,9 +5,12 @@ package machine_catalog
 import (
 	"context"
 	"reflect"
+	"regexp"
+	"strings"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/citrix/terraform-provider-citrix/internal/util"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -58,7 +61,7 @@ type ProvisioningSchemeModel struct {
 	XenserverMachineConfig      *XenserverMachineConfigModel      `tfsdk:"xenserver_machine_config"`
 	NutanixMachineConfigModel   *NutanixMachineConfigModel        `tfsdk:"nutanix_machine_config"`
 	NumTotalMachines            types.Int64                       `tfsdk:"number_of_total_machines"`
-	NetworkMapping              *NetworkMappingModel              `tfsdk:"network_mapping"`
+	NetworkMapping              []NetworkMappingModel             `tfsdk:"network_mapping"`
 	AvailabilityZones           types.String                      `tfsdk:"availability_zones"`
 	IdentityType                types.String                      `tfsdk:"identity_type"`
 	MachineDomainIdentity       *MachineDomainIdentityModel       `tfsdk:"machine_domain_identity"`
@@ -145,4 +148,23 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 	r = r.updateCatalogWithProvScheme(ctx, client, catalog, connectionType, pluginId)
 
 	return r
+}
+
+func (networkMapping NetworkMappingModel) RefreshListItem(nic citrixorchestration.NetworkMapResponseModel) NetworkMappingModel {
+	networkMapping.NetworkDevice = types.StringValue(nic.GetDeviceId())
+	network := nic.GetNetwork()
+	segments := strings.Split(network.GetXDPath(), "\\")
+	lastIndex := len(segments)
+
+	networkName := (strings.Split(segments[lastIndex-1], "."))[0]
+	matchAws := regexp.MustCompile(util.AwsNetworkNameRegex)
+	if matchAws.MatchString(networkName) {
+		/* For AWS Network, the XDPath looks like:
+		* XDHyp:\\HostingUnits\\{resource pool}\\{availability zone}.availabilityzone\\{network ip}`/{prefix length} (vpc-{vpc-id}).network
+		* The Network property should be set to {network ip}/{prefix length}
+		 */
+		networkName = strings.ReplaceAll(strings.Split((strings.Split(segments[lastIndex-1], ".network"))[0], " ")[0], "`/", "/")
+	}
+	networkMapping.Network = types.StringValue(networkName)
+	return networkMapping
 }

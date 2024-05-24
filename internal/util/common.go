@@ -45,6 +45,9 @@ const IPv4Regex string = `^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$`
 // IPv4 with https
 const IPv4RegexWithProtocol string = `^(http|https)://((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$`
 
+// AWS Network Name
+const AwsNetworkNameRegex string = `^(\d{1,3}\.){3}\d{1,3}` + "`" + `/\d{1,3}\s\(vpc-.+\)\.network$`
+
 // Date YYYY-MM-DD
 const DateRegex string = `^\d{4}-\d{2}-\d{2}$`
 
@@ -59,6 +62,9 @@ const SslThumbprintRegex string = `^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$`
 
 // AWS EC2 Instance Type
 const AwsEc2InstanceTypeRegex string = `^[a-z0-9]{1,15}\.[a-z0-9]{1,15}$`
+
+// NOT_EXIST error code
+const NOT_EXIST string = "NOT_EXIST"
 
 // Resource Types
 const ImageVersionResourceType string = "ImageVersion"
@@ -82,6 +88,12 @@ const AzureEphemeralOSDisk = "Azure_Ephemeral_OS_Disk"
 // Azure License Types
 const WindowsClientLicenseType string = "Windows_Client"
 const WindowsServerLicenseType string = "Windows_Server"
+
+// GAC
+const AssignmentPriority = 0
+const GacAppName = "Workspace"
+
+var PlatformSettingsAssignedTo = []string{"AllUsersNoAuthentication"}
 
 // Terraform model for name value string pair
 type NameValueStringPairModel struct {
@@ -210,6 +222,25 @@ func ConvertPrimitiveStringArrayToBaseStringArray(v []string) []types.String {
 }
 
 // <summary>
+// Helper function to convert array of golang primitive interface to array of terraform strings
+// </summary>
+// <param name="v">Array of golang primitive interface</param>
+// <returns>Array of terraform strings</returns>
+func ConvertPrimitiveInterfaceArrayToBaseStringArray(v []interface{}) ([]types.String, string) {
+	res := []types.String{}
+	for _, val := range v {
+		switch stringVal := val.(type) {
+		case string:
+			res = append(res, types.StringValue(stringVal))
+		default:
+			return nil, "At this time, only string values are supported in arrays."
+		}
+	}
+
+	return res, ""
+}
+
+// <summary>
 // Helper function to convert terraform bool value to string
 // </summary>
 // <param name="from">Boolean value in terraform bool</param>
@@ -276,6 +307,21 @@ type HttpErrorBody struct {
 // <returns>Response of the Get call. Raw http response. Error if failed to read the resource.</returns>
 func ReadResource[ResponseType any](request any, ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, resourceType, resourceIdOrName string) (ResponseType, *http.Response, error) {
 	response, httpResp, err := citrixdaasclient.ExecuteWithRetry[ResponseType](request, client)
+
+	// Resource Location does not return an error if not found
+	if resourceType == "Resource Location" {
+		if httpResp.StatusCode == http.StatusNoContent {
+			resp.Diagnostics.AddWarning(
+				fmt.Sprintf("%s not found", resourceType),
+				fmt.Sprintf("%s %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", resourceType, resourceIdOrName),
+			)
+
+			resp.State.RemoveResource(ctx)
+			// Set err so that control does not go to refresh properties in the read method
+			err = fmt.Errorf("could not find resource location %s", resourceIdOrName)
+			return response, httpResp, err
+		}
+	}
 	if err != nil && resp != nil {
 		body, _ := io.ReadAll(httpResp.Body)
 		httpErrorBody := HttpErrorBody{}
@@ -497,4 +543,68 @@ func PanicHandler(diagnostics *diag.Diagnostics) {
 			msg,
 		)
 	}
+}
+
+// <summary>
+// Helper function to get the allowed functional level values for setting the minimum functional level for machine catalog and deliver group.
+// </summary>
+func GetAllowedFunctionalLevelValues() []string {
+	res := []string{}
+	for _, v := range citrixorchestration.AllowedFunctionalLevelEnumValues {
+		if v != citrixorchestration.FUNCTIONALLEVEL_UNKNOWN &&
+			v != citrixorchestration.FUNCTIONALLEVEL_LMIN &&
+			v != citrixorchestration.FUNCTIONALLEVEL_LMAX {
+			res = append(res, string(v))
+		}
+	}
+
+	return res
+}
+
+// <summary>
+// Helper function to check the version requirement for DDC.
+// </summary>
+func CheckProductVersion(client *citrixdaasclient.CitrixDaasClient, diagnostic *diag.Diagnostics, requiredOrchestrationApiVersion int32, requiredProductMajorVersion int, requiredProductMinorVersion int, resourceName string) bool {
+	// Validate DDC version
+	if client.AuthConfig.OnPremises {
+		productVersionSplit := strings.Split(client.ClientConfig.ProductVersion, ".")
+		productMajorVersion, err := strconv.Atoi(productVersionSplit[0])
+		if err != nil {
+			diagnostic.AddError(
+				"Error parsing product major version",
+				"Error message: "+err.Error(),
+			)
+			return false
+		}
+
+		productMinorVersion, err := strconv.Atoi(productVersionSplit[1])
+		if err != nil {
+			diagnostic.AddError(
+				"Error parsing product minor version",
+				"Error message: "+err.Error(),
+			)
+			return false
+		}
+
+		if productMajorVersion < requiredProductMajorVersion ||
+			(productMajorVersion == requiredProductMajorVersion && productMinorVersion < requiredProductMinorVersion) {
+			diagnostic.AddError(
+				fmt.Sprintf("Current DDC version %d.%d does not support operations on %s resources.", productMajorVersion, productMinorVersion, resourceName),
+				fmt.Sprintf("Please upgrade your DDC product version to %d.%d or above to operate on %s resources.", requiredProductMajorVersion, requiredProductMinorVersion, resourceName),
+			)
+			return false
+		}
+	}
+
+	// Validate Orchestration version
+	if client.ClientConfig.OrchestrationApiVersion < requiredOrchestrationApiVersion {
+		diagnostic.AddError(
+			fmt.Sprintf("Current DDC version %d does not support operations on %s resources.", client.ClientConfig.OrchestrationApiVersion, resourceName),
+			"",
+		)
+
+		return false
+	}
+
+	return true
 }

@@ -22,7 +22,14 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_role"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_user"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/application"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/gac_settings"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/resource_locations"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/storefront_server"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/vda"
+	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_authentication"
+	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_deployment"
+	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_store"
+	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_webreceiver"
 
 	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_scope"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/delivery_group"
@@ -71,12 +78,19 @@ type citrixProvider struct {
 
 // citrixProviderModel maps provider schema data to a Go type.
 type citrixProviderModel struct {
-	Hostname               types.String `tfsdk:"hostname"`
-	Environment            types.String `tfsdk:"environment"`
-	CustomerId             types.String `tfsdk:"customer_id"`
-	ClientId               types.String `tfsdk:"client_id"`
-	ClientSecret           types.String `tfsdk:"client_secret"`
-	DisableSslVerification types.Bool   `tfsdk:"disable_ssl_verification"`
+	Hostname               types.String      `tfsdk:"hostname"`
+	Environment            types.String      `tfsdk:"environment"`
+	CustomerId             types.String      `tfsdk:"customer_id"`
+	ClientId               types.String      `tfsdk:"client_id"`
+	ClientSecret           types.String      `tfsdk:"client_secret"`
+	DisableSslVerification types.Bool        `tfsdk:"disable_ssl_verification"`
+	StoreFrontRemoteHost   *storefrontConfig `tfsdk:"storefront_remote_host"`
+}
+
+type storefrontConfig struct {
+	ComputerName    types.String `tfsdk:"computer_name"`
+	ADadminUserName types.String `tfsdk:"ad_admin_username"`
+	AdAdminPassword types.String `tfsdk:"ad_admin_password"`
 }
 
 // Metadata returns the provider type name.
@@ -139,6 +153,31 @@ func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 					"[It is recommended to configure a valid certificate for the target DDC](https://docs.citrix.com/en-us/citrix-virtual-apps-desktops/install-configure/install-core/secure-web-studio-deployment) " + "<br />" +
 					"Can be set via Environment Variable **CITRIX_DISABLE_SSL_VERIFICATION**.",
 				Optional: true,
+			},
+			"storefront_remote_host": schema.SingleNestedAttribute{
+				Description: "StoreFront Remote Host for Citrix DaaS service. " + "<br />" +
+					"Only applicable for Citrix on-premises StoreFront. Use this to specify StoreFront Remote Host. " + "<br />",
+				Optional: true,
+				Attributes: map[string]schema.Attribute{
+					"computer_name": schema.StringAttribute{
+						Required: true,
+						Description: "StoreFront server computer Name " + "<br />" +
+							"Only applicable for Citrix on-premises customers. Use this to specify StoreFront server computer name " + "<br />" +
+							"Can be set via Environment Variable **SF_COMPUTER_NAME**.",
+					},
+					"ad_admin_username": schema.StringAttribute{
+						Description: "Active Directory Admin Username to connect to storefront server " + "<br />" +
+							"Only applicable for Citrix on-premises customers. Use this to specify AD admin username " + "<br />" +
+							"Can be set via Environment Variable **SF_AD_ADMAIN_USERNAME**.",
+						Required: true,
+					},
+					"ad_admin_password": schema.StringAttribute{
+						Description: "Active Directory Admin Password to connect to storefront server " + "<br />" +
+							"Only applicable for Citrix on-premises customers. Use this to specify AD admin password" + "<br />" +
+							"Can be set via Environment Variable **SF_AD_ADMAIN_PASSWORD**.",
+						Required: true,
+					},
+				},
 			},
 		},
 	}
@@ -311,6 +350,9 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	clientId := os.Getenv("CITRIX_CLIENT_ID")
 	clientSecret := os.Getenv("CITRIX_CLIENT_SECRET")
 	disableSslVerification := strings.EqualFold(os.Getenv("CITRIX_DISABLE_SSL_VERIFICATION"), "true")
+	storefront_computer_name := os.Getenv("SF_COMPUTER_NAME")
+	storefront_ad_admin_username := os.Getenv("SF_AD_ADMAIN_USERNAME")
+	storefront_ad_admin_password := os.Getenv("SF_AD_ADMAIN_PASSWORD")
 
 	if !config.Hostname.IsNull() {
 		hostname = config.Hostname.ValueString()
@@ -334,6 +376,18 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 	if !config.DisableSslVerification.IsNull() {
 		disableSslVerification = config.DisableSslVerification.ValueBool()
+	}
+
+	if config.StoreFrontRemoteHost != nil {
+		if !config.StoreFrontRemoteHost.ComputerName.IsNull() {
+			storefront_computer_name = config.StoreFrontRemoteHost.ComputerName.ValueString()
+		}
+		if !config.StoreFrontRemoteHost.ADadminUserName.IsNull() {
+			storefront_ad_admin_username = config.StoreFrontRemoteHost.ADadminUserName.ValueString()
+		}
+		if !config.StoreFrontRemoteHost.AdAdminPassword.IsNull() {
+			storefront_ad_admin_password = config.StoreFrontRemoteHost.AdAdminPassword.ValueString()
+		}
 	}
 
 	if environment == "" {
@@ -395,22 +449,30 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 	// Indicate whether Citrix Cloud requests should go through API Gateway
 	apiGateway := true
+	ccUrl := ""
 	if !onPremises {
+		if environment == "Production" {
+			ccUrl = "api.cloud.com"
+		} else if environment == "Staging" {
+			ccUrl = "api.cloudburrito.com"
+		} else if environment == "Japan" {
+			ccUrl = "api.citrixcloud.jp"
+		} else if environment == "JapanStaging" {
+			ccUrl = "api.citrixcloudstaging.jp"
+		} else if environment == "Gov" {
+			ccUrl = fmt.Sprintf("registry.citrixworkspacesapi.us/%s", customerId)
+		} else if environment == "GovStaging" {
+			ccUrl = fmt.Sprintf("registry.ctxwsstgapi.us/%s", customerId)
+		}
 		if hostname == "" {
-			if environment == "Production" {
-				hostname = "api.cloud.com"
-			} else if environment == "Staging" {
-				hostname = "api.cloudburrito.com"
-			} else if environment == "Japan" {
-				hostname = "api.citrixcloud.jp"
-			} else if environment == "JapanStaging" {
-				hostname = "api.citrixcloudstaging.jp"
-			} else if environment == "Gov" {
+			if environment == "Gov" {
 				hostname = fmt.Sprintf("%s.xendesktop.us", customerId)
 				apiGateway = false
 			} else if environment == "GovStaging" {
 				hostname = fmt.Sprintf("%s.xdstaging.us", customerId)
 				apiGateway = false
+			} else {
+				hostname = ccUrl
 			}
 		} else if !strings.HasPrefix(hostname, "api.") {
 			// When a cloud customer sets explicit hostname to the cloud DDC, bypass API Gateway
@@ -455,7 +517,7 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 	userAgent := "citrix-terraform-provider/" + p.version + " (https://github.com/citrix/terraform-provider-citrix)"
 	// Create a new Citrix API client using the configuration values
-	client, httpResp, err := citrixclient.NewCitrixDaasClient(ctx, authUrl, hostname, customerId, clientId, clientSecret, onPremises, apiGateway, isGov, disableSslVerification, &userAgent, middlewareAuthFunc)
+	client, httpResp, err := citrixclient.NewCitrixDaasClient(ctx, authUrl, ccUrl, hostname, customerId, clientId, clientSecret, onPremises, apiGateway, isGov, disableSslVerification, &userAgent, middlewareAuthFunc)
 	if err != nil {
 		if httpResp != nil {
 			if httpResp.StatusCode == 401 {
@@ -530,6 +592,9 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		return
 	}
 
+	//Set Storefront Client
+	client = citrixclient.NewStoreFrontClient(ctx, storefront_computer_name, storefront_ad_admin_username, storefront_ad_admin_password, client)
+
 	// Make the Citrix API client available during DataSource and Resource
 	// type Configure methods.
 	resp.DataSourceData = client
@@ -564,12 +629,20 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		hypervisor_resource_pool.NewNutanixHypervisorResourcePoolResource,
 		machine_catalog.NewMachineCatalogResource,
 		delivery_group.NewDeliveryGroupResource,
+		storefront_server.NewStoreFrontServerResource,
 		application.NewApplicationResource,
 		application.NewApplicationFolderResource,
 		admin_scope.NewAdminScopeResource,
 		admin_role.NewAdminRoleResource,
 		policies.NewPolicySetResource,
 		admin_user.NewAdminUserResource,
-		//Add resource here
+		gac_settings.NewAGacSettingsResource,
+		resource_locations.NewResourceLocationResource,
+		// StoreFront Resources
+		stf_deployment.NewSTFDeploymentResource,
+		stf_authentication.NewSTFAuthenticationServiceResource,
+		stf_store.NewSTFStoreServiceResource,
+		stf_webreceiver.NewSTFWebReceiverResource,
+		// Add resource here
 	}
 }

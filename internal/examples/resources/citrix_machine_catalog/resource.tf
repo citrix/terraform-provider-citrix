@@ -38,10 +38,12 @@ resource "citrix_machine_catalog" "example-azure-mtsession" {
 				storage_cost_saving = true
 			}
         }
-		network_mapping = {
-            network_device = "0"
-            network = "<Azure Subnet for machine>"
-        }
+		network_mapping = [
+            {
+                network_device = "0"
+                network = "<Azure Subnet for machine>"
+            }
+        ]
 		availability_zones = "1,2,..."
 		number_of_total_machines = 	1
 		machine_account_creation_rules ={
@@ -79,10 +81,12 @@ resource "citrix_machine_catalog" "example-aws-mtsession" {
             ]
             tenancy_type = "Shared"
         }
-		network_mapping = {
-            network_device = "0"
-            network = "10.0.128.0/20"
-        }
+		network_mapping = [
+            {
+                network_device = "0"
+                network = "10.0.128.0/20"
+            }
+        ]
 		number_of_total_machines =  1
         machine_account_creation_rules ={
 			naming_scheme 	   = "aws-multi-##"
@@ -315,10 +319,12 @@ resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
 			storage_type = "Standard_LRS"
 			use_managed_disks = true
             service_offering = "Standard_D2_v2"
-            resource_group = "<Azure resource group name for image vhd>"
-            storage_account = "<Azure storage account name for image vhd>"
-            container = "<Azure storage container for image vhd>"
-            master_image = "<Image vhd blob name>"
+            azure_master_image = {
+                resource_group 		 = "<Azure resource group name for image vhd>"
+				storage_account 	 = "<Azure storage account name for image vhd>"
+				container 			 = "<Azure storage container for image vhd>"
+                master_image = "<Image vhd blob name>"
+            }
 			writeback_cache = {
 				wbc_disk_storage_type = "pd-standard"
 				persist_wbc = true

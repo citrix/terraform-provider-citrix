@@ -44,7 +44,11 @@ func TestHypervisorResourcePoolAzureRM(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+				Config: composeTestResourceTf(
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool", "name", name),
@@ -68,7 +72,11 @@ func TestHypervisorResourcePoolAzureRM(t *testing.T) {
 			},
 			// Update and Read
 			{
-				Config: BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
+				Config: composeTestResourceTf(
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
 				),
@@ -108,7 +116,11 @@ func TestHypervisorResourcePoolGCP(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildHypervisorResourcePoolResourceGCP(t, hypervisor_resource_pool_testResource_gcp),
+				Config: composeTestResourceTf(
+					BuildHypervisorResourcePoolResourceGCP(t, hypervisor_resource_pool_testResource_gcp),
+					BuildHypervisorResourceGCP(t, hypervisor_testResources_gcp),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_GCP")),
+				),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_gcp_hypervisor_resource_pool.testHypervisorResourcePool", "name", name),
@@ -131,7 +143,11 @@ func TestHypervisorResourcePoolGCP(t *testing.T) {
 			},
 			// Update and Read
 			{
-				Config: BuildHypervisorResourcePoolResourceGCP(t, hypervisor_resource_pool_updated_testResource_gcp),
+				Config: composeTestResourceTf(
+					BuildHypervisorResourcePoolResourceGCP(t, hypervisor_resource_pool_updated_testResource_gcp),
+					BuildHypervisorResourceGCP(t, hypervisor_testResources_gcp),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_GCP")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_gcp_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
 				),
@@ -171,7 +187,11 @@ func TestHypervisorResourcePoolXenserver(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildHypervisorResourcePoolResourceXenServer(t),
+				Config: composeTestResourceTf(
+					BuildHypervisorResourcePoolResourceXenServer(t, hypervisor_resource_pool_testResource_xenserver),
+					BuildHypervisorResourceXenserver(t, hypervisor_testResources_xenserver),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_XENSERVER")),
+				),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool", "name", name),
@@ -195,7 +215,11 @@ func TestHypervisorResourcePoolXenserver(t *testing.T) {
 			},
 			// Update and Read
 			{
-				Config: BuildHypervisorResourcePoolResourceXenServerUpdated(t),
+				Config: composeTestResourceTf(
+					BuildHypervisorResourcePoolResourceXenServerUpdated(t, hypervisor_resource_pool_updated_testResource_xenserver),
+					BuildHypervisorResourceXenserver(t, hypervisor_testResources_xenserver),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_XENSERVER")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
 					resource.TestCheckResourceAttr("citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool", "networks.#", "2"),
@@ -242,7 +266,11 @@ func TestHypervisorResourcePoolVsphere(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildHypervisorResourcePoolResourceVsphere(t),
+				Config: composeTestResourceTf(
+					BuildHypervisorResourcePoolResourceVsphere(t, hypervisor_resource_pool_testResource_vsphere),
+					BuildHypervisorResourceVsphere(t, hypervisor_testResources_vsphere),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_VSPHERE")),
+				),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "name", name),
@@ -267,7 +295,11 @@ func TestHypervisorResourcePoolVsphere(t *testing.T) {
 			},
 			// Update and Read
 			{
-				Config: BuildHypervisorResourcePoolResourceVsphereUpdated(t),
+				Config: composeTestResourceTf(
+					BuildHypervisorResourcePoolResourceVsphereUpdated(t, hypervisor_resource_pool_updated_testResource_vsphere),
+					BuildHypervisorResourceVsphere(t, hypervisor_testResources_vsphere),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_VSPHERE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
 					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "storage.#", "2"),
@@ -299,7 +331,11 @@ func TestHypervisorResourcePoolNutanix(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildHypervisorResourcePoolResourceNutanix(t, hypervisor_resource_pool_testResource_nutanix),
+				Config: composeTestResourceTf(
+					BuildHypervisorResourcePoolResourceNutanix(t, hypervisor_resource_pool_testResource_nutanix),
+					BuildHypervisorResourceNutanix(t, hypervisor_testResources_nutanix),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_NUTANIX")),
+				),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_nutanix_hypervisor_resource_pool.testHypervisorResourcePool", "name", name),
@@ -317,7 +353,11 @@ func TestHypervisorResourcePoolNutanix(t *testing.T) {
 			},
 			// Update and Read
 			{
-				Config: BuildHypervisorResourcePoolResourceNutanix(t, hypervisor_resource_pool_updated_testResource_nutanix),
+				Config: composeTestResourceTf(
+					BuildHypervisorResourcePoolResourceNutanix(t, hypervisor_resource_pool_updated_testResource_nutanix),
+					BuildHypervisorResourceNutanix(t, hypervisor_testResources_nutanix),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_NUTANIX")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_nutanix_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
 				),
@@ -354,7 +394,11 @@ func TestHypervisorResourcePoolAwsEc2(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildHypervisorResourcePoolResourceAwsEc2(t, hypervisor_resource_pool_testResource_aws_ec2),
+				Config: composeTestResourceTf(
+					BuildHypervisorResourcePoolResourceAwsEc2(t, hypervisor_resource_pool_testResource_aws_ec2),
+					BuildHypervisorResourceAwsEc2(t, hypervisor_testResources_aws_ec2),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AWS_EC2")),
+				),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_aws_hypervisor_resource_pool.testHypervisorResourcePool", "name", name),
@@ -373,7 +417,11 @@ func TestHypervisorResourcePoolAwsEc2(t *testing.T) {
 			},
 			// Update and Read
 			{
-				Config: BuildHypervisorResourcePoolResourceAwsEc2(t, hypervisor_resource_pool_updated_testResource_aws_ec2),
+				Config: composeTestResourceTf(
+					BuildHypervisorResourcePoolResourceAwsEc2(t, hypervisor_resource_pool_updated_testResource_aws_ec2),
+					BuildHypervisorResourceAwsEc2(t, hypervisor_testResources_aws_ec2),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AWS_EC2")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_aws_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
 				),
@@ -620,7 +668,7 @@ func BuildHypervisorResourcePoolResourceAzure(t *testing.T, hypervisorRP string)
 	virtualNetwork := os.Getenv("TEST_HYPERV_RP_VIRTUAL_NETWORK")
 	subnet := os.Getenv("Test_HYPERV_RP_SUBNETS")
 
-	return BuildHypervisorResourceAzure(t, hypervisor_testResources) + fmt.Sprintf(hypervisorRP, name, region, virtualNetworkResourceGroup, virtualNetwork, subnet)
+	return fmt.Sprintf(hypervisorRP, name, region, virtualNetworkResourceGroup, virtualNetwork, subnet)
 }
 
 func BuildHypervisorResourcePoolResourceGCP(t *testing.T, hypervisorRP string) string {
@@ -630,29 +678,29 @@ func BuildHypervisorResourcePoolResourceGCP(t *testing.T, hypervisorRP string) s
 	projectName := os.Getenv("TEST_HYPERV_RP_PROJECT_NAME_GCP")
 	vpc := os.Getenv("TEST_HYPERV_RP_VPC_GCP")
 
-	return BuildHypervisorResourceGCP(t, hypervisor_testResources_gcp) + fmt.Sprintf(hypervisorRP, name, projectName, region, subnet, vpc)
+	return fmt.Sprintf(hypervisorRP, name, projectName, region, subnet, vpc)
 }
 
-func BuildHypervisorResourcePoolResourceXenServer(t *testing.T) string {
+func BuildHypervisorResourcePoolResourceXenServer(t *testing.T, hypervisorRP string) string {
 	name := os.Getenv("TEST_HYPERV_RP_NAME_XENSERVER")
 	network1 := os.Getenv("TEST_HYPERV_RP_NETWORK_1_XENSERVER")
 	storage := os.Getenv("TEST_HYPERV_RP_STORAGE_XENSERVER")
 	tempStorage := os.Getenv("TEST_HYPERV_RP_TEMP_STORAGE_XENSERVER")
 
-	return BuildHypervisorResourceXenserver(t, hypervisor_testResources_xenserver) + fmt.Sprintf(hypervisor_resource_pool_testResource_xenserver, name, network1, storage, tempStorage)
+	return fmt.Sprintf(hypervisorRP, name, network1, storage, tempStorage)
 }
 
-func BuildHypervisorResourcePoolResourceXenServerUpdated(t *testing.T) string {
+func BuildHypervisorResourcePoolResourceXenServerUpdated(t *testing.T, hypervisorRP string) string {
 	name := os.Getenv("TEST_HYPERV_RP_NAME_XENSERVER")
 	network1 := os.Getenv("TEST_HYPERV_RP_NETWORK_1_XENSERVER")
 	network2 := os.Getenv("TEST_HYPERV_RP_NETWORK_2_XENSERVER")
 	storage := os.Getenv("TEST_HYPERV_RP_STORAGE_XENSERVER")
 	tempStorage := os.Getenv("TEST_HYPERV_RP_TEMP_STORAGE_XENSERVER")
 
-	return BuildHypervisorResourceXenserver(t, hypervisor_testResources_xenserver) + fmt.Sprintf(hypervisor_resource_pool_updated_testResource_xenserver, name, network1, network2, storage, tempStorage)
+	return fmt.Sprintf(hypervisorRP, name, network1, network2, storage, tempStorage)
 }
 
-func BuildHypervisorResourcePoolResourceVsphere(t *testing.T) string {
+func BuildHypervisorResourcePoolResourceVsphere(t *testing.T, hypervisorRP string) string {
 	name := os.Getenv("TEST_HYPERV_RP_NAME_VSPHERE")
 	datacenter := os.Getenv("TEST_HYPERV_RP_DATACENTER_VSPHERE")
 	host := os.Getenv("TEST_HYPERV_RP_HOST_VSPHERE")
@@ -660,10 +708,10 @@ func BuildHypervisorResourcePoolResourceVsphere(t *testing.T) string {
 	storage_1 := os.Getenv("TEST_HYPERV_RP_STORAGE_1_VSPHERE")
 	tempStorage := os.Getenv("TEST_HYPERV_RP_TEMP_STORAGE_VSPHERE")
 
-	return BuildHypervisorResourceVsphere(t, hypervisor_testResources_vsphere) + fmt.Sprintf(hypervisor_resource_pool_testResource_vsphere, name, datacenter, host, network, storage_1, tempStorage)
+	return fmt.Sprintf(hypervisorRP, name, datacenter, host, network, storage_1, tempStorage)
 }
 
-func BuildHypervisorResourcePoolResourceVsphereUpdated(t *testing.T) string {
+func BuildHypervisorResourcePoolResourceVsphereUpdated(t *testing.T, hypervisorRP string) string {
 	name := os.Getenv("TEST_HYPERV_RP_NAME_VSPHERE")
 	datacenter := os.Getenv("TEST_HYPERV_RP_DATACENTER_VSPHERE")
 	host := os.Getenv("TEST_HYPERV_RP_HOST_VSPHERE")
@@ -672,21 +720,21 @@ func BuildHypervisorResourcePoolResourceVsphereUpdated(t *testing.T) string {
 	storage_2 := os.Getenv("TEST_HYPERV_RP_STORAGE_2_VSPHERE")
 	tempStorage := os.Getenv("TEST_HYPERV_RP_TEMP_STORAGE_VSPHERE")
 
-	return BuildHypervisorResourceVsphere(t, hypervisor_testResources_vsphere) + fmt.Sprintf(hypervisor_resource_pool_updated_testResource_vsphere, name, datacenter, host, network, storage_1, storage_2, tempStorage)
+	return fmt.Sprintf(hypervisorRP, name, datacenter, host, network, storage_1, storage_2, tempStorage)
 }
 
-func BuildHypervisorResourcePoolResourceNutanix(t *testing.T, hypervisorRp string) string {
+func BuildHypervisorResourcePoolResourceNutanix(t *testing.T, hypervisorRP string) string {
 	name := os.Getenv("TEST_HYPERV_RP_NAME_NUTANIX")
 	network := os.Getenv("TEST_HYPERV_RP_NETWORK_NUTANIX")
 
-	return BuildHypervisorResourceNutanix(t, hypervisor_testResources_nutanix) + fmt.Sprintf(hypervisorRp, name, network)
+	return fmt.Sprintf(hypervisorRP, name, network)
 }
 
-func BuildHypervisorResourcePoolResourceAwsEc2(t *testing.T, hypervisorRp string) string {
+func BuildHypervisorResourcePoolResourceAwsEc2(t *testing.T, hypervisorRP string) string {
 	name := os.Getenv("TEST_HYPERV_RP_NAME_AWS_EC2")
 	vpc := os.Getenv("TEST_HYPERV_RP_VPC_AWS_EC2")
 	availability_zone := os.Getenv("TEST_HYPERV_RP_AVAILABILITY_ZONE_AWS_EC2")
 	subnets := os.Getenv("Test_HYPERV_RP_SUBNETS_AWS_EC2")
 
-	return BuildHypervisorResourceAwsEc2(t, hypervisor_testResources_aws_ec2) + fmt.Sprintf(hypervisorRp, name, vpc, availability_zone, subnets)
+	return fmt.Sprintf(hypervisorRP, name, vpc, availability_zone, subnets)
 }

@@ -25,10 +25,6 @@ resource "citrix_machine_catalog" "example-catalog" {
         }
         availability_zones = "<project name>:<region>:<availability zone1>,<project name>:<region>:<availability zone2>,..."
         number_of_total_machines = 1
-        network_mapping = {
-            network_device = "0"
-            network = "<GCP VPC Subnet for machine>"
-        }
         machine_account_creation_rules = {
             naming_scheme = "ctx-pvdr-##"
             naming_scheme_type = "Numeric"

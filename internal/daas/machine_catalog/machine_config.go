@@ -87,8 +87,10 @@ type AzureMasterImageModel struct {
 }
 
 type AzureMachineProfileModel struct {
-	MachineProfileVmName        types.String `tfsdk:"machine_profile_vm_name"`
-	MachineProfileResourceGroup types.String `tfsdk:"machine_profile_resource_group"`
+	MachineProfileVmName              types.String `tfsdk:"machine_profile_vm_name"`
+	MachineProfileTemplateSpecName    types.String `tfsdk:"machine_profile_template_spec_name"`
+	MachineProfileTemplateSpecVersion types.String `tfsdk:"machine_profile_template_spec_version"`
+	MachineProfileResourceGroup       types.String `tfsdk:"machine_profile_resource_group"`
 }
 
 // WritebackCacheModel maps the write back cacheconfiguration schema data.
@@ -286,6 +288,10 @@ func (mc *AzureMachineConfigModel) RefreshProperties(catalog citrixorchestration
 				replicaMaximum, _ := strconv.Atoi(stringPair.GetValue())
 				mc.UseAzureComputeGallery.ReplicaMaximum = types.Int64Value(int64(replicaMaximum))
 			}
+		case "UseEphemeralOsDisk":
+			if strings.EqualFold(stringPair.GetValue(), "true") {
+				mc.StorageType = types.StringValue(util.AzureEphemeralOSDisk)
+			}
 		default:
 		}
 	}
@@ -463,13 +469,31 @@ func (mc *NutanixMachineConfigModel) RefreshProperties(catalog citrixorchestrati
 func parseAzureMachineProfileResponseToModel(machineProfileResponse citrixorchestration.HypervisorResourceRefResponseModel) *AzureMachineProfileModel {
 	machineProfileModel := AzureMachineProfileModel{}
 	if machineProfileName := machineProfileResponse.GetName(); machineProfileName != "" {
-		machineProfileModel.MachineProfileVmName = types.StringValue(machineProfileName)
 		machineProfileSegments := strings.Split(machineProfileResponse.GetXDPath(), "\\")
 		lastIndex := len(machineProfileSegments) - 1
-		machineProfileParent := machineProfileSegments[lastIndex-1]
-		machineProfileParentType := strings.Split(machineProfileParent, ".")[1]
-		if machineProfileParentType == "resourcegroup" {
-			machineProfileModel.MachineProfileResourceGroup = types.StringValue(strings.Split(machineProfileParent, ".")[0])
+		resourceType := strings.Split(machineProfileSegments[lastIndex], ".")[1]
+		if strings.EqualFold(resourceType, "templatespecversion") {
+			machineProfileModel.MachineProfileTemplateSpecVersion = types.StringValue(machineProfileName)
+
+			templateSpecIndex := slices.IndexFunc(machineProfileSegments, func(machineProfileSegment string) bool {
+				return strings.Contains(machineProfileSegment, ".templatespec")
+			})
+
+			if templateSpecIndex != -1 {
+				templateSpec := strings.Split(machineProfileSegments[templateSpecIndex], ".")[0]
+				machineProfileModel.MachineProfileTemplateSpecName = types.StringValue(templateSpec)
+			}
+		} else {
+			machineProfileModel.MachineProfileVmName = types.StringValue(machineProfileName)
+		}
+
+		resourceGroupIndex := slices.IndexFunc(machineProfileSegments, func(machineProfileSegment string) bool {
+			return strings.Contains(machineProfileSegment, ".resourcegroup")
+		})
+
+		if resourceGroupIndex != -1 {
+			resourceGroup := strings.Split(machineProfileSegments[resourceGroupIndex], ".")[0]
+			machineProfileModel.MachineProfileResourceGroup = types.StringValue(resourceGroup)
 		}
 	} else {
 		machineProfileModel.MachineProfileVmName = types.StringNull()

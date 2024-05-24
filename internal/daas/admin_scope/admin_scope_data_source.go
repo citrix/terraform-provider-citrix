@@ -86,6 +86,8 @@ func (d *AdminScopeDataSource) Configure(ctx context.Context, req datasource.Con
 }
 
 func (d *AdminScopeDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
 	var data AdminScopeDataSourceModel
 
 	// Read Terraform configuration data into the model

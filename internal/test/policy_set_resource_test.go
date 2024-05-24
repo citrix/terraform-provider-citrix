@@ -159,7 +159,7 @@ func BuildPolicySetResource(t *testing.T, policySet string) string {
 	policySetName := os.Getenv("TEST_POLICY_SET_NAME")
 	ddcServerHostName := os.Getenv("CITRIX_DDC_HOST_NAME")
 
-	return BuildDeliveryGroupResource(t, testDeliveryGroupResources_updated) + fmt.Sprintf(policySet, policySetName, ddcServerHostName)
+	return fmt.Sprintf(policySet, policySetName, ddcServerHostName)
 }
 
 func TestPolicySetResource(t *testing.T) {
@@ -176,7 +176,15 @@ func TestPolicySetResource(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildPolicySetResource(t, policy_set_testResource),
+				Config: composeTestResourceTf(
+					BuildPolicySetResource(t, policy_set_testResource),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updated),
+					BuildPolicySetResourceWithoutDeliveryGroup(t),
+					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "name", os.Getenv("TEST_POLICY_SET_NAME")+"-1"),
@@ -204,7 +212,15 @@ func TestPolicySetResource(t *testing.T) {
 			},
 			// Reorder and Read testing
 			{
-				Config: BuildPolicySetResource(t, policy_set_reordered_testResource),
+				Config: composeTestResourceTf(
+					BuildPolicySetResource(t, policy_set_reordered_testResource),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updated),
+					BuildPolicySetResourceWithoutDeliveryGroup(t),
+					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "name", os.Getenv("TEST_POLICY_SET_NAME")+"-2"),
@@ -235,7 +251,15 @@ func TestPolicySetResource(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: BuildPolicySetResource(t, policy_set_updated_testResource),
+				Config: composeTestResourceTf(
+					BuildPolicySetResource(t, policy_set_updated_testResource),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updated),
+					BuildPolicySetResourceWithoutDeliveryGroup(t),
+					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "name", os.Getenv("TEST_POLICY_SET_NAME")+"-3"),
