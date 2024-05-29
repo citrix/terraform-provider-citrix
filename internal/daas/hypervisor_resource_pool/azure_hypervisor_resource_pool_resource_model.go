@@ -3,10 +3,20 @@
 package hypervisor_resource_pool
 
 import (
+	"context"
+	"regexp"
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
+	"github.com/hashicorp/go-azure-helpers/resourcemanager/location"
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -15,14 +25,79 @@ type AzureHypervisorResourcePoolResourceModel struct {
 	Name       types.String `tfsdk:"name"`
 	Hypervisor types.String `tfsdk:"hypervisor"`
 	/**** Resource Pool Details ****/
-	Region         types.String   `tfsdk:"region"`
-	VirtualNetwork types.String   `tfsdk:"virtual_network"`
-	Subnets        []types.String `tfsdk:"subnets"`
+	Region         types.String `tfsdk:"region"`
+	VirtualNetwork types.String `tfsdk:"virtual_network"`
+	Subnets        types.List   `tfsdk:"subnets"` // List[string]
 	/** Azure Resource Pool **/
 	VirtualNetworkResourceGroup types.String `tfsdk:"virtual_network_resource_group"`
 }
 
-func (r AzureHypervisorResourcePoolResourceModel) RefreshPropertyValues(resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) AzureHypervisorResourcePoolResourceModel {
+func GetAzureHypervisorResourcePoolSchema() schema.Schema {
+	return schema.Schema{
+		Description: "Manages an Azure hypervisor resource pool.",
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Description: "GUID identifier of the resource pool.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"name": schema.StringAttribute{
+				Description: "Name of the resource pool. Name should be unique across all hypervisors.",
+				Required:    true,
+			},
+			"hypervisor": schema.StringAttribute{
+				Description: "Id of the hypervisor for which the resource pool needs to be created.",
+				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
+				},
+			},
+			"virtual_network_resource_group": schema.StringAttribute{
+				Description: "The name of the resource group where the vnet resides.",
+				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"virtual_network": schema.StringAttribute{
+				Description: "Name of the cloud virtual network.",
+				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"subnets": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "List of subnets to allocate VDAs within the virtual network.",
+				Required:    true,
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+			"region": schema.StringAttribute{
+				Description: "Cloud Region where the virtual network sits in.",
+				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplaceIf(
+						func(_ context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+							resp.RequiresReplace = !req.ConfigValue.IsNull() && !req.StateValue.IsNull() &&
+								(location.Normalize(req.ConfigValue.ValueString()) != location.Normalize(req.StateValue.ValueString()))
+						},
+						"Force replacement when region changes, unless changing between Azure region name (East US) and Id (eastus)",
+						"Force replacement when region changes, unless changing between Azure region name (East US) and Id (eastus)",
+					),
+				},
+			},
+		},
+	}
+}
+
+func (r AzureHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) AzureHypervisorResourcePoolResourceModel {
 
 	r.Id = types.StringValue(resourcePool.GetId())
 	r.Name = types.StringValue(resourcePool.GetName())
@@ -42,7 +117,7 @@ func (r AzureHypervisorResourcePoolResourceModel) RefreshPropertyValues(resource
 	for _, model := range resourcePool.GetSubnets() {
 		res = append(res, model.GetName())
 	}
-	r.Subnets = util.ConvertPrimitiveStringArrayToBaseStringArray(res)
+	r.Subnets = util.RefreshListValues(ctx, diagnostics, r.Subnets, res)
 
 	return r
 }

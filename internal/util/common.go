@@ -22,6 +22,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
@@ -99,6 +100,25 @@ var PlatformSettingsAssignedTo = []string{"AllUsersNoAuthentication"}
 type NameValueStringPairModel struct {
 	Name  types.String `tfsdk:"name"`
 	Value types.String `tfsdk:"value"`
+}
+
+func (r NameValueStringPairModel) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"name": schema.StringAttribute{
+				Description: "Metadata name.",
+				Required:    true,
+			},
+			"value": schema.StringAttribute{
+				Description: "Metadata value.",
+				Required:    true,
+			},
+		},
+	}
+}
+
+func (NameValueStringPairModel) GetAttributes() map[string]schema.Attribute {
+	return NameValueStringPairModel{}.GetSchema().Attributes
 }
 
 // <summary>
@@ -191,72 +211,6 @@ func ReadClientError(err error) string {
 	}
 
 	return err.Error()
-}
-
-// <summary>
-// Helper function to convert array of terraform strings to array of golang primitive strings
-// </summary>
-// <param name="v">Array of terraform stringsArray of golang primitive strings</param>
-// <returns>Array of golang primitive strings</returns>
-func ConvertBaseStringArrayToPrimitiveStringArray(v []types.String) []string {
-	res := []string{}
-	for _, stringVal := range v {
-		res = append(res, stringVal.ValueString())
-	}
-
-	return res
-}
-
-// <summary>
-// Helper function to convert array of golang primitive strings to array of terraform strings
-// </summary>
-// <param name="v">Array of golang primitive strings</param>
-// <returns>Array of terraform strings</returns>
-func ConvertPrimitiveStringArrayToBaseStringArray(v []string) []types.String {
-	res := []types.String{}
-	for _, stringVal := range v {
-		res = append(res, types.StringValue(stringVal))
-	}
-
-	return res
-}
-
-// <summary>
-// Helper function to convert array of golang primitive interface to array of terraform strings
-// </summary>
-// <param name="v">Array of golang primitive interface</param>
-// <returns>Array of terraform strings</returns>
-func ConvertPrimitiveInterfaceArrayToBaseStringArray(v []interface{}) ([]types.String, string) {
-	res := []types.String{}
-	for _, val := range v {
-		switch stringVal := val.(type) {
-		case string:
-			res = append(res, types.StringValue(stringVal))
-		default:
-			return nil, "At this time, only string values are supported in arrays."
-		}
-	}
-
-	return res, ""
-}
-
-// <summary>
-// Helper function to convert terraform bool value to string
-// </summary>
-// <param name="from">Boolean value in terraform bool</param>
-// <returns>Boolean value in string</returns>
-func TypeBoolToString(from types.Bool) string {
-	return strconv.FormatBool(from.ValueBool())
-}
-
-// <summary>
-// Helper function to convert string to terraform boolean value
-// </summary>
-// <param name="from">Boolean value in string</param>
-// <returns>Boolean value in terraform types.Bool</returns>
-func StringToTypeBool(from string) types.Bool {
-	result, _ := strconv.ParseBool(from)
-	return types.BoolValue(result)
 }
 
 // <summary>
@@ -420,7 +374,26 @@ func ProcessAsyncJobResponse(ctx context.Context, client *citrixdaasclient.Citri
 // <param name="clientId">Name of the identifier field in client model</param>
 // <param name="refreshFunc">Name of the refresh properties function defined in the terraform model</param>
 // <returns>Array in Terraform model for new state</returns>
-func RefreshListProperties[tfType any, clientType any](state []tfType, tfId string, remote []clientType, clientId string, refreshFunc string) []tfType {
+func RefreshListValueProperties[tfType ModelWithAttributes, clientType any](ctx context.Context, diagnostics *diag.Diagnostics, state types.List, tfId string, remote []clientType, clientId string, refreshFunc string) types.List {
+	unwrappedList := ObjectListToTypedArray[tfType](ctx, diagnostics, state)
+	refreshedList := RefreshListProperties[tfType, clientType](ctx, diagnostics, unwrappedList, tfId, remote, clientId, refreshFunc)
+	return TypedArrayToObjectList[tfType](ctx, diagnostics, refreshedList)
+}
+
+// TODO: make RefreshListProperties private once all resources are updated to use types.List
+// <summary>
+// Helper function for calculating the new state of a list of nested attribute, while
+// keeping the order of the elements in the array intact, and adds missing elements
+// from remote to state.
+// Can be used for refreshing all list nested attributes.
+// </summary>
+// <param name="state">State values in Terraform model</param>
+// <param name="tfId">Name of the identifier field in Terraform model</param>
+// <param name="remote">Remote values in client model</param>
+// <param name="clientId">Name of the identifier field in client model</param>
+// <param name="refreshFunc">Name of the refresh properties function defined in the terraform model</param>
+// <returns>Array in Terraform model for new state</returns>
+func RefreshListProperties[tfType any, clientType any](ctx context.Context, diagnostics *diag.Diagnostics, state []tfType, tfId string, remote []clientType, clientId string, refreshFunc string) []tfType {
 	if len(remote) == 0 {
 		return nil
 	}
@@ -456,11 +429,11 @@ func RefreshListProperties[tfType any, clientType any](state []tfType, tfId stri
 		index, exists := stateItems[id]
 		requestValue := reflect.ValueOf(item)
 		if exists {
-			newStateItemReflectValue := method.Func.Call([]reflect.Value{reflect.ValueOf(state[index]), requestValue})[0]
+			newStateItemReflectValue := method.Func.Call([]reflect.Value{reflect.ValueOf(state[index]), reflect.ValueOf(ctx), reflect.ValueOf(diagnostics), requestValue})[0]
 			newState[index] = newStateItemReflectValue.Interface().(tfType)
 		} else {
 			tfStructItem := reflect.New(tfStruct).Elem()
-			newStateItemReflectValue := method.Func.Call([]reflect.Value{tfStructItem, requestValue})[0]
+			newStateItemReflectValue := method.Func.Call([]reflect.Value{tfStructItem, reflect.ValueOf(ctx), reflect.ValueOf(diagnostics), requestValue})[0]
 			newState = append(newState, newStateItemReflectValue.Interface().(tfType))
 		}
 
@@ -484,11 +457,60 @@ func RefreshListProperties[tfType any, clientType any](state []tfType, tfId stri
 // Helper function for calculating the new state of a list of strings, while
 // keeping the order of the elements in the array intact, and adds missing elements
 // from remote to state.
+// Can be used for refreshing all list of strings.
+// </summary>
+// <param name="state">State values in Terraform model</param>
+// <param name="remote">Remote values in client model</param>
+// <returns>Array in Terraform model for new state</returns>
+func RefreshListValues(ctx context.Context, diagnostics *diag.Diagnostics, state types.List, remote []string) types.List {
+	unwrappedList := StringListToStringArray(ctx, diagnostics, state)
+	refreshedList := RefreshList(unwrappedList, remote)
+	return StringArrayToStringList(ctx, diagnostics, refreshedList)
+}
+
+// <summary>
+// Helper function for calculating the new state of a list of strings, while
+// keeping the order of the elements in the array intact, and adds missing elements
+// from remote to state.
 // Can be used for refreshing list of strings.
 // </summary>
 // <param name="state">List of values in state</param>
 // <param name="remote">List of values in remote</param>
-func RefreshList(state []types.String, remote []string) []types.String {
+func RefreshList(state []string, remote []string) []string {
+	stateItems := map[string]bool{}
+	for _, item := range state {
+		stateItems[strings.ToLower(item)] = false // not visited
+	}
+
+	for _, item := range remote {
+		itemInLowerCase := strings.ToLower(item)
+		_, exists := stateItems[itemInLowerCase]
+		if !exists {
+			state = append(state, item)
+		}
+		stateItems[itemInLowerCase] = true
+	}
+
+	result := []string{}
+	for _, item := range state {
+		if stateItems[strings.ToLower(item)] {
+			result = append(result, item)
+		}
+	}
+
+	return result
+}
+
+// <summary>
+// Helper function for calculating the new state of a list of strings, while
+// keeping the order of the elements in the array intact, and adds missing elements
+// from remote to state.
+// Can be used for refreshing list of strings.
+// Deprecated: Remove after we fully move to types.List
+// </summary>
+// <param name="state">List of values in state</param>
+// <param name="remote">List of values in remote</param>
+func RefreshListDeprecated(state []types.String, remote []string) []types.String {
 	stateItems := map[string]bool{}
 	for _, item := range state {
 		stateItems[strings.ToLower(item.ValueString())] = false // not visited

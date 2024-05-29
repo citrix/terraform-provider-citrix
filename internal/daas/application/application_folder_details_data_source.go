@@ -128,7 +128,7 @@ func (d *ApplicationDataSource) Read(ctx context.Context, req datasource.ReadReq
 			)
 			return // Stop processing
 		}
-		data = data.RefreshPropertyValues(apps)
+		data = data.RefreshPropertyValues(ctx, &resp.Diagnostics, apps)
 	}
 
 	// Save data into Terraform state

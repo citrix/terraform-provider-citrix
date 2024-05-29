@@ -114,7 +114,7 @@ func (r *adminUserResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	var adminRights []citrixorchestration.AdminRightRequestModel
-	for _, right := range plan.Rights {
+	for _, right := range util.ObjectListToTypedArray[RightsModel](ctx, &resp.Diagnostics, plan.Rights) {
 		adminRights = append(adminRights, citrixorchestration.AdminRightRequestModel{
 			Role:  right.Role.ValueString(),
 			Scope: right.Scope.ValueString(),
@@ -149,7 +149,7 @@ func (r *adminUserResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	// Map response body to schema and populate computed attribute values
-	plan = plan.RefreshPropertyValues(adminUser)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, adminUser)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -177,7 +177,7 @@ func (r *adminUserResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	state = state.RefreshPropertyValues(adminUser)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, adminUser)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -203,7 +203,7 @@ func (r *adminUserResource) Update(ctx context.Context, req resource.UpdateReque
 	var adminUserName = plan.Name.ValueString()
 
 	var adminRights []citrixorchestration.AdminRightRequestModel
-	for _, right := range plan.Rights {
+	for _, right := range util.ObjectListToTypedArray[RightsModel](ctx, &resp.Diagnostics, plan.Rights) {
 		adminRights = append(adminRights, citrixorchestration.AdminRightRequestModel{
 			Role:  right.Role.ValueString(),
 			Scope: right.Scope.ValueString(),
@@ -236,7 +236,7 @@ func (r *adminUserResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 
 	// Update resource state with updated property values
-	plan = plan.RefreshPropertyValues(updatedAdminUser)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, updatedAdminUser)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

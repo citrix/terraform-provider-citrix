@@ -10,16 +10,9 @@ import (
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -48,52 +41,7 @@ func (r *adminRoleResource) Metadata(_ context.Context, req resource.MetadataReq
 
 // Schema defines the schema for the resource.
 func (r *adminRoleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		// This description is used by the documentation generator and the language server.
-		Description: "Manages an administrator role.",
-
-		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "ID of the admin role.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"name": schema.StringAttribute{
-				Description: "Name of the admin role.",
-				Required:    true,
-			},
-			"description": schema.StringAttribute{
-				Description: "Description of the admin role.",
-				Optional:    true,
-			},
-			"is_built_in": schema.BoolAttribute{
-				Description: "Flag to determine if the role was built-in or user defined",
-				Computed:    true,
-			},
-			"can_launch_manage": schema.BoolAttribute{
-				Description: "Flag to determine if the user will have access to the Manage tab on the console. This field is only applicable for cloud admins. For on-premise admins, the only acceptable value is `true`. Defaults to `true`.",
-				Optional:    true,
-				Computed:    true,
-				Default:     booldefault.StaticBool(true), // Default value gets set for an attribute after Validation and before applying configuration changes
-			},
-			"can_launch_monitor": schema.BoolAttribute{
-				Description: "Flag to determine if the user will have access to the Monitor tab on the console. This field is only applicable for cloud admins. For on-premise admins, the only acceptable value is `true`. Defaults to `true`.",
-				Optional:    true,
-				Computed:    true,
-				Default:     booldefault.StaticBool(true),
-			},
-			"permissions": schema.ListAttribute{
-				ElementType: types.StringType,
-				Description: "List of permissions to be associated with the admin role. To get a list of supported permissions, please refer to [Admin Predefined Permissions for Cloud](https://developer-docs.citrix.com/en-us/citrix-daas-service-apis/citrix-daas-rest-apis/apis/#/Admin-APIs/Admin-GetPredefinedPermissions) and [Admin Predefined Permissions for On-Premise](https://developer-docs.citrix.com/en-us/citrix-virtual-apps-desktops/citrix-cvad-rest-apis/apis/#/Admin-APIs/Admin-GetPredefinedPermissions).",
-				Required:    true,
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
-				},
-			},
-		},
-	}
+	resp.Schema = GetAdminRoleSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -123,7 +71,7 @@ func (r *adminRoleResource) Create(ctx context.Context, req resource.CreateReque
 	body.SetDescription(plan.Description.ValueString())
 	body.SetCanLaunchManage(plan.CanLaunchManage.ValueBool())
 	body.SetCanLaunchMonitor(plan.CanLaunchMonitor.ValueBool())
-	body.SetPermissions(util.ConvertBaseStringArrayToPrimitiveStringArray(plan.Permissions))
+	body.SetPermissions(util.StringListToStringArray(ctx, &diags, plan.Permissions))
 
 	createAdminRoleRequest := r.client.ApiClient.AdminAPIsDAAS.AdminCreateAdminRole(ctx)
 	createAdminRoleRequest = createAdminRoleRequest.CreateAdminRoleRequestModel(body)
@@ -156,7 +104,7 @@ func (r *adminRoleResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	// Map response body to schema and populate computed attribute values
-	plan = plan.RefreshPropertyValues(adminRole)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, adminRole)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -184,7 +132,7 @@ func (r *adminRoleResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	state = state.RefreshPropertyValues(adminRole)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, adminRole)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -215,7 +163,7 @@ func (r *adminRoleResource) Update(ctx context.Context, req resource.UpdateReque
 	body.SetDescription(plan.Description.ValueString())
 	body.SetCanLaunchManage(plan.CanLaunchManage.ValueBool())
 	body.SetCanLaunchMonitor(plan.CanLaunchMonitor.ValueBool())
-	body.SetPermissions(util.ConvertBaseStringArrayToPrimitiveStringArray(plan.Permissions))
+	body.SetPermissions(util.StringListToStringArray(ctx, &diags, plan.Permissions))
 
 	// Update admin role using orchestration call
 	updateAdminRoleRequest := r.client.ApiClient.AdminAPIsDAAS.AdminUpdateAdminRole(ctx, adminRoleId)
@@ -237,7 +185,7 @@ func (r *adminRoleResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 
 	// Update resource state with updated property values
-	plan = plan.RefreshPropertyValues(updatedAdminRole)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, updatedAdminRole)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

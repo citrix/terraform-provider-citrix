@@ -21,13 +21,13 @@ type HypervisorStorageModel struct {
 	Superseded  types.Bool   `tfsdk:"superseded"`
 }
 
-func (v HypervisorStorageModel) RefreshListItem(remote citrixorchestration.HypervisorStorageResourceResponseModel) HypervisorStorageModel {
+func (v HypervisorStorageModel) RefreshListItem(_ context.Context, _ *diag.Diagnostics, remote citrixorchestration.HypervisorStorageResourceResponseModel) HypervisorStorageModel {
 	v.StorageName = types.StringValue(remote.GetName())
 	v.Superseded = types.BoolValue(remote.GetSuperseded())
 	return v
 }
 
-func GetNestedAttributeObjectSchmeaForStorege() schema.NestedAttributeObject {
+func (HypervisorStorageModel) GetSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
 			"storage_name": schema.StringAttribute{
@@ -42,6 +42,10 @@ func GetNestedAttributeObjectSchmeaForStorege() schema.NestedAttributeObject {
 			},
 		},
 	}
+}
+
+func (HypervisorStorageModel) GetAttributes() map[string]schema.Attribute {
+	return HypervisorStorageModel{}.GetSchema().Attributes
 }
 
 // Create creates the resource and sets the initial Terraform state.

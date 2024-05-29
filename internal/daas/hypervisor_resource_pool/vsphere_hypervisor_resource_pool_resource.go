@@ -6,24 +6,14 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
-	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
@@ -66,7 +56,8 @@ func (r *vsphereHypervisorResourcePoolResource) ModifyPlan(ctx context.Context, 
 		return
 	}
 
-	for _, storageModel := range plan.Storage {
+	storage := util.ObjectListToTypedArray[HypervisorStorageModel](ctx, &resp.Diagnostics, plan.Storage)
+	for _, storageModel := range storage {
 		if storageModel.Superseded.ValueBool() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("storage"),
@@ -76,7 +67,8 @@ func (r *vsphereHypervisorResourcePoolResource) ModifyPlan(ctx context.Context, 
 		}
 	}
 
-	for _, storageModel := range plan.TemporaryStorage {
+	temporaryStorage := util.ObjectListToTypedArray[HypervisorStorageModel](ctx, &resp.Diagnostics, plan.TemporaryStorage)
+	for _, storageModel := range temporaryStorage {
 		if storageModel.Superseded.ValueBool() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("temporary_storage"),
@@ -93,88 +85,7 @@ func (r *vsphereHypervisorResourcePoolResource) Metadata(_ context.Context, req 
 }
 
 func (r *vsphereHypervisorResourcePoolResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "Manages a VMware vSphere hypervisor resource pool.",
-		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "GUID identifier of the resource pool.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"name": schema.StringAttribute{
-				Description: "Name of the resource pool. Name should be unique across all hypervisors.",
-				Required:    true,
-			},
-			"hypervisor": schema.StringAttribute{
-				Description: "Id of the hypervisor for which the resource pool needs to be created.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
-				},
-			},
-			"cluster": schema.SingleNestedAttribute{
-				Description: "Details of the cluster where resources reside and new resources will be created.",
-				Required:    true,
-				Attributes: map[string]schema.Attribute{
-					"datacenter": schema.StringAttribute{
-						Description: "The name of the datacenter.",
-						Required:    true,
-					},
-					"cluster_name": schema.StringAttribute{
-						Description: "The name of the cluster.",
-						Optional:    true,
-						Validators: []validator.String{
-							stringvalidator.AtLeastOneOf(path.Expressions{
-								path.MatchRelative().AtParent().AtName("host"),
-							}...),
-						},
-					},
-					"host": schema.StringAttribute{
-						Description: "The IP address or FQDN of the host.",
-						Optional:    true,
-					},
-				},
-			},
-			"networks": schema.ListAttribute{
-				ElementType: types.StringType,
-				Description: "List of networks for allocating resources.",
-				Required:    true,
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
-				},
-			},
-			"storage": schema.ListNestedAttribute{
-				Description:  "List of hypervisor storage to use for OS data.",
-				Required:     true,
-				NestedObject: GetNestedAttributeObjectSchmeaForStorege(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
-				},
-			},
-			"temporary_storage": schema.ListNestedAttribute{
-				Description:  "List of hypervisor storage to use for temporary data.",
-				Required:     true,
-				NestedObject: GetNestedAttributeObjectSchmeaForStorege(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
-				},
-			},
-			"use_local_storage_caching": schema.BoolAttribute{
-				Description: "Indicates whether intellicache is enabled to reduce load on the shared storage device. Will only be effective when shared storage is used. Default value is `false`.",
-				Optional:    true,
-				Computed:    true,
-				Default:     booldefault.StaticBool(false),
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.RequiresReplace(),
-				},
-			},
-		},
-	}
+	resp.Schema = GetVsphereHypervisorResourcePoolSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -206,23 +117,24 @@ func (r *vsphereHypervisorResourcePoolResource) Create(ctx context.Context, req 
 	folderPath := hypervisor.GetXDPath()
 	var relativePath string
 
-	resource, err := util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, folderPath, plan.Cluster.Datacenter.ValueString(), "datacenter", "", hypervisor)
+	cluster := util.ObjectValueToTypedObject[VsphereHypervisorClusterModel](ctx, &resp.Diagnostics, plan.Cluster)
+	resource, err := util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, folderPath, cluster.Datacenter.ValueString(), "datacenter", "", hypervisor)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor Resource Pool for vSphere",
-			fmt.Sprintf("Failed to resolve resource %s, error: %s", plan.Cluster.Datacenter.ValueString(), err.Error()),
+			fmt.Sprintf("Failed to resolve resource %s, error: %s", cluster.Datacenter.ValueString(), err.Error()),
 		)
 		return
 	}
 	folderPath = resource.GetXDPath()
 	relativePath = resource.GetRelativePath()
 
-	if !plan.Cluster.ClusterName.IsNull() {
-		resource, err = util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, folderPath, plan.Cluster.ClusterName.ValueString(), "cluster", "", hypervisor)
+	if !cluster.ClusterName.IsNull() {
+		resource, err = util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, folderPath, cluster.ClusterName.ValueString(), "cluster", "", hypervisor)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating Hypervisor Resource Pool for vSphere",
-				fmt.Sprintf("Failed to resolve resource %s, error: %s", plan.Cluster.ClusterName.ValueString(), err.Error()),
+				fmt.Sprintf("Failed to resolve resource %s, error: %s", cluster.ClusterName.ValueString(), err.Error()),
 			)
 			return
 		}
@@ -230,12 +142,12 @@ func (r *vsphereHypervisorResourcePoolResource) Create(ctx context.Context, req 
 		relativePath = resource.GetRelativePath()
 	}
 
-	if !plan.Cluster.Host.IsNull() {
-		resource, err = util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, folderPath, plan.Cluster.Host.ValueString(), "computeresource", "", hypervisor)
+	if !cluster.Host.IsNull() {
+		resource, err = util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, folderPath, cluster.Host.ValueString(), "computeresource", "", hypervisor)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating Hypervisor Resource Pool for vSphere",
-				fmt.Sprintf("Failed to resolve resource %s, error: %s", plan.Cluster.Host.ValueString(), err.Error()),
+				fmt.Sprintf("Failed to resolve resource %s, error: %s", cluster.Host.ValueString(), err.Error()),
 			)
 			return
 		}
@@ -274,7 +186,7 @@ func (r *vsphereHypervisorResourcePoolResource) Create(ctx context.Context, req 
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(resourcePool)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, resourcePool)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -304,7 +216,7 @@ func (r *vsphereHypervisorResourcePoolResource) Read(ctx context.Context, req re
 	}
 
 	// Override with refreshed state
-	state = state.RefreshPropertyValues(resourcePool)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, resourcePool)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -396,7 +308,7 @@ func (r *vsphereHypervisorResourcePoolResource) Update(ctx context.Context, req 
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(updatedResourcePool)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, updatedResourcePool)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -456,7 +368,8 @@ func (plan VsphereHypervisorResourcePoolResourceModel) GetStorageList(ctx contex
 	}
 
 	storage := []basetypes.StringValue{}
-	for _, storageModel := range plan.Storage {
+	storageFromPlan := util.ObjectListToTypedArray[HypervisorStorageModel](ctx, diags, plan.Storage)
+	for _, storageModel := range storageFromPlan {
 		if storageModel.Superseded.ValueBool() == forSuperseded {
 			storage = append(storage, storageModel.StorageName)
 		}
@@ -464,13 +377,14 @@ func (plan VsphereHypervisorResourcePoolResourceModel) GetStorageList(ctx contex
 	storageNames := util.ConvertBaseStringArrayToPrimitiveStringArray(storage)
 	hypervisorId := hypervisor.GetId()
 	hypervisorConnectionType := hypervisor.GetConnectionType()
-	folderPath := fmt.Sprintf("%s\\%s.datacenter", hypervisor.GetXDPath(), plan.Cluster.Datacenter.ValueString())
-	if !plan.Cluster.ClusterName.IsNull() {
-		folderPath = fmt.Sprintf("%s\\%s.cluster", folderPath, plan.Cluster.ClusterName.ValueString())
+	cluster := util.ObjectValueToTypedObject[VsphereHypervisorClusterModel](ctx, diags, plan.Cluster)
+	folderPath := fmt.Sprintf("%s\\%s.datacenter", hypervisor.GetXDPath(), cluster.Datacenter.ValueString())
+	if !cluster.ClusterName.IsNull() {
+		folderPath = fmt.Sprintf("%s\\%s.cluster", folderPath, cluster.ClusterName.ValueString())
 	}
 
-	if !plan.Cluster.Host.IsNull() {
-		folderPath = fmt.Sprintf("%s\\%s.computeresource", folderPath, plan.Cluster.Host.ValueString())
+	if !cluster.Host.IsNull() {
+		folderPath = fmt.Sprintf("%s\\%s.computeresource", folderPath, cluster.Host.ValueString())
 	}
 	storages, err := util.GetFilteredResourcePathList(ctx, client, hypervisorId, folderPath, util.StorageResourceType, storageNames, hypervisorConnectionType, hypervisor.GetPluginId())
 
@@ -487,7 +401,8 @@ func (plan VsphereHypervisorResourcePoolResourceModel) GetStorageList(ctx contex
 	}
 
 	tempStorage := []basetypes.StringValue{}
-	for _, storageModel := range plan.TemporaryStorage {
+	temporaryStorageFromPlan := util.ObjectListToTypedArray[HypervisorStorageModel](ctx, diags, plan.TemporaryStorage)
+	for _, storageModel := range temporaryStorageFromPlan {
 		if storageModel.Superseded.ValueBool() == forSuperseded {
 			tempStorage = append(tempStorage, storageModel.StorageName)
 		}
@@ -517,16 +432,17 @@ func (plan VsphereHypervisorResourcePoolResourceModel) GetNetworksList(ctx conte
 		action = "creating"
 	}
 
-	folderPath := fmt.Sprintf("%s\\%s.datacenter", hypervisor.GetXDPath(), plan.Cluster.Datacenter.ValueString())
-	if !plan.Cluster.ClusterName.IsNull() {
-		folderPath = fmt.Sprintf("%s\\%s.cluster", folderPath, plan.Cluster.ClusterName.ValueString())
+	cluster := util.ObjectValueToTypedObject[VsphereHypervisorClusterModel](ctx, diags, plan.Cluster)
+	folderPath := fmt.Sprintf("%s\\%s.datacenter", hypervisor.GetXDPath(), cluster.Datacenter.ValueString())
+	if !cluster.ClusterName.IsNull() {
+		folderPath = fmt.Sprintf("%s\\%s.cluster", folderPath, cluster.ClusterName.ValueString())
 	}
 
-	if !plan.Cluster.Host.IsNull() {
-		folderPath = fmt.Sprintf("%s\\%s.computeresource", folderPath, plan.Cluster.Host.ValueString())
+	if !cluster.Host.IsNull() {
+		folderPath = fmt.Sprintf("%s\\%s.computeresource", folderPath, cluster.Host.ValueString())
 	}
 
-	networkNames := util.ConvertBaseStringArrayToPrimitiveStringArray(plan.Networks)
+	networkNames := util.StringListToStringArray(ctx, diags, plan.Networks)
 	networks, err := util.GetFilteredResourcePathList(ctx, client, hypervisorId, folderPath, util.NetworkResourceType, networkNames, hypervisorConnectionType, hypervisor.GetPluginId())
 	if len(networks) == 0 {
 		errDetail := "No network found for the given network names"

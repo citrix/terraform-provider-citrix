@@ -6,22 +6,13 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
-	"github.com/hashicorp/go-azure-helpers/resourcemanager/location"
-	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -47,68 +38,7 @@ func (r *azureHypervisorResourcePoolResource) Metadata(_ context.Context, req re
 }
 
 func (r *azureHypervisorResourcePoolResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "Manages an Azure hypervisor resource pool.",
-		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "GUID identifier of the resource pool.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"name": schema.StringAttribute{
-				Description: "Name of the resource pool. Name should be unique across all hypervisors.",
-				Required:    true,
-			},
-			"hypervisor": schema.StringAttribute{
-				Description: "Id of the hypervisor for which the resource pool needs to be created.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
-				},
-			},
-			"virtual_network_resource_group": schema.StringAttribute{
-				Description: "The name of the resource group where the vnet resides.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"virtual_network": schema.StringAttribute{
-				Description: "Name of the cloud virtual network.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"subnets": schema.ListAttribute{
-				ElementType: types.StringType,
-				Description: "List of subnets to allocate VDAs within the virtual network.",
-				Required:    true,
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
-				},
-			},
-			"region": schema.StringAttribute{
-				Description: "Cloud Region where the virtual network sits in.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplaceIf(
-						func(_ context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
-							resp.RequiresReplace = !req.ConfigValue.IsNull() && !req.StateValue.IsNull() &&
-								(location.Normalize(req.ConfigValue.ValueString()) != location.Normalize(req.StateValue.ValueString()))
-						},
-						"Force replacement when region changes, unless changing between Azure region name (East US) and Id (eastus)",
-						"Force replacement when region changes, unless changing between Azure region name (East US) and Id (eastus)",
-					),
-				},
-			},
-		},
-	}
+	resp.Schema = GetAzureHypervisorResourcePoolSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -178,14 +108,14 @@ func (r *azureHypervisorResourcePoolResource) Create(ctx context.Context, req re
 	}
 	resourcePoolDetails.SetVirtualNetwork(vnetPath)
 	//Checking the subnet
-	if len(plan.Subnets) == 0 {
+	if plan.Subnets.IsNull() {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor Resource Pool for Azure",
 			"Subnet is missing.",
 		)
 		return
 	}
-	planSubnet := util.ConvertBaseStringArrayToPrimitiveStringArray(plan.Subnets)
+	planSubnet := util.StringListToStringArray(ctx, &diags, plan.Subnets)
 	subnets, err := util.GetFilteredResourcePathList(ctx, r.client, hypervisorId, fmt.Sprintf("%s/virtualprivatecloud.folder/%s", regionPath, vnetPath), util.NetworkResourceType, planSubnet, hypervisorConnectionType, hypervisor.GetPluginId())
 
 	if err != nil {
@@ -196,7 +126,7 @@ func (r *azureHypervisorResourcePoolResource) Create(ctx context.Context, req re
 		return
 	}
 
-	if len(plan.Subnets) != len(subnets) {
+	if len(plan.Subnets.Elements()) != len(subnets) {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor Resource Pool for Azure",
 			"Subnet contains invalid value.",
@@ -211,7 +141,7 @@ func (r *azureHypervisorResourcePoolResource) Create(ctx context.Context, req re
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(resourcePool)
+	plan = plan.RefreshPropertyValues(ctx, &diags, resourcePool)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -242,7 +172,7 @@ func (r *azureHypervisorResourcePoolResource) Read(ctx context.Context, req reso
 	}
 
 	// Override with refreshed state
-	state = state.RefreshPropertyValues(resourcePool)
+	state = state.RefreshPropertyValues(ctx, &diags, resourcePool)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -274,7 +204,7 @@ func (r *azureHypervisorResourcePoolResource) Update(ctx context.Context, req re
 	editHypervisorResourcePool.SetName(plan.Name.ValueString())
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM)
 
-	planSubnet := util.ConvertBaseStringArrayToPrimitiveStringArray(plan.Subnets)
+	planSubnet := util.StringListToStringArray(ctx, &diags, plan.Subnets)
 	regionPath := fmt.Sprintf("%s.region", plan.Region.ValueString())
 	resourceGroupPath := fmt.Sprintf("%s.resourcegroup", plan.VirtualNetworkResourceGroup.ValueString())
 	vnetPath := fmt.Sprintf("%s.virtualprivatecloud", plan.VirtualNetwork.ValueString())
@@ -289,7 +219,7 @@ func (r *azureHypervisorResourcePoolResource) Update(ctx context.Context, req re
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(updatedResourcePool)
+	plan = plan.RefreshPropertyValues(ctx, &diags, updatedResourcePool)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)

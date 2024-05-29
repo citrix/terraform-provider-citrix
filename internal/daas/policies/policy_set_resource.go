@@ -430,7 +430,7 @@ func (r *policySetResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	util.RefreshList(plan.Scopes, policySet.Scopes)
+	util.RefreshListDeprecated(plan.Scopes, policySet.Scopes)
 
 	// Map response body to schema and populate Computed attribute values
 	plan = plan.RefreshPropertyValues(policySet, policies)
@@ -465,7 +465,7 @@ func (r *policySetResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	util.RefreshList(state.Scopes, policySet.Scopes)
+	util.RefreshListDeprecated(state.Scopes, policySet.Scopes)
 
 	state = state.RefreshPropertyValues(policySet, policies)
 
@@ -659,7 +659,7 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	util.RefreshList(plan.Scopes, policySet.Scopes)
+	util.RefreshListDeprecated(plan.Scopes, policySet.Scopes)
 
 	// Map response body to schema and populate Computed attribute values
 	plan = plan.RefreshPropertyValues(policySet, policies)

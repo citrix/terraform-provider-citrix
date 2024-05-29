@@ -3,8 +3,16 @@
 package hypervisor
 
 import (
-	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"regexp"
 
+	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"github.com/citrix/terraform-provider-citrix/internal/util"
+
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -17,6 +25,44 @@ type GcpHypervisorResourceModel struct {
 	/** GCP Connection **/
 	ServiceAccountId          types.String `tfsdk:"service_account_id"`
 	ServiceAccountCredentials types.String `tfsdk:"service_account_credentials"`
+}
+
+func GetGcpHypervisorSchema() schema.Schema {
+	return schema.Schema{
+		Description: "Manages a GCP hypervisor.",
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Description: "GUID identifier of the hypervisor.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"name": schema.StringAttribute{
+				Description: "Name of the hypervisor.",
+				Required:    true,
+			},
+			"zone": schema.StringAttribute{
+				Description: "Id of the zone the hypervisor is associated with.",
+				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
+				},
+			},
+			"service_account_id": schema.StringAttribute{
+				Description: "The service account ID used to access the Google Cloud APIs.",
+				Required:    true,
+			},
+			"service_account_credentials": schema.StringAttribute{
+				Description: "The JSON-encoded service account credentials used to access the Google Cloud APIs.",
+				Required:    true,
+				Sensitive:   true,
+			},
+		},
+	}
 }
 
 func (r GcpHypervisorResourceModel) RefreshPropertyValues(hypervisor *citrixorchestration.HypervisorDetailResponseModel) GcpHypervisorResourceModel {

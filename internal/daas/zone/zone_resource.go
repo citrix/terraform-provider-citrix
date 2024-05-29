@@ -10,14 +10,9 @@ import (
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -45,45 +40,7 @@ func (r *zoneResource) Metadata(_ context.Context, req resource.MetadataRequest,
 
 // Schema defines the schema for the resource.
 func (r *zoneResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "Manages a zone.\nFor cloud DDC, Zones and Cloud Connectors are managed only by Citrix Cloud. Ensure you have a resource location manually created and connectors deployed in it. You may then apply or import the zone using the zone Id.",
-		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "GUID identifier of the zone.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"name": schema.StringAttribute{
-				Description: "Name of the zone.\nFor Cloud DDC, ensure this matches the name of the existing zone that needs to be used.",
-				Required:    true,
-			},
-			"description": schema.StringAttribute{
-				Description: "Description of the zone.\nFor Cloud DDC, ensure this matches the description of the existing zone that needs to be used.",
-				Optional:    true,
-			},
-			"metadata": schema.ListNestedAttribute{
-				Description: "Metadata of the zone. Cannot be modified in DaaS cloud.",
-				Optional:    true,
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"name": schema.StringAttribute{
-							Description: "Metadata name.",
-							Required:    true,
-						},
-						"value": schema.StringAttribute{
-							Description: "Metadata value.",
-							Required:    true,
-						},
-					},
-				},
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
-				},
-			},
-		},
-	}
+	resp.Schema = GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -115,7 +72,7 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 		if err == nil && zone != nil {
 			// zone exists. Add it to the state file
-			plan = plan.RefreshPropertyValues(zone, false)
+			plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, zone, false)
 
 			diags = resp.State.Set(ctx, plan)
 			resp.Diagnostics.Append(diags...)
@@ -133,8 +90,9 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 	var body citrixorchestration.CreateZoneRequestModel
 	body.SetName(plan.Name.ValueString())
 	body.SetDescription(plan.Description.ValueString())
-	if plan.Metadata != nil {
-		metadata := util.ParseNameValueStringPairToClientModel(plan.Metadata)
+	if !plan.Metadata.IsNull() {
+		terraformModel := util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata)
+		metadata := util.ParseNameValueStringPairToClientModel(terraformModel)
 		body.SetMetadata(metadata)
 	}
 
@@ -159,7 +117,7 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(zone, r.client.AuthConfig.OnPremises)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, zone, r.client.AuthConfig.OnPremises)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -187,7 +145,7 @@ func (r *zoneResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	state = state.RefreshPropertyValues(zone, r.client.AuthConfig.OnPremises)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, zone, r.client.AuthConfig.OnPremises)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -222,8 +180,9 @@ func (r *zoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	editZoneRequestBody.SetName(plan.Name.ValueString())
 	editZoneRequestBody.SetDescription(plan.Description.ValueString())
 
-	if plan.Metadata != nil {
-		metadata := util.ParseNameValueStringPairToClientModel(plan.Metadata)
+	if !plan.Metadata.IsNull() {
+		terraformModel := util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata)
+		metadata := util.ParseNameValueStringPairToClientModel(terraformModel)
 		editZoneRequestBody.SetMetadata(metadata)
 	}
 
@@ -246,7 +205,7 @@ func (r *zoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 
 	// Update resource state with updated property values
-	plan = plan.RefreshPropertyValues(updatedZone, r.client.AuthConfig.OnPremises)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, updatedZone, r.client.AuthConfig.OnPremises)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

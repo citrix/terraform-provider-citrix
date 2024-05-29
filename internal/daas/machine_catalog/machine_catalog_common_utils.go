@@ -97,10 +97,10 @@ func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ct
 	body.SetIsRemotePC(plan.IsRemotePc.ValueBool())
 
 	if isRemotePcCatalog {
-		remotePCEnrollmentScopes := getRemotePcEnrollmentScopes(plan, true)
+		remotePCEnrollmentScopes := getRemotePcEnrollmentScopes(ctx, diagnostics, plan, true)
 		body.SetRemotePCEnrollmentScopes(remotePCEnrollmentScopes)
 	} else {
-		machinesRequest, err = getMachinesForManualCatalogs(ctx, client, plan.MachineAccounts)
+		machinesRequest, err = getMachinesForManualCatalogs(ctx, diagnostics, client, util.ObjectListToTypedArray[MachineAccountsModel](ctx, diagnostics, plan.MachineAccounts))
 		if err != nil {
 			diagnostics.AddError(
 				"Error creating Machine Catalog",
@@ -149,18 +149,19 @@ func getRequestModelForUpdateMachineCatalog(plan MachineCatalogResourceModel, ct
 	if *provisioningType == citrixorchestration.PROVISIONINGTYPE_MANUAL {
 
 		if plan.IsRemotePc.ValueBool() {
-			remotePCEnrollmentScopes := getRemotePcEnrollmentScopes(plan, false)
+			remotePCEnrollmentScopes := getRemotePcEnrollmentScopes(ctx, &resp.Diagnostics, plan, false)
 			body.SetRemotePCEnrollmentScopes(remotePCEnrollmentScopes)
 		}
 
 		return &body, nil
 	}
 
-	if !checkIfProvSchemeIsCloudOnly(plan, isOnPremises, &resp.Diagnostics) {
-		return nil, fmt.Errorf("identity type %s is not supported in OnPremises environment. ", plan.ProvisioningScheme.IdentityType.ValueString())
+	provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
+	if !checkIfProvSchemeIsCloudOnly(provSchemeModel, isOnPremises, &resp.Diagnostics, ctx) {
+		return nil, fmt.Errorf("identity type %s is not supported in OnPremises environment. ", provSchemeModel.IdentityType.ValueString())
 	}
 
-	body, err = setProvSchemePropertiesForUpdateCatalog(plan, body, ctx, client, &resp.Diagnostics)
+	body, err = setProvSchemePropertiesForUpdateCatalog(provSchemeModel, body, ctx, client, &resp.Diagnostics)
 	if err != nil {
 		return nil, err
 	}
@@ -168,14 +169,14 @@ func getRequestModelForUpdateMachineCatalog(plan MachineCatalogResourceModel, ct
 	return &body, nil
 }
 
-func checkIfProvSchemeIsCloudOnly(plan MachineCatalogResourceModel, isOnPremises bool, diagnostics *diag.Diagnostics) bool {
-	if plan.ProvisioningScheme.IdentityType.ValueString() == string(citrixorchestration.IDENTITYTYPE_AZURE_AD) ||
-		plan.ProvisioningScheme.IdentityType.ValueString() == string(citrixorchestration.IDENTITYTYPE_WORKGROUP) {
+func checkIfProvSchemeIsCloudOnly(provisoningScheme ProvisioningSchemeModel, isOnPremises bool, diagnostics *diag.Diagnostics, ctx context.Context) bool {
+	if provisoningScheme.IdentityType.ValueString() == string(citrixorchestration.IDENTITYTYPE_AZURE_AD) ||
+		provisoningScheme.IdentityType.ValueString() == string(citrixorchestration.IDENTITYTYPE_WORKGROUP) {
 		if isOnPremises {
 			diagnostics.AddAttributeError(
 				path.Root("identity_type"),
 				"Unsupported Machine Catalog Configuration",
-				fmt.Sprintf("Identity type %s is not supported in OnPremises environment. ", string(plan.ProvisioningScheme.IdentityType.ValueString())),
+				fmt.Sprintf("Identity type %s is not supported in OnPremises environment. ", string(provisoningScheme.IdentityType.ValueString())),
 			)
 
 			return false
@@ -184,7 +185,7 @@ func checkIfProvSchemeIsCloudOnly(plan MachineCatalogResourceModel, isOnPremises
 	return true
 }
 
-func generateBatchApiHeaders(client *citrixdaasclient.CitrixDaasClient, plan MachineCatalogResourceModel, generateCredentialHeader bool) ([]citrixorchestration.NameValueStringPairModel, *http.Response, error) {
+func generateBatchApiHeaders(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, provisioningSchemePlan ProvisioningSchemeModel, generateCredentialHeader bool) ([]citrixorchestration.NameValueStringPairModel, *http.Response, error) {
 	headers := []citrixorchestration.NameValueStringPairModel{}
 
 	cwsAuthToken, httpResp, err := client.SignIn()
@@ -201,8 +202,8 @@ func generateBatchApiHeaders(client *citrixdaasclient.CitrixDaasClient, plan Mac
 		headers = append(headers, header)
 	}
 
-	if generateCredentialHeader && plan.ProvisioningScheme.MachineDomainIdentity != nil {
-		adminCredentialHeader := generateAdminCredentialHeader(plan)
+	if generateCredentialHeader && !provisioningSchemePlan.MachineDomainIdentity.IsNull() {
+		adminCredentialHeader := generateAdminCredentialHeader(util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, diagnostics, provisioningSchemePlan.MachineDomainIdentity))
 		var header citrixorchestration.NameValueStringPairModel
 		header.SetName("X-AdminCredential")
 		header.SetValue(adminCredentialHeader)
@@ -219,8 +220,8 @@ func readMachineCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaas
 	return catalog, httpResp, err
 }
 
-func deleteMachinesFromCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, plan MachineCatalogResourceModel, machinesToDelete []citrixorchestration.MachineResponseModel, catalogNameOrId string, isMcsCatalog bool) error {
-	batchApiHeaders, httpResp, err := generateBatchApiHeaders(client, plan, false)
+func deleteMachinesFromCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, provisioningSchemePlan ProvisioningSchemeModel, machinesToDelete []citrixorchestration.MachineResponseModel, catalogNameOrId string, isMcsCatalog bool) error {
+	batchApiHeaders, httpResp, err := generateBatchApiHeaders(ctx, &resp.Diagnostics, client, provisioningSchemePlan, false)
 	txId := citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -291,7 +292,7 @@ func deleteMachinesFromCatalog(ctx context.Context, client *citrixdaasclient.Cit
 		}
 	}
 
-	batchApiHeaders, httpResp, err = generateBatchApiHeaders(client, plan, isMcsCatalog)
+	batchApiHeaders, httpResp, err = generateBatchApiHeaders(ctx, &resp.Diagnostics, client, provisioningSchemePlan, isMcsCatalog)
 	txId = citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -357,7 +358,7 @@ func allocationTypeEnumToString(conn citrixorchestration.AllocationType) string 
 	}
 }
 
-func (scope RemotePcOuModel) RefreshListItem(remote citrixorchestration.RemotePCEnrollmentScopeResponseModel) RemotePcOuModel {
+func (scope RemotePcOuModel) RefreshListItem(_ context.Context, _ *diag.Diagnostics, remote citrixorchestration.RemotePCEnrollmentScopeResponseModel) RemotePcOuModel {
 	scope.OUName = types.StringValue(remote.GetOU())
 	scope.IncludeSubFolders = types.BoolValue(remote.GetIncludeSubfolders())
 

@@ -6,23 +6,13 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
-	"github.com/hashicorp/go-azure-helpers/resourcemanager/location"
-	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -48,75 +38,7 @@ func (r *gcpHypervisorResourcePoolResource) Metadata(_ context.Context, req reso
 }
 
 func (r *gcpHypervisorResourcePoolResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "Manages a GCP hypervisor resource pool.",
-		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "GUID identifier of the resource pool.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"name": schema.StringAttribute{
-				Description: "Name of the resource pool. Name should be unique across all hypervisors.",
-				Required:    true,
-			},
-			"hypervisor": schema.StringAttribute{
-				Description: "Id of the hypervisor for which the resource pool needs to be created.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
-				},
-			},
-			"vpc": schema.StringAttribute{
-				Description: "Name of the cloud virtual network.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"subnets": schema.ListAttribute{
-				ElementType: types.StringType,
-				Description: "List of subnets to allocate VDAs within the virtual network.",
-				Required:    true,
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
-				},
-			},
-			"region": schema.StringAttribute{
-				Description: "Cloud Region where the virtual network sits in.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplaceIf(
-						func(_ context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
-							resp.RequiresReplace = !req.ConfigValue.IsNull() && !req.StateValue.IsNull() &&
-								(location.Normalize(req.ConfigValue.ValueString()) != location.Normalize(req.StateValue.ValueString()))
-						},
-						"Force replacement when region changes, unless changing between GCP region name (East US) and Id (eastus)",
-						"Force replacement when region changes, unless changing between GCP region name (East US) and Id (eastus)",
-					),
-				},
-			},
-			"project_name": schema.StringAttribute{
-				Description: "GCP Project name.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplaceIfConfigured(),
-				},
-			},
-			"shared_vpc": schema.BoolAttribute{
-				Description: "Indicate whether the GCP Virtual Private Cloud is a shared VPC.",
-				Optional:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.RequiresReplaceIfConfigured(),
-				},
-			},
-		},
-	}
+	resp.Schema = GetGcpHypervisorResourcePoolSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -174,14 +96,14 @@ func (r *gcpHypervisorResourcePoolResource) Create(ctx context.Context, req reso
 	}
 	resourcePoolDetails.SetVirtualPrivateCloud(vnetPath)
 	//Checking the subnet
-	if len(plan.Subnets) == 0 {
+	if plan.Subnets.IsNull() {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor Resource Pool for GCP",
 			"Subnet is missing.",
 		)
 		return
 	}
-	planSubnet := util.ConvertBaseStringArrayToPrimitiveStringArray(plan.Subnets)
+	planSubnet := util.StringListToStringArray(ctx, &diags, plan.Subnets)
 	subnets, err := util.GetFilteredResourcePathList(ctx, r.client, hypervisorId, vnetPath, util.NetworkResourceType, planSubnet, hypervisorConnectionType, hypervisor.GetPluginId())
 
 	if err != nil {
@@ -192,7 +114,7 @@ func (r *gcpHypervisorResourcePoolResource) Create(ctx context.Context, req reso
 		return
 	}
 
-	if len(plan.Subnets) != len(subnets) {
+	if len(plan.Subnets.Elements()) != len(subnets) {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor Resource Pool for GCP",
 			"Subnet contains invalid value.",
@@ -207,7 +129,7 @@ func (r *gcpHypervisorResourcePoolResource) Create(ctx context.Context, req reso
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(resourcePool)
+	plan = plan.RefreshPropertyValues(ctx, &diags, resourcePool)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -238,7 +160,7 @@ func (r *gcpHypervisorResourcePoolResource) Read(ctx context.Context, req resour
 	}
 
 	// Override with refreshed state
-	state = state.RefreshPropertyValues(resourcePool)
+	state = state.RefreshPropertyValues(ctx, &diags, resourcePool)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -270,7 +192,7 @@ func (r *gcpHypervisorResourcePoolResource) Update(ctx context.Context, req reso
 	editHypervisorResourcePool.SetName(plan.Name.ValueString())
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM)
 
-	planSubnet := util.ConvertBaseStringArrayToPrimitiveStringArray(plan.Subnets)
+	planSubnet := util.StringListToStringArray(ctx, &diags, plan.Subnets)
 	regionPath := fmt.Sprintf("%s.project/%s.region", plan.ProjectName.ValueString(), plan.Region.ValueString())
 	vnetPath := fmt.Sprintf("%s/%s.virtualprivatecloud", regionPath, plan.Vpc.ValueString())
 	if plan.SharedVpc.ValueBool() {
@@ -288,7 +210,7 @@ func (r *gcpHypervisorResourcePoolResource) Update(ctx context.Context, req reso
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(updatedResourcePool)
+	plan = plan.RefreshPropertyValues(ctx, &diags, updatedResourcePool)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)

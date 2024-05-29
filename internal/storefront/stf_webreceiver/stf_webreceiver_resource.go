@@ -276,7 +276,7 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 			)
 			return
 		}
-		util.RefreshList(plan.AuthenticationMethods, authMethoResult.Methods)
+		util.RefreshListDeprecated(plan.AuthenticationMethods, authMethoResult.Methods)
 	}
 
 	//Refresh Plugin Assistant

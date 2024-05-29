@@ -10,15 +10,9 @@ import (
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -45,56 +39,7 @@ func (r *adminScopeResource) Metadata(_ context.Context, req resource.MetadataRe
 
 // Schema defines the schema for the resource.
 func (r *adminScopeResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		// This description is used by the documentation generator and the language server.
-		Description: "Manages an administrator scope.",
-
-		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "ID of the admin scope.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"name": schema.StringAttribute{
-				Description: "Name of the admin scope.",
-				Required:    true,
-			},
-			"description": schema.StringAttribute{
-				Description: "Description of the admin scope.",
-				Optional:    true,
-			},
-			"scoped_objects": schema.ListNestedAttribute{
-				Description: "List of scoped objects to be associated with the admin scope.",
-				Optional:    true,
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
-				},
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"object_type": schema.StringAttribute{
-							Description: "Type of the scoped object. Allowed values are: `HypervisorConnection`, `MachineCatalog`, `DeliveryGroup`, `ApplicationGroup`, `Tag`, `PolicySet` and `Unknown`.",
-							Required:    true,
-							Validators: []validator.String{
-								stringvalidator.OneOf("Unknown",
-									"HypervisorConnection",
-									"MachineCatalog",
-									"DeliveryGroup",
-									"ApplicationGroup",
-									"Tag",
-									"PolicySet"),
-							},
-						},
-						"object": schema.StringAttribute{
-							Description: "Name of an existing object under the object type to be added to the scope.",
-							Required:    true,
-						},
-					},
-				},
-			},
-		},
-	}
+	resp.Schema = GetAdminScopeSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -118,7 +63,7 @@ func (r *adminScopeResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	var scopedObjectsRequestModel, errorMsg = getScopedObjectsRequestModel(plan.ScopedObjects)
+	var scopedObjectsRequestModel, errorMsg = getScopedObjectsRequestModel(util.ObjectListToTypedArray[ScopedObjectsModel](ctx, &resp.Diagnostics, plan.ScopedObjects))
 	if errorMsg != "" {
 		resp.Diagnostics.AddError(
 			"Error creating Admin Scope",
@@ -160,7 +105,7 @@ func (r *adminScopeResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(adminScope, scopedObjects)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, adminScope, scopedObjects)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -194,7 +139,7 @@ func (r *adminScopeResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	state = state.RefreshPropertyValues(adminScope, scopedObjects)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, adminScope, scopedObjects)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -216,7 +161,7 @@ func (r *adminScopeResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	var scopedObjectsRequestModel, errorMsg = getScopedObjectsRequestModel(plan.ScopedObjects)
+	var scopedObjectsRequestModel, errorMsg = getScopedObjectsRequestModel(util.ObjectListToTypedArray[ScopedObjectsModel](ctx, &resp.Diagnostics, plan.ScopedObjects))
 	if errorMsg != "" {
 		resp.Diagnostics.AddError(
 			"Error creating Admin Scope",
@@ -260,7 +205,7 @@ func (r *adminScopeResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 
 	// Update resource state with updated property values
-	plan = plan.RefreshPropertyValues(updatedAdminScope, updatedScopedObjects)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, updatedAdminScope, updatedScopedObjects)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
