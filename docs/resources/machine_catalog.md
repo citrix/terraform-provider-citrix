@@ -259,7 +259,7 @@ resource "citrix_machine_catalog" "example-manual-power-managed-mtsession" {
                 {
                     region = "East US"
                     resource_group_name = "machine-resource-group-name"
-                    machine_name = "Domain\\MachineName"
+                    machine_account = "Domain\\MachineName"
                 }
             ]
         }
@@ -279,10 +279,10 @@ resource "citrix_machine_catalog" "example-manual-non-power-managed-mtsession" {
         {
             machines = [
                 {
-                    machine_name = "Domain\\MachineName1"
+                    machine_account = "Domain\\MachineName1"
                 },
 				{
-                    machine_name = "Domain\\MachineName2"
+                    machine_account = "Domain\\MachineName2"
                 }
             ]
         }
@@ -302,10 +302,10 @@ resource "citrix_machine_catalog" "example-remote-pc" {
         {
             machines = [
                 {
-                    machine_name = "Domain\\MachineName1"
+                    machine_account = "Domain\\MachineName1"
                 },
 				{
-                    machine_name = "Domain\\MachineName2"
+                    machine_account = "Domain\\MachineName2"
                 }
             ]
         }
