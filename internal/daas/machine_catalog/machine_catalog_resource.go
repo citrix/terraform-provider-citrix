@@ -512,7 +512,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 		}
 
 		data.IsPowerManaged = types.BoolValue(true) // set power managed to true for MCS catalog
-	} else {
+	} else if data.ProvisioningType.ValueString() == provisioningTypeManual {
 		// Manual provisioning type
 		if data.IsPowerManaged.IsNull() {
 			resp.Diagnostics.AddAttributeError(
