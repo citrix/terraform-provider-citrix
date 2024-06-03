@@ -219,7 +219,9 @@ func (mc *AzureMachineConfigModel) RefreshProperties(catalog citrixorchestration
 	for _, stringPair := range customProperties {
 		switch stringPair.GetName() {
 		case "StorageType":
-			mc.StorageType = types.StringValue(stringPair.GetValue())
+			if mc.StorageType != types.StringValue(util.AzureEphemeralOSDisk) {
+				mc.StorageType = types.StringValue(stringPair.GetValue())
+			}
 		case "UseManagedDisks":
 			mc.UseManagedDisks = util.StringToTypeBool(stringPair.GetValue())
 		case "ResourceGroups":
@@ -471,8 +473,7 @@ func parseAzureMachineProfileResponseToModel(machineProfileResponse citrixorches
 	if machineProfileName := machineProfileResponse.GetName(); machineProfileName != "" {
 		machineProfileSegments := strings.Split(machineProfileResponse.GetXDPath(), "\\")
 		lastIndex := len(machineProfileSegments) - 1
-		resourceType := strings.Split(machineProfileSegments[lastIndex], ".")[1]
-		if strings.EqualFold(resourceType, "templatespecversion") {
+		if strings.HasSuffix(machineProfileSegments[lastIndex], ".templatespecversion") {
 			machineProfileModel.MachineProfileTemplateSpecVersion = types.StringValue(machineProfileName)
 
 			templateSpecIndex := slices.IndexFunc(machineProfileSegments, func(machineProfileSegment string) bool {
