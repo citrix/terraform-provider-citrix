@@ -216,10 +216,11 @@ func (mc *AzureMachineConfigModel) RefreshProperties(catalog citrixorchestration
 	isLicenseTypeSet := false
 	isDesSet := false
 	isUseSharedImageGallerySet := false
+	isUseEphemeralOsDiskSet := false
 	for _, stringPair := range customProperties {
 		switch stringPair.GetName() {
 		case "StorageType":
-			if mc.StorageType != types.StringValue(util.AzureEphemeralOSDisk) {
+			if !isUseEphemeralOsDiskSet {
 				mc.StorageType = types.StringValue(stringPair.GetValue())
 			}
 		case "UseManagedDisks":
@@ -293,6 +294,7 @@ func (mc *AzureMachineConfigModel) RefreshProperties(catalog citrixorchestration
 		case "UseEphemeralOsDisk":
 			if strings.EqualFold(stringPair.GetValue(), "true") {
 				mc.StorageType = types.StringValue(util.AzureEphemeralOSDisk)
+				isUseEphemeralOsDiskSet = true
 			}
 		default:
 		}
