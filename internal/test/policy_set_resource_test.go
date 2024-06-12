@@ -1,4 +1,4 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 
 package test
 
@@ -15,7 +15,6 @@ var (
 resource "citrix_policy_set" "testPolicySet" {
     name = "%s-1"
     description = "Test policy set description"
-    scopes = [ "All" ]
     type = "DeliveryGroupPolicies"
     policies = [
         {
@@ -34,13 +33,9 @@ resource "citrix_policy_set" "testPolicySet" {
                     use_default = false
                 }
             ]
-            policy_filters = [
+            delivery_group_filters = [
                 {
-                    type = "DesktopGroup"
-                    data = {
-                        server = "%s"
-                        uuid = citrix_delivery_group.testDeliveryGroup.id
-                    }
+                    delivery_group_id = citrix_delivery_group.testDeliveryGroup.id
                     enabled = true
                     allowed = true
                 },
@@ -57,7 +52,6 @@ resource "citrix_policy_set" "testPolicySet" {
                     use_default = false
                 },
             ]
-            policy_filters = []
         }
     ]
 }
@@ -67,7 +61,6 @@ resource "citrix_policy_set" "testPolicySet" {
 resource "citrix_policy_set" "testPolicySet" {
     name = "%s-2"
     description = "Test policy set description"
-    scopes = [ "All" ]
     type = "DeliveryGroupPolicies"
     policies = [
 		{
@@ -81,7 +74,6 @@ resource "citrix_policy_set" "testPolicySet" {
                     use_default = false
                 },
             ]
-            policy_filters = []
         },
         {
             name = "first-test-policy"
@@ -94,13 +86,9 @@ resource "citrix_policy_set" "testPolicySet" {
                     use_default = false
                 },
             ]
-            policy_filters = [
+            delivery_group_filters = [
                 {
-                    type = "DesktopGroup"
-                    data = {
-                        server = "%s"
-                        uuid = citrix_delivery_group.testDeliveryGroup.id
-                    }
+                    delivery_group_id = citrix_delivery_group.testDeliveryGroup.id
                     enabled = true
                     allowed = true
                 },
@@ -114,7 +102,6 @@ resource "citrix_policy_set" "testPolicySet" {
 resource "citrix_policy_set" "testPolicySet" {
     name = "%s-3"
     description = "Test policy set description updated"
-    scopes = [ "All" ]
     type = "DeliveryGroupPolicies"
     policies = [
         {
@@ -128,13 +115,9 @@ resource "citrix_policy_set" "testPolicySet" {
                     use_default = false
                 },
             ]
-            policy_filters = [
+            delivery_group_filters = [
                 {
-                    type = "DesktopGroup"
-                    data = {
-                        server = "%s"
-                        uuid = citrix_delivery_group.testDeliveryGroup.id
-                    }
+                    delivery_group_id = citrix_delivery_group.testDeliveryGroup.id
                     enabled = true
                     allowed = true
                 },
@@ -149,17 +132,12 @@ func TestPolicySetResourcePreCheck(t *testing.T) {
 	if v := os.Getenv("TEST_POLICY_SET_NAME"); v == "" {
 		t.Fatal("TEST_POLICY_SET_NAME must be set for acceptance tests")
 	}
-
-	if v := os.Getenv("CITRIX_DDC_HOST_NAME"); v == "" {
-		t.Fatal("CITRIX_DDC_HOST_NAME must be set for acceptance tests")
-	}
 }
 
 func BuildPolicySetResource(t *testing.T, policySet string) string {
 	policySetName := os.Getenv("TEST_POLICY_SET_NAME")
-	ddcServerHostName := os.Getenv("CITRIX_DDC_HOST_NAME")
 
-	return fmt.Sprintf(policySet, policySetName, ddcServerHostName)
+	return fmt.Sprintf(policySet, policySetName)
 }
 
 func TestPolicySetResource(t *testing.T) {
@@ -193,9 +171,7 @@ func TestPolicySetResource(t *testing.T) {
 					// Verify type of the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "type", "DeliveryGroupPolicies"),
 					// Verify the number of scopes of the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.#", "1"),
-					// Verify the scopes of the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.0", "All"),
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.#", "0"),
 					// Verify the number of policies in the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.#", "2"),
 					// Verify name of the first policy in the policy set
@@ -229,9 +205,7 @@ func TestPolicySetResource(t *testing.T) {
 					// Verify type of the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "type", "DeliveryGroupPolicies"),
 					// Verify the number of scopes of the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.#", "1"),
-					// Verify the scopes of the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.0", "All"),
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.#", "0"),
 					// Verify the number of policies in the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.#", "2"),
 					// Verify name of the first policy in the policy set
@@ -268,9 +242,7 @@ func TestPolicySetResource(t *testing.T) {
 					// Verify type of the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "type", "DeliveryGroupPolicies"),
 					// Verify the number of scopes of the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.#", "1"),
-					// Verify the scopes of the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.0", "All"),
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.#", "0"),
 					// Verify the number of policies in the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.#", "1"),
 					// Verify name of the second policy in the policy set

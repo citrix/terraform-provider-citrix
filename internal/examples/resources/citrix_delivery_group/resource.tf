@@ -9,7 +9,7 @@ resource "citrix_delivery_group" "example-delivery-group" {
     desktops = [
         {
             published_name = "Example Desktop"
-            description = "Desription for example desktop"
+            description = "Description for example desktop"
             restricted_access_users = {
                 allow_list = [
                     "user1@example.com"
@@ -98,7 +98,6 @@ resource "citrix_delivery_group" "example-delivery-group" {
 			}
 		}
 	]
-	
     policy_set_id            = citrix_policy_set.example-policy-set.id
     minimum_functional_level = "L7_20"
 }

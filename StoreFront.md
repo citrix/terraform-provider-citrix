@@ -3,7 +3,6 @@
 This Terraform module allows you to manage resources in Citrix StoreFront.
 
 ## Table of Contents
-
 - [Terraform Module for Citrix StoreFront](#terraform-module-for-citrix-storefront)
   - [Table of Contents](#table-of-contents)
   - [Prerequisites](#prerequisites)
@@ -26,9 +25,9 @@ This Terraform module allows you to manage resources in Citrix StoreFront.
 If running the StoreFront provider on a machine other than the machine where StoreFront is installed, please provide the Active Directory Admin credentials in either environment variables or provider configuration
   - `SF_COMPUTER_NAME`: 
       - The name of the remote computer where the StoreFront server is running.
-  - `SF_AD_ADMAIN_USERNAME`: 
+  - `SF_AD_ADMIN_USERNAME`: 
       - The Active Directory Admin username to connect to the remote PowerShell of the StoreFront Server machine.
-  - `SF_AD_ADMAIN_PASSWORD`: 
+  - `SF_AD_ADMIN_PASSWORD`: 
       - The Active Directory Admin password to connect to the remote PowerShell of the StoreFront server machine.
 
 

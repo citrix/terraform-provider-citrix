@@ -1,4 +1,4 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 
 package application
 
@@ -77,7 +77,7 @@ func (d *ApplicationDataSource) Schema(ctx context.Context, req datasource.Schem
 								},
 							},
 						},
-						"delivery_groups": schema.ListAttribute{
+						"delivery_groups": schema.SetAttribute{
 							ElementType:         types.StringType,
 							MarkdownDescription: "The delivery groups which the application is associated with.",
 							Computed:            true,
@@ -128,7 +128,7 @@ func (d *ApplicationDataSource) Read(ctx context.Context, req datasource.ReadReq
 			)
 			return // Stop processing
 		}
-		data = data.RefreshPropertyValues(apps)
+		data = data.RefreshPropertyValues(ctx, &resp.Diagnostics, apps)
 	}
 
 	// Save data into Terraform state

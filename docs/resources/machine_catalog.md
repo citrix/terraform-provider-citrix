@@ -19,10 +19,7 @@ resource "citrix_machine_catalog" "example-azure-mtsession" {
 	zone						= "<zone Id>"
 	allocation_type				= "Random"
 	session_support				= "MultiSession"
-	is_power_managed			= true
-	is_remote_pc 			  	= false
 	provisioning_type 			= "MCS"
-	minimum_functional_level    = "L7_20"
 	provisioning_scheme			= 	{
 		hypervisor = citrix_azure_hypervisor.example-azure-hypervisor.id
 		hypervisor_resource_pool = citrix_azure_hypervisor_resource_pool.example-azure-hypervisor-resource-pool.id
@@ -37,11 +34,19 @@ resource "citrix_machine_catalog" "example-azure-mtsession" {
 			storage_type = "Standard_LRS"
 			use_managed_disks = true
             service_offering = "Standard_D2_v2"
-            azure_machine_config = {
-                resource_group = "<Azure resource group name for image vhd>"
-                storage_account = "<Azure storage account name for image vhd>"
-                container = "<Azure storage container for image vhd>"
-                master_image = "<Image vhd blob name>"
+            azure_master_image = {
+                # shared_subscription = var.azure_image_subscription # Uncomment if the image is from a subscription outside of the hypervisor's subscription
+
+                # For Azure master image from managed disk or snapshot
+                resource_group       = var.azure_resource_group
+                master_image         = var.azure_master_image
+
+                # For Azure image gallery
+                # gallery_image = {
+                #     gallery    = var.azure_gallery_name
+                #     definition = var.azure_gallery_image_definition
+                #     version    = var.azure_gallery_image_version
+                # }
             }
 			writeback_cache = {
 				wbc_disk_storage_type = "pd-standard"
@@ -53,12 +58,6 @@ resource "citrix_machine_catalog" "example-azure-mtsession" {
 				storage_cost_saving = true
 			}
         }
-		network_mapping = [
-            {
-                network_device = "0"
-                network = "<Azure Subnet for machine>"
-            }
-        ]
 		availability_zones = "1,2,..."
 		number_of_total_machines = 	1
 		machine_account_creation_rules ={
@@ -74,8 +73,6 @@ resource "citrix_machine_catalog" "example-aws-mtsession" {
    	zone						= "<zone Id>"
 	allocation_type				= "Random"
 	session_support				= "MultiSession"
-	is_power_managed			= true
-	is_remote_pc 			  	= false
 	provisioning_type 			= "MCS"
     provisioning_scheme         = {
 		hypervisor = citrix_aws_hypervisor.example-aws-hypervisor.id
@@ -96,12 +93,6 @@ resource "citrix_machine_catalog" "example-aws-mtsession" {
             ]
             tenancy_type = "Shared"
         }
-		network_mapping = [
-            {
-                network_device = "0"
-                network = "10.0.128.0/20"
-            }
-        ]
 		number_of_total_machines =  1
         machine_account_creation_rules ={
 			naming_scheme 	   = "aws-multi-##"
@@ -116,8 +107,6 @@ resource "citrix_machine_catalog" "example-gcp-mtsession" {
    	zone						= "<zone Id>"
 	allocation_type				= "Random"
 	session_support				= "MultiSession"
-	is_power_managed			= true
-	is_remote_pc 			  	= false
 	provisioning_type 			= "MCS"
     provisioning_scheme         = {
 		hypervisor = citrix_gcp_hypervisor.example-gcp-hypervisor.id
@@ -130,7 +119,6 @@ resource "citrix_machine_catalog" "example-gcp-mtsession" {
             service_account_password = "<Admin Password>"
         }
         gcp_machine_config = {
-            
             machine_profile = "<Machine profile template VM name>"
             master_image = "<Image template VM name>"
             machine_snapshot = "<Image template VM snapshot name>"
@@ -155,29 +143,29 @@ resource "citrix_machine_catalog" "example-gcp-mtsession" {
 resource "citrix_machine_catalog" "example-vsphere-mtsession" {
     name                        = "example-vsphere-mtsession"
     description                 = "Example multi-session catalog on Vsphere hypervisor"
-    provisioning_type 			= "MCS"
+    zone                        = "<zone Id>"
     allocation_type             = "Random"
     session_support             = "MultiSession"
-    zone                        = "<zone Id>"
+    provisioning_type 			= "MCS"
     provisioning_scheme         = {
-        identity_type = "ActiveDirectory"
-        number_of_total_machines = 1
-        machine_account_creation_rules = {
-            naming_scheme = "catalog-##"
-            naming_scheme_type = "Numeric"
-        }
         hypervisor = citrix_vsphere_hypervisor.vsphere-hypervisor-1.id
         hypervisor_resource_pool = citrix_vsphere_hypervisor_resource_pool.vsphere-hypervisor-rp-1.id
+        identity_type = "ActiveDirectory"
+        machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
         vsphere_machine_config = {
             master_image_vm = "<Image VM name>"
             image_snapshot = "<Snapshot 1>/<Snapshot 2>/<Snapshot 3>/..."
             cpu_count = 2
             memory_mb = 4096
         }
-        machine_domain_identity = {
-            domain                   = "<DomainFQDN>"
-            service_account          = "<Admin Username>"
-            service_account_password = "<Admin Password>"
+        number_of_total_machines = 1
+        machine_account_creation_rules = {
+            naming_scheme = "catalog-##"
+            naming_scheme_type = "Numeric"
         }
     }
 }
@@ -185,29 +173,29 @@ resource "citrix_machine_catalog" "example-vsphere-mtsession" {
 resource "citrix_machine_catalog" "example-xenserver-mtsession" {
     name                        = "example-xenserver-mtsession"
     description                 = "Example multi-session catalog on XenServer hypervisor"
-    provisioning_type 			= "MCS"
+    zone                        = "<zone Id>"
     allocation_type             = "Random"
     session_support             = "MultiSession"
-    zone                        = "<zone Id>"
+    provisioning_type 			= "MCS"
     provisioning_scheme         = {
-        identity_type = "ActiveDirectory"
-        number_of_total_machines = 1
-        machine_account_creation_rules = {
-            naming_scheme = "catalog-##"
-            naming_scheme_type = "Numeric"
-        }
         hypervisor = citrix_xenserver_hypervisor.xenserver-hypervisor-1.id
         hypervisor_resource_pool = citrix_xenserver_hypervisor_resource_pool.xenserver-hypervisor-rp-1.id
+        identity_type = "ActiveDirectory"
+        machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
         xenserver_machine_config = {
             master_image_vm = "<Image VM name>"
             image_snapshot = "<Snapshot 1>/<Snapshot 2>/<Snapshot 3>/..."
             cpu_count = 2
             memory_mb = 4096
         }
-        machine_domain_identity = {
-            domain                   = "<DomainFQDN>"
-            service_account          = "<Admin Username>"
-            service_account_password = "<Admin Password>"
+        number_of_total_machines = 1
+        machine_account_creation_rules = {
+            naming_scheme = "catalog-##"
+            naming_scheme_type = "Numeric"
         }
     }
 }
@@ -215,19 +203,19 @@ resource "citrix_machine_catalog" "example-xenserver-mtsession" {
 resource "citrix_machine_catalog" "example-nutanix-mtsession" {
     name                        = "example-nutanix-mtsession"
     description                 = "Example multi-session catalog on Nutanix hypervisor"
-    provisioning_type 			= "MCS"
+    zone                        = citrix_zone.example-zone.id
     allocation_type             = "Random"
     session_support             = "MultiSession"
-    zone                        = citrix_zone.example-zone.id
+    provisioning_type 			= "MCS"
     provisioning_scheme         = {
-        identity_type = "ActiveDirectory"
-        number_of_total_machines = 1
-        machine_account_creation_rules = {
-            naming_scheme = "catalog-##"
-            naming_scheme_type = "Numeric"
-        }
         hypervisor = citrix_nutanix_hypervisor.example-nutanix-hypervisor.id
         hypervisor_resource_pool = citrix_nutanix_hypervisor_resource_pool.example-nutanix-rp.id
+        identity_type = "ActiveDirectory"
+        machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
         nutanix_machine_config = {
             container = "<Container name>"
             master_image = "<Image name>"
@@ -235,10 +223,10 @@ resource "citrix_machine_catalog" "example-nutanix-mtsession" {
             memory_mb = 4096
             cores_per_cpu_count = 2
         }
-        machine_domain_identity = {
-            domain                   = "<DomainFQDN>"
-            service_account          = "<Admin Username>"
-            service_account_password = "<Admin Password>"
+        number_of_total_machines = 1
+        machine_account_creation_rules = {
+            naming_scheme = "catalog-##"
+            naming_scheme_type = "Numeric"
         }
     }
 }
@@ -259,7 +247,8 @@ resource "citrix_machine_catalog" "example-manual-power-managed-mtsession" {
                 {
                     region = "East US"
                     resource_group_name = "machine-resource-group-name"
-                    machine_name = "Domain\\MachineName"
+                    machine_account = "DOMAIN\\MachineName"
+                    machine_name = "MachineName"
                 }
             ]
         }
@@ -279,10 +268,10 @@ resource "citrix_machine_catalog" "example-manual-non-power-managed-mtsession" {
         {
             machines = [
                 {
-                    machine_name = "Domain\\MachineName1"
+                    machine_account = "DOMAIN\\MachineName1"
                 },
 				{
-                    machine_name = "Domain\\MachineName2"
+                    machine_account = "DOMAIN\\MachineName2"
                 }
             ]
         }
@@ -302,10 +291,10 @@ resource "citrix_machine_catalog" "example-remote-pc" {
         {
             machines = [
                 {
-                    machine_name = "Domain\\MachineName1"
+                    machine_account = "DOMAIN\\MachineName1"
                 },
 				{
-                    machine_name = "Domain\\MachineName2"
+                    machine_account = "DOMAIN\\MachineName2"
                 }
             ]
         }
@@ -335,10 +324,18 @@ resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
 			use_managed_disks = true
             service_offering = "Standard_D2_v2"
             azure_master_image = {
-                resource_group 		 = "<Azure resource group name for image vhd>"
-				storage_account 	 = "<Azure storage account name for image vhd>"
-				container 			 = "<Azure storage container for image vhd>"
-                master_image = "<Image vhd blob name>"
+                # shared_subscription = var.azure_image_subscription # Uncomment if the image is from a subscription outside of the hypervisor's subscription
+
+                # For Azure master image from managed disk or snapshot
+                resource_group       = var.azure_resource_group
+                master_image         = var.azure_master_image
+
+                # For Azure image gallery
+                # gallery_image = {
+                #     gallery    = var.azure_gallery_name
+                #     definition = var.azure_gallery_image_definition
+                #     version    = var.azure_gallery_image_version
+                # }
             }
 			writeback_cache = {
 				wbc_disk_storage_type = "pd-standard"
@@ -376,10 +373,11 @@ resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
 - `description` (String) Description of the machine catalog.
 - `is_power_managed` (Boolean) Specify if the machines in the machine catalog will be power managed.
 - `is_remote_pc` (Boolean) Specify if this catalog is for Remote PC access.
-- `machine_accounts` (Attributes List) List of machine accounts to add to the catalog. Only to be used when using `provisioning_type = MANUAL` (see [below for nested schema](#nestedatt--machine_accounts))
+- `machine_accounts` (Attributes List) Machine accounts to add to the catalog. Only to be used when using `provisioning_type = MANUAL` (see [below for nested schema](#nestedatt--machine_accounts))
 - `minimum_functional_level` (String) Specifies the minimum functional level for the VDA machines in the catalog. Defaults to `L7_20`.
 - `provisioning_scheme` (Attributes) Machine catalog provisioning scheme. Required when `provisioning_type = MCS` (see [below for nested schema](#nestedatt--provisioning_scheme))
 - `remote_pc_ous` (Attributes List) Organizational Units to be included in the Remote PC machine catalog. Only to be used when `is_remote_pc = true`. For adding machines, use `machine_accounts`. (see [below for nested schema](#nestedatt--remote_pc_ous))
+- `scopes` (Set of String) The IDs of the scopes for the machine catalog to be a part of.
 - `vda_upgrade_type` (String) Type of Vda Upgrade. Choose between LTSR and CR. When omitted, Vda Upgrade is disabled.
 
 ### Read-Only
@@ -391,7 +389,7 @@ resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
 
 Required:
 
-- `machines` (Attributes List) List of machines (see [below for nested schema](#nestedatt--machine_accounts--machines))
+- `machines` (Attributes List) Machines to add to the catalog (see [below for nested schema](#nestedatt--machine_accounts--machines))
 
 Optional:
 
@@ -430,7 +428,7 @@ Required:
 
 Optional:
 
-- `availability_zones` (String) The Availability Zones for provisioning virtual machines. Use a comma as a delimiter for multiple availability_zones.
+- `availability_zones` (List of String) The Availability Zones for provisioning virtual machines.
 - `aws_machine_config` (Attributes) Machine Configuration For AWS EC2 MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--aws_machine_config))
 - `azure_machine_config` (Attributes) Machine Configuration For Azure MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config))
 - `custom_properties` (Attributes List) **This is an advanced feature. Use with caution.** Custom properties to be set for the machine catalog. For properties that are already supported as a terraform configuration field, please use terraform field instead. (see [below for nested schema](#nestedatt--provisioning_scheme--custom_properties))
@@ -457,9 +455,28 @@ Required:
 
 - `image_ami` (String) AMI of the AWS image to be used as the template image for the machine catalog.
 - `master_image` (String) The name of the virtual machine image that will be used.
-- `security_groups` (List of String) List of security groups to associate with the machine. When omitted, the default security group of the VPC will be used by default.
+- `security_groups` (List of String) Security groups to associate with the machine. When omitted, the default security group of the VPC will be used by default.
 - `service_offering` (String) The AWS VM Sku to use when creating machines.
 - `tenancy_type` (String) Tenancy type of the machine. Choose between `Shared`, `Instance` and `Host`.
+
+Optional:
+
+- `image_update_reboot_options` (Attributes) The options for how rebooting is performed for image update. When omitted, image update on the VDAs will be performed on next shutdown. (see [below for nested schema](#nestedatt--provisioning_scheme--aws_machine_config--image_update_reboot_options))
+- `master_image_note` (String) The note for the master image.
+
+<a id="nestedatt--provisioning_scheme--aws_machine_config--image_update_reboot_options"></a>
+### Nested Schema for `provisioning_scheme.aws_machine_config.image_update_reboot_options`
+
+Required:
+
+- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
+
+Optional:
+
+- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.
+- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot.  The optional pattern '%m%' is replaced by the number of minutes until the reboot.
+- `warning_repeat_interval` (Number) Number of minutes to wait before showing the reboot warning message again.
+
 
 
 <a id="nestedatt--provisioning_scheme--azure_machine_config"></a>
@@ -475,8 +492,10 @@ Optional:
 
 - `disk_encryption_set` (Attributes) The configuration for Disk Encryption Set (DES). The DES must be in the same subscription and region as your resources. If your master image is encrypted with a DES, use the same DES when creating this machine catalog. When using a DES, if you later disable the key with which the corresponding DES is associated in Azure, you can no longer power on the machines in this catalog or add machines to it. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--disk_encryption_set))
 - `enroll_in_intune` (Boolean) Specify whether to enroll machines in Microsoft Intune. Use this property only when `identity_type` is set to `AzureAD`.
+- `image_update_reboot_options` (Attributes) The options for how rebooting is performed for image update. When omitted, image update on the VDAs will be performed on next shutdown. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--image_update_reboot_options))
 - `license_type` (String) Windows license type used to provision virtual machines in Azure at the base compute rate. License types include: `Windows_Client` and `Windows_Server`.
 - `machine_profile` (Attributes) The name of the virtual machine or template spec that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone.<br />Required when identity_type is set to `AzureAD` (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--machine_profile))
+- `master_image_note` (String) The note for the master image.
 - `use_azure_compute_gallery` (Attributes) Use this to place prepared image in Azure Compute Gallery. Required when `storage_type = Azure_Ephemeral_OS_Disk`. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--use_azure_compute_gallery))
 - `use_managed_disks` (Boolean) Indicate whether to use Azure managed disks for the provisioned virtual machine.
 - `vda_resource_group` (String) Designated resource group where the VDA VMs will be located on Azure.
@@ -515,6 +534,20 @@ Required:
 
 - `disk_encryption_set_name` (String) The name of the disk encryption set.
 - `disk_encryption_set_resource_group` (String) The name of the resource group in which the disk encryption set resides.
+
+
+<a id="nestedatt--provisioning_scheme--azure_machine_config--image_update_reboot_options"></a>
+### Nested Schema for `provisioning_scheme.azure_machine_config.image_update_reboot_options`
+
+Required:
+
+- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
+
+Optional:
+
+- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.
+- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot.  The optional pattern '%m%' is replaced by the number of minutes until the reboot.
+- `warning_repeat_interval` (Number) Number of minutes to wait before showing the reboot warning message again.
 
 
 <a id="nestedatt--provisioning_scheme--azure_machine_config--machine_profile"></a>
@@ -574,9 +607,25 @@ Required:
 
 Optional:
 
+- `image_update_reboot_options` (Attributes) The options for how rebooting is performed for image update. When omitted, image update on the VDAs will be performed on next shutdown. (see [below for nested schema](#nestedatt--provisioning_scheme--gcp_machine_config--image_update_reboot_options))
 - `machine_profile` (String) The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone. If not specified, the VM specified in master_image will be used as template.
 - `machine_snapshot` (String) The name of the virtual machine snapshot of a GCP VM that will be used as master image.
+- `master_image_note` (String) The note for the master image.
 - `writeback_cache` (Attributes) Write-back Cache config. Leave this empty to disable Write-back Cache. (see [below for nested schema](#nestedatt--provisioning_scheme--gcp_machine_config--writeback_cache))
+
+<a id="nestedatt--provisioning_scheme--gcp_machine_config--image_update_reboot_options"></a>
+### Nested Schema for `provisioning_scheme.gcp_machine_config.image_update_reboot_options`
+
+Required:
+
+- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
+
+Optional:
+
+- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.
+- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot.  The optional pattern '%m%' is replaced by the number of minutes until the reboot.
+- `warning_repeat_interval` (Number) Number of minutes to wait before showing the reboot warning message again.
+
 
 <a id="nestedatt--provisioning_scheme--gcp_machine_config--writeback_cache"></a>
 ### Nested Schema for `provisioning_scheme.gcp_machine_config.writeback_cache`
@@ -625,6 +674,25 @@ Required:
 - `master_image` (String) The name of the master image that will be the template for all virtual machines in this catalog.
 - `memory_mb` (Number) The maximum amount of memory that virtual machines created from the provisioning scheme should use.
 
+Optional:
+
+- `image_update_reboot_options` (Attributes) The options for how rebooting is performed for image update. When omitted, image update on the VDAs will be performed on next shutdown. (see [below for nested schema](#nestedatt--provisioning_scheme--nutanix_machine_config--image_update_reboot_options))
+- `master_image_note` (String) The note for the master image.
+
+<a id="nestedatt--provisioning_scheme--nutanix_machine_config--image_update_reboot_options"></a>
+### Nested Schema for `provisioning_scheme.nutanix_machine_config.image_update_reboot_options`
+
+Required:
+
+- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
+
+Optional:
+
+- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.
+- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot.  The optional pattern '%m%' is replaced by the number of minutes until the reboot.
+- `warning_repeat_interval` (Number) Number of minutes to wait before showing the reboot warning message again.
+
+
 
 <a id="nestedatt--provisioning_scheme--vsphere_machine_config"></a>
 ### Nested Schema for `provisioning_scheme.vsphere_machine_config`
@@ -638,7 +706,23 @@ Required:
 Optional:
 
 - `image_snapshot` (String) The Snapshot of the virtual machine specified in `master_image_vm`. Specify the relative path of the snapshot. Eg: snaphost-1/snapshot-2/snapshot-3. This property is case sensitive.
+- `image_update_reboot_options` (Attributes) The options for how rebooting is performed for image update. When omitted, image update on the VDAs will be performed on next shutdown. (see [below for nested schema](#nestedatt--provisioning_scheme--vsphere_machine_config--image_update_reboot_options))
+- `master_image_note` (String) The note for the master image.
 - `writeback_cache` (Attributes) Write-back Cache config. Leave this empty to disable Write-back Cache. (see [below for nested schema](#nestedatt--provisioning_scheme--vsphere_machine_config--writeback_cache))
+
+<a id="nestedatt--provisioning_scheme--vsphere_machine_config--image_update_reboot_options"></a>
+### Nested Schema for `provisioning_scheme.vsphere_machine_config.image_update_reboot_options`
+
+Required:
+
+- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
+
+Optional:
+
+- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.
+- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot.  The optional pattern '%m%' is replaced by the number of minutes until the reboot.
+- `warning_repeat_interval` (Number) Number of minutes to wait before showing the reboot warning message again.
+
 
 <a id="nestedatt--provisioning_scheme--vsphere_machine_config--writeback_cache"></a>
 ### Nested Schema for `provisioning_scheme.vsphere_machine_config.writeback_cache`
@@ -666,7 +750,23 @@ Required:
 Optional:
 
 - `image_snapshot` (String) The Snapshot of the virtual machine specified in `master_image_vm`. Specify the relative path of the snapshot. Eg: snaphost-1/snapshot-2/snapshot-3. This property is case sensitive.
+- `image_update_reboot_options` (Attributes) The options for how rebooting is performed for image update. When omitted, image update on the VDAs will be performed on next shutdown. (see [below for nested schema](#nestedatt--provisioning_scheme--xenserver_machine_config--image_update_reboot_options))
+- `master_image_note` (String) The note for the master image.
 - `writeback_cache` (Attributes) Write-back Cache config. Leave this empty to disable Write-back Cache. (see [below for nested schema](#nestedatt--provisioning_scheme--xenserver_machine_config--writeback_cache))
+
+<a id="nestedatt--provisioning_scheme--xenserver_machine_config--image_update_reboot_options"></a>
+### Nested Schema for `provisioning_scheme.xenserver_machine_config.image_update_reboot_options`
+
+Required:
+
+- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
+
+Optional:
+
+- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.
+- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot.  The optional pattern '%m%' is replaced by the number of minutes until the reboot.
+- `warning_repeat_interval` (Number) Number of minutes to wait before showing the reboot warning message again.
+
 
 <a id="nestedatt--provisioning_scheme--xenserver_machine_config--writeback_cache"></a>
 ### Nested Schema for `provisioning_scheme.xenserver_machine_config.writeback_cache`

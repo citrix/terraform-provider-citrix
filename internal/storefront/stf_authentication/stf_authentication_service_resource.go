@@ -1,4 +1,4 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 
 package stf_authentication
 
@@ -46,7 +46,7 @@ func (r *stfAuthenticationServiceResource) Metadata(_ context.Context, req resou
 // Schema defines the schema for the resource.
 func (r *stfAuthenticationServiceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Storefront Authentication Service.",
+		Description: "StoreFront Authentication Service.",
 		Attributes: map[string]schema.Attribute{
 			"site_id": schema.StringAttribute{
 				Description: "The IIS site to configure the authentication service for. Defaults to `1`.",
@@ -106,7 +106,7 @@ func (r *stfAuthenticationServiceResource) Create(ctx context.Context, req resou
 	siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error updating Storefront Authentication Service ",
+			"Error updating StoreFront Authentication Service ",
 			"\nError message: "+err.Error(),
 		)
 		return
@@ -122,7 +122,7 @@ func (r *stfAuthenticationServiceResource) Create(ctx context.Context, req resou
 	authenticationServiceDetail, err := addAuthenticationServiceRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error adding Storefront Authentication Service",
+			"Error adding StoreFront Authentication Service",
 			fmt.Sprintf("Error Message: %s", err.Error()),
 		)
 		return
@@ -200,7 +200,7 @@ func (r *stfAuthenticationServiceResource) Update(ctx context.Context, req resou
 		siteIdInt, err := strconv.ParseInt(state.SiteId.ValueString(), 10, 64)
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error updating Storefront Authentication Service ",
+				"Error updating StoreFront Authentication Service ",
 				"\nError message: "+err.Error(),
 			)
 			return
@@ -216,7 +216,7 @@ func (r *stfAuthenticationServiceResource) Update(ctx context.Context, req resou
 	err := removeAuthenticationServiceRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error updating Storefront Authentication Service ",
+			"Error updating StoreFront Authentication Service ",
 			"\nError message: "+err.Error(),
 		)
 		return
@@ -228,7 +228,7 @@ func (r *stfAuthenticationServiceResource) Update(ctx context.Context, req resou
 	siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error updating Storefront Authentication Service ",
+			"Error updating StoreFront Authentication Service ",
 			"\nError message: "+err.Error(),
 		)
 		return
@@ -243,7 +243,7 @@ func (r *stfAuthenticationServiceResource) Update(ctx context.Context, req resou
 	authenticationServiceDetail, err := addAuthenticationServiceRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error adding Storefront Authentication Service",
+			"Error adding StoreFront Authentication Service",
 			fmt.Sprintf("Error Message: %s", err.Error()),
 		)
 		return
@@ -277,7 +277,7 @@ func (r *stfAuthenticationServiceResource) Delete(ctx context.Context, req resou
 		siteIdInt, err := strconv.ParseInt(state.SiteId.ValueString(), 10, 64)
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error removing Storefront Authentication Service ",
+				"Error removing StoreFront Authentication Service ",
 				"\nError message: "+err.Error(),
 			)
 			return
@@ -293,7 +293,7 @@ func (r *stfAuthenticationServiceResource) Delete(ctx context.Context, req resou
 	err := removeAuthenticationServiceRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error removing Storefront Authentication Service ",
+			"Error removing StoreFront Authentication Service ",
 			"\nError message: "+err.Error(),
 		)
 		return
@@ -335,7 +335,7 @@ func getSTFAuthenticationService(ctx context.Context, client *citrixdaasclient.C
 		siteIdInt, err := strconv.ParseInt(state.SiteId.ValueString(), 10, 64)
 		if err != nil {
 			diagnostics.AddError(
-				"Error fetching state of Storefront Authentication Service ",
+				"Error fetching state of StoreFront Authentication Service ",
 				"Error message: "+err.Error(),
 			)
 			return nil, err
@@ -356,7 +356,7 @@ func getSTFAuthenticationService(ctx context.Context, client *citrixdaasclient.C
 			return nil, nil
 		}
 		diagnostics.AddError(
-			"Error fetching state of Storefront Authentication Service ",
+			"Error fetching state of StoreFront Authentication Service ",
 			"Error message: "+err.Error(),
 		)
 		return &STFAuthenticationService, err

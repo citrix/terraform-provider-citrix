@@ -3,12 +3,12 @@
 page_title: "citrix_stf_store_service Resource - citrix"
 subcategory: ""
 description: |-
-  Storefront StoreService.
+  StoreFront StoreService.
 ---
 
 # citrix_stf_store_service (Resource)
 
-Storefront StoreService.
+StoreFront StoreService.
 
 ## Example Usage
 
@@ -48,7 +48,7 @@ resource "citrix_stf_store_service" "example-stf-store-service" {
 - `farm_config` (Attributes) Farm configuration for the Store. (see [below for nested schema](#nestedatt--farm_config))
 - `friendly_name` (String) The friendly name of the Store
 - `load_balance` (Boolean) Whether the Store is load balanced.
-- `site_id` (String) The IIS site id of the Storefront storeservice. Defaults to 1.
+- `site_id` (String) The IIS site id of the StoreFront storeservice. Defaults to 1.
 
 <a id="nestedatt--farm_config"></a>
 ### Nested Schema for `farm_config`

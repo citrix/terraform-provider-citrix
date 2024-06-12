@@ -1,36 +1,42 @@
 resource "citrix_machine_catalog" "example-catalog" {
-    name                        = "example-catalog"
+    name                        = var.machine_catalog_name
     description                 = "description for example catalog"
     allocation_type             = "Random"
     session_support             = "MultiSession"
-    is_power_managed			= true
-	is_remote_pc 			  	= false
 	provisioning_type 			= "MCS"
     zone                        = citrix_zone.example-zone.id
-    minimum_functional_level    = "L7_20"
     provisioning_scheme         = {
         hypervisor               = citrix_azure_hypervisor.example-azure-hypervisor.id
         hypervisor_resource_pool = citrix_azure_hypervisor_resource_pool.example-azure-rp.id
         identity_type            = "ActiveDirectory"
-        machine_domain_identity = {
-                domain                   = "<DomainFQDN>"
-                service_account          = "<Admin Username>"
-                service_account_password = "<Admin Password>"
-            }
+        machine_domain_identity  = {
+            domain                   = var.domain_fqdn
+            domain_ou                = var.domain_ou
+            service_account          = var.domain_service_account
+            service_account_password = var.domain_service_account_password
+        }
         azure_machine_config     = {
-            service_offering    = "Standard_D2_v2"
-            azure_master_image  = {
-                resource_group      = "<Resource Group for VDA image>"
-                storage_account     = "<Storage account for VDA image>"
-                container           = "<Container for VDA image>"
-                master_image        = "<Blob name for VDA image>"
+            service_offering     = var.azure_service_offering
+            azure_master_image = {
+                # shared_subscription = var.azure_image_subscription # Uncomment if the image is from a subscription outside of the hypervisor's subscription
+
+                # For Azure master image from managed disk or snapshot
+                resource_group       = var.azure_resource_group
+                master_image         = var.azure_master_image
+
+                # For Azure image gallery
+                # gallery_image = {
+                #     gallery    = var.azure_gallery_name
+                #     definition = var.azure_gallery_image_definition
+                #     version    = var.azure_gallery_image_version
+                # }
             }
-            storage_type        = "Standard_LRS"
-            use_managed_disks   = true
+            storage_type         = var.azure_storage_type
+            use_managed_disks    = true
         }
         number_of_total_machines = 1
         machine_account_creation_rules = {
-            naming_scheme = "ctx-pvdr-##"
+            naming_scheme = var.machine_catalog_naming_scheme
             naming_scheme_type = "Numeric"
         }
     }

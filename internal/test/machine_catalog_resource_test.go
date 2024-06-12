@@ -1,10 +1,11 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 
 package test
 
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -75,7 +76,7 @@ func TestActiveDirectoryMachineCatalogResourceAzure(t *testing.T) {
 					// Verify machine catalog identity type
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AD", "provisioning_scheme.identity_type", "ActiveDirectory"),
 					// Verify nic network
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AD", "provisioning_scheme.network_mapping.network", os.Getenv("TEST_MC_SUBNET")),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AD", "provisioning_scheme.network_mapping.0.network", os.Getenv("TEST_MC_SUBNET")),
 				),
 			},
 			// ImportState testing
@@ -160,7 +161,7 @@ func TestHybridAzureADMachineCatalogResourceAzure(t *testing.T) {
 					// Verify domain admin username
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "provisioning_scheme.machine_domain_identity.service_account", os.Getenv("TEST_MC_SERVICE_ACCOUNT")),
 					// Verify nic network
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "provisioning_scheme.network_mapping.network", os.Getenv("TEST_MC_SUBNET")),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "provisioning_scheme.network_mapping.0.network", os.Getenv("TEST_MC_SUBNET")),
 				),
 			},
 			// ImportState testing
@@ -259,7 +260,7 @@ func TestAzureADMachineCatalogResourceAzure(t *testing.T) {
 					// Verify machine catalog identity type
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AAD", "provisioning_scheme.identity_type", "AzureAD"),
 					// Verify nic network
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AAD", "provisioning_scheme.network_mapping.network", os.Getenv("TEST_MC_SUBNET")),
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AAD", "provisioning_scheme.network_mapping.0.network", os.Getenv("TEST_MC_SUBNET")),
 				),
 			},
 			// ImportState testing
@@ -1141,7 +1142,7 @@ func TestMachineCatalogResource_Manual_Power_Managed_Nutanix(t *testing.T) {
 
 func TestMachineCatalogPreCheck_Manual_Power_Managed_AWS_EC2(t *testing.T) {
 	if v := os.Getenv("TEST_MC_NAME_MANUAL_AWS_EC2"); v == "" {
-		t.Fatal("TEST_MC_NAME_MANUAL must be set for acceptance tests")
+		t.Fatal("TEST_MC_NAME_MANUAL_AWS_EC2 must be set for acceptance tests")
 	}
 	if v := os.Getenv("TEST_MC_ALLOCATION_TYPE_MANUAL_POWER_MANAGED"); v == "" {
 		t.Fatal("TEST_MC_ALLOCATION_TYPE_MANUAL_POWER_MANAGED must be set for acceptance tests")
@@ -1354,7 +1355,7 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 		]
 		number_of_total_machines = 	1
 		machine_account_creation_rules ={
-			naming_scheme =     "test-machine-##"
+			naming_scheme =     "%s"
 			naming_scheme_type ="Numeric"
 		}
 	}
@@ -1405,10 +1406,10 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 					network 	   = "%s"
 				}
 			]
-			availability_zones = "1,3"
+			availability_zones = ["1","3"]
 			number_of_total_machines = 	2
 			machine_account_creation_rules ={
-				naming_scheme =     "test-machine-##"
+				naming_scheme =     "%s"
 				naming_scheme_type ="Numeric"
 			}
 		}
@@ -1459,10 +1460,10 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 					network 	   = "%s"
 				}
 			]
-			availability_zones = "1,3"
+			availability_zones = ["1","3"]
 			number_of_total_machines = 	1
 			machine_account_creation_rules ={
-				naming_scheme =     "test-machine-##"
+				naming_scheme =     "%s"
 				naming_scheme_type ="Numeric"
 			}
 		}
@@ -1512,7 +1513,7 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 			]
 			number_of_total_machines = 	1
 			machine_account_creation_rules ={
-				naming_scheme =     "test-machine-##"
+				naming_scheme =     "%s"
 				naming_scheme_type ="Numeric"
 			}
 		}
@@ -1561,10 +1562,10 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 					network 	   = "%s"
 				}
 			]
-			availability_zones = "1,3"
+			availability_zones = ["1","3"]
 			number_of_total_machines = 	2
 			machine_account_creation_rules ={
-				naming_scheme =     "test-machine-##"
+				naming_scheme =     "%s"
 				naming_scheme_type ="Numeric"
 			}
 		}
@@ -1605,7 +1606,7 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 			}
 			number_of_total_machines = 	1
 			machine_account_creation_rules ={
-				naming_scheme =     "test-machine-##"
+				naming_scheme =     "%s"
 				naming_scheme_type ="Numeric"
 			}
 		}
@@ -1644,10 +1645,10 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 					storage_cost_saving = true
 				}
 			}
-			availability_zones = "1,3"
+			availability_zones = ["1","3"]
 			number_of_total_machines = 	2
 			machine_account_creation_rules ={
-				naming_scheme =     "test-machine-##"
+				naming_scheme =     "%s"
 				naming_scheme_type ="Numeric"
 			}
 		}
@@ -1679,7 +1680,7 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 				machine_snapshot = "%s"
 			}
 			number_of_total_machines = 	1
-			availability_zones = "%s"
+			availability_zones = %s
 			machine_account_creation_rules ={
 				naming_scheme =     "test-machine-##"
 				naming_scheme_type ="Numeric"
@@ -1713,7 +1714,7 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 				machine_snapshot = "%s"
 			}
 			number_of_total_machines = 	2
-			availability_zones = "%s"
+			availability_zones = %s
 			machine_account_creation_rules ={
 				naming_scheme =     "test-machine-##"
 				naming_scheme_type ="Numeric"
@@ -2197,11 +2198,14 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 
 func BuildMachineCatalogResourceAzure(t *testing.T, machineResource, catalogNameSuffix, identityType string) string {
 	name := os.Getenv("TEST_MC_NAME")
+	namingScheme := "vda-##"
 	if identityType == "HybridAzureAD" {
 		name += "-HybAAD"
+		namingScheme += "-HybAAD"
 	}
 	if identityType == "AzureAD" {
 		name += "-AAD"
+		namingScheme += "-AAD"
 	}
 	service_account := os.Getenv("TEST_MC_SERVICE_ACCOUNT")
 	service_account_pass := os.Getenv("TEST_MC_SERVICE_ACCOUNT_PASS")
@@ -2218,7 +2222,7 @@ func BuildMachineCatalogResourceAzure(t *testing.T, machineResource, catalogName
 	//machine account
 	domain := os.Getenv("TEST_MC_DOMAIN")
 
-	return fmt.Sprintf(machineResource, catalogNameSuffix, name, identityType, domain, service_account, service_account_pass, service_offering, resource_group, storage_account, container, master_image, subnet)
+	return fmt.Sprintf(machineResource, catalogNameSuffix, name, identityType, domain, service_account, service_account_pass, service_offering, resource_group, storage_account, container, master_image, subnet, namingScheme)
 }
 
 func BuildMachineCatalogResourceAzureAd(t *testing.T, machineResource string) string {
@@ -2229,6 +2233,7 @@ func BuildMachineCatalogResourceAzureAd(t *testing.T, machineResource string) st
 	storage_account := os.Getenv("TEST_MC_IMAGE_STORAGE_ACCOUNT")
 	container := os.Getenv("TEST_MC_IMAGE_CONTAINER")
 	subnet := os.Getenv("TEST_MC_SUBNET")
+	namingScheme := "vda-##-AAD"
 
 	machine_profile_vm_name := os.Getenv("TEST_MC_MACHINE_PROFILE_VM_NAME")
 	machine_profile_resource_group := os.Getenv("TEST_MC_MACHINE_PROFILE_RESOURCE_GROUP")
@@ -2236,7 +2241,7 @@ func BuildMachineCatalogResourceAzureAd(t *testing.T, machineResource string) st
 		master_image = os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")
 	}
 
-	return fmt.Sprintf(machineResource, "-AAD", name, service_offering, resource_group, storage_account, container, master_image, machine_profile_vm_name, machine_profile_resource_group, subnet)
+	return fmt.Sprintf(machineResource, "-AAD", name, service_offering, resource_group, storage_account, container, master_image, machine_profile_vm_name, machine_profile_resource_group, subnet, namingScheme)
 }
 
 func BuildMachineCatalogResourceWorkgroup(t *testing.T, machineResource string) string {
@@ -2246,12 +2251,13 @@ func BuildMachineCatalogResourceWorkgroup(t *testing.T, machineResource string) 
 	resource_group := os.Getenv("TEST_MC_IMAGE_RESOUCE_GROUP")
 	storage_account := os.Getenv("TEST_MC_IMAGE_STORAGE_ACCOUNT")
 	container := os.Getenv("TEST_MC_IMAGE_CONTAINER")
+	namingScheme := "vda-##-WG"
 
 	if machineResource == machinecatalog_testResources_workgroup_updated {
 		master_image = os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")
 	}
 
-	return fmt.Sprintf(machineResource, "-WG", name, service_offering, resource_group, storage_account, container, master_image)
+	return fmt.Sprintf(machineResource, "-WG", name, service_offering, resource_group, storage_account, container, master_image, namingScheme)
 }
 
 func BuildMachineCatalogResourceGCP(t *testing.T, machineResource string) string {
@@ -2260,7 +2266,8 @@ func BuildMachineCatalogResourceGCP(t *testing.T, machineResource string) string
 	service_account := os.Getenv("TEST_MC_SERVICE_ACCOUNT_GCP")
 	service_account_pass := os.Getenv("TEST_MC_SERVICE_ACCOUNT_PASS_GCP")
 	storage_type := os.Getenv("TEST_MC_STORAGE_TYPE_GCP")
-	availability_zones := os.Getenv("TEST_MC_AVAILABILITY_ZONES_GCP")
+	availability_zones_list := strings.Split(os.Getenv("TEST_MC_AVAILABILITY_ZONES_GCP"), ",")
+	availability_zones := "[\"" + strings.Join(availability_zones_list, "\",\"") + "\"]" // ["1","3"]
 	machine_profile := os.Getenv("TEST_MC_MACHINE_PROFILE_GCP")
 	master_image := os.Getenv("TEST_MC_MASTER_IMAGE_GCP")
 	machine_snapshot := os.Getenv("TEST_MC_MACHINE_SNAPSHOT_GCP")

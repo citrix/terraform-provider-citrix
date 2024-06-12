@@ -34,7 +34,7 @@ resource "citrix_gcp_hypervisor_resource_pool" "example-gcp-hypervisor-resource-
 - `name` (String) Name of the resource pool. Name should be unique across all hypervisors.
 - `project_name` (String) GCP Project name.
 - `region` (String) Cloud Region where the virtual network sits in.
-- `subnets` (List of String) List of subnets to allocate VDAs within the virtual network.
+- `subnets` (List of String) Subnets to allocate VDAs within the virtual network.
 - `vpc` (String) Name of the cloud virtual network.
 
 ### Optional

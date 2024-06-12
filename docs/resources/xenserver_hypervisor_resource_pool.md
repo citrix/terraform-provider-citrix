@@ -43,7 +43,7 @@ resource "citrix_xenserver_hypervisor_resource_pool" "example-xenserver-hypervis
 
 - `hypervisor` (String) Id of the hypervisor for which the resource pool needs to be created.
 - `name` (String) Name of the resource pool. Name should be unique across all hypervisors.
-- `networks` (List of String) List of networks for allocating resources.
+- `networks` (List of String) Networks for allocating resources.
 - `storage` (Attributes List) List of hypervisor storage to use for OS data. (see [below for nested schema](#nestedatt--storage))
 - `temporary_storage` (Attributes List) List of hypervisor storage to use for temporary data. (see [below for nested schema](#nestedatt--temporary_storage))
 

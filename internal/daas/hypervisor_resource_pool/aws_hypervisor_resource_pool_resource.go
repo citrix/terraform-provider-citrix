@@ -1,4 +1,4 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 
 package hypervisor_resource_pool
 
@@ -6,21 +6,13 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
-	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -46,54 +38,7 @@ func (r *awsHypervisorResourcePoolResource) Metadata(_ context.Context, req reso
 }
 
 func (r *awsHypervisorResourcePoolResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "Manages an AWS EC2 hypervisor resource pool.",
-		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "GUID identifier of the resource pool.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"name": schema.StringAttribute{
-				Description: "Name of the resource pool. Name should be unique across all hypervisors.",
-				Required:    true,
-			},
-			"hypervisor": schema.StringAttribute{
-				Description: "Id of the hypervisor for which the resource pool needs to be created.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
-				},
-			},
-			"vpc": schema.StringAttribute{
-				Description: "Name of the virtual private cloud.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"subnets": schema.ListAttribute{
-				ElementType: types.StringType,
-				Description: "List of subnets to allocate VDAs within the virtual private cloud.",
-				Required:    true,
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
-				},
-			},
-			"availability_zone": schema.StringAttribute{
-				Description: "The name of the availability zone resource to use for provisioning operations in this resource pool.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplaceIfConfigured(),
-				},
-			},
-		},
-	}
+	resp.Schema = GetAwsHypervisorResourcePoolSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -146,7 +91,7 @@ func (r *awsHypervisorResourcePoolResource) Create(ctx context.Context, req reso
 	resourcePoolDetails.SetVirtualPrivateCloud(vpcPath)
 	availabilityZonePath := fmt.Sprintf("%s/%s.availabilityzone", vpcPath, plan.AvailabilityZone.ValueString())
 	resourcePoolDetails.SetAvailabilityZone(availabilityZonePath)
-	planSubnet := util.ConvertBaseStringArrayToPrimitiveStringArray(plan.Subnets)
+	planSubnet := util.StringListToStringArray(ctx, &diags, plan.Subnets)
 	subnets, err := util.GetFilteredResourcePathList(ctx, r.client, hypervisorId, availabilityZonePath, util.NetworkResourceType, planSubnet, hypervisorConnectionType, hypervisor.GetPluginId())
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -156,7 +101,7 @@ func (r *awsHypervisorResourcePoolResource) Create(ctx context.Context, req reso
 		return
 	}
 
-	if len(plan.Subnets) != len(subnets) {
+	if len(plan.Subnets.Elements()) != len(subnets) {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor Resource Pool for AWS",
 			"Subnet contains invalid value.",
@@ -172,7 +117,7 @@ func (r *awsHypervisorResourcePoolResource) Create(ctx context.Context, req reso
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(resourcePool)
+	plan = plan.RefreshPropertyValues(ctx, &diags, resourcePool)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -203,7 +148,7 @@ func (r *awsHypervisorResourcePoolResource) Read(ctx context.Context, req resour
 	}
 
 	// Override with refreshed state
-	state = state.RefreshPropertyValues(resourcePool)
+	state = state.RefreshPropertyValues(ctx, &diags, resourcePool)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -235,7 +180,7 @@ func (r *awsHypervisorResourcePoolResource) Update(ctx context.Context, req reso
 	editHypervisorResourcePool.SetName(plan.Name.ValueString())
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS)
 
-	planSubnet := util.ConvertBaseStringArrayToPrimitiveStringArray(plan.Subnets)
+	planSubnet := util.StringListToStringArray(ctx, &diags, plan.Subnets)
 	availabilityZonePath := fmt.Sprintf("%s.virtualprivatecloud/%s.availabilityzone", plan.Vpc.ValueString(), plan.AvailabilityZone.ValueString())
 	subnets, err := util.GetFilteredResourcePathList(ctx, r.client, plan.Hypervisor.ValueString(), availabilityZonePath, util.NetworkResourceType, planSubnet, citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS, "")
 	if err != nil {
@@ -248,7 +193,7 @@ func (r *awsHypervisorResourcePoolResource) Update(ctx context.Context, req reso
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(updatedResourcePool)
+	plan = plan.RefreshPropertyValues(ctx, &diags, updatedResourcePool)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)

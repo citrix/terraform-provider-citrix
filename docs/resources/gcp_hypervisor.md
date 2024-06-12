@@ -32,6 +32,10 @@ resource "citrix_gcp_hypervisor" "example-gcp-hypervisor" {
 - `service_account_id` (String) The service account ID used to access the Google Cloud APIs.
 - `zone` (String) Id of the zone the hypervisor is associated with.
 
+### Optional
+
+- `scopes` (Set of String) The IDs of the scopes for the hypervisor to be a part of.
+
 ### Read-Only
 
 - `id` (String) GUID identifier of the hypervisor.

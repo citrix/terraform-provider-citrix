@@ -42,6 +42,7 @@ resource "citrix_nutanix_hypervisor" "example-nutanix-hypervisor" {
 - `max_absolute_active_actions` (Number) Maximum number of actions that can execute in parallel on the hypervisor. Default is 100.
 - `max_absolute_new_actions_per_minute` (Number) Maximum number of actions that can be started on the hypervisor per-minute. Default is 10.
 - `max_power_actions_percentage_of_machines` (Number) Maximum percentage of machines on the hypervisor which can have their power state changed simultaneously. Default is 20.
+- `scopes` (Set of String) The IDs of the scopes for the hypervisor to be a part of.
 
 ### Read-Only
 

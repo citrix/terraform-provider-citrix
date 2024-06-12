@@ -1,9 +1,7 @@
 resource "citrix_aws_hypervisor_resource_pool" "example-aws-rp" {
-    name                = "example-aws-rp"
+    name                = var.resource_pool_name
     hypervisor          = citrix_aws_hypervisor.example-aws-hypervisor.id
-    subnets             = [
-        "<AWS Subnet Mask>",
-    ]
-    vpc   = "<AWS VPC Name>"
-    availability_zone = "us-east-1a"
+    subnets             = var.aws_subnets
+    vpc                 = var.aws_vpc
+    availability_zone   = var.aws_availability_zone
 }

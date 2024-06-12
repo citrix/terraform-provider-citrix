@@ -1,4 +1,4 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 
 package test
 
@@ -20,8 +20,6 @@ func TestAdminScopeResourcePreCheck(t *testing.T) {
 
 func TestAdminScopeResource(t *testing.T) {
 	name := os.Getenv("TEST_ADMIN_SCOPE_NAME")
-	catalogName := os.Getenv("TEST_MC_NAME")
-	dgName := os.Getenv("TEST_DG_NAME")
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		PreCheck: func() {
@@ -49,11 +47,6 @@ func TestAdminScopeResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "name", name),
 					// Verify the description of the admin scope
 					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "description", "test scope created via terraform"),
-					// Verify number of scoped objects
-					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "scoped_objects.#", "1"),
-					// Verify the scoped objects data
-					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "scoped_objects.0.object_type", "DeliveryGroup"),
-					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "scoped_objects.0.object", dgName),
 				),
 			},
 			// ImportState testing
@@ -81,13 +74,6 @@ func TestAdminScopeResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "name", fmt.Sprintf("%s-updated", name)),
 					// Verify the description of the admin scope
 					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "description", "Updated description for test scope"),
-					// Verify number of scoped objects
-					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "scoped_objects.#", "2"),
-					// Verify the scoped objects data
-					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "scoped_objects.0.object_type", "DeliveryGroup"),
-					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "scoped_objects.0.object", dgName),
-					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "scoped_objects.1.object_type", "MachineCatalog"),
-					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "scoped_objects.1.object", catalogName),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
@@ -100,28 +86,12 @@ var (
 	resource "citrix_admin_scope" "test_scope" {
 		name = "%s"
 		description = "test scope created via terraform"
-		scoped_objects = [
-			{
-				object_type = "DeliveryGroup",
-				object = citrix_delivery_group.testDeliveryGroup.name
-			}
-		]
 	}
 	`
 	adminScopeTestResource_updated = `
 	resource "citrix_admin_scope" "test_scope" {
 		name        = "%s-updated"
 		description = "Updated description for test scope"
-		scoped_objects    = [
-			{
-				object_type = "DeliveryGroup",
-				object = citrix_delivery_group.testDeliveryGroup.name
-			},
-			{
-				object_type = "MachineCatalog",
-				object = citrix_machine_catalog.testMachineCatalog.name
-			}
-		]
 	}
 	`
 )

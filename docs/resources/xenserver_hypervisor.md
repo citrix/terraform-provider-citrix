@@ -46,6 +46,7 @@ resource "citrix_xenserver_hypervisor" "example-xenserver-hypervisor" {
 - `max_absolute_active_actions` (Number) Maximum number of actions that can execute in parallel on the hypervisor. Default is 40.
 - `max_absolute_new_actions_per_minute` (Number) Maximum number of actions that can be started on the hypervisor per-minute. Default is 10.
 - `max_power_actions_percentage_of_machines` (Number) Maximum percentage of machines on the hypervisor which can have their power state changed simultaneously. Default is 20.
+- `scopes` (Set of String) The IDs of the scopes for the hypervisor to be a part of.
 - `ssl_thumbprints` (List of String) SSL certificate thumbprints to consider acceptable for this connection.  If not specified, and the hypervisor uses SSL for its connection, the SSL certificate's root certification authority and any intermediate certificates must be trusted.
 
 ### Read-Only

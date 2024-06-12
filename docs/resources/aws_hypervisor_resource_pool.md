@@ -32,7 +32,7 @@ resource "citrix_aws_hypervisor_resource_pool" "example-aws-hypervisor-resource-
 - `availability_zone` (String) The name of the availability zone resource to use for provisioning operations in this resource pool.
 - `hypervisor` (String) Id of the hypervisor for which the resource pool needs to be created.
 - `name` (String) Name of the resource pool. Name should be unique across all hypervisors.
-- `subnets` (List of String) List of subnets to allocate VDAs within the virtual private cloud.
+- `subnets` (List of String) Subnets to allocate VDAs within the virtual private cloud.
 - `vpc` (String) Name of the virtual private cloud.
 
 ### Read-Only

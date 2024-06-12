@@ -3,12 +3,12 @@
 page_title: "citrix_stf_deployment Resource - citrix"
 subcategory: ""
 description: |-
-  Storefront Deployment.
+  StoreFront Deployment.
 ---
 
 # citrix_stf_deployment (Resource)
 
-Storefront Deployment.
+StoreFront Deployment.
 
 ## Example Usage
 
@@ -28,7 +28,7 @@ resource "citrix_stf_deployment" "example-stf-deployment" {
 
 ### Optional
 
-- `site_id` (String) The IIS site id of the Storefront deployment. Defaults to 1.
+- `site_id` (String) The IIS site id of the StoreFront deployment. Defaults to 1.
 
 ## Import
 

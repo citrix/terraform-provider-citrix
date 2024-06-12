@@ -1,4 +1,4 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 
 package hypervisor_resource_pool
 
@@ -6,22 +6,14 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
-	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -46,40 +38,7 @@ func (*nutanixHypervisorResourcePoolResource) Metadata(_ context.Context, req re
 }
 
 func (*nutanixHypervisorResourcePoolResource) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "Manages a Nutanix AHV hypervisor resource pool.",
-		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "GUID identifier of the resource pool.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"name": schema.StringAttribute{
-				Description: "Name of the resource pool. Name should be unique across all hypervisors.",
-				Required:    true,
-			},
-			"hypervisor": schema.StringAttribute{
-				Description: "Id of the hypervisor for which the resource pool needs to be created.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
-				},
-			},
-			"networks": schema.ListAttribute{
-				ElementType: types.StringType,
-				Description: "List of networks for allocating resources.",
-				Required:    true,
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
-				},
-			},
-		},
-	}
+	resp.Schema = GetNutanixHypervisorResourcePoolSchema()
 }
 
 func (r *nutanixHypervisorResourcePoolResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -133,7 +92,7 @@ func (r *nutanixHypervisorResourcePoolResource) Create(ctx context.Context, req 
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(resourcePool)
+	plan = plan.RefreshPropertyValues(ctx, &diags, resourcePool)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -164,7 +123,7 @@ func (r *nutanixHypervisorResourcePoolResource) Read(ctx context.Context, req re
 	}
 
 	// Override with refreshed state
-	state = state.RefreshPropertyValues(resourcePool)
+	state = state.RefreshPropertyValues(ctx, &diags, resourcePool)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -227,7 +186,7 @@ func (r *nutanixHypervisorResourcePoolResource) Update(ctx context.Context, req 
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(resourcePool)
+	plan = plan.RefreshPropertyValues(ctx, &diags, resourcePool)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -288,7 +247,7 @@ func (plan NutanixHypervisorResourcePoolResourceModel) GetNetworksList(ctx conte
 		action = "creating"
 	}
 
-	networkNames := util.ConvertBaseStringArrayToPrimitiveStringArray(plan.Networks)
+	networkNames := util.StringListToStringArray(ctx, diags, plan.Networks)
 	networks, err := util.GetFilteredResourcePathList(ctx, client, hypervisorId, "", util.NetworkResourceType, networkNames, hypervisorConnectionType, pluginId)
 	if len(networks) == 0 {
 		errDetail := "No network found for the given network names"

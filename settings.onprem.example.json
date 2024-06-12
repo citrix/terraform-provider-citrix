@@ -213,7 +213,9 @@
         "TEST_APP_NAME"                 :"app-test",
         // Application Folder Go Tests
         "TEST_APP_FOLDER_NAME"          :"app-folder",
-
+        // Application Group Go Tests
+        "TEST_APP_GROUP_NAME"          :"app-group",
+        
         // Admin role env variable
         "TEST_ROLE_NAME"                :"ctx-test-role",
         // Admin Scope Go Tests
@@ -224,17 +226,24 @@
 
         // Policy Set env variable
         "TEST_POLICY_SET_NAME"          :"ctx-test-policy-set",
-        "CITRIX_DDC_HOST_NAME"          : "{ddcHostname}",
 
         // StoreFront env variable
         "SF_COMPUTER_NAME"              : "{storefront_computer_name}",
-        "SF_AD_ADMAIN_USERNAME"         : "{storefront_admin_username}",
+        "SF_AD_ADMIN_USERNAME"         : "{storefront_admin_username}",
         "SF_AD_ADMIN_PASSWORD"          : "{storefront_admin_password}",
         "TEST_STF_SITE_ID"              :"1",
         "TEST_STF_SITE_ID_UPDATED"      :"2",
         "TEST_STF_Auth_Virtual_Path" : "/Citrix/Auth" ,
         "TEST_STF_Store_Virtual_Path" : "/Citrix/Store",
-        "TEST_STF_WEBRECEIVER_VIRTUAL_PATH" : "/Citrix/StoreWeb"
+        "TEST_STF_WEBRECEIVER_VIRTUAL_PATH" : "/Citrix/StoreWeb",
+
+        // StoreFront STFUserFarmMapping Resource env variables
+        "TEST_STF_USER_FARM_MAPPING_NAME": "Test STFUserFarmMappingName",
+        "TEST_STF_USER_FARM_MAPPING_USER1_SID": "{Active Directory User 1 Account Sid}",
+        "TEST_STF_USER_FARM_MAPPING_USER2_SID": "{Active Directory User 2 Account Sid}",
+        "TEST_STF_PRIMARY_FARM_NAME": "{Primary Farm Name}",
+        "TEST_STF_SECONDARY_FARM_NAME": "{Secondary Farm Name}",
+        "TEST_STF_BACKUP_FARM_NAME": "{Backup Farm Name}"
     },
     "go.testTimeout": "30m"
 }

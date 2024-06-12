@@ -1,4 +1,4 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 package stf_store
 
 import (
@@ -14,14 +14,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -44,91 +36,6 @@ type stfStoreServiceResource struct {
 // Metadata returns the resource type name.
 func (r *stfStoreServiceResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_stf_store_service"
-}
-
-// Schema defines the schema for the resource.
-func (r *stfStoreServiceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "Storefront StoreService.",
-		Attributes: map[string]schema.Attribute{
-			"site_id": schema.StringAttribute{
-				Description: "The IIS site id of the Storefront storeservice. Defaults to 1.",
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString("1"),
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"virtual_path": schema.StringAttribute{
-				Description: "The IIS VirtualPath at which the Store will be configured to be accessed by Receivers.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"friendly_name": schema.StringAttribute{
-				Description: "The friendly name of the Store",
-				Optional:    true,
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"authentication_service": schema.StringAttribute{
-				Description: "The StoreFront Authentication Service to use for authenticating users.",
-				Optional:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"anonymous": schema.BoolAttribute{
-				Description: "Whether the Store is anonymous. Anonymous Store not requiring authentication.",
-				Optional:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.RequiresReplace(),
-				},
-			},
-			"load_balance": schema.BoolAttribute{
-				Description: "Whether the Store is load balanced.",
-				Optional:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.RequiresReplace(),
-				},
-			},
-			"farm_config": schema.SingleNestedAttribute{
-				Description: "Farm configuration for the Store.",
-				Optional:    true,
-				PlanModifiers: []planmodifier.Object{
-					objectplanmodifier.RequiresReplace(),
-				},
-				Attributes: map[string]schema.Attribute{
-					"farm_name": schema.StringAttribute{
-						Description: "The name of the Farm.",
-						Required:    true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.RequiresReplace(),
-						},
-					},
-					"farm_type": schema.StringAttribute{
-						Description: "The type of the Farm.",
-						Required:    true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.RequiresReplace(),
-						},
-					},
-					"servers": schema.ListAttribute{
-						ElementType: types.StringType,
-						Description: "The list of servers in the Farm.",
-						Required:    true,
-						PlanModifiers: []planmodifier.List{
-							listplanmodifier.RequiresReplace(),
-						},
-					},
-				},
-			},
-		},
-	}
 }
 
 // Configure adds the provider configured client to the resource.
@@ -158,7 +65,7 @@ func (r *stfStoreServiceResource) Create(ctx context.Context, req resource.Creat
 	siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error creating Storefront StoreService ",
+			"Error creating StoreFront StoreService ",
 			"\nError message: "+err.Error(),
 		)
 		return
@@ -178,10 +85,12 @@ func (r *stfStoreServiceResource) Create(ctx context.Context, req resource.Creat
 		body.SetLoadBalance(plan.LoadBalance.ValueBool())
 	}
 
-	if plan.FarmConfig != nil {
-		body.SetFarmName(plan.FarmConfig.FarmName.ValueString())
-		body.SetFarmType(plan.FarmConfig.FarmType.ValueString())
-		body.SetServers(util.ConvertBaseStringArrayToPrimitiveStringArray(plan.FarmConfig.Servers))
+	if !plan.FarmConfig.IsNull() {
+		farmConfig := util.ObjectValueToTypedObject[FarmConfig](ctx, &resp.Diagnostics, plan.FarmConfig)
+		body.SetFarmName(farmConfig.FarmName.ValueString())
+		body.SetFarmType(farmConfig.FarmType.ValueString())
+		farmServers := util.StringListToStringArray(ctx, &resp.Diagnostics, farmConfig.Servers)
+		body.SetServers(farmServers)
 	}
 
 	createStoreServiceRequest := r.client.StorefrontClient.StoreSF.STFStoreCreateSTFStore(ctx, body)
@@ -190,7 +99,7 @@ func (r *stfStoreServiceResource) Create(ctx context.Context, req resource.Creat
 	StoreServiceDetail, err := createStoreServiceRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error creating Storefront StoreService",
+			"Error creating StoreFront StoreService",
 			"TransactionId: ",
 		)
 		return
@@ -260,7 +169,7 @@ func (r *stfStoreServiceResource) Update(ctx context.Context, req resource.Updat
 	_, err = editStoreServiceRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error updating Storefront StoreService ",
+			"Error updating StoreFront StoreService ",
 			"\nError message: "+err.Error(),
 		)
 	}
@@ -303,7 +212,7 @@ func (r *stfStoreServiceResource) Delete(ctx context.Context, req resource.Delet
 	_, err := deleteStoreServiceRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error deleting Storefront StoreService ",
+			"Error deleting StoreFront StoreService ",
 			"\nError message: "+err.Error(),
 		)
 		return
@@ -344,7 +253,7 @@ func getSTFStoreService(ctx context.Context, client *citrixdaasclient.CitrixDaas
 		siteIdInt, err := strconv.ParseInt(*siteId, 10, 64)
 		if err != nil {
 			diagnostics.AddError(
-				"Error fetching state of Storefront StoreService ",
+				"Error fetching state of StoreFront StoreService ",
 				"Error message: "+err.Error(),
 			)
 			return nil, err

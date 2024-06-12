@@ -1,84 +1,59 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 
 package admin_scope
 
 import (
-	"reflect"
+	"context"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // AdminScopeResourceModel maps the resource schema data.
 type AdminScopeResourceModel struct {
-	Id            types.String         `tfsdk:"id"`
-	Name          types.String         `tfsdk:"name"`
-	Description   types.String         `tfsdk:"description"`
-	ScopedObjects []ScopedObjectsModel `tfsdk:"scoped_objects"`
+	Id          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	Description types.String `tfsdk:"description"`
 }
 
-type ScopedObjectsModel struct {
-	ObjectType types.String `tfsdk:"object_type"`
-	Object     types.String `tfsdk:"object"`
-}
-
-func (r AdminScopeResourceModel) RefreshPropertyValues(adminScope *citrixorchestration.ScopeResponseModel, scopedObjects []citrixorchestration.ScopedObjectResponseModel) AdminScopeResourceModel {
+func (r AdminScopeResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, adminScope *citrixorchestration.ScopeResponseModel) AdminScopeResourceModel {
 
 	// Overwrite admin scope with refreshed state
 	r.Id = types.StringValue(adminScope.GetId())
 	r.Name = types.StringValue(adminScope.GetName())
-	r.ScopedObjects = r.refreshScopedObjects(scopedObjects)
-
-	if adminScope.GetDescription() != "" || !r.Description.IsNull() {
-		r.Description = types.StringValue(adminScope.GetDescription())
-	}
+	r.Description = types.StringValue(adminScope.GetDescription())
 
 	return r
 }
 
-func (r AdminScopeResourceModel) refreshScopedObjects(scopedObjectsFromRemote []citrixorchestration.ScopedObjectResponseModel) []ScopedObjectsModel {
-
-	type RemoteScopedObjectTracker struct {
-		ObjectType types.String
-		IsVisited  bool
+func GetAdminScopeSchema() schema.Schema {
+	return schema.Schema{
+		// This description is used by the documentation generator and the language server.
+		Description: "Manages an administrator scope.",
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Description: "ID of the admin scope.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"name": schema.StringAttribute{
+				Description: "Name of the admin scope.",
+				Required:    true,
+			},
+			"description": schema.StringAttribute{
+				Description: "Description of the admin scope.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(""),
+			},
+		},
 	}
-
-	// Create a map of ObjectName -> RemoteScopedObjectTracker from the scoped objects returned from remote
-	scopedObjectMapFromRemote := map[string]*RemoteScopedObjectTracker{}
-	for _, scopedObjectFromRemote := range scopedObjectsFromRemote {
-		scopedObjectMapFromRemote[scopedObjectFromRemote.Object.GetName()] = &RemoteScopedObjectTracker{
-			ObjectType: types.StringValue(reflect.ValueOf(scopedObjectFromRemote.GetObjectType()).String()),
-			IsVisited:  false,
-		}
-	}
-
-	// Prepare the scoped objects list to be stored in the state
-	var scopedObjectsForState []ScopedObjectsModel
-	for _, scopedObject := range r.ScopedObjects {
-		scopedObjectFromRemote, exists := scopedObjectMapFromRemote[scopedObject.Object.ValueString()]
-		if !exists {
-			// If scoped object is not present in the remote, then don't add it to the state
-			continue
-		}
-
-		scopedObjectsForState = append(scopedObjectsForState, ScopedObjectsModel{
-			ObjectType: scopedObjectFromRemote.ObjectType,
-			Object:     scopedObject.Object,
-		})
-
-		scopedObjectMapFromRemote[scopedObject.Object.ValueString()].IsVisited = true
-	}
-
-	// Add all the scoped objects from remote which are not present in the state
-	for scopedObjectName, scopedObjectType := range scopedObjectMapFromRemote {
-		if !scopedObjectType.IsVisited {
-			scopedObjectsForState = append(scopedObjectsForState, ScopedObjectsModel{
-				ObjectType: scopedObjectType.ObjectType,
-				Object:     types.StringValue(scopedObjectName),
-			})
-		}
-	}
-
-	return scopedObjectsForState
 }

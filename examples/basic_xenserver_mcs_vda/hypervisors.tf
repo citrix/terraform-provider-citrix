@@ -1,13 +1,8 @@
 resource "citrix_xenserver_hypervisor" "example-xenserver-hypervisor" {
-    name            = "example-xenserver-hyperv"
+    name            = var.hypervisor_name
     zone            = citrix_zone.example-zone.id
-    username        = "<XenServer Username>"
-    password        = "<XenServer Password>"        
-    password_format = "PlainText"
-    addresses       = [
-        "http://<IP address or hostname for XenServer>"
-    ]
-    ssl_thumbprints = [
-        "<SSL thumbprint in SHA-256 format without colons>"
-    ]
+    username        = var.xenserver_username
+    password        = var.xenserver_password    
+    password_format = var.xenserver_password_format
+    addresses       = var.xenserver_addresses
 }

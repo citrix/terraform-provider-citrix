@@ -1,26 +1,16 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 
 package hypervisor
 
 import (
 	"context"
 	"net/http"
-	"regexp"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
-	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -55,88 +45,7 @@ func (r *nutanixHypervisorResource) Configure(_ context.Context, req resource.Co
 
 // Schema implements resource.Resource.
 func (r *nutanixHypervisorResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "Manages a Nutanix AHV hypervisor.",
-		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "GUID identifier of the hypervisor.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"name": schema.StringAttribute{
-				Description: "Name of the hypervisor.",
-				Required:    true,
-			},
-			"zone": schema.StringAttribute{
-				Description: "Id of the zone the hypervisor is associated with.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
-				},
-			},
-			"username": schema.StringAttribute{
-				Description: "Username of the hypervisor.",
-				Required:    true,
-			},
-			"password": schema.StringAttribute{
-				Description: "Password of the hypervisor.",
-				Required:    true,
-			},
-			"password_format": schema.StringAttribute{
-				Description: "Password format of the hypervisor. Choose between Base64 and PlainText.",
-				Required:    true,
-				Validators: []validator.String{
-					stringvalidator.OneOf(
-						string(citrixorchestration.IDENTITYPASSWORDFORMAT_BASE64),
-						string(citrixorchestration.IDENTITYPASSWORDFORMAT_PLAIN_TEXT),
-					),
-				},
-			},
-			"addresses": schema.ListAttribute{
-				ElementType: types.StringType,
-				Description: "Hypervisor address(es).  At least one is required.",
-				Required:    true,
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
-					listvalidator.ValueStringsAre(
-						stringvalidator.RegexMatches(regexp.MustCompile(util.IPv4Regex), "must be a valid IPv4 address without protocol (http:// or https://) and port number"),
-					),
-				},
-			},
-			"max_absolute_active_actions": schema.Int64Attribute{
-				Description: "Maximum number of actions that can execute in parallel on the hypervisor. Default is 100.",
-				Optional:    true,
-				Computed:    true,
-				Default:     int64default.StaticInt64(100),
-				Validators: []validator.Int64{
-					int64validator.AtLeast(1),
-				},
-			},
-			"max_absolute_new_actions_per_minute": schema.Int64Attribute{
-				Description: "Maximum number of actions that can be started on the hypervisor per-minute. Default is 10.",
-				Optional:    true,
-				Computed:    true,
-				Default:     int64default.StaticInt64(10),
-				Validators: []validator.Int64{
-					int64validator.AtLeast(1),
-				},
-			},
-			"max_power_actions_percentage_of_machines": schema.Int64Attribute{
-				Description: "Maximum percentage of machines on the hypervisor which can have their power state changed simultaneously. Default is 20.",
-				Optional:    true,
-				Computed:    true,
-				Default:     int64default.StaticInt64(20),
-				Validators: []validator.Int64{
-					int64validator.AtLeast(1),
-				},
-			},
-		},
-	}
+	resp.Schema = GetNutanixHypervisorSchema()
 }
 
 // ImportState implements resource.ResourceWithImportState.
@@ -174,11 +83,14 @@ func (r *nutanixHypervisorResource) Create(ctx context.Context, req resource.Cre
 	}
 	connectionDetails.SetPasswordFormat(*pwdFormat)
 
-	addresses := util.ConvertBaseStringArrayToPrimitiveStringArray(plan.Addresses)
+	addresses := util.StringListToStringArray(ctx, &diags, plan.Addresses)
 	connectionDetails.SetAddresses(addresses)
 	connectionDetails.SetMaxAbsoluteActiveActions(int32(plan.MaxAbsoluteActiveActions.ValueInt64()))
 	connectionDetails.SetMaxAbsoluteNewActionsPerMinute(int32(plan.MaxAbsoluteNewActionsPerMinute.ValueInt64()))
 	connectionDetails.SetMaxPowerActionsPercentageOfMachines(int32(plan.MaxPowerActionsPercentageOfMachines.ValueInt64()))
+	if !plan.Scopes.IsNull() {
+		connectionDetails.SetScopes(util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes))
+	}
 
 	var body citrixorchestration.CreateHypervisorRequestModel
 	body.SetConnectionDetails(connectionDetails)
@@ -190,7 +102,7 @@ func (r *nutanixHypervisorResource) Create(ctx context.Context, req resource.Cre
 	}
 
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(hypervisor)
+	plan = plan.RefreshPropertyValues(ctx, &diags, hypervisor)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -228,7 +140,7 @@ func (r *nutanixHypervisorResource) Read(ctx context.Context, req resource.ReadR
 	}
 
 	// Overwrite hypervisor with refreshed state
-	state = state.RefreshPropertyValues(hypervisor)
+	state = state.RefreshPropertyValues(ctx, &diags, hypervisor)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -272,12 +184,15 @@ func (r *nutanixHypervisorResource) Update(ctx context.Context, req resource.Upd
 	}
 	editHypervisorRequestBody.SetPasswordFormat(*pwdFormat)
 
-	addresses := util.ConvertBaseStringArrayToPrimitiveStringArray(plan.Addresses)
+	addresses := util.StringListToStringArray(ctx, &diags, plan.Addresses)
 	editHypervisorRequestBody.SetAddresses(addresses)
 
 	editHypervisorRequestBody.SetMaxAbsoluteActiveActions(int32(plan.MaxAbsoluteActiveActions.ValueInt64()))
 	editHypervisorRequestBody.SetMaxAbsoluteNewActionsPerMinute(int32(plan.MaxAbsoluteNewActionsPerMinute.ValueInt64()))
 	editHypervisorRequestBody.SetMaxPowerActionsPercentageOfMachines(int32(plan.MaxPowerActionsPercentageOfMachines.ValueInt64()))
+	if !plan.Scopes.IsNull() {
+		editHypervisorRequestBody.SetScopes(util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes))
+	}
 
 	// Patch hypervisor
 	updatedHypervisor, err := UpdateHypervisor(ctx, r.client, &resp.Diagnostics, hypervisor, editHypervisorRequestBody)
@@ -286,7 +201,7 @@ func (r *nutanixHypervisorResource) Update(ctx context.Context, req resource.Upd
 	}
 
 	// Update resource state with updated property values
-	plan = plan.RefreshPropertyValues(updatedHypervisor)
+	plan = plan.RefreshPropertyValues(ctx, &diags, updatedHypervisor)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

@@ -3,12 +3,12 @@
 page_title: "citrix_stf_webreceiver_service Resource - citrix"
 subcategory: ""
 description: |-
-  Storefront WebReceiver.
+  StoreFront WebReceiver.
 ---
 
 # citrix_stf_webreceiver_service (Resource)
 
-Storefront WebReceiver.
+StoreFront WebReceiver.
 
 ## Example Usage
 
@@ -40,10 +40,10 @@ resource "citrix_stf_webreceiver_service" "example-stf-webreceiver-service"{
 
 ### Optional
 
-- `authentication_methods` (List of String) The authentication methods supported by the WebReceiver.
+- `authentication_methods` (Set of String) The authentication methods supported by the WebReceiver.
 - `friendly_name` (String) The friendly name of the WebReceiver
 - `plugin_assistant` (Attributes) Pluin Assistant configuration for the WebReceiver. (see [below for nested schema](#nestedatt--plugin_assistant))
-- `site_id` (String) The IIS site id of the Storefront webreceiver. Defaults to 1.
+- `site_id` (String) The IIS site id of the StoreFront webreceiver. Defaults to 1.
 - `store_service` (String) The StoreFront Store Service linked to the WebReceiver.
 
 <a id="nestedatt--plugin_assistant"></a>

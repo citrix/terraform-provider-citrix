@@ -1,4 +1,4 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 
 package hypervisor
 
@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"regexp"
 	"strconv"
 	"time"
 
@@ -14,14 +13,8 @@ import (
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
 
 const (
@@ -52,68 +45,7 @@ func (r *azureHypervisorResource) Metadata(_ context.Context, req resource.Metad
 
 // Schema defines the schema for the resource.
 func (r *azureHypervisorResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "Manages an Azure hypervisor.",
-		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "GUID identifier of the hypervisor.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"name": schema.StringAttribute{
-				Description: "Name of the hypervisor.",
-				Required:    true,
-			},
-			"zone": schema.StringAttribute{
-				Description: "Id of the zone the hypervisor is associated with.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
-				},
-			},
-			"application_id": schema.StringAttribute{
-				Description: "Application ID of the service principal used to access the Azure APIs.",
-				Required:    true,
-			},
-			"application_secret": schema.StringAttribute{
-				Description: "The Application Secret of the service principal used to access the Azure APIs.",
-				Required:    true,
-				Sensitive:   true,
-			},
-			"application_secret_expiration_date": schema.StringAttribute{
-				Description: "The expiration date of the application secret of the service principal used to access the Azure APIs. Format is YYYY-MM-DD.",
-				Optional:    true,
-				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(`^((?:19|20|21)\d\d)[-](0[1-9]|1[012])[-](0[1-9]|[12][0-9]|3[01])$`), "ensure date is valid and is in the format YYYY-MM-DD"),
-				},
-			},
-			"subscription_id": schema.StringAttribute{
-				Description: "Azure Subscription ID.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplaceIfConfigured(),
-				},
-			},
-			"active_directory_id": schema.StringAttribute{
-				Description: "Azure Active Directory ID.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplaceIfConfigured(),
-				},
-			},
-			"enable_azure_ad_device_management": schema.BoolAttribute{
-				Description: "Enable Azure AD device management. Default is false.",
-				Optional:    true,
-				Computed:    true,
-				Default:     booldefault.StaticBool(false),
-			},
-		},
-	}
+	resp.Schema = GetAzureHypervisorSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -156,7 +88,9 @@ func (r *azureHypervisorResource) Create(ctx context.Context, req resource.Creat
 	connectionDetails.SetMetadata(metadata)
 	connectionDetails.SetSubscriptionId(plan.SubscriptionId.ValueString())
 	connectionDetails.SetActiveDirectoryId(plan.ActiveDirectoryId.ValueString())
-
+	if !plan.Scopes.IsNull() {
+		connectionDetails.SetScopes(util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes))
+	}
 	// Set custom properties for enabling AzureAD Device Management
 	customProperties := []citrixorchestration.NameValueStringPairModel{}
 	enableAADDeviceManagementProperty := citrixorchestration.NameValueStringPairModel{}
@@ -177,7 +111,7 @@ func (r *azureHypervisorResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(hypervisor)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, hypervisor)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -215,7 +149,7 @@ func (r *azureHypervisorResource) Read(ctx context.Context, req resource.ReadReq
 	}
 
 	// Overwrite hypervisor with refreshed state
-	state = state.RefreshPropertyValues(hypervisor)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, hypervisor)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -259,6 +193,9 @@ func (r *azureHypervisorResource) Update(ctx context.Context, req resource.Updat
 	editHypervisorRequestBody.SetApplicationSecret(plan.ApplicationSecret.ValueString())
 	metadata := getMetadataForAzureRmHypervisor(plan)
 	editHypervisorRequestBody.SetMetadata(metadata)
+	if !plan.Scopes.IsNull() {
+		editHypervisorRequestBody.SetScopes(util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes))
+	}
 
 	// Modify custom properties
 	customPropertiesString := hypervisor.GetCustomProperties()
@@ -291,7 +228,7 @@ func (r *azureHypervisorResource) Update(ctx context.Context, req resource.Updat
 	}
 
 	// Update resource state with updated property values
-	plan = plan.RefreshPropertyValues(updatedHypervisor)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, updatedHypervisor)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

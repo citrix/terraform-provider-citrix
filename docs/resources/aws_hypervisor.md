@@ -34,6 +34,10 @@ resource "citrix_aws_hypervisor" "example-aws-hypervisor" {
 - `secret_key` (String, Sensitive) The secret key used to authenticate with the AWS APIs.
 - `zone` (String) Id of the zone the hypervisor is associated with.
 
+### Optional
+
+- `scopes` (Set of String) The IDs of the scopes for the hypervisor to be a part of.
+
 ### Read-Only
 
 - `id` (String) GUID identifier of the hypervisor.

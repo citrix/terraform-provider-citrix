@@ -1,4 +1,4 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 
 package test
 
@@ -11,8 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-// testAccPreCheck validates the necessary test API keys exist
-// in the testing environment
+// TestSTFWebReceiverServicePreCheck validates the necessary test API keys exist in the testing environment
 
 func TestSTFWebReceiverServicePreCheck(t *testing.T) {
 	if v := os.Getenv("TEST_STF_SITE_ID"); v == "" {

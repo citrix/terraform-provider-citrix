@@ -1,4 +1,4 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 
 package hypervisor_resource_pool
 
@@ -16,18 +16,25 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+// ensure HypervisorStorageModel implements RefreshableListItemWithAttributes
+var _ util.RefreshableListItemWithAttributes[citrixorchestration.HypervisorStorageResourceResponseModel] = HypervisorStorageModel{}
+
 type HypervisorStorageModel struct {
 	StorageName types.String `tfsdk:"storage_name"`
 	Superseded  types.Bool   `tfsdk:"superseded"`
 }
 
-func (v HypervisorStorageModel) RefreshListItem(remote citrixorchestration.HypervisorStorageResourceResponseModel) HypervisorStorageModel {
+func (h HypervisorStorageModel) GetKey() string {
+	return h.StorageName.ValueString()
+}
+
+func (v HypervisorStorageModel) RefreshListItem(_ context.Context, _ *diag.Diagnostics, remote citrixorchestration.HypervisorStorageResourceResponseModel) util.ModelWithAttributes {
 	v.StorageName = types.StringValue(remote.GetName())
 	v.Superseded = types.BoolValue(remote.GetSuperseded())
 	return v
 }
 
-func GetNestedAttributeObjectSchmeaForStorege() schema.NestedAttributeObject {
+func (HypervisorStorageModel) GetSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
 			"storage_name": schema.StringAttribute{
@@ -42,6 +49,10 @@ func GetNestedAttributeObjectSchmeaForStorege() schema.NestedAttributeObject {
 			},
 		},
 	}
+}
+
+func (HypervisorStorageModel) GetAttributes() map[string]schema.Attribute {
+	return HypervisorStorageModel{}.GetSchema().Attributes
 }
 
 // Create creates the resource and sets the initial Terraform state.

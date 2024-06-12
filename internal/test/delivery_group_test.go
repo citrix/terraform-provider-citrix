@@ -1,4 +1,4 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 
 package test
 
@@ -366,7 +366,6 @@ resource "citrix_delivery_group" "testDeliveryGroup" {
 resource "citrix_policy_set" "testPolicySetWithoutDG" {
     name = "%s"
     description = "Test policy set description updated"
-    scopes = [ "All" ]
     type = "DeliveryGroupPolicies"
     policies = [
         {
@@ -379,8 +378,6 @@ resource "citrix_policy_set" "testPolicySetWithoutDG" {
                     value = "13:00:00"
                     use_default = false
                 },
-            ]
-            policy_filters = [
             ]
         }
     ]
