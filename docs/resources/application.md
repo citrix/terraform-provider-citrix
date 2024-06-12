@@ -24,6 +24,8 @@ resource "citrix_application" "example-application" {
     working_directory       = "<Working directory path for the executable>"
   }
   delivery_groups = [citrix_delivery_group.example-delivery-group.id]
+  icon            = citrix_application_icon.example-application-icon.id
+  limit_visibility_to_users = ["example\\user1"]
 }
 ```
 
@@ -32,7 +34,7 @@ resource "citrix_application" "example-application" {
 
 ### Required
 
-- `delivery_groups` (List of String) The delivery group id's to which the application should be added.
+- `delivery_groups` (Set of String) The delivery group IDs to which the application should be added.
 - `installed_app_properties` (Attributes) The install application properties. (see [below for nested schema](#nestedatt--installed_app_properties))
 - `name` (String) Name of the application.
 - `published_name` (String) A display name for the application that is shown to users.
@@ -41,6 +43,8 @@ resource "citrix_application" "example-application" {
 
 - `application_folder_path` (String) The application folder path in which the application should be created.
 - `description` (String) Description of the application.
+- `icon` (String) The Id of the icon to be associated with the application.
+- `limit_visibility_to_users` (Set of String) By default, the application is visible to all users within a delivery group. However, you can restrict its visibility to only certain users by specifying them in the 'limit_visibility_to_users' list. Must be in `DOMAIN\UserOrGroupName` or `user@domain.com` format
 
 ### Read-Only
 

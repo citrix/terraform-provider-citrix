@@ -30,7 +30,7 @@ resource "citrix_nutanix_hypervisor_resource_pool" "example-nutanix-hypervisor-r
 
 - `hypervisor` (String) Id of the hypervisor for which the resource pool needs to be created.
 - `name` (String) Name of the resource pool. Name should be unique across all hypervisors.
-- `networks` (List of String) List of networks for allocating resources.
+- `networks` (List of String) Networks for allocating resources.
 
 ### Read-Only
 

@@ -1,4 +1,4 @@
 resource "citrix_zone" "example-zone" {
-    name        = "example zone"
+    name        = var.zone_name
     description = "description for example zone"
 }

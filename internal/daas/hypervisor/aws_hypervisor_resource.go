@@ -1,23 +1,17 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 
 package hypervisor
 
 import (
 	"context"
 	"net/http"
-	"regexp"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -44,48 +38,7 @@ func (r *awsHypervisorResource) Metadata(_ context.Context, req resource.Metadat
 
 // Schema defines the schema for the resource.
 func (r *awsHypervisorResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "Manages an AWS EC2 hypervisor.",
-		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "GUID identifier of the hypervisor.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"name": schema.StringAttribute{
-				Description: "Name of the hypervisor.",
-				Required:    true,
-			},
-			"zone": schema.StringAttribute{
-				Description: "Id of the zone the hypervisor is associated with.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
-				},
-			},
-			"region": schema.StringAttribute{
-				Description: "AWS region to connect to.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplaceIfConfigured(),
-				},
-			},
-			"api_key": schema.StringAttribute{
-				Description: "The API key used to authenticate with the AWS APIs.",
-				Required:    true,
-			},
-			"secret_key": schema.StringAttribute{
-				Description: "The secret key used to authenticate with the AWS APIs.",
-				Required:    true,
-				Sensitive:   true,
-			},
-		},
-	}
+	resp.Schema = GetAwsHypervisorSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -114,7 +67,9 @@ func (r *awsHypervisorResource) Create(ctx context.Context, req resource.CreateR
 	connectionDetails.SetName(plan.Name.ValueString())
 	connectionDetails.SetZone(plan.Zone.ValueString())
 	connectionDetails.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS)
-
+	if !plan.Scopes.IsNull() {
+		connectionDetails.SetScopes(util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes))
+	}
 	if plan.Region.IsNull() || plan.ApiKey.IsNull() || plan.SecretKey.IsNull() {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor for AWS",
@@ -138,7 +93,7 @@ func (r *awsHypervisorResource) Create(ctx context.Context, req resource.CreateR
 	}
 
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(hypervisor)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, hypervisor)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -176,7 +131,7 @@ func (r *awsHypervisorResource) Read(ctx context.Context, req resource.ReadReque
 	}
 
 	// Overwrite hypervisor with refreshed state
-	state = state.RefreshPropertyValues(hypervisor)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, hypervisor)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -218,6 +173,9 @@ func (r *awsHypervisorResource) Update(ctx context.Context, req resource.UpdateR
 	editHypervisorRequestBody.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS)
 	editHypervisorRequestBody.SetApiKey(plan.ApiKey.ValueString())
 	editHypervisorRequestBody.SetSecretKey(plan.SecretKey.ValueString())
+	if !plan.Scopes.IsNull() {
+		editHypervisorRequestBody.SetScopes(util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes))
+	}
 
 	// Patch hypervisor
 	updatedHypervisor, err := UpdateHypervisor(ctx, r.client, &resp.Diagnostics, hypervisor, editHypervisorRequestBody)
@@ -226,7 +184,7 @@ func (r *awsHypervisorResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	// Update resource state with updated property values
-	plan = plan.RefreshPropertyValues(updatedHypervisor)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, updatedHypervisor)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

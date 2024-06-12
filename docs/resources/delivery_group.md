@@ -24,7 +24,7 @@ resource "citrix_delivery_group" "example-delivery-group" {
     desktops = [
         {
             published_name = "Example Desktop"
-            description = "Desription for example desktop"
+            description = "Description for example desktop"
             restricted_access_users = {
                 allow_list = [
                     "user1@example.com"
@@ -113,7 +113,6 @@ resource "citrix_delivery_group" "example-delivery-group" {
 			}
 		}
 	]
-	
     policy_set_id            = citrix_policy_set.example-policy-set.id
     minimum_functional_level = "L7_20"
 }
@@ -133,10 +132,13 @@ resource "citrix_delivery_group" "example-delivery-group" {
 - `autoscale_settings` (Attributes) The power management settings governing the machine(s) in the delivery group. (see [below for nested schema](#nestedatt--autoscale_settings))
 - `description` (String) Description of the delivery group.
 - `desktops` (Attributes List) A list of Desktop resources to publish on the delivery group. Only 1 desktop can be added to a Remote PC Delivery Group. (see [below for nested schema](#nestedatt--desktops))
+- `make_resources_available_in_lhc` (Boolean) In the event of a service disruption or loss of connectivity, select if you want Local Host Cache to keep resources in the delivery group available to launch new sessions. Existing sessions are not impacted. This setting only impacts Single Session OS Random (pooled) desktops which are power managed. LHC is always enabled for Single Session OS static and Multi Session OS desktops.When set to `true`, machines will remain available and allow new connections and changes to the machine caused by a user might be present in subsequent sessions. When set to `false`, machines in the delivery group will be unavailable for new connections during a Local Host Cache event.
 - `minimum_functional_level` (String) Specifies the minimum functional level for the VDA machines in the delivery group. Defaults to `L7_20`.
 - `policy_set_id` (String) GUID identifier of the policy set.
 - `reboot_schedules` (Attributes List) The reboot schedule for the delivery group. (see [below for nested schema](#nestedatt--reboot_schedules))
 - `restricted_access_users` (Attributes) Restrict access to this Delivery Group by specifying users and groups in the allow and block list. If no value is specified, all authenticated users will have access to this Delivery Group. To give access to unauthenticated users, use the `allow_anonymous_access` property. (see [below for nested schema](#nestedatt--restricted_access_users))
+- `scopes` (Set of String) The IDs of the scopes for the delivery group to be a part of.
+- `storefront_servers` (Set of String) A list of GUID identifiers of StoreFront Servers to associate with the delivery group.
 
 ### Read-Only
 
@@ -186,14 +188,14 @@ Optional:
 
 Required:
 
-- `days_of_week` (List of String) The pattern of days of the week that the power time scheme covers.
+- `days_of_week` (Set of String) The pattern of days of the week that the power time scheme covers.
 - `display_name` (String) The name of the power time scheme as displayed in the console.
-- `peak_time_ranges` (List of String) List of peak time ranges during the day. e.g. 09:00-17:00
+- `peak_time_ranges` (Set of String) Peak time ranges during the day. e.g. 09:00-17:00
 - `pool_using_percentage` (Boolean) Indicates whether the integer values in the pool size array are to be treated as absolute values (if this value is `false`) or as percentages of the number of machines in the delivery group (if this value is `true`).
 
 Optional:
 
-- `pool_size_schedules` (Attributes List) List of pool size schedules during the day. Each is specified as a time range and an indicator of the number of machines that should be powered on during that time range. Do not specify schedules when no machines should be powered on. (see [below for nested schema](#nestedatt--autoscale_settings--power_time_schemes--pool_size_schedules))
+- `pool_size_schedules` (Attributes List) Pool size schedules during the day. Each is specified as a time range and an indicator of the number of machines that should be powered on during that time range. Do not specify schedules when no machines should be powered on. (see [below for nested schema](#nestedatt--autoscale_settings--power_time_schemes--pool_size_schedules))
 
 <a id="nestedatt--autoscale_settings--power_time_schemes--pool_size_schedules"></a>
 ### Nested Schema for `autoscale_settings.power_time_schemes.pool_size_schedules`
@@ -225,8 +227,8 @@ Optional:
 
 Optional:
 
-- `allow_list` (List of String) Users who can use this Desktop. Must be in `DOMAIN\UserOrGroupName` or `user@domain.com` format
-- `block_list` (List of String) Users who cannot use this Desktop. A block list is meaningful only when used to block users in the allow list. Must be in `Domain\UserOrGroupName` or `user@domain.com` format
+- `allow_list` (Set of String) Users who can use this Desktop. Must be in `DOMAIN\UserOrGroupName` or `user@domain.com` format
+- `block_list` (Set of String) Users who cannot use this Desktop. A block list is meaningful only when used to block users in the allow list. Must be in `DOMAIN\UserOrGroupName` or `user@domain.com` format
 
 
 
@@ -248,7 +250,7 @@ Required:
 Optional:
 
 - `day_in_month` (String) The day in the month on which the reboot schedule runs monthly. Can only be set to `Sunday`, `Monday`, `Tuesday`, `Wednesday`, `Thursday`, `Friday`, or `Saturday`.
-- `days_in_week` (List of String) The days of the week on which the reboot schedule runs weekly. Can only be set to `Sunday`, `Monday`, `Tuesday`, `Wednesday`, `Thursday`, `Friday`, or `Saturday`.
+- `days_in_week` (Set of String) The days of the week on which the reboot schedule runs weekly. Can only be set to `Sunday`, `Monday`, `Tuesday`, `Wednesday`, `Thursday`, `Friday`, or `Saturday`.
 - `description` (String) The description of the reboot schedule.
 - `reboot_notification_to_users` (Attributes) The reboot notification for the reboot schedule. Not available for natural reboot. (see [below for nested schema](#nestedatt--reboot_schedules--reboot_notification_to_users))
 - `restrict_to_tag` (String) The tag to which the reboot schedule is restricted.
@@ -274,8 +276,8 @@ Optional:
 
 Optional:
 
-- `allow_list` (List of String) Users who can use this Delivery Group. Must be in `DOMAIN\UserOrGroupName` or `user@domain.com` format
-- `block_list` (List of String) Users who cannot use this Delivery Group. A block list is meaningful only when used to block users in the allow list. Must be in `Domain\UserOrGroupName` or `user@domain.com` format
+- `allow_list` (Set of String) Users who can use this Delivery Group. Must be in `DOMAIN\UserOrGroupName` or `user@domain.com` format
+- `block_list` (Set of String) Users who cannot use this Delivery Group. A block list is meaningful only when used to block users in the allow list. Must be in `DOMAIN\UserOrGroupName` or `user@domain.com` format
 
 ## Import
 

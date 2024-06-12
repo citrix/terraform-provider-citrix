@@ -3,12 +3,12 @@
 page_title: "citrix_stf_authentication_service Resource - citrix"
 subcategory: ""
 description: |-
-  Storefront Authentication Service.
+  StoreFront Authentication Service.
 ---
 
 # citrix_stf_authentication_service (Resource)
 
-Storefront Authentication Service.
+StoreFront Authentication Service.
 
 ## Example Usage
 

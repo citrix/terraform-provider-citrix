@@ -1,4 +1,4 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 
 package machine_catalog
 
@@ -41,7 +41,7 @@ func (r *machineCatalogResource) Metadata(_ context.Context, req resource.Metada
 
 // Schema defines the schema for the resource.
 func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = getSchemaForMachineCatalogResource()
+	resp.Schema = GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -72,9 +72,11 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 
 	createMachineCatalogRequest := r.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsCreateMachineCatalog(ctx)
 
+	provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
+
 	// Add domain credential header
-	if plan.ProvisioningType.ValueString() == string(citrixorchestration.PROVISIONINGTYPE_MCS) && plan.ProvisioningScheme.MachineDomainIdentity != nil {
-		header := generateAdminCredentialHeader(plan)
+	if plan.ProvisioningType.ValueString() == string(citrixorchestration.PROVISIONINGTYPE_MCS) && !provSchemeModel.MachineDomainIdentity.IsNull() {
+		header := generateAdminCredentialHeader(util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemeModel.MachineDomainIdentity))
 		createMachineCatalogRequest = createMachineCatalogRequest.XAdminCredential(header)
 	}
 
@@ -128,7 +130,7 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 	}
 
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(ctx, r.client, catalog, &connectionType, machines, pluginId)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, catalog, &connectionType, machines, pluginId)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -180,7 +182,7 @@ func (r *machineCatalogResource) Read(ctx context.Context, req resource.ReadRequ
 		pluginId = hypervisor.GetPluginId()
 	}
 	// Overwrite items with refreshed state
-	state = state.RefreshPropertyValues(ctx, r.client, catalog, connectionType, machineCatalogMachines, pluginId)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, catalog, connectionType, machineCatalogMachines, pluginId)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -247,28 +249,29 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 
 	if *provisioningType == citrixorchestration.PROVISIONINGTYPE_MANUAL {
 		// For manual, compare state and plan to find machines to add and delete
-		addMachinesList, deleteMachinesMap := createAddAndRemoveMachinesListForManualCatalogs(state, plan)
+		addMachinesList, deleteMachinesMap := createAddAndRemoveMachinesListForManualCatalogs(ctx, &resp.Diagnostics, state, plan)
 
-		addMachinesToManualCatalog(ctx, r.client, resp, addMachinesList, catalogId)
+		addMachinesToManualCatalog(ctx, &resp.Diagnostics, r.client, resp, addMachinesList, catalogId)
 		deleteMachinesFromManualCatalog(ctx, r.client, resp, deleteMachinesMap, catalogId)
 	} else {
+		provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
 		err = updateCatalogImageAndMachineProfile(ctx, r.client, resp, catalog, plan)
 
 		if err != nil {
 			return
 		}
 
-		if catalog.GetTotalCount() > int32(plan.ProvisioningScheme.NumTotalMachines.ValueInt64()) {
+		if catalog.GetTotalCount() > int32(provSchemeModel.NumTotalMachines.ValueInt64()) {
 			// delete machines from machine catalog
-			err = deleteMachinesFromMcsCatalog(ctx, r.client, resp, catalog, plan)
+			err = deleteMachinesFromMcsCatalog(ctx, r.client, resp, catalog, provSchemeModel)
 			if err != nil {
 				return
 			}
 		}
 
-		if catalog.GetTotalCount() < int32(plan.ProvisioningScheme.NumTotalMachines.ValueInt64()) {
+		if catalog.GetTotalCount() < int32(provSchemeModel.NumTotalMachines.ValueInt64()) {
 			// add machines to machine catalog
-			err = addMachinesToMcsCatalog(ctx, r.client, resp, catalog, plan)
+			err = addMachinesToMcsCatalog(ctx, r.client, resp, catalog, provSchemeModel)
 			if err != nil {
 				return
 			}
@@ -301,7 +304,7 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 	}
 
 	// Update resource state with updated items and timestamp
-	plan = plan.RefreshPropertyValues(ctx, r.client, catalog, &connectionType, machines, pluginId)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, catalog, &connectionType, machines, pluginId)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -345,16 +348,17 @@ func (r *machineCatalogResource) Delete(ctx context.Context, req resource.Delete
 	deleteMachineCatalogRequest := r.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsDeleteMachineCatalog(ctx, catalogId)
 	deleteAccountOption := citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE
 	deleteVmOption := false
-	if catalog.ProvisioningType == citrixorchestration.PROVISIONINGTYPE_MCS {
+	if catalog.GetProvisioningType() == citrixorchestration.PROVISIONINGTYPE_MCS {
 		provScheme := catalog.GetProvisioningScheme()
 		identityType := provScheme.GetIdentityType()
 
 		if identityType == citrixorchestration.IDENTITYTYPE_ACTIVE_DIRECTORY || identityType == citrixorchestration.IDENTITYTYPE_HYBRID_AZURE_AD {
 			// If there's no provisioning scheme in state, there will not be any machines create by MCS.
 			// Therefore we will just omit credential for removing machine accounts.
-			if catalog.ProvisioningScheme != nil {
+			if !state.ProvisioningScheme.IsNull() {
 				// Add domain credential header
-				header := generateAdminCredentialHeader(state)
+				provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, state.ProvisioningScheme)
+				header := generateAdminCredentialHeader(util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemeModel.MachineDomainIdentity))
 				deleteMachineCatalogRequest = deleteMachineCatalogRequest.XAdminCredential(header)
 			}
 
@@ -412,7 +416,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 	azureAD := string(citrixorchestration.IDENTITYTYPE_AZURE_AD)
 
 	if data.ProvisioningType.ValueString() == provisioningTypeMcs {
-		if data.ProvisioningScheme == nil {
+		if data.ProvisioningScheme.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("provisioning_scheme"),
 				"Missing Attribute Configuration",
@@ -420,12 +424,14 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 			)
 		} else {
 			// Validate Provisioning Scheme
-			if data.ProvisioningScheme.AzureMachineConfig != nil {
+			provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, data.ProvisioningScheme)
+			if !provSchemeModel.AzureMachineConfig.IsNull() {
+				azureMachineConfigModel := util.ObjectValueToTypedObject[AzureMachineConfigModel](ctx, &resp.Diagnostics, provSchemeModel.AzureMachineConfig)
 				// Validate Azure Machine Config
-				if data.ProvisioningScheme.AzureMachineConfig.WritebackCache != nil {
+				if !azureMachineConfigModel.WritebackCache.IsNull() {
 					// Validate Writeback Cache
-					wbc := data.ProvisioningScheme.AzureMachineConfig.WritebackCache
-					if !wbc.PersistOsDisk.ValueBool() && wbc.PersistVm.ValueBool() {
+					azureWbcModel := util.ObjectValueToTypedObject[AzureWritebackCacheModel](ctx, &resp.Diagnostics, azureMachineConfigModel.WritebackCache)
+					if !azureWbcModel.PersistOsDisk.ValueBool() && azureWbcModel.PersistVm.ValueBool() {
 						resp.Diagnostics.AddAttributeError(
 							path.Root("persist_vm"),
 							"Incorrect Attribute Configuration",
@@ -433,7 +439,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 						)
 					}
 
-					if !wbc.PersistWBC.ValueBool() && wbc.StorageCostSaving.ValueBool() {
+					if !azureWbcModel.PersistWBC.ValueBool() && azureWbcModel.StorageCostSaving.ValueBool() {
 						resp.Diagnostics.AddAttributeError(
 							path.Root("storage_cost_saving"),
 							"Incorrect Attribute Configuration",
@@ -443,8 +449,8 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 				}
 
 				// Validate Azure Intune Enrollment
-				if data.ProvisioningScheme.IdentityType.ValueString() != azureAD &&
-					!data.ProvisioningScheme.AzureMachineConfig.EnrollInIntune.IsNull() {
+				if provSchemeModel.IdentityType.ValueString() != azureAD &&
+					!azureMachineConfigModel.EnrollInIntune.IsNull() {
 					resp.Diagnostics.AddAttributeError(
 						path.Root("enroll_in_intune"),
 						"Incorrect Attribute Configuration",
@@ -452,7 +458,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 					)
 				}
 				if data.AllocationType.ValueString() != allocationTypeStatic &&
-					data.ProvisioningScheme.AzureMachineConfig.EnrollInIntune.ValueBool() {
+					azureMachineConfigModel.EnrollInIntune.ValueBool() {
 					resp.Diagnostics.AddAttributeError(
 						path.Root("enroll_in_intune"),
 						"Incorrect Attribute Configuration",
@@ -460,9 +466,9 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 					)
 				}
 
-				if data.ProvisioningScheme.AzureMachineConfig.StorageType.ValueString() == util.AzureEphemeralOSDisk {
+				if azureMachineConfigModel.StorageType.ValueString() == util.AzureEphemeralOSDisk {
 					// Validate Azure Ephemeral OS Disk
-					if !data.ProvisioningScheme.AzureMachineConfig.UseManagedDisks.ValueBool() {
+					if !azureMachineConfigModel.UseManagedDisks.ValueBool() {
 						resp.Diagnostics.AddAttributeError(
 							path.Root("use_managed_disks"),
 							"Incorrect Attribute Configuration",
@@ -470,7 +476,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 						)
 					}
 
-					if data.ProvisioningScheme.AzureMachineConfig.UseAzureComputeGallery == nil {
+					if azureMachineConfigModel.UseAzureComputeGallery.IsNull() {
 						resp.Diagnostics.AddAttributeError(
 							path.Root("use_azure_compute_gallery"),
 							"Missing Attribute Configuration",
@@ -478,10 +484,61 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 						)
 					}
 				}
+
+				if !azureMachineConfigModel.ImageUpdateRebootOptions.IsNull() {
+					// Validate Image Update Reboot Options
+					rebootOptions := util.ObjectValueToTypedObject[ImageUpdateRebootOptionsModel](ctx, &resp.Diagnostics, azureMachineConfigModel.ImageUpdateRebootOptions)
+					rebootOptions.ValidateConfig(&resp.Diagnostics)
+				}
+			}
+
+			if !provSchemeModel.AwsMachineConfig.IsNull() {
+				awsMachineConfigModel := util.ObjectValueToTypedObject[AwsMachineConfigModel](ctx, &resp.Diagnostics, provSchemeModel.AwsMachineConfig)
+				if !awsMachineConfigModel.ImageUpdateRebootOptions.IsNull() {
+					// Validate Image Update Reboot Options
+					rebootOptions := util.ObjectValueToTypedObject[ImageUpdateRebootOptionsModel](ctx, &resp.Diagnostics, awsMachineConfigModel.ImageUpdateRebootOptions)
+					rebootOptions.ValidateConfig(&resp.Diagnostics)
+				}
+			}
+
+			if !provSchemeModel.GcpMachineConfig.IsNull() {
+				gcpMachineConfigModel := util.ObjectValueToTypedObject[GcpMachineConfigModel](ctx, &resp.Diagnostics, provSchemeModel.GcpMachineConfig)
+				if !gcpMachineConfigModel.ImageUpdateRebootOptions.IsNull() {
+					// Validate Image Update Reboot Options
+					rebootOptions := util.ObjectValueToTypedObject[ImageUpdateRebootOptionsModel](ctx, &resp.Diagnostics, gcpMachineConfigModel.ImageUpdateRebootOptions)
+					rebootOptions.ValidateConfig(&resp.Diagnostics)
+				}
+			}
+
+			if !provSchemeModel.VsphereMachineConfig.IsNull() {
+				vSphereMachineConfigModel := util.ObjectValueToTypedObject[VsphereMachineConfigModel](ctx, &resp.Diagnostics, provSchemeModel.VsphereMachineConfig)
+				if !vSphereMachineConfigModel.ImageUpdateRebootOptions.IsNull() {
+					// Validate Image Update Reboot Options
+					rebootOptions := util.ObjectValueToTypedObject[ImageUpdateRebootOptionsModel](ctx, &resp.Diagnostics, vSphereMachineConfigModel.ImageUpdateRebootOptions)
+					rebootOptions.ValidateConfig(&resp.Diagnostics)
+				}
+			}
+
+			if !provSchemeModel.XenserverMachineConfig.IsNull() {
+				xenserverMachineConfigModel := util.ObjectValueToTypedObject[XenserverMachineConfigModel](ctx, &resp.Diagnostics, provSchemeModel.XenserverMachineConfig)
+				if !xenserverMachineConfigModel.ImageUpdateRebootOptions.IsNull() {
+					// Validate Image Update Reboot Options
+					rebootOptions := util.ObjectValueToTypedObject[ImageUpdateRebootOptionsModel](ctx, &resp.Diagnostics, xenserverMachineConfigModel.ImageUpdateRebootOptions)
+					rebootOptions.ValidateConfig(&resp.Diagnostics)
+				}
+			}
+
+			if !provSchemeModel.NutanixMachineConfig.IsNull() {
+				nutanixMachineConfigModel := util.ObjectValueToTypedObject[NutanixMachineConfigModel](ctx, &resp.Diagnostics, provSchemeModel.NutanixMachineConfig)
+				if !nutanixMachineConfigModel.ImageUpdateRebootOptions.IsNull() {
+					// Validate Image Update Reboot Options
+					rebootOptions := util.ObjectValueToTypedObject[ImageUpdateRebootOptionsModel](ctx, &resp.Diagnostics, nutanixMachineConfigModel.ImageUpdateRebootOptions)
+					rebootOptions.ValidateConfig(&resp.Diagnostics)
+				}
 			}
 		}
 
-		if data.MachineAccounts != nil {
+		if !data.MachineAccounts.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("machine_accounts"),
 				"Incorrect Attribute Configuration",
@@ -489,24 +546,24 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 			)
 		}
 
-		if data.IsRemotePc.ValueBool() {
+		if !data.IsRemotePc.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("is_remote_pc"),
 				"Incorrect Attribute Configuration",
-				fmt.Sprintf("Remote PC access catalog cannot be created when provisioning_type is %s.", provisioningTypeMcs),
+				fmt.Sprintf("is_remote_pc cannot be configured when provisioning_type is %s.", provisioningTypeMcs),
 			)
 		}
 
-		if !data.IsPowerManaged.IsNull() && !data.IsPowerManaged.ValueBool() {
+		if !data.IsPowerManaged.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("is_power_managed"),
 				"Incorrect Attribute Configuration",
-				fmt.Sprintf("Machines have to be power managed when provisioning_type is %s.", provisioningTypeMcs),
+				fmt.Sprintf("is_power_managed cannot be configured when provisioning_type is %s.", provisioningTypeMcs),
 			)
 		}
 
 		data.IsPowerManaged = types.BoolValue(true) // set power managed to true for MCS catalog
-	} else {
+	} else if data.ProvisioningType.ValueString() == provisioningTypeManual {
 		// Manual provisioning type
 		if data.IsPowerManaged.IsNull() {
 			resp.Diagnostics.AddAttributeError(
@@ -524,7 +581,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 			)
 		}
 
-		if data.ProvisioningScheme != nil {
+		if !data.ProvisioningScheme.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("provisioning_scheme"),
 				"Incorrect Attribute Configuration",
@@ -533,8 +590,9 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 		}
 
 		if data.IsPowerManaged.ValueBool() {
-			if data.MachineAccounts != nil {
-				for _, machineAccount := range data.MachineAccounts {
+			if !data.MachineAccounts.IsNull() {
+				machineAccounts := util.ObjectListToTypedArray[MachineAccountsModel](ctx, &resp.Diagnostics, data.MachineAccounts)
+				for _, machineAccount := range machineAccounts {
 					if machineAccount.Hypervisor.IsNull() {
 						resp.Diagnostics.AddAttributeError(
 							path.Root("machine_accounts"),
@@ -543,7 +601,8 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 						)
 					}
 
-					for _, machine := range machineAccount.Machines {
+					machines := util.ObjectListToTypedArray[MachineCatalogMachineModel](ctx, &resp.Diagnostics, machineAccount.Machines)
+					for _, machine := range machines {
 						if machine.MachineName.IsNull() {
 							resp.Diagnostics.AddAttributeError(
 								path.Root("machine_accounts"),
@@ -584,8 +643,10 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 		}
 	}
 
-	if data.ProvisioningScheme != nil && data.ProvisioningScheme.CustomProperties != nil {
-		for _, customProperty := range data.ProvisioningScheme.CustomProperties {
+	provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, data.ProvisioningScheme)
+	if !data.ProvisioningScheme.IsNull() && !provSchemeModel.CustomProperties.IsNull() {
+		customProperties := util.ObjectListToTypedArray[CustomPropertyModel](ctx, &resp.Diagnostics, provSchemeModel.CustomProperties)
+		for _, customProperty := range customProperties {
 			propertyName := customProperty.Name.ValueString()
 			if val, ok := MappedCustomProperties[propertyName]; ok {
 				resp.Diagnostics.AddAttributeError(

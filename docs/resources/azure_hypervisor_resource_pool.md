@@ -34,7 +34,7 @@ resource "citrix_azure_hypervisor_resource_pool" "example-azure-hypervisor-resou
 - `hypervisor` (String) Id of the hypervisor for which the resource pool needs to be created.
 - `name` (String) Name of the resource pool. Name should be unique across all hypervisors.
 - `region` (String) Cloud Region where the virtual network sits in.
-- `subnets` (List of String) List of subnets to allocate VDAs within the virtual network.
+- `subnets` (List of String) Subnets to allocate VDAs within the virtual network.
 - `virtual_network` (String) Name of the cloud virtual network.
 - `virtual_network_resource_group` (String) The name of the resource group where the vnet resides.
 

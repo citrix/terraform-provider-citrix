@@ -1,4 +1,4 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 
 package test
 
@@ -485,9 +485,7 @@ func TestAzureMcs(t *testing.T) {
 					// Verify type of the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "type", "DeliveryGroupPolicies"),
 					// Verify the number of scopes of the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.#", "1"),
-					// Verify the scopes of the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.0", "All"),
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.#", "0"),
 					// Verify the number of policies in the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.#", "2"),
 					// Verify name of the first policy in the policy set
@@ -600,9 +598,7 @@ func TestAzureMcs(t *testing.T) {
 					// Verify type of the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "type", "DeliveryGroupPolicies"),
 					// Verify the number of scopes of the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.#", "1"),
-					// Verify the scopes of the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.0", "All"),
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.#", "0"),
 					// Verify the number of policies in the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.#", "1"),
 					// Verify name of the second policy in the policy set

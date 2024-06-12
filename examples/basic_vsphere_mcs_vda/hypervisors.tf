@@ -1,11 +1,9 @@
 resource "citrix_vsphere_hypervisor" "example-vsphere-hypervisor" {
-    name            = "example-vsphere-hyperv"
+    name            = var.hypervisor_name
     zone            = citrix_zone.example-zone.id
-    username        = "<vSphere Username>"
-    password        = "<vSphere Password>"        
-    password_format = "PlainText"
-    addresses       = [
-        "http://<IP address or hostname for vSphere>"
-    ]
+    username        = var.vsphere_username
+    password        = var.vsphere_password
+    password_format = var.vsphere_password_format
+    addresses       = var.vsphere_addresses
     max_absolute_active_actions = 20
 }

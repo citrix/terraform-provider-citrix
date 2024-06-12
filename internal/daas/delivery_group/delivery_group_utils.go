@@ -1,29 +1,31 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 
 package delivery_group
 
 import (
 	"context"
 	"fmt"
-	"reflect"
-	"regexp"
-	"slices"
+	"net/http"
 	"strconv"
 	"strings"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
-	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
+
+type AssociatedMachineCatalogProperties struct {
+	SessionSupport    citrixorchestration.SessionSupport
+	IsPowerManaged    bool
+	IsRemotePcCatalog bool
+	IdentityType      citrixorchestration.IdentityType
+	AllocationType    citrixorchestration.AllocationType
+}
 
 func getDeliveryGroup(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string) (*citrixorchestration.DeliveryGroupDetailResponseModel, error) {
 	getDeliveryGroupRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroup(ctx, deliveryGroupId)
@@ -115,60 +117,63 @@ func sessionHostingActionEnumValidator() validator.String {
 	return util.GetValidatorFromEnum(citrixorchestration.AllowedSessionChangeHostingActionEnumValues)
 }
 
-func validatePowerManagementSettings(plan DeliveryGroupResourceModel, sessionSupport citrixorchestration.SessionSupport) (bool, string) {
-	if plan.AutoscaleSettings == nil || sessionSupport == citrixorchestration.SESSIONSUPPORT_SINGLE_SESSION {
+func validatePowerManagementSettings(ctx context.Context, diags *diag.Diagnostics, plan DeliveryGroupResourceModel, sessionSupport citrixorchestration.SessionSupport) (bool, string) {
+	if plan.AutoscaleSettings.IsNull() || sessionSupport == citrixorchestration.SESSIONSUPPORT_SINGLE_SESSION {
 		return true, ""
 	}
+	autoscale := util.ObjectValueToTypedObject[DeliveryGroupPowerManagementSettings](ctx, diags, plan.AutoscaleSettings)
 
 	errStringSuffix := "cannot be set for a Multisession catalog"
 
-	if plan.AutoscaleSettings.PeakLogOffAction.ValueString() != "Nothing" {
+	if autoscale.PeakLogOffAction.ValueString() != "Nothing" {
 		return false, "PeakLogOffAction " + errStringSuffix
 	}
 
-	if plan.AutoscaleSettings.OffPeakLogOffAction.ValueString() != "Nothing" {
+	if autoscale.OffPeakLogOffAction.ValueString() != "Nothing" {
 		return false, "OffPeakLogOffAction " + errStringSuffix
 	}
 
-	if plan.AutoscaleSettings.PeakDisconnectAction.ValueString() != "Nothing" {
+	if autoscale.PeakDisconnectAction.ValueString() != "Nothing" {
 		return false, "PeakDisconnectAction " + errStringSuffix
 	}
 
-	if plan.AutoscaleSettings.PeakExtendedDisconnectAction.ValueString() != "Nothing" {
+	if autoscale.PeakExtendedDisconnectAction.ValueString() != "Nothing" {
 		return false, "PeakDisconnectTimeoutMinutes " + errStringSuffix
 	}
 
-	if plan.AutoscaleSettings.OffPeakDisconnectAction.ValueString() != "Nothing" {
+	if autoscale.OffPeakDisconnectAction.ValueString() != "Nothing" {
 		return false, "OffPeakDisconnectAction " + errStringSuffix
 	}
 
-	if plan.AutoscaleSettings.OffPeakExtendedDisconnectAction.ValueString() != "Nothing" {
+	if autoscale.OffPeakExtendedDisconnectAction.ValueString() != "Nothing" {
 		return false, "OffPeakDisconnectTimeoutMinutes " + errStringSuffix
 	}
 
-	if plan.AutoscaleSettings.PeakDisconnectTimeoutMinutes.ValueInt64() != 0 {
+	if autoscale.PeakDisconnectTimeoutMinutes.ValueInt64() != 0 {
 		return false, "PeakDisconnectTimeoutMinutes " + errStringSuffix
 	}
 
-	if plan.AutoscaleSettings.PeakExtendedDisconnectTimeoutMinutes.ValueInt64() != 0 {
+	if autoscale.PeakExtendedDisconnectTimeoutMinutes.ValueInt64() != 0 {
 		return false, "PeakExtendedDisconnectTimeoutMinutes " + errStringSuffix
 	}
 
-	if plan.AutoscaleSettings.OffPeakDisconnectTimeoutMinutes.ValueInt64() != 0 {
+	if autoscale.OffPeakDisconnectTimeoutMinutes.ValueInt64() != 0 {
 		return false, "OffPeakDisconnectTimeoutMinutes " + errStringSuffix
 	}
 
-	if plan.AutoscaleSettings.OffPeakExtendedDisconnectTimeoutMinutes.ValueInt64() != 0 {
+	if autoscale.OffPeakExtendedDisconnectTimeoutMinutes.ValueInt64() != 0 {
 		return false, "OffPeakExtendedDisconnectTimeoutMinutes " + errStringSuffix
 	}
 
 	return true, ""
 }
 
-func validateAndReturnMachineCatalogSessionSupport(ctx context.Context, client citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, dgMachineCatalogs []DeliveryGroupMachineCatalogModel, addErrorIfCatalogNotFound bool) (catalogSessionSupport *citrixorchestration.SessionSupport, isPowerManagedCatalog bool, isRemotePcCatalog bool, catalogIdentityType citrixorchestration.IdentityType, err error) {
-	var sessionSupport *citrixorchestration.SessionSupport
+func validateAndReturnMachineCatalogSessionSupport(ctx context.Context, client citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, dgMachineCatalogs []DeliveryGroupMachineCatalogModel, addErrorIfCatalogNotFound bool) (machineCatalogProperties AssociatedMachineCatalogProperties, err error) {
 	var provisioningType *citrixorchestration.ProvisioningType
+	var sessionSupport citrixorchestration.SessionSupport
+	var allocationType citrixorchestration.AllocationType
 	var identityType citrixorchestration.IdentityType
+	var associatedMachineCatalogProperties AssociatedMachineCatalogProperties
 	isPowerManaged := false
 	isRemotePc := false
 	for _, dgMachineCatalog := range dgMachineCatalogs {
@@ -180,7 +185,7 @@ func validateAndReturnMachineCatalogSessionSupport(ctx context.Context, client c
 		catalog, err := util.GetMachineCatalog(ctx, &client, diagnostics, catalogId, addErrorIfCatalogNotFound)
 
 		if err != nil {
-			return sessionSupport, false, false, citrixorchestration.IDENTITYTYPE_UNKNOWN, err
+			return associatedMachineCatalogProperties, err
 		}
 
 		if provisioningType == nil {
@@ -189,6 +194,8 @@ func validateAndReturnMachineCatalogSessionSupport(ctx context.Context, client c
 			isRemotePc = catalog.GetIsRemotePC()
 			provScheme := catalog.GetProvisioningScheme()
 			identityType = provScheme.GetIdentityType()
+			sessionSupport = catalog.GetSessionSupport()
+			allocationType = catalog.GetAllocationType()
 		}
 
 		if *provisioningType != catalog.GetProvisioningType() {
@@ -196,7 +203,7 @@ func validateAndReturnMachineCatalogSessionSupport(ctx context.Context, client c
 			diagnostics.AddError("Error validating associated Machine Catalogs",
 				"Ensure all associated Machine Catalogs have the same provisioning type.",
 			)
-			return sessionSupport, false, false, citrixorchestration.IDENTITYTYPE_UNKNOWN, err
+			return associatedMachineCatalogProperties, err
 		}
 
 		provScheme := catalog.GetProvisioningScheme()
@@ -206,7 +213,7 @@ func validateAndReturnMachineCatalogSessionSupport(ctx context.Context, client c
 			diagnostics.AddError("Error validating associated Machine Catalogs",
 				"Ensure all associated Machine Catalogs have the same identity type in provisioning scheme.",
 			)
-			return sessionSupport, false, false, citrixorchestration.IDENTITYTYPE_UNKNOWN, err
+			return associatedMachineCatalogProperties, err
 		}
 
 		if isPowerManaged != catalog.GetIsPowerManaged() {
@@ -214,7 +221,7 @@ func validateAndReturnMachineCatalogSessionSupport(ctx context.Context, client c
 			diagnostics.AddError("Error validating associated Machine Catalogs",
 				"All associated Machine Catalogs must either be power managed or non power managed.",
 			)
-			return sessionSupport, false, false, citrixorchestration.IDENTITYTYPE_UNKNOWN, err
+			return associatedMachineCatalogProperties, err
 		}
 
 		if isRemotePc != catalog.GetIsRemotePC() {
@@ -222,22 +229,29 @@ func validateAndReturnMachineCatalogSessionSupport(ctx context.Context, client c
 			diagnostics.AddError("Error validating associated Machine Catalogs",
 				"All associated Machine Catalogs must either be Remote PC or non Remote PC.",
 			)
-			return sessionSupport, false, false, citrixorchestration.IDENTITYTYPE_UNKNOWN, err
+			return associatedMachineCatalogProperties, err
 		}
 
-		if sessionSupport != nil && *sessionSupport != catalog.GetSessionSupport() {
+		if sessionSupport != "" && sessionSupport != catalog.GetSessionSupport() {
 			err := fmt.Errorf("all associated machine catalogs must have the same session support")
 			diagnostics.AddError("Error validating associated Machine Catalogs", "Ensure all associated Machine Catalogs have the same Session Support.")
-			return sessionSupport, false, false, citrixorchestration.IDENTITYTYPE_UNKNOWN, err
+			return associatedMachineCatalogProperties, err
 		}
 
-		if sessionSupport == nil {
-			sessionSupportValue := catalog.GetSessionSupport()
-			sessionSupport = &sessionSupportValue
+		if allocationType != "" && allocationType != catalog.GetAllocationType() {
+			err := fmt.Errorf("all associated machine catalogs must have the same allocation type")
+			diagnostics.AddError("Error validating associated Machine Catalogs", "Ensure all associated Machine Catalogs have the same Allocation Type.")
+			return associatedMachineCatalogProperties, err
 		}
 	}
 
-	return sessionSupport, isPowerManaged, isRemotePc, identityType, err
+	associatedMachineCatalogProperties.SessionSupport = sessionSupport
+	associatedMachineCatalogProperties.AllocationType = allocationType
+	associatedMachineCatalogProperties.IdentityType = identityType
+	associatedMachineCatalogProperties.IsPowerManaged = isPowerManaged
+	associatedMachineCatalogProperties.IsRemotePcCatalog = isRemotePc
+
+	return associatedMachineCatalogProperties, err
 }
 
 func getDeliveryGroupAddMachinesRequest(associatedMachineCatalogs []DeliveryGroupMachineCatalogModel) []citrixorchestration.DeliveryGroupAddMachinesRequestModel {
@@ -317,7 +331,7 @@ func addRemoveMachinesFromDeliveryGroup(ctx context.Context, client *citrixdaasc
 	existingAssociatedMachineCatalogsMap := createExistingCatalogsAndMachinesMap(deliveryGroupMachines)
 
 	requestedAssociatedMachineCatalogsMap := map[string]bool{}
-	for _, associatedMachineCatalog := range plan.AssociatedMachineCatalogs {
+	for _, associatedMachineCatalog := range util.ObjectListToTypedArray[DeliveryGroupMachineCatalogModel](ctx, diagnostics, plan.AssociatedMachineCatalogs) {
 
 		requestedAssociatedMachineCatalogsMap[associatedMachineCatalog.MachineCatalog.ValueString()] = true
 
@@ -365,51 +379,9 @@ func addRemoveMachinesFromDeliveryGroup(ctx context.Context, client *citrixdaasc
 	return nil
 }
 
-func getSchemaForRestrictedAccessUsers(forDeliveryGroup bool) schema.NestedAttribute {
-	resource := "Delivery Group"
-	description := "Restrict access to this Delivery Group by specifying users and groups in the allow and block list. If no value is specified, all authenticated users will have access to this Delivery Group. To give access to unauthenticated users, use the `allow_anonymous_access` property."
-	if !forDeliveryGroup {
-		resource = "Desktop"
-		description = "Restrict access to this Desktop by specifying users and groups in the allow and block list. If no value is specified, all users that have access to this Delivery Group will have access to the Desktop. Required for Remote PC Delivery Groups."
-	}
-
-	return schema.SingleNestedAttribute{
-		Description: description,
-		Optional:    true,
-		Attributes: map[string]schema.Attribute{
-			"allow_list": schema.ListAttribute{
-				ElementType: types.StringType,
-				Description: fmt.Sprintf("Users who can use this %s. Must be in `DOMAIN\\UserOrGroupName` or `user@domain.com` format", resource),
-				Optional:    true,
-				Validators: []validator.List{
-					listvalidator.ValueStringsAre(
-						validator.String(
-							stringvalidator.RegexMatches(regexp.MustCompile(fmt.Sprintf("%s|%s", util.SamRegex, util.UpnRegex)), "must be in `DOMAIN\\UserOrGroupName` or `user@domain.com` format"),
-						),
-					),
-					listvalidator.SizeAtLeast(1),
-				},
-			},
-			"block_list": schema.ListAttribute{
-				ElementType: types.StringType,
-				Description: fmt.Sprintf("Users who cannot use this %s. A block list is meaningful only when used to block users in the allow list. Must be in `Domain\\UserOrGroupName` or `user@domain.com` format", resource),
-				Optional:    true,
-				Validators: []validator.List{
-					listvalidator.ValueStringsAre(
-						validator.String(
-							stringvalidator.RegexMatches(regexp.MustCompile(fmt.Sprintf("%s|%s", util.SamRegex, util.UpnRegex)), "must be in `DOMAIN\\UserOrGroupName` or `user@domain.com` format"),
-						),
-					),
-					listvalidator.SizeAtLeast(1),
-				},
-			},
-		},
-	}
-}
-
-func validatePowerTimeSchemes(diagnostics *diag.Diagnostics, powerTimeSchemes []DeliveryGroupPowerTimeScheme) {
+func validatePowerTimeSchemes(ctx context.Context, diagnostics *diag.Diagnostics, powerTimeSchemes []DeliveryGroupPowerTimeScheme) {
 	for _, powerTimeScheme := range powerTimeSchemes {
-		if powerTimeScheme.PoolSizeSchedule == nil {
+		if powerTimeScheme.PoolSizeSchedule.IsNull() {
 			continue
 		}
 
@@ -419,7 +391,10 @@ func validatePowerTimeSchemes(diagnostics *diag.Diagnostics, powerTimeSchemes []
 		hoursPoolSizeArray := make([]int, 24)
 		minutesPoolSizeArray := make([]int, 24)
 
-		for _, schedule := range powerTimeScheme.PoolSizeSchedule {
+		for _, schedule := range util.ObjectListToTypedArray[PowerTimeSchemePoolSizeScheduleRequestModel](ctx, diagnostics, powerTimeScheme.PoolSizeSchedule) {
+			if schedule.TimeRange.IsNull() {
+				continue
+			}
 			timeRanges := strings.Split(schedule.TimeRange.ValueString(), "-")
 
 			startTimes := strings.Split(timeRanges[0], ":")
@@ -525,11 +500,11 @@ func validatePowerTimeSchemes(diagnostics *diag.Diagnostics, powerTimeSchemes []
 	}
 }
 
-func validateRebootSchedules(diagnostics *diag.Diagnostics, rebootSchedules []DeliveryGroupRebootSchedule) {
+func validateRebootSchedules(ctx context.Context, diagnostics *diag.Diagnostics, rebootSchedules []DeliveryGroupRebootSchedule) {
 	for _, rebootSchedule := range rebootSchedules {
 		switch freq := rebootSchedule.Frequency.ValueString(); freq {
 		case "Weekly":
-			if len(rebootSchedule.DaysInWeek) == 0 {
+			if len(rebootSchedule.DaysInWeek.Elements()) == 0 {
 				diagnostics.AddAttributeError(
 					path.Root("days_in_week"),
 					"Missing Attribute Configuration",
@@ -554,7 +529,7 @@ func validateRebootSchedules(diagnostics *diag.Diagnostics, rebootSchedules []De
 
 		}
 
-		if rebootSchedule.UseNaturalRebootSchedule.ValueBool() && rebootSchedule.DeliveryGroupRebootNotificationToUsers != nil {
+		if rebootSchedule.UseNaturalRebootSchedule.ValueBool() && !rebootSchedule.DeliveryGroupRebootNotificationToUsers.IsNull() {
 			diagnostics.AddAttributeError(
 				path.Root("reboot_notification_to_users"),
 				"Incorrect Attribute Configuration",
@@ -562,34 +537,66 @@ func validateRebootSchedules(diagnostics *diag.Diagnostics, rebootSchedules []De
 			)
 		}
 
-		if rebootSchedule.DeliveryGroupRebootNotificationToUsers != nil && !rebootSchedule.DeliveryGroupRebootNotificationToUsers.NotificationDurationMinutes.IsNull() && !rebootSchedule.DeliveryGroupRebootNotificationToUsers.NotificationRepeatEvery5Minutes.IsNull() &&
-			rebootSchedule.DeliveryGroupRebootNotificationToUsers.NotificationDurationMinutes.ValueInt64() != 15 {
-			diagnostics.AddAttributeError(
-				path.Root("notification_repeat_every_5_minutes"),
-				"Incorrect Attribute Configuration",
-				"NotificationRepeatEvery5Minutes can only be set to true when NotificationDurationMinutes is 15 minutes",
-			)
+		if !rebootSchedule.DeliveryGroupRebootNotificationToUsers.IsNull() {
+			notification := util.ObjectValueToTypedObject[DeliveryGroupRebootNotificationToUsers](ctx, diagnostics, rebootSchedule.DeliveryGroupRebootNotificationToUsers)
+			if !notification.NotificationDurationMinutes.IsNull() && !notification.NotificationRepeatEvery5Minutes.IsNull() &&
+				notification.NotificationDurationMinutes.ValueInt64() != 15 {
+				diagnostics.AddAttributeError(
+					path.Root("notification_repeat_every_5_minutes"),
+					"Incorrect Attribute Configuration",
+					"NotificationRepeatEvery5Minutes can only be set to true when NotificationDurationMinutes is 15 minutes",
+				)
+			}
 		}
 
 	}
 }
 
-func getRequestModelForDeliveryGroupCreate(diagnostics *diag.Diagnostics, plan DeliveryGroupResourceModel, catalogSessionSupport *citrixorchestration.SessionSupport, identityType citrixorchestration.IdentityType) (citrixorchestration.CreateDeliveryGroupRequestModel, error) {
-	deliveryGroupMachineCatalogsArray := getDeliveryGroupAddMachinesRequest(plan.AssociatedMachineCatalogs)
-	deliveryGroupDesktopsArray := parseDeliveryGroupDesktopsToClientModel(plan.Desktops)
-	deliveryGroupRebootScheduleArray := parseDeliveryGroupRebootScheduleToClientModel(plan.RebootSchedules)
+func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, plan DeliveryGroupResourceModel, associatedMachineCatalogProperties AssociatedMachineCatalogProperties) (citrixorchestration.CreateDeliveryGroupRequestModel, error) {
+	deliveryGroupMachineCatalogsArray := getDeliveryGroupAddMachinesRequest(util.ObjectListToTypedArray[DeliveryGroupMachineCatalogModel](ctx, diagnostics, plan.AssociatedMachineCatalogs))
+	desktops := util.ObjectListToTypedArray[DeliveryGroupDesktop](ctx, diagnostics, plan.Desktops)
+	deliveryGroupDesktopsArray, err := verifyUsersAndParseDeliveryGroupDesktopsToClientModel(ctx, diagnostics, client, desktops)
 
-	var includedUsers []string
-	var excludedUsers []string
+	if err != nil {
+		return citrixorchestration.CreateDeliveryGroupRequestModel{}, err
+	}
+
+	rebootSchedules := util.ObjectListToTypedArray[DeliveryGroupRebootSchedule](ctx, diagnostics, plan.RebootSchedules)
+	deliveryGroupRebootScheduleArray := parseDeliveryGroupRebootScheduleToClientModel(ctx, diagnostics, rebootSchedules)
+
+	var httpResp *http.Response
+	var includedUserIds []string
+	var excludedUserIds []string
 	includedUsersFilterEnabled := false
 	excludedUsersFilterEnabled := false
-	if plan.RestrictedAccessUsers != nil {
+	if !plan.RestrictedAccessUsers.IsNull() {
 		includedUsersFilterEnabled = true
-		includedUsers = util.ConvertBaseStringArrayToPrimitiveStringArray(plan.RestrictedAccessUsers.AllowList)
+		users := util.ObjectValueToTypedObject[RestrictedAccessUsers](ctx, diagnostics, plan.RestrictedAccessUsers)
+		includedUsers := util.StringSetToStringArray(ctx, diagnostics, users.AllowList)
+		includedUserIds, httpResp, err = util.GetUserIdsUsingIdentity(ctx, client, includedUsers)
 
-		if plan.RestrictedAccessUsers.BlockList != nil {
+		if err != nil {
+			diagnostics.AddError(
+				"Error fetching user details for delivery group",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return citrixorchestration.CreateDeliveryGroupRequestModel{}, err
+		}
+
+		if !users.BlockList.IsNull() {
 			excludedUsersFilterEnabled = true
-			excludedUsers = util.ConvertBaseStringArrayToPrimitiveStringArray(plan.RestrictedAccessUsers.BlockList)
+			excludedUsers := util.StringSetToStringArray(ctx, diagnostics, users.BlockList)
+			excludedUserIds, httpResp, err = util.GetUserIdsUsingIdentity(ctx, client, excludedUsers)
+
+			if err != nil {
+				diagnostics.AddError(
+					"Error fetching user details for delivery group",
+					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+						"\nError message: "+util.ReadClientError(err),
+				)
+				return citrixorchestration.CreateDeliveryGroupRequestModel{}, err
+			}
 		}
 	}
 
@@ -597,8 +604,8 @@ func getRequestModelForDeliveryGroupCreate(diagnostics *diag.Diagnostics, plan D
 	simpleAccessPolicy.SetAllowAnonymous(plan.AllowAnonymousAccess.ValueBool())
 	simpleAccessPolicy.SetIncludedUserFilterEnabled(includedUsersFilterEnabled)
 	simpleAccessPolicy.SetExcludedUserFilterEnabled(excludedUsersFilterEnabled)
-	simpleAccessPolicy.SetIncludedUsers(includedUsers)
-	simpleAccessPolicy.SetExcludedUsers(excludedUsers)
+	simpleAccessPolicy.SetIncludedUsers(includedUserIds)
+	simpleAccessPolicy.SetExcludedUsers(excludedUserIds)
 
 	var body citrixorchestration.CreateDeliveryGroupRequestModel
 	body.SetName(plan.Name.ValueString())
@@ -617,7 +624,7 @@ func getRequestModelForDeliveryGroupCreate(diagnostics *diag.Diagnostics, plan D
 	body.SetMinimumFunctionalLevel(*functionalLevel)
 
 	deliveryKind := citrixorchestration.DELIVERYKIND_DESKTOPS_AND_APPS
-	if *catalogSessionSupport != citrixorchestration.SESSIONSUPPORT_MULTI_SESSION {
+	if associatedMachineCatalogProperties.SessionSupport != "" && associatedMachineCatalogProperties.SessionSupport != citrixorchestration.SESSIONSUPPORT_MULTI_SESSION {
 		deliveryKind = citrixorchestration.DELIVERYKIND_DESKTOPS_ONLY
 	}
 	body.SetDeliveryType(deliveryKind)
@@ -625,48 +632,74 @@ func getRequestModelForDeliveryGroupCreate(diagnostics *diag.Diagnostics, plan D
 	body.SetDefaultDesktopPublishedName(plan.Name.ValueString())
 	body.SetSimpleAccessPolicy(simpleAccessPolicy)
 	body.SetPolicySetGuid(plan.PolicySetId.ValueString())
-	if identityType == citrixorchestration.IDENTITYTYPE_AZURE_AD {
+	if associatedMachineCatalogProperties.IdentityType == citrixorchestration.IDENTITYTYPE_AZURE_AD {
 		body.SetMachineLogOnType(citrixorchestration.MACHINELOGONTYPE_AZURE_AD)
-	} else if identityType == citrixorchestration.IDENTITYTYPE_WORKGROUP {
+	} else if associatedMachineCatalogProperties.IdentityType == citrixorchestration.IDENTITYTYPE_WORKGROUP {
 		body.SetMachineLogOnType(citrixorchestration.MACHINELOGONTYPE_LOCAL_MAPPED_ACCOUNT)
 	} else {
 		body.SetMachineLogOnType(citrixorchestration.MACHINELOGONTYPE_ACTIVE_DIRECTORY)
 	}
 
-	if plan.AutoscaleSettings != nil {
-		body.SetAutoScaleEnabled(plan.AutoscaleSettings.AutoscaleEnabled.ValueBool())
-		body.SetTimeZone(plan.AutoscaleSettings.Timezone.ValueString())
-		body.SetPeakDisconnectTimeoutMinutes(int32(plan.AutoscaleSettings.PeakDisconnectTimeoutMinutes.ValueInt64()))
-		body.SetPeakLogOffAction(getSessionChangeHostingActionValue(plan.AutoscaleSettings.PeakLogOffAction.ValueString()))
-		body.SetPeakDisconnectAction(getSessionChangeHostingActionValue(plan.AutoscaleSettings.PeakDisconnectAction.ValueString()))
-		body.SetPeakExtendedDisconnectAction(getSessionChangeHostingActionValue(plan.AutoscaleSettings.PeakExtendedDisconnectAction.ValueString()))
-		body.SetOffPeakLogOffAction(getSessionChangeHostingActionValue(plan.AutoscaleSettings.OffPeakLogOffAction.ValueString()))
-		body.SetOffPeakDisconnectAction(getSessionChangeHostingActionValue(plan.AutoscaleSettings.OffPeakDisconnectAction.ValueString()))
-		body.SetOffPeakExtendedDisconnectAction(getSessionChangeHostingActionValue(plan.AutoscaleSettings.OffPeakExtendedDisconnectAction.ValueString()))
-		body.SetPeakExtendedDisconnectTimeoutMinutes(int32(plan.AutoscaleSettings.PeakExtendedDisconnectTimeoutMinutes.ValueInt64()))
-		body.SetOffPeakDisconnectTimeoutMinutes(int32(plan.AutoscaleSettings.OffPeakDisconnectTimeoutMinutes.ValueInt64()))
-		body.SetOffPeakExtendedDisconnectTimeoutMinutes(int32(plan.AutoscaleSettings.OffPeakExtendedDisconnectTimeoutMinutes.ValueInt64()))
-		body.SetPeakBufferSizePercent(int32(plan.AutoscaleSettings.PeakBufferSizePercent.ValueInt64()))
-		body.SetOffPeakBufferSizePercent(int32(plan.AutoscaleSettings.OffPeakBufferSizePercent.ValueInt64()))
-		body.SetPowerOffDelayMinutes(int32(plan.AutoscaleSettings.PowerOffDelayMinutes.ValueInt64()))
-		body.SetDisconnectPeakIdleSessionAfterSeconds(int32(plan.AutoscaleSettings.DisconnectPeakIdleSessionAfterSeconds.ValueInt64()))
-		body.SetDisconnectOffPeakIdleSessionAfterSeconds(int32(plan.AutoscaleSettings.DisconnectOffPeakIdleSessionAfterSeconds.ValueInt64()))
-		body.SetLogoffPeakDisconnectedSessionAfterSeconds(int32(plan.AutoscaleSettings.LogoffPeakDisconnectedSessionAfterSeconds.ValueInt64()))
-		body.SetLogoffOffPeakDisconnectedSessionAfterSeconds(int32(plan.AutoscaleSettings.LogoffOffPeakDisconnectedSessionAfterSeconds.ValueInt64()))
+	if !plan.MakeResourcesAvailableInLHC.IsNull() {
+		body.SetReuseMachinesWithoutShutdownInOutage(plan.MakeResourcesAvailableInLHC.ValueBool())
+	}
 
-		powerTimeSchemes := parsePowerTimeSchemesPluginToClientModel(plan.AutoscaleSettings.PowerTimeSchemes)
+	if !plan.AutoscaleSettings.IsNull() {
+		autoscale := util.ObjectValueToTypedObject[DeliveryGroupPowerManagementSettings](ctx, diagnostics, plan.AutoscaleSettings)
+		body.SetAutoScaleEnabled(autoscale.AutoscaleEnabled.ValueBool())
+		body.SetTimeZone(autoscale.Timezone.ValueString())
+		body.SetPeakDisconnectTimeoutMinutes(int32(autoscale.PeakDisconnectTimeoutMinutes.ValueInt64()))
+		body.SetPeakLogOffAction(getSessionChangeHostingActionValue(autoscale.PeakLogOffAction.ValueString()))
+		body.SetPeakDisconnectAction(getSessionChangeHostingActionValue(autoscale.PeakDisconnectAction.ValueString()))
+		body.SetPeakExtendedDisconnectAction(getSessionChangeHostingActionValue(autoscale.PeakExtendedDisconnectAction.ValueString()))
+		body.SetOffPeakLogOffAction(getSessionChangeHostingActionValue(autoscale.OffPeakLogOffAction.ValueString()))
+		body.SetOffPeakDisconnectAction(getSessionChangeHostingActionValue(autoscale.OffPeakDisconnectAction.ValueString()))
+		body.SetOffPeakExtendedDisconnectAction(getSessionChangeHostingActionValue(autoscale.OffPeakExtendedDisconnectAction.ValueString()))
+		body.SetPeakExtendedDisconnectTimeoutMinutes(int32(autoscale.PeakExtendedDisconnectTimeoutMinutes.ValueInt64()))
+		body.SetOffPeakDisconnectTimeoutMinutes(int32(autoscale.OffPeakDisconnectTimeoutMinutes.ValueInt64()))
+		body.SetOffPeakExtendedDisconnectTimeoutMinutes(int32(autoscale.OffPeakExtendedDisconnectTimeoutMinutes.ValueInt64()))
+		body.SetPeakBufferSizePercent(int32(autoscale.PeakBufferSizePercent.ValueInt64()))
+		body.SetOffPeakBufferSizePercent(int32(autoscale.OffPeakBufferSizePercent.ValueInt64()))
+		body.SetPowerOffDelayMinutes(int32(autoscale.PowerOffDelayMinutes.ValueInt64()))
+		body.SetDisconnectPeakIdleSessionAfterSeconds(int32(autoscale.DisconnectPeakIdleSessionAfterSeconds.ValueInt64()))
+		body.SetDisconnectOffPeakIdleSessionAfterSeconds(int32(autoscale.DisconnectOffPeakIdleSessionAfterSeconds.ValueInt64()))
+		body.SetLogoffPeakDisconnectedSessionAfterSeconds(int32(autoscale.LogoffPeakDisconnectedSessionAfterSeconds.ValueInt64()))
+		body.SetLogoffOffPeakDisconnectedSessionAfterSeconds(int32(autoscale.LogoffOffPeakDisconnectedSessionAfterSeconds.ValueInt64()))
+
+		powerTimeSchemes := parsePowerTimeSchemesPluginToClientModel(ctx, diagnostics, util.ObjectListToTypedArray[DeliveryGroupPowerTimeScheme](ctx, diagnostics, autoscale.PowerTimeSchemes))
 		body.SetPowerTimeSchemes(powerTimeSchemes)
+	}
+
+	if !plan.Scopes.IsNull() {
+		plannedScopes := util.StringSetToStringArray(ctx, diagnostics, plan.Scopes)
+		body.SetScopes(plannedScopes)
+	}
+	if !plan.StoreFrontServers.IsNull() {
+		associatedStoreFrontServers := util.StringSetToStringArray(ctx, diagnostics, plan.StoreFrontServers)
+		var storeFrontServersList []citrixorchestration.StoreFrontServerRequestModel
+		for _, storeFrontServer := range associatedStoreFrontServers {
+			storeFrontServerModel := citrixorchestration.StoreFrontServerRequestModel{}
+			storeFrontServerModel.SetId(storeFrontServer)
+			storeFrontServersList = append(storeFrontServersList, storeFrontServerModel)
+		}
+		body.SetStoreFrontServersForHostedReceiver(storeFrontServersList)
 	}
 
 	return body, nil
 }
 
-func getRequestModelForDeliveryGroupUpdate(diagnostics *diag.Diagnostics, plan DeliveryGroupResourceModel, currentDeliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel) (citrixorchestration.EditDeliveryGroupRequestModel, error) {
-	deliveryGroupDesktopsArray := parseDeliveryGroupDesktopsToClientModel(plan.Desktops)
-	deliveryGroupRebootScheduleArray := parseDeliveryGroupRebootScheduleToClientModel(plan.RebootSchedules)
+func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, plan DeliveryGroupResourceModel, currentDeliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel) (citrixorchestration.EditDeliveryGroupRequestModel, error) {
+	desktops := util.ObjectListToTypedArray[DeliveryGroupDesktop](ctx, diagnostics, plan.Desktops)
+	deliveryGroupDesktopsArray, err := verifyUsersAndParseDeliveryGroupDesktopsToClientModel(ctx, diagnostics, client, desktops)
+	if err != nil {
+		return citrixorchestration.EditDeliveryGroupRequestModel{}, err
+	}
+	rebootSchedules := util.ObjectListToTypedArray[DeliveryGroupRebootSchedule](ctx, diagnostics, plan.RebootSchedules)
+	deliveryGroupRebootScheduleArray := parseDeliveryGroupRebootScheduleToClientModel(ctx, diagnostics, rebootSchedules)
 
-	includedUsers := []string{}
-	excludedUsers := []string{}
+	var httpResp *http.Response
+	includedUserIds := []string{}
+	excludedUserIds := []string{}
 	includedUsersFilterEnabled := false
 	excludedUsersFilterEnabled := false
 	advancedAccessPolicies := []citrixorchestration.AdvancedAccessPolicyRequestModel{}
@@ -677,7 +710,9 @@ func getRequestModelForDeliveryGroupUpdate(diagnostics *diag.Diagnostics, plan D
 		allowedUser = citrixorchestration.ALLOWEDUSER_ANY
 	}
 
-	if plan.RestrictedAccessUsers != nil {
+	if !plan.RestrictedAccessUsers.IsNull() {
+		users := util.ObjectValueToTypedObject[RestrictedAccessUsers](ctx, diagnostics, plan.RestrictedAccessUsers)
+
 		allowedUser = citrixorchestration.ALLOWEDUSER_FILTERED
 
 		if plan.AllowAnonymousAccess.ValueBool() {
@@ -685,11 +720,30 @@ func getRequestModelForDeliveryGroupUpdate(diagnostics *diag.Diagnostics, plan D
 		}
 
 		includedUsersFilterEnabled = true
-		includedUsers = util.ConvertBaseStringArrayToPrimitiveStringArray(plan.RestrictedAccessUsers.AllowList)
+		includedUsers := util.StringSetToStringArray(ctx, diagnostics, users.AllowList)
+		includedUserIds, httpResp, err = util.GetUserIdsUsingIdentity(ctx, client, includedUsers)
+		if err != nil {
+			diagnostics.AddError(
+				"Error fetching user details for delivery group",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return citrixorchestration.EditDeliveryGroupRequestModel{}, err
+		}
 
-		if plan.RestrictedAccessUsers.BlockList != nil {
+		if !users.BlockList.IsNull() {
 			excludedUsersFilterEnabled = true
-			excludedUsers = util.ConvertBaseStringArrayToPrimitiveStringArray(plan.RestrictedAccessUsers.BlockList)
+			excludedUsers := util.StringSetToStringArray(ctx, diagnostics, users.BlockList)
+			excludedUserIds, httpResp, err = util.GetUserIdsUsingIdentity(ctx, client, excludedUsers)
+
+			if err != nil {
+				diagnostics.AddError(
+					"Error fetching user details for delivery group",
+					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+						"\nError message: "+util.ReadClientError(err),
+				)
+				return citrixorchestration.EditDeliveryGroupRequestModel{}, err
+			}
 		}
 	}
 
@@ -698,9 +752,9 @@ func getRequestModelForDeliveryGroupUpdate(diagnostics *diag.Diagnostics, plan D
 		var advancedAccessPolicyRequest citrixorchestration.AdvancedAccessPolicyRequestModel
 		advancedAccessPolicyRequest.SetId(existingAdvancedAccessPolicy.GetId())
 		advancedAccessPolicyRequest.SetIncludedUserFilterEnabled(includedUsersFilterEnabled)
-		advancedAccessPolicyRequest.SetIncludedUsers(includedUsers)
+		advancedAccessPolicyRequest.SetIncludedUsers(includedUserIds)
 		advancedAccessPolicyRequest.SetExcludedUserFilterEnabled(excludedUsersFilterEnabled)
-		advancedAccessPolicyRequest.SetExcludedUsers(excludedUsers)
+		advancedAccessPolicyRequest.SetExcludedUsers(excludedUserIds)
 		advancedAccessPolicyRequest.SetAllowedUsers(allowedUser)
 		advancedAccessPolicies = append(advancedAccessPolicies, advancedAccessPolicyRequest)
 	}
@@ -713,40 +767,61 @@ func getRequestModelForDeliveryGroupUpdate(diagnostics *diag.Diagnostics, plan D
 	editDeliveryGroupRequestBody.SetRebootSchedules(deliveryGroupRebootScheduleArray)
 	editDeliveryGroupRequestBody.SetAdvancedAccessPolicy(advancedAccessPolicies)
 
+	if !plan.Scopes.IsNull() {
+		plannedScopes := util.StringSetToStringArray(ctx, diagnostics, plan.Scopes)
+		editDeliveryGroupRequestBody.SetScopes(plannedScopes)
+	}
+
 	if plan.PolicySetId.ValueString() != "" {
 		editDeliveryGroupRequestBody.SetPolicySetGuid(plan.PolicySetId.ValueString())
 	} else {
 		editDeliveryGroupRequestBody.SetPolicySetGuid(util.DefaultSitePolicySetId)
 	}
 
-	if plan.AutoscaleSettings != nil {
+	if !plan.MakeResourcesAvailableInLHC.IsNull() {
+		editDeliveryGroupRequestBody.SetReuseMachinesWithoutShutdownInOutage(plan.MakeResourcesAvailableInLHC.ValueBool())
+	}
 
-		if plan.AutoscaleSettings.Timezone.ValueString() != "" {
-			editDeliveryGroupRequestBody.SetTimeZone(plan.AutoscaleSettings.Timezone.ValueString())
+	if !plan.AutoscaleSettings.IsNull() {
+		autoscale := util.ObjectValueToTypedObject[DeliveryGroupPowerManagementSettings](ctx, diagnostics, plan.AutoscaleSettings)
+
+		if autoscale.Timezone.ValueString() != "" {
+			editDeliveryGroupRequestBody.SetTimeZone(autoscale.Timezone.ValueString())
 		}
 
-		editDeliveryGroupRequestBody.SetAutoScaleEnabled(plan.AutoscaleSettings.AutoscaleEnabled.ValueBool())
-		editDeliveryGroupRequestBody.SetPeakDisconnectTimeoutMinutes(int32(plan.AutoscaleSettings.PeakDisconnectTimeoutMinutes.ValueInt64()))
-		editDeliveryGroupRequestBody.SetPeakLogOffAction(getSessionChangeHostingActionValue(plan.AutoscaleSettings.PeakLogOffAction.ValueString()))
-		editDeliveryGroupRequestBody.SetPeakDisconnectAction(getSessionChangeHostingActionValue(plan.AutoscaleSettings.PeakDisconnectAction.ValueString()))
-		editDeliveryGroupRequestBody.SetPeakExtendedDisconnectAction(getSessionChangeHostingActionValue(plan.AutoscaleSettings.PeakExtendedDisconnectAction.ValueString()))
-		editDeliveryGroupRequestBody.SetPeakExtendedDisconnectTimeoutMinutes(int32(plan.AutoscaleSettings.PeakExtendedDisconnectTimeoutMinutes.ValueInt64()))
-		editDeliveryGroupRequestBody.SetOffPeakDisconnectTimeoutMinutes(int32(plan.AutoscaleSettings.OffPeakDisconnectTimeoutMinutes.ValueInt64()))
-		editDeliveryGroupRequestBody.SetOffPeakLogOffAction(getSessionChangeHostingActionValue(plan.AutoscaleSettings.OffPeakLogOffAction.ValueString()))
-		editDeliveryGroupRequestBody.SetOffPeakDisconnectAction(getSessionChangeHostingActionValue(plan.AutoscaleSettings.OffPeakDisconnectAction.ValueString()))
-		editDeliveryGroupRequestBody.SetOffPeakExtendedDisconnectAction(getSessionChangeHostingActionValue(plan.AutoscaleSettings.OffPeakExtendedDisconnectAction.ValueString()))
-		editDeliveryGroupRequestBody.SetOffPeakExtendedDisconnectTimeoutMinutes(int32(plan.AutoscaleSettings.OffPeakExtendedDisconnectTimeoutMinutes.ValueInt64()))
-		editDeliveryGroupRequestBody.SetPeakBufferSizePercent(int32(plan.AutoscaleSettings.PeakBufferSizePercent.ValueInt64()))
-		editDeliveryGroupRequestBody.SetOffPeakBufferSizePercent(int32(plan.AutoscaleSettings.OffPeakBufferSizePercent.ValueInt64()))
-		editDeliveryGroupRequestBody.SetPowerOffDelayMinutes(int32(plan.AutoscaleSettings.PowerOffDelayMinutes.ValueInt64()))
-		editDeliveryGroupRequestBody.SetDisconnectPeakIdleSessionAfterSeconds(int32(plan.AutoscaleSettings.DisconnectPeakIdleSessionAfterSeconds.ValueInt64()))
-		editDeliveryGroupRequestBody.SetDisconnectOffPeakIdleSessionAfterSeconds(int32(plan.AutoscaleSettings.DisconnectOffPeakIdleSessionAfterSeconds.ValueInt64()))
-		editDeliveryGroupRequestBody.SetLogoffPeakDisconnectedSessionAfterSeconds(int32(plan.AutoscaleSettings.LogoffPeakDisconnectedSessionAfterSeconds.ValueInt64()))
-		editDeliveryGroupRequestBody.SetLogoffOffPeakDisconnectedSessionAfterSeconds(int32(plan.AutoscaleSettings.LogoffOffPeakDisconnectedSessionAfterSeconds.ValueInt64()))
+		editDeliveryGroupRequestBody.SetAutoScaleEnabled(autoscale.AutoscaleEnabled.ValueBool())
+		editDeliveryGroupRequestBody.SetPeakDisconnectTimeoutMinutes(int32(autoscale.PeakDisconnectTimeoutMinutes.ValueInt64()))
+		editDeliveryGroupRequestBody.SetPeakLogOffAction(getSessionChangeHostingActionValue(autoscale.PeakLogOffAction.ValueString()))
+		editDeliveryGroupRequestBody.SetPeakDisconnectAction(getSessionChangeHostingActionValue(autoscale.PeakDisconnectAction.ValueString()))
+		editDeliveryGroupRequestBody.SetPeakExtendedDisconnectAction(getSessionChangeHostingActionValue(autoscale.PeakExtendedDisconnectAction.ValueString()))
+		editDeliveryGroupRequestBody.SetPeakExtendedDisconnectTimeoutMinutes(int32(autoscale.PeakExtendedDisconnectTimeoutMinutes.ValueInt64()))
+		editDeliveryGroupRequestBody.SetOffPeakDisconnectTimeoutMinutes(int32(autoscale.OffPeakDisconnectTimeoutMinutes.ValueInt64()))
+		editDeliveryGroupRequestBody.SetOffPeakLogOffAction(getSessionChangeHostingActionValue(autoscale.OffPeakLogOffAction.ValueString()))
+		editDeliveryGroupRequestBody.SetOffPeakDisconnectAction(getSessionChangeHostingActionValue(autoscale.OffPeakDisconnectAction.ValueString()))
+		editDeliveryGroupRequestBody.SetOffPeakExtendedDisconnectAction(getSessionChangeHostingActionValue(autoscale.OffPeakExtendedDisconnectAction.ValueString()))
+		editDeliveryGroupRequestBody.SetOffPeakExtendedDisconnectTimeoutMinutes(int32(autoscale.OffPeakExtendedDisconnectTimeoutMinutes.ValueInt64()))
+		editDeliveryGroupRequestBody.SetPeakBufferSizePercent(int32(autoscale.PeakBufferSizePercent.ValueInt64()))
+		editDeliveryGroupRequestBody.SetOffPeakBufferSizePercent(int32(autoscale.OffPeakBufferSizePercent.ValueInt64()))
+		editDeliveryGroupRequestBody.SetPowerOffDelayMinutes(int32(autoscale.PowerOffDelayMinutes.ValueInt64()))
+		editDeliveryGroupRequestBody.SetDisconnectPeakIdleSessionAfterSeconds(int32(autoscale.DisconnectPeakIdleSessionAfterSeconds.ValueInt64()))
+		editDeliveryGroupRequestBody.SetDisconnectOffPeakIdleSessionAfterSeconds(int32(autoscale.DisconnectOffPeakIdleSessionAfterSeconds.ValueInt64()))
+		editDeliveryGroupRequestBody.SetLogoffPeakDisconnectedSessionAfterSeconds(int32(autoscale.LogoffPeakDisconnectedSessionAfterSeconds.ValueInt64()))
+		editDeliveryGroupRequestBody.SetLogoffOffPeakDisconnectedSessionAfterSeconds(int32(autoscale.LogoffOffPeakDisconnectedSessionAfterSeconds.ValueInt64()))
 
-		powerTimeSchemes := parsePowerTimeSchemesPluginToClientModel(plan.AutoscaleSettings.PowerTimeSchemes)
+		powerTimeSchemes := parsePowerTimeSchemesPluginToClientModel(ctx, diagnostics, util.ObjectListToTypedArray[DeliveryGroupPowerTimeScheme](ctx, diagnostics, autoscale.PowerTimeSchemes))
 		editDeliveryGroupRequestBody.SetPowerTimeSchemes(powerTimeSchemes)
 	}
+
+	storeFrontServersList := []citrixorchestration.StoreFrontServerRequestModel{}
+	if !plan.StoreFrontServers.IsNull() {
+		associatedStoreFrontServers := util.StringSetToStringArray(ctx, diagnostics, plan.StoreFrontServers)
+		for _, storeFrontServer := range associatedStoreFrontServers {
+			storeFrontServerModel := citrixorchestration.StoreFrontServerRequestModel{}
+			storeFrontServerModel.SetId(storeFrontServer)
+			storeFrontServersList = append(storeFrontServersList, storeFrontServerModel)
+		}
+	}
+	editDeliveryGroupRequestBody.SetStoreFrontServersForHostedReceiver(storeFrontServersList)
 
 	functionalLevel, err := citrixorchestration.NewFunctionalLevelFromValue(plan.MinimumFunctionalLevel.ValueString())
 	if err != nil {
@@ -761,26 +836,26 @@ func getRequestModelForDeliveryGroupUpdate(diagnostics *diag.Diagnostics, plan D
 	return editDeliveryGroupRequestBody, nil
 }
 
-func parsePowerTimeSchemesPluginToClientModel(powerTimeSchemes []DeliveryGroupPowerTimeScheme) []citrixorchestration.PowerTimeSchemeRequestModel {
+func parsePowerTimeSchemesPluginToClientModel(ctx context.Context, diags *diag.Diagnostics, powerTimeSchemes []DeliveryGroupPowerTimeScheme) []citrixorchestration.PowerTimeSchemeRequestModel {
 	res := []citrixorchestration.PowerTimeSchemeRequestModel{}
 	for _, powerTimeScheme := range powerTimeSchemes {
 		var powerTimeSchemeRequest citrixorchestration.PowerTimeSchemeRequestModel
 
 		var daysOfWeek []citrixorchestration.TimeSchemeDays
-		for _, dayOfWeek := range powerTimeScheme.DaysOfWeek {
-			timeSchemeDay := getTimeSchemeDayValue(dayOfWeek.ValueString())
+		for _, dayOfWeek := range util.StringSetToStringArray(ctx, diags, powerTimeScheme.DaysOfWeek) {
+			timeSchemeDay := getTimeSchemeDayValue(dayOfWeek)
 			daysOfWeek = append(daysOfWeek, timeSchemeDay)
 		}
 
 		var poolSizeScheduleRequests []citrixorchestration.PoolSizeScheduleRequestModel
-		for _, poolSizeSchedule := range powerTimeScheme.PoolSizeSchedule {
+		for _, poolSizeSchedule := range util.ObjectListToTypedArray[PowerTimeSchemePoolSizeScheduleRequestModel](ctx, diags, powerTimeScheme.PoolSizeSchedule) {
 			var poolSizeScheduleRequest citrixorchestration.PoolSizeScheduleRequestModel
 			poolSizeScheduleRequest.SetTimeRange(poolSizeSchedule.TimeRange.ValueString())
 			poolSizeScheduleRequest.SetPoolSize(int32(poolSizeSchedule.PoolSize.ValueInt64()))
 			poolSizeScheduleRequests = append(poolSizeScheduleRequests, poolSizeScheduleRequest)
 		}
 
-		peakTimeRanges := util.ConvertBaseStringArrayToPrimitiveStringArray(powerTimeScheme.PeakTimeRanges)
+		peakTimeRanges := util.StringSetToStringArray(ctx, diags, powerTimeScheme.PeakTimeRanges)
 
 		powerTimeSchemeRequest.SetDisplayName(powerTimeScheme.DisplayName.ValueString())
 		powerTimeSchemeRequest.SetPeakTimeRanges(peakTimeRanges)
@@ -793,14 +868,14 @@ func parsePowerTimeSchemesPluginToClientModel(powerTimeSchemes []DeliveryGroupPo
 	return res
 }
 
-func parsePowerTimeSchemesClientToPluginModel(powerTimeSchemesResponse []citrixorchestration.PowerTimeSchemeResponseModel) []DeliveryGroupPowerTimeScheme {
+func parsePowerTimeSchemesClientToPluginModel(ctx context.Context, diags *diag.Diagnostics, powerTimeSchemesResponse []citrixorchestration.PowerTimeSchemeResponseModel) []DeliveryGroupPowerTimeScheme {
 	var res []DeliveryGroupPowerTimeScheme
 	for _, powerTimeSchemeResponse := range powerTimeSchemesResponse {
 		var deliveryGroupPowerTimeScheme DeliveryGroupPowerTimeScheme
 
-		var daysOfWeek []types.String
+		var daysOfWeek []string
 		for _, dayOfWeek := range powerTimeSchemeResponse.GetDaysOfWeek() {
-			timeSchemeDay := types.StringValue(reflect.ValueOf(dayOfWeek).String())
+			timeSchemeDay := string(dayOfWeek)
 			daysOfWeek = append(daysOfWeek, timeSchemeDay)
 		}
 
@@ -817,11 +892,10 @@ func parsePowerTimeSchemesClientToPluginModel(powerTimeSchemesResponse []citrixo
 		}
 
 		deliveryGroupPowerTimeScheme.DisplayName = types.StringValue(powerTimeSchemeResponse.GetDisplayName())
-		peakTimeRanges := util.ConvertPrimitiveStringArrayToBaseStringArray(powerTimeSchemeResponse.GetPeakTimeRanges())
-		deliveryGroupPowerTimeScheme.PeakTimeRanges = peakTimeRanges
+		deliveryGroupPowerTimeScheme.PeakTimeRanges = util.StringArrayToStringSet(ctx, diags, powerTimeSchemeResponse.GetPeakTimeRanges())
 		deliveryGroupPowerTimeScheme.PoolUsingPercentage = types.BoolValue(powerTimeSchemeResponse.GetPoolUsingPercentage())
-		deliveryGroupPowerTimeScheme.DaysOfWeek = daysOfWeek
-		deliveryGroupPowerTimeScheme.PoolSizeSchedule = poolSizeScheduleRequests
+		deliveryGroupPowerTimeScheme.DaysOfWeek = util.StringArrayToStringSet(ctx, diags, daysOfWeek)
+		deliveryGroupPowerTimeScheme.PoolSizeSchedule = util.TypedArrayToObjectList[PowerTimeSchemePoolSizeScheduleRequestModel](ctx, diags, poolSizeScheduleRequests)
 
 		res = append(res, deliveryGroupPowerTimeScheme)
 	}
@@ -829,7 +903,7 @@ func parsePowerTimeSchemesClientToPluginModel(powerTimeSchemesResponse []citrixo
 	return res
 }
 
-func parseDeliveryGroupRebootScheduleToClientModel(rebootSchedules []DeliveryGroupRebootSchedule) []citrixorchestration.RebootScheduleRequestModel {
+func parseDeliveryGroupRebootScheduleToClientModel(ctx context.Context, diags *diag.Diagnostics, rebootSchedules []DeliveryGroupRebootSchedule) []citrixorchestration.RebootScheduleRequestModel {
 	res := []citrixorchestration.RebootScheduleRequestModel{}
 	if rebootSchedules == nil {
 		return res
@@ -854,18 +928,20 @@ func parseDeliveryGroupRebootScheduleToClientModel(rebootSchedules []DeliveryGro
 		rebootScheduleRequest.SetRebootDurationMinutes(int32(rebootSchedule.RebootDurationMinutes.ValueInt64()))
 		rebootScheduleRequest.SetUseNaturalReboot(rebootSchedule.UseNaturalRebootSchedule.ValueBool())
 		if rebootSchedule.Frequency.ValueString() == "Weekly" {
-			rebootScheduleRequest.SetDaysInWeek(getRebootScheduleDaysInWeekActionValue(util.ConvertBaseStringArrayToPrimitiveStringArray(rebootSchedule.DaysInWeek)))
+			rebootScheduleRequest.SetDaysInWeek(getRebootScheduleDaysInWeekActionValue(util.StringSetToStringArray(ctx, diags, rebootSchedule.DaysInWeek)))
 		}
 		if rebootSchedule.Frequency.ValueString() == "Monthly" {
 			rebootScheduleRequest.SetWeekInMonth(getRebootScheduleWeekActionValue(rebootSchedule.WeekInMonth.ValueString()))
 			rebootScheduleRequest.SetDayInMonth(getRebootScheduleDaysActionValue(rebootSchedule.DayInMonth.ValueString()))
 		}
 
-		if rebootSchedule.DeliveryGroupRebootNotificationToUsers != nil && !rebootSchedule.UseNaturalRebootSchedule.ValueBool() {
-			rebootScheduleRequest.SetWarningDurationMinutes(int32(rebootSchedule.DeliveryGroupRebootNotificationToUsers.NotificationDurationMinutes.ValueInt64())) //can only be 1 5 15, or 0 means no warning
-			rebootScheduleRequest.SetWarningTitle(rebootSchedule.DeliveryGroupRebootNotificationToUsers.NotificationTitle.ValueString())
-			rebootScheduleRequest.SetWarningMessage(rebootSchedule.DeliveryGroupRebootNotificationToUsers.NotificationMessage.ValueString())
-			if rebootSchedule.DeliveryGroupRebootNotificationToUsers.NotificationRepeatEvery5Minutes.ValueBool() {
+		if !rebootSchedule.DeliveryGroupRebootNotificationToUsers.IsNull() && !rebootSchedule.UseNaturalRebootSchedule.ValueBool() {
+			notification := util.ObjectValueToTypedObject[DeliveryGroupRebootNotificationToUsers](ctx, diags, rebootSchedule.DeliveryGroupRebootNotificationToUsers)
+
+			rebootScheduleRequest.SetWarningDurationMinutes(int32(notification.NotificationDurationMinutes.ValueInt64())) //can only be 1 5 15, or 0 means no warning
+			rebootScheduleRequest.SetWarningTitle(notification.NotificationTitle.ValueString())
+			rebootScheduleRequest.SetWarningMessage(notification.NotificationMessage.ValueString())
+			if notification.NotificationRepeatEvery5Minutes.ValueBool() {
 				rebootScheduleRequest.SetWarningRepeatIntervalMinutes(5)
 			} else {
 				rebootScheduleRequest.SetWarningRepeatIntervalMinutes(0)
@@ -882,7 +958,7 @@ func parseDeliveryGroupRebootScheduleToClientModel(rebootSchedules []DeliveryGro
 
 }
 
-func (schedule DeliveryGroupRebootSchedule) RefreshListItem(rebootSchedule citrixorchestration.RebootScheduleResponseModel) DeliveryGroupRebootSchedule {
+func (schedule DeliveryGroupRebootSchedule) RefreshListItem(ctx context.Context, diags *diag.Diagnostics, rebootSchedule citrixorchestration.RebootScheduleResponseModel) util.ModelWithAttributes {
 	schedule.Name = types.StringValue(rebootSchedule.GetName())
 	if rebootSchedule.GetDescription() != "" {
 		schedule.Description = types.StringValue(rebootSchedule.GetDescription())
@@ -893,30 +969,26 @@ func (schedule DeliveryGroupRebootSchedule) RefreshListItem(rebootSchedule citri
 		schedule.RestrictToTag = types.StringValue(*rebootSchedule.GetRestrictToTag().Name.Get())
 	}
 	schedule.IgnoreMaintenanceMode = types.BoolValue(rebootSchedule.GetIgnoreMaintenanceMode()) //bug in orchestration side
-	schedule.Frequency = types.StringValue(reflect.ValueOf(rebootSchedule.GetFrequency()).String())
+	schedule.Frequency = types.StringValue(string(rebootSchedule.GetFrequency()))
 
-	startDate := schedule.StartDate.ValueString()
-	if reflect.ValueOf(rebootSchedule.GetFrequency()).String() == "Weekly" {
-		res := []types.String{}
+	if rebootSchedule.GetFrequency() == citrixorchestration.REBOOTSCHEDULEFREQUENCY_WEEKLY {
+		res := []string{}
 		for _, scheduleDay := range rebootSchedule.GetDaysInWeek() {
-			res = append(res, types.StringValue(reflect.ValueOf(scheduleDay).String()))
+			res = append(res, string(scheduleDay))
 		}
-		schedule.DaysInWeek = res
-		if startDate != "" && startDate[5:6] == rebootSchedule.GetStartDate()[5:6] { //same month for plan and remote schedule
-			schedule.StartDate = types.StringValue(startDate)
-		}
-	} else if reflect.ValueOf(rebootSchedule.GetFrequency()).String() == "Monthly" {
-		schedule.WeekInMonth = types.StringValue(reflect.ValueOf(rebootSchedule.GetWeekInMonth()).String())
-		schedule.DayInMonth = types.StringValue(reflect.ValueOf(rebootSchedule.GetDayInMonth()).String())
-		schedule.StartDate = types.StringValue(startDate)
+		schedule.DaysInWeek = util.StringArrayToStringSet(ctx, diags, res)
+	} else if rebootSchedule.GetFrequency() == citrixorchestration.REBOOTSCHEDULEFREQUENCY_MONTHLY {
+		schedule.WeekInMonth = types.StringValue(string(rebootSchedule.GetWeekInMonth()))
+		schedule.DayInMonth = types.StringValue(string(rebootSchedule.GetDayInMonth()))
 	} else {
-		if startDate != "" {
-			schedule.StartDate = types.StringValue(rebootSchedule.GetStartDate())
-		}
+		schedule.StartDate = types.StringValue(rebootSchedule.GetStartDate())
 	}
 	schedule.FrequencyFactor = types.Int64Value(int64(rebootSchedule.GetFrequencyFactor()))
-
 	schedule.StartTime = types.StringValue(rebootSchedule.GetStartTime()[:5])
+
+	if schedule.StartDate.IsNull() {
+		schedule.StartDate = types.StringValue(rebootSchedule.GetStartDate())
+	}
 
 	if rebootSchedule.GetUseNaturalReboot() {
 		schedule.UseNaturalRebootSchedule = types.BoolValue(true)
@@ -932,19 +1004,16 @@ func (schedule DeliveryGroupRebootSchedule) RefreshListItem(rebootSchedule citri
 			if rebootSchedule.GetWarningRepeatIntervalMinutes() == 5 {
 				notif.NotificationRepeatEvery5Minutes = types.BoolValue(true)
 			}
-			schedule.DeliveryGroupRebootNotificationToUsers = &notif
+			schedule.DeliveryGroupRebootNotificationToUsers = util.TypedObjectToObjectValue(ctx, diags, notif)
 		}
 	}
 	return schedule
 }
 
-func (dgDesktop DeliveryGroupDesktop) RefreshListItem(desktop citrixorchestration.DesktopResponseModel) DeliveryGroupDesktop {
+func (dgDesktop DeliveryGroupDesktop) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, desktop citrixorchestration.DesktopResponseModel) util.ModelWithAttributes {
 	dgDesktop.PublishedName = types.StringValue(desktop.GetPublishedName())
-	if desktop.GetDescription() != "" {
-		dgDesktop.DesktopDescription = types.StringValue(desktop.GetDescription())
-	} else {
-		dgDesktop.DesktopDescription = types.StringNull()
-	}
+	dgDesktop.DesktopDescription = types.StringValue(desktop.GetDescription())
+
 	dgDesktop.Enabled = types.BoolValue(desktop.GetEnabled())
 	sessionReconnection := desktop.GetSessionReconnection()
 	if sessionReconnection == citrixorchestration.SESSIONRECONNECTION_ALWAYS {
@@ -953,31 +1022,34 @@ func (dgDesktop DeliveryGroupDesktop) RefreshListItem(desktop citrixorchestratio
 		dgDesktop.EnableSessionRoaming = types.BoolValue(false)
 	}
 
+	var users RestrictedAccessUsers
 	if !desktop.GetIncludedUserFilterEnabled() {
-		dgDesktop.RestrictedAccessUsers = nil
+		if attributes, err := util.AttributeMapFromObject(users); err == nil {
+			dgDesktop.RestrictedAccessUsers = types.ObjectNull(attributes)
+		} else {
+			diagnostics.AddWarning("Error when creating null RestrictedAccessUsers", err.Error())
+		}
 		return dgDesktop
 	}
 
-	if dgDesktop.RestrictedAccessUsers == nil {
-		dgDesktop.RestrictedAccessUsers = &RestrictedAccessUsers{}
-	}
+	users = util.ObjectValueToTypedObject[RestrictedAccessUsers](ctx, diagnostics, dgDesktop.RestrictedAccessUsers)
 
 	includedUsers := desktop.GetIncludedUsers()
 	excludedUsers := desktop.GetExcludedUsers()
 
 	if len(includedUsers) == 0 {
-		dgDesktop.RestrictedAccessUsers.AllowList = nil
+		users.AllowList = types.SetNull(types.StringType)
 	} else {
-		updatedAllowedUsers := refreshUsersList(dgDesktop.RestrictedAccessUsers.AllowList, includedUsers)
-		dgDesktop.RestrictedAccessUsers.AllowList = updatedAllowedUsers
+		users.AllowList = util.RefreshUsersList(ctx, diagnostics, users.AllowList, includedUsers)
 	}
 
 	if len(excludedUsers) == 0 {
-		dgDesktop.RestrictedAccessUsers.BlockList = nil
+		users.BlockList = types.SetNull(types.StringType)
 	} else {
-		updatedBlockedUsers := refreshUsersList(dgDesktop.RestrictedAccessUsers.BlockList, excludedUsers)
-		dgDesktop.RestrictedAccessUsers.BlockList = updatedBlockedUsers
+		users.BlockList = util.RefreshUsersList(ctx, diagnostics, users.BlockList, excludedUsers)
 	}
+	usersObj := util.TypedObjectToObjectValue(ctx, diagnostics, users)
+	dgDesktop.RestrictedAccessUsers = usersObj
 
 	return dgDesktop
 }
@@ -1027,11 +1099,11 @@ func getRebootScheduleDaysInWeekActionValue(v []string) []citrixorchestration.Re
 	return res
 }
 
-func parseDeliveryGroupDesktopsToClientModel(deliveryGroupDesktops []DeliveryGroupDesktop) []citrixorchestration.DesktopRequestModel {
+func verifyUsersAndParseDeliveryGroupDesktopsToClientModel(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, deliveryGroupDesktops []DeliveryGroupDesktop) ([]citrixorchestration.DesktopRequestModel, error) {
 	desktopRequests := []citrixorchestration.DesktopRequestModel{}
 
 	if deliveryGroupDesktops == nil {
-		return desktopRequests
+		return desktopRequests, nil
 	}
 
 	for _, deliveryGroupDesktop := range deliveryGroupDesktops {
@@ -1045,29 +1117,54 @@ func parseDeliveryGroupDesktopsToClientModel(deliveryGroupDesktops []DeliveryGro
 		desktopRequest.SetEnabled(deliveryGroupDesktop.Enabled.ValueBool())
 		desktopRequest.SetSessionReconnection(sessionReconnection)
 
-		includedUsers := []string{}
-		excludedUsers := []string{}
+		includedUserIds := []string{}
+		excludedUserIds := []string{}
+		var err error
+		var httpResp *http.Response
 		includedUsersFilterEnabled := false
 		excludedUsersFilterEnabled := false
-		if deliveryGroupDesktop.RestrictedAccessUsers != nil {
-			includedUsersFilterEnabled = true
-			includedUsers = util.ConvertBaseStringArrayToPrimitiveStringArray(deliveryGroupDesktop.RestrictedAccessUsers.AllowList)
+		if !deliveryGroupDesktop.RestrictedAccessUsers.IsNull() {
+			users := util.ObjectValueToTypedObject[RestrictedAccessUsers](ctx, diagnostics, deliveryGroupDesktop.RestrictedAccessUsers)
 
-			if deliveryGroupDesktop.RestrictedAccessUsers.BlockList != nil {
+			includedUsersFilterEnabled = true
+			includedUsers := util.StringSetToStringArray(ctx, diagnostics, users.AllowList)
+
+			// Call identity to make sure users exist. Extract the Ids from the reponse
+			includedUserIds, httpResp, err = util.GetUserIdsUsingIdentity(ctx, client, includedUsers)
+			if err != nil {
+				diagnostics.AddError(
+					"Error fetching user details for delivery group",
+					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+						"\nError message: "+util.ReadClientError(err),
+				)
+				return desktopRequests, err
+			}
+
+			if !users.BlockList.IsNull() {
 				excludedUsersFilterEnabled = true
-				excludedUsers = util.ConvertBaseStringArrayToPrimitiveStringArray(deliveryGroupDesktop.RestrictedAccessUsers.BlockList)
+				excludedUsers := util.StringSetToStringArray(ctx, diagnostics, users.BlockList)
+				excludedUserIds, httpResp, err = util.GetUserIdsUsingIdentity(ctx, client, excludedUsers)
+
+				if err != nil {
+					diagnostics.AddError(
+						"Error fetching user details for delivery group",
+						"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+							"\nError message: "+util.ReadClientError(err),
+					)
+					return desktopRequests, err
+				}
 			}
 		}
 
 		desktopRequest.SetIncludedUserFilterEnabled(includedUsersFilterEnabled)
 		desktopRequest.SetExcludedUserFilterEnabled(excludedUsersFilterEnabled)
-		desktopRequest.SetIncludedUsers(includedUsers)
-		desktopRequest.SetExcludedUsers(excludedUsers)
+		desktopRequest.SetIncludedUsers(includedUserIds)
+		desktopRequest.SetExcludedUsers(excludedUserIds)
 
 		desktopRequests = append(desktopRequests, desktopRequest)
 	}
 
-	return desktopRequests
+	return desktopRequests, nil
 }
 
 func getTimeSchemeDayValue(v string) citrixorchestration.TimeSchemeDays {
@@ -1079,13 +1176,13 @@ func getTimeSchemeDayValue(v string) citrixorchestration.TimeSchemeDays {
 	return *timeSchemeDay
 }
 
-func (r DeliveryGroupResourceModel) updatePlanWithRebootSchedule(rebootSchedules *citrixorchestration.RebootScheduleResponseModelCollection) DeliveryGroupResourceModel {
-	schedules := util.RefreshListProperties[DeliveryGroupRebootSchedule, citrixorchestration.RebootScheduleResponseModel](r.RebootSchedules, "Name", rebootSchedules.GetItems(), "Name", "RefreshListItem")
+func (r DeliveryGroupResourceModel) updatePlanWithRebootSchedule(ctx context.Context, diagnostics *diag.Diagnostics, rebootSchedules *citrixorchestration.RebootScheduleResponseModelCollection) DeliveryGroupResourceModel {
+	schedules := util.RefreshListValueProperties[DeliveryGroupRebootSchedule, citrixorchestration.RebootScheduleResponseModel](ctx, diagnostics, r.RebootSchedules, rebootSchedules.GetItems(), util.GetOrchestrationRebootScheduleKey)
 	r.RebootSchedules = schedules
 	return r
 }
 
-func (r DeliveryGroupResourceModel) updatePlanWithAssociatedCatalogs(machines *citrixorchestration.MachineResponseModelCollection) DeliveryGroupResourceModel {
+func (r DeliveryGroupResourceModel) updatePlanWithAssociatedCatalogs(ctx context.Context, diags *diag.Diagnostics, machines *citrixorchestration.MachineResponseModelCollection) DeliveryGroupResourceModel {
 	machineCatalogMap := map[string]int{}
 
 	for _, machine := range machines.GetItems() {
@@ -1094,24 +1191,25 @@ func (r DeliveryGroupResourceModel) updatePlanWithAssociatedCatalogs(machines *c
 		machineCatalogMap[machineCatalogId] += 1
 	}
 
-	r.AssociatedMachineCatalogs = []DeliveryGroupMachineCatalogModel{}
+	associatedMachineCatalogs := []DeliveryGroupMachineCatalogModel{}
 	for key, val := range machineCatalogMap {
 		var deliveryGroupMachineCatalogModel DeliveryGroupMachineCatalogModel
 		deliveryGroupMachineCatalogModel.MachineCatalog = types.StringValue(key)
 		deliveryGroupMachineCatalogModel.MachineCount = types.Int64Value(int64(val))
-		r.AssociatedMachineCatalogs = append(r.AssociatedMachineCatalogs, deliveryGroupMachineCatalogModel)
+		associatedMachineCatalogs = append(associatedMachineCatalogs, deliveryGroupMachineCatalogModel)
 	}
+	r.AssociatedMachineCatalogs = util.TypedArrayToObjectList[DeliveryGroupMachineCatalogModel](ctx, diags, associatedMachineCatalogs)
 
 	return r
 }
 
-func (r DeliveryGroupResourceModel) updatePlanWithDesktops(deliveryGroupDesktops *citrixorchestration.DesktopResponseModelCollection) DeliveryGroupResourceModel {
-	desktops := util.RefreshListProperties[DeliveryGroupDesktop, citrixorchestration.DesktopResponseModel](r.Desktops, "PublishedName", deliveryGroupDesktops.GetItems(), "PublishedName", "RefreshListItem")
+func (r DeliveryGroupResourceModel) updatePlanWithDesktops(ctx context.Context, diagnostics *diag.Diagnostics, deliveryGroupDesktops *citrixorchestration.DesktopResponseModelCollection) DeliveryGroupResourceModel {
+	desktops := util.RefreshListValueProperties[DeliveryGroupDesktop, citrixorchestration.DesktopResponseModel](ctx, diagnostics, r.Desktops, deliveryGroupDesktops.GetItems(), util.GetOrchestrationDesktopKey)
 	r.Desktops = desktops
 	return r
 }
 
-func updateDeliveryGroupUserAccessDetails(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, deliveryGroupDesktops *citrixorchestration.DesktopResponseModelCollection) (*citrixorchestration.DeliveryGroupDetailResponseModel, *citrixorchestration.DesktopResponseModelCollection, error) {
+func updateDeliveryGroupAndDesktopUsers(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, deliveryGroupDesktops *citrixorchestration.DesktopResponseModelCollection) (*citrixorchestration.DeliveryGroupDetailResponseModel, *citrixorchestration.DesktopResponseModelCollection, error) {
 	simpleAccessPolicy := deliveryGroup.GetSimpleAccessPolicy()
 	updatedIncludedUsers, updatedExcludedUsers, err := updateIdentityUserDetails(ctx, client, diagnostics, simpleAccessPolicy.GetIncludedUsers(), simpleAccessPolicy.GetExcludedUsers())
 	if err != nil {
@@ -1137,161 +1235,132 @@ func updateDeliveryGroupUserAccessDetails(ctx context.Context, client *citrixdaa
 	return deliveryGroup, deliveryGroupDesktops, nil
 }
 
-func verifyIdentityUserListCompleteness(inputUserNames []string, remoteUsers []citrixorchestration.IdentityUserResponseModel) error {
-	if len(remoteUsers) < len(inputUserNames) {
-		missingUsers := []string{}
-		for _, includedUser := range inputUserNames {
-			userIndex := slices.IndexFunc(remoteUsers, func(i citrixorchestration.IdentityUserResponseModel) bool {
-				return includedUser == i.GetSamName() || includedUser == i.GetPrincipalName()
-			})
-			if userIndex == -1 {
-				missingUsers = append(missingUsers, includedUser)
-			}
-		}
-
-		return fmt.Errorf("The following users could not be found: " + strings.Join(missingUsers, ", "))
-	}
-	return nil
-}
-
 func updateIdentityUserDetails(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, includedUsers []citrixorchestration.IdentityUserResponseModel, excludedUsers []citrixorchestration.IdentityUserResponseModel) ([]citrixorchestration.IdentityUserResponseModel, []citrixorchestration.IdentityUserResponseModel, error) {
 	includedUserNames := []string{}
+	var err error
+	var httpResp *http.Response
 	for _, includedUser := range includedUsers {
-		if includedUser.GetSamName() != "" {
-			includedUserNames = append(includedUserNames, includedUser.GetSamName())
-		} else if includedUser.GetPrincipalName() != "" {
+		if includedUser.GetPrincipalName() != "" {
 			includedUserNames = append(includedUserNames, includedUser.GetPrincipalName())
+		} else if includedUser.GetSamName() != "" {
+			includedUserNames = append(includedUserNames, includedUser.GetSamName())
 		}
 	}
 
 	if len(includedUserNames) > 0 {
-		getIncludedUsersRequest := client.ApiClient.IdentityAPIsDAAS.IdentityGetUsers(ctx)
-		getIncludedUsersRequest = getIncludedUsersRequest.User(includedUserNames)
-		getIncludedUsersRequest = getIncludedUsersRequest.Provider(citrixorchestration.IDENTITYPROVIDERTYPE_ALL)
-		includedUsersResponse, httpResp, err := citrixdaasclient.AddRequestData(getIncludedUsersRequest, client).Execute()
+		includedUsers, httpResp, err = util.GetUsersUsingIdentity(ctx, client, includedUserNames)
 		if err != nil {
 			diagnostics.AddError(
-				"Error fetching delivery group user details",
+				"Error fetching user details for delivery group",
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadClientError(err),
 			)
 			return nil, nil, err
 		}
-
-		err = verifyIdentityUserListCompleteness(includedUserNames, includedUsersResponse.GetItems())
-		if err != nil {
-			diagnostics.AddError(
-				"Error fetching delivery group user details",
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+err.Error(),
-			)
-			return nil, nil, err
-		}
-
-		includedUsers = includedUsersResponse.GetItems()
 	}
 
 	excludedUserNames := []string{}
 	for _, excludedUser := range excludedUsers {
-		if excludedUser.GetSamName() != "" {
-			excludedUserNames = append(excludedUserNames, excludedUser.GetSamName())
-		} else if excludedUser.GetPrincipalName() != "" {
+		if excludedUser.GetPrincipalName() != "" {
 			excludedUserNames = append(excludedUserNames, excludedUser.GetPrincipalName())
+		} else if excludedUser.GetSamName() != "" {
+			excludedUserNames = append(excludedUserNames, excludedUser.GetSamName())
 		}
 	}
 
 	if len(excludedUserNames) > 0 {
-		getExcludedUsersRequest := client.ApiClient.IdentityAPIsDAAS.IdentityGetUsers(ctx)
-		getExcludedUsersRequest = getExcludedUsersRequest.User(excludedUserNames)
-		getExcludedUsersRequest = getExcludedUsersRequest.Provider(citrixorchestration.IDENTITYPROVIDERTYPE_ALL)
-		excludedUsersResponse, httpResp, err := citrixdaasclient.AddRequestData(getExcludedUsersRequest, client).Execute()
+		excludedUsers, httpResp, err = util.GetUsersUsingIdentity(ctx, client, excludedUserNames)
 		if err != nil {
 			diagnostics.AddError(
-				"Error fetching delivery group user details",
+				"Error fetching user details for delivery group",
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadClientError(err),
 			)
 			return nil, nil, err
 		}
-
-		err = verifyIdentityUserListCompleteness(excludedUserNames, excludedUsersResponse.GetItems())
-		if err != nil {
-			diagnostics.AddError(
-				"Error fetching delivery group user details",
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+err.Error(),
-			)
-			return nil, nil, err
-		}
-
-		excludedUsers = excludedUsersResponse.GetItems()
 	}
 
 	return includedUsers, excludedUsers, nil
 }
 
-func (r DeliveryGroupResourceModel) updatePlanWithRestrictedAccessUsers(deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel) DeliveryGroupResourceModel {
+func (r DeliveryGroupResourceModel) updatePlanWithRestrictedAccessUsers(ctx context.Context, diagnostics *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel) DeliveryGroupResourceModel {
 	simpleAccessPolicy := deliveryGroup.GetSimpleAccessPolicy()
 
 	if !r.AllowAnonymousAccess.IsNull() {
 		r.AllowAnonymousAccess = types.BoolValue(simpleAccessPolicy.GetAllowAnonymous())
 	}
 
-	if !simpleAccessPolicy.GetIncludedUserFilterEnabled() {
-		r.RestrictedAccessUsers = nil
+	if !simpleAccessPolicy.GetIncludedUserFilterEnabled() || r.RestrictedAccessUsers.IsNull() {
+		if attributes, err := util.AttributeMapFromObject(RestrictedAccessUsers{}); err == nil {
+			r.RestrictedAccessUsers = types.ObjectNull(attributes)
+		} else {
+			diagnostics.AddWarning("Error when creating null RestrictedAccessUsers", err.Error())
+		}
 		return r
 	}
 
-	if r.RestrictedAccessUsers == nil {
-		r.RestrictedAccessUsers = &RestrictedAccessUsers{}
-	}
+	users := util.ObjectValueToTypedObject[RestrictedAccessUsers](ctx, diagnostics, r.RestrictedAccessUsers)
 
-	updatedAllowList := refreshUsersList(r.RestrictedAccessUsers.AllowList, simpleAccessPolicy.GetIncludedUsers())
-	r.RestrictedAccessUsers.AllowList = updatedAllowList
+	remoteIncludedUsers := simpleAccessPolicy.GetIncludedUsers()
+	if len(remoteIncludedUsers) == 0 {
+		users.AllowList = types.SetNull(types.StringType)
+	} else {
+		users.AllowList = util.RefreshUsersList(ctx, diagnostics, users.AllowList, simpleAccessPolicy.GetIncludedUsers())
+	}
 
 	if simpleAccessPolicy.GetExcludedUserFilterEnabled() {
-		updatedBlockList := refreshUsersList(r.RestrictedAccessUsers.BlockList, simpleAccessPolicy.GetExcludedUsers())
-		r.RestrictedAccessUsers.BlockList = updatedBlockList
+		if len(simpleAccessPolicy.GetExcludedUsers()) == 0 {
+			users.BlockList = types.SetNull(types.StringType)
+		} else {
+			users.BlockList = util.RefreshUsersList(ctx, diagnostics, users.BlockList, simpleAccessPolicy.GetExcludedUsers())
+		}
 	}
+
+	r.RestrictedAccessUsers = util.TypedObjectToObjectValue(ctx, diagnostics, users)
 
 	return r
 }
 
-func (r DeliveryGroupResourceModel) updatePlanWithAutoscaleSettings(deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, dgPowerTimeSchemes *citrixorchestration.PowerTimeSchemeResponseModelCollection) DeliveryGroupResourceModel {
-	if r.AutoscaleSettings == nil {
+func (r DeliveryGroupResourceModel) updatePlanWithAutoscaleSettings(ctx context.Context, diags *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, dgPowerTimeSchemes *citrixorchestration.PowerTimeSchemeResponseModelCollection) DeliveryGroupResourceModel {
+	if r.AutoscaleSettings.IsNull() {
 		return r
 	}
 
-	r.AutoscaleSettings.AutoscaleEnabled = types.BoolValue(deliveryGroup.GetAutoScaleEnabled())
+	autoscale := util.ObjectValueToTypedObject[DeliveryGroupPowerManagementSettings](context.Background(), nil, r.AutoscaleSettings)
+	autoscale.AutoscaleEnabled = types.BoolValue(deliveryGroup.GetAutoScaleEnabled())
 
-	if !r.AutoscaleSettings.Timezone.IsNull() {
-		r.AutoscaleSettings.Timezone = types.StringValue(deliveryGroup.GetTimeZone())
+	if !autoscale.Timezone.IsNull() {
+		autoscale.Timezone = types.StringValue(deliveryGroup.GetTimeZone())
 	}
 
-	r.AutoscaleSettings.PeakDisconnectTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetPeakDisconnectTimeoutMinutes()))
-	r.AutoscaleSettings.PeakLogOffAction = types.StringValue(reflect.ValueOf(deliveryGroup.GetPeakLogOffAction()).String())
-	r.AutoscaleSettings.PeakDisconnectAction = types.StringValue(reflect.ValueOf(deliveryGroup.GetPeakDisconnectAction()).String())
-	r.AutoscaleSettings.PeakExtendedDisconnectAction = types.StringValue(reflect.ValueOf(deliveryGroup.GetPeakExtendedDisconnectAction()).String())
-	r.AutoscaleSettings.PeakExtendedDisconnectTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetPeakExtendedDisconnectTimeoutMinutes()))
-	r.AutoscaleSettings.OffPeakDisconnectTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetOffPeakDisconnectTimeoutMinutes()))
-	r.AutoscaleSettings.OffPeakLogOffAction = types.StringValue(reflect.ValueOf(deliveryGroup.GetOffPeakLogOffAction()).String())
-	r.AutoscaleSettings.OffPeakDisconnectAction = types.StringValue(reflect.ValueOf(deliveryGroup.GetOffPeakExtendedDisconnectAction()).String())
-	r.AutoscaleSettings.OffPeakExtendedDisconnectAction = types.StringValue(reflect.ValueOf(deliveryGroup.GetOffPeakExtendedDisconnectAction()).String())
-	r.AutoscaleSettings.OffPeakExtendedDisconnectTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetOffPeakExtendedDisconnectTimeoutMinutes()))
-	r.AutoscaleSettings.PeakBufferSizePercent = types.Int64Value(int64(deliveryGroup.GetPeakBufferSizePercent()))
-	r.AutoscaleSettings.OffPeakBufferSizePercent = types.Int64Value(int64(deliveryGroup.GetOffPeakBufferSizePercent()))
-	r.AutoscaleSettings.PowerOffDelayMinutes = types.Int64Value(int64(deliveryGroup.GetPowerOffDelayMinutes()))
-	r.AutoscaleSettings.DisconnectPeakIdleSessionAfterSeconds = types.Int64Value(int64(deliveryGroup.GetDisconnectPeakIdleSessionAfterSeconds()))
-	r.AutoscaleSettings.DisconnectOffPeakIdleSessionAfterSeconds = types.Int64Value(int64(deliveryGroup.GetDisconnectOffPeakIdleSessionAfterSeconds()))
-	r.AutoscaleSettings.LogoffPeakDisconnectedSessionAfterSeconds = types.Int64Value(int64(deliveryGroup.GetLogoffPeakDisconnectedSessionAfterSeconds()))
-	r.AutoscaleSettings.LogoffOffPeakDisconnectedSessionAfterSeconds = types.Int64Value(int64(deliveryGroup.GetLogoffOffPeakDisconnectedSessionAfterSeconds()))
-	parsedPowerTimeSchemes := parsePowerTimeSchemesClientToPluginModel(dgPowerTimeSchemes.GetItems())
-	r.AutoscaleSettings.PowerTimeSchemes = preserveOrderInPowerTimeSchemes(r.AutoscaleSettings.PowerTimeSchemes, parsedPowerTimeSchemes)
+	autoscale.PeakDisconnectTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetPeakDisconnectTimeoutMinutes()))
+	autoscale.PeakLogOffAction = types.StringValue(string(deliveryGroup.GetPeakLogOffAction()))
+	autoscale.PeakDisconnectAction = types.StringValue(string(deliveryGroup.GetPeakDisconnectAction()))
+	autoscale.PeakExtendedDisconnectAction = types.StringValue(string(deliveryGroup.GetPeakExtendedDisconnectAction()))
+	autoscale.PeakExtendedDisconnectTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetPeakExtendedDisconnectTimeoutMinutes()))
+	autoscale.OffPeakDisconnectTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetOffPeakDisconnectTimeoutMinutes()))
+	autoscale.OffPeakLogOffAction = types.StringValue(string(deliveryGroup.GetOffPeakLogOffAction()))
+	autoscale.OffPeakDisconnectAction = types.StringValue(string(deliveryGroup.GetOffPeakExtendedDisconnectAction()))
+	autoscale.OffPeakExtendedDisconnectAction = types.StringValue(string(deliveryGroup.GetOffPeakExtendedDisconnectAction()))
+	autoscale.OffPeakExtendedDisconnectTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetOffPeakExtendedDisconnectTimeoutMinutes()))
+	autoscale.PeakBufferSizePercent = types.Int64Value(int64(deliveryGroup.GetPeakBufferSizePercent()))
+	autoscale.OffPeakBufferSizePercent = types.Int64Value(int64(deliveryGroup.GetOffPeakBufferSizePercent()))
+	autoscale.PowerOffDelayMinutes = types.Int64Value(int64(deliveryGroup.GetPowerOffDelayMinutes()))
+	autoscale.DisconnectPeakIdleSessionAfterSeconds = types.Int64Value(int64(deliveryGroup.GetDisconnectPeakIdleSessionAfterSeconds()))
+	autoscale.DisconnectOffPeakIdleSessionAfterSeconds = types.Int64Value(int64(deliveryGroup.GetDisconnectOffPeakIdleSessionAfterSeconds()))
+	autoscale.LogoffPeakDisconnectedSessionAfterSeconds = types.Int64Value(int64(deliveryGroup.GetLogoffPeakDisconnectedSessionAfterSeconds()))
+	autoscale.LogoffOffPeakDisconnectedSessionAfterSeconds = types.Int64Value(int64(deliveryGroup.GetLogoffOffPeakDisconnectedSessionAfterSeconds()))
 
+	parsedPowerTimeSchemes := parsePowerTimeSchemesClientToPluginModel(ctx, diags, dgPowerTimeSchemes.GetItems())
+	autoscalePowerTimeSchemes := util.ObjectListToTypedArray[DeliveryGroupPowerTimeScheme](ctx, diags, autoscale.PowerTimeSchemes)
+	parsedPowerTimeSchemes = preserveOrderInPowerTimeSchemes(ctx, diags, autoscalePowerTimeSchemes, parsedPowerTimeSchemes)
+	autoscale.PowerTimeSchemes = util.TypedArrayToObjectList[DeliveryGroupPowerTimeScheme](ctx, diags, parsedPowerTimeSchemes)
+
+	r.AutoscaleSettings = util.TypedObjectToObjectValue(ctx, diags, autoscale)
 	return r
 }
 
-func preserveOrderInPowerTimeSchemes(powerTimeSchemeInPlan, powerTimeSchemesInRemote []DeliveryGroupPowerTimeScheme) []DeliveryGroupPowerTimeScheme {
+func preserveOrderInPowerTimeSchemes(ctx context.Context, diags *diag.Diagnostics, powerTimeSchemeInPlan, powerTimeSchemesInRemote []DeliveryGroupPowerTimeScheme) []DeliveryGroupPowerTimeScheme {
 	planPowerTimeSchemesMap := map[string]int{}
 
 	for index, powerTimeScheme := range powerTimeSchemeInPlan {
@@ -1303,7 +1372,10 @@ func preserveOrderInPowerTimeSchemes(powerTimeSchemeInPlan, powerTimeSchemesInRe
 		if !exists {
 			powerTimeSchemeInPlan = append(powerTimeSchemeInPlan, powerTimeScheme)
 		} else {
-			powerTimeSchemeInPlan[index].PoolSizeSchedule = preserveOrderInPoolSizeSchedule(powerTimeSchemeInPlan[index].PoolSizeSchedule, powerTimeScheme.PoolSizeSchedule)
+			updatedPoolSizeSchedule := preserveOrderInPoolSizeSchedule(
+				util.ObjectListToTypedArray[PowerTimeSchemePoolSizeScheduleRequestModel](ctx, diags, powerTimeSchemeInPlan[index].PoolSizeSchedule),
+				util.ObjectListToTypedArray[PowerTimeSchemePoolSizeScheduleRequestModel](ctx, diags, powerTimeScheme.PoolSizeSchedule))
+			powerTimeSchemeInPlan[index].PoolSizeSchedule = util.TypedArrayToObjectList[PowerTimeSchemePoolSizeScheduleRequestModel](ctx, diags, updatedPoolSizeSchedule)
 		}
 		planPowerTimeSchemesMap[powerTimeScheme.DisplayName.ValueString()] = -1
 	}
@@ -1344,64 +1416,4 @@ func preserveOrderInPoolSizeSchedule(poolSizeScheduleInPlan, poolSizeScheduleInR
 	}
 
 	return poolSizeSchedules
-}
-
-func refreshUsersList(users []basetypes.StringValue, usersInRemote []citrixorchestration.IdentityUserResponseModel) []basetypes.StringValue {
-	samNamesMap := map[string]int{}
-	upnMap := map[string]int{}
-
-	for index, userInRemote := range usersInRemote {
-		userSamName := userInRemote.GetSamName()
-		userPrincipalName := userInRemote.GetPrincipalName()
-		if userSamName != "" {
-			samNamesMap[userSamName] = index
-		}
-		if userPrincipalName != "" {
-			upnMap[userPrincipalName] = index
-		}
-	}
-
-	res := []basetypes.StringValue{}
-	for _, user := range users {
-		userStringValue := user.ValueString()
-		samRegex, _ := regexp.Compile(util.SamRegex)
-		if samRegex.MatchString(userStringValue) {
-			index, exists := samNamesMap[userStringValue]
-			if !exists {
-				continue
-			}
-			res = append(res, user)
-			samNamesMap[userStringValue] = -1
-			userPrincipalName := usersInRemote[index].GetPrincipalName()
-			_, exists = upnMap[userPrincipalName]
-			if exists {
-				upnMap[userPrincipalName] = -1
-			}
-
-			continue
-		}
-
-		upnRegex, _ := regexp.Compile(util.UpnRegex)
-		if upnRegex.MatchString(userStringValue) {
-			index, exists := upnMap[userStringValue]
-			if !exists {
-				continue
-			}
-			res = append(res, user)
-			upnMap[userStringValue] = -1
-			samName := usersInRemote[index].GetSamName()
-			_, exists = samNamesMap[samName]
-			if exists {
-				samNamesMap[samName] = -1
-			}
-		}
-	}
-
-	for samName, index := range samNamesMap {
-		if index != -1 { // Users that are only in remote
-			res = append(res, types.StringValue(samName))
-		}
-	}
-
-	return res
 }

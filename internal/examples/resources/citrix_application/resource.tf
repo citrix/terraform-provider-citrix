@@ -9,4 +9,6 @@ resource "citrix_application" "example-application" {
     working_directory       = "<Working directory path for the executable>"
   }
   delivery_groups = [citrix_delivery_group.example-delivery-group.id]
+  icon            = citrix_application_icon.example-application-icon.id
+  limit_visibility_to_users = ["example\\user1"]
 }

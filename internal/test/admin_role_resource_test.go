@@ -1,4 +1,4 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 
 package test
 
@@ -40,8 +40,8 @@ func TestAdminRoleResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "can_launch_monitor", "true"),
 					// Verify the permissions list
 					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "permissions.#", "2"),
-					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "permissions.0", "Director_DismissAlerts"),
-					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "permissions.1", "DesktopGroup_AddApplicationGroup"),
+					resource.TestCheckTypeSetElemAttr("citrix_admin_role.test_role", "permissions.*", "Director_DismissAlerts"),
+					resource.TestCheckTypeSetElemAttr("citrix_admin_role.test_role", "permissions.*", "DesktopGroup_AddApplicationGroup"),
 				),
 			},
 			// ImportState testing
@@ -67,9 +67,9 @@ func TestAdminRoleResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "can_launch_monitor", "true"),
 					// Verify the permissions list
 					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "permissions.#", "3"),
-					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "permissions.0", "Director_DismissAlerts"),
-					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "permissions.1", "ApplicationGroup_AddScope"),
-					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "permissions.2", "AppLib_AddPackage"),
+					resource.TestCheckTypeSetElemAttr("citrix_admin_role.test_role", "permissions.*", "Director_DismissAlerts"),
+					resource.TestCheckTypeSetElemAttr("citrix_admin_role.test_role", "permissions.*", "ApplicationGroup_AddScope"),
+					resource.TestCheckTypeSetElemAttr("citrix_admin_role.test_role", "permissions.*", "AppLib_AddPackage"),
 				),
 			},
 			// Delete testing automatically occurs in TestCase

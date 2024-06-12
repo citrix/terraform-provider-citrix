@@ -1,4 +1,4 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 
 package machine_catalog
 
@@ -12,11 +12,12 @@ import (
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-func getMachinesForManualCatalogs(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, machineAccounts []MachineAccountsModel) ([]citrixorchestration.AddMachineToMachineCatalogRequestModel, error) {
+func getMachinesForManualCatalogs(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, machineAccounts []MachineAccountsModel) ([]citrixorchestration.AddMachineToMachineCatalogRequestModel, error) {
 	if machineAccounts == nil {
 		return nil, nil
 	}
@@ -34,7 +35,9 @@ func getMachinesForManualCatalogs(ctx context.Context, client *citrixdaasclient.
 			}
 		}
 
-		for _, machine := range machineAccount.Machines {
+		machines := util.ObjectListToTypedArray[MachineCatalogMachineModel](ctx, diagnostics, machineAccount.Machines)
+
+		for _, machine := range machines {
 			addMachineRequest := citrixorchestration.AddMachineToMachineCatalogRequestModel{}
 			addMachineRequest.SetMachineName(machine.MachineAccount.ValueString())
 
@@ -167,17 +170,17 @@ func deleteMachinesFromManualCatalog(ctx context.Context, client *citrixdaasclie
 		}
 	}
 
-	return deleteMachinesFromCatalog(ctx, client, resp, MachineCatalogResourceModel{}, machinesToDelete, catalogNameOrId, false)
+	return deleteMachinesFromCatalog(ctx, client, resp, ProvisioningSchemeModel{}, machinesToDelete, catalogNameOrId, false)
 }
 
-func addMachinesToManualCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, addMachinesList []MachineAccountsModel, catalogIdOrName string) error {
+func addMachinesToManualCatalog(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, addMachinesList []MachineAccountsModel, catalogIdOrName string) error {
 
 	if len(addMachinesList) < 1 {
 		// no machines to add
 		return nil
 	}
 
-	addMachinesRequest, err := getMachinesForManualCatalogs(ctx, client, addMachinesList)
+	addMachinesRequest, err := getMachinesForManualCatalogs(ctx, diagnostics, client, addMachinesList)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error adding machines(s) to Machine Catalog "+catalogIdOrName,
@@ -187,7 +190,7 @@ func addMachinesToManualCatalog(ctx context.Context, client *citrixdaasclient.Ci
 		return err
 	}
 
-	batchApiHeaders, httpResp, err := generateBatchApiHeaders(client, MachineCatalogResourceModel{}, false)
+	batchApiHeaders, httpResp, err := generateBatchApiHeaders(ctx, &resp.Diagnostics, client, ProvisioningSchemeModel{}, false)
 	txId := citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -245,14 +248,16 @@ func addMachinesToManualCatalog(ctx context.Context, client *citrixdaasclient.Ci
 	return nil
 }
 
-func createAddAndRemoveMachinesListForManualCatalogs(state, plan MachineCatalogResourceModel) ([]MachineAccountsModel, map[string]bool) {
+func createAddAndRemoveMachinesListForManualCatalogs(ctx context.Context, diagnostics *diag.Diagnostics, state, plan MachineCatalogResourceModel) ([]MachineAccountsModel, map[string]bool) {
 	addMachinesList := []MachineAccountsModel{}
 	existingMachineAccounts := map[string]map[string]bool{}
 
 	// create map for existing machines marking all machines for deletion
-	if state.MachineAccounts != nil {
-		for _, machineAccount := range state.MachineAccounts {
-			for _, machine := range machineAccount.Machines {
+	if !state.MachineAccounts.IsNull() {
+		machineAccounts := util.ObjectListToTypedArray[MachineAccountsModel](ctx, diagnostics, state.MachineAccounts)
+		for _, machineAccount := range machineAccounts {
+			machines := util.ObjectListToTypedArray[MachineCatalogMachineModel](ctx, diagnostics, machineAccount.Machines)
+			for _, machine := range machines {
 				machineMap, exists := existingMachineAccounts[machineAccount.Hypervisor.ValueString()]
 				if !exists {
 					existingMachineAccounts[machineAccount.Hypervisor.ValueString()] = map[string]bool{}
@@ -264,10 +269,12 @@ func createAddAndRemoveMachinesListForManualCatalogs(state, plan MachineCatalogR
 	}
 
 	// iterate over plan and if machine already exists, mark false for deletion. If not, add it to the addMachineList
-	if plan.MachineAccounts != nil {
-		for _, machineAccount := range plan.MachineAccounts {
+	if !plan.MachineAccounts.IsNull() {
+		machineAccounts := util.ObjectListToTypedArray[MachineAccountsModel](ctx, diagnostics, plan.MachineAccounts)
+		for _, machineAccount := range machineAccounts {
 			machineAccountMachines := []MachineCatalogMachineModel{}
-			for _, machine := range machineAccount.Machines {
+			machines := util.ObjectListToTypedArray[MachineCatalogMachineModel](ctx, diagnostics, machineAccount.Machines)
+			for _, machine := range machines {
 				if existingMachineAccounts[machineAccount.Hypervisor.ValueString()][strings.ToLower(machine.MachineAccount.ValueString())] {
 					// Machine exists. Mark false for deletion
 					existingMachineAccounts[machineAccount.Hypervisor.ValueString()][strings.ToLower(machine.MachineAccount.ValueString())] = false
@@ -280,7 +287,7 @@ func createAddAndRemoveMachinesListForManualCatalogs(state, plan MachineCatalogR
 			if len(machineAccountMachines) > 0 {
 				var addMachineAccount MachineAccountsModel
 				addMachineAccount.Hypervisor = machineAccount.Hypervisor
-				addMachineAccount.Machines = machineAccountMachines
+				addMachineAccount.Machines = util.TypedArrayToObjectList[MachineCatalogMachineModel](ctx, diagnostics, machineAccountMachines)
 				addMachinesList = append(addMachinesList, addMachineAccount)
 			}
 		}
@@ -299,9 +306,9 @@ func createAddAndRemoveMachinesListForManualCatalogs(state, plan MachineCatalogR
 	return addMachinesList, deleteMachinesMap
 }
 
-func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, machines *citrixorchestration.MachineResponseModelCollection) MachineCatalogResourceModel {
+func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, machines *citrixorchestration.MachineResponseModelCollection) MachineCatalogResourceModel {
 	if machines == nil {
-		r.MachineAccounts = nil
+		r.MachineAccounts = util.TypedArrayToObjectList[MachineAccountsModel](ctx, diagnostics, nil)
 		return r
 	}
 
@@ -310,10 +317,12 @@ func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Conte
 		machineMapFromRemote[strings.ToLower(machine.GetName())] = machine
 	}
 
-	if r.MachineAccounts != nil {
+	if !r.MachineAccounts.IsNull() {
 		machinesNotPresetInRemote := map[string]bool{}
-		for _, machineAccount := range r.MachineAccounts {
-			for _, machineFromPlan := range machineAccount.Machines {
+		machineAccounts := util.ObjectListToTypedArray[MachineAccountsModel](ctx, diagnostics, r.MachineAccounts)
+		for _, machineAccount := range machineAccounts {
+			machines := util.ObjectListToTypedArray[MachineCatalogMachineModel](ctx, diagnostics, machineAccount.Machines)
+			for _, machineFromPlan := range machines {
 				machineFromPlanName := machineFromPlan.MachineAccount.ValueString()
 				machineFromRemote, exists := machineMapFromRemote[strings.ToLower(machineFromPlanName)]
 				if !exists {
@@ -396,20 +405,22 @@ func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Conte
 			}
 		}
 
-		machineAccounts := []MachineAccountsModel{}
-		for _, machineAccount := range r.MachineAccounts {
-			machines := []MachineCatalogMachineModel{}
-			for _, machine := range machineAccount.Machines {
+		machineAccountsArray := []MachineAccountsModel{}
+		machineAccountsModel := util.ObjectListToTypedArray[MachineAccountsModel](ctx, diagnostics, r.MachineAccounts)
+		for _, machineAccount := range machineAccountsModel {
+			machineAccountMachines := []MachineCatalogMachineModel{}
+			machines := util.ObjectListToTypedArray[MachineCatalogMachineModel](ctx, diagnostics, machineAccount.Machines)
+			for _, machine := range machines {
 				if machinesNotPresetInRemote[strings.ToLower(machine.MachineAccount.ValueString())] {
 					continue
 				}
-				machines = append(machines, machine)
+				machineAccountMachines = append(machineAccountMachines, machine)
 			}
-			machineAccount.Machines = machines
-			machineAccounts = append(machineAccounts, machineAccount)
+			machineAccount.Machines = util.TypedArrayToObjectList[MachineCatalogMachineModel](ctx, diagnostics, machineAccountMachines)
+			machineAccountsArray = append(machineAccountsArray, machineAccount)
 		}
 
-		r.MachineAccounts = machineAccounts
+		r.MachineAccounts = util.TypedArrayToObjectList[MachineAccountsModel](ctx, diagnostics, machineAccountsArray)
 	}
 
 	// go over any machines that are in remote but were not in plan
@@ -475,37 +486,38 @@ func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Conte
 		newMachines[hypId] = append(newMachines[hypId], machineModel)
 	}
 
-	if len(newMachines) > 0 && r.MachineAccounts == nil {
-		r.MachineAccounts = []MachineAccountsModel{}
+	if len(newMachines) > 0 && r.MachineAccounts.IsNull() {
+		r.MachineAccounts = util.TypedArrayToObjectList[MachineAccountsModel](ctx, diagnostics, []MachineAccountsModel{})
 	}
 
 	machineAccountMap := map[string]int{}
-	for index, machineAccount := range r.MachineAccounts {
+	machineAccounts := util.ObjectListToTypedArray[MachineAccountsModel](ctx, diagnostics, r.MachineAccounts)
+	for index, machineAccount := range machineAccounts {
 		machineAccountMap[machineAccount.Hypervisor.ValueString()] = index
 	}
 
 	for hypId, machines := range newMachines {
 		machineAccIndex, exists := machineAccountMap[hypId]
 		if exists {
-			machAccounts := r.MachineAccounts
+			machAccounts := util.ObjectListToTypedArray[MachineAccountsModel](ctx, diagnostics, r.MachineAccounts)
 			machineAccount := machAccounts[machineAccIndex]
-			if machineAccount.Machines == nil {
-				machineAccount.Machines = []MachineCatalogMachineModel{}
+			if machineAccount.Machines.IsNull() {
+				machineAccount.Machines = util.TypedArrayToObjectList[MachineCatalogMachineModel](ctx, diagnostics, []MachineCatalogMachineModel{})
 			}
-			machineAccountMachines := machineAccount.Machines
+			machineAccountMachines := util.ObjectListToTypedArray[MachineCatalogMachineModel](ctx, diagnostics, machineAccount.Machines)
 			machineAccountMachines = append(machineAccountMachines, machines...)
-			machineAccount.Machines = machineAccountMachines
+			machineAccount.Machines = util.TypedArrayToObjectList[MachineCatalogMachineModel](ctx, diagnostics, machineAccountMachines)
 			machAccounts[machineAccIndex] = machineAccount
-			r.MachineAccounts = machAccounts
+			r.MachineAccounts = util.TypedArrayToObjectList[MachineAccountsModel](ctx, diagnostics, machAccounts)
 			continue
 		}
 		var machineAccount MachineAccountsModel
 		machineAccount.Hypervisor = types.StringValue(hypId)
-		machineAccount.Machines = machines
-		machAccounts := r.MachineAccounts
+		machineAccount.Machines = util.TypedArrayToObjectList[MachineCatalogMachineModel](ctx, diagnostics, machines)
+		machAccounts := util.ObjectListToTypedArray[MachineAccountsModel](ctx, diagnostics, r.MachineAccounts)
 		machAccounts = append(machAccounts, machineAccount)
 		machineAccountMap[hypId] = len(machAccounts) - 1
-		r.MachineAccounts = machAccounts
+		r.MachineAccounts = util.TypedArrayToObjectList[MachineAccountsModel](ctx, diagnostics, machAccounts)
 	}
 
 	return r

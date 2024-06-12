@@ -14,10 +14,12 @@ Currently this script is still in TechPreview
 
 .Parameter ClientId
     The Client Id for Citrix DaaS service authentication.
+    For Citrix on-premises customers: Use this to specify a DDC administrator username.
+    For Citrix Cloud customers: Use this to specify Cloud API Key Client Id.
     
 .Parameter ClientSecret
     The Client Secret for Citrix DaaS service authentication.
-    For Citrix on-premises customers: Use this to specify Domain Admin Password.
+    For Citrix on-premises customers: Use this to specify a DDC administrator password.
     For Citrix Cloud customers: Use this to specify Cloud API Key Client Secret.
 
 .Parameter Hostname
@@ -468,8 +470,8 @@ function RemoveComputedProperties {
     $pathRegex = '(\s+)path\s*=\s*".*\\\\.*"'
     $content = $content -replace $pathRegex, ""
 
-    # Remove is_assigned property from application since it is computed
-    $isAssignedRegex = "(\s+)is_assigned(\s+)= (\S+)"
+    # Remove assigned property from application since it is computed
+    $isAssignedRegex = "(\s+)assigned(\s+)= (\S+)"
     $content = $content -replace $isAssignedRegex, ""
 
     return $content

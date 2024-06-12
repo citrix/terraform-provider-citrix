@@ -33,7 +33,7 @@ resource "citrix_admin_user" "example-admin-user" {
 
 - `domain_name` (String) Name of the domain that the user is a part of. For example, if the domain is `example.com`, then provide the value `example` for this field.
 - `name` (String) Name of an existing user in the active directory.
-- `rights` (Attributes List) List of rights to be associated with the admin user. (see [below for nested schema](#nestedatt--rights))
+- `rights` (Attributes List) Rights to be associated with the admin user. (see [below for nested schema](#nestedatt--rights))
 
 ### Optional
 

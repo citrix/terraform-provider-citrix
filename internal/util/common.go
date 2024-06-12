@@ -1,4 +1,4 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 
 package util
 
@@ -10,18 +10,22 @@ import (
 	"io/ioutil"
 	"net/http"
 	"reflect"
+	"regexp"
 	"runtime"
 	"runtime/debug"
+	"slices"
 	"strconv"
 	"strings"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	citrixstorefront "github.com/citrix/citrix-daas-rest-go/citrixstorefront/models"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
@@ -36,8 +40,13 @@ const SamRegex string = `^[a-zA-Z][a-zA-Z0-9\- ]{0,61}[a-zA-Z0-9]\\\w[\w\.\- ]+$
 // UPN
 const UpnRegex string = `^[^@]+@\b(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}$`
 
+const SamAndUpnRegex string = `^[a-zA-Z][a-zA-Z0-9\- ]{0,61}[a-zA-Z0-9]\\\w[\w\.\- ]+$|^[^@]+@\b(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}$`
+
 // GUID
 const GuidRegex string = `^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}[}]?$`
+
+// GUID
+const StoreFrontServerIdRegex string = `^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{13}[}]?$`
 
 // IPv4
 const IPv4Regex string = `^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$`
@@ -63,8 +72,17 @@ const SslThumbprintRegex string = `^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$`
 // AWS EC2 Instance Type
 const AwsEc2InstanceTypeRegex string = `^[a-z0-9]{1,15}\.[a-z0-9]{1,15}$`
 
+// Active Directory Sid
+const ActiveDirectorySidRegex string = `^S-1-[0-59]-\d{2}-\d{8,10}-\d{8,10}-\d{8,10}-[1-9]\d{3}$`
+
 // NOT_EXIST error code
 const NOT_EXIST string = "NOT_EXIST"
+
+// ID of the All Scope
+const AllScopeId string = "00000000-0000-0000-0000-000000000000"
+
+// ID of the Citrix Managed Users Scope
+const CtxManagedScopeId string = "f71a1148-7030-467a-a6d3-4a6bcf6a6532"
 
 // Resource Types
 const ImageVersionResourceType string = "ImageVersion"
@@ -99,6 +117,25 @@ var PlatformSettingsAssignedTo = []string{"AllUsersNoAuthentication"}
 type NameValueStringPairModel struct {
 	Name  types.String `tfsdk:"name"`
 	Value types.String `tfsdk:"value"`
+}
+
+func (r NameValueStringPairModel) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"name": schema.StringAttribute{
+				Description: "Metadata name.",
+				Required:    true,
+			},
+			"value": schema.StringAttribute{
+				Description: "Metadata value.",
+				Required:    true,
+			},
+		},
+	}
+}
+
+func (NameValueStringPairModel) GetAttributes() map[string]schema.Attribute {
+	return NameValueStringPairModel{}.GetSchema().Attributes
 }
 
 // <summary>
@@ -194,72 +231,6 @@ func ReadClientError(err error) string {
 }
 
 // <summary>
-// Helper function to convert array of terraform strings to array of golang primitive strings
-// </summary>
-// <param name="v">Array of terraform stringsArray of golang primitive strings</param>
-// <returns>Array of golang primitive strings</returns>
-func ConvertBaseStringArrayToPrimitiveStringArray(v []types.String) []string {
-	res := []string{}
-	for _, stringVal := range v {
-		res = append(res, stringVal.ValueString())
-	}
-
-	return res
-}
-
-// <summary>
-// Helper function to convert array of golang primitive strings to array of terraform strings
-// </summary>
-// <param name="v">Array of golang primitive strings</param>
-// <returns>Array of terraform strings</returns>
-func ConvertPrimitiveStringArrayToBaseStringArray(v []string) []types.String {
-	res := []types.String{}
-	for _, stringVal := range v {
-		res = append(res, types.StringValue(stringVal))
-	}
-
-	return res
-}
-
-// <summary>
-// Helper function to convert array of golang primitive interface to array of terraform strings
-// </summary>
-// <param name="v">Array of golang primitive interface</param>
-// <returns>Array of terraform strings</returns>
-func ConvertPrimitiveInterfaceArrayToBaseStringArray(v []interface{}) ([]types.String, string) {
-	res := []types.String{}
-	for _, val := range v {
-		switch stringVal := val.(type) {
-		case string:
-			res = append(res, types.StringValue(stringVal))
-		default:
-			return nil, "At this time, only string values are supported in arrays."
-		}
-	}
-
-	return res, ""
-}
-
-// <summary>
-// Helper function to convert terraform bool value to string
-// </summary>
-// <param name="from">Boolean value in terraform bool</param>
-// <returns>Boolean value in string</returns>
-func TypeBoolToString(from types.Bool) string {
-	return strconv.FormatBool(from.ValueBool())
-}
-
-// <summary>
-// Helper function to convert string to terraform boolean value
-// </summary>
-// <param name="from">Boolean value in string</param>
-// <returns>Boolean value in terraform types.Bool</returns>
-func StringToTypeBool(from string) types.Bool {
-	result, _ := strconv.ParseBool(from)
-	return types.BoolValue(result)
-}
-
-// <summary>
 // Helper function to serialize any struct value into a string
 // </summary>
 // <param name="model">Input struct value</param>
@@ -271,6 +242,47 @@ func ConvertToString(model any) (string, error) {
 	}
 
 	return string(body), nil
+}
+
+// <summary>
+// Extract Ids from a list of objects
+// </summary>
+// <param name="slice">Input list of objects</param>
+// <returns>List of Ids extracted from input list</returns>
+func GetIdsForOrchestrationObjects[objType any](slice []objType) []string {
+	val := reflect.ValueOf(slice)
+	ids := []string{}
+
+	for i := 0; i < val.Len(); i++ {
+		elem := val.Index(i)
+		if elem.Kind() == reflect.Ptr {
+			elem = elem.Elem()
+		}
+		idField := elem.FieldByName("Id")
+		if !idField.IsValid() || idField.Kind() != reflect.String {
+			continue
+		}
+		ids = append(ids, idField.String())
+	}
+
+	return ids
+}
+
+// <summary>
+// Extract Ids from a list of scope objects
+// </summary>
+// <param name="slice">Input list of objects</param>
+// <returns>List of Ids extracted from input list</returns>
+func GetIdsForScopeObjects[objType any](slice []objType) []string {
+	ids := GetIdsForOrchestrationObjects(slice)
+	filteredIds := []string{}
+
+	for _, id := range ids {
+		if id != AllScopeId && id != CtxManagedScopeId {
+			filteredIds = append(filteredIds, id)
+		}
+	}
+	return filteredIds
 }
 
 // <summary>
@@ -408,6 +420,47 @@ func ProcessAsyncJobResponse(ctx context.Context, client *citrixdaasclient.Citri
 	return nil
 }
 
+// Represents a list item which supports being refreshed from a client model
+type RefreshableListItemWithAttributes[clientType any] interface {
+	// Gets the key to compare the item with the client model
+	GetKey() string
+
+	// Refreshes the item with the client model and returns the updated item
+	RefreshListItem(context.Context, *diag.Diagnostics, clientType) ModelWithAttributes
+
+	// Has to implement the ModelWithAttributes interface for conversion back to a Terraform model
+	ModelWithAttributes
+}
+
+// These functions are used by RefreshListProperties
+func GetOrchestrationRebootScheduleKey(r citrixorchestration.RebootScheduleResponseModel) string {
+	return r.GetName()
+}
+
+func GetOrchestrationDesktopKey(r citrixorchestration.DesktopResponseModel) string {
+	return r.GetPublishedName()
+}
+
+func GetOrchestrationHypervisorStorageKey(remote citrixorchestration.HypervisorStorageResourceResponseModel) string {
+	return remote.GetName()
+}
+
+func GetOrchestrationNetworkMappingKey(remote citrixorchestration.NetworkMapResponseModel) string {
+	return remote.GetDeviceId()
+}
+
+func GetOrchestrationRemotePcOuKey(remote citrixorchestration.RemotePCEnrollmentScopeResponseModel) string {
+	return remote.GetOU()
+}
+
+func GetSTFGroupMemberKey(remote citrixstorefront.STFGroupMemberResponseModel) string {
+	return *remote.GroupName.Get()
+}
+
+func GetSTFFarmSetKey(remote citrixstorefront.STFFarmSetResponseModel) string {
+	return *remote.Name.Get()
+}
+
 // <summary>
 // Helper function for calculating the new state of a list of nested attribute, while
 // keeping the order of the elements in the array intact, and adds missing elements
@@ -415,12 +468,16 @@ func ProcessAsyncJobResponse(ctx context.Context, client *citrixdaasclient.Citri
 // Can be used for refreshing all list nested attributes.
 // </summary>
 // <param name="state">State values in Terraform model</param>
-// <param name="tfId">Name of the identifier field in Terraform model</param>
 // <param name="remote">Remote values in client model</param>
-// <param name="clientId">Name of the identifier field in client model</param>
-// <param name="refreshFunc">Name of the refresh properties function defined in the terraform model</param>
-// <returns>Array in Terraform model for new state</returns>
-func RefreshListProperties[tfType any, clientType any](state []tfType, tfId string, remote []clientType, clientId string, refreshFunc string) []tfType {
+// <param name="getClientKey">Function to get the Id from the client model</param>
+// <returns>Terraform list for new state</returns>
+func RefreshListValueProperties[tfType RefreshableListItemWithAttributes[clientType], clientType any](ctx context.Context, diagnostics *diag.Diagnostics, state types.List, remote []clientType, getClientKey func(clientType) string) types.List {
+	unwrappedList := ObjectListToTypedArray[tfType](ctx, diagnostics, state)
+	refreshedList := refreshListProperties[tfType, clientType](ctx, diagnostics, unwrappedList, remote, getClientKey)
+	return TypedArrayToObjectList[tfType](ctx, diagnostics, refreshedList)
+}
+
+func refreshListProperties[tfType RefreshableListItemWithAttributes[clientType], clientType any](ctx context.Context, diagnostics *diag.Diagnostics, state []tfType, remote []clientType, getClientKey func(clientType) string) []tfType {
 	if len(remote) == 0 {
 		return nil
 	}
@@ -430,50 +487,36 @@ func RefreshListProperties[tfType any, clientType any](state []tfType, tfId stri
 	}
 
 	stateItems := map[string]int{}
-	for index, item := range state {
-		value := reflect.ValueOf(&item).Elem()
-		id := value.FieldByName(tfId).Interface().(basetypes.StringValue)
-		stateItems[id.ValueString()] = index
+	for index, tfItem := range state {
+		stateItems[tfItem.GetKey()] = index
 	}
 
-	var tfItem tfType
-	tfStruct := reflect.TypeOf(tfItem)
-
-	method, _ := tfStruct.MethodByName(refreshFunc)
 	newState := state
-	var id string
-	for _, item := range remote {
-		value := reflect.ValueOf(&item).Elem()
-		valueType := value.FieldByName(clientId).Type()
-		if valueType == reflect.TypeOf(citrixorchestration.NullableString{}) {
-			idNullable := value.FieldByName(clientId).Interface().(citrixorchestration.NullableString)
-			if idNullable.IsSet() {
-				id = *idNullable.Get()
-			}
-		} else {
-			id = value.FieldByName(clientId).Interface().(string)
-		}
-		index, exists := stateItems[id]
-		requestValue := reflect.ValueOf(item)
+	for _, clientItem := range remote {
+		clientKey := getClientKey(clientItem)
+		index, exists := stateItems[clientKey]
 		if exists {
-			newStateItemReflectValue := method.Func.Call([]reflect.Value{reflect.ValueOf(state[index]), requestValue})[0]
-			newState[index] = newStateItemReflectValue.Interface().(tfType)
+			tfItem := state[index]
+			newState[index] = tfItem.RefreshListItem(ctx, diagnostics, clientItem).(tfType)
 		} else {
-			tfStructItem := reflect.New(tfStruct).Elem()
-			newStateItemReflectValue := method.Func.Call([]reflect.Value{tfStructItem, requestValue})[0]
-			newState = append(newState, newStateItemReflectValue.Interface().(tfType))
+			var tfStructItem tfType
+			if attributeMap, err := AttributeMapFromObject(tfStructItem); err == nil {
+				// start with the null object to populate all nested lists/objects as null
+				tfStructItem = defaultObjectFromObjectValue[tfType](ctx, types.ObjectNull(attributeMap))
+				newStateItem := tfStructItem.RefreshListItem(ctx, diagnostics, clientItem).(tfType)
+				newState = append(newState, newStateItem)
+			} else {
+				diagnostics.AddWarning("Error when creating empty "+reflect.TypeOf(tfStructItem).String(), err.Error())
+			}
 		}
 
-		stateItems[id] = -1 // Mark as visited. The ones not visited should be removed.
+		stateItems[clientKey] = -1 // Mark as visited. The ones not visited should be removed.
 	}
 
 	result := []tfType{}
-	for _, item := range newState {
-		value := reflect.ValueOf(&item).Elem()
-		id := value.FieldByName(tfId).Interface().(basetypes.StringValue)
-
-		if stateItems[id.ValueString()] == -1 {
-			result = append(result, item) // if visited, include. Not visited ones will not be included.
+	for _, tfItem := range newState {
+		if stateItems[tfItem.GetKey()] == -1 {
+			result = append(result, tfItem) // if visited, include. Not visited ones will not be included.
 		}
 	}
 
@@ -484,28 +527,43 @@ func RefreshListProperties[tfType any, clientType any](state []tfType, tfId stri
 // Helper function for calculating the new state of a list of strings, while
 // keeping the order of the elements in the array intact, and adds missing elements
 // from remote to state.
+// Can be used for refreshing all list of strings.
+// </summary>
+// <param name="state">State values in Terraform model</param>
+// <param name="remote">Remote values in client model</param>
+// <returns>Array in Terraform model for new state</returns>
+func RefreshListValues(ctx context.Context, diagnostics *diag.Diagnostics, state types.List, remote []string) types.List {
+	unwrappedList := StringListToStringArray(ctx, diagnostics, state)
+	refreshedList := RefreshList(unwrappedList, remote)
+	return StringArrayToStringList(ctx, diagnostics, refreshedList)
+}
+
+// <summary>
+// Helper function for calculating the new state of a list of strings, while
+// keeping the order of the elements in the array intact, and adds missing elements
+// from remote to state.
 // Can be used for refreshing list of strings.
 // </summary>
 // <param name="state">List of values in state</param>
 // <param name="remote">List of values in remote</param>
-func RefreshList(state []types.String, remote []string) []types.String {
+func RefreshList(state []string, remote []string) []string {
 	stateItems := map[string]bool{}
 	for _, item := range state {
-		stateItems[strings.ToLower(item.ValueString())] = false // not visited
+		stateItems[strings.ToLower(item)] = false // not visited
 	}
 
 	for _, item := range remote {
 		itemInLowerCase := strings.ToLower(item)
 		_, exists := stateItems[itemInLowerCase]
 		if !exists {
-			state = append(state, types.StringValue(item))
+			state = append(state, item)
 		}
 		stateItems[itemInLowerCase] = true
 	}
 
-	result := []types.String{}
+	result := []string{}
 	for _, item := range state {
-		if stateItems[strings.ToLower(item.ValueString())] {
+		if stateItems[strings.ToLower(item)] {
 			result = append(result, item)
 		}
 	}
@@ -607,4 +665,198 @@ func CheckProductVersion(client *citrixdaasclient.CitrixDaasClient, diagnostic *
 	}
 
 	return true
+}
+
+// </summary>
+// Helper function to refresh user list.
+// </summary>
+func RefreshUsersList(ctx context.Context, diags *diag.Diagnostics, usersSet types.Set, usersInRemote []citrixorchestration.IdentityUserResponseModel) types.Set {
+	samNamesMap := map[string]int{}
+	upnMap := map[string]int{}
+
+	for index, userInRemote := range usersInRemote {
+		userSamName := userInRemote.GetSamName()
+		userPrincipalName := userInRemote.GetPrincipalName()
+		if userSamName != "" {
+			samNamesMap[strings.ToLower(userSamName)] = index
+		}
+		if userPrincipalName != "" {
+			upnMap[strings.ToLower(userPrincipalName)] = index
+		}
+	}
+
+	res := []string{}
+	users := StringSetToStringArray(ctx, diags, usersSet)
+	for _, user := range users {
+		samRegex, _ := regexp.Compile(SamRegex)
+		if samRegex.MatchString(user) {
+			index, exists := samNamesMap[strings.ToLower(user)]
+			if !exists {
+				continue
+			}
+			res = append(res, user)
+			samNamesMap[strings.ToLower(user)] = -1
+			if index != -1 {
+				userPrincipalName := usersInRemote[index].GetPrincipalName()
+				_, exists = upnMap[strings.ToLower(userPrincipalName)]
+				if exists {
+					upnMap[strings.ToLower(userPrincipalName)] = -1
+				}
+			}
+
+			continue
+		}
+
+		upnRegex, _ := regexp.Compile(UpnRegex)
+		if upnRegex.MatchString(user) {
+			index, exists := upnMap[strings.ToLower(user)]
+			if !exists {
+				continue
+			}
+			res = append(res, user)
+			upnMap[strings.ToLower(user)] = -1
+			if index != -1 {
+				samName := usersInRemote[index].GetSamName()
+				_, exists = samNamesMap[strings.ToLower(samName)]
+				if exists {
+					samNamesMap[strings.ToLower(samName)] = -1
+				}
+			}
+		}
+	}
+
+	for samName, index := range samNamesMap {
+		if index != -1 { // Users that are only in remote
+			res = append(res, samName)
+		}
+	}
+
+	return StringArrayToStringSet(ctx, diags, res)
+}
+
+// <summary>
+// Helper function to fetch scope ids from scope names
+// </summary>
+func FetchScopeIdsByNames(ctx context.Context, diagnostics diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, scopeNames []string) ([]string, error) {
+	getAdminScopesRequest := client.ApiClient.AdminAPIsDAAS.AdminGetAdminScopes(ctx)
+	// get all the scopes
+	getScopesResponse, httpResp, err := citrixdaasclient.AddRequestData(getAdminScopesRequest, client).Execute()
+	if err != nil || getScopesResponse == nil {
+		diagnostics.AddError(
+			"Error fetch scope ids from names",
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+ReadClientError(err),
+		)
+		return nil, err
+	}
+
+	scopeNameIdMap := map[string]string{}
+	for _, scope := range getScopesResponse.Items {
+		scopeNameIdMap[scope.GetName()] = scope.GetId()
+	}
+
+	scopeIds := []string{}
+	for _, scopeName := range scopeNames {
+		scopeIds = append(scopeIds, scopeNameIdMap[scopeName])
+	}
+
+	return scopeIds, nil
+}
+
+// <summary>
+// Helper function to fetch scope names from scope ids
+// </summary>
+func FetchScopeNamesByIds(ctx context.Context, diagnostics diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, scopeIds []string) ([]string, error) {
+	getAdminScopesRequest := client.ApiClient.AdminAPIsDAAS.AdminGetAdminScopes(ctx)
+	// Create new Policy Set
+	getScopesResponse, httpResp, err := citrixdaasclient.AddRequestData(getAdminScopesRequest, client).Execute()
+	if err != nil || getScopesResponse == nil {
+		diagnostics.AddError(
+			"Error fetch scope names from ids",
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+ReadClientError(err),
+		)
+		return nil, err
+	}
+
+	scopeIdNameMap := map[string]types.String{}
+	for _, scope := range getScopesResponse.Items {
+		scopeIdNameMap[scope.GetId()] = types.StringValue(scope.GetName())
+	}
+
+	scopeNames := []string{}
+	for _, scopeId := range scopeIds {
+		scopeNames = append(scopeNames, scopeIdNameMap[scopeId].ValueString())
+	}
+
+	return scopeNames, nil
+}
+
+func GetUsersUsingIdentity(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, users []string) ([]citrixorchestration.IdentityUserResponseModel, *http.Response, error) {
+	allUsersFromIdentity := []citrixorchestration.IdentityUserResponseModel{}
+
+	getIncludedUsersRequest := client.ApiClient.IdentityAPIsDAAS.IdentityGetUsers(ctx)
+	getIncludedUsersRequest = getIncludedUsersRequest.User(users).UserType(citrixorchestration.IDENTITYUSERTYPE_ALL)
+	adUsers, httpResp, err := citrixdaasclient.AddRequestData(getIncludedUsersRequest, client).Execute()
+
+	if err != nil {
+		return allUsersFromIdentity, httpResp, err
+	}
+
+	allUsersFromIdentity = append(allUsersFromIdentity, adUsers.GetItems()...)
+
+	if len(allUsersFromIdentity) < len(users) {
+		getIncludedUsersRequest = getIncludedUsersRequest.User(users).UserType(citrixorchestration.IDENTITYUSERTYPE_ALL).Provider(citrixorchestration.IDENTITYPROVIDERTYPE_ALL)
+		azureAdUsers, httpResp, err := citrixdaasclient.AddRequestData(getIncludedUsersRequest, client).Execute()
+
+		if err != nil {
+			return allUsersFromIdentity, httpResp, err
+		}
+
+		allUsersFromIdentity = append(allUsersFromIdentity, azureAdUsers.GetItems()...)
+	}
+
+	err = VerifyIdentityUserListCompleteness(users, allUsersFromIdentity)
+
+	if err != nil {
+		return allUsersFromIdentity, httpResp, err
+	}
+
+	return allUsersFromIdentity, httpResp, nil
+}
+
+func GetUserIdsUsingIdentity(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, users []string) ([]string, *http.Response, error) {
+	userIds := []string{}
+	allUsersFromIdentity, httpResp, err := GetUsersUsingIdentity(ctx, client, users)
+	if err != nil {
+		return userIds, httpResp, err
+	}
+
+	for _, user := range allUsersFromIdentity {
+		id := user.GetOid() // Azure AD users
+		if id == "" {
+			id = user.GetSid() // For AD users, OID is empty, use SID
+		}
+		userIds = append(userIds, id)
+	}
+
+	return userIds, httpResp, nil
+}
+
+func VerifyIdentityUserListCompleteness(inputUserNames []string, remoteUsers []citrixorchestration.IdentityUserResponseModel) error {
+	missingUsers := []string{}
+	for _, includedUser := range inputUserNames {
+		userIndex := slices.IndexFunc(remoteUsers, func(i citrixorchestration.IdentityUserResponseModel) bool {
+			return strings.EqualFold(includedUser, i.GetSamName()) || strings.EqualFold(includedUser, i.GetPrincipalName())
+		})
+		if userIndex == -1 {
+			missingUsers = append(missingUsers, includedUser)
+		}
+	}
+
+	if len(missingUsers) > 0 {
+		return fmt.Errorf("The following users could not be found: " + strings.Join(missingUsers, ", "))
+	}
+
+	return nil
 }

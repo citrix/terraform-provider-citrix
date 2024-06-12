@@ -30,7 +30,7 @@ Data source for retrieving details of applications belonging to a specific folde
 Read-Only:
 
 - `application_folder_path` (String) The path of the folder which the application belongs to
-- `delivery_groups` (List of String) The delivery groups which the application is associated with.
+- `delivery_groups` (Set of String) The delivery groups which the application is associated with.
 - `description` (String) The description of the application.
 - `installed_app_properties` (Attributes) The installed application properties of the application. (see [below for nested schema](#nestedatt--applications_list--installed_app_properties))
 - `name` (String) The name of the application.

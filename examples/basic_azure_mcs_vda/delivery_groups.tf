@@ -1,6 +1,5 @@
 resource "citrix_delivery_group" "example-delivery-group" {
-    name = "example-delivery-group"
-    minimum_functional_level    = "L7_20"
+    name = var.delivery_group_name
     associated_machine_catalogs = [
         {
             machine_catalog = citrix_machine_catalog.example-catalog.id
@@ -10,19 +9,13 @@ resource "citrix_delivery_group" "example-delivery-group" {
     desktops = [
         {
             published_name = "Example Desktop"
-            description = "Desription for example desktop"
+            description = "Description for example desktop"
             restricted_access_users = {
-                allow_list = [
-                    "example\\user1"
-                ]
-                block_list = [
-                    "example\\user2",
-                ]
+                allow_list = var.allow_list
             }
             enabled = true
             enable_session_roaming = false
-        }
-        
+        } 
     ] 
     autoscale_settings = {
         autoscale_enabled = true
@@ -51,11 +44,6 @@ resource "citrix_delivery_group" "example-delivery-group" {
         ]
     }
     restricted_access_users = {
-        allow_list = [
-            "example\\user1"
-        ]
-        block_list = [
-            "example\\user2",
-        ]
+        allow_list = var.allow_list
     }
 }

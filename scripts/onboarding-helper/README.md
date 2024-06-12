@@ -44,10 +44,10 @@ This automation script is designed to onboard an existing site to Terraform. It 
     - `CustomerId`: 
       - For Citrix Cloud customers **only** (Required): Your Citrix Cloud customer ID. This is only applicable for Citrix Cloud customers.
     - `ClientId`: Your client ID for Citrix DaaS service authentication.
-      - For Citrix On-Premises customers: Use this to specify Domain Admin Username.
+      - For Citrix On-Premises customers: Use this to specify a DDC administrator username.
       - For Citrix Cloud customers: Use this to specify Cloud API Key Client Id.
     - `ClientSecret`: Your client secret for Citrix DaaS service authentication.
-      - For Citrix on-premises customers: Use this to specify Domain Admin Password.
+      - For Citrix on-premises customers: Use this to specify a DDC administrator password.
       - For Citrix Cloud customers: Use this to specify Cloud API Key Client Secret.
     - `DomainFqdn`: Your client secret for Citrix DaaS service authentication.
       - For Citrix on-premises customers **only** (Required): Use this to specify Domain FQDN.

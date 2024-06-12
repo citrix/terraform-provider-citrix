@@ -17,7 +17,7 @@ resource "citrix_policy_set" "example-policy-set" {
     name = "example-policy-set"
     description = "This is an example policy set description"
     type = "DeliveryGroupPolicies"
-    scopes = [ "All", citrix_admin_scope.example-admin-scope.name ]
+    scopes = [ citrix_admin_scope.example-admin-scope.id ]
     policies = [
         {
             name = "test-policy-with-priority-0"
@@ -30,13 +30,64 @@ resource "citrix_policy_set" "example-policy-set" {
                     use_default = false
                 },
             ]
-            policy_filters = [
+            access_control_filters = [
                 {
-                    type = "DesktopGroup"
-                    data = {
-                        server = "0.0.0.0"
-                        uuid = citrix_delivery_group.example-delivery-group.id
-                    }
+                    connection = "WithAccessGateway"
+                    condition  = "*"
+                    gateway    = "*"
+                    enabled    = true
+                    allowed    = true
+                },
+            ]
+            branch_repeater_filter = {
+                enabled = true
+                allowed = true
+            },
+            client_ip_filters = [
+                {
+                    ip_address = "10.0.0.1"
+                    enabled    = true
+                    allowed    = true
+                }
+            ]
+            client_name_filters = [
+                {
+                    client_name = "Example Client Name"
+                    enabled     = true
+                    allowed     = true
+                }
+            ]
+            delivery_group_filters = [
+                {
+                    delivery_group_id = citrix_delivery_group.example-delivery-group.id
+                    enabled           = true
+                    allowed           = true
+                },
+            ]
+            delivery_group_type_filters = [
+                {
+                    delivery_group_type = "Private"
+                    enabled             = true
+                    allowed             = true
+                },
+            ]
+            ou_filters = [
+                {
+                    ou     = "{Path of the oranizational unit to be filtered}"
+                    enabled = true
+                    allowed = true
+                },
+            ]
+            user_filters = [
+                {
+                    sid     = "{SID of the user or user group to be filtered}"
+                    enabled = true
+                    allowed = true
+                },
+            ]
+            tag_filters = [
+                {
+                    tag     = "{ID of the tag to be filtered}"
                     enabled = true
                     allowed = true
                 },
@@ -47,7 +98,6 @@ resource "citrix_policy_set" "example-policy-set" {
             description = "Test policy in the example policy set with priority 1"
             enabled = false
             policy_settings = []
-            policy_filters = []
         }
     ]
 }
@@ -60,17 +110,17 @@ resource "citrix_policy_set" "example-policy-set" {
 
 - `name` (String) Name of the policy set.
 - `policies` (Attributes List) Ordered list of policies. The order of policies in the list determines the priority of the policies. (see [below for nested schema](#nestedatt--policies))
-- `type` (String) Type of the policy set. Type can be one of `SitePolicies`, `DeliveryGroupPolicies`, `SiteTemplates`, or `CustomTemplates`.
 
 ### Optional
 
 - `description` (String) Description of the policy set.
-- `scopes` (List of String) The names of the scopes for the policy set to apply on.
+- `scopes` (Set of String) The IDs of the scopes for the policy set to be a part of.
+- `type` (String) Type of the policy set. Type can be one of `SitePolicies`, `DeliveryGroupPolicies`, `SiteTemplates`, or `CustomTemplates`.
 
 ### Read-Only
 
+- `assigned` (Boolean) Indicate whether the policy set is being assigned to delivery groups.
 - `id` (String) GUID identifier of the policy set.
-- `is_assigned` (Boolean) Indicate whether the policy set is being assigned to delivery groups.
 
 <a id="nestedatt--policies"></a>
 ### Nested Schema for `policies`
@@ -79,39 +129,20 @@ Required:
 
 - `enabled` (Boolean) Indicate whether the policy is being enabled.
 - `name` (String) Name of the policy.
-- `policy_filters` (Attributes List) Set of policy filters. (see [below for nested schema](#nestedatt--policies--policy_filters))
 - `policy_settings` (Attributes List) Set of policy settings. (see [below for nested schema](#nestedatt--policies--policy_settings))
 
 Optional:
 
+- `access_control_filters` (Attributes List) Access control policy filters. (see [below for nested schema](#nestedatt--policies--access_control_filters))
+- `branch_repeater_filter` (Attributes) Set of policy filters. (see [below for nested schema](#nestedatt--policies--branch_repeater_filter))
+- `client_ip_filters` (Attributes List) Client ip policy filters. (see [below for nested schema](#nestedatt--policies--client_ip_filters))
+- `client_name_filters` (Attributes List) Client name policy filters. (see [below for nested schema](#nestedatt--policies--client_name_filters))
+- `delivery_group_filters` (Attributes List) Delivery group policy filters. (see [below for nested schema](#nestedatt--policies--delivery_group_filters))
+- `delivery_group_type_filters` (Attributes List) Delivery group type policy filters. (see [below for nested schema](#nestedatt--policies--delivery_group_type_filters))
 - `description` (String) Description of the policy.
-
-<a id="nestedatt--policies--policy_filters"></a>
-### Nested Schema for `policies.policy_filters`
-
-Required:
-
-- `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
-- `enabled` (Boolean) Indicate whether the policy is being enabled.
-- `type` (String) Type of the policy filter. Type can be one of `AccessControl`, `BranchRepeater`, `ClientIP`, `ClientName`, `DesktopGroup`, `DesktopKind`, `OU`, `User`, and `DesktopTag`
-
-Optional:
-
-- `data` (Attributes) Data of the policy filter. (see [below for nested schema](#nestedatt--policies--policy_filters--data))
-
-<a id="nestedatt--policies--policy_filters--data"></a>
-### Nested Schema for `policies.policy_filters.data`
-
-Optional:
-
-- `condition` (String) Gateway condition for the policy filter data.
-- `connection` (String) Gateway connection for the policy filter data.
-- `gateway` (String) Gateway for the policy filter data.
-- `server` (String) Server address for the policy filter data.
-- `uuid` (String) Resource UUID for the policy filter data.
-- `value` (String) Va;ie for the policy filter data.
-
-
+- `ou_filters` (Attributes List) Organizational unit policy filters. (see [below for nested schema](#nestedatt--policies--ou_filters))
+- `tag_filters` (Attributes List) Tag policy filters. (see [below for nested schema](#nestedatt--policies--tag_filters))
+- `user_filters` (Attributes List) User policy filters. (see [below for nested schema](#nestedatt--policies--user_filters))
 
 <a id="nestedatt--policies--policy_settings"></a>
 ### Nested Schema for `policies.policy_settings`
@@ -125,6 +156,97 @@ Optional:
 
 - `enabled` (Boolean) Whether of the policy setting has enabled or allowed value.
 - `value` (String) Value of the policy setting.
+
+
+<a id="nestedatt--policies--access_control_filters"></a>
+### Nested Schema for `policies.access_control_filters`
+
+Required:
+
+- `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
+- `condition` (String) Gateway condition for the policy filter.
+- `connection` (String) Gateway connection for the policy filter.
+- `enabled` (Boolean) Indicate whether the filter is being enabled.
+- `gateway` (String) Gateway for the policy filter.
+
+
+<a id="nestedatt--policies--branch_repeater_filter"></a>
+### Nested Schema for `policies.branch_repeater_filter`
+
+Required:
+
+- `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
+- `enabled` (Boolean) Indicate whether the filter is being enabled.
+
+
+<a id="nestedatt--policies--client_ip_filters"></a>
+### Nested Schema for `policies.client_ip_filters`
+
+Required:
+
+- `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
+- `enabled` (Boolean) Indicate whether the filter is being enabled.
+- `ip_address` (String) IP Address of the client to be filtered.
+
+
+<a id="nestedatt--policies--client_name_filters"></a>
+### Nested Schema for `policies.client_name_filters`
+
+Required:
+
+- `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
+- `client_name` (String) Name of the client to be filtered.
+- `enabled` (Boolean) Indicate whether the filter is being enabled.
+
+
+<a id="nestedatt--policies--delivery_group_filters"></a>
+### Nested Schema for `policies.delivery_group_filters`
+
+Required:
+
+- `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
+- `delivery_group_id` (String) Id of the delivery group to be filtered.
+- `enabled` (Boolean) Indicate whether the filter is being enabled.
+
+
+<a id="nestedatt--policies--delivery_group_type_filters"></a>
+### Nested Schema for `policies.delivery_group_type_filters`
+
+Required:
+
+- `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
+- `delivery_group_type` (String) Type of the delivery groups to be filtered.
+- `enabled` (Boolean) Indicate whether the filter is being enabled.
+
+
+<a id="nestedatt--policies--ou_filters"></a>
+### Nested Schema for `policies.ou_filters`
+
+Required:
+
+- `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
+- `enabled` (Boolean) Indicate whether the filter is being enabled.
+- `ou` (String) Organizational Unit to be filtered.
+
+
+<a id="nestedatt--policies--tag_filters"></a>
+### Nested Schema for `policies.tag_filters`
+
+Required:
+
+- `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
+- `enabled` (Boolean) Indicate whether the filter is being enabled.
+- `tag` (String) Tag to be filtered.
+
+
+<a id="nestedatt--policies--user_filters"></a>
+### Nested Schema for `policies.user_filters`
+
+Required:
+
+- `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
+- `enabled` (Boolean) Indicate whether the filter is being enabled.
+- `sid` (String) SID of the user or user group to be filtered.
 
 ## Import
 

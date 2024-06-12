@@ -2,9 +2,9 @@
 
 Citrix has developed a custom Terraform provider for automating Citrix product deployments and configurations. Using [Terraform](https://www.terraform.io) with Citrix provider, you can manage your Citrix products via Infrastructure as Code, giving you higher efficiency and consistency on infrastructure management, as well as better reusability on infrastructure configuration. The provider is developed and maintained by Citrix. Please note that this provider is still in tech preview.
 
-## Table of Content
+## Table of Contents
 - [Plugin for Terraform Provider for Citrix®](#plugin-for-terraform-provider-for-citrix)
-  - [Table of Content](#table-of-content)
+  - [Table of Contents](#table-of-contents)
   - [Contacting the Maintainers](#contacting-the-maintainers)
   - [Plugin for Terraform Provider for Citrix® Documentation](#plugin-for-terraform-provider-for-citrix-documentation)
     - [Navigating the repository](#navigating-the-repository)
@@ -24,7 +24,7 @@ Citrix has developed a custom Terraform provider for automating Citrix product d
     - [Configure Global App Configuration (GAC) Settings](#configure-global-app-configuration-gac-settings)
     - [Create Citrix Cloud Resource Locations](#create-citrix-cloud-resource-locations)
     - [Managing StoreFront resources](#managing-storefront-resources)
-  - [Deployment Guides](#deployment-guides)
+  - [Examples and Deployment Guides](#examples-and-deployment-guides)
   - [Frequently Asked Questions](#frequently-asked-questions)
       - [What resource is supported for different connection types?](#what-resource-is-supported-for-different-connection-types)
       - [What provisioning types are supported for machine catalog?](#what-provisioning-types-are-supported-for-machine-catalog)
@@ -66,15 +66,11 @@ Example for Cloud site:
 
 ```hcl
 provider "citrix" {
-    region        = "US"  # Optionally set with `CITRIX_REGION` environment variable.
-    environment   = "Production"  # Optionally set with `CITRIX_ENVIRONMENT` environment variable.
     customer_id   = "${var.customer_id}"  # Optionally set with `CITRIX_CUSTOMER_ID` environment variable.
     client_id     = "${var.api_key_clientId}"  # Optionally set with `CITRIX_CLIENT_ID` environment variable.
     client_secret = "${var.api_key_clientSecret}"  # Optionally set with `CITRIX_CLIENT_SECRET` environment variable.
 }
 ```
-
-You can also set `hostname` for cloud site to force override the Citrix DaaS service URL for a cloud customer. 
 
 You can use environment variables as stated in the comments above. When running Go tests, always use environment variables so that no credentials or other sensitive information are checked-in to the code.
 
@@ -82,8 +78,7 @@ Below is a table to show the difference between on-premises and Cloud provider c
 
 |              | Cloud                             | On-Premises                           |
 |--------------|-----------------------------------|---------------------------------------|
-| region       | `US` / `EU` / `AP-S` / `JP`       | N/A                                   |
-| environment  | `Production` / `Staging`          | N/A                                   |
+| environment  | `Production`, `Japan`, `Gov`      | N/A                                   |
 | customerId   | Cloud Customer Id                 | N/A                                   |
 | hostname     | (Optional) Cloud DDC hostname     | On-Premises DDC Hostname / IP address |
 | clientId     | Citrix Cloud API Key clientId     | Domain Admin Username                 |
@@ -162,9 +157,10 @@ Resource locations contain the resources (e.g. cloud connectors) required to del
 ### Managing StoreFront resources
 Please refer to the [StoreFront.md](StoreFront.md) to configure StoreFront resources via terraform.
 
-## Deployment Guides
-Detailed instructions on setting up deployments on different cloud providers.
+## Examples and Deployment Guides
+Basic example templates for getting started: [/examples](/examples)
 
+Detailed instructions on setting up deployments on different cloud providers from Citrix Tech Zone:
 - [AWS EC2](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-aws/)
 - [Azure](https://community.citrix.com/tech-zone/build/deployment-guides/citrix-daas-terraform-azure/)
 - [GCP](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-gcp/)
@@ -211,4 +207,4 @@ This project is Licensed under the Apache License, Version 2.0 (the "License"); 
 
 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 
-<sub>Copyright © 2023. Citrix Systems, Inc.</sub>
+<sub>Copyright © 2024. Citrix Systems, Inc.</sub>

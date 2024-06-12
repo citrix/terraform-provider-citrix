@@ -1,8 +1,8 @@
 # AWS Hypervisor
 resource "citrix_aws_hypervisor" "example-aws-hypervisor" {
-    name              = "example-aws-hyperv"
+    name              = var.hypervisor_name
     zone              = citrix_zone.example-zone.id
-    api_key           = "{AWS API access key}"
-    secret_key        = "{AWS API secret key}"
-    region            = "us-east-1"
+    api_key           = var.aws_api_key
+    secret_key        = var.aws_secret_key
+    region            = var.aws_region
 }

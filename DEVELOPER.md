@@ -3,7 +3,6 @@
 This documentation will guide you through the process of setting up your dev environment for running Plugin for Terraform Provider for Citrix® server locally on your dev machine.
 
 ## Table of Contents
-
 - [Plugin for Terraform Provider for Citrix® Developer Guide](#plugin-for-terraform-provider-for-citrix-developer-guide)
   - [Table of Contents](#table-of-contents)
   - [Install Dependencies](#install-dependencies)
@@ -13,9 +12,13 @@ This documentation will guide you through the process of setting up your dev env
     - [Start Debugger](#start-debugger)
     - [Attach Local Provider to PowerShell](#attach-local-provider-to-powershell)
   - [Debugging with citrix-daas-rest-go client code in Visual Studio Code](#debugging-with-citrix-daas-rest-go-client-code-in-visual-studio-code)
+  - [Handling Terraform lists/sets and nested objects](#handling-terraform-listssets-and-nested-objects)
+    - [Converting to Go native types](#converting-to-go-native-types)
+    - [Preserving order in lists](#preserving-order-in-lists)
   - [Running the tests](#running-the-tests)
   - [Commonly faced errors](#commonly-faced-errors)
   - [Plugin for Terraform Provider for StoreFront Developer Guide](#plugin-for-terraform-provider-for-storefront-developer-guide)
+
 ## Install Dependencies
 * Install Go on your local system: https://go.dev/doc/install
   * `choco install golang`
@@ -84,6 +87,35 @@ Clone the Go client from <https://github.com/citrix/citrix-daas-rest-go>. Go to 
 Run [Debugging Provider code in Visual Studio Code](#debugging-provider-code-in-visual-studio-code) again and you will be able to step into the client functions.
 
 Set a breakpoint in `terraform-provider-citrix/internal/provider/provider.go::Configure`
+
+## Handling Terraform lists/sets and nested objects
+### Converting to Go native types
+When the Terraform configuration, state, or plan is being converted into a Go model we must use `types.List` and `types.Object` for lists and nested objects rather than go native slices and structs. This is in order to support Null/Unknown values. Unknown is especially important because any variables in the .tf configuration files can be unknown in `ValidateConfig` and `ModifyPlan`. However, handling these Terraform List and Object types is cumbersome as they are dynamically typed at runtime. See [this doc](https://developer.hashicorp.com/terraform/plugin/framework/handling-data/accessing-values) for more information. 
+
+In order to reduce errors this project has introduced a system to convert between Terraform List/Object and Go native slices/structs. When data needs to be operated on it should be first converted to the Go native representation, then converted back to the Terraform representation. The following helper methods can handle this for you.
+
+| From | To | Function | Notes |
+|------|----|----------|-------|
+| `types.Object` | `T` | `ObjectValueToTypedObject` | `T` must implement `ModelWithAttributes` |
+| `T` | `types.Object` | `TypedObjectToObjectValue` | `T` must implement `ModelWithAttributes` |
+| `types.List` | `T[]` | `ObjectListToTypedArray[T]` | `T` must implement `ModelWithAttributes`. For a list of nested objects |
+| `T[]` | `types.List` | `TypedArrayToObjectList[T]` | `T` must implement `ModelWithAttributes`. For a list of nested objects |
+| `types.List` | `string[]` | `StringListToStringArray` | For a list of strings |
+| `string[]` | `types.List` | `StringArrayToStringList` | For a list of strings |
+| `types.Set` | `string[]` | `StringSetToStringArray` | For a set of strings |
+| `string[]` | `types.Set` | `StringArrayToStringSet` | For a set of strings |
+
+In order to use the first 4 of these methods, the struct `T` needs to implement the [ModelWithAttributes](internal/util/types.go) interface which is ultimately populated from the attribute's Schema. This gives the Terraform type system the necessary information to populate a `types.Object` or `types.List` with a nested object.
+
+### Preserving order in lists
+Often time the order of elements in a list does not matter to the service. In this case one of the following helper functions should be used. These functions will get state list in sync with the remote list while preserving the order in the state when possible. 
+
+| Function | Input | Notes |
+|----------|-------|-------|
+| `RefreshList` | `[]string` | |
+| `RefreshUsersList` | `types.Set` | Will ensure users are not duplicated by UPN or SAMname |
+| `RefreshListValues` | `types.List` of `string` | |
+| `RefreshListValueProperties` | `types.List` of `types.Object` | Each element will have its `RefreshListItem` method called. The element's type must implement the `RefreshableListItemWithAttributes` interface |
 
 ## Running the tests
 

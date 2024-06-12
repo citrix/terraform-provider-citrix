@@ -1,27 +1,19 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 
 package application
 
 import (
 	"context"
 	"net/http"
-	"regexp"
 	"strings"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -57,74 +49,7 @@ func (r *applicationResource) Configure(_ context.Context, req resource.Configur
 
 // Schema defines the schema for the data source.
 func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "Resource for creating and managing applications.",
-		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "GUID identifier of the application.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"name": schema.StringAttribute{
-				Description: "Name of the application.",
-				Required:    true,
-			},
-			"published_name": schema.StringAttribute{
-				Description: "A display name for the application that is shown to users.",
-				Required:    true,
-			},
-			"description": schema.StringAttribute{
-				Description: "Description of the application.",
-				Optional:    true,
-			},
-			"installed_app_properties": schema.SingleNestedAttribute{
-				Description: "The install application properties.",
-				Required:    true,
-				Attributes: map[string]schema.Attribute{
-					"command_line_arguments": schema.StringAttribute{
-						Description: "The command-line arguments to use when launching the executable.",
-						Optional:    true,
-						Validators: []validator.String{
-							validator.String(
-								stringvalidator.LengthAtLeast(1),
-							),
-						},
-					},
-					"command_line_executable": schema.StringAttribute{
-						Description: "The path of the executable file to launch.",
-						Required:    true,
-					},
-					"working_directory": schema.StringAttribute{
-						Description: "The working directory which the executable is launched from.",
-						Optional:    true,
-						Validators: []validator.String{
-							validator.String(
-								stringvalidator.LengthAtLeast(1),
-							),
-						},
-					},
-				},
-			},
-			"delivery_groups": schema.ListAttribute{
-				ElementType: types.StringType,
-				Description: "The delivery group id's to which the application should be added.",
-				Required:    true,
-				Validators: []validator.List{
-					listvalidator.ValueStringsAre(
-						validator.String(
-							stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
-						),
-					),
-				},
-			},
-			"application_folder_path": schema.StringAttribute{
-				Description: "The application folder path in which the application should be created.",
-				Optional:    true,
-			},
-		},
-	}
+	resp.Schema = GetSchema()
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -141,9 +66,10 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 
 	// Generate API request body from plan
 	var createInstalledAppRequest citrixorchestration.CreateInstalledAppRequestModel
-	createInstalledAppRequest.SetCommandLineArguments(plan.InstalledAppProperties.CommandLineArguments.ValueString())
-	createInstalledAppRequest.SetCommandLineExecutable(plan.InstalledAppProperties.CommandLineExecutable.ValueString())
-	createInstalledAppRequest.SetWorkingDirectory(plan.InstalledAppProperties.WorkingDirectory.ValueString())
+	var installedAppProperties = util.ObjectValueToTypedObject[InstalledAppResponseModel](ctx, &resp.Diagnostics, plan.InstalledAppProperties)
+	createInstalledAppRequest.SetCommandLineArguments(installedAppProperties.CommandLineArguments.ValueString())
+	createInstalledAppRequest.SetCommandLineExecutable(installedAppProperties.CommandLineExecutable.ValueString())
+	createInstalledAppRequest.SetWorkingDirectory(installedAppProperties.WorkingDirectory.ValueString())
 
 	var createApplicationRequest citrixorchestration.CreateApplicationRequestModel
 	createApplicationRequest.SetName(plan.Name.ValueString())
@@ -151,14 +77,33 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 	createApplicationRequest.SetPublishedName(plan.PublishedName.ValueString())
 	createApplicationRequest.SetInstalledAppProperties(createInstalledAppRequest)
 	createApplicationRequest.SetApplicationFolder(plan.ApplicationFolderPath.ValueString())
+	createApplicationRequest.SetIcon(plan.Icon.ValueString())
+
+	if plan.LimitVisibilityToUsers.IsNull() {
+		createApplicationRequest.SetIncludedUserFilterEnabled(false)
+		createApplicationRequest.SetIncludedUsers([]string{})
+	} else {
+		limitVisibilityToUsers := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.LimitVisibilityToUsers)
+		limitVisibilityToUserIds, httpResponse, err := util.GetUserIdsUsingIdentity(ctx, r.client, limitVisibilityToUsers)
+		if err != nil {
+			diags.AddError(
+				"Error fetching user details for application resource",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResponse)+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return
+		}
+		createApplicationRequest.SetIncludedUsers(limitVisibilityToUserIds)
+		createApplicationRequest.SetIncludedUserFilterEnabled(true)
+	}
 
 	var newApplicationRequest []citrixorchestration.CreateApplicationRequestModel
 	newApplicationRequest = append(newApplicationRequest, createApplicationRequest)
 
 	var deliveryGroups []citrixorchestration.PriorityRefRequestModel
-	for _, value := range plan.DeliveryGroups {
+	for _, value := range util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.DeliveryGroups) {
 		var deliveryGroupRequestModel citrixorchestration.PriorityRefRequestModel
-		deliveryGroupRequestModel.SetItem(value.ValueString())
+		deliveryGroupRequestModel.SetItem(value)
 		deliveryGroups = append(deliveryGroups, deliveryGroupRequestModel)
 	}
 
@@ -200,7 +145,7 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 	}
 
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(application)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, application)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -228,7 +173,7 @@ func (r *applicationResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	state = state.RefreshPropertyValues(application)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, application)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -265,18 +210,37 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 	editApplicationRequestBody.SetDescription(plan.Description.ValueString())
 	editApplicationRequestBody.SetPublishedName(plan.PublishedName.ValueString())
 	editApplicationRequestBody.SetApplicationFolder(plan.ApplicationFolderPath.ValueString())
+	editApplicationRequestBody.SetIcon(plan.Icon.ValueString())
 
+	if plan.LimitVisibilityToUsers.IsNull() {
+		editApplicationRequestBody.SetIncludedUserFilterEnabled(false)
+		editApplicationRequestBody.SetIncludedUsers([]string{})
+	} else {
+		limitVisibilityToUsers := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.LimitVisibilityToUsers)
+		limitVisibilityToUserIds, httpResponse, err := util.GetUserIdsUsingIdentity(ctx, r.client, limitVisibilityToUsers)
+		if err != nil {
+			diags.AddError(
+				"Error fetching user details for application resource",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResponse)+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return
+		}
+		editApplicationRequestBody.SetIncludedUsers(limitVisibilityToUserIds)
+		editApplicationRequestBody.SetIncludedUserFilterEnabled(true)
+	}
 	var editInstalledAppRequest citrixorchestration.EditInstalledAppRequestModel
-	editInstalledAppRequest.SetCommandLineArguments(plan.InstalledAppProperties.CommandLineArguments.ValueString())
-	editInstalledAppRequest.SetCommandLineExecutable(plan.InstalledAppProperties.CommandLineExecutable.ValueString())
-	editInstalledAppRequest.SetWorkingDirectory(plan.InstalledAppProperties.WorkingDirectory.ValueString())
+	var installedAppProperties = util.ObjectValueToTypedObject[InstalledAppResponseModel](ctx, &resp.Diagnostics, plan.InstalledAppProperties)
+	editInstalledAppRequest.SetCommandLineArguments(installedAppProperties.CommandLineArguments.ValueString())
+	editInstalledAppRequest.SetCommandLineExecutable(installedAppProperties.CommandLineExecutable.ValueString())
+	editInstalledAppRequest.SetWorkingDirectory(installedAppProperties.WorkingDirectory.ValueString())
 
 	editApplicationRequestBody.SetInstalledAppProperties(editInstalledAppRequest)
 
 	var deliveryGroups []citrixorchestration.PriorityRefRequestModel
-	for _, value := range plan.DeliveryGroups {
+	for _, value := range util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.DeliveryGroups) {
 		var deliveryGroupRequestModel citrixorchestration.PriorityRefRequestModel
-		deliveryGroupRequestModel.SetItem(value.ValueString())
+		deliveryGroupRequestModel.SetItem(value)
 		deliveryGroups = append(deliveryGroups, deliveryGroupRequestModel)
 	}
 
@@ -306,7 +270,7 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 	}
 
 	// Update resource state with updated property values
-	plan = plan.RefreshPropertyValues(application)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, application)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

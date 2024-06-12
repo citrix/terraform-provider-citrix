@@ -1,4 +1,4 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 package stf_deployment
 
 import (
@@ -43,10 +43,10 @@ func (r *stfDeploymentResource) Metadata(_ context.Context, req resource.Metadat
 // Schema defines the schema for the resource.
 func (r *stfDeploymentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Storefront Deployment.",
+		Description: "StoreFront Deployment.",
 		Attributes: map[string]schema.Attribute{
 			"site_id": schema.StringAttribute{
-				Description: "The IIS site id of the Storefront deployment. Defaults to 1.",
+				Description: "The IIS site id of the StoreFront deployment. Defaults to 1.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString("1"),
@@ -89,7 +89,7 @@ func (r *stfDeploymentResource) Create(ctx context.Context, req resource.CreateR
 	siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error creating Storefront Deployment ",
+			"Error creating StoreFront Deployment ",
 			"\nError message: "+err.Error(),
 		)
 		return
@@ -104,7 +104,7 @@ func (r *stfDeploymentResource) Create(ctx context.Context, req resource.CreateR
 	DeploymentDetail, err := createDeploymentRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error creating Storefront Deployment",
+			"Error creating StoreFront Deployment",
 			"TransactionId: ",
 		)
 		return
@@ -172,7 +172,7 @@ func (r *stfDeploymentResource) Update(ctx context.Context, req resource.UpdateR
 	siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error fetching state of Storefront Authentication Service ",
+			"Error fetching state of StoreFront Authentication Service ",
 			"Error message: "+err.Error(),
 		)
 		return
@@ -184,7 +184,7 @@ func (r *stfDeploymentResource) Update(ctx context.Context, req resource.UpdateR
 	_, err = editDeploymentRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error updating Storefront Deployment ",
+			"Error updating StoreFront Deployment ",
 			"\nError message: "+err.Error(),
 		)
 	}
@@ -222,7 +222,7 @@ func (r *stfDeploymentResource) Delete(ctx context.Context, req resource.DeleteR
 		siteIdInt, err := strconv.ParseInt(state.SiteId.ValueString(), 10, 64)
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error deleting Storefront Deployment ",
+				"Error deleting StoreFront Deployment ",
 				"Error message: "+err.Error(),
 			)
 			return
@@ -235,7 +235,7 @@ func (r *stfDeploymentResource) Delete(ctx context.Context, req resource.DeleteR
 	_, err := deleteDeploymentRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error deleting Storefront Deployment ",
+			"Error deleting StoreFront Deployment ",
 			"\nError message: "+err.Error(),
 		)
 		return
@@ -254,7 +254,7 @@ func getSTFDeployment(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 		siteIdInt, err := strconv.ParseInt(*siteId, 10, 64)
 		if err != nil {
 			diagnostics.AddError(
-				"Error fetching state of Storefront Deployment ",
+				"Error fetching state of StoreFront Deployment ",
 				"Error message: "+err.Error(),
 			)
 			return nil, err

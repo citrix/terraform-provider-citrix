@@ -10,7 +10,7 @@ resource "citrix_policy_set" "example-policy-set" {
     name = "Policy Set Name"
     description = "Policy Set Description"
     type = "DeliveryGroupPolicies"
-    scopes = [ "All", "citrix_admin_scope.example-admin-scope.name" ]
+    scopes = [ "citrix_admin_scope.example-admin-scope.id" ]
     policies = [
         {
             name = "Name of the Policy with Priority 0"
@@ -23,13 +23,9 @@ resource "citrix_policy_set" "example-policy-set" {
                     use_default = false
                 },
             ]
-            policy_filters = [
+            delivery_group_filters = [
                 {
-                    type = "DesktopGroup"
-                    data = {
-                        server = "10.0.0.1"
-                        uuid   = citrix_delivery_group.example-delivery-group.id
-                    }
+                    delivery_group_id   = citrix_delivery_group.example-delivery-group.id
                     enabled = true
                     allowed = true
                 },
@@ -40,7 +36,6 @@ resource "citrix_policy_set" "example-policy-set" {
             description = "Policy in the example policy set with priority 1"
             enabled = false
             policy_settings = []
-            policy_filters = []
         }
     ]
 }
@@ -55,21 +50,29 @@ resource "citrix_policy_set" "example-policy-set" {
 ### Access Control
 Filter Type: `AccessControl`
 
-Filter Data:
+Example: 
 ```
 # With Citrix Gateway
-data = {
-    connection = "WithAccessGateway"
-    condition  = {Access Condition} // Wildcard `*` is allowed
-    gateway    = {Gateway farm name} // Wildcard `*` is allowed
-}
+access_control_filters = [
+    {
+        enabled    = true
+        allowed    = true
+        connection = "WithAccessGateway"
+        condition  = {Access Condition} // Wildcard `*` is allowed
+        gateway    = {Gateway farm name} // Wildcard `*` is allowed
+    }
+]
 
 # Without Citrix Gateway
-data = {
-    connection = "WithoutAccessGateway"
-    condition  = "*"
-    gateway    = "*"
-}
+access_control_filters = [
+    {
+        enabled    = true
+        allowed    = true
+        connection = "WithoutAccessGateway"
+        condition  = "*"
+        gateway    = "*"
+    }
+]
 ```
 
 ### Citrix SD-WAN
@@ -79,43 +82,55 @@ Filter Data should not be specified
 
 When `allowed` is set to `true`, this means policy is applied to `Connections with Citrix SD-WAN`. When it is set to `false`, this means policy is applied to `Connections without Citrix SD-WAN`.
 
+Example: 
+```
+branch_repeater_filter = {
+    enabled    = true
+    allowed    = true
+}
+```
+
 
 ### Client IP Address
 Filter Type: `ClientIP`
 
-Filter Data: 
+Example: 
 ```
-data = {
-    value = "{IP address to be filtered}"
-}
+client_ip_filters = [
+    {
+        enabled    = true
+        allowed    = true
+        ip_address = "{IP address to be filtered}"
+    }
+]
 ```
 
 ### Client Name
 Filter Type: `Client Name`
 
-Filter Data: 
+Example: 
 ```
-data = {
-    value = "{Name of the client}"
-}
+client_name_filters = [
+    {
+        enabled     = true
+        allowed     = true
+        client_name = "{Name of the client to be filtered}"
+    }
+]
 ```
 
 ### Delivery Group
 Filter Type: `DesktopGroup`
 
-Filter Data Template: 
+Example: 
 ```
-# OnPrem
-data = {
-    server = "{IP of the DDC}"
-    uuid   = {Id of the Delivery Group}
-}
-
-# Cloud
-data = {
-    server = "{Customer ID}.xendesktop.net"
-    uuid   = {Id of the Delivery Group}
-}
+delivery_group_filters = [
+    {
+        enabled           = true
+        allowed           = true
+        delivery_group_id = "{ID of the delivery group to be filtered}"
+    }
+]
 ```
 
 ### Delivery Group Type
@@ -129,29 +144,30 @@ Private Application | `PrivateApp`
 Shared Desktop | `Shared`
 Shared Application | `SharedApp`
 
-Filter Data Template: 
+Example: 
 ```
-data = {
-    value = "{Filter Data}"
-}
+delivery_group_type_filters = [
+    {
+        enabled             = true
+        allowed             = true
+        delivery_group_type = "{Type of the delivery group to be filtered}"
+    }
+]
 ```
 
 
 ### Organizational Unit (OU)
 Filter Type: `OU`
 
-Filter Data: 
-```
-data = {
-    value = "{OU Path}"
-}
-```
-
 Example: 
 ```
-data = {
-    value = "CN=Computers,DC=ctx-ad,DC=local"
-}
+ou_filters = [
+    {
+        enabled = true
+        allowed = true
+        ou      = "{Path of the oranizational unit to be filtered}"
+    }
+]
 ```
 
 ### User or Group
@@ -161,22 +177,29 @@ Filter Data: Sid of the user or group
 
 Filter Data Example: `S-1-5-21-4235287923-3346439331-1564732298-1103`
 
+Example: 
+```
+user_filters = [
+    {
+        enabled = true
+        allowed = true
+        sid     = "{SID of the user or user group to be filtered}"
+    }
+]
+```
+
 ### Tag
 Filter Type: `DesktopTag`
 
-Filter Data Template: 
+Example: 
 ```
-# OnPrem
-data = {
-    server = "{IP of the DDC}"
-    uuid   = {Id of the Tag}
-}
-
-# Cloud
-data = {
-    server = "{Customer ID}.xendesktop.net"
-    uuid   = {Id of the Tag}
-}
+tag_filters = [
+    {
+        enabled = true
+        allowed = true
+        tag     = "{ID of the tag to be filtered}"
+    }
+]
 ```
 
 ## Available Policy Settings
@@ -393,7 +416,6 @@ Related Settings:
 Allowed URLs to be redirected to VDA
 
 Allowed URLs to be redirected to Client
-
 ```
 
 Setting Name: `AllowBidirectionalContentRedirection`
@@ -8142,7 +8164,6 @@ Examples:
 Tags for watermark settings can be used with other watermark policies. Unsupported tags will be shown as regular text.
 
 Watermark text should not exceed 25 characters.
-
 ```
 
 Setting Name: `WatermarkCustomText`
@@ -8180,21 +8201,39 @@ Setting Value:
 ### WebSockets port number
 Description:
 ```
+TCP port number for incoming WebSockets connections.
 ```
 
 Setting Name: `WebSocketsPort`
 
-Setting Value: `{Port Number}`
+Setting Value: `{TCP Port Number}`
 
 ### WebSockets trusted origin server list
 Description:
 ```
-TCP port number for incoming WebSockets connections.
+Comma-separated list of trusted origin servers expressed as URLs with the option of using wildcards.
+
+It is usually the address of the Receiver for Web site. Only Websockets connections originating from one of these addresses will be accepted by XenApp. The generic syntax for this address is:<protocol>://<FQDN of host>:<port>/ The protocols should be HTTP or HTTPS. Port is an optional variable and if it is not specified, ports 80 and 443 are used for HTTP and HTTPS respectively. Wildcard characters can also be used to extend this syntax. If this field contains just a '*', it indicates that connections from all origin servers will be accepted.
+
+Examples
+https://abc.domain.com:8080/
+http://abc.def.domain.com:8080/
+https://hostname.domain.com:8081/
+https://*.trusteddomain.com/
+'*' is not treated as wild card character if used with IP.
+'http://10.105.*.*' is an invalid trusted origin as per current design.
 ```
 
 Setting Name: `WSTrustedOriginServerList`
 
-Setting Value: `{TCP Port Number}`
+Setting Value: `https://abc.domain.com:8080/`
+
+Related Settings:
+```
+WebSockets connections
+
+WebSockets port number
+```
 
 ### WIA redirection
 Description:

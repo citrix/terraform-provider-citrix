@@ -1,4 +1,4 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 package stf_webreceiver
 
 import (
@@ -14,13 +14,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -43,129 +36,6 @@ type stfWebReceiverResource struct {
 // Metadata returns the resource type name.
 func (r *stfWebReceiverResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_stf_webreceiver_service"
-}
-
-// Schema defines the schema for the resource.
-func (r *stfWebReceiverResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "Storefront WebReceiver.",
-		Attributes: map[string]schema.Attribute{
-			"site_id": schema.StringAttribute{
-				Description: "The IIS site id of the Storefront webreceiver. Defaults to 1.",
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString("1"),
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"virtual_path": schema.StringAttribute{
-				Description: "The IIS VirtualPath at which the WebReceiver will be configured to be accessed by Receivers.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"friendly_name": schema.StringAttribute{
-				Description: "The friendly name of the WebReceiver",
-				Optional:    true,
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"store_service": schema.StringAttribute{
-				Description: "The StoreFront Store Service linked to the WebReceiver.",
-				Optional:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"authentication_methods": schema.ListAttribute{
-				ElementType: types.StringType,
-				Description: "The authentication methods supported by the WebReceiver.",
-				Optional:    true,
-				Computed:    true,
-				Default:     listdefault.StaticValue(types.ListNull(types.StringType)),
-			},
-			"plugin_assistant": schema.SingleNestedAttribute{
-				Description: "Pluin Assistant configuration for the WebReceiver.",
-				Optional:    true,
-				Attributes: map[string]schema.Attribute{
-					"enabled": schema.BoolAttribute{
-						Description: "Enable the Plugin Assistant.",
-						Optional:    true,
-						Computed:    true,
-						Default:     booldefault.StaticBool(true),
-					},
-					"upgrade_at_login": schema.BoolAttribute{
-						Description: "Prompt to upgrade older clients.",
-						Optional:    true,
-						Computed:    true,
-						Default:     booldefault.StaticBool(false),
-					},
-					"show_after_login": schema.BoolAttribute{
-						Description: "Show Plugin Assistant after the user logs in.",
-						Optional:    true,
-						Computed:    true,
-						Default:     booldefault.StaticBool(false),
-					},
-					"win32_path": schema.StringAttribute{
-						Description: "Path to the Windows Receiver.",
-						Optional:    true,
-					},
-					"macos_path": schema.StringAttribute{
-						Description: "Path to the MacOS Receiver.",
-						Optional:    true,
-					},
-					"macos_minimum_supported_version": schema.StringAttribute{
-						Description: "Minimum version of the MacOS supported.",
-						Optional:    true,
-					},
-					"html5_single_tab_launch": schema.BoolAttribute{
-						Description: "Launch Html5 Receiver in the same browser tab.",
-						Optional:    true,
-					},
-					"html5_enabled": schema.StringAttribute{
-						Description: "Method of deploying and using the Html5 Receiver.",
-						Optional:    true,
-						Computed:    true,
-						Default:     stringdefault.StaticString("Off"),
-					},
-					"html5_platforms": schema.StringAttribute{
-						Description: "The supported Html5 platforms.",
-						Optional:    true,
-					},
-					"html5_preferences": schema.StringAttribute{
-						Description: "Html5 Receiver preferences.",
-						Optional:    true,
-					},
-					"html5_chrome_app_origins": schema.StringAttribute{
-						Description: "The Html5 Chrome Application Origins settings.",
-						Optional:    true,
-					},
-					"html5_chrome_app_preferences": schema.StringAttribute{
-						Description: "The Html5 Chrome Application preferences.",
-						Optional:    true,
-					},
-					"protocol_handler_enabled": schema.BoolAttribute{
-						Description: "Enable the Receiver Protocol Handler.",
-						Optional:    true,
-						Computed:    true,
-						Default:     booldefault.StaticBool(true),
-					},
-					"protocol_handler_platforms": schema.StringAttribute{
-						Description: "The supported Protocol Handler platforms.",
-						Optional:    true,
-					},
-					"protocol_handler_skip_double_hop_check_when_disabled": schema.BoolAttribute{
-						Description: "Skip the Protocol Handle double hop check.",
-						Optional:    true,
-					},
-				},
-			},
-		},
-	}
 }
 
 // Configure adds the provider configured client to the resource.
@@ -194,7 +64,7 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 	siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error creating Storefront WebReceiver ",
+			"Error creating StoreFront WebReceiver ",
 			"\nError message: "+err.Error(),
 		)
 		return
@@ -208,23 +78,24 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 	WebReceiverDetail, err := createWebReceiverRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error creating Storefront WebReceiver",
+			"Error creating StoreFront WebReceiver",
 			"TransactionId: ",
 		)
 		return
 	}
 
 	// Create the authentication methods Body
-	if plan.AuthenticationMethods != nil {
+	if !plan.AuthenticationMethods.IsNull() {
 		var authMethodCreateBody citrixstorefront.UpdateSTFWebReceiverAuthenticationMethodsRequestModel
 		authMethodCreateBody.SetWebReceiverService("(Get-STFWebReceiverService -VirtualPath " + plan.VirtualPath.ValueString() + " -SiteId " + plan.SiteId.ValueString() + " )")
-		authMethodCreateBody.SetAuthenticationMethods(util.ConvertBaseStringArrayToPrimitiveStringArray(plan.AuthenticationMethods))
+		authMethods := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.AuthenticationMethods)
+		authMethodCreateBody.SetAuthenticationMethods(authMethods)
 		creatAuthProtocolRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverSetSTFWebReceiverAuthenticationMethods(ctx, authMethodCreateBody)
 		// Create new STF WebReceiver Authentication Methods
 		_, err = creatAuthProtocolRequest.Execute()
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error creating Storefront WebReceiver Authentication Methods",
+				"Error creating StoreFront WebReceiver Authentication Methods",
 				"TransactionId: ",
 			)
 			return
@@ -232,30 +103,32 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 	}
 
 	// Create the Plugin Assistant
-	if plan.PluginAssistant != nil {
+	if !plan.PluginAssistant.IsNull() {
 		var pluginAssistantBody citrixstorefront.UpdateSTFWebReceiverPluginAssistantRequestModel
 		pluginAssistantBody.SetWebReceiverService("(Get-STFWebReceiverService -VirtualPath " + plan.VirtualPath.ValueString() + " -SiteId " + plan.SiteId.ValueString() + " )")
-		pluginAssistantBody.SetEnabled(plan.PluginAssistant.Enabled.ValueBool())
-		pluginAssistantBody.SetUpgradeAtLogin(plan.PluginAssistant.UpgradeAtLogin.ValueBool())
-		pluginAssistantBody.SetShowAfterLogin(plan.PluginAssistant.ShowAfterLogin.ValueBool())
-		pluginAssistantBody.SetWin32Path(plan.PluginAssistant.Win32Path.ValueString())
-		pluginAssistantBody.SetMacOSPath(plan.PluginAssistant.MacOSPath.ValueString())
-		pluginAssistantBody.SetMacOSMinimumSupportedVersion(plan.PluginAssistant.MacOSMinimumSupportedVersion.ValueString())
-		pluginAssistantBody.SetHtml5SingleTabLaunch(plan.PluginAssistant.Html5SingleTabLaunch.ValueBool())
-		pluginAssistantBody.SetHtml5Enabled(plan.PluginAssistant.Html5Enabled.ValueString())
-		pluginAssistantBody.SetHtml5Platforms(plan.PluginAssistant.Html5Platforms.ValueString())
-		pluginAssistantBody.SetHtml5Preferences(plan.PluginAssistant.Html5Preferences.ValueString())
-		pluginAssistantBody.SetHtml5ChromeAppOrigins(plan.PluginAssistant.Html5ChromeAppOrigins.ValueString())
-		pluginAssistantBody.SetHtml5ChromeAppPreferences(plan.PluginAssistant.Html5ChromeAppPreferences.ValueString())
-		pluginAssistantBody.SetProtocolHandlerEnabled(plan.PluginAssistant.ProtocolHandlerEnabled.ValueBool())
-		pluginAssistantBody.SetProtocolHandlerPlatforms(plan.PluginAssistant.ProtocolHandlerPlatforms.ValueString())
-		pluginAssistantBody.SetProtocolHandlerSkipDoubleHopCheckWhenDisabled(plan.PluginAssistant.ProtocolHandlerSkipDoubleHopCheckWhenDisabled.ValueBool())
+
+		plannedPluginAssistant := util.ObjectValueToTypedObject[PluginAssistant](ctx, &resp.Diagnostics, plan.PluginAssistant)
+		pluginAssistantBody.SetEnabled(plannedPluginAssistant.Enabled.ValueBool())
+		pluginAssistantBody.SetUpgradeAtLogin(plannedPluginAssistant.UpgradeAtLogin.ValueBool())
+		pluginAssistantBody.SetShowAfterLogin(plannedPluginAssistant.ShowAfterLogin.ValueBool())
+		pluginAssistantBody.SetWin32Path(plannedPluginAssistant.Win32Path.ValueString())
+		pluginAssistantBody.SetMacOSPath(plannedPluginAssistant.MacOSPath.ValueString())
+		pluginAssistantBody.SetMacOSMinimumSupportedVersion(plannedPluginAssistant.MacOSMinimumSupportedVersion.ValueString())
+		pluginAssistantBody.SetHtml5SingleTabLaunch(plannedPluginAssistant.Html5SingleTabLaunch.ValueBool())
+		pluginAssistantBody.SetHtml5Enabled(plannedPluginAssistant.Html5Enabled.ValueString())
+		pluginAssistantBody.SetHtml5Platforms(plannedPluginAssistant.Html5Platforms.ValueString())
+		pluginAssistantBody.SetHtml5Preferences(plannedPluginAssistant.Html5Preferences.ValueString())
+		pluginAssistantBody.SetHtml5ChromeAppOrigins(plannedPluginAssistant.Html5ChromeAppOrigins.ValueString())
+		pluginAssistantBody.SetHtml5ChromeAppPreferences(plannedPluginAssistant.Html5ChromeAppPreferences.ValueString())
+		pluginAssistantBody.SetProtocolHandlerEnabled(plannedPluginAssistant.ProtocolHandlerEnabled.ValueBool())
+		pluginAssistantBody.SetProtocolHandlerPlatforms(plannedPluginAssistant.ProtocolHandlerPlatforms.ValueString())
+		pluginAssistantBody.SetProtocolHandlerSkipDoubleHopCheckWhenDisabled(plannedPluginAssistant.ProtocolHandlerSkipDoubleHopCheckWhenDisabled.ValueBool())
 		pluginAssistantRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverPluginAssistantUpdate(ctx, pluginAssistantBody)
 		// Create new STF WebReceiver Plugin Assistant
 		_, err = pluginAssistantRequest.Execute()
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error creating Storefront WebReceiver Plugin Assistant",
+				"Error creating StoreFront WebReceiver Plugin Assistant",
 				"TransactionId: ",
 			)
 			return
@@ -264,35 +137,36 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 	}
 
 	// Refresh the authentication methods
-	if plan.AuthenticationMethods != nil {
+	if !plan.AuthenticationMethods.IsNull() {
 		var authMethodGetBody citrixstorefront.GetSTFWebReceiverAuthenticationMethodsRequestModel
 		authMethodGetBody.SetWebReceiverService("(Get-STFWebReceiverService -VirtualPath " + plan.VirtualPath.ValueString() + " -SiteId " + plan.SiteId.ValueString() + " )")
 		getAuthProtocolRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverGetSTFWebReceiverAuthenticationMethods(ctx, authMethodGetBody)
 		authMethoResult, err := getAuthProtocolRequest.Execute()
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error fetching Storefront WebReceiver Authentication Methods",
+				"Error fetching StoreFront WebReceiver Authentication Methods",
 				"TransactionId: ",
 			)
 			return
 		}
-		util.RefreshList(plan.AuthenticationMethods, authMethoResult.Methods)
+
+		plan.AuthenticationMethods = util.StringArrayToStringSet(ctx, &resp.Diagnostics, authMethoResult.Methods)
 	}
 
 	//Refresh Plugin Assistant
-	if plan.PluginAssistant != nil {
+	if !plan.PluginAssistant.IsNull() {
 		var pluginAssistantGetBody citrixstorefront.GetSTFWebReceiverPluginAssistantRequestModel
 		pluginAssistantGetBody.SetWebReceiverService("(Get-STFWebReceiverService -VirtualPath " + plan.VirtualPath.ValueString() + " -SiteId " + plan.SiteId.ValueString() + " )")
 		getPlugInAssistantRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverPluginAssistantGet(ctx, pluginAssistantGetBody)
 		assistant, err := getPlugInAssistantRequest.Execute()
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error fetching Storefront WebReceiver Plugin Assistant",
+				"Error fetching StoreFront WebReceiver Plugin Assistant",
 				"TransactionId: ",
 			)
 			return
 		}
-		plan.RefreshPlugInAssistant(&assistant)
+		plan.RefreshPlugInAssistant(ctx, &resp.Diagnostics, &assistant)
 	}
 
 	// Map response body to schema and populate Computed attribute values
@@ -324,19 +198,19 @@ func (r *stfWebReceiverResource) Read(ctx context.Context, req resource.ReadRequ
 	}
 
 	//Refresh Plugin Assistant
-	if state.PluginAssistant != nil {
+	if !state.PluginAssistant.IsNull() {
 		var pluginAssistantGetBody citrixstorefront.GetSTFWebReceiverPluginAssistantRequestModel
 		pluginAssistantGetBody.SetWebReceiverService("(Get-STFWebReceiverService -VirtualPath " + state.VirtualPath.ValueString() + " -SiteId " + state.SiteId.ValueString() + " )")
 		getPlugInAssistantRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverPluginAssistantGet(ctx, pluginAssistantGetBody)
 		assistant, err := getPlugInAssistantRequest.Execute()
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error fetching Storefront WebReceiver Plugin Assistant",
+				"Error fetching StoreFront WebReceiver Plugin Assistant",
 				"TransactionId: ",
 			)
 			return
 		}
-		state.RefreshPlugInAssistant(&assistant)
+		state.RefreshPlugInAssistant(ctx, &resp.Diagnostics, &assistant)
 	}
 
 	state.RefreshPropertyValues(STFWebReceiver)
@@ -370,16 +244,17 @@ func (r *stfWebReceiverResource) Update(ctx context.Context, req resource.Update
 	}
 
 	// Update the Auth Methods
-	if plan.AuthenticationMethods != nil {
+	if !plan.AuthenticationMethods.IsNull() {
 		var authMethodCreateBody citrixstorefront.UpdateSTFWebReceiverAuthenticationMethodsRequestModel
 		authMethodCreateBody.SetWebReceiverService("(Get-STFWebReceiverService -VirtualPath " + plan.VirtualPath.ValueString() + " -SiteId " + plan.SiteId.ValueString() + " )")
-		authMethodCreateBody.SetAuthenticationMethods(util.ConvertBaseStringArrayToPrimitiveStringArray(plan.AuthenticationMethods))
+		authMethods := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.AuthenticationMethods)
+		authMethodCreateBody.SetAuthenticationMethods(authMethods)
 		creatAuthProtocolRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverSetSTFWebReceiverAuthenticationMethods(ctx, authMethodCreateBody)
 		// Create new STF WebReceiver Authentication Methods
 		_, err := creatAuthProtocolRequest.Execute()
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error creating Storefront WebReceiver Authentication Methods",
+				"Error creating StoreFront WebReceiver Authentication Methods",
 				"TransactionId: ",
 			)
 			return
@@ -387,30 +262,32 @@ func (r *stfWebReceiverResource) Update(ctx context.Context, req resource.Update
 	}
 
 	// update the Plugin Assistant
-	if plan.PluginAssistant != nil {
+	if !plan.PluginAssistant.IsNull() {
 		var pluginAssistantBody citrixstorefront.UpdateSTFWebReceiverPluginAssistantRequestModel
 		pluginAssistantBody.SetWebReceiverService("(Get-STFWebReceiverService -VirtualPath " + plan.VirtualPath.ValueString() + " -SiteId " + plan.SiteId.ValueString() + " )")
-		pluginAssistantBody.SetEnabled(plan.PluginAssistant.Enabled.ValueBool())
-		pluginAssistantBody.SetUpgradeAtLogin(plan.PluginAssistant.UpgradeAtLogin.ValueBool())
-		pluginAssistantBody.SetShowAfterLogin(plan.PluginAssistant.ShowAfterLogin.ValueBool())
-		pluginAssistantBody.SetWin32Path(plan.PluginAssistant.Win32Path.ValueString())
-		pluginAssistantBody.SetMacOSPath(plan.PluginAssistant.MacOSPath.ValueString())
-		pluginAssistantBody.SetMacOSMinimumSupportedVersion(plan.PluginAssistant.MacOSMinimumSupportedVersion.ValueString())
-		pluginAssistantBody.SetHtml5SingleTabLaunch(plan.PluginAssistant.Html5SingleTabLaunch.ValueBool())
-		pluginAssistantBody.SetHtml5Enabled(plan.PluginAssistant.Html5Enabled.ValueString())
-		pluginAssistantBody.SetHtml5Platforms(plan.PluginAssistant.Html5Platforms.ValueString())
-		pluginAssistantBody.SetHtml5Preferences(plan.PluginAssistant.Html5Preferences.ValueString())
-		pluginAssistantBody.SetHtml5ChromeAppOrigins(plan.PluginAssistant.Html5ChromeAppOrigins.ValueString())
-		pluginAssistantBody.SetHtml5ChromeAppPreferences(plan.PluginAssistant.Html5ChromeAppPreferences.ValueString())
-		pluginAssistantBody.SetProtocolHandlerEnabled(plan.PluginAssistant.ProtocolHandlerEnabled.ValueBool())
-		pluginAssistantBody.SetProtocolHandlerPlatforms(plan.PluginAssistant.ProtocolHandlerPlatforms.ValueString())
-		pluginAssistantBody.SetProtocolHandlerSkipDoubleHopCheckWhenDisabled(plan.PluginAssistant.ProtocolHandlerSkipDoubleHopCheckWhenDisabled.ValueBool())
+
+		plannedPluginAssistant := util.ObjectValueToTypedObject[PluginAssistant](ctx, &resp.Diagnostics, plan.PluginAssistant)
+		pluginAssistantBody.SetEnabled(plannedPluginAssistant.Enabled.ValueBool())
+		pluginAssistantBody.SetUpgradeAtLogin(plannedPluginAssistant.UpgradeAtLogin.ValueBool())
+		pluginAssistantBody.SetShowAfterLogin(plannedPluginAssistant.ShowAfterLogin.ValueBool())
+		pluginAssistantBody.SetWin32Path(plannedPluginAssistant.Win32Path.ValueString())
+		pluginAssistantBody.SetMacOSPath(plannedPluginAssistant.MacOSPath.ValueString())
+		pluginAssistantBody.SetMacOSMinimumSupportedVersion(plannedPluginAssistant.MacOSMinimumSupportedVersion.ValueString())
+		pluginAssistantBody.SetHtml5SingleTabLaunch(plannedPluginAssistant.Html5SingleTabLaunch.ValueBool())
+		pluginAssistantBody.SetHtml5Enabled(plannedPluginAssistant.Html5Enabled.ValueString())
+		pluginAssistantBody.SetHtml5Platforms(plannedPluginAssistant.Html5Platforms.ValueString())
+		pluginAssistantBody.SetHtml5Preferences(plannedPluginAssistant.Html5Preferences.ValueString())
+		pluginAssistantBody.SetHtml5ChromeAppOrigins(plannedPluginAssistant.Html5ChromeAppOrigins.ValueString())
+		pluginAssistantBody.SetHtml5ChromeAppPreferences(plannedPluginAssistant.Html5ChromeAppPreferences.ValueString())
+		pluginAssistantBody.SetProtocolHandlerEnabled(plannedPluginAssistant.ProtocolHandlerEnabled.ValueBool())
+		pluginAssistantBody.SetProtocolHandlerPlatforms(plannedPluginAssistant.ProtocolHandlerPlatforms.ValueString())
+		pluginAssistantBody.SetProtocolHandlerSkipDoubleHopCheckWhenDisabled(plannedPluginAssistant.ProtocolHandlerSkipDoubleHopCheckWhenDisabled.ValueBool())
 		pluginAssistantRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverPluginAssistantUpdate(ctx, pluginAssistantBody)
 		// Create new STF WebReceiver Plugin Assistant
 		_, err := pluginAssistantRequest.Execute()
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error creating Storefront WebReceiver Plugin Assistant",
+				"Error creating StoreFront WebReceiver Plugin Assistant",
 				"TransactionId: ",
 			)
 			return
@@ -447,7 +324,7 @@ func (r *stfWebReceiverResource) Delete(ctx context.Context, req resource.Delete
 	_, err := deleteWebReceiverRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error deleting Storefront WebReceiver ",
+			"Error deleting StoreFront WebReceiver ",
 			"\nError message: "+err.Error(),
 		)
 		return
@@ -488,7 +365,7 @@ func getSTFWebReceiver(ctx context.Context, client *citrixdaasclient.CitrixDaasC
 		siteIdInt, err := strconv.ParseInt(state.SiteId.ValueString(), 10, 64)
 		if err != nil {
 			diagnostics.AddError(
-				"Error fetching state of Storefront WebReceiver ",
+				"Error fetching state of StoreFront WebReceiver ",
 				"Error message: "+err.Error(),
 			)
 			return nil, err

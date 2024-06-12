@@ -1,4 +1,4 @@
-// Copyright © 2023. Citrix Systems, Inc.
+// Copyright © 2024. Citrix Systems, Inc.
 
 package provider
 
@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/daas/vda"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_authentication"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_deployment"
+	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_multi_site"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_store"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_webreceiver"
 
@@ -133,14 +135,14 @@ func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 			},
 			"client_id": schema.StringAttribute{
 				Description: "Client Id for Citrix DaaS service authentication. " + "<br />" +
-					"For Citrix On-Premises customers: Use this to specify Domain Admin Username. " + "<br />" +
+					"For Citrix On-Premises customers: Use this to specify a DDC administrator username. " + "<br />" +
 					"For Citrix Cloud customers: Use this to specify Cloud API Key Client Id." + "<br />" +
 					"Can be set via Environment Variable **CITRIX_CLIENT_ID**.",
 				Optional: true,
 			},
 			"client_secret": schema.StringAttribute{
 				Description: "Client Secret for Citrix DaaS service authentication. " + "<br />" +
-					"For Citrix on-premises customers: Use this to specify Domain Admin Password. " + "<br />" +
+					"For Citrix on-premises customers: Use this to specify a DDC administrator password. " + "<br />" +
 					"For Citrix Cloud customers: Use this to specify Cloud API Key Client Secret." + "<br />" +
 					"Can be set via Environment Variable **CITRIX_CLIENT_SECRET**.",
 				Optional:  true,
@@ -168,13 +170,13 @@ func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 					"ad_admin_username": schema.StringAttribute{
 						Description: "Active Directory Admin Username to connect to storefront server " + "<br />" +
 							"Only applicable for Citrix on-premises customers. Use this to specify AD admin username " + "<br />" +
-							"Can be set via Environment Variable **SF_AD_ADMAIN_USERNAME**.",
+							"Can be set via Environment Variable **SF_AD_ADMIN_USERNAME**.",
 						Required: true,
 					},
 					"ad_admin_password": schema.StringAttribute{
 						Description: "Active Directory Admin Password to connect to storefront server " + "<br />" +
 							"Only applicable for Citrix on-premises customers. Use this to specify AD admin password" + "<br />" +
-							"Can be set via Environment Variable **SF_AD_ADMAIN_PASSWORD**.",
+							"Can be set via Environment Variable **SF_AD_ADMIN_PASSWORD**.",
 						Required: true,
 					},
 				},
@@ -208,8 +210,9 @@ func middlewareAuthFunc(authClient *citrixclient.CitrixDaasClient, r *http.Reque
 	})
 }
 
-type RegistryResponse struct {
-	Version string `json:"version"`
+type registryResponse struct {
+	Version  string   `json:"version"`
+	Versions []string `json:"versions"`
 }
 
 func getVersionFromTerraformRegistry() (string, error) {
@@ -226,12 +229,22 @@ func getVersionFromTerraformRegistry() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	registryResp := RegistryResponse{}
+	registryResp := registryResponse{}
 	err = json.Unmarshal(body, &registryResp)
 	if err != nil {
 		return "", err
 	}
 
+	// find the last stable version
+	// the versions are returned in order from oldest to newest so reverse it first
+	slices.Reverse(registryResp.Versions)
+	for _, ver := range registryResp.Versions {
+		if semver.Prerelease("v"+ver) == "" {
+			return ver, nil
+		}
+	}
+
+	// if no stable version found just return the latest version
 	return registryResp.Version, nil
 }
 
@@ -351,8 +364,8 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	clientSecret := os.Getenv("CITRIX_CLIENT_SECRET")
 	disableSslVerification := strings.EqualFold(os.Getenv("CITRIX_DISABLE_SSL_VERIFICATION"), "true")
 	storefront_computer_name := os.Getenv("SF_COMPUTER_NAME")
-	storefront_ad_admin_username := os.Getenv("SF_AD_ADMAIN_USERNAME")
-	storefront_ad_admin_password := os.Getenv("SF_AD_ADMAIN_PASSWORD")
+	storefront_ad_admin_username := os.Getenv("SF_AD_ADMIN_USERNAME")
+	storefront_ad_admin_password := os.Getenv("SF_AD_ADMIN_PASSWORD")
 
 	if !config.Hostname.IsNull() {
 		hostname = config.Hostname.ValueString()
@@ -525,7 +538,7 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 					"Invalid credential in provider config",
 					"Make sure client_id and client_secret is correct in provider config. ",
 				)
-			} else if httpResp.StatusCode == 503 {
+			} else if httpResp.StatusCode >= 500 {
 				if onPremises {
 					resp.Diagnostics.AddError(
 						"Citrix DaaS service unavailable",
@@ -592,7 +605,7 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		return
 	}
 
-	//Set Storefront Client
+	// Set StoreFront Client
 	client = citrixclient.NewStoreFrontClient(ctx, storefront_computer_name, storefront_ad_admin_username, storefront_ad_admin_password, client)
 
 	// Make the Citrix API client available during DataSource and Resource
@@ -632,6 +645,8 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		storefront_server.NewStoreFrontServerResource,
 		application.NewApplicationResource,
 		application.NewApplicationFolderResource,
+		application.NewApplicationGroupResource,
+		application.NewApplicationIconResource,
 		admin_scope.NewAdminScopeResource,
 		admin_role.NewAdminRoleResource,
 		policies.NewPolicySetResource,
@@ -643,6 +658,7 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		stf_authentication.NewSTFAuthenticationServiceResource,
 		stf_store.NewSTFStoreServiceResource,
 		stf_webreceiver.NewSTFWebReceiverResource,
+		stf_multi_site.NewSTFUserFarmMappingResource,
 		// Add resource here
 	}
 }

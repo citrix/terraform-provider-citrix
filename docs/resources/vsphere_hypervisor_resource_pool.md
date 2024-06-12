@@ -49,9 +49,9 @@ resource "citrix_vsphere_hypervisor_resource_pool" "example-vsphere-hypervisor-r
 - `cluster` (Attributes) Details of the cluster where resources reside and new resources will be created. (see [below for nested schema](#nestedatt--cluster))
 - `hypervisor` (String) Id of the hypervisor for which the resource pool needs to be created.
 - `name` (String) Name of the resource pool. Name should be unique across all hypervisors.
-- `networks` (List of String) List of networks for allocating resources.
-- `storage` (Attributes List) List of hypervisor storage to use for OS data. (see [below for nested schema](#nestedatt--storage))
-- `temporary_storage` (Attributes List) List of hypervisor storage to use for temporary data. (see [below for nested schema](#nestedatt--temporary_storage))
+- `networks` (List of String) Networks for allocating resources.
+- `storage` (Attributes List) Storage resources to use for OS data. (see [below for nested schema](#nestedatt--storage))
+- `temporary_storage` (Attributes List) Storage resources to use for temporary data. (see [below for nested schema](#nestedatt--temporary_storage))
 
 ### Optional
 
