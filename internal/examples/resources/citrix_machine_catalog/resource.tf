@@ -43,7 +43,7 @@ resource "citrix_machine_catalog" "example-azure-mtsession" {
 				storage_cost_saving = true
 			}
         }
-		availability_zones = "1,2,..."
+		availability_zones = ["1","2"]
 		number_of_total_machines = 	1
 		machine_account_creation_rules ={
 			naming_scheme =     "az-multi-##"
@@ -332,7 +332,7 @@ resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
 				storage_cost_saving = true
 			}
         }
-		availability_zones = "1,2,..."
+		availability_zones = ["1","2"]
 		number_of_total_machines = 	1
 		machine_account_creation_rules ={
 			naming_scheme =     "ndj-multi-##"
