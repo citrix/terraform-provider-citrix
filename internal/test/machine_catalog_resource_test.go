@@ -1140,6 +1140,66 @@ func TestMachineCatalogResource_Manual_Power_Managed_Nutanix(t *testing.T) {
 	})
 }
 
+func TestMachineCatalogPreCheck_Manual_Power_Managed_SCVMM(t *testing.T) {
+	if v := os.Getenv("TEST_MC_NAME_MANUAL"); v == "" {
+		t.Fatal("TEST_MC_NAME_MANUAL must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_HOST_SCVMM"); v == "" {
+		t.Fatal("TEST_MC_HOST_SCVMM must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_MACHINE_NAME_MANUAL_SCVMM"); v == "" {
+		t.Fatal("TEST_MC_MACHINE_NAME_MANUAL_SCVMM must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_MACHINE_ACCOUNT_MANUAL_SCVMM"); v == "" {
+		t.Fatal("TEST_MC_MACHINE_ACCOUNT_MANUAL_SCVMM must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_ALLOCATION_TYPE_MANUAL_POWER_MANAGED"); v == "" {
+		t.Fatal("TEST_MC_ALLOCATION_TYPE_MANUAL_POWER_MANAGED must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_SESSION_SUPPORT_MANUAL_POWER_MANAGED"); v == "" {
+		t.Fatal("TEST_MC_SESSION_SUPPORT_MANUAL_POWER_MANAGED must be set for acceptance tests")
+	}
+}
+
+func TestMachineCatalogResource_Manual_Power_Managed_SCVMM(t *testing.T) {
+	name := os.Getenv("TEST_MC_NAME_MANUAL")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck: func() {
+			TestProviderPreCheck(t)
+			TestHypervisorPreCheck_SCVMM(t)
+			TestMachineCatalogPreCheck_Manual_Power_Managed_SCVMM(t)
+		},
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceManualPowerManagedSCVMM(t, machinecatalog_testResources_manual_power_managed_scvmm),
+					BuildHypervisorResourceSCVMM(t, hypervisor_testResources_scvmm),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_SCVMM")),
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify name of catalog
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogManualPowerManaged", "name", name),
+					// Verify session support
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogManualPowerManaged", "session_support", os.Getenv("TEST_MC_SESSION_SUPPORT_MANUAL_POWER_MANAGED")),
+					// Verify total number of machines
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogManualPowerManaged", "machine_accounts.#", "1"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:            "citrix_machine_catalog.testMachineCatalogManualPowerManaged",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"machine_accounts", "is_remote_pc", "is_power_managed"},
+			},
+			//Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
 func TestMachineCatalogPreCheck_Manual_Power_Managed_AWS_EC2(t *testing.T) {
 	if v := os.Getenv("TEST_MC_NAME_MANUAL_AWS_EC2"); v == "" {
 		t.Fatal("TEST_MC_NAME_MANUAL_AWS_EC2 must be set for acceptance tests")
@@ -2121,6 +2181,31 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 	}
 	`
 
+	machinecatalog_testResources_manual_power_managed_scvmm = `
+	resource "citrix_machine_catalog" "testMachineCatalogManualPowerManaged" {
+		name                        = "%s"
+		description                 = "manual power managed multi-session catalog testing"
+		is_power_managed 			= true
+		is_remote_pc 				= false
+		provisioning_type 			= "Manual"
+		allocation_type             = "%s"
+		session_support             = "%s"
+		zone                        = citrix_zone.test.id
+		machine_accounts = [
+			{
+				hypervisor = citrix_scvmm_hypervisor.testHypervisor.id
+				machines = [
+					{
+						machine_name = "%s"
+						machine_account = "%s"
+						host = "%s"
+					}
+				]
+			}
+		]
+	}
+	`
+
 	machinecatalog_testResources_manual_power_managed_aws_ec2 = `
 	resource "citrix_machine_catalog" "testMachineCatalogManualPowerManaged" {
 		name                        = "%s"
@@ -2383,6 +2468,17 @@ func BuildMachineCatalogResourceManualPowerManagedNutanix(t *testing.T, machineR
 	session_support := os.Getenv("TEST_MC_SESSION_SUPPORT_MANUAL_POWER_MANAGED")
 
 	return fmt.Sprintf(machineResource, name, allocation_type, session_support, machine_name, machine_account)
+}
+
+func BuildMachineCatalogResourceManualPowerManagedSCVMM(t *testing.T, machineResource string) string {
+	name := os.Getenv("TEST_MC_NAME_MANUAL")
+	allocation_type := os.Getenv("TEST_MC_ALLOCATION_TYPE_MANUAL_POWER_MANAGED")
+	session_support := os.Getenv("TEST_MC_SESSION_SUPPORT_MANUAL_POWER_MANAGED")
+	machine_name := os.Getenv("TEST_MC_MACHINE_NAME_MANUAL_SCVMM")
+	machine_account := os.Getenv("TEST_MC_MACHINE_ACCOUNT_MANUAL_SCVMM")
+	host := os.Getenv("TEST_MC_HOST_SCVMM")
+
+	return fmt.Sprintf(machineResource, name, allocation_type, session_support, machine_name, machine_account, host)
 }
 
 func BuildMachineCatalogResourceManualPowerManagedAwsEc2(t *testing.T, machineResource string) string {

@@ -12,13 +12,15 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &gcpHypervisorResource{}
-	_ resource.ResourceWithConfigure   = &gcpHypervisorResource{}
-	_ resource.ResourceWithImportState = &gcpHypervisorResource{}
+	_ resource.Resource                   = &gcpHypervisorResource{}
+	_ resource.ResourceWithConfigure      = &gcpHypervisorResource{}
+	_ resource.ResourceWithImportState    = &gcpHypervisorResource{}
+	_ resource.ResourceWithValidateConfig = &gcpHypervisorResource{}
 )
 
 // NewHypervisorResource is a helper function to simplify the provider implementation.
@@ -38,7 +40,7 @@ func (r *gcpHypervisorResource) Metadata(_ context.Context, req resource.Metadat
 
 // Schema defines the schema for the resource.
 func (r *gcpHypervisorResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = GetGcpHypervisorSchema()
+	resp.Schema = GcpHypervisorResourceModel{}.GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -216,4 +218,18 @@ func (r *gcpHypervisorResource) Delete(ctx context.Context, req resource.DeleteR
 func (r *gcpHypervisorResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Retrieve import ID and save to id attribute
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+func (r *gcpHypervisorResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data GcpHypervisorResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }

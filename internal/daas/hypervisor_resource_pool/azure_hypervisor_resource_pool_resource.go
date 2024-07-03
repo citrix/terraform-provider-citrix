@@ -13,13 +13,15 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &azureHypervisorResourcePoolResource{}
-	_ resource.ResourceWithConfigure   = &azureHypervisorResourcePoolResource{}
-	_ resource.ResourceWithImportState = &azureHypervisorResourcePoolResource{}
+	_ resource.Resource                   = &azureHypervisorResourcePoolResource{}
+	_ resource.ResourceWithConfigure      = &azureHypervisorResourcePoolResource{}
+	_ resource.ResourceWithImportState    = &azureHypervisorResourcePoolResource{}
+	_ resource.ResourceWithValidateConfig = &azureHypervisorResourcePoolResource{}
 )
 
 // NewHypervisorResourcePoolResource is a helper function to simplify the provider implementation.
@@ -38,7 +40,7 @@ func (r *azureHypervisorResourcePoolResource) Metadata(_ context.Context, req re
 }
 
 func (r *azureHypervisorResourcePoolResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = GetAzureHypervisorResourcePoolSchema()
+	resp.Schema = AzureHypervisorResourcePoolResourceModel{}.GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -270,4 +272,18 @@ func (r *azureHypervisorResourcePoolResource) Delete(ctx context.Context, req re
 		)
 		return
 	}
+}
+
+func (r *azureHypervisorResourcePoolResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data AzureHypervisorResourcePoolResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }

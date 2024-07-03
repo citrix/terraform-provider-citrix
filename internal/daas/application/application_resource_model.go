@@ -78,7 +78,7 @@ type ApplicationResourceModel struct {
 }
 
 // Schema defines the schema for the data source.
-func GetSchema() schema.Schema {
+func (ApplicationResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "Resource for creating and managing applications.",
 		Attributes: map[string]schema.Attribute{
@@ -140,6 +140,10 @@ func GetSchema() schema.Schema {
 			},
 		},
 	}
+}
+
+func (ApplicationResourceModel) GetAttributes() map[string]schema.Attribute {
+	return ApplicationResourceModel{}.GetSchema().Attributes
 }
 
 func (r ApplicationResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, application *citrixorchestration.ApplicationDetailResponseModel) ApplicationResourceModel {

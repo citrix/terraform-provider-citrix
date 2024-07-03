@@ -11,21 +11,19 @@ import (
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &adminUserResource{}
-	_ resource.ResourceWithConfigure   = &adminUserResource{}
-	_ resource.ResourceWithImportState = &adminUserResource{}
+	_ resource.Resource                   = &adminUserResource{}
+	_ resource.ResourceWithConfigure      = &adminUserResource{}
+	_ resource.ResourceWithImportState    = &adminUserResource{}
+	_ resource.ResourceWithValidateConfig = &adminUserResource{}
+	_ resource.ResourceWithModifyPlan     = &adminUserResource{}
 )
 
 // NewAdminUserResource is a helper function to simplify the provider implementation.
@@ -45,51 +43,7 @@ func (r *adminUserResource) Metadata(_ context.Context, req resource.MetadataReq
 
 // Schema defines the schema for the resource.
 func (r *adminUserResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		// This description is used by the documentation generator and the language server.
-		Description: "Manages an administrator user for on-premise environment.",
-
-		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "ID of the admin user.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"name": schema.StringAttribute{
-				Description: "Name of an existing user in the active directory.",
-				Required:    true,
-			},
-			"domain_name": schema.StringAttribute{
-				Description: "Name of the domain that the user is a part of. For example, if the domain is `example.com`, then provide the value `example` for this field.",
-				Required:    true,
-			},
-			"rights": schema.ListNestedAttribute{
-				Description: "Rights to be associated with the admin user.",
-				Required:    true,
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
-				},
-				NestedObject: schema.NestedAttributeObject{
-					Attributes: map[string]schema.Attribute{
-						"role": schema.StringAttribute{
-							Description: "Name of the role to be associated with the admin user.",
-							Required:    true,
-						},
-						"scope": schema.StringAttribute{
-							Description: "Name of the scope to be associated with the admin user.",
-							Required:    true,
-						},
-					},
-				},
-			},
-			"is_enabled": schema.BoolAttribute{
-				Description: "Flag to determine if the administrator is to be enabled or not.",
-				Optional:    true,
-			},
-		},
-	}
+	resp.Schema = AdminUserResourceModel{}.GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -354,6 +308,20 @@ func readAdminUser(ctx context.Context, client *citrixdaasclient.CitrixDaasClien
 	getAdminUserRequest := client.ApiClient.AdminAPIsDAAS.AdminGetAdminAdministrator(ctx, adminUserFqdnOrId)
 	adminUser, _, err := util.ReadResource[*citrixorchestration.AdministratorResponseModel](getAdminUserRequest, ctx, client, resp, "Admin User", adminUserFqdnOrId)
 	return adminUser, err
+}
+
+func (r *adminUserResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data AdminUserResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }
 
 func (r *adminUserResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {

@@ -6,19 +6,34 @@ import (
 	"context"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-func getRemotePcEnrollmentScopes(ctx context.Context, diagnostics *diag.Diagnostics, plan MachineCatalogResourceModel, includeMachines bool) []citrixorchestration.RemotePCEnrollmentScopeRequestModel {
+func getRemotePcEnrollmentScopes(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, plan MachineCatalogResourceModel, includeMachines bool) ([]citrixorchestration.RemotePCEnrollmentScopeRequestModel, error) {
 	remotePCEnrollmentScopes := []citrixorchestration.RemotePCEnrollmentScopeRequestModel{}
 	if !plan.RemotePcOus.IsNull() {
 		remotePcOus := util.ObjectListToTypedArray[RemotePcOuModel](ctx, diagnostics, plan.RemotePcOus)
 		for _, ou := range remotePcOus {
+
+			getIdentityContainer := client.ApiClient.IdentityAPIsDAAS.IdentityGetContainer(ctx, ou.OUName.ValueString())
+			identityContainer, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.IdentityContainerResponseModel](getIdentityContainer, client)
+
+			if err != nil {
+				diagnostics.AddError(
+					"An error occurred while fetching OU "+ou.OUName.ValueString(),
+					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+						"\nError message: "+util.ReadClientError(err),
+				)
+
+				return remotePCEnrollmentScopes, err
+			}
+
 			var remotePCEnrollmentScope citrixorchestration.RemotePCEnrollmentScopeRequestModel
 			remotePCEnrollmentScope.SetIncludeSubfolders(ou.IncludeSubFolders.ValueBool())
-			remotePCEnrollmentScope.SetOU(ou.OUName.ValueString())
+			remotePCEnrollmentScope.SetOU(identityContainer.GetDistinguishedName())
 			remotePCEnrollmentScope.SetIsOrganizationalUnit(true)
 			remotePCEnrollmentScopes = append(remotePCEnrollmentScopes, remotePCEnrollmentScope)
 		}
@@ -28,6 +43,18 @@ func getRemotePcEnrollmentScopes(ctx context.Context, diagnostics *diag.Diagnost
 		machineAccounts := util.ObjectListToTypedArray[MachineAccountsModel](ctx, diagnostics, plan.MachineAccounts)
 		for _, machineAccount := range machineAccounts {
 			machines := util.ObjectListToTypedArray[MachineCatalogMachineModel](ctx, diagnostics, machineAccount.Machines)
+
+			// verify machine accounts using Identity API
+			httpResp, err := verifyMachinesUsingIdentity(ctx, client, machines)
+			if err != nil {
+				diagnostics.AddError(
+					"An error occurred while fetching machines using identity",
+					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+						"\nError message: "+util.ReadClientError(err),
+				)
+				return remotePCEnrollmentScopes, err
+			}
+
 			for _, machine := range machines {
 				var remotePCEnrollmentScope citrixorchestration.RemotePCEnrollmentScopeRequestModel
 				remotePCEnrollmentScope.SetIncludeSubfolders(false)
@@ -38,7 +65,7 @@ func getRemotePcEnrollmentScopes(ctx context.Context, diagnostics *diag.Diagnost
 		}
 	}
 
-	return remotePCEnrollmentScopes
+	return remotePCEnrollmentScopes, nil
 }
 
 func (r MachineCatalogResourceModel) updateCatalogWithRemotePcConfig(ctx context.Context, diagnostics *diag.Diagnostics, catalog *citrixorchestration.MachineCatalogDetailResponseModel) MachineCatalogResourceModel {

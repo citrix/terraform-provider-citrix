@@ -6,7 +6,7 @@ This automation script is designed to onboard an existing site to Terraform. It 
 
 - PowerShell version `5.0` or higher
 - Citrix Provider version `0.5.2` or higher
-- For On-Premises Customers: CVAD DDC `version 2308` or newer.
+- For On-Premises Customers: CVAD DDC `version 2311` or newer.
 
 ## Workflow:
 

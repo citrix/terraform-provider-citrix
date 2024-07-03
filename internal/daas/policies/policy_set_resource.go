@@ -20,14 +20,16 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &policySetResource{}
-	_ resource.ResourceWithConfigure   = &policySetResource{}
-	_ resource.ResourceWithImportState = &policySetResource{}
-	_ resource.ResourceWithModifyPlan  = &policySetResource{}
+	_ resource.Resource                   = &policySetResource{}
+	_ resource.ResourceWithConfigure      = &policySetResource{}
+	_ resource.ResourceWithImportState    = &policySetResource{}
+	_ resource.ResourceWithValidateConfig = &policySetResource{}
+	_ resource.ResourceWithModifyPlan     = &policySetResource{}
 )
 
 // NewPolicySetResource is a helper function to simplify the provider implementation.
@@ -121,7 +123,7 @@ func (r *policySetResource) Configure(_ context.Context, req resource.ConfigureR
 
 // Schema implements resource.Resource.
 func (*policySetResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = GetSchema()
+	resp.Schema = PolicySetResourceModel{}.GetSchema()
 }
 
 // Create implements resource.Resource.
@@ -938,4 +940,18 @@ func constructPolicyPriorityRequest(ctx context.Context, client *citrixdaasclien
 	createPolicyPriorityRequest = createPolicyPriorityRequest.PolicySetGuid(policySetId)
 	createPolicyPriorityRequest = createPolicyPriorityRequest.RequestBody(util.ConvertBaseStringArrayToPrimitiveStringArray(policyPriority))
 	return createPolicyPriorityRequest
+}
+
+func (r *policySetResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data PolicySetResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }

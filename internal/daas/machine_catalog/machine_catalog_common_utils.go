@@ -15,7 +15,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"golang.org/x/exp/slices"
 )
 
 func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, isOnPremises bool) (*citrixorchestration.CreateMachineCatalogRequestModel, error) {
@@ -37,7 +39,7 @@ func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ct
 	// Generate API request body from plan
 	body.SetName(plan.Name.ValueString())
 	body.SetDescription(plan.Description.ValueString())
-	body.SetProvisioningType(*provisioningType) // Only support MCS and Manual. Block other types
+	body.SetProvisioningType(*provisioningType) // Only support MCS, PVS Streaming and Manual. Block other types
 	allocationType, err := citrixorchestration.NewAllocationTypeFromValue(plan.AllocationType.ValueString())
 	if err != nil {
 		diagnostics.AddError(
@@ -57,7 +59,8 @@ func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ct
 	}
 	body.SetSessionSupport(*sessionSupport)
 	persistChanges := citrixorchestration.PERSISTCHANGES_DISCARD
-	if *sessionSupport == citrixorchestration.SESSIONSUPPORT_SINGLE_SESSION && *allocationType == citrixorchestration.ALLOCATIONTYPE_STATIC {
+	if *provisioningType == citrixorchestration.PROVISIONINGTYPE_MANUAL ||
+		(*provisioningType != citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING && *sessionSupport == citrixorchestration.SESSIONSUPPORT_SINGLE_SESSION && *allocationType == citrixorchestration.ALLOCATIONTYPE_STATIC) {
 		persistChanges = citrixorchestration.PERSISTCHANGES_ON_LOCAL
 	}
 	body.SetPersistUserChanges(persistChanges)
@@ -83,8 +86,8 @@ func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ct
 		body.SetScopes(plannedScopes)
 	}
 
-	if *provisioningType == citrixorchestration.PROVISIONINGTYPE_MCS {
-		provisioningScheme, err := getProvSchemeForMcsCatalog(plan, ctx, client, diagnostics, isOnPremises)
+	if *provisioningType == citrixorchestration.PROVISIONINGTYPE_MCS || *provisioningType == citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING {
+		provisioningScheme, err := getProvSchemeForCatalog(plan, ctx, client, diagnostics, isOnPremises, provisioningType)
 		if err != nil {
 			return nil, err
 		}
@@ -102,7 +105,10 @@ func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ct
 	body.SetIsRemotePC(plan.IsRemotePc.ValueBool())
 
 	if isRemotePcCatalog {
-		remotePCEnrollmentScopes := getRemotePcEnrollmentScopes(ctx, diagnostics, plan, true)
+		remotePCEnrollmentScopes, err := getRemotePcEnrollmentScopes(ctx, diagnostics, client, plan, true)
+		if err != nil {
+			return nil, err
+		}
 		body.SetRemotePCEnrollmentScopes(remotePCEnrollmentScopes)
 	} else {
 		machinesRequest, err = getMachinesForManualCatalogs(ctx, diagnostics, client, util.ObjectListToTypedArray[MachineAccountsModel](ctx, diagnostics, plan.MachineAccounts))
@@ -159,7 +165,10 @@ func getRequestModelForUpdateMachineCatalog(plan MachineCatalogResourceModel, ct
 	if *provisioningType == citrixorchestration.PROVISIONINGTYPE_MANUAL {
 
 		if plan.IsRemotePc.ValueBool() {
-			remotePCEnrollmentScopes := getRemotePcEnrollmentScopes(ctx, &resp.Diagnostics, plan, false)
+			remotePCEnrollmentScopes, err := getRemotePcEnrollmentScopes(ctx, &resp.Diagnostics, client, plan, false)
+			if err != nil {
+				return nil, err
+			}
 			body.SetRemotePCEnrollmentScopes(remotePCEnrollmentScopes)
 		}
 
@@ -171,7 +180,7 @@ func getRequestModelForUpdateMachineCatalog(plan MachineCatalogResourceModel, ct
 		return nil, fmt.Errorf("identity type %s is not supported in OnPremises environment. ", provSchemeModel.IdentityType.ValueString())
 	}
 
-	body, err = setProvSchemePropertiesForUpdateCatalog(provSchemeModel, body, ctx, client, &resp.Diagnostics)
+	body, err = setProvSchemePropertiesForUpdateCatalog(provSchemeModel, body, ctx, client, &resp.Diagnostics, provisioningType)
 	if err != nil {
 		return nil, err
 	}
@@ -230,7 +239,7 @@ func readMachineCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaas
 	return catalog, httpResp, err
 }
 
-func deleteMachinesFromCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, provisioningSchemePlan ProvisioningSchemeModel, machinesToDelete []citrixorchestration.MachineResponseModel, catalogNameOrId string, isMcsCatalog bool) error {
+func deleteMachinesFromCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, provisioningSchemePlan ProvisioningSchemeModel, machinesToDelete []citrixorchestration.MachineResponseModel, catalogNameOrId string, isMcsOrPvsCatalog bool) error {
 	batchApiHeaders, httpResp, err := generateBatchApiHeaders(ctx, &resp.Diagnostics, client, provisioningSchemePlan, false)
 	txId := citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
 	if err != nil {
@@ -302,7 +311,7 @@ func deleteMachinesFromCatalog(ctx context.Context, client *citrixdaasclient.Cit
 		}
 	}
 
-	batchApiHeaders, httpResp, err = generateBatchApiHeaders(ctx, &resp.Diagnostics, client, provisioningSchemePlan, isMcsCatalog)
+	batchApiHeaders, httpResp, err = generateBatchApiHeaders(ctx, &resp.Diagnostics, client, provisioningSchemePlan, isMcsOrPvsCatalog)
 	txId = citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -314,13 +323,13 @@ func deleteMachinesFromCatalog(ctx context.Context, client *citrixdaasclient.Cit
 	}
 
 	deleteAccountOpion := "Leave"
-	if isMcsCatalog {
+	if isMcsOrPvsCatalog {
 		deleteAccountOpion = "Delete"
 	}
 	batchRequestItems = []citrixorchestration.BatchRequestItemModel{}
 	for index, machineToDelete := range machinesToDelete {
 		var batchRequestItem citrixorchestration.BatchRequestItemModel
-		relativeUrl := fmt.Sprintf("/Machines/%s?deleteVm=%t&purgeDBOnly=false&deleteAccount=%s&async=true", machineToDelete.GetId(), isMcsCatalog, deleteAccountOpion)
+		relativeUrl := fmt.Sprintf("/Machines/%s?deleteVm=%t&purgeDBOnly=false&deleteAccount=%s&async=true", machineToDelete.GetId(), isMcsOrPvsCatalog, deleteAccountOpion)
 		batchRequestItem.SetReference(strconv.Itoa(index))
 		batchRequestItem.SetMethod(http.MethodDelete)
 		batchRequestItem.SetHeaders(batchApiHeaders)
@@ -373,4 +382,67 @@ func (scope RemotePcOuModel) RefreshListItem(_ context.Context, _ *diag.Diagnost
 	scope.IncludeSubFolders = types.BoolValue(remote.GetIncludeSubfolders())
 
 	return scope
+}
+
+func verifyMachinesUsingIdentity(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, machines []MachineCatalogMachineModel) (*http.Response, error) {
+	machineAccounts := []string{}
+	for _, machine := range machines {
+		machineAccounts = append(machineAccounts, machine.MachineAccount.ValueString())
+	}
+	_, httpResp, err := getMachinesUsingIdentity(ctx, client, machineAccounts)
+	return httpResp, err
+}
+
+func getMachinesUsingIdentity(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, machines []string) ([]citrixorchestration.IdentityMachineResponseModel, *http.Response, error) {
+	getMachinesRequest := client.ApiClient.IdentityAPIsDAAS.IdentityGetMachines(ctx)
+	getMachinesRequest = getMachinesRequest.Machine(machines)
+	identityMachinesResponseModel, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.IdentityMachineResponseModelCollection](getMachinesRequest, client)
+
+	identityMachines := identityMachinesResponseModel.GetItems()
+
+	if err != nil {
+		return identityMachines, httpResp, err
+	}
+
+	err = verifyIdentityMachineListCompleteness(machines, identityMachines)
+
+	if err != nil {
+		return identityMachines, httpResp, err
+	}
+
+	return identityMachines, httpResp, nil
+}
+
+func verifyIdentityMachineListCompleteness(inputMachines []string, remoteMachines []citrixorchestration.IdentityMachineResponseModel) error {
+	missingMachines := []string{}
+	for _, inputMachine := range inputMachines {
+		machineIndex := slices.IndexFunc(remoteMachines, func(i citrixorchestration.IdentityMachineResponseModel) bool {
+			return strings.EqualFold(inputMachine+"$", i.GetSamName()) // Sam account name of machine has a trailing '$' (this is to differentiate machine from user accounts)
+		})
+		if machineIndex == -1 {
+			missingMachines = append(missingMachines, inputMachine)
+		}
+	}
+
+	if len(missingMachines) > 0 {
+		return fmt.Errorf("The following machines could not be found: " + strings.Join(missingMachines, ", "))
+	}
+
+	return nil
+}
+
+func checkIfCatalogAttributeCanBeUpdated(ctx context.Context, state tfsdk.State) bool {
+	var stateModel MachineCatalogResourceModel
+	_ = state.Get(ctx, &stateModel)
+
+	// Attribute can be set during catalog creation process, so return true
+	if stateModel.Id.ValueString() == "" {
+		return true
+	}
+
+	if stateModel.ProvisioningType.ValueString() == string(citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING) {
+		return false
+	}
+
+	return true
 }

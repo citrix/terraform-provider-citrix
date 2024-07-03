@@ -14,10 +14,10 @@ StoreFront WebReceiver.
 
 ```terraform
 resource "citrix_stf_webreceiver_service" "example-stf-webreceiver-service"{
-  	site_id      = "citrix_stf_deployment.testSTFDeployment.site_id"
+  	site_id      = citrix_stf_deployment.example-stf-deployment.site_id
 	virtual_path = "/Citrix/StoreWeb"
 	friendly_name = "Receiver"
-  	store_service = "${citrix_stf_store_service.example-stf-store-service.virtual_path}"
+  	store_virtual_path = citrix_stf_store_service.example-stf-store-service.virtual_path
 	authentication_methods = [ 
       "ExplicitForms", 
 	  "CitrixAGBasic"
@@ -28,6 +28,60 @@ resource "citrix_stf_webreceiver_service" "example-stf-webreceiver-service"{
 		upgrade_at_login = true
 		html5_enabled = "Fallback"
 	}
+	application_shortcuts = {
+		prompt_for_untrusted_shortcuts = true
+		trusted_urls                   = [ "https://example.trusted.url/" ]
+		gateway_urls                   = [ "https://example.gateway.url/" ]
+	}
+	communication = {
+		attempts = 1
+		timeout = "0.0:3:0"
+		loopback = "Off"
+		loopback_port_using_http = 80
+		proxy_enabled = false
+		proxy_port = 8888
+		proxy_process_name = "Fiddler"
+	}
+	strict_transport_security = {
+		enabled = false
+		policy_duration = "90.0:0:0"
+	}
+	authentication_manager = {
+		login_form_timeout = 5
+	}
+	user_interface = {
+			auto_launch_desktop = true
+			multi_click_timeout = 3
+			enable_apps_folder_view = true
+			workspace_control = {
+				enabled = true
+				auto_reconnect_at_logon = true
+				logoff_action = "Disconnect"
+				show_reconnect_button = false
+				show_disconnect_button = false
+			}
+			receiver_configuration = {
+				enabled = true
+			}
+			app_shortcuts = {
+				enabled = true
+				show_desktop_shortcut = true	
+			}
+			ui_views = {
+				show_apps_view = true
+				show_desktops_view = true
+				default_view = "Auto"
+			}
+			category_view_collapsed = false
+			move_app_to_uncategorized = true
+			progressive_web_app = {
+				enabled = false
+				show_install_prompt = false
+			}
+			show_activity_manager = true
+			show_first_time_use = true
+			prevent_ica_downloads = false
+		}
 }
 ```
 
@@ -36,15 +90,61 @@ resource "citrix_stf_webreceiver_service" "example-stf-webreceiver-service"{
 
 ### Required
 
+- `store_virtual_path` (String) The Virtual Path of the StoreFront Store Service linked to the WebReceiver.
 - `virtual_path` (String) The IIS VirtualPath at which the WebReceiver will be configured to be accessed by Receivers.
 
 ### Optional
 
+- `application_shortcuts` (Attributes) Application shortcuts configurations for the WebReceiver. (see [below for nested schema](#nestedatt--application_shortcuts))
+- `authentication_manager` (Attributes) WebReceiver Authentication Manager client options. (see [below for nested schema](#nestedatt--authentication_manager))
 - `authentication_methods` (Set of String) The authentication methods supported by the WebReceiver.
+- `communication` (Attributes) Communication settings used for the WebReceiver proxy. (see [below for nested schema](#nestedatt--communication))
 - `friendly_name` (String) The friendly name of the WebReceiver
 - `plugin_assistant` (Attributes) Pluin Assistant configuration for the WebReceiver. (see [below for nested schema](#nestedatt--plugin_assistant))
 - `site_id` (String) The IIS site id of the StoreFront webreceiver. Defaults to 1.
-- `store_service` (String) The StoreFront Store Service linked to the WebReceiver.
+- `strict_transport_security` (Attributes) Communication settings used for the WebReceiver proxy. (see [below for nested schema](#nestedatt--strict_transport_security))
+- `user_interface` (Attributes) User interface configuration for the WebReceiver. (see [below for nested schema](#nestedatt--user_interface))
+
+<a id="nestedatt--application_shortcuts"></a>
+### Nested Schema for `application_shortcuts`
+
+Required:
+
+- `prompt_for_untrusted_shortcuts` (Boolean) Display confirmation dialog when Receiver for Web cannot determine if an app shortcut originated from a trusted internal site.
+
+Optional:
+
+- `gateway_urls` (Set of String) Set of gateways through which shortcuts will be provided to users.
+- `trusted_urls` (Set of String) Set of internal web sites that will provide app shortcuts to users.
+
+
+<a id="nestedatt--authentication_manager"></a>
+### Nested Schema for `authentication_manager`
+
+Optional:
+
+- `login_form_timeout` (Number) The WebReceiver login form timeout in minutes. Defaults to `5`.
+
+Read-Only:
+
+- `change_credentials_url` (String) The URL to initiate a change password operation. Defaults to `ExplicitAuth/GetChangeCredentialForm`.
+- `get_user_name_url` (String) The URL to obtain the full username. Defaults to `Authentication/GetUserName`.
+- `logoff_url` (String) The URL to log off the Citrix Receiver for Web session. Defaults to `Authentication/Logoff`.
+
+
+<a id="nestedatt--communication"></a>
+### Nested Schema for `communication`
+
+Optional:
+
+- `attempts` (Number) The number of attempts WebReceiver should make to contact StoreFront before it gives up. Defaults to `1`.
+- `loopback` (String) Whether to use the loopback address for communications with the store service, rather than the actual StoreFront server URL. Available values are `On`, `Off`, `OnUsingHttp`. Defaults to `Off`.
+- `loopback_port_using_http` (Number) When loopback is set to `OnUsingHttp`, the port number to use for loopback communications. Defaults to `80`.
+- `proxy_enabled` (Boolean) Whether the communications proxy is enabled. Defaults to `false`.
+- `proxy_port` (Number) The port to use for the communications proxy. Defaults to `8888`.
+- `proxy_process_name` (String) The name of the process acting as proxy. Defaults to `Fiddler`.
+- `timeout` (String) Timeout value for communicating with StoreFront in `dd.hh:mm:ss` format with 0's trimmed. Defaults to `0.0:3:0`.
+
 
 <a id="nestedatt--plugin_assistant"></a>
 ### Nested Schema for `plugin_assistant`
@@ -66,6 +166,86 @@ Optional:
 - `show_after_login` (Boolean) Show Plugin Assistant after the user logs in.
 - `upgrade_at_login` (Boolean) Prompt to upgrade older clients.
 - `win32_path` (String) Path to the Windows Receiver.
+
+
+<a id="nestedatt--strict_transport_security"></a>
+### Nested Schema for `strict_transport_security`
+
+Optional:
+
+- `enabled` (Boolean) Whether to enable the HTTP Strict Transport Security feature. Defaults to `false`.
+- `policy_duration` (String) The time period for which browsers should apply HSTS to the RfWeb site in `dd.hh:mm:ss` format with 0's trimmed. Defaults to `90.0:0:0`.
+
+
+<a id="nestedatt--user_interface"></a>
+### Nested Schema for `user_interface`
+
+Optional:
+
+- `app_shortcuts` (Attributes) App shortcuts configuration for the WebReceiver. (see [below for nested schema](#nestedatt--user_interface--app_shortcuts))
+- `auto_launch_desktop` (Boolean) Whether to auto-launch desktop at login if there is only one desktop available for the user. Defaults to `true`.
+- `category_view_collapsed` (Boolean) Collapse the category view so that only the immediate contents of the selected category/sub-catagory are displayed. Defaults to `false`.
+- `enable_apps_folder_view` (Boolean) Allows the user to turn off folder view when in a locked-down store or unauthenticated store. Defaults to `true`.
+- `move_app_to_uncategorized` (Boolean) Move uncategorized apps into a folder named ‘Uncategorized’ when the category view is collapsed. Defaults to `true`.
+- `multi_click_timeout` (Number) The time period in seconds for which the spinner control is displayed, after the user clicks on the App/Desktop icon within Receiver for Web. Defaults to `3`.
+- `prevent_ica_downloads` (Boolean) Prevent download of ICA Files. Defaults to `false`. StoreFront version 2402 or higher is required to modify this setting.
+- `progressive_web_app` (Attributes) Progressive Web App configuration for the WebReceiver. (see [below for nested schema](#nestedatt--user_interface--progressive_web_app))
+- `receiver_configuration` (Attributes) Receiver configuration for the WebReceiver. (see [below for nested schema](#nestedatt--user_interface--receiver_configuration))
+- `show_activity_manager` (Boolean) Enable the Activity Manager within the end user interface. Defaults to `true`.
+- `show_first_time_use` (Boolean) Enable the showing of the First Time Use screen within the end user interface. Defaults to `true`.
+- `ui_views` (Attributes) UI view configuration for the WebReceiver. (see [below for nested schema](#nestedatt--user_interface--ui_views))
+- `workspace_control` (Attributes) Workspace control configuration for the WebReceiver. (see [below for nested schema](#nestedatt--user_interface--workspace_control))
+
+<a id="nestedatt--user_interface--app_shortcuts"></a>
+### Nested Schema for `user_interface.app_shortcuts`
+
+Optional:
+
+- `allow_session_reconnect` (Boolean) Enable App Shortcuts to support session reconnect. Defaults to `false`.
+- `enabled` (Boolean) Enable app shortcuts. Defaults to `false`.
+
+
+<a id="nestedatt--user_interface--progressive_web_app"></a>
+### Nested Schema for `user_interface.progressive_web_app`
+
+Optional:
+
+- `enabled` (Boolean) Enable Progressive Web App support. Defaults to `false`.
+- `show_install_prompt` (Boolean) Enable prompt to install Progressive Web App. Defaults to `false`.
+
+
+<a id="nestedatt--user_interface--receiver_configuration"></a>
+### Nested Schema for `user_interface.receiver_configuration`
+
+Optional:
+
+- `enabled` (Boolean) Enable the Receiver Configuration .cr file download. Defaults to `true`.
+
+Read-Only:
+
+- `download_url` (String) The URL to download the Receiver Configuration .cr file.
+
+
+<a id="nestedatt--user_interface--ui_views"></a>
+### Nested Schema for `user_interface.ui_views`
+
+Optional:
+
+- `default_view` (String) The view to show after logon. Available values are `Auto`, `Desktops`, and `Apps`. Defaults to `Auto`.
+- `show_apps_view` (Boolean) Whether to show the apps view tab. Defaults to `true`.
+- `show_desktops_view` (Boolean) Whether to show the desktops tab. Defaults to `true`.
+
+
+<a id="nestedatt--user_interface--workspace_control"></a>
+### Nested Schema for `user_interface.workspace_control`
+
+Optional:
+
+- `auto_reconnect_at_logon` (Boolean) Whether to perform auto-reconnect at login. Defaults to `true`.
+- `enabled` (Boolean) Whether to enable workspace control. Defaults to `true`.
+- `logoff_action` (String) Whether to disconnect or terminate HDX sessions when actively logging off Receiver for Web. Available values are `Disconnect`, `Terminate`, and `None`. Defaults to `Disconnect`.
+- `show_disconnect_button` (Boolean) Whether to show the disconnect button/link. Defaults to `false`.
+- `show_reconnect_button` (Boolean) Whether to show the reconnect button/link. Defaults to `false`.
 
 ## Import
 

@@ -100,12 +100,14 @@ In order to reduce errors this project has introduced a system to convert betwee
 | `T` | `types.Object` | `TypedObjectToObjectValue` | `T` must implement `ModelWithAttributes` |
 | `types.List` | `T[]` | `ObjectListToTypedArray[T]` | `T` must implement `ModelWithAttributes`. For a list of nested objects |
 | `T[]` | `types.List` | `TypedArrayToObjectList[T]` | `T` must implement `ModelWithAttributes`. For a list of nested objects |
+| `types.Set` | `T[]` | `ObjectSetToTypedArray[T]` | `T` must implement `ModelWithAttributes`. For a set of nested objects |
+| `T[]` | `types.Set` | `TypedArrayToObjectSet[T]` | `T` must implement `ModelWithAttributes`. For a set of nested objects |
 | `types.List` | `string[]` | `StringListToStringArray` | For a list of strings |
 | `string[]` | `types.List` | `StringArrayToStringList` | For a list of strings |
 | `types.Set` | `string[]` | `StringSetToStringArray` | For a set of strings |
 | `string[]` | `types.Set` | `StringArrayToStringSet` | For a set of strings |
 
-In order to use the first 4 of these methods, the struct `T` needs to implement the [ModelWithAttributes](internal/util/types.go) interface which is ultimately populated from the attribute's Schema. This gives the Terraform type system the necessary information to populate a `types.Object` or `types.List` with a nested object.
+In order to use the first 6 of these methods, the struct `T` needs to implement the [ModelWithAttributes](internal/util/types.go) interface which is ultimately populated from the attribute's Schema. This gives the Terraform type system the necessary information to populate a `types.Object` or `types.List` with a nested object.
 
 ### Preserving order in lists
 Often time the order of elements in a list does not matter to the service. In this case one of the following helper functions should be used. These functions will get state list in sync with the remote list while preserving the order in the state when possible. 

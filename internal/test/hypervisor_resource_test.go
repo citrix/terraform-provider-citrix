@@ -322,6 +322,72 @@ func TestHypervisorResourceNutanix(t *testing.T) {
 	})
 }
 
+func TestHypervisorPreCheck_SCVMM(t *testing.T) {
+	if v := os.Getenv("TEST_ZONE_NAME_SCVMM"); v == "" {
+		t.Fatal("TEST_ZONE_NAME_SCVMM must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_NAME_SCVMM"); v == "" {
+		t.Fatal("TEST_HYPERV_NAME_SCVMM must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_USERNAME_SCVMM"); v == "" {
+		t.Fatal("TEST_HYPERV_USERNAME_SCVMM must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_PASSWORD_PLAINTEXT_SCVMM"); v == "" {
+		t.Fatal("TEST_HYPERV_PASSWORD_PLAINTEXT_SCVMM must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_ADDRESS_SCVMM"); v == "" {
+		t.Fatal("TEST_HYPERV_ADDRESS_SCVMM must be set for acceptance tests")
+	}
+}
+
+func TestHypervisorResourceSCVMM(t *testing.T) {
+	name := os.Getenv("TEST_HYPERV_NAME_SCVMM")
+	username := os.Getenv("TEST_HYPERV_USERNAME_SCVMM")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck: func() {
+			TestProviderPreCheck(t)
+			TestHypervisorPreCheck_SCVMM(t)
+		},
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: composeTestResourceTf(BuildHypervisorResourceSCVMM(t, hypervisor_testResources_scvmm), BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_SCVMM"))),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify name of hypervisor
+					resource.TestCheckResourceAttr("citrix_scvmm_hypervisor.testHypervisor", "name", name),
+					resource.TestCheckResourceAttr("citrix_scvmm_hypervisor.testHypervisor", "username", username),
+					resource.TestCheckResourceAttr("citrix_scvmm_hypervisor.testHypervisor", "addresses.#", "1"),
+					resource.TestCheckResourceAttr("citrix_scvmm_hypervisor.testHypervisor", "max_absolute_active_actions", "50"),
+					resource.TestCheckResourceAttr("citrix_scvmm_hypervisor.testHypervisor", "max_absolute_new_actions_per_minute", "10"),
+					resource.TestCheckResourceAttr("citrix_scvmm_hypervisor.testHypervisor", "max_power_actions_percentage_of_machines", "10"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "citrix_scvmm_hypervisor.testHypervisor",
+				ImportState:       true,
+				ImportStateVerify: true,
+				// The last_updated attribute does not exist in the Orchestration
+				// API, therefore there is no value for it during import.
+				ImportStateVerifyIgnore: []string{"password", "password_format"},
+			},
+			// Update and Read testing
+			{
+				Config: composeTestResourceTf(BuildHypervisorResourceSCVMM(t, hypervisor_testResources_updated_scvmm), BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_SCVMM"))),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify name of hypervisor
+					resource.TestCheckResourceAttr("citrix_scvmm_hypervisor.testHypervisor", "name", fmt.Sprintf("%s-updated", name)),
+					resource.TestCheckResourceAttr("citrix_scvmm_hypervisor.testHypervisor", "max_absolute_active_actions", "40"),
+					resource.TestCheckResourceAttr("citrix_scvmm_hypervisor.testHypervisor", "max_absolute_new_actions_per_minute", "30"),
+					resource.TestCheckResourceAttr("citrix_scvmm_hypervisor.testHypervisor", "max_power_actions_percentage_of_machines", "20"),
+				),
+			},
+		},
+	})
+}
+
 func TestHypervisorPreCheck_AWS_EC2(t *testing.T) {
 	if v := os.Getenv("TEST_ZONE_NAME_AWS_EC2"); v == "" {
 		t.Fatal("TEST_ZONE_NAME_AWS_EC2 must be set for acceptance tests")
@@ -526,6 +592,38 @@ var (
 	`
 )
 
+// test resources for SCVMM hypervisor
+var (
+	hypervisor_testResources_scvmm = `
+	resource citrix_scvmm_hypervisor "testHypervisor" {
+		name                = "%s"
+		zone                = %s
+		username = "%s"
+		password = "%s"
+		password_format = "PlainText"
+		addresses = [
+			"%s"
+		]
+	}
+	`
+
+	hypervisor_testResources_updated_scvmm = `
+	resource citrix_scvmm_hypervisor "testHypervisor" {
+		name                = "%s-updated"
+		zone                = %s
+		username = "%s"
+		password = "%s"
+		password_format = "PlainText"
+		addresses = [
+			"%s"
+		]		
+		max_absolute_active_actions = 40
+		max_absolute_new_actions_per_minute = 30
+		max_power_actions_percentage_of_machines = 20
+	}
+	`
+)
+
 // test resources for AWS EC2 hypervisor
 var (
 	hypervisor_testResources_aws_ec2 = `
@@ -593,6 +691,15 @@ func BuildHypervisorResourceNutanix(t *testing.T, hypervisor string) string {
 	username := os.Getenv("TEST_HYPERV_USERNAME_NUTANIX")
 	password := os.Getenv("TEST_HYPERV_PASSWORD_PLAINTEXT_NUTANIX")
 	address := os.Getenv("TEST_HYPERV_ADDRESS_NUTANIX")
+	zoneValueForHypervisor := "citrix_zone.test.id"
+	return fmt.Sprintf(hypervisor, name, zoneValueForHypervisor, username, password, address)
+}
+
+func BuildHypervisorResourceSCVMM(t *testing.T, hypervisor string) string {
+	name := os.Getenv("TEST_HYPERV_NAME_SCVMM")
+	username := os.Getenv("TEST_HYPERV_USERNAME_SCVMM")
+	password := os.Getenv("TEST_HYPERV_PASSWORD_PLAINTEXT_SCVMM")
+	address := os.Getenv("TEST_HYPERV_ADDRESS_SCVMM")
 	zoneValueForHypervisor := "citrix_zone.test.id"
 	return fmt.Sprintf(hypervisor, name, zoneValueForHypervisor, username, password, address)
 }

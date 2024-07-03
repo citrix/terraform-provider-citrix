@@ -50,6 +50,8 @@ func TestSTFUserFarmMappingResource(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		PreCheck: func() {
 			TestProviderPreCheck(t)
+			TestSTFDeploymentPreCheck(t)
+			TestSTFAuthenticationServicePreCheck(t)
 			TestSTFStoreServicePreCheck(t)
 			TestSTFUserFarmMappingResourcePreCheck(t)
 		},

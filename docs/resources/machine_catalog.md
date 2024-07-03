@@ -142,7 +142,7 @@ resource "citrix_machine_catalog" "example-gcp-mtsession" {
 
 resource "citrix_machine_catalog" "example-vsphere-mtsession" {
     name                        = "example-vsphere-mtsession"
-    description                 = "Example multi-session catalog on Vsphere hypervisor"
+    description                 = "Example multi-session catalog on vSphere hypervisor"
     zone                        = "<zone Id>"
     allocation_type             = "Random"
     session_support             = "MultiSession"
@@ -229,6 +229,48 @@ resource "citrix_machine_catalog" "example-nutanix-mtsession" {
             naming_scheme_type = "Numeric"
         }
     }
+}
+
+resource "citrix_machine_catalog" "example-azure-pvs-mtsession" {
+	name                		= "example-azure-pvs-mtsession"
+	description					= "Example multi-session catalog on Azure hypervisor"
+	zone						= "<zone Id>"
+	allocation_type				= "Random"
+	session_support				= "MultiSession"
+	provisioning_type 			= "PVSStreaming"
+	provisioning_scheme			= 	{
+		hypervisor = citrix_azure_hypervisor.example-azure-hypervisor.id
+		hypervisor_resource_pool = citrix_azure_hypervisor_resource_pool.example-azure-hypervisor-resource-pool.id
+		identity_type      = "ActiveDirectory"
+		machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+			domain_ou				 = "<DomainOU>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+		azure_machine_config = {
+			storage_type = "Standard_LRS"
+            azure_pvs_config = {
+                pvs_site_id = data.citrix_pvs.example_pvs_config.pvs_site_id
+				pvs_vdisk_id = data.citrix_pvs.example_pvs_config.pvs_vdisk_id
+            }
+			use_managed_disks = true
+            service_offering = "Standard_D2_v2"
+			writeback_cache = {
+				wbc_disk_storage_type = "Standard_LRS"
+				persist_wbc = true
+				persist_os_disk = true
+				persist_vm = true
+				writeback_cache_disk_size_gb = 127
+                writeback_cache_memory_size_mb = 256
+			}
+        }
+		number_of_total_machines = 	1
+		machine_account_creation_rules ={
+			naming_scheme =     "az-pvs-multi-##"
+			naming_scheme_type ="Numeric"
+		}
+	}
 }
 
 resource "citrix_machine_catalog" "example-manual-power-managed-mtsession" {
@@ -347,7 +389,6 @@ resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
 				storage_cost_saving = true
 			}
         }
-		availability_zones = ["1","2"]
 		number_of_total_machines = 	1
 		machine_account_creation_rules ={
 			naming_scheme =     "ndj-multi-##"
@@ -375,7 +416,7 @@ resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
 - `is_remote_pc` (Boolean) Specify if this catalog is for Remote PC access.
 - `machine_accounts` (Attributes List) Machine accounts to add to the catalog. Only to be used when using `provisioning_type = MANUAL` (see [below for nested schema](#nestedatt--machine_accounts))
 - `minimum_functional_level` (String) Specifies the minimum functional level for the VDA machines in the catalog. Defaults to `L7_20`.
-- `provisioning_scheme` (Attributes) Machine catalog provisioning scheme. Required when `provisioning_type = MCS` (see [below for nested schema](#nestedatt--provisioning_scheme))
+- `provisioning_scheme` (Attributes) Machine catalog provisioning scheme. Required when `provisioning_type = MCS` or `provisioning_type = PVS_STREAMING`. (see [below for nested schema](#nestedatt--provisioning_scheme))
 - `remote_pc_ous` (Attributes List) Organizational Units to be included in the Remote PC machine catalog. Only to be used when `is_remote_pc = true`. For adding machines, use `machine_accounts`. (see [below for nested schema](#nestedatt--remote_pc_ous))
 - `scopes` (Set of String) The IDs of the scopes for the machine catalog to be a part of.
 - `vda_upgrade_type` (String) Type of Vda Upgrade. Choose between LTSR and CR. When omitted, Vda Upgrade is disabled.
@@ -407,7 +448,7 @@ Optional:
 - `availability_zone` (String) **[AWS: Required]** The availability zone in which the machine resides. Required only if `is_power_managed = true`
 - `cluster` (String) **[vSphere: Optional]** The cluster in which the machine resides. To be used only if `is_power_managed = true`
 - `datacenter` (String) **[vSphere: Required]** The datacenter in which the machine resides. Required only if `is_power_managed = true`
-- `host` (String) **[vSphere: Required]** The IP address or FQDN of the host in which the machine resides. Required only if `is_power_managed = true`
+- `host` (String) **[vSphere, SCVMM: Required]** For vSphere, this is the IP address or FQDN of the host in which the machine resides. For SCVMM, this is the name of the host in which the machine resides. Required only if `is_power_managed = true`
 - `machine_name` (String) The name of the machine. Required only if `is_power_managed = true`
 - `project_name` (String) **[GCP: Required]** The project name in which the machine resides. Required only if `is_power_managed = true`
 - `region` (String) **[Azure, GCP: Required]** The region in which the machine resides. Required only if `is_power_managed = true`
@@ -430,7 +471,7 @@ Optional:
 
 - `availability_zones` (List of String) The Availability Zones for provisioning virtual machines.
 - `aws_machine_config` (Attributes) Machine Configuration For AWS EC2 MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--aws_machine_config))
-- `azure_machine_config` (Attributes) Machine Configuration For Azure MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config))
+- `azure_machine_config` (Attributes) Machine Configuration For Azure MCS and PVS Streaming catalogs. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config))
 - `custom_properties` (Attributes List) **This is an advanced feature. Use with caution.** Custom properties to be set for the machine catalog. For properties that are already supported as a terraform configuration field, please use terraform field instead. (see [below for nested schema](#nestedatt--provisioning_scheme--custom_properties))
 - `gcp_machine_config` (Attributes) Machine Configuration For GCP MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--gcp_machine_config))
 - `machine_domain_identity` (Attributes) The domain identity for machines in the machine catalog.<br />Required when identity_type is set to `ActiveDirectory` (see [below for nested schema](#nestedatt--provisioning_scheme--machine_domain_identity))
@@ -484,17 +525,18 @@ Optional:
 
 Required:
 
-- `azure_master_image` (Attributes) Details of the Azure Image to use for creating machines. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--azure_master_image))
 - `service_offering` (String) The Azure VM Sku to use when creating machines.
 - `storage_type` (String) Storage account type used for provisioned virtual machine disks on Azure. Storage types include: `Standard_LRS`, `StandardSSD_LRS` and `Premium_LRS`.
 
 Optional:
 
+- `azure_master_image` (Attributes) Details of the Azure Image to use for creating machines. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--azure_master_image))
+- `azure_pvs_config` (Attributes) PVS Configuration to create machine catalog using PVSStreaming. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--azure_pvs_config))
 - `disk_encryption_set` (Attributes) The configuration for Disk Encryption Set (DES). The DES must be in the same subscription and region as your resources. If your master image is encrypted with a DES, use the same DES when creating this machine catalog. When using a DES, if you later disable the key with which the corresponding DES is associated in Azure, you can no longer power on the machines in this catalog or add machines to it. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--disk_encryption_set))
 - `enroll_in_intune` (Boolean) Specify whether to enroll machines in Microsoft Intune. Use this property only when `identity_type` is set to `AzureAD`.
 - `image_update_reboot_options` (Attributes) The options for how rebooting is performed for image update. When omitted, image update on the VDAs will be performed on next shutdown. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--image_update_reboot_options))
 - `license_type` (String) Windows license type used to provision virtual machines in Azure at the base compute rate. License types include: `Windows_Client` and `Windows_Server`.
-- `machine_profile` (Attributes) The name of the virtual machine or template spec that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone.<br />Required when identity_type is set to `AzureAD` (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--machine_profile))
+- `machine_profile` (Attributes) The name of the virtual machine or template spec that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone.<br />Required when provisioning_type is set to PVSStreaming or when identity_type is set to `AzureAD` (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--machine_profile))
 - `master_image_note` (String) The note for the master image.
 - `use_azure_compute_gallery` (Attributes) Use this to place prepared image in Azure Compute Gallery. Required when `storage_type = Azure_Ephemeral_OS_Disk`. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--use_azure_compute_gallery))
 - `use_managed_disks` (Boolean) Indicate whether to use Azure managed disks for the provisioned virtual machine.
@@ -525,6 +567,15 @@ Required:
 - `gallery` (String) The Azure Image Gallery where the image for creating machines is located. Only applicable to Azure Image Gallery image.
 - `version` (String) The image version for the image to be used in the Azure Image Gallery. Only applicable to Azure Image Gallery image.
 
+
+
+<a id="nestedatt--provisioning_scheme--azure_machine_config--azure_pvs_config"></a>
+### Nested Schema for `provisioning_scheme.azure_machine_config.azure_pvs_config`
+
+Required:
+
+- `pvs_site_id` (String) The id of the PVS site to use for creating machines.
+- `pvs_vdisk_id` (String) The id of the PVS vDisk to use for creating machines.
 
 
 <a id="nestedatt--provisioning_scheme--azure_machine_config--disk_encryption_set"></a>
@@ -580,10 +631,13 @@ Required:
 
 - `persist_os_disk` (Boolean) Persist the OS disk when power cycling the non-persistent provisioned virtual machine.
 - `persist_vm` (Boolean) Persist the non-persistent provisioned virtual machine in Azure environments when power cycling. This property only applies when the PersistOsDisk property is set to True.
-- `persist_wbc` (Boolean) Persist Write-back Cache
-- `storage_cost_saving` (Boolean) Save storage cost by downgrading the storage type of the disk to Standard HDD when VM shut down.
 - `wbc_disk_storage_type` (String) Type of naming scheme. Choose between Numeric and Alphabetic.
 - `writeback_cache_disk_size_gb` (Number) The size in GB of any temporary storage disk used by the write back cache.
+
+Optional:
+
+- `persist_wbc` (Boolean) Persist Write-back Cache
+- `storage_cost_saving` (Boolean) Save storage cost by downgrading the storage type of the disk to Standard HDD when VM shut down.
 - `writeback_cache_memory_size_mb` (Number) The size of the in-memory write back cache in MB.
 
 
@@ -707,6 +761,7 @@ Optional:
 
 - `image_snapshot` (String) The Snapshot of the virtual machine specified in `master_image_vm`. Specify the relative path of the snapshot. Eg: snaphost-1/snapshot-2/snapshot-3. This property is case sensitive.
 - `image_update_reboot_options` (Attributes) The options for how rebooting is performed for image update. When omitted, image update on the VDAs will be performed on next shutdown. (see [below for nested schema](#nestedatt--provisioning_scheme--vsphere_machine_config--image_update_reboot_options))
+- `machine_profile` (String) The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics and host cache property of OS disk.
 - `master_image_note` (String) The note for the master image.
 - `writeback_cache` (Attributes) Write-back Cache config. Leave this empty to disable Write-back Cache. (see [below for nested schema](#nestedatt--provisioning_scheme--vsphere_machine_config--writeback_cache))
 

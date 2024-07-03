@@ -33,7 +33,7 @@ type GcpHypervisorResourceModel struct {
 	ServiceAccountCredentials types.String `tfsdk:"service_account_credentials"`
 }
 
-func GetGcpHypervisorSchema() schema.Schema {
+func (GcpHypervisorResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "Manages a GCP hypervisor.",
 		Attributes: map[string]schema.Attribute{
@@ -84,6 +84,10 @@ func GetGcpHypervisorSchema() schema.Schema {
 			},
 		},
 	}
+}
+
+func (GcpHypervisorResourceModel) GetAttributes() map[string]schema.Attribute {
+	return GcpHypervisorResourceModel{}.GetSchema().Attributes
 }
 
 func (r GcpHypervisorResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel) GcpHypervisorResourceModel {

@@ -11,13 +11,15 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &xenserverHypervisorResource{}
-	_ resource.ResourceWithConfigure   = &xenserverHypervisorResource{}
-	_ resource.ResourceWithImportState = &xenserverHypervisorResource{}
+	_ resource.Resource                   = &xenserverHypervisorResource{}
+	_ resource.ResourceWithConfigure      = &xenserverHypervisorResource{}
+	_ resource.ResourceWithImportState    = &xenserverHypervisorResource{}
+	_ resource.ResourceWithValidateConfig = &xenserverHypervisorResource{}
 )
 
 // NewHypervisorResource is a helper function to simplify the provider implementation.
@@ -45,7 +47,7 @@ func (r *xenserverHypervisorResource) Configure(_ context.Context, req resource.
 
 // Schema implements resource.Resource.
 func (r *xenserverHypervisorResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = GetXenServerHypervisorSchema()
+	resp.Schema = XenserverHypervisorResourceModel{}.GetSchema()
 }
 
 // ImportState implements resource.ResourceWithImportState.
@@ -243,4 +245,18 @@ func (r *xenserverHypervisorResource) Delete(ctx context.Context, req resource.D
 		)
 		return
 	}
+}
+
+func (r *xenserverHypervisorResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data XenserverHypervisorResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }

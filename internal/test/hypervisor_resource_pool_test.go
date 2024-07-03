@@ -366,6 +366,82 @@ func TestHypervisorResourcePoolNutanix(t *testing.T) {
 	})
 }
 
+func TestHypervisorResourcePoolPreCheck_SCVMM(t *testing.T) {
+	if v := os.Getenv("TEST_HYPERV_RP_NAME_SCVMM"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_NAME_SCVMM must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_RP_HOST_SCVMM"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_HOST_SCVMM must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_RP_NETWORK_SCVMM"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_NETWORK_SCVMM must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_RP_STORAGE_1_SCVMM"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_STORAGE_1_SCVMM must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_RP_STORAGE_2_SCVMM"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_STORAGE_2_SCVMM must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_HYPERV_RP_TEMP_STORAGE_SCVMM"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_TEMP_STORAGE_SCVMM must be set for acceptance tests")
+	}
+}
+
+func TestHypervisorResourcePoolSCVMM(t *testing.T) {
+	name := os.Getenv("TEST_HYPERV_RP_NAME_SCVMM")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck: func() {
+			TestProviderPreCheck(t)
+			TestHypervisorPreCheck_SCVMM(t)
+			TestHypervisorResourcePoolPreCheck_SCVMM(t)
+		},
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: composeTestResourceTf(
+					BuildHypervisorResourcePoolResourceSCVMM(t, hypervisor_resource_pool_testResource_scvmm),
+					BuildHypervisorResourceSCVMM(t, hypervisor_testResources_scvmm),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_SCVMM")),
+				),
+
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("citrix_scvmm_hypervisor_resource_pool.testHypervisorResourcePool", "name", name),
+					// Verify name of the region
+					resource.TestCheckResourceAttr("citrix_scvmm_hypervisor_resource_pool.testHypervisorResourcePool", "networks.#", "1"),
+					resource.TestCheckResourceAttr("citrix_scvmm_hypervisor_resource_pool.testHypervisorResourcePool", "networks.0", os.Getenv("TEST_HYPERV_RP_NETWORK_SCVMM")),
+					// Verify subnets
+					resource.TestCheckResourceAttr("citrix_scvmm_hypervisor_resource_pool.testHypervisorResourcePool", "storage.#", "1"),
+					resource.TestCheckResourceAttr("citrix_scvmm_hypervisor_resource_pool.testHypervisorResourcePool", "storage.0.storage_name", os.Getenv("TEST_HYPERV_RP_STORAGE_1_SCVMM")),
+					// Verify name of the project
+					resource.TestCheckResourceAttr("citrix_scvmm_hypervisor_resource_pool.testHypervisorResourcePool", "temporary_storage.#", "1"),
+					resource.TestCheckResourceAttr("citrix_scvmm_hypervisor_resource_pool.testHypervisorResourcePool", "temporary_storage.0.storage_name", os.Getenv("TEST_HYPERV_RP_TEMP_STORAGE_SCVMM")),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "citrix_scvmm_hypervisor_resource_pool.testHypervisorResourcePool",
+				ImportState:       true,
+				ImportStateIdFunc: generateImportStateId_SCVMM,
+				ImportStateVerify: true,
+			},
+			// Update and Read
+			{
+				Config: composeTestResourceTf(
+					BuildHypervisorResourcePoolResourceSCVMMUpdated(t, hypervisor_resource_pool_updated_testResource_scvmm),
+					BuildHypervisorResourceSCVMM(t, hypervisor_testResources_scvmm),
+					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_SCVMM")),
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("citrix_scvmm_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
+					resource.TestCheckResourceAttr("citrix_scvmm_hypervisor_resource_pool.testHypervisorResourcePool", "storage.#", "2"),
+				),
+			},
+		},
+	})
+}
+
 func TestHypervisorResourcePoolPreCheck_Aws_Ec2(t *testing.T) {
 	if v := os.Getenv("TEST_HYPERV_RP_NAME_AWS_EC2"); v == "" {
 		t.Fatal("TEST_HYPERV_RP_NAME_AWS_EC2 must be set for acceptance tests")
@@ -488,6 +564,20 @@ func generateImportStateId_Vsphere(state *terraform.State) (string, error) {
 
 func generateImportStateId_Nutanix(state *terraform.State) (string, error) {
 	resourceName := "citrix_nutanix_hypervisor_resource_pool.testHypervisorResourcePool"
+	var rawState map[string]string
+	for _, m := range state.Modules {
+		if len(m.Resources) > 0 {
+			if v, ok := m.Resources[resourceName]; ok {
+				rawState = v.Primary.Attributes
+			}
+		}
+	}
+
+	return fmt.Sprintf("%s,%s", rawState["hypervisor"], rawState["id"]), nil
+}
+
+func generateImportStateId_SCVMM(state *terraform.State) (string, error) {
+	resourceName := "citrix_scvmm_hypervisor_resource_pool.testHypervisorResourcePool"
 	var rawState map[string]string
 	for _, m := range state.Modules {
 		if len(m.Resources) > 0 {
@@ -624,6 +714,39 @@ resource "citrix_vsphere_hypervisor_resource_pool" "testHypervisorResourcePool" 
 	}]
 }	
 `
+	hypervisor_resource_pool_testResource_scvmm = `
+resource "citrix_scvmm_hypervisor_resource_pool" "testHypervisorResourcePool" {
+	name = "%s"
+	hypervisor = citrix_scvmm_hypervisor.testHypervisor.id
+	host = "%s"
+	networks = ["%s"]
+	storage = [
+	{
+		storage_name = "%s"
+	}]
+	temporary_storage = [{
+		storage_name = "%s"
+	}]
+}
+`
+	hypervisor_resource_pool_updated_testResource_scvmm = `
+resource "citrix_scvmm_hypervisor_resource_pool" "testHypervisorResourcePool" {
+	name = "%s-updated"
+	hypervisor = citrix_scvmm_hypervisor.testHypervisor.id
+	host = "%s"
+	networks = ["%s"]
+	storage = [{
+		storage_name = "%s"
+	},
+	{
+		storage_name = "%s"
+	}]
+	temporary_storage = [{
+		storage_name = "%s"
+	}]
+}	
+`
+
 	hypervisor_resource_pool_testResource_nutanix = `
 resource "citrix_nutanix_hypervisor_resource_pool" "testHypervisorResourcePool" {
 	name = "%s"
@@ -728,6 +851,27 @@ func BuildHypervisorResourcePoolResourceNutanix(t *testing.T, hypervisorRP strin
 	network := os.Getenv("TEST_HYPERV_RP_NETWORK_NUTANIX")
 
 	return fmt.Sprintf(hypervisorRP, name, network)
+}
+
+func BuildHypervisorResourcePoolResourceSCVMM(t *testing.T, hypervisorRP string) string {
+	name := os.Getenv("TEST_HYPERV_RP_NAME_SCVMM")
+	host := os.Getenv("TEST_HYPERV_RP_HOST_SCVMM")
+	network := os.Getenv("TEST_HYPERV_RP_NETWORK_SCVMM")
+	storage_1 := os.Getenv("TEST_HYPERV_RP_STORAGE_1_SCVMM")
+	tempStorage := os.Getenv("TEST_HYPERV_RP_TEMP_STORAGE_SCVMM")
+
+	return fmt.Sprintf(hypervisorRP, name, host, network, storage_1, tempStorage)
+}
+
+func BuildHypervisorResourcePoolResourceSCVMMUpdated(t *testing.T, hypervisorRP string) string {
+	name := os.Getenv("TEST_HYPERV_RP_NAME_SCVMM")
+	host := os.Getenv("TEST_HYPERV_RP_HOST_SCVMM")
+	network := os.Getenv("TEST_HYPERV_RP_NETWORK_SCVMM")
+	storage_1 := os.Getenv("TEST_HYPERV_RP_STORAGE_1_SCVMM")
+	storage_2 := os.Getenv("TEST_HYPERV_RP_STORAGE_2_SCVMM")
+	tempStorage := os.Getenv("TEST_HYPERV_RP_TEMP_STORAGE_SCVMM")
+
+	return fmt.Sprintf(hypervisorRP, name, host, network, storage_1, storage_2, tempStorage)
 }
 
 func BuildHypervisorResourcePoolResourceAwsEc2(t *testing.T, hypervisorRP string) string {

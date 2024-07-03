@@ -30,6 +30,7 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_authentication"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_deployment"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_multi_site"
+	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_roaming"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_store"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_webreceiver"
 
@@ -496,7 +497,7 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	authUrl := ""
 	isGov := false
 	if onPremises {
-		authUrl = fmt.Sprintf("https://%s/citrix/orchestration/api/techpreview/tokens", hostname)
+		authUrl = fmt.Sprintf("https://%s/citrix/orchestration/api/tokens", hostname)
 	} else {
 		if environment == "Production" {
 			authUrl = fmt.Sprintf("https://api.cloud.com/cctrustoauth2/%s/tokens/clients", customerId)
@@ -525,6 +526,11 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	ctx = tflog.SetField(ctx, "citrix_client_secret", clientSecret)
 	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "citrix_client_secret")
 	ctx = tflog.SetField(ctx, "citrix_on_premises", onPremises)
+	if !onPremises {
+		// customerId is considered sensitive information for Citrix Cloud customers
+		ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "customerId", "customer_id", "citrix_customer_id")
+		ctx = tflog.MaskAllFieldValuesStrings(ctx, customerId)
+	}
 
 	tflog.Debug(ctx, "Creating Citrix API client")
 
@@ -618,9 +624,17 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 // DataSources defines the data sources implemented in the provider.
 func (p *citrixProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
+		zone.NewZoneDataSource,
+		hypervisor.NewHypervisorDataSource,
+		hypervisor_resource_pool.NewHypervisorResourcePoolDataSource,
+		machine_catalog.NewMachineCatalogDataSource,
+		delivery_group.NewDeliveryGroupDataSource,
 		vda.NewVdaDataSource,
 		application.NewApplicationDataSourceSource,
 		admin_scope.NewAdminScopeDataSource,
+		machine_catalog.NewPvsDataSource,
+		// StoreFront DataSources
+		stf_roaming.NewSTFRoamingServiceDataSource,
 	}
 }
 
@@ -634,12 +648,14 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		hypervisor.NewVsphereHypervisorResource,
 		hypervisor.NewXenserverHypervisorResource,
 		hypervisor.NewNutanixHypervisorResource,
+		hypervisor.NewSCVMMHypervisorResource,
 		hypervisor_resource_pool.NewAzureHypervisorResourcePoolResource,
 		hypervisor_resource_pool.NewAwsHypervisorResourcePoolResource,
 		hypervisor_resource_pool.NewGcpHypervisorResourcePoolResource,
 		hypervisor_resource_pool.NewXenserverHypervisorResourcePoolResource,
 		hypervisor_resource_pool.NewVsphereHypervisorResourcePoolResource,
 		hypervisor_resource_pool.NewNutanixHypervisorResourcePoolResource,
+		hypervisor_resource_pool.NewSCVMMHypervisorResourcePoolResource,
 		machine_catalog.NewMachineCatalogResource,
 		delivery_group.NewDeliveryGroupResource,
 		storefront_server.NewStoreFrontServerResource,
@@ -657,8 +673,10 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		stf_deployment.NewSTFDeploymentResource,
 		stf_authentication.NewSTFAuthenticationServiceResource,
 		stf_store.NewSTFStoreServiceResource,
+		stf_store.NewSTFStoreFarmResource,
 		stf_webreceiver.NewSTFWebReceiverResource,
 		stf_multi_site.NewSTFUserFarmMappingResource,
+		stf_roaming.NewSTFRoamingGatewayResource,
 		// Add resource here
 	}
 }

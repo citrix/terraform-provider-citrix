@@ -42,7 +42,7 @@ type XenserverHypervisorResourceModel struct {
 	MaxPowerActionsPercentageOfMachines types.Int64  `tfsdk:"max_power_actions_percentage_of_machines"`
 }
 
-func GetXenServerHypervisorSchema() schema.Schema {
+func (XenserverHypervisorResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "Manages a XenServer hypervisor.",
 		Attributes: map[string]schema.Attribute{
@@ -74,6 +74,7 @@ func GetXenServerHypervisorSchema() schema.Schema {
 			"password": schema.StringAttribute{
 				Description: "Password of the hypervisor.",
 				Required:    true,
+				Sensitive:   true,
 			},
 			"password_format": schema.StringAttribute{
 				Description: "Password format of the hypervisor. Choose between Base64 and PlainText.",
@@ -87,7 +88,7 @@ func GetXenServerHypervisorSchema() schema.Schema {
 			},
 			"addresses": schema.ListAttribute{
 				ElementType: types.StringType,
-				Description: "Hypervisor address(es).  At least one is required.",
+				Description: "Hypervisor address(es). At least one is required.",
 				Required:    true,
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
@@ -154,6 +155,10 @@ func GetXenServerHypervisorSchema() schema.Schema {
 			},
 		},
 	}
+}
+
+func (XenserverHypervisorResourceModel) GetAttributes() map[string]schema.Attribute {
+	return XenserverHypervisorResourceModel{}.GetSchema().Attributes
 }
 
 func (r XenserverHypervisorResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel) XenserverHypervisorResourceModel {

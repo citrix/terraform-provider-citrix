@@ -30,6 +30,9 @@ func TestSTFWebReceiverServiceResource(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		PreCheck: func() {
 			TestProviderPreCheck(t)
+			TestSTFDeploymentPreCheck(t)
+			TestSTFAuthenticationServicePreCheck(t)
+			TestSTFStoreServicePreCheck(t)
 			TestSTFWebReceiverServicePreCheck(t)
 		},
 		Steps: []resource.TestStep{
@@ -53,7 +56,7 @@ func TestSTFWebReceiverServiceResource(t *testing.T) {
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "virtual_path",
 				ImportStateIdFunc:                    generateImportStateId_STFWebReceiverService,
-				ImportStateVerifyIgnore:              []string{"last_updated", "store_service"},
+				ImportStateVerifyIgnore:              []string{"last_updated", "store_virtual_path"},
 			},
 
 			// Update testing for STF WebReceiver Service
@@ -67,6 +70,52 @@ func TestSTFWebReceiverServiceResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "authentication_methods.#", "2"),
 
 					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "plugin_assistant.enabled", "true"),
+
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "application_shortcuts.trusted_urls.#", "1"),
+					resource.TestCheckTypeSetElemAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "application_shortcuts.trusted_urls.*", "https://test.trusted.url/"),
+
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "application_shortcuts.gateway_urls.#", "1"),
+					resource.TestCheckTypeSetElemAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "application_shortcuts.gateway_urls.*", "https://test.gateway.url/"),
+
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "communication.attempts", "3"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "communication.timeout", "0.0:5:0"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "communication.loopback", "On"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "communication.loopback_port_using_http", "8081"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "communication.proxy_enabled", "true"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "communication.proxy_port", "8889"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "communication.proxy_process_name", "TestFiddler"),
+
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "strict_transport_security.enabled", "true"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "strict_transport_security.policy_duration", "100.0:0:0"),
+
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "authentication_manager.login_form_timeout", "8"),
+
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.auto_launch_desktop", "true"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.multi_click_timeout", "5"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.enable_apps_folder_view", "true"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.category_view_collapsed", "true"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.move_app_to_uncategorized", "true"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.show_activity_manager", "true"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.show_first_time_use", "true"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.prevent_ica_downloads", "true"),
+
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.workspace_control.enabled", "true"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.workspace_control.auto_reconnect_at_logon", "true"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.workspace_control.logoff_action", "Terminate"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.workspace_control.show_reconnect_button", "true"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.workspace_control.show_disconnect_button", "true"),
+
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.receiver_configuration.enabled", "true"),
+
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.app_shortcuts.enabled", "true"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.app_shortcuts.allow_session_reconnect", "true"),
+
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.ui_views.show_apps_view", "true"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.ui_views.show_desktops_view", "true"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.ui_views.default_view", "Apps"),
+
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.progressive_web_app.enabled", "true"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.progressive_web_app.show_install_prompt", "true"),
 				),
 			},
 		},
@@ -101,7 +150,7 @@ var (
 		site_id       = "%s"
 		virtual_path = "%s"
 		friendly_name = "WebReceiver"
-		store_service = citrix_stf_store_service.testSTFStoreService.virtual_path
+		store_virtual_path = citrix_stf_store_service.testSTFStoreService.virtual_path
 	
 	  }
 	`
@@ -110,7 +159,7 @@ var (
 		site_id       = "%s"
 		virtual_path = "%s"
 		friendly_name = "WebReceiver_Updated" 
-		store_service = citrix_stf_store_service.testSTFStoreService.virtual_path
+		store_virtual_path = citrix_stf_store_service.testSTFStoreService.virtual_path
 		authentication_methods = [ 
 			"ExplicitForms", 
 			"CitrixAGBasic"
@@ -118,6 +167,60 @@ var (
 		plugin_assistant = {
 			enabled = true
 			html5_single_tab_launch = true
+		}
+		application_shortcuts = {
+			prompt_for_untrusted_shortcuts = true
+			trusted_urls                   = [ "https://test.trusted.url/" ]
+			gateway_urls                   = [ "https://test.gateway.url/" ]
+		}
+		communication = {
+			attempts = 3
+			timeout = "0.0:5:0"
+			loopback = "On"
+			loopback_port_using_http = 8081
+			proxy_enabled = true
+			proxy_port = 8889
+			proxy_process_name = "TestFiddler"
+		}
+		strict_transport_security = {
+			enabled = true
+			policy_duration = "100.0:0:0"
+		}
+		authentication_manager = {
+			login_form_timeout = 8
+		}
+		user_interface = {
+			auto_launch_desktop = true
+			multi_click_timeout = 5
+			enable_apps_folder_view = true
+			workspace_control = {
+				enabled = true
+				auto_reconnect_at_logon = true
+				logoff_action = "Terminate"
+				show_reconnect_button = true
+				show_disconnect_button = true
+			}
+			receiver_configuration = {
+				enabled = true
+			}
+			app_shortcuts = {
+				enabled = true
+				allow_session_reconnect = true	
+			}
+			ui_views = {
+				show_apps_view = true
+				show_desktops_view = true
+				default_view = "Apps"
+			}
+			category_view_collapsed = true
+			move_app_to_uncategorized = true
+			progressive_web_app = {
+				enabled = true
+				show_install_prompt = true
+			}
+			show_activity_manager = true
+			show_first_time_use = true
+			prevent_ica_downloads = true
 		}
 	  }
 	`

@@ -13,13 +13,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &applicationGroupResource{}
-	_ resource.ResourceWithConfigure   = &applicationGroupResource{}
-	_ resource.ResourceWithImportState = &applicationGroupResource{}
+	_ resource.Resource                   = &applicationGroupResource{}
+	_ resource.ResourceWithConfigure      = &applicationGroupResource{}
+	_ resource.ResourceWithImportState    = &applicationGroupResource{}
+	_ resource.ResourceWithValidateConfig = &applicationGroupResource{}
 )
 
 // NewApplicationGroupResource is a helper function to simplify the provider implementation.
@@ -48,7 +50,7 @@ func (r *applicationGroupResource) Configure(_ context.Context, req resource.Con
 
 // Schema defines the schema for the data source.
 func (r *applicationGroupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = GetApplicationGroupSchema()
+	resp.Schema = ApplicationGroupResourceModel{}.GetSchema()
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -315,4 +317,18 @@ func getDeliveryGroups(ctx context.Context, client *citrixdaasclient.CitrixDaasC
 	}
 
 	return deliveryGroups, err
+}
+
+func (r *applicationGroupResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data ApplicationGroupResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }

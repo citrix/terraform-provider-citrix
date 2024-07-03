@@ -40,7 +40,7 @@ type AzureHypervisorResourceModel struct {
 	EnableAzureADDeviceManagement   types.Bool   `tfsdk:"enable_azure_ad_device_management"`
 }
 
-func GetAzureHypervisorSchema() schema.Schema {
+func (AzureHypervisorResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "Manages an Azure hypervisor.",
 		Attributes: map[string]schema.Attribute{
@@ -118,6 +118,10 @@ func GetAzureHypervisorSchema() schema.Schema {
 			},
 		},
 	}
+}
+
+func (AzureHypervisorResourceModel) GetAttributes() map[string]schema.Attribute {
+	return AzureHypervisorResourceModel{}.GetSchema().Attributes
 }
 
 func (r AzureHypervisorResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel) AzureHypervisorResourceModel {

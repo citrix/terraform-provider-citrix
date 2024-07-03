@@ -181,6 +181,10 @@ func GetSingleHypervisorResource(ctx context.Context, client *citrixdaasclient.C
 			if strings.EqualFold(child.GetName(), resourceName) {
 				return &child, nil
 			}
+		case citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM:
+			if strings.EqualFold(child.GetName(), resourceName) {
+				return &child, nil
+			}
 		case citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM:
 			if hypervisor.GetPluginId() == NUTANIX_PLUGIN_ID && strings.EqualFold(child.GetName(), resourceName) {
 				return &child, nil
@@ -217,7 +221,8 @@ func GetFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.C
 	// Skip resource type filter for on-prem hypervisors to avoid server side filtering timeout
 	if connectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM &&
 		connectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER &&
-		connectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER {
+		connectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER &&
+		connectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM {
 		req = req.Type_([]string{resourceType})
 	}
 
@@ -228,13 +233,19 @@ func GetFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.C
 
 	result := []string{}
 	if filter != nil {
+
+		filterMap := map[string]bool{}
+		for _, f := range filter {
+			filterMap[strings.ToLower(f)] = false
+		}
+
 		for _, child := range resources.Children {
 			if strings.EqualFold(child.ResourceType, resourceType) {
 				name := child.GetName()
 				if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS {
 					name = strings.Split(name, " ")[0]
 				}
-				if Contains(filter, name) {
+				if _, exists := filterMap[strings.ToLower(name)]; exists {
 					if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER && strings.EqualFold(resourceType, NetworkResourceType) {
 						result = append(result, child.GetRelativePath())
 					} else if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && strings.EqualFold(pluginId, NUTANIX_PLUGIN_ID) && strings.EqualFold(resourceType, NetworkResourceType) {
@@ -242,9 +253,23 @@ func GetFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.C
 					} else {
 						result = append(result, child.GetXDPath())
 					}
+
+					filterMap[strings.ToLower(name)] = true
 				}
 			}
 		}
+
+		resourcesNotFound := []string{}
+		for f, found := range filterMap {
+			if !found {
+				resourcesNotFound = append(resourcesNotFound, f)
+			}
+		}
+
+		if len(resourcesNotFound) > 0 {
+			return nil, fmt.Errorf("the following resources were not found: %v", resourcesNotFound)
+		}
+
 	} else {
 		//when the filter is empty
 		for _, child := range resources.Children {
@@ -255,15 +280,6 @@ func GetFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.C
 	}
 
 	return result, nil
-}
-
-func Contains[T comparable](s []T, e T) bool {
-	for _, v := range s {
-		if v == e {
-			return true
-		}
-	}
-	return false
 }
 
 func ValidateHypervisorResource(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorName, hypervisorPoolName, resourcePath string) (bool, string) {

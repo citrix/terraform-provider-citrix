@@ -32,7 +32,7 @@ type AzureHypervisorResourcePoolResourceModel struct {
 	VirtualNetworkResourceGroup types.String `tfsdk:"virtual_network_resource_group"`
 }
 
-func GetAzureHypervisorResourcePoolSchema() schema.Schema {
+func (AzureHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "Manages an Azure hypervisor resource pool.",
 		Attributes: map[string]schema.Attribute{
@@ -95,6 +95,10 @@ func GetAzureHypervisorResourcePoolSchema() schema.Schema {
 			},
 		},
 	}
+}
+
+func (AzureHypervisorResourcePoolResourceModel) GetAttributes() map[string]schema.Attribute {
+	return AzureHypervisorResourcePoolResourceModel{}.GetSchema().Attributes
 }
 
 func (r AzureHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) AzureHypervisorResourcePoolResourceModel {

@@ -33,7 +33,7 @@ type ApplicationGroupResourceModel struct {
 	Scopes         types.Set    `tfsdk:"scopes"`          // Set[string]
 }
 
-func GetApplicationGroupSchema() schema.Schema {
+func (ApplicationGroupResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "Resource for creating and managing application group.",
 		Attributes: map[string]schema.Attribute{
@@ -99,6 +99,10 @@ func GetApplicationGroupSchema() schema.Schema {
 			},
 		},
 	}
+}
+
+func (ApplicationGroupResourceModel) GetAttributes() map[string]schema.Attribute {
+	return ApplicationGroupResourceModel{}.GetSchema().Attributes
 }
 
 func (appGroup ApplicationGroupResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, application *citrixorchestration.ApplicationGroupDetailResponseModel, dgs *citrixorchestration.ApplicationGroupDeliveryGroupResponseModelCollection) ApplicationGroupResourceModel {

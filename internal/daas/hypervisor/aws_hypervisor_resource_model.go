@@ -34,7 +34,7 @@ type AwsHypervisorResourceModel struct {
 	SecretKey types.String `tfsdk:"secret_key"`
 }
 
-func GetAwsHypervisorSchema() schema.Schema {
+func (AwsHypervisorResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "Manages an AWS EC2 hypervisor.",
 		Attributes: map[string]schema.Attribute{
@@ -92,6 +92,10 @@ func GetAwsHypervisorSchema() schema.Schema {
 			},
 		},
 	}
+}
+
+func (AwsHypervisorResourceModel) GetAttributes() map[string]schema.Attribute {
+	return AwsHypervisorResourceModel{}.GetSchema().Attributes
 }
 
 func (r AwsHypervisorResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel) AwsHypervisorResourceModel {

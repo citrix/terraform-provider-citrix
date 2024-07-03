@@ -13,23 +13,43 @@ StoreFront StoreService.
 ## Example Usage
 
 ```terraform
-resource "citrix_stf_storeservice" "example-stf-store-service" {
-	site_id      = "1"
+resource "citrix_stf_store_service" "example-stf-store-service" {
+	site_id      = citrix_stf_deployment.example-stf-deployment.site_id
 	virtual_path = "/Citrix/Store"
 	friendly_name = "Store"
 	authentication_service = "${citrix_stf_authentication_service.example-stf-authentication-service.virtual_path}"
-	farm_config = {
-		farm_name = "Controller"
-		farm_type = "XenDesktop"
-		servers = ["cvad.storefront.com", "cvad.storefront2.com"] 
-  	}
+	pna = {
+		enabled = true
+		default_pna_service = true
+	}
+    enumeration_options = {
+        enhanced_enumeration = false
+        maximum_concurrent_enumerations = 2
+        filter_by_keywords_include = ["AppSet1","AppSet2"]
+    }
+    launch_options = {
+        vda_logon_data_provider = "FASLogonDataProvider"
+    }
+	farm_settings = {
+		enable_file_type_association = true
+		communication_timeout = "0.0:0:0"
+		connection_timeout = "0.0:0:0"
+		leasing_status_expiry_failed = "0.0:0:0"
+		leasing_status_expiry_leasing = "0.0:0:0"
+		leasing_status_expiry_pending = "0.0:0:0"
+		pooled_sockets = false
+		server_communication_attempts = 5
+		background_healthcheck_polling = "0.0:0:0"
+		advanced_healthcheck = false
+		cert_revocation_policy = "MustCheck"
+    }
 }
 
 // Anonymous Authentication Service
 resource "citrix_stf_store_service" "example-stf-store-service" {
-	site_id      = "1"
+	site_id      = citrix_stf_deployment.example-stf-deployment.site_id
 	virtual_path = "/Citrix/Store"
-	friedly_name = "Store"
+	friendly_name = "Store"
 	anonymous = true
 }
 ```
@@ -44,20 +64,72 @@ resource "citrix_stf_store_service" "example-stf-store-service" {
 ### Optional
 
 - `anonymous` (Boolean) Whether the Store is anonymous. Anonymous Store not requiring authentication.
-- `authentication_service` (String) The StoreFront Authentication Service to use for authenticating users.
-- `farm_config` (Attributes) Farm configuration for the Store. (see [below for nested schema](#nestedatt--farm_config))
+- `authentication_service_virtual_path` (String) The Virtual Path of the StoreFront Authentication Service to use for authenticating users.
+- `enumeration_options` (Attributes) Enumeration options for the Store (see [below for nested schema](#nestedatt--enumeration_options))
+- `farm_settings` (Attributes) Store farm configuration settings for the Store. (see [below for nested schema](#nestedatt--farm_settings))
 - `friendly_name` (String) The friendly name of the Store
+- `launch_options` (Attributes) Launch options for the Store (see [below for nested schema](#nestedatt--launch_options))
 - `load_balance` (Boolean) Whether the Store is load balanced.
+- `pna` (Attributes) StoreFront PNA (Program Neighborhood Agent) state of the Store (see [below for nested schema](#nestedatt--pna))
 - `site_id` (String) The IIS site id of the StoreFront storeservice. Defaults to 1.
 
-<a id="nestedatt--farm_config"></a>
-### Nested Schema for `farm_config`
+<a id="nestedatt--enumeration_options"></a>
+### Nested Schema for `enumeration_options`
+
+Optional:
+
+- `enhanced_enumeration` (Boolean) Enable enhanced enumeration. Enumerate multiple farms in parallel to reduce operation time. Default is true.
+- `filter_by_keywords_exclude` (List of String) Exclude applications and desktops that match the keywords. Default is empty list.
+- `filter_by_keywords_include` (List of String) Only include applications and desktops that match the keywords. Default is empty list.
+- `filter_by_types_include` (List of String) Inclusive resource filter by type (Applications, Desktops or Documents). Default is empty list.
+- `maximum_concurrent_enumerations` (Number) Maximum farms enumerated in parallel. Default is 0.
+- `minimum_farms_required_for_concurrent_enumeration` (Number) Minimum farms required for concurrent enumeration. Default is 3.
+
+
+<a id="nestedatt--farm_settings"></a>
+### Nested Schema for `farm_settings`
+
+Optional:
+
+- `advanced_healthcheck` (Boolean) Indicates whether advanced healthcheck should be performed. Default value is false.
+- `background_healthcheck_polling` (String) Period of time between polling servers in timestamp format, which must be in `dd.hh:mm:ss` format with 0's trimmed. Defaults to `0.0:1:0.
+- `cert_revocation_policy` (String) Certificate Revocation Policy to use when connecting to XML services using HTTPS. Valid values are NoCheck (Default), MustCheck, FullCheck or NoNetworkAccess.
+- `communication_timeout` (String) Communication timeout when using to the Xml service in timestamp format, which must be in `dd.hh:mm:ss` format with 0's trimmed. Defaults to `0.0:0:30.
+- `connection_timeout` (String) Connection timeout when using to the Xml service in timestamp format, which must be in `dd.hh:mm:ss` format with 0's trimmed. Defaults to `0.0:0:6.
+- `enable_file_type_association` (Boolean) Enable File Type Association so that content is seamlessly redirected to users subscribed applications when they open local files of the appropriate types. Default value is true.
+- `leasing_status_expiry_failed` (String) Period of time before retrying a XenDesktop 7 and greater farm in failed leasing mode in timestamp format, which must be in `dd.hh:mm:ss` format with 0's trimmed. Defaults to `0.0:3:0.
+- `leasing_status_expiry_leasing` (String) Period of time before retrying a XenDesktop 7 and greater farm in leasing mode in timestamp format, which must be in `dd.hh:mm:ss` format with 0's trimmed. Defaults to `0.0:3:0.
+- `leasing_status_expiry_pending` (String) Period of time before retrying a XenDesktop 7 and greater farm in pending leasing mode in timestamp format, which must be in `dd.hh:mm:ss` format with 0's trimmed. Defaults to `0.0:3:0.
+- `pooled_sockets` (Boolean) Use pooled sockets so that StoreFront maintains a pool of sockets. Default value is false.
+- `server_communication_attempts` (Number) Number of server connection attempts before failure. Default value is 1.
+
+
+<a id="nestedatt--launch_options"></a>
+### Nested Schema for `launch_options`
+
+Optional:
+
+- `address_resolution_type` (String) Specifies the type of address(Dns, DnsPort, IPV4, IPV4Port, Dot, DotPort, Uri, NoChange) to use in the .ica launch file. Default is DnsPort.
+- `allow_font_smoothing` (Boolean) Specifies whether or not font smoothing is permitted for ICA sessions. Default is true.
+- `allow_special_folder_redirection` (Boolean) Redirect special folders such as Documents, Computer and the Desktop. Default is false.
+- `federated_authentication_service_failover` (Boolean) Specifies whether to failover to launch without the Federated Auth Service (FAS) should it become uncontactable. Default is false.
+- `ica_template_name` (String) Ica template to use when launching an application or desktop. Default is empty string.
+- `ignore_client_provided_client_address` (Boolean) Specifies whether or not to ignore the address provided by the Citrix client. Default is false.
+- `overlay_auto_login_credentials_with_ticket` (Boolean) Specifies whether a logon ticket must be duplicated in a logon ticket entry or placed in a separate .ica launch file ticket entry only. Default is false.
+- `override_ica_client_name` (Boolean) Specifies whether or not a Web Interface-generated ID must be passed in the client name entry of an .ica launch file. Default is false.
+- `rdp_only` (Boolean) Configure the Store to only launch use the RDP protocol. Default is false.
+- `request_ica_client_secure_channel` (String) Specifies TLS settings(SSLAnyCiphers, TLSGovCipers, DetectAnyCiphers). Default is DetectAnyCipher.
+- `require_launch_reference` (Boolean) Specifies whether or not the use of launch references is enforced. Default is true.
+- `set_no_load_bias_flag` (Boolean) Specifies whether XenApp load bias should be used. Default is false.
+- `vda_logon_data_provider` (String) The Vda logon data provider to use during launch. Default is empty string.
+
+
+<a id="nestedatt--pna"></a>
+### Nested Schema for `pna`
 
 Required:
 
-- `farm_name` (String) The name of the Farm.
-- `farm_type` (String) The type of the Farm.
-- `servers` (List of String) The list of servers in the Farm.
+- `enable` (Boolean) Whether PNA is enabled for the Store.
 
 ## Import
 

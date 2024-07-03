@@ -13,13 +13,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &adminScopeResource{}
-	_ resource.ResourceWithConfigure   = &adminScopeResource{}
-	_ resource.ResourceWithImportState = &adminScopeResource{}
+	_ resource.Resource                   = &adminScopeResource{}
+	_ resource.ResourceWithConfigure      = &adminScopeResource{}
+	_ resource.ResourceWithImportState    = &adminScopeResource{}
+	_ resource.ResourceWithValidateConfig = &adminScopeResource{}
 )
 
 // NewAdminScopeResource is a helper function to simplify the provider implementation.
@@ -39,7 +41,7 @@ func (r *adminScopeResource) Metadata(_ context.Context, req resource.MetadataRe
 
 // Schema defines the schema for the resource.
 func (r *adminScopeResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = GetAdminScopeSchema()
+	resp.Schema = AdminScopeResourceModel{}.GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -226,4 +228,18 @@ func readAdminScope(ctx context.Context, client *citrixdaasclient.CitrixDaasClie
 	getAdminScopeRequest := client.ApiClient.AdminAPIsDAAS.AdminGetAdminScope(ctx, adminScopeName)
 	adminScope, _, err := util.ReadResource[*citrixorchestration.ScopeResponseModel](getAdminScopeRequest, ctx, client, resp, "Admin Scope", adminScopeName)
 	return adminScope, err
+}
+
+func (r *adminScopeResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data AdminScopeResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }

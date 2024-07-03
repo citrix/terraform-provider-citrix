@@ -633,7 +633,7 @@ type DeliveryGroupResourceModel struct {
 	MakeResourcesAvailableInLHC types.Bool   `tfsdk:"make_resources_available_in_lhc"`
 }
 
-func GetSchema() schema.Schema {
+func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "Manages a delivery group.",
 		Attributes: map[string]schema.Attribute{
@@ -740,6 +740,10 @@ func GetSchema() schema.Schema {
 	}
 }
 
+func (DeliveryGroupResourceModel) GetAttributes() map[string]schema.Attribute {
+	return DeliveryGroupResourceModel{}.GetSchema().Attributes
+}
+
 func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, dgDesktops *citrixorchestration.DesktopResponseModelCollection, dgPowerTimeSchemes *citrixorchestration.PowerTimeSchemeResponseModelCollection, dgMachines *citrixorchestration.MachineResponseModelCollection, dgRebootSchedule *citrixorchestration.RebootScheduleResponseModelCollection) DeliveryGroupResourceModel {
 
 	// Set required values
@@ -760,8 +764,10 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 	scopeIds := util.GetIdsForScopeObjects(deliveryGroup.GetScopes())
 	r.Scopes = util.StringArrayToStringSet(ctx, diagnostics, scopeIds)
 
-	if !r.MakeResourcesAvailableInLHC.IsNull() {
-		r.MakeResourcesAvailableInLHC = types.BoolValue(deliveryGroup.GetReuseMachinesWithoutShutdownInOutage())
+	if deliveryGroup.GetReuseMachinesWithoutShutdownInOutage() {
+		r.MakeResourcesAvailableInLHC = types.BoolValue(true)
+	} else if !r.MakeResourcesAvailableInLHC.IsNull() {
+		r.MakeResourcesAvailableInLHC = types.BoolValue(false)
 	}
 
 	r = r.updatePlanWithRestrictedAccessUsers(ctx, diagnostics, deliveryGroup)

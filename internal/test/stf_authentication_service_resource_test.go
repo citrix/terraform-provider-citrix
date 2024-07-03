@@ -14,14 +14,14 @@ func TestSTFAuthenticationServicePreCheck(t *testing.T) {
 		t.Fatal("TEST_STF_SITE_ID must be set for acceptance tests")
 	}
 
-	if v := os.Getenv("TEST_STF_Auth_Virtual_Path"); v == "" {
-		t.Fatal("TEST_STF_Auth_Virtual_Path must be set for acceptance tests")
+	if v := os.Getenv("TEST_STF_AUTH_VIRTUAL_PATH"); v == "" {
+		t.Fatal("TEST_STF_AUTH_VIRTUAL_PATH must be set for acceptance tests")
 	}
 }
 
 func TestSTFAuthenticationServiceResource(t *testing.T) {
 	siteId := os.Getenv("TEST_STF_SITE_ID")
-	virtualPath := os.Getenv("TEST_STF_Auth_Virtual_Path")
+	virtualPath := os.Getenv("TEST_STF_AUTH_VIRTUAL_PATH")
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		PreCheck: func() {
@@ -39,6 +39,7 @@ func TestSTFAuthenticationServiceResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_stf_authentication_service.testSTFAuthenticationService", "site_id", siteId),
 					resource.TestCheckResourceAttr("citrix_stf_authentication_service.testSTFAuthenticationService", "virtual_path", virtualPath),
 					resource.TestCheckResourceAttr("citrix_stf_authentication_service.testSTFAuthenticationService", "friendly_name", "testSTFAuthenticationService"),
+					resource.TestCheckResourceAttr("citrix_stf_authentication_service.testSTFAuthenticationService", "claims_factory_name", "standardClaimsFactory"),
 				),
 			},
 
@@ -60,7 +61,9 @@ func TestSTFAuthenticationServiceResource(t *testing.T) {
 					// Verify parameters of the updated STF authentication service
 					resource.TestCheckResourceAttr("citrix_stf_authentication_service.testSTFAuthenticationService", "site_id", siteId),
 					resource.TestCheckResourceAttr("citrix_stf_authentication_service.testSTFAuthenticationService", "virtual_path", virtualPath),
-					resource.TestCheckResourceAttr("citrix_stf_authentication_service.testSTFAuthenticationService", "friendly_name", "testAuthServiceUpdated")),
+					resource.TestCheckResourceAttr("citrix_stf_authentication_service.testSTFAuthenticationService", "friendly_name", "testAuthServiceUpdated"),
+					resource.TestCheckResourceAttr("citrix_stf_authentication_service.testSTFAuthenticationService", "claims_factory_name", "testClaimsFactoryNameUpdated"),
+				),
 			},
 		},
 	})
@@ -68,7 +71,7 @@ func TestSTFAuthenticationServiceResource(t *testing.T) {
 
 func BuildSTFAuthenticationServiceResource(t *testing.T, authService string) string {
 	siteId := os.Getenv("TEST_STF_SITE_ID")
-	authVirtualPath := os.Getenv("TEST_STF_Auth_Virtual_Path")
+	authVirtualPath := os.Getenv("TEST_STF_AUTH_VIRTUAL_PATH")
 	return BuildSTFDeploymentResource(t, testSTFDeploymentResources, siteId) + fmt.Sprintf(authService, authVirtualPath)
 }
 
@@ -89,9 +92,9 @@ func generateImportStateId_STFAuthenService(state *terraform.State) (string, err
 var (
 	testSTFAuthenticationServiceResources = `
 	resource "citrix_stf_authentication_service" "testSTFAuthenticationService" {
-		site_id       = citrix_stf_deployment.testSTFDeployment.site_id
-		virtual_path  = "%s"
-		friendly_name = "testSTFAuthenticationService"
+		site_id             = citrix_stf_deployment.testSTFDeployment.site_id
+		virtual_path        = "%s"
+		friendly_name       = "testSTFAuthenticationService"
 	}
 	`
 
@@ -100,6 +103,7 @@ var (
 		site_id       = citrix_stf_deployment.testSTFDeployment.site_id
 		virtual_path  = "%s"
 		friendly_name = "testAuthServiceUpdated"
+		claims_factory_name = "testClaimsFactoryNameUpdated"
 	}
 	`
 )

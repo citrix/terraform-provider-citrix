@@ -31,7 +31,7 @@ type VsphereHypervisorResourceModel struct {
 	Name   types.String `tfsdk:"name"`
 	Zone   types.String `tfsdk:"zone"`
 	Scopes types.Set    `tfsdk:"scopes"` // Set[string]
-	/** Vsphere Connection **/
+	/** vSphere Connection **/
 	Username                            types.String `tfsdk:"username"`
 	Password                            types.String `tfsdk:"password"`
 	PasswordFormat                      types.String `tfsdk:"password_format"`
@@ -42,7 +42,7 @@ type VsphereHypervisorResourceModel struct {
 	MaxPowerActionsPercentageOfMachines types.Int64  `tfsdk:"max_power_actions_percentage_of_machines"`
 }
 
-func GetVsphereHypervisorSchema() schema.Schema {
+func (VsphereHypervisorResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "Manages a VMware vSphere hypervisor.",
 		Attributes: map[string]schema.Attribute{
@@ -74,6 +74,7 @@ func GetVsphereHypervisorSchema() schema.Schema {
 			"password": schema.StringAttribute{
 				Description: "Password of the hypervisor.",
 				Required:    true,
+				Sensitive:   true,
 			},
 			"password_format": schema.StringAttribute{
 				Description: "Password format of the hypervisor. Choose between Base64 and PlainText.",
@@ -87,7 +88,7 @@ func GetVsphereHypervisorSchema() schema.Schema {
 			},
 			"addresses": schema.ListAttribute{
 				ElementType: types.StringType,
-				Description: "Hypervisor address(es).  At least one is required.",
+				Description: "Hypervisor address(es). At least one is required.",
 				Required:    true,
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
@@ -151,6 +152,10 @@ func GetVsphereHypervisorSchema() schema.Schema {
 			},
 		},
 	}
+}
+
+func (VsphereHypervisorResourceModel) GetAttributes() map[string]schema.Attribute {
+	return VsphereHypervisorResourceModel{}.GetSchema().Attributes
 }
 
 func (r VsphereHypervisorResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel) VsphereHypervisorResourceModel {

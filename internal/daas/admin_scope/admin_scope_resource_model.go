@@ -32,7 +32,7 @@ func (r AdminScopeResourceModel) RefreshPropertyValues(ctx context.Context, diag
 	return r
 }
 
-func GetAdminScopeSchema() schema.Schema {
+func (AdminScopeResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		// This description is used by the documentation generator and the language server.
 		Description: "Manages an administrator scope.",
@@ -56,4 +56,8 @@ func GetAdminScopeSchema() schema.Schema {
 			},
 		},
 	}
+}
+
+func (AdminScopeResourceModel) GetAttributes() map[string]schema.Attribute {
+	return AdminScopeResourceModel{}.GetSchema().Attributes
 }

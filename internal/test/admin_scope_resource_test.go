@@ -24,24 +24,12 @@ func TestAdminScopeResource(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		PreCheck: func() {
 			TestProviderPreCheck(t)
-			TestHypervisorPreCheck_Azure(t)
-			TestHypervisorResourcePoolPreCheck_Azure(t)
-			TestMachineCatalogPreCheck_Azure(t)
-			TestDeliveryGroupPreCheck(t)
 			TestAdminScopeResourcePreCheck(t)
 		},
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: composeTestResourceTf(
-					BuildAdminScopeResource(t, adminScopeTestResource),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
-					BuildPolicySetResourceWithoutDeliveryGroup(t),
-					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
-					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
-					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
-				),
+				Config: BuildAdminScopeResource(t, adminScopeTestResource),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the admin scope
 					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "name", name),
@@ -60,15 +48,7 @@ func TestAdminScopeResource(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: composeTestResourceTf(
-					BuildAdminScopeResource(t, adminScopeTestResource_updated),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
-					BuildPolicySetResourceWithoutDeliveryGroup(t),
-					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
-					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
-					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
-				),
+				Config: BuildAdminScopeResource(t, adminScopeTestResource_updated),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the admin scope
 					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "name", fmt.Sprintf("%s-updated", name)),

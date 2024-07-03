@@ -37,6 +37,12 @@ func getMachinesForManualCatalogs(ctx context.Context, diagnostics *diag.Diagnos
 
 		machines := util.ObjectListToTypedArray[MachineCatalogMachineModel](ctx, diagnostics, machineAccount.Machines)
 
+		// Verify machine accounts using Identity API
+		_, err = verifyMachinesUsingIdentity(ctx, client, machines)
+		if err != nil {
+			return nil, err
+		}
+
 		for _, machine := range machines {
 			addMachineRequest := citrixorchestration.AddMachineToMachineCatalogRequestModel{}
 			addMachineRequest.SetMachineName(machine.MachineAccount.ValueString())
@@ -126,6 +132,16 @@ func getMachinesForManualCatalogs(ctx context.Context, diagnostics *diag.Diagnos
 				vmId = vm.GetId()
 			case citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER:
 				vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, "", machineName, util.VirtualMachineResourceType, "", hypervisor)
+				if err != nil {
+					return nil, err
+				}
+				vmId = vm.GetId()
+			case citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM:
+				host, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, "", machine.Host.ValueString(), util.HostResourceType, "", hypervisor)
+				if err != nil {
+					return nil, err
+				}
+				vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, host.GetFullName(), machineName, util.VirtualMachineResourceType, "", hypervisor)
 				if err != nil {
 					return nil, err
 				}
@@ -392,6 +408,18 @@ func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Conte
 							machineFromPlan.MachineName = types.StringValue(hostedMachineName)
 						}
 					}
+				case citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM:
+					if hostedMachineName != "" {
+						if !strings.EqualFold(machineFromPlan.MachineName.ValueString(), hostedMachineName) {
+							machineFromPlan.MachineName = types.StringValue(hostedMachineName)
+						}
+					}
+					if hostingServerName != "" {
+						host := strings.Split(hostingServerName, ".")[0] // hosting server name is hosting-name.domain.com
+						if !strings.EqualFold(machineFromPlan.Host.ValueString(), host) {
+							machineFromPlan.Host = types.StringValue(host)
+						}
+					}
 				case citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM:
 					if hyp.GetPluginId() == util.NUTANIX_PLUGIN_ID && hostedMachineName != "" {
 						if !strings.EqualFold(machineFromPlan.MachineName.ValueString(), hostedMachineName) {
@@ -469,6 +497,14 @@ func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Conte
 			case citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER:
 				if hostedMachineName != "" {
 					machineModel.MachineName = types.StringValue(hostedMachineName)
+				}
+			case citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM:
+				if hostedMachineName != "" {
+					machineModel.MachineName = types.StringValue(hostedMachineName)
+				}
+				if hostingServerName != "" {
+					host := strings.Split(hostingServerName, ".")[0] // hosting server name is hosting-name.domain.com
+					machineModel.Host = types.StringValue(host)
 				}
 			case citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM:
 				if hyp.GetPluginId() == util.NUTANIX_PLUGIN_ID && hostedMachineName != "" {

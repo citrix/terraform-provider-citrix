@@ -13,7 +13,7 @@ Manages a VMware vSphere hypervisor.
 ## Example Usage
 
 ```terraform
-# Vsphere Hypervisor
+# vSphere Hypervisor
 resource "citrix_vsphere_hypervisor" "example-vsphere-hypervisor" {
     name               = "example-vsphere-hypervisor"
     zone               = "<Zone Id>"
@@ -30,9 +30,9 @@ resource "citrix_vsphere_hypervisor" "example-vsphere-hypervisor" {
 
 ### Required
 
-- `addresses` (List of String) Hypervisor address(es).  At least one is required.
+- `addresses` (List of String) Hypervisor address(es). At least one is required.
 - `name` (String) Name of the hypervisor.
-- `password` (String) Password of the hypervisor.
+- `password` (String, Sensitive) Password of the hypervisor.
 - `password_format` (String) Password format of the hypervisor. Choose between Base64 and PlainText.
 - `username` (String) Username of the hypervisor.
 - `zone` (String) Id of the zone the hypervisor is associated with.
@@ -54,6 +54,6 @@ resource "citrix_vsphere_hypervisor" "example-vsphere-hypervisor" {
 Import is supported using the following syntax:
 
 ```shell
-# Vsphere Hypervisor can be imported by specifying the GUID
+# vSphere Hypervisor can be imported by specifying the GUID
 terraform import citrix_vsphere_hypervisor.example-vsphere-hypervisor b2339edf-7b00-436e-9c3a-54c987c3526e
 ```

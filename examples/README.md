@@ -65,3 +65,4 @@ Detailed instructions on setting up deployments on different cloud providers fro
 - [AWS EC2](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-aws/)
 - [Azure](https://community.citrix.com/tech-zone/build/deployment-guides/citrix-daas-terraform-azure/)
 - [GCP](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-gcp/)
+- [vSphere](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-vsphere8/)

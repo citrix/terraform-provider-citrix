@@ -70,7 +70,7 @@ Param (
 
 function Get-Site {
     if ($script:onPremise) {
-        $siteRequest = "https://$script:hostname/citrix/orchestration/api/techpreview/me"
+        $siteRequest = "https://$script:hostname/citrix/orchestration/api/me"
     }
     else {
         $siteRequest = "https://$script:hostname/cvad/manage/me"
@@ -82,7 +82,7 @@ function Get-Site {
 
 function Get-RequestBaseUrl {
     if ($script:onPremise) {
-        $url = "https://$script:hostname/citrix/orchestration/api/techpreview/CitrixOnPremises/$script:siteId"
+        $url = "https://$script:hostname/citrix/orchestration/api/CitrixOnPremises/$script:siteId"
     }
     else {
         $url = "https://$script:hostname/cvad/manage"
@@ -144,7 +144,7 @@ function Invoke-WebRequestWithRetry {
 
 function Get-AuthToken {
     if ($script:onPremise) {
-        $url = "https://$script:hostname/citrix/orchestration/api/techpreview/tokens"
+        $url = "https://$script:hostname/citrix/orchestration/api/tokens"
         $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}\{1}:{2}" -f $script:domainFqdn, $script:clientId, $script:clientSecret)))
         $basicAuth = "Basic $base64AuthInfo"
         $response = Invoke-WebRequestWithRetry -Uri $url -Method 'POST' -Headers @{Authorization = $basicAuth } 
@@ -516,7 +516,7 @@ function InjectPlaceHolderSensitiveValues {
     $content = InjectSecretValues -targetProperty "api_key" -newProperty "secret_key" -content $content
     ######    GCP    ######
     $content = InjectSecretValues -targetProperty "service_account_id" -newProperty "service_account_credentials" -content $content
-    ###### XenServer / Vsphere ######
+    ###### XenServer / vSphere ######
     $content = InjectSecretValues -targetProperty "username" -newProperty "password" -content $content
 
 

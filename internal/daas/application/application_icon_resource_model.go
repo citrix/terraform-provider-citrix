@@ -16,7 +16,7 @@ type ApplicationIconResourceModel struct {
 	RawData types.String `tfsdk:"raw_data"`
 }
 
-func GetApplicationIconSchema() schema.Schema {
+func (ApplicationIconResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "Resource for managing application icons.",
 		Attributes: map[string]schema.Attribute{
@@ -33,6 +33,10 @@ func GetApplicationIconSchema() schema.Schema {
 			},
 		},
 	}
+}
+
+func (ApplicationIconResourceModel) GetAttributes() map[string]schema.Attribute {
+	return ApplicationIconResourceModel{}.GetSchema().Attributes
 }
 
 func (r ApplicationIconResourceModel) RefreshPropertyValues(application *citrixorchestration.IconResponseModel) ApplicationIconResourceModel {
