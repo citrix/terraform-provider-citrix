@@ -15,10 +15,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -41,42 +37,6 @@ type stfAuthenticationServiceResource struct {
 // Metadata returns the resource type name.
 func (r *stfAuthenticationServiceResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_stf_authentication_service"
-}
-
-// Schema defines the schema for the resource.
-func (r *stfAuthenticationServiceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "StoreFront Authentication Service.",
-		Attributes: map[string]schema.Attribute{
-			"site_id": schema.StringAttribute{
-				Description: "The IIS site to configure the authentication service for. Defaults to `1`.",
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString("1"),
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"virtual_path": schema.StringAttribute{
-				Description: "The IIS virtual path to use for the authentication service. Defaults to `/Citrix/Authentication`.",
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString("/Citrix/Authentication"),
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"friendly_name": schema.StringAttribute{
-				Description: "The friendly name the authentication service should be known as. Defaults to `Authentication Service`.",
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString("Authentication Service"),
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-		},
-	}
 }
 
 // Configure adds the provider configured client to the resource.
@@ -119,7 +79,7 @@ func (r *stfAuthenticationServiceResource) Create(ctx context.Context, req resou
 	addAuthenticationServiceRequest := r.client.StorefrontClient.AuthenticationServiceSF.STFAuthenticationCreateSTFAuthenticationService(ctx, body)
 
 	// Create new STF Deployment
-	authenticationServiceDetail, err := addAuthenticationServiceRequest.Execute()
+	_, err = addAuthenticationServiceRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error adding StoreFront Authentication Service",
@@ -128,8 +88,15 @@ func (r *stfAuthenticationServiceResource) Create(ctx context.Context, req resou
 		return
 	}
 
+	err = setSTFClaimsFactoryNames(ctx, &resp.Diagnostics, r.client, siteIdInt, plan.VirtualPath.ValueString(), plan.ClaimsFactoryName.ValueString())
+	if err != nil {
+		return
+	}
+
+	getAuthServiceResponse, err := getSTFAuthenticationService(ctx, &resp.Diagnostics, r.client, plan)
+
 	// Map response body to schema and populate Computed attribute values
-	plan.RefreshPropertyValues(&authenticationServiceDetail)
+	plan.RefreshPropertyValues(ctx, &resp.Diagnostics, getAuthServiceResponse)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -151,21 +118,21 @@ func (r *stfAuthenticationServiceResource) Read(ctx context.Context, req resourc
 		return
 	}
 
-	STFAuthenticationService, err := getSTFAuthenticationService(ctx, r.client, &resp.Diagnostics, state)
+	STFAuthenticationService, err := getSTFAuthenticationService(ctx, &resp.Diagnostics, r.client, state)
 	if err != nil {
 		return
 	}
 
 	if STFAuthenticationService == nil {
 		resp.Diagnostics.AddWarning(
-			"Authentication Service not found",
-			"Authentication Service was not found and will be removed from the state file. An apply action will result in the creation of a new resource.",
+			"StoreFront Authentication Service not found",
+			"StoreFront Authentication Service was not found and will be removed from the state file. An apply action will result in the creation of a new resource.",
 		)
 		resp.State.RemoveResource(ctx)
 		return
 	}
 
-	state.RefreshPropertyValues(STFAuthenticationService)
+	state.RefreshPropertyValues(ctx, &resp.Diagnostics, STFAuthenticationService)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -240,7 +207,7 @@ func (r *stfAuthenticationServiceResource) Update(ctx context.Context, req resou
 
 	addAuthenticationServiceRequest := r.client.StorefrontClient.AuthenticationServiceSF.STFAuthenticationCreateSTFAuthenticationService(ctx, createBody)
 
-	authenticationServiceDetail, err := addAuthenticationServiceRequest.Execute()
+	_, err = addAuthenticationServiceRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error adding StoreFront Authentication Service",
@@ -249,8 +216,15 @@ func (r *stfAuthenticationServiceResource) Update(ctx context.Context, req resou
 		return
 	}
 
+	err = setSTFClaimsFactoryNames(ctx, &resp.Diagnostics, r.client, siteIdInt, plan.VirtualPath.ValueString(), plan.ClaimsFactoryName.ValueString())
+	if err != nil {
+		return
+	}
+
+	getAuthServiceResponse, err := getSTFAuthenticationService(ctx, &resp.Diagnostics, r.client, plan)
+
 	// Map response body to schema and populate Computed attribute values
-	plan.RefreshPropertyValues(&authenticationServiceDetail)
+	plan.RefreshPropertyValues(ctx, &resp.Diagnostics, getAuthServiceResponse)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, plan)
@@ -329,7 +303,7 @@ func (r *stfAuthenticationServiceResource) ImportState(ctx context.Context, req 
 }
 
 // Gets the getSTFAuthenticationService and logs any errors
-func getSTFAuthenticationService(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, state STFAuthenticationServiceResourceModel) (*citrixstorefront.STFAuthenticationServiceResponseModel, error) {
+func getSTFAuthenticationService(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, state STFAuthenticationServiceResourceModel) (*citrixstorefront.STFAuthenticationServiceResponseModel, error) {
 	var body citrixstorefront.GetSTFAuthenticationServiceRequestModel
 	if state.SiteId.ValueString() != "" {
 		siteIdInt, err := strconv.ParseInt(state.SiteId.ValueString(), 10, 64)
@@ -362,4 +336,24 @@ func getSTFAuthenticationService(ctx context.Context, client *citrixdaasclient.C
 		return &STFAuthenticationService, err
 	}
 	return &STFAuthenticationService, nil
+}
+
+// Set STFClaimsFactoryNames
+func setSTFClaimsFactoryNames(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteIdInt int64, virtualPath string, claimsFactoryName string) error {
+	var getAuthServiceBody citrixstorefront.GetSTFAuthenticationServiceRequestModel
+	var setClaimsFactoryNamesBody citrixstorefront.SetSTFClaimsFactoryNamesRequestModel
+	getAuthServiceBody.SetSiteId(siteIdInt)
+	getAuthServiceBody.SetVirtualPath(virtualPath)
+	setClaimsFactoryNamesBody.SetClaimsFactoryName(claimsFactoryName)
+
+	setClaimsFactoryNamesRequest := client.StorefrontClient.AuthenticationServiceSF.STFSetClaimsFactoryNames(ctx, getAuthServiceBody, setClaimsFactoryNamesBody)
+	err := setClaimsFactoryNamesRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error adding StoreFront Authentication Service",
+			fmt.Sprintf("Failed to set Claims Factory Names. Error Message: %s", err.Error()),
+		)
+		return err
+	}
+	return nil
 }

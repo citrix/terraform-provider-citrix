@@ -30,9 +30,9 @@ resource "citrix_nutanix_hypervisor" "example-nutanix-hypervisor" {
 
 ### Required
 
-- `addresses` (List of String) Hypervisor address(es).  At least one is required.
+- `addresses` (List of String) Hypervisor address(es). At least one is required.
 - `name` (String) Name of the hypervisor.
-- `password` (String) Password of the hypervisor.
+- `password` (String, Sensitive) Password of the hypervisor.
 - `password_format` (String) Password format of the hypervisor. Choose between Base64 and PlainText.
 - `username` (String) Username of the hypervisor.
 - `zone` (String) Id of the zone the hypervisor is associated with.

@@ -50,7 +50,7 @@ type MachineCatalogResourceModel struct {
 
 type MachineAccountsModel struct {
 	Hypervisor types.String `tfsdk:"hypervisor"`
-	Machines   types.List   `tfsdk:"machines"`
+	Machines   types.List   `tfsdk:"machines"` // List[MachineCatalogMachineModel]
 }
 
 func (MachineAccountsModel) GetSchema() schema.NestedAttributeObject {
@@ -127,7 +127,7 @@ func (MachineCatalogMachineModel) GetSchema() schema.NestedAttributeObject {
 				Optional:    true,
 			},
 			"host": schema.StringAttribute{
-				Description: "**[vSphere: Required]** The IP address or FQDN of the host in which the machine resides. Required only if `is_power_managed = true`",
+				Description: "**[vSphere, SCVMM: Required]** For vSphere, this is the IP address or FQDN of the host in which the machine resides. For SCVMM, this is the name of the host in which the machine resides. Required only if `is_power_managed = true`",
 				Optional:    true,
 			},
 		},
@@ -159,7 +159,7 @@ type ProvisioningSchemeModel struct {
 
 func (ProvisioningSchemeModel) GetSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
-		Description: "Machine catalog provisioning scheme. Required when `provisioning_type = MCS`",
+		Description: "Machine catalog provisioning scheme. Required when `provisioning_type = MCS` or `provisioning_type = PVS_STREAMING`.",
 		Optional:    true,
 		Attributes: map[string]schema.Attribute{
 			"hypervisor": schema.StringAttribute{
@@ -306,6 +306,9 @@ func (MachineDomainIdentityModel) GetSchema() schema.SingleNestedAttribute {
 			"domain_ou": schema.StringAttribute{
 				Description: "The organization unit that computer accounts will be created into.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
 			},
 			"service_account": schema.StringAttribute{
 				Description: "Service account for the domain. Only the username is required; do not include the domain name.",
@@ -428,7 +431,7 @@ func (RemotePcOuModel) GetAttributes() map[string]schema.Attribute {
 	return RemotePcOuModel{}.GetSchema().Attributes
 }
 
-func GetSchema() schema.Schema {
+func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "Manages a machine catalog.",
 		Attributes: map[string]schema.Attribute{
@@ -507,6 +510,7 @@ func GetSchema() schema.Schema {
 					stringvalidator.OneOf(
 						string(citrixorchestration.PROVISIONINGTYPE_MCS),
 						string(citrixorchestration.PROVISIONINGTYPE_MANUAL),
+						string(citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING),
 					),
 				},
 				PlanModifiers: []planmodifier.String{
@@ -558,6 +562,10 @@ func GetSchema() schema.Schema {
 	}
 }
 
+func (MachineCatalogResourceModel) GetAttributes() map[string]schema.Attribute {
+	return MachineCatalogResourceModel{}.GetSchema().Attributes
+}
+
 func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixclient.CitrixDaasClient, catalog *citrixorchestration.MachineCatalogDetailResponseModel, connectionType *citrixorchestration.HypervisorConnectionType, machines *citrixorchestration.MachineResponseModelCollection, pluginId string) MachineCatalogResourceModel {
 	// Machine Catalog Properties
 	r.Id = types.StringValue(catalog.GetId())
@@ -583,7 +591,15 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 	}
 
 	provtype := catalog.GetProvisioningType()
-	r.ProvisioningType = types.StringValue(string(provtype))
+	provScheme := catalog.GetProvisioningScheme()
+	provSchemeType := provScheme.GetProvisioningSchemeType()
+
+	if provSchemeType == "PVS" {
+		// For PVS Streaming, provisioning type returned (MCS) is different from the value sent in schema (PVSStreaming)
+		r.ProvisioningType = types.StringValue(string(citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING))
+	} else {
+		r.ProvisioningType = types.StringValue(string(provtype))
+	}
 	if provtype == citrixorchestration.PROVISIONINGTYPE_MANUAL {
 		r.IsPowerManaged = types.BoolValue(catalog.GetIsPowerManaged())
 	} else {
@@ -610,7 +626,7 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 	r.Scopes = util.StringArrayToStringSet(ctx, diagnostics, scopeIds)
 
 	// Provisioning Scheme Properties
-	r = r.updateCatalogWithProvScheme(ctx, diagnostics, client, catalog, connectionType, pluginId)
+	r = r.updateCatalogWithProvScheme(ctx, diagnostics, client, catalog, connectionType, pluginId, provScheme)
 
 	return r
 }

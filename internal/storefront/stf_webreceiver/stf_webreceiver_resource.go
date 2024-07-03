@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -21,6 +22,7 @@ var (
 	_ resource.Resource                = &stfWebReceiverResource{}
 	_ resource.ResourceWithConfigure   = &stfWebReceiverResource{}
 	_ resource.ResourceWithImportState = &stfWebReceiverResource{}
+	_ resource.ResourceWithModifyPlan  = &stfWebReceiverResource{}
 )
 
 // stfWebReceiverResource is a helper function to simplify the provider implementation.
@@ -47,6 +49,40 @@ func (r *stfWebReceiverResource) Configure(_ context.Context, req resource.Confi
 	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
 }
 
+// ModifyPlan modifies the resource plan before it is applied.
+func (r *stfWebReceiverResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	// Skip modify plan when doing destroy action
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+
+	operation := "updating"
+	if req.State.Raw.IsNull() {
+		operation = "creating"
+	}
+
+	// Retrieve values from plan
+	var plan STFWebReceiverResourceModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	webReceiverUI := util.ObjectValueToTypedObject[UserInterface](ctx, &resp.Diagnostics, plan.UserInterface)
+	if !webReceiverUI.PreventIcaDownloads.IsUnknown() && !webReceiverUI.PreventIcaDownloads.IsNull() {
+		stfSupportPreventIcaDownload := util.CheckStoreFrontVersion(r.client.StorefrontClient.VersionSF, ctx, &resp.Diagnostics, 3, 29)
+		if !stfSupportPreventIcaDownload && webReceiverUI.PreventIcaDownloads.ValueBool() {
+			resp.Diagnostics.AddError(
+				fmt.Sprintf("Error %s StoreFront Web Receiver resource", operation),
+				"`prevent_ica_download` cannot be set to `true` for the targeted StoreFront, StoreFront version 2402 or higher is required",
+			)
+		}
+	}
+}
+
 // Create creates the resource and sets the initial Terraform state.
 func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
@@ -70,33 +106,49 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 	body.SetSiteId(siteIdInt)
-	body.SetVirtualPath(plan.VirtualPath.String())
+	body.SetVirtualPath(plan.VirtualPath.ValueString())
 	body.SetFriendlyName(plan.FriendlyName.ValueString())
-	body.SetStoreService("(Get-STFStoreService -VirtualPath " + plan.StoreService.ValueString() + " ) ")
-	createWebReceiverRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverCreateSTFWebReceiver(ctx, body)
+
+	var getSTFStoreBody citrixstorefront.GetSTFStoreRequestModel
+	getSTFStoreBody.SetVirtualPath(plan.StoreServiceVirtualPath.ValueString())
+	createWebReceiverRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverCreateSTFWebReceiver(ctx, body, getSTFStoreBody)
 	// Create new STF WebReceiver
 	WebReceiverDetail, err := createWebReceiverRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating StoreFront WebReceiver",
-			"TransactionId: ",
+			"\nError message: "+err.Error(),
 		)
 		return
+	}
+
+	var getWebReceiverRequestBody citrixstorefront.GetSTFWebReceiverRequestModel
+	getWebReceiverRequestBody.SetVirtualPath(plan.VirtualPath.ValueString())
+	if plan.SiteId.ValueString() != "" {
+		siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating StoreFront Authentication Service ",
+				"\nError message: "+err.Error(),
+			)
+			return
+		}
+		getWebReceiverRequestBody.SetSiteId(siteIdInt)
 	}
 
 	// Create the authentication methods Body
 	if !plan.AuthenticationMethods.IsNull() {
 		var authMethodCreateBody citrixstorefront.UpdateSTFWebReceiverAuthenticationMethodsRequestModel
-		authMethodCreateBody.SetWebReceiverService("(Get-STFWebReceiverService -VirtualPath " + plan.VirtualPath.ValueString() + " -SiteId " + plan.SiteId.ValueString() + " )")
 		authMethods := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.AuthenticationMethods)
 		authMethodCreateBody.SetAuthenticationMethods(authMethods)
-		creatAuthProtocolRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverSetSTFWebReceiverAuthenticationMethods(ctx, authMethodCreateBody)
+
+		creatAuthProtocolRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverSetSTFWebReceiverAuthenticationMethods(ctx, authMethodCreateBody, getWebReceiverRequestBody)
 		// Create new STF WebReceiver Authentication Methods
 		_, err = creatAuthProtocolRequest.Execute()
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating StoreFront WebReceiver Authentication Methods",
-				"TransactionId: ",
+				"\nError message: "+err.Error(),
 			)
 			return
 		}
@@ -105,7 +157,6 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 	// Create the Plugin Assistant
 	if !plan.PluginAssistant.IsNull() {
 		var pluginAssistantBody citrixstorefront.UpdateSTFWebReceiverPluginAssistantRequestModel
-		pluginAssistantBody.SetWebReceiverService("(Get-STFWebReceiverService -VirtualPath " + plan.VirtualPath.ValueString() + " -SiteId " + plan.SiteId.ValueString() + " )")
 
 		plannedPluginAssistant := util.ObjectValueToTypedObject[PluginAssistant](ctx, &resp.Diagnostics, plan.PluginAssistant)
 		pluginAssistantBody.SetEnabled(plannedPluginAssistant.Enabled.ValueBool())
@@ -123,13 +174,13 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 		pluginAssistantBody.SetProtocolHandlerEnabled(plannedPluginAssistant.ProtocolHandlerEnabled.ValueBool())
 		pluginAssistantBody.SetProtocolHandlerPlatforms(plannedPluginAssistant.ProtocolHandlerPlatforms.ValueString())
 		pluginAssistantBody.SetProtocolHandlerSkipDoubleHopCheckWhenDisabled(plannedPluginAssistant.ProtocolHandlerSkipDoubleHopCheckWhenDisabled.ValueBool())
-		pluginAssistantRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverPluginAssistantUpdate(ctx, pluginAssistantBody)
+		pluginAssistantRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverPluginAssistantUpdate(ctx, pluginAssistantBody, getWebReceiverRequestBody)
 		// Create new STF WebReceiver Plugin Assistant
 		_, err = pluginAssistantRequest.Execute()
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating StoreFront WebReceiver Plugin Assistant",
-				"TransactionId: ",
+				"\nError message: "+err.Error(),
 			)
 			return
 		}
@@ -138,14 +189,12 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 
 	// Refresh the authentication methods
 	if !plan.AuthenticationMethods.IsNull() {
-		var authMethodGetBody citrixstorefront.GetSTFWebReceiverAuthenticationMethodsRequestModel
-		authMethodGetBody.SetWebReceiverService("(Get-STFWebReceiverService -VirtualPath " + plan.VirtualPath.ValueString() + " -SiteId " + plan.SiteId.ValueString() + " )")
-		getAuthProtocolRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverGetSTFWebReceiverAuthenticationMethods(ctx, authMethodGetBody)
+		getAuthProtocolRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverGetSTFWebReceiverAuthenticationMethods(ctx, getWebReceiverRequestBody)
 		authMethoResult, err := getAuthProtocolRequest.Execute()
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching StoreFront WebReceiver Authentication Methods",
-				"TransactionId: ",
+				"\nError message: "+err.Error(),
 			)
 			return
 		}
@@ -155,22 +204,62 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 
 	//Refresh Plugin Assistant
 	if !plan.PluginAssistant.IsNull() {
-		var pluginAssistantGetBody citrixstorefront.GetSTFWebReceiverPluginAssistantRequestModel
-		pluginAssistantGetBody.SetWebReceiverService("(Get-STFWebReceiverService -VirtualPath " + plan.VirtualPath.ValueString() + " -SiteId " + plan.SiteId.ValueString() + " )")
-		getPlugInAssistantRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverPluginAssistantGet(ctx, pluginAssistantGetBody)
+
+		getPlugInAssistantRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverPluginAssistantGet(ctx, getWebReceiverRequestBody)
 		assistant, err := getPlugInAssistantRequest.Execute()
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching StoreFront WebReceiver Plugin Assistant",
-				"TransactionId: ",
+				"\nError message: "+err.Error(),
 			)
 			return
 		}
 		plan.RefreshPlugInAssistant(ctx, &resp.Diagnostics, &assistant)
 	}
 
+	var appShortcutsResponse citrixstorefront.GetWebReceiverApplicationShortcutsResponseModel
+	if !plan.ApplicationShortcuts.IsNull() {
+		appShortcutsResponse, err = setAndGetSTFWebReceiverApplicationShortcuts(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.ApplicationShortcuts)
+		if err != nil {
+			return
+		}
+	}
+
+	var communicationResponse citrixstorefront.GetWebReceiverCommunicationResponseModel
+	if !plan.Communication.IsNull() {
+		communicationResponse, err = setAndGetSTFWebReceiverCommunication(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.Communication)
+		if err != nil {
+			return
+		}
+	}
+
+	var stsResponse citrixstorefront.GetWebReceiverStrictTransportSecurityResponseModel
+	if !plan.StrictTransportSecurity.IsNull() {
+		stsResponse, err = setAndGetSTFWebReceiverStrictTransportSecurity(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.StrictTransportSecurity)
+		if err != nil {
+			return
+		}
+	}
+
+	var authManagerResponse citrixstorefront.GetWebReceiverAuthenticationManagerResponseModel
+	if !plan.AuthenticationManager.IsNull() {
+		authManagerResponse, err = setAndGetSTFWebReceiverAuthenticationManager(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.AuthenticationManager)
+		if err != nil {
+			return
+		}
+	}
+
+	// WebReceiverUserInterface config
+	var uiResponse citrixstorefront.GetSTFWebReceiverUserInterfaceResponseModel
+	if !plan.UserInterface.IsNull() {
+		uiResponse, err = setAndGetSTFWebReceiverUserInterface(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.UserInterface)
+		if err != nil {
+			return
+		}
+	}
+
 	// Map response body to schema and populate Computed attribute values
-	plan.RefreshPropertyValues(&WebReceiverDetail)
+	plan.RefreshPropertyValues(ctx, &resp.Diagnostics, &WebReceiverDetail, &appShortcutsResponse, &communicationResponse, &stsResponse, &authManagerResponse, &uiResponse)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -197,23 +286,85 @@ func (r *stfWebReceiverResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 
+	if STFWebReceiver == nil {
+		resp.Diagnostics.AddWarning(
+			"StoreFront Web Receiver Service not found",
+			"StoreFront Web Receiver Service was not found and will be removed from the state file. An apply action will result in the creation of a new resource.",
+		)
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
+	var getWebReceiverRequestBody citrixstorefront.GetSTFWebReceiverRequestModel
+	getWebReceiverRequestBody.SetVirtualPath(state.VirtualPath.ValueString())
+	if state.SiteId.ValueString() != "" {
+		siteIdInt, err := strconv.ParseInt(state.SiteId.ValueString(), 10, 64)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error reading StoreFront Authentication Service ",
+				"\nError message: "+err.Error(),
+			)
+			return
+		}
+		getWebReceiverRequestBody.SetSiteId(siteIdInt)
+	}
+
 	//Refresh Plugin Assistant
 	if !state.PluginAssistant.IsNull() {
-		var pluginAssistantGetBody citrixstorefront.GetSTFWebReceiverPluginAssistantRequestModel
-		pluginAssistantGetBody.SetWebReceiverService("(Get-STFWebReceiverService -VirtualPath " + state.VirtualPath.ValueString() + " -SiteId " + state.SiteId.ValueString() + " )")
-		getPlugInAssistantRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverPluginAssistantGet(ctx, pluginAssistantGetBody)
+		getPlugInAssistantRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverPluginAssistantGet(ctx, getWebReceiverRequestBody)
 		assistant, err := getPlugInAssistantRequest.Execute()
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching StoreFront WebReceiver Plugin Assistant",
-				"TransactionId: ",
+				"\nError message: "+err.Error(),
 			)
 			return
 		}
 		state.RefreshPlugInAssistant(ctx, &resp.Diagnostics, &assistant)
 	}
 
-	state.RefreshPropertyValues(STFWebReceiver)
+	var appShortcutsResponse citrixstorefront.GetWebReceiverApplicationShortcutsResponseModel
+	if !state.ApplicationShortcuts.IsNull() {
+		appShortcutsResponse, err = getSTFWebReceiverApplicationShortcuts(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
+		if err != nil {
+			return
+		}
+	}
+
+	var communicationResponse citrixstorefront.GetWebReceiverCommunicationResponseModel
+	if !state.Communication.IsNull() {
+		communicationResponse, err = getSTFWebReceiverCommunication(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
+		if err != nil {
+			return
+		}
+	}
+
+	var stsResponse citrixstorefront.GetWebReceiverStrictTransportSecurityResponseModel
+	if !state.StrictTransportSecurity.IsNull() {
+		stsResponse, err = getSTFWebReceiverStrictTransportSecurity(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
+		if err != nil {
+			return
+		}
+	}
+
+	var authManagerResponse citrixstorefront.GetWebReceiverAuthenticationManagerResponseModel
+	if !state.AuthenticationManager.IsNull() {
+		authManagerResponse, err = getSTFWebReceiverAuthenticationManager(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
+		if err != nil {
+			return
+		}
+	}
+
+	// WebReceiverUserInterface config
+	var uiResponse citrixstorefront.GetSTFWebReceiverUserInterfaceResponseModel
+	if !state.UserInterface.IsNull() {
+		uiResponse, err = getSTFWebReceiverUserInterface(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
+		if err != nil {
+			return
+		}
+	}
+
+	state.RefreshPropertyValues(ctx, &resp.Diagnostics, STFWebReceiver, &appShortcutsResponse, &communicationResponse, &stsResponse, &authManagerResponse, &uiResponse)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -235,27 +386,33 @@ func (r *stfWebReceiverResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	// Get current state
-	var state STFWebReceiverResourceModel
-	diags = req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
+	var getWebReceiverRequestBody citrixstorefront.GetSTFWebReceiverRequestModel
+	getWebReceiverRequestBody.SetVirtualPath(plan.VirtualPath.ValueString())
+	if plan.SiteId.ValueString() != "" {
+		siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating StoreFront Authentication Service ",
+				"\nError message: "+err.Error(),
+			)
+			return
+		}
+		getWebReceiverRequestBody.SetSiteId(siteIdInt)
 	}
 
 	// Update the Auth Methods
 	if !plan.AuthenticationMethods.IsNull() {
 		var authMethodCreateBody citrixstorefront.UpdateSTFWebReceiverAuthenticationMethodsRequestModel
-		authMethodCreateBody.SetWebReceiverService("(Get-STFWebReceiverService -VirtualPath " + plan.VirtualPath.ValueString() + " -SiteId " + plan.SiteId.ValueString() + " )")
 		authMethods := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.AuthenticationMethods)
 		authMethodCreateBody.SetAuthenticationMethods(authMethods)
-		creatAuthProtocolRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverSetSTFWebReceiverAuthenticationMethods(ctx, authMethodCreateBody)
+
+		creatAuthProtocolRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverSetSTFWebReceiverAuthenticationMethods(ctx, authMethodCreateBody, getWebReceiverRequestBody)
 		// Create new STF WebReceiver Authentication Methods
 		_, err := creatAuthProtocolRequest.Execute()
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating StoreFront WebReceiver Authentication Methods",
-				"TransactionId: ",
+				"\nError message: "+err.Error(),
 			)
 			return
 		}
@@ -264,7 +421,6 @@ func (r *stfWebReceiverResource) Update(ctx context.Context, req resource.Update
 	// update the Plugin Assistant
 	if !plan.PluginAssistant.IsNull() {
 		var pluginAssistantBody citrixstorefront.UpdateSTFWebReceiverPluginAssistantRequestModel
-		pluginAssistantBody.SetWebReceiverService("(Get-STFWebReceiverService -VirtualPath " + plan.VirtualPath.ValueString() + " -SiteId " + plan.SiteId.ValueString() + " )")
 
 		plannedPluginAssistant := util.ObjectValueToTypedObject[PluginAssistant](ctx, &resp.Diagnostics, plan.PluginAssistant)
 		pluginAssistantBody.SetEnabled(plannedPluginAssistant.Enabled.ValueBool())
@@ -282,17 +438,59 @@ func (r *stfWebReceiverResource) Update(ctx context.Context, req resource.Update
 		pluginAssistantBody.SetProtocolHandlerEnabled(plannedPluginAssistant.ProtocolHandlerEnabled.ValueBool())
 		pluginAssistantBody.SetProtocolHandlerPlatforms(plannedPluginAssistant.ProtocolHandlerPlatforms.ValueString())
 		pluginAssistantBody.SetProtocolHandlerSkipDoubleHopCheckWhenDisabled(plannedPluginAssistant.ProtocolHandlerSkipDoubleHopCheckWhenDisabled.ValueBool())
-		pluginAssistantRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverPluginAssistantUpdate(ctx, pluginAssistantBody)
+		pluginAssistantRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverPluginAssistantUpdate(ctx, pluginAssistantBody, getWebReceiverRequestBody)
 		// Create new STF WebReceiver Plugin Assistant
 		_, err := pluginAssistantRequest.Execute()
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating StoreFront WebReceiver Plugin Assistant",
-				"TransactionId: ",
+				"\nError message: "+err.Error(),
 			)
 			return
 		}
+	}
 
+	if !plan.ApplicationShortcuts.IsNull() {
+		appShortcutsResponse, err := setAndGetSTFWebReceiverApplicationShortcuts(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.ApplicationShortcuts)
+		if err != nil {
+			return
+		}
+
+		plan.ApplicationShortcuts = plan.RefreshApplicationShortcuts(ctx, &resp.Diagnostics, &appShortcutsResponse)
+	}
+
+	if !plan.Communication.IsNull() {
+		communicationResponse, err := setAndGetSTFWebReceiverCommunication(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.Communication)
+		if err != nil {
+			return
+		}
+
+		plan.Communication = plan.RefreshCommunication(ctx, &resp.Diagnostics, &communicationResponse)
+	}
+
+	if !plan.StrictTransportSecurity.IsNull() {
+		stsResponse, err := setAndGetSTFWebReceiverStrictTransportSecurity(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.StrictTransportSecurity)
+		if err != nil {
+			return
+		}
+		plan.StrictTransportSecurity = plan.RefreshStrictTransportSecurity(ctx, &resp.Diagnostics, &stsResponse)
+	}
+
+	if !plan.AuthenticationManager.IsNull() {
+		authManagerResponse, err := setAndGetSTFWebReceiverAuthenticationManager(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.AuthenticationManager)
+		if err != nil {
+			return
+		}
+		plan.AuthenticationManager = plan.RefreshAuthenticationManager(ctx, &resp.Diagnostics, &authManagerResponse)
+	}
+
+	// WebReceiverUserInterface config
+	if !plan.UserInterface.IsNull() {
+		uiResponse, err := setAndGetSTFWebReceiverUserInterface(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.UserInterface)
+		if err != nil {
+			return
+		}
+		plan.UserInterface = plan.RefreshUserInterface(ctx, &resp.Diagnostics, &uiResponse)
 	}
 
 	diags = resp.State.Set(ctx, plan)
@@ -314,9 +512,18 @@ func (r *stfWebReceiverResource) Delete(ctx context.Context, req resource.Delete
 		return
 	}
 
-	var body citrixstorefront.ClearSTFWebReceiverRequestModel
+	var body citrixstorefront.GetSTFWebReceiverRequestModel
+	body.SetVirtualPath(state.VirtualPath.ValueString())
 	if state.SiteId.ValueString() != "" {
-		body.SetWebReceiverService("(Get-STFWebReceiverService -VirtualPath " + state.VirtualPath.ValueString() + " -SiteId " + state.SiteId.ValueString() + " )")
+		siteIdInt, err := strconv.ParseInt(state.SiteId.ValueString(), 10, 64)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error deleting StoreFront Authentication Service ",
+				"\nError message: "+err.Error(),
+			)
+			return
+		}
+		body.SetSiteId(siteIdInt)
 	}
 
 	// Delete existing STF WebReceiver
@@ -358,6 +565,21 @@ func (r *stfWebReceiverResource) ImportState(ctx context.Context, req resource.I
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("virtual_path"), idSegments[1])...)
 }
 
+func constructGetWebReceiverRequestBody(diagnostics *diag.Diagnostics, siteId string, virtualPath string) (citrixstorefront.GetSTFWebReceiverRequestModel, error) {
+	var getWebReceiverRequestBody citrixstorefront.GetSTFWebReceiverRequestModel
+	siteIdInt, err := strconv.ParseInt(siteId, 10, 64)
+	if err != nil {
+		diagnostics.AddError(
+			"Error parsing Site Id of the StoreFront WebReceiver ",
+			"Error message: "+err.Error(),
+		)
+		return citrixstorefront.GetSTFWebReceiverRequestModel{}, err
+	}
+	getWebReceiverRequestBody.SetSiteId(siteIdInt)
+	getWebReceiverRequestBody.SetVirtualPath(virtualPath)
+	return getWebReceiverRequestBody, nil
+}
+
 // Gets the STFWebReceiver and logs any errors
 func getSTFWebReceiver(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, state STFWebReceiverResourceModel) (*citrixstorefront.STFWebReceiverDetailModel, error) {
 	var body citrixstorefront.GetSTFWebReceiverRequestModel
@@ -381,7 +603,276 @@ func getSTFWebReceiver(ctx context.Context, client *citrixdaasclient.CitrixDaasC
 	// Get refreshed STFWebReceiver properties from Orchestration
 	STFWebReceiver, err := getSTFWebReceiverRequest.Execute()
 	if err != nil {
+		if strings.EqualFold(err.Error(), util.NOT_EXIST) {
+			return nil, nil
+		}
 		return &STFWebReceiver, err
 	}
 	return &STFWebReceiver, nil
+}
+
+func setAndGetSTFWebReceiverApplicationShortcuts(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteId string, virtualPath string, appShortcuts basetypes.ObjectValue) (citrixstorefront.GetWebReceiverApplicationShortcutsResponseModel, error) {
+	getWebReceiverRequestBody, err := constructGetWebReceiverRequestBody(diagnostics, siteId, virtualPath)
+	if err != nil {
+		return citrixstorefront.GetWebReceiverApplicationShortcutsResponseModel{}, err
+	}
+
+	plannedAppShortcuts := util.ObjectValueToTypedObject[ApplicationShortcuts](ctx, diagnostics, appShortcuts)
+	gatewayUrls := util.StringSetToStringArray(ctx, diagnostics, plannedAppShortcuts.GatewayUrls)
+	trustedUrls := util.StringSetToStringArray(ctx, diagnostics, plannedAppShortcuts.TrustedUrls)
+
+	var setAppShortcutsBody citrixstorefront.SetWebReceiverApplicationShortcutsRequestModel
+	setAppShortcutsBody.SetPromptForUntrustedShortcuts(plannedAppShortcuts.PromptForUntrustedShortcuts.ValueBool())
+	setAppShortcutsBody.SetGatewayUrls(gatewayUrls)
+	setAppShortcutsBody.SetTrustedUrls(trustedUrls)
+
+	appShortcutsRequest := client.StorefrontClient.WebReceiverSF.STFWebReceiverApplicationShortcutsSet(ctx, getWebReceiverRequestBody, setAppShortcutsBody)
+	err = appShortcutsRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error setting application shortcuts for the StoreFront WebReceiver ",
+			"Error message: "+err.Error(),
+		)
+		return citrixstorefront.GetWebReceiverApplicationShortcutsResponseModel{}, err
+	}
+
+	appShortcutsResponse, err := getSTFWebReceiverApplicationShortcuts(ctx, diagnostics, client, siteId, virtualPath)
+	return appShortcutsResponse, err
+}
+
+func getSTFWebReceiverApplicationShortcuts(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteId string, virtualPath string) (citrixstorefront.GetWebReceiverApplicationShortcutsResponseModel, error) {
+	getWebReceiverRequestBody, err := constructGetWebReceiverRequestBody(diagnostics, siteId, virtualPath)
+	if err != nil {
+		return citrixstorefront.GetWebReceiverApplicationShortcutsResponseModel{}, err
+	}
+
+	getAppShortcutsRequest := client.StorefrontClient.WebReceiverSF.STFWebReceiverApplicationShortcutsGet(ctx, getWebReceiverRequestBody)
+	appShortcutsResponse, err := getAppShortcutsRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error fetching StoreFront WebReceiver Application Shortcuts details",
+			"Error Message: "+err.Error(),
+		)
+	}
+	return appShortcutsResponse, err
+}
+
+func setAndGetSTFWebReceiverCommunication(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteId string, virtualPath string, communication basetypes.ObjectValue) (citrixstorefront.GetWebReceiverCommunicationResponseModel, error) {
+	getWebReceiverRequestBody, err := constructGetWebReceiverRequestBody(diagnostics, siteId, virtualPath)
+	if err != nil {
+		return citrixstorefront.GetWebReceiverCommunicationResponseModel{}, err
+	}
+
+	plannedCommunication := util.ObjectValueToTypedObject[Communication](ctx, diagnostics, communication)
+
+	var setCommunicationBody citrixstorefront.SetWebReceiverCommunicationRequestModel
+	setCommunicationBody.SetAttempts(int(plannedCommunication.Attempts.ValueInt64()))
+	setCommunicationBody.SetTimeout(plannedCommunication.Timeout.ValueString())
+	setCommunicationBody.SetLoopback(plannedCommunication.Loopback.ValueString())
+	setCommunicationBody.SetLoopbackPortUsingHttp(int(plannedCommunication.LoopbackPortUsingHttp.ValueInt64()))
+	setCommunicationBody.SetProxyEnabled(plannedCommunication.ProxyEnabled.ValueBool())
+	setCommunicationBody.SetProxyPort(int(plannedCommunication.ProxyPort.ValueInt64()))
+	setCommunicationBody.SetProxyProcessName(plannedCommunication.ProxyProcessName.ValueString())
+
+	communicationRequest := client.StorefrontClient.WebReceiverSF.STFWebReceiverCommunicationSet(ctx, getWebReceiverRequestBody, setCommunicationBody)
+	err = communicationRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error setting communication configuration for the StoreFront WebReceiver ",
+			"Error message: "+err.Error(),
+		)
+		return citrixstorefront.GetWebReceiverCommunicationResponseModel{}, err
+	}
+
+	communicationResponse, err := getSTFWebReceiverCommunication(ctx, diagnostics, client, siteId, virtualPath)
+	return communicationResponse, err
+}
+
+func getSTFWebReceiverCommunication(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteId string, virtualPath string) (citrixstorefront.GetWebReceiverCommunicationResponseModel, error) {
+	getWebReceiverRequestBody, err := constructGetWebReceiverRequestBody(diagnostics, siteId, virtualPath)
+	if err != nil {
+		return citrixstorefront.GetWebReceiverCommunicationResponseModel{}, err
+	}
+
+	getCommunicationRequest := client.StorefrontClient.WebReceiverSF.STFWebReceiverCommunicationGet(ctx, getWebReceiverRequestBody)
+	communicationResponse, err := getCommunicationRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error fetching StoreFront WebReceiver Communicationconfiguration details",
+			"Error Message: "+err.Error(),
+		)
+	}
+	return communicationResponse, err
+}
+
+func setAndGetSTFWebReceiverStrictTransportSecurity(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteId string, virtualPath string, sts basetypes.ObjectValue) (citrixstorefront.GetWebReceiverStrictTransportSecurityResponseModel, error) {
+	getWebReceiverRequestBody, err := constructGetWebReceiverRequestBody(diagnostics, siteId, virtualPath)
+	if err != nil {
+		return citrixstorefront.GetWebReceiverStrictTransportSecurityResponseModel{}, err
+	}
+
+	plannedSts := util.ObjectValueToTypedObject[StrictTransportSecurity](ctx, diagnostics, sts)
+
+	var setStsBody citrixstorefront.SetWebReceiverStrictTransportSecurityRequestModel
+	setStsBody.SetEnabled(plannedSts.Enabled.ValueBool())
+	setStsBody.SetPolicyDuration(plannedSts.PolicyDuration.ValueString())
+
+	stsRequest := client.StorefrontClient.WebReceiverSF.STFWebReceiverStrictTransportSecuritySet(ctx, getWebReceiverRequestBody, setStsBody)
+	err = stsRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error setting Strict Transport Security configuration for the StoreFront WebReceiver ",
+			"Error message: "+err.Error(),
+		)
+		return citrixstorefront.GetWebReceiverStrictTransportSecurityResponseModel{}, err
+	}
+
+	stsResponse, err := getSTFWebReceiverStrictTransportSecurity(ctx, diagnostics, client, siteId, virtualPath)
+	return stsResponse, err
+}
+
+func getSTFWebReceiverStrictTransportSecurity(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteId string, virtualPath string) (citrixstorefront.GetWebReceiverStrictTransportSecurityResponseModel, error) {
+	getWebReceiverRequestBody, err := constructGetWebReceiverRequestBody(diagnostics, siteId, virtualPath)
+	if err != nil {
+		return citrixstorefront.GetWebReceiverStrictTransportSecurityResponseModel{}, err
+	}
+
+	getStsRequest := client.StorefrontClient.WebReceiverSF.STFWebReceiverStrictTransportSecurityGet(ctx, getWebReceiverRequestBody)
+	stsResponse, err := getStsRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error fetching StoreFront WebReceiver StrictTransportSecurity details",
+			"Error Message: "+err.Error(),
+		)
+	}
+	return stsResponse, err
+}
+
+func setAndGetSTFWebReceiverAuthenticationManager(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteId string, virtualPath string, authManager basetypes.ObjectValue) (citrixstorefront.GetWebReceiverAuthenticationManagerResponseModel, error) {
+	getWebReceiverRequestBody, err := constructGetWebReceiverRequestBody(diagnostics, siteId, virtualPath)
+	if err != nil {
+		return citrixstorefront.GetWebReceiverAuthenticationManagerResponseModel{}, err
+	}
+
+	plannedAuthManager := util.ObjectValueToTypedObject[AuthenticationManager](ctx, diagnostics, authManager)
+
+	var setAuthManagerBody citrixstorefront.SetWebReceiverAuthenticationManagerRequestModel
+	setAuthManagerBody.SetLoginFormTimeout(int(plannedAuthManager.LoginFormTimeout.ValueInt64()))
+
+	authManagerRequest := client.StorefrontClient.WebReceiverSF.STFWebReceiverAuthenticationManagerSet(ctx, getWebReceiverRequestBody, setAuthManagerBody)
+	err = authManagerRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error setting Authentication Manager configuration for the StoreFront WebReceiver ",
+			"Error message: "+err.Error(),
+		)
+		return citrixstorefront.GetWebReceiverAuthenticationManagerResponseModel{}, err
+	}
+
+	authManagerResponse, err := getSTFWebReceiverAuthenticationManager(ctx, diagnostics, client, siteId, virtualPath)
+	return authManagerResponse, err
+}
+
+func getSTFWebReceiverAuthenticationManager(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteId string, virtualPath string) (citrixstorefront.GetWebReceiverAuthenticationManagerResponseModel, error) {
+	getWebReceiverRequestBody, err := constructGetWebReceiverRequestBody(diagnostics, siteId, virtualPath)
+	if err != nil {
+		return citrixstorefront.GetWebReceiverAuthenticationManagerResponseModel{}, err
+	}
+
+	getAuthManagerRequest := client.StorefrontClient.WebReceiverSF.STFWebReceiverAuthenticationManagerGet(ctx, getWebReceiverRequestBody)
+	authManagerResponse, err := getAuthManagerRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error fetching StoreFront WebReceiver AuthenticationManager details",
+			"Error Message: "+err.Error(),
+		)
+	}
+	return authManagerResponse, err
+}
+
+func setAndGetSTFWebReceiverUserInterface(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteId string, virtualPath string, userInterface basetypes.ObjectValue) (citrixstorefront.GetSTFWebReceiverUserInterfaceResponseModel, error) {
+	getWebReceiverRequestBody, err := constructGetWebReceiverRequestBody(diagnostics, siteId, virtualPath)
+	if err != nil {
+		return citrixstorefront.GetSTFWebReceiverUserInterfaceResponseModel{}, err
+	}
+
+	plannedUserInterface := util.ObjectValueToTypedObject[UserInterface](ctx, diagnostics, userInterface)
+
+	var setUserInterfaceBody citrixstorefront.SetSTFWebReceiverUserInterfaceRequestModel
+
+	setUserInterfaceBody.SetAutoLaunchDesktop(plannedUserInterface.AutoLaunchDesktop.ValueBool())
+	setUserInterfaceBody.SetMultiClickTimeout(int(plannedUserInterface.MultiClickTimeout.ValueInt64()))
+	setUserInterfaceBody.SetEnableAppsFolderView(plannedUserInterface.EnableAppsFolderView.ValueBool())
+	setUserInterfaceBody.SetCategoryViewCollapsed(plannedUserInterface.CategoryViewCollapsed.ValueBool())
+	setUserInterfaceBody.SetMoveAppToUncategorized(plannedUserInterface.MoveAppToUncategorized.ValueBool())
+	setUserInterfaceBody.SetShowActivityManager(plannedUserInterface.ShowActivityManager.ValueBool())
+	setUserInterfaceBody.SetShowFirstTimeUse(plannedUserInterface.ShowFirstTimeUse.ValueBool())
+
+	stfSupportPreventIcaDownload := util.CheckStoreFrontVersion(client.StorefrontClient.VersionSF, ctx, diagnostics, 3, 29)
+	if !plannedUserInterface.PreventIcaDownloads.IsNull() && stfSupportPreventIcaDownload {
+		setUserInterfaceBody.SetPreventIcaDownloads(plannedUserInterface.PreventIcaDownloads.ValueBool())
+	}
+
+	if !plannedUserInterface.UIViews.IsNull() {
+		plannedUiViews := util.ObjectValueToTypedObject[UIViews](ctx, diagnostics, plannedUserInterface.UIViews)
+		setUserInterfaceBody.SetShowAppsView(plannedUiViews.ShowAppsView.ValueBool())
+		setUserInterfaceBody.SetShowDesktopsView(plannedUiViews.ShowDesktopsView.ValueBool())
+		setUserInterfaceBody.SetDefaultView(plannedUiViews.DefaultView.ValueString())
+	}
+
+	if !plannedUserInterface.WorkspaceControl.IsNull() {
+		plannedWorkspaceControl := util.ObjectValueToTypedObject[WorkspaceControl](ctx, diagnostics, plannedUserInterface.WorkspaceControl)
+		setUserInterfaceBody.SetWorkspaceControlEnabled(plannedWorkspaceControl.Enabled.ValueBool())
+		setUserInterfaceBody.SetWorkspaceControlAutoReconnectAtLogon(plannedWorkspaceControl.AutoReconnectAtLogon.ValueBool())
+		setUserInterfaceBody.SetWorkspaceControlLogoffAction(plannedWorkspaceControl.LogoffAction.ValueString())
+		setUserInterfaceBody.SetWorkspaceControlShowReconnectButton(plannedWorkspaceControl.ShowReconnectButton.ValueBool())
+		setUserInterfaceBody.SetWorkspaceControlShowDisconnectButton(plannedWorkspaceControl.ShowDisconnectButton.ValueBool())
+	}
+
+	if !plannedUserInterface.ReceiverConfiguration.IsNull() {
+		plannedReceiverConfiguration := util.ObjectValueToTypedObject[ReceiverConfiguration](ctx, diagnostics, plannedUserInterface.ReceiverConfiguration)
+		setUserInterfaceBody.SetReceiverConfigurationEnabled(plannedReceiverConfiguration.Enabled.ValueBool())
+	}
+
+	if !plannedUserInterface.AppShortcuts.IsNull() {
+		plannedAppShortcuts := util.ObjectValueToTypedObject[AppShortcuts](ctx, diagnostics, plannedUserInterface.AppShortcuts)
+		setUserInterfaceBody.SetAppShortcutsEnabled(plannedAppShortcuts.Enabled.ValueBool())
+		setUserInterfaceBody.SetAppShortcutsAllowSessionReconnect(plannedAppShortcuts.AllowSessionReconnect.ValueBool())
+	}
+
+	if !plannedUserInterface.ProgressiveWebApp.IsNull() {
+		plannedProgressiveWebApp := util.ObjectValueToTypedObject[ProgressiveWebApp](ctx, diagnostics, plannedUserInterface.ProgressiveWebApp)
+		setUserInterfaceBody.SetProgressiveWebAppEnabled(plannedProgressiveWebApp.Enabled.ValueBool())
+		setUserInterfaceBody.SetShowProgressiveWebAppInstallPrompt(plannedProgressiveWebApp.ShowInstallPrompt.ValueBool())
+	}
+
+	setUserInterfaceRequest := client.StorefrontClient.WebReceiverSF.STFWebReceiverUserInterfaceSet(ctx, getWebReceiverRequestBody, setUserInterfaceBody)
+	err = setUserInterfaceRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error setting User Interface configuration for the StoreFront WebReceiver ",
+			"Error message: "+err.Error(),
+		)
+		return citrixstorefront.GetSTFWebReceiverUserInterfaceResponseModel{}, err
+	}
+
+	userInterfaceResponse, err := getSTFWebReceiverUserInterface(ctx, diagnostics, client, siteId, virtualPath)
+	return userInterfaceResponse, err
+}
+
+func getSTFWebReceiverUserInterface(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteId string, virtualPath string) (citrixstorefront.GetSTFWebReceiverUserInterfaceResponseModel, error) {
+	getWebReceiverRequestBody, err := constructGetWebReceiverRequestBody(diagnostics, siteId, virtualPath)
+	if err != nil {
+		return citrixstorefront.GetSTFWebReceiverUserInterfaceResponseModel{}, err
+	}
+
+	getUserInterfaceRequest := client.StorefrontClient.WebReceiverSF.STFWebReceiverUserInterfaceGet(ctx, getWebReceiverRequestBody)
+	userInterfaceResponse, err := getUserInterfaceRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error fetching StoreFront WebReceiver UserInterface details",
+			"Error Message: "+err.Error(),
+		)
+	}
+	return userInterfaceResponse, err
 }

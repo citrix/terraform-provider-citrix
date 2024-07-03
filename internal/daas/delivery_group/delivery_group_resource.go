@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -50,7 +51,7 @@ func (r *deliveryGroupResource) Configure(_ context.Context, req resource.Config
 
 // Schema defines the schema for the resource.
 func (r *deliveryGroupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = GetSchema()
+	resp.Schema = DeliveryGroupResourceModel{}.GetSchema()
 }
 
 func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -393,6 +394,10 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 	if data.AutoscaleSettings.IsNull() {
 		return
 	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
+
 	autoscale := util.ObjectValueToTypedObject[DeliveryGroupPowerManagementSettings](ctx, &resp.Diagnostics, data.AutoscaleSettings)
 
 	validatePowerTimeSchemes(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[DeliveryGroupPowerTimeScheme](ctx, &resp.Diagnostics, autoscale.PowerTimeSchemes))

@@ -285,6 +285,65 @@ func TypedArrayToObjectList[objTyp ModelWithAttributes](ctx context.Context, dia
 }
 
 // <summary>
+// Helper function to convert a native terraform list of objects to a golang slice of the specified type
+// Use TypedArrayToObjectSet to go the other way.
+// </summary>
+// <param name="ctx">context</param>
+// <param name="diagnostics">Any issues will be appended to these diagnostics</param>
+// <param name="v">List of object in the native terraform types.List wrapper</param>
+// <returns>Array of the specified type</returns>
+func ObjectSetToTypedArray[objTyp any](ctx context.Context, diagnostics *diag.Diagnostics, v types.Set) []objTyp {
+	res := make([]types.Object, 0, len(v.Elements()))
+	if v.IsNull() || v.IsUnknown() {
+		return nil
+	}
+
+	// convert to slice of TF type
+	diags := v.ElementsAs(ctx, &res, false)
+	if diags != nil {
+		diagnostics.Append(diags...)
+		return nil
+	}
+
+	// convert to slice of real objects
+	arr := make([]objTyp, 0, len(res))
+	for _, val := range res {
+		arr = append(arr, ObjectValueToTypedObject[objTyp](ctx, diagnostics, val))
+	}
+	return arr
+}
+
+// <summary>
+// Helper function to convert a golang slice to a native terraform list of objects.
+// Use ObjectSetToTypedArray to go the other way.
+// </summary>
+// <param name="diagnostics">Any issues will be appended to these diagnostics</param>
+// <param name="v">Slice of objects</param>
+// <returns>types.List</returns>
+func TypedArrayToObjectSet[objTyp ModelWithAttributes](ctx context.Context, diagnostics *diag.Diagnostics, v []objTyp) types.Set {
+	var t objTyp
+	attributesMap, err := AttributeMapFromObject(t)
+	if err != nil {
+		diagnostics.AddError("Error converting schema to attribute map", err.Error())
+	}
+
+	if v == nil {
+		return types.SetNull(types.ObjectType{AttrTypes: attributesMap})
+	}
+
+	res := make([]types.Object, 0, len(v))
+	for _, val := range v {
+		res = append(res, TypedObjectToObjectValue(ctx, diagnostics, val))
+	}
+	set, diags := types.SetValueFrom(ctx, types.ObjectType{AttrTypes: attributesMap}, res)
+	if diags != nil {
+		diagnostics.Append(diags...)
+		return types.SetNull(types.ObjectType{AttrTypes: attributesMap})
+	}
+	return set
+}
+
+// <summary>
 // Helper function to convert a terraform list of terraform strings to array of golang primitive strings.
 // Use StringArrayToStringList to go the other way.
 // </summary>
@@ -402,38 +461,32 @@ func ConvertBaseStringArrayToPrimitiveStringArray(v []types.String) []string {
 }
 
 // <summary>
-// Helper function to convert array of golang primitive strings to array of terraform strings
-// Deprecated: Remove after we fully move to types.List
-// </summary>
-// <param name="v">Array of golang primitive strings</param>
-// <returns>Array of terraform strings</returns>
-func ConvertPrimitiveStringArrayToBaseStringArray(v []string) []types.String {
-	res := []types.String{}
-	for _, stringVal := range v {
-		res = append(res, types.StringValue(stringVal))
-	}
-
-	return res
-}
-
-// <summary>
-// Helper function to convert array of golang primitive interface to array of terraform strings
-// Deprecated: Remove after we fully move to types.List
+// Helper function to convert array of golang primitive interface to native terraform list of strings
 // </summary>
 // <param name="v">Array of golang primitive interface</param>
-// <returns>Array of terraform strings</returns>
-func ConvertPrimitiveInterfaceArrayToBaseStringArray(v []interface{}) ([]types.String, string) {
-	res := []types.String{}
+// <returns>Terraform list of strings</returns>
+func ConvertPrimitiveInterfaceArrayToStringList(ctx context.Context, diagnostics *diag.Diagnostics, v []interface{}) (types.List, string) {
+	if v == nil {
+		return types.ListNull(types.StringType), ""
+	}
+
+	res := make([]types.String, 0, len(v))
 	for _, val := range v {
 		switch stringVal := val.(type) {
 		case string:
-			res = append(res, types.StringValue(stringVal))
+			res = append(res, basetypes.NewStringValue(stringVal))
 		default:
-			return nil, "At this time, only string values are supported in arrays."
+			return types.ListNull(types.StringType), "At this time, only string values are supported in arrays."
 		}
 	}
 
-	return res, ""
+	resList, diags := types.ListValueFrom(ctx, types.StringType, res)
+	if diags != nil {
+		diagnostics.Append(diags...)
+		return types.ListNull(types.StringType), "An error occurred when converting base string array to list of strings"
+	}
+
+	return resList, ""
 }
 
 // <summary>

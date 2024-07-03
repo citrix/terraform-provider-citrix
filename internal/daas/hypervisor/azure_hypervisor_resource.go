@@ -15,6 +15,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 const (
@@ -23,9 +24,10 @@ const (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &azureHypervisorResource{}
-	_ resource.ResourceWithConfigure   = &azureHypervisorResource{}
-	_ resource.ResourceWithImportState = &azureHypervisorResource{}
+	_ resource.Resource                   = &azureHypervisorResource{}
+	_ resource.ResourceWithConfigure      = &azureHypervisorResource{}
+	_ resource.ResourceWithImportState    = &azureHypervisorResource{}
+	_ resource.ResourceWithValidateConfig = &azureHypervisorResource{}
 )
 
 // NewHypervisorResource is a helper function to simplify the provider implementation.
@@ -45,7 +47,7 @@ func (r *azureHypervisorResource) Metadata(_ context.Context, req resource.Metad
 
 // Schema defines the schema for the resource.
 func (r *azureHypervisorResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = GetAzureHypervisorSchema()
+	resp.Schema = AzureHypervisorResourceModel{}.GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -286,4 +288,18 @@ func getMetadataForAzureRmHypervisor(plan AzureHypervisorResourceModel) []citrix
 	}
 
 	return metadata
+}
+
+func (r *azureHypervisorResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data AzureHypervisorResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }

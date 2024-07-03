@@ -10,16 +10,9 @@ import (
 	globalappconfiguration "github.com/citrix/citrix-daas-rest-go/globalappconfiguration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -47,330 +40,7 @@ func (r *gacSettingsResource) Metadata(_ context.Context, req resource.MetadataR
 
 // Schema defines the schema for the resource.
 func (r *gacSettingsResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "Manages the Global App Configuration settings for a service url.",
-
-		Attributes: map[string]schema.Attribute{
-			"service_url": schema.StringAttribute{
-				Description: "Citrix workspace application store url for which settings are to be configured. The value is case sensitive and requires the protocol (\"https\" or \"http\") and port number.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"name": schema.StringAttribute{
-				Description: "Name of the settings record.",
-				Required:    true,
-			},
-			"description": schema.StringAttribute{
-				Description: "Description of the settings record.",
-				Required:    true, //Check if this can be made into Optional
-			},
-			"use_for_app_config": schema.BoolAttribute{
-				Description: "Defines whether to use the settings for app configuration or not. Defaults to `true`.",
-				Optional:    true,
-				Computed:    true,
-				Default:     booldefault.StaticBool(true),
-			},
-			"app_settings": schema.SingleNestedAttribute{
-				Description: "Defines the device platform and the associated settings. Currently, only settings objects with value type of integer, boolean, strings and list of strings is supported.",
-				Required:    true,
-				Attributes: map[string]schema.Attribute{
-					"windows": schema.ListNestedAttribute{
-						Description: "Settings to be applied for users using windows platform.",
-						Optional:    true,
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"category": schema.StringAttribute{
-									Description: "Defines the category of the setting.",
-									Required:    true,
-								},
-								"user_override": schema.BoolAttribute{
-									Description: "Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.",
-									Required:    true,
-								},
-								"settings": schema.ListNestedAttribute{
-									Description: "A list of name value pairs for the settings. Please refer to [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
-									Required:    true,
-									Validators: []validator.List{
-										listvalidator.SizeAtLeast(1),
-									},
-									NestedObject: schema.NestedAttributeObject{
-										Attributes: map[string]schema.Attribute{
-											"name": schema.StringAttribute{
-												Description: "Name of the setting.",
-												Required:    true,
-											},
-											"value_string": schema.StringAttribute{
-												Description: "String value (if any) associated with the setting.",
-												Optional:    true,
-												Validators: []validator.String{
-													stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_string"), path.MatchRelative().AtParent().AtName("value_list")),
-													stringvalidator.LengthAtLeast(1),
-												},
-											},
-											"value_list": schema.ListAttribute{
-												ElementType: types.StringType,
-												Description: "List value (if any) associated with the setting.",
-												Optional:    true,
-												Validators: []validator.List{
-													listvalidator.SizeAtLeast(1),
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-						Validators: []validator.List{
-							listvalidator.SizeAtLeast(1),
-						},
-					},
-					"ios": schema.ListNestedAttribute{
-						Description: "Settings to be applied for users using ios platform.",
-						Optional:    true,
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"category": schema.StringAttribute{
-									Description: "Defines the category of the setting",
-									Required:    true,
-								},
-								"user_override": schema.BoolAttribute{
-									Description: "Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.",
-									Required:    true,
-								},
-								"settings": schema.ListNestedAttribute{
-									Description: "A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
-									Required:    true,
-									Validators: []validator.List{
-										listvalidator.SizeAtLeast(1),
-									},
-									NestedObject: schema.NestedAttributeObject{
-										Attributes: map[string]schema.Attribute{
-											"name": schema.StringAttribute{
-												Description: "Name of the setting.",
-												Required:    true,
-											},
-											"value_string": schema.StringAttribute{
-												Description: "String value (if any) associated with the setting.",
-												Optional:    true,
-												Validators: []validator.String{
-													stringvalidator.LengthAtLeast(1),
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-						Validators: []validator.List{
-							listvalidator.SizeAtLeast(1),
-						},
-					},
-					"android": schema.ListNestedAttribute{
-						Description: "Settings to be applied for users using android platform.",
-						Optional:    true,
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"category": schema.StringAttribute{
-									Description: "Defines the category of the setting.",
-									Required:    true,
-								},
-								"user_override": schema.BoolAttribute{
-									Description: "Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.",
-									Required:    true,
-								},
-								"settings": schema.ListNestedAttribute{
-									Description: "A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
-									Required:    true,
-									Validators: []validator.List{
-										listvalidator.SizeAtLeast(1),
-									},
-									NestedObject: schema.NestedAttributeObject{
-										Attributes: map[string]schema.Attribute{
-											"name": schema.StringAttribute{
-												Description: "Name of the setting.",
-												Required:    true,
-											},
-											"value_string": schema.StringAttribute{
-												Description: "String value (if any) associated with the setting.",
-												Optional:    true,
-												Validators: []validator.String{
-													stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_string"), path.MatchRelative().AtParent().AtName("value_list")),
-													stringvalidator.LengthAtLeast(1),
-												},
-											},
-											"value_list": schema.ListAttribute{
-												ElementType: types.StringType,
-												Description: "List value (if any) associated with the setting.",
-												Optional:    true,
-												Validators: []validator.List{
-													listvalidator.SizeAtLeast(1),
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-						Validators: []validator.List{
-							listvalidator.SizeAtLeast(1),
-						},
-					},
-					"html5": schema.ListNestedAttribute{
-						Description: "Settings to be applied for users using html5.",
-						Optional:    true,
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"category": schema.StringAttribute{
-									Description: "Defines the category of the setting.",
-									Required:    true,
-								},
-								"user_override": schema.BoolAttribute{
-									Description: "Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.",
-									Required:    true,
-								},
-								"settings": schema.ListNestedAttribute{
-									Description: "A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
-									Required:    true,
-									Validators: []validator.List{
-										listvalidator.SizeAtLeast(1),
-									},
-									NestedObject: schema.NestedAttributeObject{
-										Attributes: map[string]schema.Attribute{
-											"name": schema.StringAttribute{
-												Description: "Name of the setting.",
-												Required:    true,
-											},
-											"value_string": schema.StringAttribute{
-												Description: "String value (if any) associated with the setting.",
-												Optional:    true,
-												Validators: []validator.String{
-													stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_string"), path.MatchRelative().AtParent().AtName("value_list")),
-													stringvalidator.LengthAtLeast(1),
-												},
-											},
-											"value_list": schema.ListAttribute{
-												ElementType: types.StringType,
-												Description: "List value (if any) associated with the setting.",
-												Optional:    true,
-												Validators: []validator.List{
-													listvalidator.SizeAtLeast(1),
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-						Validators: []validator.List{
-							listvalidator.SizeAtLeast(1),
-						},
-					},
-					"chromeos": schema.ListNestedAttribute{
-						Description: "Settings to be applied for users using chrome os platform.",
-						Optional:    true,
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"category": schema.StringAttribute{
-									Description: "Defines the category of the setting.",
-									Required:    true,
-								},
-								"user_override": schema.BoolAttribute{
-									Description: "Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.",
-									Required:    true,
-								},
-								"settings": schema.ListNestedAttribute{
-									Description: "A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
-									Required:    true,
-									Validators: []validator.List{
-										listvalidator.SizeAtLeast(1),
-									},
-									NestedObject: schema.NestedAttributeObject{
-										Attributes: map[string]schema.Attribute{
-											"name": schema.StringAttribute{
-												Description: "Name of the setting.",
-												Required:    true,
-											},
-											"value_string": schema.StringAttribute{
-												Description: "String value (if any) associated with the setting.",
-												Optional:    true,
-												Validators: []validator.String{
-													stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_string"), path.MatchRelative().AtParent().AtName("value_list")),
-													stringvalidator.LengthAtLeast(1),
-												},
-											},
-											"value_list": schema.ListAttribute{
-												ElementType: types.StringType,
-												Description: "List value (if any) associated with the setting.",
-												Optional:    true,
-												Validators: []validator.List{
-													listvalidator.SizeAtLeast(1),
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-						Validators: []validator.List{
-							listvalidator.SizeAtLeast(1),
-						},
-					},
-					"macos": schema.ListNestedAttribute{
-						Description: "Settings to be applied for users using mac os platform.",
-						Optional:    true,
-						NestedObject: schema.NestedAttributeObject{
-							Attributes: map[string]schema.Attribute{
-								"category": schema.StringAttribute{
-									Description: "Defines the category of the setting.",
-									Required:    true,
-								},
-								"user_override": schema.BoolAttribute{
-									Description: "Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.",
-									Required:    true,
-								},
-								"settings": schema.ListNestedAttribute{
-									Description: "A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
-									Required:    true,
-									Validators: []validator.List{
-										listvalidator.SizeAtLeast(1),
-									},
-									NestedObject: schema.NestedAttributeObject{
-										Attributes: map[string]schema.Attribute{
-											"name": schema.StringAttribute{
-												Description: "Name of the setting.",
-												Required:    true,
-											},
-											"value_string": schema.StringAttribute{
-												Description: "String value (if any) associated with the setting.",
-												Optional:    true,
-												Validators: []validator.String{
-													stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_string"), path.MatchRelative().AtParent().AtName("value_list")),
-													stringvalidator.LengthAtLeast(1),
-												},
-											},
-											"value_list": schema.ListAttribute{
-												ElementType: types.StringType,
-												Description: "List value (if any) associated with the setting.",
-												Optional:    true,
-												Validators: []validator.List{
-													listvalidator.SizeAtLeast(1),
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-						Validators: []validator.List{
-							listvalidator.SizeAtLeast(1),
-						},
-					},
-				},
-			},
-		},
-	}
+	resp.Schema = GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -396,13 +66,15 @@ func (r *gacSettingsResource) Create(ctx context.Context, req resource.CreateReq
 	var serviceUrlModel globalappconfiguration.ServiceURL
 	serviceUrlModel.SetUrl(plan.ServiceUrl.ValueString())
 
+	planAppSettings := util.ObjectValueToTypedObject[AppSettings](ctx, &resp.Diagnostics, plan.AppSettings)
+
 	var appSettings globalappconfiguration.AppSettings
-	appSettings.SetAndroid(GetAppSettingsForAndroid(plan.AppSettings.Android))
-	appSettings.SetChromeos(GetAppSettingsForChromeos(plan.AppSettings.Chromeos))
-	appSettings.SetHtml5(GetAppSettingsForHtml5(plan.AppSettings.Html5))
-	appSettings.SetIos(GetAppSettingsForIos(plan.AppSettings.Ios))
-	appSettings.SetMacos(GetAppSettingsForMacos(plan.AppSettings.Macos))
-	appSettings.SetWindows(GetAppSettingsForWindows(plan.AppSettings.Windows))
+	appSettings.SetAndroid(GetAppSettingsForAndroid(ctx, &resp.Diagnostics, planAppSettings.Android))
+	appSettings.SetChromeos(GetAppSettingsForChromeos(ctx, &resp.Diagnostics, planAppSettings.Chromeos))
+	appSettings.SetHtml5(GetAppSettingsForHtml5(ctx, &resp.Diagnostics, planAppSettings.Html5))
+	appSettings.SetIos(GetAppSettingsForIos(ctx, &resp.Diagnostics, planAppSettings.Ios))
+	appSettings.SetMacos(GetAppSettingsForMacos(ctx, &resp.Diagnostics, planAppSettings.Macos))
+	appSettings.SetWindows(GetAppSettingsForWindows(ctx, &resp.Diagnostics, planAppSettings.Windows))
 
 	var settings globalappconfiguration.Settings
 	settings.SetName(plan.Name.ValueString())
@@ -438,7 +110,7 @@ func (r *gacSettingsResource) Create(ctx context.Context, req resource.CreateReq
 
 	//Set the new state
 	// Map response body to schema and populate computed attribute values
-	plan = plan.RefreshPropertyValues(settingsConfiguration.GetItems()[0], &resp.Diagnostics)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, settingsConfiguration.GetItems()[0])
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -465,7 +137,7 @@ func (r *gacSettingsResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	state = state.RefreshPropertyValues(settingsConfiguration.GetItems()[0], &resp.Diagnostics)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, settingsConfiguration.GetItems()[0])
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -489,13 +161,15 @@ func (r *gacSettingsResource) Update(ctx context.Context, req resource.UpdateReq
 	var serviceUrlModel globalappconfiguration.ServiceURL
 	serviceUrlModel.SetUrl(plan.ServiceUrl.ValueString())
 
+	planAppSettings := util.ObjectValueToTypedObject[AppSettings](ctx, &resp.Diagnostics, plan.AppSettings)
+
 	var appSettings globalappconfiguration.AppSettings
-	appSettings.SetAndroid(GetAppSettingsForAndroid(plan.AppSettings.Android))
-	appSettings.SetChromeos(GetAppSettingsForChromeos(plan.AppSettings.Chromeos))
-	appSettings.SetHtml5(GetAppSettingsForHtml5(plan.AppSettings.Html5))
-	appSettings.SetIos(GetAppSettingsForIos(plan.AppSettings.Ios))
-	appSettings.SetMacos(GetAppSettingsForMacos(plan.AppSettings.Macos))
-	appSettings.SetWindows(GetAppSettingsForWindows(plan.AppSettings.Windows))
+	appSettings.SetAndroid(GetAppSettingsForAndroid(ctx, &resp.Diagnostics, planAppSettings.Android))
+	appSettings.SetChromeos(GetAppSettingsForChromeos(ctx, &resp.Diagnostics, planAppSettings.Chromeos))
+	appSettings.SetHtml5(GetAppSettingsForHtml5(ctx, &resp.Diagnostics, planAppSettings.Html5))
+	appSettings.SetIos(GetAppSettingsForIos(ctx, &resp.Diagnostics, planAppSettings.Ios))
+	appSettings.SetMacos(GetAppSettingsForMacos(ctx, &resp.Diagnostics, planAppSettings.Macos))
+	appSettings.SetWindows(GetAppSettingsForWindows(ctx, &resp.Diagnostics, planAppSettings.Windows))
 
 	var settings globalappconfiguration.Settings
 	settings.SetName(plan.Name.ValueString())
@@ -527,7 +201,7 @@ func (r *gacSettingsResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(updatedSettingsConfiguration.GetItems()[0], &resp.Diagnostics)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, updatedSettingsConfiguration.GetItems()[0])
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -592,108 +266,124 @@ func readSettingsConfiguration(ctx context.Context, client *citrixdaasclient.Cit
 	return getSettingsResponse, err
 }
 
-func GetAppSettingsForWindows(windows []Windows) []globalappconfiguration.PlatformSettings {
+func GetAppSettingsForWindows(ctx context.Context, diagnostics *diag.Diagnostics, windowsList types.List) []globalappconfiguration.PlatformSettings {
 	var platformSettings []globalappconfiguration.PlatformSettings
+	windows := util.ObjectListToTypedArray[Windows](ctx, diagnostics, windowsList)
+
 	for _, windowsInstance := range windows {
 		var platformSetting globalappconfiguration.PlatformSettings
 		platformSetting.SetCategory(windowsInstance.Category.ValueString())
 		platformSetting.SetUserOverride(windowsInstance.UserOverride.ValueBool())
 		platformSetting.SetAssignmentPriority(util.AssignmentPriority)
 		platformSetting.SetAssignedTo(util.PlatformSettingsAssignedTo)
-		platformSetting.SetSettings(CreateCategorySettingsForWindows(windowsInstance.Settings))
+		platformSetting.SetSettings(CreateCategorySettingsForWindows(ctx, diagnostics, windowsInstance.Settings))
 		platformSettings = append(platformSettings, platformSetting)
 	}
 	return platformSettings
 }
 
-func GetAppSettingsForIos(ios []Ios) []globalappconfiguration.PlatformSettings {
+func GetAppSettingsForIos(ctx context.Context, diagnostics *diag.Diagnostics, iosList types.List) []globalappconfiguration.PlatformSettings {
 	var platformSettings []globalappconfiguration.PlatformSettings
+	ios := util.ObjectListToTypedArray[Ios](ctx, diagnostics, iosList)
+
 	for _, iosInstance := range ios {
 		var platformSetting globalappconfiguration.PlatformSettings
 		platformSetting.SetCategory(iosInstance.Category.ValueString())
 		platformSetting.SetUserOverride(iosInstance.UserOverride.ValueBool())
 		platformSetting.SetAssignmentPriority(util.AssignmentPriority)
 		platformSetting.SetAssignedTo(util.PlatformSettingsAssignedTo)
-		platformSetting.SetSettings(CreateCategorySettingsForIos(iosInstance.Settings))
+		platformSetting.SetSettings(CreateCategorySettingsForIos(ctx, diagnostics, iosInstance.Settings))
 		platformSettings = append(platformSettings, platformSetting)
 	}
 	return platformSettings
 }
 
-func GetAppSettingsForAndroid(android []Android) []globalappconfiguration.PlatformSettings {
+func GetAppSettingsForAndroid(ctx context.Context, diagnostics *diag.Diagnostics, androidList types.List) []globalappconfiguration.PlatformSettings {
 	var platformSettings []globalappconfiguration.PlatformSettings
+	android := util.ObjectListToTypedArray[Android](ctx, diagnostics, androidList)
+
 	for _, androidInstance := range android {
 		var platformSetting globalappconfiguration.PlatformSettings
 		platformSetting.SetCategory(androidInstance.Category.ValueString())
 		platformSetting.SetUserOverride(androidInstance.UserOverride.ValueBool())
 		platformSetting.SetAssignmentPriority(util.AssignmentPriority)
 		platformSetting.SetAssignedTo(util.PlatformSettingsAssignedTo)
-		platformSetting.SetSettings(CreateCategorySettingsForAndroid(androidInstance.Settings))
+		platformSetting.SetSettings(CreateCategorySettingsForAndroid(ctx, diagnostics, androidInstance.Settings))
 		platformSettings = append(platformSettings, platformSetting)
 	}
 	return platformSettings
 }
 
-func GetAppSettingsForChromeos(chromeos []Chromeos) []globalappconfiguration.PlatformSettings {
+func GetAppSettingsForChromeos(ctx context.Context, diagnostics *diag.Diagnostics, chromeosList types.List) []globalappconfiguration.PlatformSettings {
 	var platformSettings []globalappconfiguration.PlatformSettings
+	chromeos := util.ObjectListToTypedArray[Chromeos](ctx, diagnostics, chromeosList)
+
 	for _, chromeosInstance := range chromeos {
 		var platformSetting globalappconfiguration.PlatformSettings
 		platformSetting.SetCategory(chromeosInstance.Category.ValueString())
 		platformSetting.SetUserOverride(chromeosInstance.UserOverride.ValueBool())
 		platformSetting.SetAssignmentPriority(util.AssignmentPriority)
 		platformSetting.SetAssignedTo(util.PlatformSettingsAssignedTo)
-		platformSetting.SetSettings(CreateCategorySettingsForChromeos(chromeosInstance.Settings))
+		platformSetting.SetSettings(CreateCategorySettingsForChromeos(ctx, diagnostics, chromeosInstance.Settings))
 		platformSettings = append(platformSettings, platformSetting)
 	}
 	return platformSettings
 }
 
-func GetAppSettingsForHtml5(html5 []Html5) []globalappconfiguration.PlatformSettings {
+func GetAppSettingsForHtml5(ctx context.Context, diagnostics *diag.Diagnostics, html5List types.List) []globalappconfiguration.PlatformSettings {
 	var platformSettings []globalappconfiguration.PlatformSettings
+	html5 := util.ObjectListToTypedArray[Html5](ctx, diagnostics, html5List)
+
 	for _, html5Instance := range html5 {
 		var platformSetting globalappconfiguration.PlatformSettings
 		platformSetting.SetCategory(html5Instance.Category.ValueString())
 		platformSetting.SetUserOverride(html5Instance.UserOverride.ValueBool())
 		platformSetting.SetAssignmentPriority(util.AssignmentPriority)
 		platformSetting.SetAssignedTo(util.PlatformSettingsAssignedTo)
-		platformSetting.SetSettings(CreateCategorySettingsForHtml5(html5Instance.Settings))
+		platformSetting.SetSettings(CreateCategorySettingsForHtml5(ctx, diagnostics, html5Instance.Settings))
 		platformSettings = append(platformSettings, platformSetting)
 	}
 	return platformSettings
 }
 
-func GetAppSettingsForMacos(macos []Macos) []globalappconfiguration.PlatformSettings {
+func GetAppSettingsForMacos(ctx context.Context, diagnostics *diag.Diagnostics, macosList types.List) []globalappconfiguration.PlatformSettings {
 	var platformSettings []globalappconfiguration.PlatformSettings
+	macos := util.ObjectListToTypedArray[Macos](ctx, diagnostics, macosList)
+
 	for _, macosInstance := range macos {
 		var platformSetting globalappconfiguration.PlatformSettings
 		platformSetting.SetCategory(macosInstance.Category.ValueString())
 		platformSetting.SetUserOverride(macosInstance.UserOverride.ValueBool())
 		platformSetting.SetAssignmentPriority(util.AssignmentPriority)
 		platformSetting.SetAssignedTo(util.PlatformSettingsAssignedTo)
-		platformSetting.SetSettings(CreateCategorySettingsForMacos(macosInstance.Settings))
+		platformSetting.SetSettings(CreateCategorySettingsForMacos(ctx, diagnostics, macosInstance.Settings))
 		platformSettings = append(platformSettings, platformSetting)
 	}
 	return platformSettings
 }
 
-func CreateCategorySettingsForWindows(windowsSettings []WindowsSettings) []globalappconfiguration.CategorySettings {
+func CreateCategorySettingsForWindows(ctx context.Context, diagnostics *diag.Diagnostics, windowsSettingsList types.List) []globalappconfiguration.CategorySettings {
 	var categorySettings []globalappconfiguration.CategorySettings
+	windowsSettings := util.ObjectListToTypedArray[WindowsSettings](ctx, diagnostics, windowsSettingsList)
+
 	for _, windowsSetting := range windowsSettings {
 		var categorySetting globalappconfiguration.CategorySettings
 
 		categorySetting.SetName(windowsSetting.Name.ValueString())
 		if !windowsSetting.ValueString.IsNull() {
 			categorySetting.SetValue(windowsSetting.ValueString.ValueString())
-		} else if len(windowsSetting.ValueList) > 0 {
-			categorySetting.SetValue(util.ConvertBaseStringArrayToPrimitiveStringArray(windowsSetting.ValueList))
+		} else if len(windowsSetting.ValueList.Elements()) > 0 {
+			categorySetting.SetValue(util.StringListToStringArray(ctx, diagnostics, windowsSetting.ValueList))
 		}
 		categorySettings = append(categorySettings, categorySetting)
 	}
 	return categorySettings
 }
 
-func CreateCategorySettingsForIos(iosSettings []IosSettings) []globalappconfiguration.CategorySettings {
+func CreateCategorySettingsForIos(ctx context.Context, diagnostics *diag.Diagnostics, iosSettingsList types.List) []globalappconfiguration.CategorySettings {
 	var categorySettings []globalappconfiguration.CategorySettings
+	iosSettings := util.ObjectListToTypedArray[IosSettings](ctx, diagnostics, iosSettingsList)
+
 	for _, iosSetting := range iosSettings {
 		var categorySetting globalappconfiguration.CategorySettings
 
@@ -706,64 +396,72 @@ func CreateCategorySettingsForIos(iosSettings []IosSettings) []globalappconfigur
 	return categorySettings
 }
 
-func CreateCategorySettingsForAndroid(androidSettings []AndroidSettings) []globalappconfiguration.CategorySettings {
+func CreateCategorySettingsForAndroid(ctx context.Context, diagnostics *diag.Diagnostics, androidSettingsList types.List) []globalappconfiguration.CategorySettings {
 	var categorySettings []globalappconfiguration.CategorySettings
+	androidSettings := util.ObjectListToTypedArray[AndroidSettings](ctx, diagnostics, androidSettingsList)
+
 	for _, androidSetting := range androidSettings {
 		var categorySetting globalappconfiguration.CategorySettings
 
 		categorySetting.SetName(androidSetting.Name.ValueString())
 		if !androidSetting.ValueString.IsNull() {
 			categorySetting.SetValue(androidSetting.ValueString.ValueString())
-		} else if len(androidSetting.ValueList) > 0 {
-			categorySetting.SetValue(util.ConvertBaseStringArrayToPrimitiveStringArray(androidSetting.ValueList))
+		} else if len(androidSetting.ValueList.Elements()) > 0 {
+			categorySetting.SetValue(util.StringListToStringArray(ctx, diagnostics, androidSetting.ValueList))
 		}
 		categorySettings = append(categorySettings, categorySetting)
 	}
 	return categorySettings
 }
 
-func CreateCategorySettingsForHtml5(html5Settings []Html5Settings) []globalappconfiguration.CategorySettings {
+func CreateCategorySettingsForHtml5(ctx context.Context, diagnostics *diag.Diagnostics, html5SettingsList types.List) []globalappconfiguration.CategorySettings {
 	var categorySettings []globalappconfiguration.CategorySettings
+	html5Settings := util.ObjectListToTypedArray[Html5Settings](ctx, diagnostics, html5SettingsList)
+
 	for _, html5Setting := range html5Settings {
 		var categorySetting globalappconfiguration.CategorySettings
 
 		categorySetting.SetName(html5Setting.Name.ValueString())
 		if !html5Setting.ValueString.IsNull() {
 			categorySetting.SetValue(html5Setting.ValueString.ValueString())
-		} else if len(html5Setting.ValueList) > 0 {
-			categorySetting.SetValue(util.ConvertBaseStringArrayToPrimitiveStringArray(html5Setting.ValueList))
+		} else if len(html5Setting.ValueList.Elements()) > 0 {
+			categorySetting.SetValue(util.StringListToStringArray(ctx, diagnostics, html5Setting.ValueList))
 		}
 		categorySettings = append(categorySettings, categorySetting)
 	}
 	return categorySettings
 }
 
-func CreateCategorySettingsForChromeos(chromeosSettings []ChromeosSettings) []globalappconfiguration.CategorySettings {
+func CreateCategorySettingsForChromeos(ctx context.Context, diagnostics *diag.Diagnostics, chromeosSettingsList types.List) []globalappconfiguration.CategorySettings {
 	var categorySettings []globalappconfiguration.CategorySettings
+	chromeosSettings := util.ObjectListToTypedArray[ChromeosSettings](ctx, diagnostics, chromeosSettingsList)
+
 	for _, chromeosSetting := range chromeosSettings {
 		var categorySetting globalappconfiguration.CategorySettings
 
 		categorySetting.SetName(chromeosSetting.Name.ValueString())
 		if !chromeosSetting.ValueString.IsNull() {
 			categorySetting.SetValue(chromeosSetting.ValueString.ValueString())
-		} else if len(chromeosSetting.ValueList) > 0 {
-			categorySetting.SetValue(util.ConvertBaseStringArrayToPrimitiveStringArray(chromeosSetting.ValueList))
+		} else if len(chromeosSetting.ValueList.Elements()) > 0 {
+			categorySetting.SetValue(util.StringListToStringArray(ctx, diagnostics, chromeosSetting.ValueList))
 		}
 		categorySettings = append(categorySettings, categorySetting)
 	}
 	return categorySettings
 }
 
-func CreateCategorySettingsForMacos(macosSettings []MacosSettings) []globalappconfiguration.CategorySettings {
+func CreateCategorySettingsForMacos(ctx context.Context, diagnostics *diag.Diagnostics, macosSettingsList types.List) []globalappconfiguration.CategorySettings {
 	var categorySettings []globalappconfiguration.CategorySettings
+	macosSettings := util.ObjectListToTypedArray[MacosSettings](ctx, diagnostics, macosSettingsList)
+
 	for _, macosSetting := range macosSettings {
 		var categorySetting globalappconfiguration.CategorySettings
 
 		categorySetting.SetName(macosSetting.Name.ValueString())
 		if !macosSetting.ValueString.IsNull() {
 			categorySetting.SetValue(macosSetting.ValueString.ValueString())
-		} else if len(macosSetting.ValueList) > 0 {
-			categorySetting.SetValue(util.ConvertBaseStringArrayToPrimitiveStringArray(macosSetting.ValueList))
+		} else if len(macosSetting.ValueList.Elements()) > 0 {
+			categorySetting.SetValue(util.StringListToStringArray(ctx, diagnostics, macosSetting.ValueList))
 		}
 		categorySettings = append(categorySettings, categorySetting)
 	}

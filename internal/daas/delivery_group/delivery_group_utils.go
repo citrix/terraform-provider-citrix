@@ -778,9 +778,7 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 		editDeliveryGroupRequestBody.SetPolicySetGuid(util.DefaultSitePolicySetId)
 	}
 
-	if !plan.MakeResourcesAvailableInLHC.IsNull() {
-		editDeliveryGroupRequestBody.SetReuseMachinesWithoutShutdownInOutage(plan.MakeResourcesAvailableInLHC.ValueBool())
-	}
+	editDeliveryGroupRequestBody.SetReuseMachinesWithoutShutdownInOutage(plan.MakeResourcesAvailableInLHC.ValueBool())
 
 	if !plan.AutoscaleSettings.IsNull() {
 		autoscale := util.ObjectValueToTypedObject[DeliveryGroupPowerManagementSettings](ctx, diagnostics, plan.AutoscaleSettings)

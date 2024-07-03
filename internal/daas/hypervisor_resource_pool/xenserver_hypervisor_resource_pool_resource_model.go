@@ -31,7 +31,7 @@ type XenserverHypervisorResourcePoolResourceModel struct {
 	UseLocalStorageCaching types.Bool `tfsdk:"use_local_storage_caching"`
 }
 
-func GetXenserverHypervisorResourcePoolSchema() schema.Schema {
+func (XenserverHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "Manages an XenServer hypervisor resource pool.",
 		Attributes: map[string]schema.Attribute{
@@ -91,6 +91,10 @@ func GetXenserverHypervisorResourcePoolSchema() schema.Schema {
 			},
 		},
 	}
+}
+
+func (XenserverHypervisorResourcePoolResourceModel) GetAttributes() map[string]schema.Attribute {
+	return XenserverHypervisorResourcePoolResourceModel{}.GetSchema().Attributes
 }
 
 func (r XenserverHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) XenserverHypervisorResourcePoolResourceModel {

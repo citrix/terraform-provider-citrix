@@ -3,12 +3,21 @@
 package gac_settings
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 
 	globalappconfiguration "github.com/citrix/citrix-daas-rest-go/globalappconfiguration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -17,58 +26,312 @@ type GACSettingsResourceModel struct {
 	Name            types.String `tfsdk:"name"`
 	Description     types.String `tfsdk:"description"`
 	UseForAppConfig types.Bool   `tfsdk:"use_for_app_config"`
-	AppSettings     *AppSettings `tfsdk:"app_settings"`
+	AppSettings     types.Object `tfsdk:"app_settings"` // AppSettings
 }
 
 type AppSettings struct {
-	Windows  []Windows  `tfsdk:"windows"`
-	Ios      []Ios      `tfsdk:"ios"`
-	Android  []Android  `tfsdk:"android"`
-	Chromeos []Chromeos `tfsdk:"chromeos"`
-	Html5    []Html5    `tfsdk:"html5"`
-	Macos    []Macos    `tfsdk:"macos"`
+	Windows  types.List `tfsdk:"windows"`  //[]Windows
+	Ios      types.List `tfsdk:"ios"`      //[]Ios
+	Android  types.List `tfsdk:"android"`  //[]Android
+	Chromeos types.List `tfsdk:"chromeos"` //[]Chromeos
+	Html5    types.List `tfsdk:"html5"`    //[]Html5
+	Macos    types.List `tfsdk:"macos"`    //[]Macos
+}
+
+func (AppSettings) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "Defines the device platform and the associated settings. Currently, only settings objects with value type of integer, boolean, strings and list of strings is supported.",
+		Required:    true,
+		Attributes: map[string]schema.Attribute{
+			"windows": schema.ListNestedAttribute{
+				Description:  "Settings to be applied for users using windows platform.",
+				Optional:     true,
+				NestedObject: Windows{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+			"ios": schema.ListNestedAttribute{
+				Description:  "Settings to be applied for users using ios platform.",
+				Optional:     true,
+				NestedObject: Ios{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+			"android": schema.ListNestedAttribute{
+				Description:  "Settings to be applied for users using android platform.",
+				Optional:     true,
+				NestedObject: Android{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+			"html5": schema.ListNestedAttribute{
+				Description:  "Settings to be applied for users using html5.",
+				Optional:     true,
+				NestedObject: Html5{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+			"chromeos": schema.ListNestedAttribute{
+				Description:  "Settings to be applied for users using chrome os platform.",
+				Optional:     true,
+				NestedObject: Chromeos{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+			"macos": schema.ListNestedAttribute{
+				Description:  "Settings to be applied for users using mac os platform.",
+				Optional:     true,
+				NestedObject: Macos{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+		},
+	}
+}
+
+func (AppSettings) GetAttributes() map[string]schema.Attribute {
+	return AppSettings{}.GetSchema().Attributes
 }
 
 type Windows struct {
-	Category     types.String      `tfsdk:"category"`
-	UserOverride types.Bool        `tfsdk:"user_override"`
-	Settings     []WindowsSettings `tfsdk:"settings"`
+	Category     types.String `tfsdk:"category"`
+	UserOverride types.Bool   `tfsdk:"user_override"`
+	Settings     types.List   `tfsdk:"settings"` //[]WindowsSettings
+}
+
+func (Windows) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"category": schema.StringAttribute{
+				Description: "Defines the category of the setting.",
+				Required:    true,
+			},
+			"user_override": schema.BoolAttribute{
+				Description: "Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.",
+				Required:    true,
+			},
+			"settings": schema.ListNestedAttribute{
+				Description: "A list of name value pairs for the settings. Please refer to [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
+				Required:    true,
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+				NestedObject: WindowsSettings{}.GetSchema(),
+			},
+		},
+	}
+}
+
+func (Windows) GetAttributes() map[string]schema.Attribute {
+	return Windows{}.GetSchema().Attributes
 }
 
 type Ios struct {
-	Category     types.String  `tfsdk:"category"`
-	UserOverride types.Bool    `tfsdk:"user_override"`
-	Settings     []IosSettings `tfsdk:"settings"`
+	Category     types.String `tfsdk:"category"`
+	UserOverride types.Bool   `tfsdk:"user_override"`
+	Settings     types.List   `tfsdk:"settings"` //[]IosSettings
+}
+
+func (Ios) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"category": schema.StringAttribute{
+				Description: "Defines the category of the setting",
+				Required:    true,
+			},
+			"user_override": schema.BoolAttribute{
+				Description: "Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.",
+				Required:    true,
+			},
+			"settings": schema.ListNestedAttribute{
+				Description: "A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
+				Required:    true,
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+				NestedObject: IosSettings{}.GetSchema(),
+			},
+		},
+	}
+}
+
+func (Ios) GetAttributes() map[string]schema.Attribute {
+	return Ios{}.GetSchema().Attributes
 }
 
 type Android struct {
-	Category     types.String      `tfsdk:"category"`
-	UserOverride types.Bool        `tfsdk:"user_override"`
-	Settings     []AndroidSettings `tfsdk:"settings"`
+	Category     types.String `tfsdk:"category"`
+	UserOverride types.Bool   `tfsdk:"user_override"`
+	Settings     types.List   `tfsdk:"settings"` //[]AndroidSettings
+}
+
+func (Android) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"category": schema.StringAttribute{
+				Description: "Defines the category of the setting.",
+				Required:    true,
+			},
+			"user_override": schema.BoolAttribute{
+				Description: "Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.",
+				Required:    true,
+			},
+			"settings": schema.ListNestedAttribute{
+				Description: "A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
+				Required:    true,
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+				NestedObject: AndroidSettings{}.GetSchema(),
+			},
+		},
+	}
+}
+
+func (Android) GetAttributes() map[string]schema.Attribute {
+	return Android{}.GetSchema().Attributes
 }
 
 type Chromeos struct {
-	Category     types.String       `tfsdk:"category"`
-	UserOverride types.Bool         `tfsdk:"user_override"`
-	Settings     []ChromeosSettings `tfsdk:"settings"`
+	Category     types.String `tfsdk:"category"`
+	UserOverride types.Bool   `tfsdk:"user_override"`
+	Settings     types.List   `tfsdk:"settings"` //[]ChromeosSettings
+}
+
+func (Chromeos) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"category": schema.StringAttribute{
+				Description: "Defines the category of the setting.",
+				Required:    true,
+			},
+			"user_override": schema.BoolAttribute{
+				Description: "Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.",
+				Required:    true,
+			},
+			"settings": schema.ListNestedAttribute{
+				Description: "A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
+				Required:    true,
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+				NestedObject: ChromeosSettings{}.GetSchema(),
+			},
+		},
+	}
+}
+
+func (Chromeos) GetAttributes() map[string]schema.Attribute {
+	return Chromeos{}.GetSchema().Attributes
 }
 
 type Html5 struct {
-	Category     types.String    `tfsdk:"category"`
-	UserOverride types.Bool      `tfsdk:"user_override"`
-	Settings     []Html5Settings `tfsdk:"settings"`
+	Category     types.String `tfsdk:"category"`
+	UserOverride types.Bool   `tfsdk:"user_override"`
+	Settings     types.List   `tfsdk:"settings"` //[]Html5Settings
+}
+
+func (Html5) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"category": schema.StringAttribute{
+				Description: "Defines the category of the setting.",
+				Required:    true,
+			},
+			"user_override": schema.BoolAttribute{
+				Description: "Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.",
+				Required:    true,
+			},
+			"settings": schema.ListNestedAttribute{
+				Description: "A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
+				Required:    true,
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+				NestedObject: Html5Settings{}.GetSchema(),
+			},
+		},
+	}
+}
+
+func (Html5) GetAttributes() map[string]schema.Attribute {
+	return Html5{}.GetSchema().Attributes
 }
 
 type Macos struct {
-	Category     types.String    `tfsdk:"category"`
-	UserOverride types.Bool      `tfsdk:"user_override"`
-	Settings     []MacosSettings `tfsdk:"settings"`
+	Category     types.String `tfsdk:"category"`
+	UserOverride types.Bool   `tfsdk:"user_override"`
+	Settings     types.List   `tfsdk:"settings"` //[]MacosSettings
+}
+
+func (Macos) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"category": schema.StringAttribute{
+				Description: "Defines the category of the setting.",
+				Required:    true,
+			},
+			"user_override": schema.BoolAttribute{
+				Description: "Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.",
+				Required:    true,
+			},
+			"settings": schema.ListNestedAttribute{
+				Description: "A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
+				Required:    true,
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+				NestedObject: MacosSettings{}.GetSchema(),
+			},
+		},
+	}
+}
+
+func (Macos) GetAttributes() map[string]schema.Attribute {
+	return Macos{}.GetSchema().Attributes
 }
 
 type WindowsSettings struct {
-	Name        types.String   `tfsdk:"name"`
-	ValueString types.String   `tfsdk:"value_string"`
-	ValueList   []types.String `tfsdk:"value_list"`
+	Name        types.String `tfsdk:"name"`
+	ValueString types.String `tfsdk:"value_string"`
+	ValueList   types.List   `tfsdk:"value_list"`
+}
+
+func (WindowsSettings) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"name": schema.StringAttribute{
+				Description: "Name of the setting.",
+				Required:    true,
+			},
+			"value_string": schema.StringAttribute{
+				Description: "String value (if any) associated with the setting.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_string"), path.MatchRelative().AtParent().AtName("value_list")),
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"value_list": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "List value (if any) associated with the setting.",
+				Optional:    true,
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+		},
+	}
+}
+
+func (WindowsSettings) GetAttributes() map[string]schema.Attribute {
+	return WindowsSettings{}.GetSchema().Attributes
 }
 
 type IosSettings struct {
@@ -76,31 +339,177 @@ type IosSettings struct {
 	ValueString types.String `tfsdk:"value_string"`
 }
 
+func (IosSettings) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"name": schema.StringAttribute{
+				Description: "Name of the setting.",
+				Required:    true,
+			},
+			"value_string": schema.StringAttribute{
+				Description: "String value (if any) associated with the setting.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+		},
+	}
+}
+
+func (IosSettings) GetAttributes() map[string]schema.Attribute {
+	return IosSettings{}.GetSchema().Attributes
+}
+
 type AndroidSettings struct {
-	Name        types.String   `tfsdk:"name"`
-	ValueString types.String   `tfsdk:"value_string"`
-	ValueList   []types.String `tfsdk:"value_list"`
+	Name        types.String `tfsdk:"name"`
+	ValueString types.String `tfsdk:"value_string"`
+	ValueList   types.List   `tfsdk:"value_list"`
+}
+
+func (AndroidSettings) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"name": schema.StringAttribute{
+				Description: "Name of the setting.",
+				Required:    true,
+			},
+			"value_string": schema.StringAttribute{
+				Description: "String value (if any) associated with the setting.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_string"), path.MatchRelative().AtParent().AtName("value_list")),
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"value_list": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "List value (if any) associated with the setting.",
+				Optional:    true,
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+		},
+	}
+}
+
+func (AndroidSettings) GetAttributes() map[string]schema.Attribute {
+	return AndroidSettings{}.GetSchema().Attributes
 }
 
 type ChromeosSettings struct {
-	Name        types.String   `tfsdk:"name"`
-	ValueString types.String   `tfsdk:"value_string"`
-	ValueList   []types.String `tfsdk:"value_list"`
+	Name        types.String `tfsdk:"name"`
+	ValueString types.String `tfsdk:"value_string"`
+	ValueList   types.List   `tfsdk:"value_list"`
+}
+
+func (ChromeosSettings) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"name": schema.StringAttribute{
+				Description: "Name of the setting.",
+				Required:    true,
+			},
+			"value_string": schema.StringAttribute{
+				Description: "String value (if any) associated with the setting.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_string"), path.MatchRelative().AtParent().AtName("value_list")),
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"value_list": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "List value (if any) associated with the setting.",
+				Optional:    true,
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+		},
+	}
+}
+
+func (ChromeosSettings) GetAttributes() map[string]schema.Attribute {
+	return ChromeosSettings{}.GetSchema().Attributes
 }
 
 type Html5Settings struct {
-	Name        types.String   `tfsdk:"name"`
-	ValueString types.String   `tfsdk:"value_string"`
-	ValueList   []types.String `tfsdk:"value_list"`
+	Name        types.String `tfsdk:"name"`
+	ValueString types.String `tfsdk:"value_string"`
+	ValueList   types.List   `tfsdk:"value_list"`
+}
+
+func (Html5Settings) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"name": schema.StringAttribute{
+				Description: "Name of the setting.",
+				Required:    true,
+			},
+			"value_string": schema.StringAttribute{
+				Description: "String value (if any) associated with the setting.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_string"), path.MatchRelative().AtParent().AtName("value_list")),
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"value_list": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "List value (if any) associated with the setting.",
+				Optional:    true,
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+		},
+	}
+}
+
+func (Html5Settings) GetAttributes() map[string]schema.Attribute {
+	return Html5Settings{}.GetSchema().Attributes
 }
 
 type MacosSettings struct {
-	Name        types.String   `tfsdk:"name"`
-	ValueString types.String   `tfsdk:"value_string"`
-	ValueList   []types.String `tfsdk:"value_list"`
+	Name        types.String `tfsdk:"name"`
+	ValueString types.String `tfsdk:"value_string"`
+	ValueList   types.List   `tfsdk:"value_list"`
 }
 
-func (r GACSettingsResourceModel) RefreshPropertyValues(settingsRecordModel globalappconfiguration.SettingsRecordModel, diagnostics *diag.Diagnostics) GACSettingsResourceModel {
+func (MacosSettings) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"name": schema.StringAttribute{
+				Description: "Name of the setting.",
+				Required:    true,
+			},
+			"value_string": schema.StringAttribute{
+				Description: "String value (if any) associated with the setting.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_string"), path.MatchRelative().AtParent().AtName("value_list")),
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"value_list": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "List value (if any) associated with the setting.",
+				Optional:    true,
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+		},
+	}
+}
+
+func (MacosSettings) GetAttributes() map[string]schema.Attribute {
+	return MacosSettings{}.GetSchema().Attributes
+}
+
+func (r GACSettingsResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, settingsRecordModel globalappconfiguration.SettingsRecordModel) GACSettingsResourceModel {
 
 	var serviceUrlModel = settingsRecordModel.GetServiceURL()
 	r.ServiceUrl = types.StringValue(serviceUrlModel.GetUrl())
@@ -118,23 +527,27 @@ func (r GACSettingsResourceModel) RefreshPropertyValues(settingsRecordModel glob
 	var html5Settings = appSettings.GetHtml5()
 	var macosSettings = appSettings.GetMacos()
 
-	if r.AppSettings == nil {
-		r.AppSettings = &AppSettings{}
-	}
-	r.AppSettings.Windows = r.getWindowsSettings(windowsSettings, diagnostics)
-	r.AppSettings.Ios = r.getIosSettings(iosSettings, diagnostics)
-	r.AppSettings.Android = r.getAndroidSettings(androidSettings, diagnostics)
-	r.AppSettings.Chromeos = r.getChromeosSettings(chromeosSettings, diagnostics)
-	r.AppSettings.Html5 = r.getHtml5Settings(html5Settings, diagnostics)
-	r.AppSettings.Macos = r.getMacosSettings(macosSettings, diagnostics)
+	planAppSettings := util.ObjectValueToTypedObject[AppSettings](ctx, diagnostics, r.AppSettings)
+
+	planAppSettings.Windows = r.getWindowsSettings(ctx, diagnostics, windowsSettings)
+	planAppSettings.Ios = r.getIosSettings(ctx, diagnostics, iosSettings)
+	planAppSettings.Android = r.getAndroidSettings(ctx, diagnostics, androidSettings)
+	planAppSettings.Chromeos = r.getChromeosSettings(ctx, diagnostics, chromeosSettings)
+	planAppSettings.Html5 = r.getHtml5Settings(ctx, diagnostics, html5Settings)
+	planAppSettings.Macos = r.getMacosSettings(ctx, diagnostics, macosSettings)
+
+	r.AppSettings = util.TypedObjectToObjectValue(ctx, diagnostics, planAppSettings)
 
 	return r
 }
 
-func (r GACSettingsResourceModel) getWindowsSettings(remoteWindowsSettings []globalappconfiguration.PlatformSettings, diagnostics *diag.Diagnostics) []Windows {
+func (r GACSettingsResourceModel) getWindowsSettings(ctx context.Context, diagnostics *diag.Diagnostics, remoteWindowsSettings []globalappconfiguration.PlatformSettings) types.List {
 	var stateWindowsSettings []Windows
-	if r.AppSettings != nil && r.AppSettings.Windows != nil {
-		stateWindowsSettings = r.AppSettings.Windows
+	if !r.AppSettings.IsNull() {
+		appSettings := util.ObjectValueToTypedObject[AppSettings](ctx, diagnostics, r.AppSettings)
+		if !appSettings.Windows.IsNull() {
+			stateWindowsSettings = util.ObjectListToTypedArray[Windows](ctx, diagnostics, appSettings.Windows)
+		}
 	}
 
 	type RemoteWindowsSettingsTracker struct {
@@ -163,7 +576,7 @@ func (r GACSettingsResourceModel) getWindowsSettings(remoteWindowsSettings []glo
 		windowsSettingsForState = append(windowsSettingsForState, Windows{
 			Category:     types.StringValue(remoteWindowsSetting.platformSetting.GetCategory()),
 			UserOverride: types.BoolValue(remoteWindowsSetting.platformSetting.GetUserOverride()),
-			Settings:     getWindowsCategorySettings(stateWindowsSetting.Settings, remoteWindowsSetting.platformSetting.GetSettings(), diagnostics),
+			Settings:     getWindowsCategorySettings(ctx, diagnostics, stateWindowsSetting.Settings, remoteWindowsSetting.platformSetting.GetSettings()),
 		})
 
 		remoteWindowsSetting.IsVisited = true
@@ -176,18 +589,21 @@ func (r GACSettingsResourceModel) getWindowsSettings(remoteWindowsSettings []glo
 			windowsSettingsForState = append(windowsSettingsForState, Windows{
 				Category:     types.StringValue(remoteWindowsSetting.platformSetting.GetCategory()),
 				UserOverride: types.BoolValue(remoteWindowsSetting.platformSetting.GetUserOverride()),
-				Settings:     parseWindowsSettings(remoteWindowsSetting.platformSetting.GetSettings(), diagnostics),
+				Settings:     parseWindowsSettings(ctx, diagnostics, remoteWindowsSetting.platformSetting.GetSettings()),
 			})
 		}
 	}
 
-	return windowsSettingsForState
+	return util.TypedArrayToObjectList[Windows](ctx, diagnostics, windowsSettingsForState)
 }
 
-func (r GACSettingsResourceModel) getIosSettings(remoteIosSettings []globalappconfiguration.PlatformSettings, diagnostics *diag.Diagnostics) []Ios {
+func (r GACSettingsResourceModel) getIosSettings(ctx context.Context, diagnostics *diag.Diagnostics, remoteIosSettings []globalappconfiguration.PlatformSettings) types.List {
 	var stateIosSettings []Ios
-	if r.AppSettings != nil && r.AppSettings.Ios != nil {
-		stateIosSettings = r.AppSettings.Ios
+	if !r.AppSettings.IsNull() {
+		appSettings := util.ObjectValueToTypedObject[AppSettings](ctx, diagnostics, r.AppSettings)
+		if !appSettings.Ios.IsNull() {
+			stateIosSettings = util.ObjectListToTypedArray[Ios](ctx, diagnostics, appSettings.Ios)
+		}
 	}
 
 	type RemoteIosSettingsTracker struct {
@@ -216,7 +632,7 @@ func (r GACSettingsResourceModel) getIosSettings(remoteIosSettings []globalappco
 		iosSettingsForState = append(iosSettingsForState, Ios{
 			Category:     types.StringValue(remoteIosSetting.platformSetting.GetCategory()),
 			UserOverride: types.BoolValue(remoteIosSetting.platformSetting.GetUserOverride()),
-			Settings:     getIosCategorySettings(stateIosSetting.Settings, remoteIosSetting.platformSetting.GetSettings(), diagnostics),
+			Settings:     getIosCategorySettings(ctx, diagnostics, stateIosSetting.Settings, remoteIosSetting.platformSetting.GetSettings()),
 		})
 
 		remoteIosSetting.IsVisited = true
@@ -229,18 +645,21 @@ func (r GACSettingsResourceModel) getIosSettings(remoteIosSettings []globalappco
 			iosSettingsForState = append(iosSettingsForState, Ios{
 				Category:     types.StringValue(remoteIosSetting.platformSetting.GetCategory()),
 				UserOverride: types.BoolValue(remoteIosSetting.platformSetting.GetUserOverride()),
-				Settings:     parseIosSettings(remoteIosSetting.platformSetting.GetSettings(), diagnostics),
+				Settings:     parseIosSettings(ctx, diagnostics, remoteIosSetting.platformSetting.GetSettings()),
 			})
 		}
 	}
 
-	return iosSettingsForState
+	return util.TypedArrayToObjectList[Ios](ctx, diagnostics, iosSettingsForState)
 }
 
-func (r GACSettingsResourceModel) getAndroidSettings(remoteAndroidSettings []globalappconfiguration.PlatformSettings, diagnostics *diag.Diagnostics) []Android {
+func (r GACSettingsResourceModel) getAndroidSettings(ctx context.Context, diagnostics *diag.Diagnostics, remoteAndroidSettings []globalappconfiguration.PlatformSettings) types.List {
 	var stateAndroidSettings []Android
-	if r.AppSettings != nil && r.AppSettings.Android != nil {
-		stateAndroidSettings = r.AppSettings.Android
+	if !r.AppSettings.IsNull() {
+		appSettings := util.ObjectValueToTypedObject[AppSettings](ctx, diagnostics, r.AppSettings)
+		if !appSettings.Android.IsNull() {
+			stateAndroidSettings = util.ObjectListToTypedArray[Android](ctx, diagnostics, appSettings.Android)
+		}
 	}
 
 	type RemoteAndroidSettingsTracker struct {
@@ -269,7 +688,7 @@ func (r GACSettingsResourceModel) getAndroidSettings(remoteAndroidSettings []glo
 		androidSettingsForState = append(androidSettingsForState, Android{
 			Category:     types.StringValue(remoteAndroidSetting.platformSetting.GetCategory()),
 			UserOverride: types.BoolValue(remoteAndroidSetting.platformSetting.GetUserOverride()),
-			Settings:     getAndroidCategorySettings(stateAndroidSetting.Settings, remoteAndroidSetting.platformSetting.GetSettings(), diagnostics),
+			Settings:     getAndroidCategorySettings(ctx, diagnostics, stateAndroidSetting.Settings, remoteAndroidSetting.platformSetting.GetSettings()),
 		})
 
 		remoteAndroidSetting.IsVisited = true
@@ -282,18 +701,21 @@ func (r GACSettingsResourceModel) getAndroidSettings(remoteAndroidSettings []glo
 			androidSettingsForState = append(androidSettingsForState, Android{
 				Category:     types.StringValue(remoteAndroidSetting.platformSetting.GetCategory()),
 				UserOverride: types.BoolValue(remoteAndroidSetting.platformSetting.GetUserOverride()),
-				Settings:     parseAndroidSettings(remoteAndroidSetting.platformSetting.GetSettings(), diagnostics),
+				Settings:     parseAndroidSettings(ctx, diagnostics, remoteAndroidSetting.platformSetting.GetSettings()),
 			})
 		}
 	}
 
-	return androidSettingsForState
+	return util.TypedArrayToObjectList[Android](ctx, diagnostics, androidSettingsForState)
 }
 
-func (r GACSettingsResourceModel) getHtml5Settings(remoteHtml5Settings []globalappconfiguration.PlatformSettings, diagnostics *diag.Diagnostics) []Html5 {
+func (r GACSettingsResourceModel) getHtml5Settings(ctx context.Context, diagnostics *diag.Diagnostics, remoteHtml5Settings []globalappconfiguration.PlatformSettings) types.List {
 	var stateHtml5Settings []Html5
-	if r.AppSettings != nil && r.AppSettings.Html5 != nil {
-		stateHtml5Settings = r.AppSettings.Html5
+	if !r.AppSettings.IsNull() {
+		appSettings := util.ObjectValueToTypedObject[AppSettings](ctx, diagnostics, r.AppSettings)
+		if !appSettings.Html5.IsNull() {
+			stateHtml5Settings = util.ObjectListToTypedArray[Html5](ctx, diagnostics, appSettings.Html5)
+		}
 	}
 
 	type RemoteHtml5SettingsTracker struct {
@@ -322,7 +744,7 @@ func (r GACSettingsResourceModel) getHtml5Settings(remoteHtml5Settings []globala
 		html5SettingsForState = append(html5SettingsForState, Html5{
 			Category:     types.StringValue(remoteHtml5Setting.platformSetting.GetCategory()),
 			UserOverride: types.BoolValue(remoteHtml5Setting.platformSetting.GetUserOverride()),
-			Settings:     getHtml5CategorySettings(stateHtml5Setting.Settings, remoteHtml5Setting.platformSetting.GetSettings(), diagnostics),
+			Settings:     getHtml5CategorySettings(ctx, diagnostics, stateHtml5Setting.Settings, remoteHtml5Setting.platformSetting.GetSettings()),
 		})
 
 		remoteHtml5Setting.IsVisited = true
@@ -335,18 +757,21 @@ func (r GACSettingsResourceModel) getHtml5Settings(remoteHtml5Settings []globala
 			html5SettingsForState = append(html5SettingsForState, Html5{
 				Category:     types.StringValue(remoteHtml5Setting.platformSetting.GetCategory()),
 				UserOverride: types.BoolValue(remoteHtml5Setting.platformSetting.GetUserOverride()),
-				Settings:     parseHtml5Settings(remoteHtml5Setting.platformSetting.GetSettings(), diagnostics),
+				Settings:     parseHtml5Settings(ctx, diagnostics, remoteHtml5Setting.platformSetting.GetSettings()),
 			})
 		}
 	}
 
-	return html5SettingsForState
+	return util.TypedArrayToObjectList[Html5](ctx, diagnostics, html5SettingsForState)
 }
 
-func (r GACSettingsResourceModel) getChromeosSettings(remoteChromeosSettings []globalappconfiguration.PlatformSettings, diagnostics *diag.Diagnostics) []Chromeos {
+func (r GACSettingsResourceModel) getChromeosSettings(ctx context.Context, diagnostics *diag.Diagnostics, remoteChromeosSettings []globalappconfiguration.PlatformSettings) types.List {
 	var stateChromeosSettings []Chromeos
-	if r.AppSettings != nil && r.AppSettings.Chromeos != nil {
-		stateChromeosSettings = r.AppSettings.Chromeos
+	if !r.AppSettings.IsNull() {
+		appSettings := util.ObjectValueToTypedObject[AppSettings](ctx, diagnostics, r.AppSettings)
+		if !appSettings.Chromeos.IsNull() {
+			stateChromeosSettings = util.ObjectListToTypedArray[Chromeos](ctx, diagnostics, appSettings.Chromeos)
+		}
 	}
 
 	type RemoteChromeosSettingsTracker struct {
@@ -375,7 +800,7 @@ func (r GACSettingsResourceModel) getChromeosSettings(remoteChromeosSettings []g
 		chromeosSettingsForState = append(chromeosSettingsForState, Chromeos{
 			Category:     types.StringValue(remoteChromeosSetting.platformSetting.GetCategory()),
 			UserOverride: types.BoolValue(remoteChromeosSetting.platformSetting.GetUserOverride()),
-			Settings:     getChromeosCategorySettings(stateChromeosSetting.Settings, remoteChromeosSetting.platformSetting.GetSettings(), diagnostics),
+			Settings:     getChromeosCategorySettings(ctx, diagnostics, stateChromeosSetting.Settings, remoteChromeosSetting.platformSetting.GetSettings()),
 		})
 
 		remoteChromeosSetting.IsVisited = true
@@ -388,18 +813,21 @@ func (r GACSettingsResourceModel) getChromeosSettings(remoteChromeosSettings []g
 			chromeosSettingsForState = append(chromeosSettingsForState, Chromeos{
 				Category:     types.StringValue(remoteChromeosSetting.platformSetting.GetCategory()),
 				UserOverride: types.BoolValue(remoteChromeosSetting.platformSetting.GetUserOverride()),
-				Settings:     parseChromeosSettings(remoteChromeosSetting.platformSetting.GetSettings(), diagnostics),
+				Settings:     parseChromeosSettings(ctx, diagnostics, remoteChromeosSetting.platformSetting.GetSettings()),
 			})
 		}
 	}
 
-	return chromeosSettingsForState
+	return util.TypedArrayToObjectList[Chromeos](ctx, diagnostics, chromeosSettingsForState)
 }
 
-func (r GACSettingsResourceModel) getMacosSettings(remoteMacosSettings []globalappconfiguration.PlatformSettings, diagnostics *diag.Diagnostics) []Macos {
+func (r GACSettingsResourceModel) getMacosSettings(ctx context.Context, diagnostics *diag.Diagnostics, remoteMacosSettings []globalappconfiguration.PlatformSettings) types.List {
 	var stateMacosSettings []Macos
-	if r.AppSettings != nil && r.AppSettings.Macos != nil {
-		stateMacosSettings = r.AppSettings.Macos
+	if !r.AppSettings.IsNull() {
+		appSettings := util.ObjectValueToTypedObject[AppSettings](ctx, diagnostics, r.AppSettings)
+		if !appSettings.Macos.IsNull() {
+			stateMacosSettings = util.ObjectListToTypedArray[Macos](ctx, diagnostics, appSettings.Macos)
+		}
 	}
 
 	type RemoteMacosSettingsTracker struct {
@@ -428,7 +856,7 @@ func (r GACSettingsResourceModel) getMacosSettings(remoteMacosSettings []globala
 		macosSettingsForState = append(macosSettingsForState, Macos{
 			Category:     types.StringValue(remoteMacosSetting.platformSetting.GetCategory()),
 			UserOverride: types.BoolValue(remoteMacosSetting.platformSetting.GetUserOverride()),
-			Settings:     getMacosCategorySettings(stateMacosSetting.Settings, remoteMacosSetting.platformSetting.GetSettings(), diagnostics),
+			Settings:     getMacosCategorySettings(ctx, diagnostics, stateMacosSetting.Settings, remoteMacosSetting.platformSetting.GetSettings()),
 		})
 
 		remoteMacosSetting.IsVisited = true
@@ -441,27 +869,28 @@ func (r GACSettingsResourceModel) getMacosSettings(remoteMacosSettings []globala
 			macosSettingsForState = append(macosSettingsForState, Macos{
 				Category:     types.StringValue(remoteMacosSetting.platformSetting.GetCategory()),
 				UserOverride: types.BoolValue(remoteMacosSetting.platformSetting.GetUserOverride()),
-				Settings:     parseMacosSettings(remoteMacosSetting.platformSetting.GetSettings(), diagnostics),
+				Settings:     parseMacosSettings(ctx, diagnostics, remoteMacosSetting.platformSetting.GetSettings()),
 			})
 		}
 	}
 
-	return macosSettingsForState
+	return util.TypedArrayToObjectList[Macos](ctx, diagnostics, macosSettingsForState)
 }
 
-func parseWindowsSettings(remoteWindowsSettings []globalappconfiguration.CategorySettings, diagnostics *diag.Diagnostics) []WindowsSettings {
+func parseWindowsSettings(ctx context.Context, diagnostics *diag.Diagnostics, remoteWindowsSettings []globalappconfiguration.CategorySettings) types.List {
 	var windowsSettings []WindowsSettings
 	var errMsg string
 
 	for _, remoteWindowsSetting := range remoteWindowsSettings {
 		var windowsSetting WindowsSettings
 		windowsSetting.Name = types.StringValue(remoteWindowsSetting.GetName())
+		windowsSetting.ValueList = types.ListNull(types.StringType)
 		valueType := reflect.TypeOf(remoteWindowsSetting.GetValue())
 		switch valueType.Kind() {
 		case reflect.String:
 			windowsSetting.ValueString = types.StringValue(remoteWindowsSetting.GetValue().(string))
 		case reflect.Slice:
-			windowsSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToBaseStringArray(remoteWindowsSetting.Value.([]interface{}))
+			windowsSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteWindowsSetting.Value.([]interface{}))
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for windows setting value: %v", valueType.Kind())
 		}
@@ -475,10 +904,10 @@ func parseWindowsSettings(remoteWindowsSettings []globalappconfiguration.Categor
 		windowsSettings = append(windowsSettings, windowsSetting)
 	}
 
-	return windowsSettings
+	return util.TypedArrayToObjectList[WindowsSettings](ctx, diagnostics, windowsSettings)
 }
 
-func parseIosSettings(remoteIosSettings []globalappconfiguration.CategorySettings, diagnostics *diag.Diagnostics) []IosSettings {
+func parseIosSettings(ctx context.Context, diagnostics *diag.Diagnostics, remoteIosSettings []globalappconfiguration.CategorySettings) types.List {
 	var iosSettings []IosSettings
 	var errMsg string
 
@@ -502,22 +931,23 @@ func parseIosSettings(remoteIosSettings []globalappconfiguration.CategorySetting
 		iosSettings = append(iosSettings, iosSetting)
 	}
 
-	return iosSettings
+	return util.TypedArrayToObjectList[IosSettings](ctx, diagnostics, iosSettings)
 }
 
-func parseAndroidSettings(remoteAndroidSettings []globalappconfiguration.CategorySettings, diagnostics *diag.Diagnostics) []AndroidSettings {
+func parseAndroidSettings(ctx context.Context, diagnostics *diag.Diagnostics, remoteAndroidSettings []globalappconfiguration.CategorySettings) types.List {
 	var androidSettings []AndroidSettings
 	var errMsg string
 
 	for _, remoteAndroidSetting := range remoteAndroidSettings {
 		var androidSetting AndroidSettings
 		androidSetting.Name = types.StringValue(remoteAndroidSetting.GetName())
+		androidSetting.ValueList = types.ListNull(types.StringType)
 		valueType := reflect.TypeOf(remoteAndroidSetting.GetValue())
 		switch valueType.Kind() {
 		case reflect.String:
 			androidSetting.ValueString = types.StringValue(remoteAndroidSetting.GetValue().(string))
 		case reflect.Slice:
-			androidSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToBaseStringArray(remoteAndroidSetting.Value.([]interface{}))
+			androidSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteAndroidSetting.Value.([]interface{}))
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for android setting value: %v", valueType.Kind())
 		}
@@ -531,22 +961,23 @@ func parseAndroidSettings(remoteAndroidSettings []globalappconfiguration.Categor
 		androidSettings = append(androidSettings, androidSetting)
 	}
 
-	return androidSettings
+	return util.TypedArrayToObjectList[AndroidSettings](ctx, diagnostics, androidSettings)
 }
 
-func parseHtml5Settings(remoteHtml5Settings []globalappconfiguration.CategorySettings, diagnostics *diag.Diagnostics) []Html5Settings {
+func parseHtml5Settings(ctx context.Context, diagnostics *diag.Diagnostics, remoteHtml5Settings []globalappconfiguration.CategorySettings) types.List {
 	var html5Settings []Html5Settings
 	var errMsg string
 
 	for _, remoteHtml5Setting := range remoteHtml5Settings {
 		var html5Setting Html5Settings
 		html5Setting.Name = types.StringValue(remoteHtml5Setting.GetName())
+		html5Setting.ValueList = types.ListNull(types.StringType)
 		valueType := reflect.TypeOf(remoteHtml5Setting.GetValue())
 		switch valueType.Kind() {
 		case reflect.String:
 			html5Setting.ValueString = types.StringValue(remoteHtml5Setting.GetValue().(string))
 		case reflect.Slice:
-			html5Setting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToBaseStringArray(remoteHtml5Setting.Value.([]interface{}))
+			html5Setting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteHtml5Setting.Value.([]interface{}))
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for html5 setting value: %v", valueType.Kind())
 		}
@@ -560,22 +991,23 @@ func parseHtml5Settings(remoteHtml5Settings []globalappconfiguration.CategorySet
 		html5Settings = append(html5Settings, html5Setting)
 	}
 
-	return html5Settings
+	return util.TypedArrayToObjectList[Html5Settings](ctx, diagnostics, html5Settings)
 }
 
-func parseMacosSettings(remoteMacosSettings []globalappconfiguration.CategorySettings, diagnostics *diag.Diagnostics) []MacosSettings {
+func parseMacosSettings(ctx context.Context, diagnostics *diag.Diagnostics, remoteMacosSettings []globalappconfiguration.CategorySettings) types.List {
 	var macosSettings []MacosSettings
 	var errMsg string
 
 	for _, remoteMacosSetting := range remoteMacosSettings {
 		var macosSetting MacosSettings
 		macosSetting.Name = types.StringValue(remoteMacosSetting.GetName())
+		macosSetting.ValueList = types.ListNull(types.StringType)
 		valueType := reflect.TypeOf(remoteMacosSetting.GetValue())
 		switch valueType.Kind() {
 		case reflect.String:
 			macosSetting.ValueString = types.StringValue(remoteMacosSetting.GetValue().(string))
 		case reflect.Slice:
-			macosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToBaseStringArray(remoteMacosSetting.Value.([]interface{}))
+			macosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteMacosSetting.Value.([]interface{}))
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for macos setting value: %v", valueType.Kind())
 		}
@@ -589,22 +1021,23 @@ func parseMacosSettings(remoteMacosSettings []globalappconfiguration.CategorySet
 		macosSettings = append(macosSettings, macosSetting)
 	}
 
-	return macosSettings
+	return util.TypedArrayToObjectList[MacosSettings](ctx, diagnostics, macosSettings)
 }
 
-func parseChromeosSettings(remoteChromeosSettings []globalappconfiguration.CategorySettings, diagnostics *diag.Diagnostics) []ChromeosSettings {
+func parseChromeosSettings(ctx context.Context, diagnostics *diag.Diagnostics, remoteChromeosSettings []globalappconfiguration.CategorySettings) types.List {
 	var chromeosSettings []ChromeosSettings
 	var errMsg string
 
 	for _, remoteChromeosSetting := range remoteChromeosSettings {
 		var chromeosSetting ChromeosSettings
 		chromeosSetting.Name = types.StringValue(remoteChromeosSetting.GetName())
+		chromeosSetting.ValueList = types.ListNull(types.StringType)
 		valueType := reflect.TypeOf(remoteChromeosSetting.GetValue())
 		switch valueType.Kind() {
 		case reflect.String:
 			chromeosSetting.ValueString = types.StringValue(remoteChromeosSetting.GetValue().(string))
 		case reflect.Slice:
-			chromeosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToBaseStringArray(remoteChromeosSetting.Value.([]interface{}))
+			chromeosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteChromeosSetting.Value.([]interface{}))
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for chrome os setting value: %v", valueType.Kind())
 		}
@@ -618,13 +1051,15 @@ func parseChromeosSettings(remoteChromeosSettings []globalappconfiguration.Categ
 		chromeosSettings = append(chromeosSettings, chromeosSetting)
 	}
 
-	return chromeosSettings
+	return util.TypedArrayToObjectList[ChromeosSettings](ctx, diagnostics, chromeosSettings)
 }
 
-func getWindowsCategorySettings(stateWindowsSettings []WindowsSettings, remoteWindowsSettings []globalappconfiguration.CategorySettings, diagnostics *diag.Diagnostics) []WindowsSettings {
+func getWindowsCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, windowsSettings types.List, remoteWindowsSettings []globalappconfiguration.CategorySettings) types.List {
 
 	var windowsSettingsForState []WindowsSettings
 	var errMsg string
+
+	stateWindowsSettings := util.ObjectListToTypedArray[WindowsSettings](ctx, diagnostics, windowsSettings)
 
 	type RemoteSettingsTracker struct {
 		Value     interface{}
@@ -652,12 +1087,13 @@ func getWindowsCategorySettings(stateWindowsSettings []WindowsSettings, remoteWi
 		errMsg = ""
 
 		windowsSetting.Name = stateWindowsSetting.Name // Since this value is present as the map key, it is same as remote
+		windowsSetting.ValueList = types.ListNull(types.StringType)
 		valueType := reflect.TypeOf(remoteWindowsSetting.Value)
 		switch valueType.Kind() {
 		case reflect.String:
 			windowsSetting.ValueString = types.StringValue(remoteWindowsSetting.Value.(string))
 		case reflect.Slice:
-			windowsSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToBaseStringArray(remoteWindowsSetting.Value.([]interface{}))
+			windowsSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteWindowsSetting.Value.([]interface{}))
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for windows setting value: %v", valueType.Kind())
 		}
@@ -677,13 +1113,15 @@ func getWindowsCategorySettings(stateWindowsSettings []WindowsSettings, remoteWi
 		if !remoteWindowsSetting.IsVisited {
 			var windowsSetting WindowsSettings
 			errMsg = ""
+
 			windowsSetting.Name = types.StringValue(settingName)
+			windowsSetting.ValueList = types.ListNull(types.StringType)
 			valueType := reflect.TypeOf(remoteWindowsSetting.Value)
 			switch valueType.Kind() {
 			case reflect.String:
 				windowsSetting.ValueString = types.StringValue(remoteWindowsSetting.Value.(string))
 			case reflect.Slice:
-				windowsSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToBaseStringArray(remoteWindowsSetting.Value.([]interface{}))
+				windowsSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteWindowsSetting.Value.([]interface{}))
 			default:
 				errMsg = fmt.Sprintf("Unsupported type for windows setting value: %v", valueType.Kind())
 			}
@@ -698,13 +1136,15 @@ func getWindowsCategorySettings(stateWindowsSettings []WindowsSettings, remoteWi
 		}
 	}
 
-	return windowsSettingsForState
+	return util.TypedArrayToObjectList[WindowsSettings](ctx, diagnostics, windowsSettingsForState)
 }
 
-func getIosCategorySettings(stateIosSettings []IosSettings, remoteIosSettings []globalappconfiguration.CategorySettings, diagnostics *diag.Diagnostics) []IosSettings {
+func getIosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, iosSettings types.List, remoteIosSettings []globalappconfiguration.CategorySettings) types.List {
 
 	var iosSettingsForState []IosSettings
 	var errMsg string
+
+	stateIosSettings := util.ObjectListToTypedArray[IosSettings](ctx, diagnostics, iosSettings)
 
 	type RemoteSettingsTracker struct {
 		Value     interface{}
@@ -761,7 +1201,7 @@ func getIosCategorySettings(stateIosSettings []IosSettings, remoteIosSettings []
 			case reflect.String:
 				iosSetting.ValueString = types.StringValue(remoteIosSetting.Value.(string))
 			default:
-				fmt.Errorf("Unsupported type for ios setting value: %v", valueType.Kind())
+				errMsg = fmt.Sprintf("Unsupported type for ios setting value: %v", valueType.Kind())
 			}
 			if errMsg != "" {
 				diagnostics.AddError(
@@ -774,13 +1214,15 @@ func getIosCategorySettings(stateIosSettings []IosSettings, remoteIosSettings []
 		}
 	}
 
-	return iosSettingsForState
+	return util.TypedArrayToObjectList[IosSettings](ctx, diagnostics, iosSettingsForState)
 }
 
-func getAndroidCategorySettings(stateAndroidSettings []AndroidSettings, remoteAndroidSettings []globalappconfiguration.CategorySettings, diagnostics *diag.Diagnostics) []AndroidSettings {
+func getAndroidCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, androidSettings types.List, remoteAndroidSettings []globalappconfiguration.CategorySettings) types.List {
 
 	var androidSettingsForState []AndroidSettings
 	var errMsg string
+
+	stateAndroidSettings := util.ObjectListToTypedArray[AndroidSettings](ctx, diagnostics, androidSettings)
 
 	type RemoteSettingsTracker struct {
 		Value     interface{}
@@ -806,12 +1248,13 @@ func getAndroidCategorySettings(stateAndroidSettings []AndroidSettings, remoteAn
 
 		var androidSetting AndroidSettings
 		androidSetting.Name = stateAndroidSetting.Name // Since this value is present as the map key, it is same as remote
+		androidSetting.ValueList = types.ListNull(types.StringType)
 		valueType := reflect.TypeOf(remoteAndroidSetting.Value)
 		switch valueType.Kind() {
 		case reflect.String:
 			androidSetting.ValueString = types.StringValue(remoteAndroidSetting.Value.(string))
 		case reflect.Slice:
-			androidSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToBaseStringArray(remoteAndroidSetting.Value.([]interface{}))
+			androidSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteAndroidSetting.Value.([]interface{}))
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for android setting value: %v", valueType.Kind())
 		}
@@ -832,12 +1275,13 @@ func getAndroidCategorySettings(stateAndroidSettings []AndroidSettings, remoteAn
 			var androidSetting AndroidSettings
 			errMsg = ""
 			androidSetting.Name = types.StringValue(settingName)
+			androidSetting.ValueList = types.ListNull(types.StringType)
 			valueType := reflect.TypeOf(remoteAndroidSetting.Value)
 			switch valueType.Kind() {
 			case reflect.String:
 				androidSetting.ValueString = types.StringValue(remoteAndroidSetting.Value.(string))
 			case reflect.Slice:
-				androidSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToBaseStringArray(remoteAndroidSetting.Value.([]interface{}))
+				androidSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteAndroidSetting.Value.([]interface{}))
 			default:
 				errMsg = fmt.Sprintf("Unsupported type for android setting value: %v", valueType.Kind())
 			}
@@ -852,13 +1296,15 @@ func getAndroidCategorySettings(stateAndroidSettings []AndroidSettings, remoteAn
 		}
 	}
 
-	return androidSettingsForState
+	return util.TypedArrayToObjectList[AndroidSettings](ctx, diagnostics, androidSettingsForState)
 }
 
-func getChromeosCategorySettings(stateChromeosSettings []ChromeosSettings, remoteChromeosSettings []globalappconfiguration.CategorySettings, diagnostics *diag.Diagnostics) []ChromeosSettings {
+func getChromeosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, chromeosSettings types.List, remoteChromeosSettings []globalappconfiguration.CategorySettings) types.List {
 
 	var chromeosSettingsForState []ChromeosSettings
 	var errMsg string
+
+	stateChromeosSettings := util.ObjectListToTypedArray[ChromeosSettings](ctx, diagnostics, chromeosSettings)
 
 	type RemoteSettingsTracker struct {
 		Value     interface{}
@@ -886,12 +1332,13 @@ func getChromeosCategorySettings(stateChromeosSettings []ChromeosSettings, remot
 		errMsg = ""
 
 		chromeosSetting.Name = stateChromeosSetting.Name // Since this value is present as the map key, it is same as remote
+		chromeosSetting.ValueList = types.ListNull(types.StringType)
 		valueType := reflect.TypeOf(remoteChromeosSetting.Value)
 		switch valueType.Kind() {
 		case reflect.String:
 			chromeosSetting.ValueString = types.StringValue(remoteChromeosSetting.Value.(string))
 		case reflect.Slice:
-			chromeosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToBaseStringArray(remoteChromeosSetting.Value.([]interface{}))
+			chromeosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteChromeosSetting.Value.([]interface{}))
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for chromeos setting value: %v", valueType.Kind())
 		}
@@ -913,12 +1360,13 @@ func getChromeosCategorySettings(stateChromeosSettings []ChromeosSettings, remot
 			errMsg = ""
 
 			chromeosSetting.Name = types.StringValue(settingName)
+			chromeosSetting.ValueList = types.ListNull(types.StringType)
 			valueType := reflect.TypeOf(remoteChromeosSetting.Value)
 			switch valueType.Kind() {
 			case reflect.String:
 				chromeosSetting.ValueString = types.StringValue(remoteChromeosSetting.Value.(string))
 			case reflect.Slice:
-				chromeosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToBaseStringArray(remoteChromeosSetting.Value.([]interface{}))
+				chromeosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteChromeosSetting.Value.([]interface{}))
 			default:
 				errMsg = fmt.Sprintf("Unsupported type for chromeos setting value: %v", valueType.Kind())
 			}
@@ -933,13 +1381,15 @@ func getChromeosCategorySettings(stateChromeosSettings []ChromeosSettings, remot
 		}
 	}
 
-	return chromeosSettingsForState
+	return util.TypedArrayToObjectList[ChromeosSettings](ctx, diagnostics, chromeosSettingsForState)
 }
 
-func getHtml5CategorySettings(stateHtml5Settings []Html5Settings, remoteHtml5Settings []globalappconfiguration.CategorySettings, diagnostics *diag.Diagnostics) []Html5Settings {
+func getHtml5CategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, html5Settings types.List, remoteHtml5Settings []globalappconfiguration.CategorySettings) types.List {
 
 	var html5SettingsForState []Html5Settings
 	var errMsg string
+
+	stateHtml5Settings := util.ObjectListToTypedArray[Html5Settings](ctx, diagnostics, html5Settings)
 
 	type RemoteSettingsTracker struct {
 		Value     interface{}
@@ -967,12 +1417,13 @@ func getHtml5CategorySettings(stateHtml5Settings []Html5Settings, remoteHtml5Set
 		errMsg = ""
 
 		html5Setting.Name = stateHtml5Setting.Name // Since this value is present as the map key, it is same as remote
+		html5Setting.ValueList = types.ListNull(types.StringType)
 		valueType := reflect.TypeOf(remoteHtml5Setting.Value)
 		switch valueType.Kind() {
 		case reflect.String:
 			html5Setting.ValueString = types.StringValue(remoteHtml5Setting.Value.(string))
 		case reflect.Slice:
-			html5Setting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToBaseStringArray(remoteHtml5Setting.Value.([]interface{}))
+			html5Setting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteHtml5Setting.Value.([]interface{}))
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for html5 setting value: %v", valueType.Kind())
 		}
@@ -994,12 +1445,13 @@ func getHtml5CategorySettings(stateHtml5Settings []Html5Settings, remoteHtml5Set
 			errMsg = ""
 
 			html5Setting.Name = types.StringValue(settingName)
+			html5Setting.ValueList = types.ListNull(types.StringType)
 			valueType := reflect.TypeOf(remoteHtml5Setting.Value)
 			switch valueType.Kind() {
 			case reflect.String:
 				html5Setting.ValueString = types.StringValue(remoteHtml5Setting.Value.(string))
 			case reflect.Slice:
-				html5Setting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToBaseStringArray(remoteHtml5Setting.Value.([]interface{}))
+				html5Setting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteHtml5Setting.Value.([]interface{}))
 			default:
 				errMsg = fmt.Sprintf("Unsupported type for html5 setting value: %v", valueType.Kind())
 			}
@@ -1014,13 +1466,15 @@ func getHtml5CategorySettings(stateHtml5Settings []Html5Settings, remoteHtml5Set
 		}
 	}
 
-	return html5SettingsForState
+	return util.TypedArrayToObjectList[Html5Settings](ctx, diagnostics, html5SettingsForState)
 }
 
-func getMacosCategorySettings(stateMacosSettings []MacosSettings, remoteMacosSettings []globalappconfiguration.CategorySettings, diagnostics *diag.Diagnostics) []MacosSettings {
+func getMacosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, macosSettings types.List, remoteMacosSettings []globalappconfiguration.CategorySettings) types.List {
 
 	var macosSettingsForState []MacosSettings
 	var errMsg string
+
+	stateMacosSettings := util.ObjectListToTypedArray[MacosSettings](ctx, diagnostics, macosSettings)
 
 	type RemoteSettingsTracker struct {
 		Value     interface{}
@@ -1048,12 +1502,13 @@ func getMacosCategorySettings(stateMacosSettings []MacosSettings, remoteMacosSet
 		errMsg = ""
 
 		macosSetting.Name = stateMacosSetting.Name // Since this value is present as the map key, it is same as remote
+		macosSetting.ValueList = types.ListNull(types.StringType)
 		valueType := reflect.TypeOf(remoteMacosSetting.Value)
 		switch valueType.Kind() {
 		case reflect.String:
 			macosSetting.ValueString = types.StringValue(remoteMacosSetting.Value.(string))
 		case reflect.Slice:
-			macosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToBaseStringArray(remoteMacosSetting.Value.([]interface{}))
+			macosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteMacosSetting.Value.([]interface{}))
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for macos setting value: %v", valueType.Kind())
 		}
@@ -1075,12 +1530,13 @@ func getMacosCategorySettings(stateMacosSettings []MacosSettings, remoteMacosSet
 			errMsg = ""
 
 			macosSetting.Name = types.StringValue(settingName)
+			macosSetting.ValueList = types.ListNull(types.StringType)
 			valueType := reflect.TypeOf(remoteMacosSetting.Value)
 			switch valueType.Kind() {
 			case reflect.String:
 				macosSetting.ValueString = types.StringValue(remoteMacosSetting.Value.(string))
 			case reflect.Slice:
-				macosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToBaseStringArray(remoteMacosSetting.Value.([]interface{}))
+				macosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteMacosSetting.Value.([]interface{}))
 			default:
 				errMsg = fmt.Sprintf("Unsupported type for macos setting value: %v", valueType.Kind())
 			}
@@ -1095,5 +1551,35 @@ func getMacosCategorySettings(stateMacosSettings []MacosSettings, remoteMacosSet
 		}
 	}
 
-	return macosSettingsForState
+	return util.TypedArrayToObjectList[MacosSettings](ctx, diagnostics, macosSettingsForState)
+}
+
+func GetSchema() schema.Schema {
+	return schema.Schema{
+		Description: "Manages the Global App Configuration settings for a service url.",
+		Attributes: map[string]schema.Attribute{
+			"service_url": schema.StringAttribute{
+				Description: "Citrix workspace application store url for which settings are to be configured. The value is case sensitive and requires the protocol (\"https\" or \"http\") and port number.",
+				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"name": schema.StringAttribute{
+				Description: "Name of the settings record.",
+				Required:    true,
+			},
+			"description": schema.StringAttribute{
+				Description: "Description of the settings record.",
+				Required:    true, //Check if this can be made into Optional
+			},
+			"use_for_app_config": schema.BoolAttribute{
+				Description: "Defines whether to use the settings for app configuration or not. Defaults to `true`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
+			},
+			"app_settings": AppSettings{}.GetSchema(),
+		},
+	}
 }

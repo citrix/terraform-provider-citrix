@@ -11,13 +11,15 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &vsphereHypervisorResource{}
-	_ resource.ResourceWithConfigure   = &vsphereHypervisorResource{}
-	_ resource.ResourceWithImportState = &vsphereHypervisorResource{}
+	_ resource.Resource                   = &vsphereHypervisorResource{}
+	_ resource.ResourceWithConfigure      = &vsphereHypervisorResource{}
+	_ resource.ResourceWithImportState    = &vsphereHypervisorResource{}
+	_ resource.ResourceWithValidateConfig = &vsphereHypervisorResource{}
 )
 
 // NewHypervisorResource is a helper function to simplify the provider implementation.
@@ -45,7 +47,7 @@ func (r *vsphereHypervisorResource) Configure(_ context.Context, req resource.Co
 
 // Schema implements resource.Resource.
 func (r *vsphereHypervisorResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = GetVsphereHypervisorSchema()
+	resp.Schema = VsphereHypervisorResourceModel{}.GetSchema()
 }
 
 // ImportState implements resource.ResourceWithImportState.
@@ -76,7 +78,7 @@ func (r *vsphereHypervisorResource) Create(ctx context.Context, req resource.Cre
 	pwdFormat, err := citrixorchestration.NewIdentityPasswordFormatFromValue(plan.PasswordFormat.ValueString())
 	if err != nil || pwdFormat == nil {
 		resp.Diagnostics.AddError(
-			"Error creating Hypervisor for Vsphere",
+			"Error creating Hypervisor for vSphere",
 			"Unsupported password format: "+plan.PasswordFormat.ValueString(),
 		)
 	}
@@ -242,4 +244,18 @@ func (r *vsphereHypervisorResource) Delete(ctx context.Context, req resource.Del
 		)
 		return
 	}
+}
+
+func (r *vsphereHypervisorResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data VsphereHypervisorResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }

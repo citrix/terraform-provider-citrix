@@ -12,19 +12,16 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &resourceLocationResource{}
-	_ resource.ResourceWithConfigure   = &resourceLocationResource{}
-	_ resource.ResourceWithImportState = &resourceLocationResource{}
-	_ resource.ResourceWithModifyPlan  = &resourceLocationResource{}
+	_ resource.Resource                   = &resourceLocationResource{}
+	_ resource.ResourceWithConfigure      = &resourceLocationResource{}
+	_ resource.ResourceWithImportState    = &resourceLocationResource{}
+	_ resource.ResourceWithValidateConfig = &resourceLocationResource{}
+	_ resource.ResourceWithModifyPlan     = &resourceLocationResource{}
 )
 
 // NewResourceLocationResource is a helper function to simplify the provider implementation.
@@ -44,36 +41,7 @@ func (r *resourceLocationResource) Metadata(_ context.Context, req resource.Meta
 
 // Schema defines the schema for the resource.
 func (r *resourceLocationResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		// This description is used by the documentation generator and the language server.
-		Description: "Manages a Citrix Cloud resource location.",
-
-		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "ID of the resource location.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"name": schema.StringAttribute{
-				Description: "Name of the resource location.",
-				Required:    true,
-			},
-			"internal_only": schema.BoolAttribute{
-				Description: "Flag to determine if the resource location can only be used internally. Defaults to `false`.",
-				Computed:    true,
-				Optional:    true,
-				Default:     booldefault.StaticBool(false),
-			},
-			"time_zone": schema.StringAttribute{
-				Description: "Timezone associated with the resource location. Please refer to the `Timezone` column in the following [table](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/default-time-zones?view=windows-11#time-zones) for allowed values.",
-				Computed:    true,
-				Optional:    true,
-				Default:     stringdefault.StaticString("GMT Standard Time"),
-			},
-		},
-	}
+	resp.Schema = ResourceLocationResourceModel{}.GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -260,6 +228,20 @@ func readResourceLocation(ctx context.Context, client *citrixdaasclient.CitrixDa
 	getResourceLocationRequest := client.ResourceLocationsClient.LocationsDAAS.LocationsGet(ctx, resourceLocationId)
 	resourceLocation, _, err := util.ReadResource[*resourcelocations.CitrixCloudServicesRegistryApiModelsLocationsResourceLocationModel](getResourceLocationRequest, ctx, client, resp, "Resource Location", resourceLocationId)
 	return resourceLocation, err
+}
+
+func (r *resourceLocationResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data ResourceLocationResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }
 
 // Resource Location is a cloud concept which is not supported for on-prem environment

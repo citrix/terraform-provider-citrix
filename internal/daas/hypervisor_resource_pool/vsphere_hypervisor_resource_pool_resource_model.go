@@ -40,7 +40,7 @@ func (VsphereHypervisorClusterModel) GetSchema() schema.SingleNestedAttribute {
 				Description: "The name of the cluster.",
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.AtLeastOneOf(path.Expressions{
+					stringvalidator.ExactlyOneOf(path.Expressions{
 						path.MatchRelative().AtParent().AtName("host"),
 					}...),
 				},
@@ -69,7 +69,7 @@ type VsphereHypervisorResourcePoolResourceModel struct {
 	UseLocalStorageCaching types.Bool   `tfsdk:"use_local_storage_caching"`
 }
 
-func GetVsphereHypervisorResourcePoolSchema() schema.Schema {
+func (VsphereHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "Manages a VMware vSphere hypervisor resource pool.",
 		Attributes: map[string]schema.Attribute{
@@ -130,6 +130,10 @@ func GetVsphereHypervisorResourcePoolSchema() schema.Schema {
 			},
 		},
 	}
+}
+
+func (VsphereHypervisorResourcePoolResourceModel) GetAttributes() map[string]schema.Attribute {
+	return VsphereHypervisorResourcePoolResourceModel{}.GetSchema().Attributes
 }
 
 func (r VsphereHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) VsphereHypervisorResourcePoolResourceModel {

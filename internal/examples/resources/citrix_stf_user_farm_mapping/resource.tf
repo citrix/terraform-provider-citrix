@@ -1,6 +1,6 @@
 resource "citrix_stf_user_farm_mapping" "example-stf-user-farm-mapping" {
     name = "Example STFUserFarmMapping"
-    store_virtual_path = citrix_stf_storeservice.example-stf-store-service.virtual_path
+    store_virtual_path = citrix_stf_store_service.example-stf-store-service.virtual_path
     group_members = [
         {
             group_name = "TestGroup1"

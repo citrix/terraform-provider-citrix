@@ -14,9 +14,10 @@ StoreFront Authentication Service.
 
 ```terraform
 resource "citrix_stf_authentication_service" "example-stf-authentication-service" {
-  site_id       = "1"
-  friendly_name = "Example STF Authentication Service"
-  virtual_path  = "/Citrix/Authentication"
+  site_id             = citrix_stf_deployment.example-stf-deployment.site_id
+  friendly_name       = "Example STF Authentication Service"
+  virtual_path        = "/Citrix/Authentication"
+  claims_factory_name = "ExampleClaimsFactoryName"
 }
 ```
 
@@ -25,6 +26,7 @@ resource "citrix_stf_authentication_service" "example-stf-authentication-service
 
 ### Optional
 
+- `claims_factory_name` (String) The claims factory names to use for the StoreFront authentication services. Defaults to `standardClaimsFactory`.
 - `friendly_name` (String) The friendly name the authentication service should be known as. Defaults to `Authentication Service`.
 - `site_id` (String) The IIS site to configure the authentication service for. Defaults to `1`.
 - `virtual_path` (String) The IIS virtual path to use for the authentication service. Defaults to `/Citrix/Authentication`.

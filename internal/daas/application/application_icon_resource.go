@@ -12,13 +12,15 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &applicationIconResource{}
-	_ resource.ResourceWithConfigure   = &applicationIconResource{}
-	_ resource.ResourceWithImportState = &applicationIconResource{}
+	_ resource.Resource                   = &applicationIconResource{}
+	_ resource.ResourceWithConfigure      = &applicationIconResource{}
+	_ resource.ResourceWithImportState    = &applicationIconResource{}
+	_ resource.ResourceWithValidateConfig = &applicationIconResource{}
 )
 
 // NewApplicationIconResource is a helper function to simplify the provider implementation.
@@ -47,7 +49,7 @@ func (r *applicationIconResource) Configure(_ context.Context, req resource.Conf
 
 // Schema returns the resource schema.
 func (r *applicationIconResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = GetApplicationIconSchema()
+	resp.Schema = ApplicationIconResourceModel{}.GetSchema()
 }
 
 func (r *applicationIconResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -165,4 +167,18 @@ func readApplicationIcon(ctx context.Context, client *citrixdaasclient.CitrixDaa
 	getApplicationIconRequest := client.ApiClient.IconsAPIsDAAS.IconsGetIcon(ctx, applicationIconId)
 	applicationIcon, _, err := util.ReadResource[*citrixorchestration.IconResponseModel](getApplicationIconRequest, ctx, client, resp, "Application Icon", applicationIconId)
 	return applicationIcon, err
+}
+
+func (r *applicationIconResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data ApplicationIconResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }

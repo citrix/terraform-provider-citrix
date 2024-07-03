@@ -37,7 +37,7 @@ var MappedCustomProperties = map[string]string{
 	"UseEphemeralOsDisk":               "storage_type",
 }
 
-func getProvSchemeForMcsCatalog(plan MachineCatalogResourceModel, ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, isOnPremises bool) (*citrixorchestration.CreateMachineCatalogProvisioningSchemeRequestModel, error) {
+func getProvSchemeForCatalog(plan MachineCatalogResourceModel, ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, isOnPremises bool, provisioningType *citrixorchestration.ProvisioningType) (*citrixorchestration.CreateMachineCatalogProvisioningSchemeRequestModel, error) {
 	provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, diagnostics, plan.ProvisioningScheme)
 	if !checkIfProvSchemeIsCloudOnly(ctx, diagnostics, provSchemeModel, isOnPremises) {
 		return nil, fmt.Errorf("identity type %s is not supported in OnPremises environment. ", provSchemeModel.IdentityType.ValueString())
@@ -53,7 +53,7 @@ func getProvSchemeForMcsCatalog(plan MachineCatalogResourceModel, ctx context.Co
 		return nil, err
 	}
 
-	provisioningScheme, err := buildProvSchemeForMcsCatalog(ctx, client, diagnostics, util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, diagnostics, plan.ProvisioningScheme), hypervisor, hypervisorResourcePool)
+	provisioningScheme, err := buildProvSchemeForCatalog(ctx, client, diagnostics, util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, diagnostics, plan.ProvisioningScheme), hypervisor, hypervisorResourcePool, provisioningType)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func getProvSchemeForMcsCatalog(plan MachineCatalogResourceModel, ctx context.Co
 	return provisioningScheme, nil
 }
 
-func buildProvSchemeForMcsCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diag *diag.Diagnostics, provisioningSchemePlan ProvisioningSchemeModel, hypervisor *citrixorchestration.HypervisorDetailResponseModel, hypervisorResourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) (*citrixorchestration.CreateMachineCatalogProvisioningSchemeRequestModel, error) {
+func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diag *diag.Diagnostics, provisioningSchemePlan ProvisioningSchemeModel, hypervisor *citrixorchestration.HypervisorDetailResponseModel, hypervisorResourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel, provisioningType *citrixorchestration.ProvisioningType) (*citrixorchestration.CreateMachineCatalogProvisioningSchemeRequestModel, error) {
 	var machineAccountCreationRules citrixorchestration.MachineAccountCreationRulesRequestModel
 	machineAccountCreationRulesModel := util.ObjectValueToTypedObject[MachineAccountCreationRulesModel](ctx, diag, provisioningSchemePlan.MachineAccountCreationRules)
 	machineAccountCreationRules.SetNamingScheme(machineAccountCreationRulesModel.NamingScheme.ValueString())
@@ -96,7 +96,7 @@ func buildProvSchemeForMcsCatalog(ctx context.Context, client *citrixdaasclient.
 	provisioningScheme.SetResourcePool(provisioningSchemePlan.HypervisorResourcePool.ValueString())
 
 	if hypervisor.GetConnectionType() != citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM || hypervisor.GetPluginId() != util.NUTANIX_PLUGIN_ID {
-		customProperties := parseCustomPropertiesToClientModel(ctx, diag, provisioningSchemePlan, hypervisor.ConnectionType)
+		customProperties := parseCustomPropertiesToClientModel(ctx, diag, provisioningSchemePlan, hypervisor.ConnectionType, provisioningType, false)
 		provisioningScheme.SetCustomProperties(customProperties)
 	}
 
@@ -114,78 +114,23 @@ func buildProvSchemeForMcsCatalog(ctx context.Context, client *citrixdaasclient.
 		}
 		provisioningScheme.SetServiceOfferingPath(serviceOfferingPath)
 
-		azureMasterImageModel := util.ObjectValueToTypedObject[AzureMasterImageModel](ctx, diag, azureMachineConfigModel.AzureMasterImage)
-		sharedSubscription := azureMasterImageModel.SharedSubscription.ValueString()
-		resourceGroup := azureMasterImageModel.ResourceGroup.ValueString()
-		masterImage := azureMasterImageModel.MasterImage.ValueString()
-		imagePath := ""
-		imageBasePath := "image.folder"
-		if sharedSubscription != "" {
-			imageBasePath = fmt.Sprintf("image.folder\\%s.sharedsubscription", sharedSubscription)
-		}
-		if masterImage != "" {
-			storageAccount := azureMasterImageModel.StorageAccount.ValueString()
-			container := azureMasterImageModel.Container.ValueString()
-			if storageAccount != "" && container != "" {
-				queryPath = fmt.Sprintf(
-					"%s\\%s.resourcegroup\\%s.storageaccount\\%s.container",
-					imageBasePath,
-					resourceGroup,
-					storageAccount,
-					container)
-				imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, masterImage, "", "")
-				if err != nil {
-					diag.AddError(
-						"Error creating Machine Catalog",
-						fmt.Sprintf("Failed to resolve master image VHD %s in container %s of storage account %s, error: %s", masterImage, container, storageAccount, err.Error()),
-					)
-					return nil, err
-				}
-			} else {
-				queryPath = fmt.Sprintf(
-					"%s\\%s.resourcegroup",
-					imageBasePath,
-					resourceGroup)
-				imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, masterImage, "", "")
-				if err != nil {
-					diag.AddError(
-						"Error creating Machine Catalog",
-						fmt.Sprintf("Failed to resolve master image Managed Disk or Snapshot %s, error: %s", masterImage, err.Error()),
-					)
-					return nil, err
-				}
-			}
-		} else if !azureMasterImageModel.GalleryImage.IsNull() {
-			azureGalleryImage := util.ObjectValueToTypedObject[GalleryImageModel](ctx, diag, azureMasterImageModel.GalleryImage)
-			gallery := azureGalleryImage.Gallery.ValueString()
-			definition := azureGalleryImage.Definition.ValueString()
-			version := azureGalleryImage.Version.ValueString()
-			if gallery != "" && definition != "" {
-				queryPath = fmt.Sprintf(
-					"%s\\%s.resourcegroup\\%s.gallery\\%s.imagedefinition",
-					imageBasePath,
-					resourceGroup,
-					gallery,
-					definition)
-				imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, version, "", "")
-				if err != nil {
-					diag.AddError(
-						"Error creating Machine Catalog",
-						fmt.Sprintf("Failed to locate Azure Image Gallery image %s of version %s in gallery %s, error: %s", definition, version, gallery, err.Error()),
-					)
-					return nil, err
-				}
-			}
+		if *provisioningType == citrixorchestration.PROVISIONINGTYPE_MCS {
+			err = setProvisioningSchemeForMcsCatalog(ctx, client, azureMachineConfigModel, diag, &provisioningScheme, hypervisor, hypervisorResourcePool)
+		} else if *provisioningType == citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING {
+			err = setProvisioningSchemeForPvsCatalog(ctx, azureMachineConfigModel, diag, &provisioningScheme)
 		}
 
-		provisioningScheme.SetMasterImagePath(imagePath)
-
-		masterImageNote := azureMachineConfigModel.MasterImageNote.ValueString()
-		provisioningScheme.SetMasterImageNote(masterImageNote)
+		if err != nil {
+			diag.AddError(
+				"Error creating Machine Catalog",
+				fmt.Sprintf("Failed to set provisioning scheme for catalog with provisioning type %s on Azure, error: %s", *provisioningType, err.Error()),
+			)
+			return nil, err
+		}
 
 		machineProfile := azureMachineConfigModel.MachineProfile
 		if !machineProfile.IsNull() {
-			machineProfilePath, err := handleMachineProfileForAzureMcsCatalog(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), util.ObjectValueToTypedObject[AzureMachineProfileModel](ctx, diag, machineProfile), "creating")
+			machineProfilePath, err := handleMachineProfileForAzureMcsPvsCatalog(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), util.ObjectValueToTypedObject[AzureMachineProfileModel](ctx, diag, machineProfile), "creating")
 			if err != nil {
 				return nil, err
 			}
@@ -351,6 +296,16 @@ func buildProvSchemeForMcsCatalog(ctx context.Context, client *citrixdaasclient.
 				provisioningScheme.SetWriteBackCacheDriveLetter(writeBackCacheModel.WriteBackCacheDriveLetter.ValueString())
 			}
 		}
+
+		if !vSphereMachineConfig.MachineProfile.IsNull() {
+			machineProfile, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", vSphereMachineConfig.MachineProfile.ValueString(), util.TemplateResourceType, "")
+			if err != nil {
+				return nil, err
+			}
+
+			provisioningScheme.SetMachineProfilePath(machineProfile)
+		}
+
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER:
 		xenserverMachineConfig := util.ObjectValueToTypedObject[XenserverMachineConfigModel](ctx, diag, provisioningSchemePlan.XenserverMachineConfig)
 		provisioningScheme.SetCpuCount(int32(xenserverMachineConfig.CpuCount.ValueInt64()))
@@ -431,7 +386,90 @@ func buildProvSchemeForMcsCatalog(ctx context.Context, client *citrixdaasclient.
 	return &provisioningScheme, nil
 }
 
-func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan ProvisioningSchemeModel, body citrixorchestration.UpdateMachineCatalogRequestModel, ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) (citrixorchestration.UpdateMachineCatalogRequestModel, error) {
+func setProvisioningSchemeForMcsCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, azureMachineConfigModel AzureMachineConfigModel, diagnostics *diag.Diagnostics, provisioningScheme *citrixorchestration.CreateMachineCatalogProvisioningSchemeRequestModel, hypervisor *citrixorchestration.HypervisorDetailResponseModel, hypervisorResourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) error {
+	azureMasterImageModel := util.ObjectValueToTypedObject[AzureMasterImageModel](ctx, diagnostics, azureMachineConfigModel.AzureMasterImage)
+	sharedSubscription := azureMasterImageModel.SharedSubscription.ValueString()
+	resourceGroup := azureMasterImageModel.ResourceGroup.ValueString()
+	masterImage := azureMasterImageModel.MasterImage.ValueString()
+	imagePath := ""
+	imageBasePath := "image.folder"
+	queryPath := ""
+	err := error(nil)
+	if sharedSubscription != "" {
+		imageBasePath = fmt.Sprintf("image.folder\\%s.sharedsubscription", sharedSubscription)
+	}
+	if masterImage != "" {
+		storageAccount := azureMasterImageModel.StorageAccount.ValueString()
+		container := azureMasterImageModel.Container.ValueString()
+		if storageAccount != "" && container != "" {
+			queryPath = fmt.Sprintf(
+				"%s\\%s.resourcegroup\\%s.storageaccount\\%s.container",
+				imageBasePath,
+				resourceGroup,
+				storageAccount,
+				container)
+			imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, masterImage, "", "")
+			if err != nil {
+				diagnostics.AddError(
+					"Error creating Machine Catalog",
+					fmt.Sprintf("Failed to resolve master image VHD %s in container %s of storage account %s, error: %s", masterImage, container, storageAccount, err.Error()),
+				)
+				return err
+			}
+		} else {
+			queryPath = fmt.Sprintf(
+				"%s\\%s.resourcegroup",
+				imageBasePath,
+				resourceGroup)
+			imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, masterImage, "", "")
+			if err != nil {
+				diagnostics.AddError(
+					"Error creating Machine Catalog",
+					fmt.Sprintf("Failed to resolve master image Managed Disk or Snapshot %s, error: %s", masterImage, err.Error()),
+				)
+				return err
+			}
+		}
+	} else if !azureMasterImageModel.GalleryImage.IsNull() {
+		azureGalleryImage := util.ObjectValueToTypedObject[GalleryImageModel](ctx, diagnostics, azureMasterImageModel.GalleryImage)
+		gallery := azureGalleryImage.Gallery.ValueString()
+		definition := azureGalleryImage.Definition.ValueString()
+		version := azureGalleryImage.Version.ValueString()
+		if gallery != "" && definition != "" {
+			queryPath = fmt.Sprintf(
+				"%s\\%s.resourcegroup\\%s.gallery\\%s.imagedefinition",
+				imageBasePath,
+				resourceGroup,
+				gallery,
+				definition)
+			imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, version, "", "")
+			if err != nil {
+				diagnostics.AddError(
+					"Error creating Machine Catalog",
+					fmt.Sprintf("Failed to locate Azure Image Gallery image %s of version %s in gallery %s, error: %s", definition, version, gallery, err.Error()),
+				)
+				return err
+			}
+		}
+	}
+
+	provisioningScheme.SetMasterImagePath(imagePath)
+
+	masterImageNote := azureMachineConfigModel.MasterImageNote.ValueString()
+	provisioningScheme.SetMasterImageNote(masterImageNote)
+
+	return nil
+}
+
+func setProvisioningSchemeForPvsCatalog(ctx context.Context, azureMachineConfigModel AzureMachineConfigModel, diagnostics *diag.Diagnostics, provisioningScheme *citrixorchestration.CreateMachineCatalogProvisioningSchemeRequestModel) error {
+	pvsConfigurationModel := util.ObjectValueToTypedObject[AzurePvsConfigurationModel](ctx, diagnostics, azureMachineConfigModel.AzurePvsConfiguration)
+	provisioningScheme.SetPVSSite(pvsConfigurationModel.PvsSiteId.ValueString())
+	provisioningScheme.SetPVSVDisk(pvsConfigurationModel.PvsVdiskId.ValueString())
+
+	return nil
+}
+
+func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan ProvisioningSchemeModel, body citrixorchestration.UpdateMachineCatalogRequestModel, ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, provisioningType *citrixorchestration.ProvisioningType) (citrixorchestration.UpdateMachineCatalogRequestModel, error) {
 	hypervisor, err := util.GetHypervisor(ctx, client, diagnostics, provisioningSchemePlan.Hypervisor.ValueString())
 	if err != nil {
 		return body, err
@@ -494,6 +532,15 @@ func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan Provisioning
 		vSphereMachineConfig := util.ObjectValueToTypedObject[VsphereMachineConfigModel](ctx, nil, provisioningSchemePlan.VsphereMachineConfig)
 		body.SetCpuCount(int32(vSphereMachineConfig.CpuCount.ValueInt64()))
 		body.SetMemoryMB(int32(vSphereMachineConfig.MemoryMB.ValueInt64()))
+
+		if !vSphereMachineConfig.MachineProfile.IsNull() {
+			machineProfile, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", vSphereMachineConfig.MachineProfile.ValueString(), util.TemplateResourceType, "")
+			if err != nil {
+				return body, err
+			}
+
+			body.SetMachineProfilePath(machineProfile)
+		}
 	}
 
 	if !provisioningSchemePlan.NetworkMapping.IsNull() {
@@ -509,7 +556,7 @@ func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan Provisioning
 		body.SetNetworkMapping(networkMapping)
 	}
 
-	customProperties := parseCustomPropertiesToClientModel(ctx, diagnostics, provisioningSchemePlan, hypervisor.ConnectionType)
+	customProperties := parseCustomPropertiesToClientModel(ctx, diagnostics, provisioningSchemePlan, hypervisor.ConnectionType, provisioningType, true)
 	body.SetCustomProperties(customProperties)
 
 	return body, nil
@@ -523,7 +570,7 @@ func generateAdminCredentialHeader(machineDomainIdentityModel MachineDomainIdent
 	return header
 }
 
-func deleteMachinesFromMcsCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, catalog *citrixorchestration.MachineCatalogDetailResponseModel, provisioningSchemePlan ProvisioningSchemeModel) error {
+func deleteMachinesFromMcsPvsCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, catalog *citrixorchestration.MachineCatalogDetailResponseModel, provisioningSchemePlan ProvisioningSchemeModel) error {
 	catalogId := catalog.GetId()
 	catalogName := catalog.GetName()
 
@@ -569,7 +616,7 @@ func deleteMachinesFromMcsCatalog(ctx context.Context, client *citrixdaasclient.
 	return deleteMachinesFromCatalog(ctx, client, resp, provisioningSchemePlan, machinesToDelete, catalogName, true)
 }
 
-func addMachinesToMcsCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, catalog *citrixorchestration.MachineCatalogDetailResponseModel, provisioningSchemePlan ProvisioningSchemeModel) error {
+func addMachinesToMcsPvsCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, catalog *citrixorchestration.MachineCatalogDetailResponseModel, provisioningSchemePlan ProvisioningSchemeModel) error {
 	catalogId := catalog.GetId()
 	catalogName := catalog.GetName()
 
@@ -679,7 +726,7 @@ func updateCatalogMachineProfile(ctx context.Context, client *citrixdaasclient.C
 	return nil
 }
 
-func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, catalog *citrixorchestration.MachineCatalogDetailResponseModel, plan MachineCatalogResourceModel) error {
+func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, catalog *citrixorchestration.MachineCatalogDetailResponseModel, plan MachineCatalogResourceModel, provisioningType *citrixorchestration.ProvisioningType) error {
 
 	catalogName := catalog.GetName()
 	catalogId := catalog.GetId()
@@ -717,95 +764,99 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 	switch hypervisor.GetConnectionType() {
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
 		azureMachineConfigModel := util.ObjectValueToTypedObject[AzureMachineConfigModel](ctx, &resp.Diagnostics, provisioningSchemePlan.AzureMachineConfig)
-		azureMasterImageModel := util.ObjectValueToTypedObject[AzureMasterImageModel](ctx, &resp.Diagnostics, azureMachineConfigModel.AzureMasterImage)
-		newImage := azureMasterImageModel.MasterImage.ValueString()
-		resourceGroup := azureMasterImageModel.ResourceGroup.ValueString()
 		azureMachineProfile := azureMachineConfigModel.MachineProfile
-		if newImage != "" {
-			storageAccount := azureMasterImageModel.StorageAccount.ValueString()
-			container := azureMasterImageModel.Container.ValueString()
-			if storageAccount != "" && container != "" {
-				queryPath := fmt.Sprintf(
-					"image.folder\\%s.resourcegroup\\%s.storageaccount\\%s.container",
-					resourceGroup,
-					storageAccount,
-					container)
-				imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, newImage, "", "")
-				if err != nil {
-					resp.Diagnostics.AddError(
-						"Error updating Machine Catalog",
-						fmt.Sprintf("Failed to resolve master image VHD %s in container %s of storage account %s, error: %s", newImage, container, storageAccount, err.Error()),
-					)
-					return err
+		if !(*provisioningType == citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING) {
+			azureMasterImageModel := util.ObjectValueToTypedObject[AzureMasterImageModel](ctx, &resp.Diagnostics, azureMachineConfigModel.AzureMasterImage)
+			newImage := azureMasterImageModel.MasterImage.ValueString()
+			resourceGroup := azureMasterImageModel.ResourceGroup.ValueString()
+
+			if newImage != "" {
+				storageAccount := azureMasterImageModel.StorageAccount.ValueString()
+				container := azureMasterImageModel.Container.ValueString()
+				if storageAccount != "" && container != "" {
+					queryPath := fmt.Sprintf(
+						"image.folder\\%s.resourcegroup\\%s.storageaccount\\%s.container",
+						resourceGroup,
+						storageAccount,
+						container)
+					imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, newImage, "", "")
+					if err != nil {
+						resp.Diagnostics.AddError(
+							"Error updating Machine Catalog",
+							fmt.Sprintf("Failed to resolve master image VHD %s in container %s of storage account %s, error: %s", newImage, container, storageAccount, err.Error()),
+						)
+						return err
+					}
+				} else {
+					queryPath := fmt.Sprintf(
+						"image.folder\\%s.resourcegroup",
+						resourceGroup)
+					imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, newImage, "", "")
+					if err != nil {
+						resp.Diagnostics.AddError(
+							"Error updating Machine Catalog",
+							fmt.Sprintf("Failed to resolve master image Managed Disk or Snapshot %s, error: %s", newImage, err.Error()),
+						)
+						return err
+					}
 				}
+			} else if !azureMasterImageModel.GalleryImage.IsNull() {
+				azureGalleryImage := util.ObjectValueToTypedObject[GalleryImageModel](ctx, &resp.Diagnostics, azureMasterImageModel.GalleryImage)
+				gallery := azureGalleryImage.Gallery.ValueString()
+				definition := azureGalleryImage.Definition.ValueString()
+				version := azureGalleryImage.Version.ValueString()
+				if gallery != "" && definition != "" {
+					queryPath := fmt.Sprintf(
+						"image.folder\\%s.resourcegroup\\%s.gallery\\%s.imagedefinition",
+						resourceGroup,
+						gallery,
+						definition)
+					imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, version, "", "")
+					if err != nil {
+						resp.Diagnostics.AddError(
+							"Error updating Machine Catalog",
+							fmt.Sprintf("Failed to locate Azure Image Gallery image %s of version %s in gallery %s, error: %s", newImage, version, gallery, err.Error()),
+						)
+						return err
+					}
+				}
+			}
+
+			masterImageNote = azureMachineConfigModel.MasterImageNote.ValueString()
+
+			// Set reboot options if configured
+			if !azureMachineConfigModel.ImageUpdateRebootOptions.IsNull() {
+				rebootOptionsPlan := util.ObjectValueToTypedObject[ImageUpdateRebootOptionsModel](ctx, &resp.Diagnostics, azureMachineConfigModel.ImageUpdateRebootOptions)
+				rebootOption.SetRebootDuration(int32(rebootOptionsPlan.RebootDuration.ValueInt64()))
+				warningDuration := int32(rebootOptionsPlan.WarningDuration.ValueInt64())
+				rebootOption.SetWarningDuration(warningDuration)
+				if warningDuration > 0 {
+					// if warning duration is not 0, it's set in plan and requires warning message body
+					rebootOption.SetWarningMessage(rebootOptionsPlan.WarningMessage.ValueString())
+					if !rebootOptionsPlan.WarningRepeatInterval.IsNull() {
+						rebootOption.SetWarningRepeatInterval(int32(rebootOptionsPlan.WarningRepeatInterval.ValueInt64()))
+					}
+				}
+			}
+
+			if !azureMachineConfigModel.UseAzureComputeGallery.IsNull() {
+				azureComputeGalleryModel := util.ObjectValueToTypedObject[AzureComputeGallerySettings](ctx, &resp.Diagnostics, azureMachineConfigModel.UseAzureComputeGallery)
+				util.AppendNameValueStringPair(&updateCustomProperties, "UseSharedImageGallery", "true")
+				util.AppendNameValueStringPair(&updateCustomProperties, "SharedImageGalleryReplicaRatio", strconv.Itoa(int(azureComputeGalleryModel.ReplicaRatio.ValueInt64())))
+				util.AppendNameValueStringPair(&updateCustomProperties, "SharedImageGalleryReplicaMaximum", strconv.Itoa(int(azureComputeGalleryModel.ReplicaMaximum.ValueInt64())))
 			} else {
-				queryPath := fmt.Sprintf(
-					"image.folder\\%s.resourcegroup",
-					resourceGroup)
-				imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, newImage, "", "")
-				if err != nil {
-					resp.Diagnostics.AddError(
-						"Error updating Machine Catalog",
-						fmt.Sprintf("Failed to resolve master image Managed Disk or Snapshot %s, error: %s", newImage, err.Error()),
-					)
-					return err
-				}
-			}
-		} else if !azureMasterImageModel.GalleryImage.IsNull() {
-			azureGalleryImage := util.ObjectValueToTypedObject[GalleryImageModel](ctx, &resp.Diagnostics, azureMasterImageModel.GalleryImage)
-			gallery := azureGalleryImage.Gallery.ValueString()
-			definition := azureGalleryImage.Definition.ValueString()
-			version := azureGalleryImage.Version.ValueString()
-			if gallery != "" && definition != "" {
-				queryPath := fmt.Sprintf(
-					"image.folder\\%s.resourcegroup\\%s.gallery\\%s.imagedefinition",
-					resourceGroup,
-					gallery,
-					definition)
-				imagePath, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, version, "", "")
-				if err != nil {
-					resp.Diagnostics.AddError(
-						"Error updating Machine Catalog",
-						fmt.Sprintf("Failed to locate Azure Image Gallery image %s of version %s in gallery %s, error: %s", newImage, version, gallery, err.Error()),
-					)
-					return err
-				}
+				util.AppendNameValueStringPair(&updateCustomProperties, "UseSharedImageGallery", "false")
+				util.AppendNameValueStringPair(&updateCustomProperties, "SharedImageGalleryReplicaRatio", "")
+				util.AppendNameValueStringPair(&updateCustomProperties, "SharedImageGalleryReplicaMaximum", "")
 			}
 		}
 
-		masterImageNote = azureMachineConfigModel.MasterImageNote.ValueString()
-
-		// Set reboot options if configured
-		if !azureMachineConfigModel.ImageUpdateRebootOptions.IsNull() {
-			rebootOptionsPlan := util.ObjectValueToTypedObject[ImageUpdateRebootOptionsModel](ctx, &resp.Diagnostics, azureMachineConfigModel.ImageUpdateRebootOptions)
-			rebootOption.SetRebootDuration(int32(rebootOptionsPlan.RebootDuration.ValueInt64()))
-			warningDuration := int32(rebootOptionsPlan.WarningDuration.ValueInt64())
-			rebootOption.SetWarningDuration(warningDuration)
-			if warningDuration > 0 {
-				// if warning duration is not 0, it's set in plan and requires warning message body
-				rebootOption.SetWarningMessage(rebootOptionsPlan.WarningMessage.ValueString())
-				if !rebootOptionsPlan.WarningRepeatInterval.IsNull() {
-					rebootOption.SetWarningRepeatInterval(int32(rebootOptionsPlan.WarningRepeatInterval.ValueInt64()))
-				}
-			}
-		}
-
+		// For both MCS and PVS
 		if !azureMachineProfile.IsNull() {
-			machineProfilePath, err = handleMachineProfileForAzureMcsCatalog(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), util.ObjectValueToTypedObject[AzureMachineProfileModel](ctx, &resp.Diagnostics, azureMachineProfile), "updating")
+			machineProfilePath, err = handleMachineProfileForAzureMcsPvsCatalog(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), util.ObjectValueToTypedObject[AzureMachineProfileModel](ctx, &resp.Diagnostics, azureMachineProfile), "updating")
 			if err != nil {
 				return err
 			}
-		}
-
-		if !azureMachineConfigModel.UseAzureComputeGallery.IsNull() {
-			azureComputeGalleryModel := util.ObjectValueToTypedObject[AzureComputeGallerySettings](ctx, &resp.Diagnostics, azureMachineConfigModel.UseAzureComputeGallery)
-			util.AppendNameValueStringPair(&updateCustomProperties, "UseSharedImageGallery", "true")
-			util.AppendNameValueStringPair(&updateCustomProperties, "SharedImageGalleryReplicaRatio", strconv.Itoa(int(azureComputeGalleryModel.ReplicaRatio.ValueInt64())))
-			util.AppendNameValueStringPair(&updateCustomProperties, "SharedImageGalleryReplicaMaximum", strconv.Itoa(int(azureComputeGalleryModel.ReplicaMaximum.ValueInt64())))
-		} else {
-			util.AppendNameValueStringPair(&updateCustomProperties, "UseSharedImageGallery", "false")
-			util.AppendNameValueStringPair(&updateCustomProperties, "SharedImageGalleryReplicaRatio", "")
-			util.AppendNameValueStringPair(&updateCustomProperties, "SharedImageGalleryReplicaMaximum", "")
 		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
 		awsMachineConfig := util.ObjectValueToTypedObject[AwsMachineConfigModel](ctx, &resp.Diagnostics, provisioningSchemePlan.AwsMachineConfig)
@@ -978,56 +1029,58 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 		}
 	}
 
-	if masterImage.GetXDPath() == imagePath && currentDiskImage.GetMasterImageNote() == masterImageNote {
-		return nil
-	}
+	// Updating image is not supported for PVSStreaming catalog
+	if !(*provisioningType == citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING) {
+		if masterImage.GetXDPath() == imagePath && currentDiskImage.GetMasterImageNote() == masterImageNote {
+			return nil
+		}
 
-	// Update Master Image for Machine Catalog
-	var updateProvisioningSchemeModel citrixorchestration.UpdateMachineCatalogProvisioningSchemeRequestModel
+		// Update Master Image for Machine Catalog
+		var updateProvisioningSchemeModel citrixorchestration.UpdateMachineCatalogProvisioningSchemeRequestModel
 
-	functionalLevel, err := citrixorchestration.NewFunctionalLevelFromValue(plan.MinimumFunctionalLevel.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error updating Machine Catalog "+catalogName,
-			fmt.Sprintf("Unsupported minimum functional level %s.", plan.MinimumFunctionalLevel.ValueString()),
-		)
-		return err
-	}
+		functionalLevel, err := citrixorchestration.NewFunctionalLevelFromValue(plan.MinimumFunctionalLevel.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating Machine Catalog "+catalogName,
+				fmt.Sprintf("Unsupported minimum functional level %s.", plan.MinimumFunctionalLevel.ValueString()),
+			)
+			return err
+		}
 
-	updateProvisioningSchemeModel.SetMinimumFunctionalLevel(*functionalLevel)
-	updateProvisioningSchemeModel.SetMasterImagePath(imagePath)
+		updateProvisioningSchemeModel.SetMinimumFunctionalLevel(*functionalLevel)
+		updateProvisioningSchemeModel.SetMasterImagePath(imagePath)
 
-	updateProvisioningSchemeModel.SetStoreOldImage(true)
+		updateProvisioningSchemeModel.SetStoreOldImage(true)
 
-	updateProvisioningSchemeModel.SetMasterImageNote(masterImageNote)
-	updateProvisioningSchemeModel.SetRebootOptions(rebootOption)
+		updateProvisioningSchemeModel.SetMasterImageNote(masterImageNote)
+		updateProvisioningSchemeModel.SetRebootOptions(rebootOption)
 
-	if len(updateCustomProperties) > 0 {
-		updateProvisioningSchemeModel.SetCustomProperties(updateCustomProperties)
-	}
+		if len(updateCustomProperties) > 0 {
+			updateProvisioningSchemeModel.SetCustomProperties(updateCustomProperties)
+		}
 
-	updateMasterImageRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsUpdateMachineCatalogProvisioningScheme(ctx, catalogId)
-	updateMasterImageRequest = updateMasterImageRequest.UpdateMachineCatalogProvisioningSchemeRequestModel(updateProvisioningSchemeModel)
-	_, httpResp, err := citrixdaasclient.AddRequestData(updateMasterImageRequest, client).Async(true).Execute()
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error updating Image for Machine Catalog "+catalogName,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-	}
+		updateMasterImageRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsUpdateMachineCatalogProvisioningScheme(ctx, catalogId)
+		updateMasterImageRequest = updateMasterImageRequest.UpdateMachineCatalogProvisioningSchemeRequestModel(updateProvisioningSchemeModel)
+		_, httpResp, err := citrixdaasclient.AddRequestData(updateMasterImageRequest, client).Async(true).Execute()
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating Image for Machine Catalog "+catalogName,
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadClientError(err),
+			)
+		}
 
-	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating Image for Machine Catalog "+catalogName, &resp.Diagnostics, 60, false)
-	if err != nil {
-		return err
+		err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating Image for Machine Catalog "+catalogName, &resp.Diagnostics, 60, false)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, catalog *citrixorchestration.MachineCatalogDetailResponseModel, connectionType *citrixorchestration.HypervisorConnectionType, pluginId string) MachineCatalogResourceModel {
+func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, catalog *citrixorchestration.MachineCatalogDetailResponseModel, connectionType *citrixorchestration.HypervisorConnectionType, pluginId string, provScheme citrixorchestration.ProvisioningSchemeResponseModel) MachineCatalogResourceModel {
 	provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, diagnostics, r.ProvisioningScheme)
-	provScheme := catalog.GetProvisioningScheme()
 	resourcePool := provScheme.GetResourcePool()
 	hypervisor := resourcePool.GetHypervisor()
 	machineAccountCreateRules := provScheme.GetMachineAccountCreationRules()
@@ -1041,7 +1094,8 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Con
 	switch *connectionType {
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
 		azureMachineConfigModel := util.ObjectValueToTypedObject[AzureMachineConfigModel](ctx, diagnostics, provSchemeModel.AzureMachineConfig)
-		azureMachineConfigModel.RefreshProperties(ctx, diagnostics, *catalog)
+		provisioningType, _ := citrixorchestration.NewProvisioningTypeFromValue(r.ProvisioningType.ValueString())
+		azureMachineConfigModel.RefreshProperties(ctx, diagnostics, *catalog, provisioningType)
 		provSchemeModel.AzureMachineConfig = util.TypedObjectToObjectValue(ctx, diagnostics, azureMachineConfigModel)
 		for _, stringPair := range customProperties {
 			if stringPair.GetName() == "Zones" && stringPair.GetValue() != "" {
@@ -1179,8 +1233,9 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Con
 	return r
 }
 
-func parseCustomPropertiesToClientModel(ctx context.Context, diagnostics *diag.Diagnostics, provisioningScheme ProvisioningSchemeModel, connectionType citrixorchestration.HypervisorConnectionType) []citrixorchestration.NameValueStringPairModel {
+func parseCustomPropertiesToClientModel(ctx context.Context, diagnostics *diag.Diagnostics, provisioningScheme ProvisioningSchemeModel, connectionType citrixorchestration.HypervisorConnectionType, provisioningType *citrixorchestration.ProvisioningType, isUpdateOperation bool) []citrixorchestration.NameValueStringPairModel {
 	var res = &[]citrixorchestration.NameValueStringPairModel{}
+	var isPvsStreamingCatalog = *provisioningType == citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING
 	switch connectionType {
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
 		azureMachineConfigModel := util.ObjectValueToTypedObject[AzureMachineConfigModel](ctx, diagnostics, provisioningScheme.AzureMachineConfig)
@@ -1190,55 +1245,60 @@ func parseCustomPropertiesToClientModel(ctx context.Context, diagnostics *diag.D
 		} else {
 			util.AppendNameValueStringPair(res, "Zones", "")
 		}
-		if !azureMachineConfigModel.StorageType.IsNull() {
-			if azureMachineConfigModel.StorageType.ValueString() == util.AzureEphemeralOSDisk {
-				util.AppendNameValueStringPair(res, "UseEphemeralOsDisk", "true")
-			} else {
-				util.AppendNameValueStringPair(res, "StorageType", azureMachineConfigModel.StorageType.ValueString())
+		if !isUpdateOperation || !isPvsStreamingCatalog {
+			if !azureMachineConfigModel.StorageType.IsNull() {
+				if azureMachineConfigModel.StorageType.ValueString() == util.AzureEphemeralOSDisk {
+					util.AppendNameValueStringPair(res, "UseEphemeralOsDisk", "true")
+				} else {
+					util.AppendNameValueStringPair(res, "StorageType", azureMachineConfigModel.StorageType.ValueString())
+				}
+			}
+
+			if !azureMachineConfigModel.UseManagedDisks.IsNull() {
+				if azureMachineConfigModel.UseManagedDisks.ValueBool() {
+					util.AppendNameValueStringPair(res, "UseManagedDisks", "true")
+				} else {
+					util.AppendNameValueStringPair(res, "UseManagedDisks", "false")
+				}
+			}
+			if !azureMachineConfigModel.WritebackCache.IsNull() {
+				azureWbcModel := util.ObjectValueToTypedObject[AzureWritebackCacheModel](ctx, diagnostics, azureMachineConfigModel.WritebackCache)
+				if !azureWbcModel.WBCDiskStorageType.IsNull() {
+					util.AppendNameValueStringPair(res, "WBCDiskStorageType", azureWbcModel.WBCDiskStorageType.ValueString())
+				}
+				if azureWbcModel.PersistWBC.ValueBool() {
+					util.AppendNameValueStringPair(res, "PersistWBC", "true")
+					if !isPvsStreamingCatalog && azureWbcModel.StorageCostSaving.ValueBool() {
+						util.AppendNameValueStringPair(res, "StorageTypeAtShutdown", "Standard_LRS")
+					}
+				}
+				if azureWbcModel.PersistOsDisk.ValueBool() {
+					util.AppendNameValueStringPair(res, "PersistOsDisk", "true")
+					if azureWbcModel.PersistVm.ValueBool() {
+						util.AppendNameValueStringPair(res, "PersistVm", "true")
+					}
+				}
+			}
+			if !isPvsStreamingCatalog {
+				if !azureMachineConfigModel.UseAzureComputeGallery.IsNull() {
+					azureComputeGalleryModel := util.ObjectValueToTypedObject[AzureComputeGallerySettings](ctx, diagnostics, azureMachineConfigModel.UseAzureComputeGallery)
+					util.AppendNameValueStringPair(res, "UseSharedImageGallery", "true")
+					util.AppendNameValueStringPair(res, "SharedImageGalleryReplicaRatio", strconv.Itoa(int(azureComputeGalleryModel.ReplicaRatio.ValueInt64())))
+					util.AppendNameValueStringPair(res, "SharedImageGalleryReplicaMaximum", strconv.Itoa(int(azureComputeGalleryModel.ReplicaMaximum.ValueInt64())))
+				} else {
+					util.AppendNameValueStringPair(res, "UseSharedImageGallery", "false")
+					util.AppendNameValueStringPair(res, "SharedImageGalleryReplicaRatio", "")
+					util.AppendNameValueStringPair(res, "SharedImageGalleryReplicaMaximum", "")
+				}
 			}
 		}
+
 		if !azureMachineConfigModel.VdaResourceGroup.IsNull() {
 			util.AppendNameValueStringPair(res, "ResourceGroups", azureMachineConfigModel.VdaResourceGroup.ValueString())
-		}
-		if !azureMachineConfigModel.UseManagedDisks.IsNull() {
-			if azureMachineConfigModel.UseManagedDisks.ValueBool() {
-				util.AppendNameValueStringPair(res, "UseManagedDisks", "true")
-			} else {
-				util.AppendNameValueStringPair(res, "UseManagedDisks", "false")
-			}
-		}
-		if !azureMachineConfigModel.WritebackCache.IsNull() {
-			azureWbcModel := util.ObjectValueToTypedObject[AzureWritebackCacheModel](ctx, diagnostics, azureMachineConfigModel.WritebackCache)
-			if !azureWbcModel.WBCDiskStorageType.IsNull() {
-				util.AppendNameValueStringPair(res, "WBCDiskStorageType", azureWbcModel.WBCDiskStorageType.ValueString())
-			}
-			if azureWbcModel.PersistWBC.ValueBool() {
-				util.AppendNameValueStringPair(res, "PersistWBC", "true")
-				if azureWbcModel.StorageCostSaving.ValueBool() {
-					util.AppendNameValueStringPair(res, "StorageTypeAtShutdown", "Standard_LRS")
-				}
-			}
-			if azureWbcModel.PersistOsDisk.ValueBool() {
-				util.AppendNameValueStringPair(res, "PersistOsDisk", "true")
-				if azureWbcModel.PersistVm.ValueBool() {
-					util.AppendNameValueStringPair(res, "PersistVm", "true")
-				}
-			}
 		}
 
 		licenseType := azureMachineConfigModel.LicenseType.ValueString()
 		util.AppendNameValueStringPair(res, "LicenseType", licenseType)
-
-		if !azureMachineConfigModel.UseAzureComputeGallery.IsNull() {
-			azureComputeGalleryModel := util.ObjectValueToTypedObject[AzureComputeGallerySettings](ctx, diagnostics, azureMachineConfigModel.UseAzureComputeGallery)
-			util.AppendNameValueStringPair(res, "UseSharedImageGallery", "true")
-			util.AppendNameValueStringPair(res, "SharedImageGalleryReplicaRatio", strconv.Itoa(int(azureComputeGalleryModel.ReplicaRatio.ValueInt64())))
-			util.AppendNameValueStringPair(res, "SharedImageGalleryReplicaMaximum", strconv.Itoa(int(azureComputeGalleryModel.ReplicaMaximum.ValueInt64())))
-		} else {
-			util.AppendNameValueStringPair(res, "UseSharedImageGallery", "false")
-			util.AppendNameValueStringPair(res, "SharedImageGalleryReplicaRatio", "")
-			util.AppendNameValueStringPair(res, "SharedImageGalleryReplicaMaximum", "")
-		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
 		if !provisioningScheme.AvailabilityZones.IsNull() {
 			availability_zones := util.StringListToStringArray(ctx, diagnostics, provisioningScheme.AvailabilityZones)
@@ -1352,7 +1412,7 @@ func getOnPremImagePath(ctx context.Context, client *citrixdaasclient.CitrixDaas
 	return imagePath, nil
 }
 
-func handleMachineProfileForAzureMcsCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diag *diag.Diagnostics, hypervisorName, resourcePoolName string, machineProfile AzureMachineProfileModel, action string) (string, error) {
+func handleMachineProfileForAzureMcsPvsCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diag *diag.Diagnostics, hypervisorName, resourcePoolName string, machineProfile AzureMachineProfileModel, action string) (string, error) {
 	machineProfileResourceGroup := machineProfile.MachineProfileResourceGroup.ValueString()
 	machineProfileVmOrTemplateSpecVersion := machineProfile.MachineProfileVmName.ValueString()
 	resourceType := util.VirtualMachineResourceType

@@ -15,14 +15,16 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &vsphereHypervisorResourcePoolResource{}
-	_ resource.ResourceWithConfigure   = &vsphereHypervisorResourcePoolResource{}
-	_ resource.ResourceWithImportState = &vsphereHypervisorResourcePoolResource{}
-	_ resource.ResourceWithModifyPlan  = &vsphereHypervisorResourcePoolResource{}
+	_ resource.Resource                   = &vsphereHypervisorResourcePoolResource{}
+	_ resource.ResourceWithConfigure      = &vsphereHypervisorResourcePoolResource{}
+	_ resource.ResourceWithImportState    = &vsphereHypervisorResourcePoolResource{}
+	_ resource.ResourceWithValidateConfig = &vsphereHypervisorResourcePoolResource{}
+	_ resource.ResourceWithModifyPlan     = &vsphereHypervisorResourcePoolResource{}
 )
 
 // NewHypervisorResourcePoolResource is a helper function to simplify the provider implementation.
@@ -85,7 +87,7 @@ func (r *vsphereHypervisorResourcePoolResource) Metadata(_ context.Context, req 
 }
 
 func (r *vsphereHypervisorResourcePoolResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = GetVsphereHypervisorResourcePoolSchema()
+	resp.Schema = VsphereHypervisorResourcePoolResourceModel{}.GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -457,4 +459,18 @@ func (plan VsphereHypervisorResourcePoolResourceModel) GetNetworksList(ctx conte
 	}
 
 	return networks
+}
+
+func (r *vsphereHypervisorResourcePoolResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data VsphereHypervisorResourcePoolResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }

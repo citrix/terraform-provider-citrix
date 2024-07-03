@@ -49,7 +49,7 @@ func (r AdminRoleResourceModel) RefreshPropertyValues(ctx context.Context, diagn
 	return r
 }
 
-func GetAdminRoleSchema() schema.Schema {
+func (AdminRoleResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		// This description is used by the documentation generator and the language server.
 		Description: "Manages an administrator role.",
@@ -98,4 +98,8 @@ func GetAdminRoleSchema() schema.Schema {
 			},
 		},
 	}
+}
+
+func (AdminRoleResourceModel) GetAttributes() map[string]schema.Attribute {
+	return AdminRoleResourceModel{}.GetSchema().Attributes
 }

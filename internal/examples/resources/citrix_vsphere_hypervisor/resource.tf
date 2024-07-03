@@ -1,4 +1,4 @@
-# Vsphere Hypervisor
+# vSphere Hypervisor
 resource "citrix_vsphere_hypervisor" "example-vsphere-hypervisor" {
     name               = "example-vsphere-hypervisor"
     zone               = "<Zone Id>"

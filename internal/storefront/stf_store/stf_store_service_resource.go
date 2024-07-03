@@ -21,6 +21,7 @@ var (
 	_ resource.Resource                = &stfStoreServiceResource{}
 	_ resource.ResourceWithConfigure   = &stfStoreServiceResource{}
 	_ resource.ResourceWithImportState = &stfStoreServiceResource{}
+	_ resource.ResourceWithModifyPlan  = &stfStoreServiceResource{}
 )
 
 // stfStoreServiceResource is a helper function to simplify the provider implementation.
@@ -45,6 +46,37 @@ func (r *stfStoreServiceResource) Configure(_ context.Context, req resource.Conf
 	}
 
 	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+}
+
+// ModifyPlan modifies the resource plan before it is applied.
+func (r *stfStoreServiceResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	// Skip modify plan when doing destroy action
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+
+	operation := "updating"
+	if req.State.Raw.IsNull() {
+		operation = "creating"
+	}
+
+	// Retrieve values from plan
+	var plan STFStoreServiceResourceModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if !plan.Anonymous.IsUnknown() && !plan.AuthenticationService.IsUnknown() &&
+		plan.Anonymous.IsNull() && plan.AuthenticationService.IsNull() {
+		resp.Diagnostics.AddError(
+			"Error "+operation+" StoreFront StoreService",
+			"Either `anonymous` or `authentication_service_virtual_path` should be provided",
+		)
+	}
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -72,41 +104,132 @@ func (r *stfStoreServiceResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	body.SetSiteId(siteIdInt)
-	body.SetVirtualPath(plan.VirtualPath.String())
+	body.SetVirtualPath(plan.VirtualPath.ValueString())
 	body.SetFriendlyName(plan.FriendlyName.ValueString())
 
+	var getAuthenticationServiceBody citrixstorefront.GetSTFAuthenticationServiceRequestModel
 	if !plan.Anonymous.IsNull() && plan.Anonymous.ValueBool() {
 		body.SetAnonymous(true)
 	} else {
-		body.SetAuthenticationService("(Get-STFAuthenticationService -VirtualPath " + plan.AuthenticationService.ValueString() + " ) ")
+		getAuthenticationServiceBody.SetVirtualPath(plan.AuthenticationService.ValueString())
 	}
 
 	if !plan.LoadBalance.IsNull() {
 		body.SetLoadBalance(plan.LoadBalance.ValueBool())
 	}
 
-	if !plan.FarmConfig.IsNull() {
-		farmConfig := util.ObjectValueToTypedObject[FarmConfig](ctx, &resp.Diagnostics, plan.FarmConfig)
-		body.SetFarmName(farmConfig.FarmName.ValueString())
-		body.SetFarmType(farmConfig.FarmType.ValueString())
-		farmServers := util.StringListToStringArray(ctx, &resp.Diagnostics, farmConfig.Servers)
-		body.SetServers(farmServers)
-	}
-
-	createStoreServiceRequest := r.client.StorefrontClient.StoreSF.STFStoreCreateSTFStore(ctx, body)
+	createStoreServiceRequest := r.client.StorefrontClient.StoreSF.STFStoreCreateSTFStore(ctx, body, getAuthenticationServiceBody)
 
 	// Create new STF StoreService
 	StoreServiceDetail, err := createStoreServiceRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating StoreFront StoreService",
-			"TransactionId: ",
+			"\nError message: "+err.Error(),
 		)
 		return
 	}
-
 	// Map response body to schema and populate Computed attribute values
-	plan.RefreshPropertyValues(&StoreServiceDetail)
+	plan.RefreshPropertyValues(ctx, &resp.Diagnostics, &StoreServiceDetail)
+
+	// Create StoreFarmConfiguration
+	if !plan.FarmSettings.IsNull() {
+
+		err := setFarmSettingsSetRequest(ctx, r.client, &resp.Diagnostics, plan)
+
+		if err != nil {
+			return
+		}
+
+		// Get updated STFStoreFarmConfiguration Settings
+		getResponse, err := getFarmSettingsGetRequest(ctx, r.client, plan)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error fetching STF StoreFarmConfigurations",
+				"Error message: "+err.Error(),
+			)
+			return
+		}
+		plan.RefreshFarmSettings(ctx, &resp.Diagnostics, getResponse)
+	}
+
+	// Create StoreFront Store Enumeration Options
+	if !plan.EnumerationOptions.IsNull() {
+
+		// Update Storefront Store Enumeration Options
+		setSTFStoreEnumerationOptions(ctx, r.client, &resp.Diagnostics, plan)
+
+		// Get updated STFStoreService Enumeration Options
+		getResponse, err := getSTFStoreEnumerationOptions(ctx, r.client, plan)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error fetching StoreFront Store Enumeration Options",
+				"\nError message: "+err.Error(),
+			)
+			return
+		}
+
+		// Refresh Storefront StoreService Enumerations
+		plan.RefreshEnumerationOptions(ctx, &resp.Diagnostics, getResponse)
+	}
+	// Set PNA properties
+	if !plan.STFStorePNA.IsNull() {
+		var storeBody citrixstorefront.GetSTFStoreRequestModel
+		storeBody.SetVirtualPath(plan.VirtualPath.ValueString())
+
+		pna := util.ObjectValueToTypedObject[STFStorePNA](ctx, &resp.Diagnostics, plan.STFStorePNA)
+		if pna.Enable.ValueBool() { // Enable PNA
+			var pnaSetBody citrixstorefront.STFStorePnaSetRequestModel
+			enablePnaRequest := r.client.StorefrontClient.StoreSF.STFStoreEnableStorePna(ctx, pnaSetBody, storeBody)
+			err := enablePnaRequest.Execute()
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error enabling PNA for StoreFront StoreService",
+					"\nError message: "+err.Error(),
+				)
+			}
+		} else {
+			// Disable PNA
+			disablePnaRequest := r.client.StorefrontClient.StoreSF.STFStoreDisableStorePna(ctx, storeBody)
+			err := disablePnaRequest.Execute()
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error disabling PNA for StoreFront StoreService",
+					"\nError message: "+err.Error(),
+				)
+			}
+		}
+
+		// Fetch updated PNA
+		updatedPna, err := r.client.StorefrontClient.StoreSF.STFStoreGetStorePna(ctx, storeBody).Execute()
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error fetching updated PNA for StoreFront StoreService",
+				"\nError message: "+err.Error(),
+			)
+		}
+		plan.RefreshPnaValues(ctx, &resp.Diagnostics, updatedPna)
+	}
+
+	// Create StoreFront Store Launch Options
+	if !plan.LaunchOptions.IsNull() {
+
+		// Update Storefront Store Launch Options
+		setSTFStoreLaunchOptions(ctx, r.client, &resp.Diagnostics, plan)
+
+		// Get updated STFStoreService Launch Options
+		getResponse, err := getSTFStoreLaunchOptions(ctx, r.client, plan)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error fetching StoreFront Store Launch Options",
+				"\nError message: "+err.Error(),
+			)
+			return
+		}
+
+		// Refresh Storefront StoreService Launch Options
+		plan.RefreshLaunchOptions(ctx, &resp.Diagnostics, getResponse)
+	}
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -114,6 +237,7 @@ func (r *stfStoreServiceResource) Create(ctx context.Context, req resource.Creat
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
 }
 
 // Read refreshes the Terraform state with the latest data.
@@ -132,7 +256,69 @@ func (r *stfStoreServiceResource) Read(ctx context.Context, req resource.ReadReq
 	if err != nil {
 		return
 	}
-	state.RefreshPropertyValues(STFStoreService)
+	if STFStoreService == nil {
+		resp.Diagnostics.AddWarning(
+			"StoreFront Store Service not found",
+			"StoreFront Store Service was not found and will be removed from the state file. An apply action will result in the creation of a new resource.",
+		)
+		resp.State.RemoveResource(ctx)
+		return
+	}
+	state.RefreshPropertyValues(ctx, &resp.Diagnostics, STFStoreService)
+	// Refresh StoreFarmConfiguration
+	if !state.FarmSettings.IsNull() {
+		// Get updated STFStoreFarmConfiguration Settings
+		getResponse, err := getFarmSettingsGetRequest(ctx, r.client, state)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error fetching STF StoreFarmConfigurations",
+				"Error message: "+err.Error(),
+			)
+			return
+		}
+		state.RefreshFarmSettings(ctx, &resp.Diagnostics, getResponse)
+	}
+	//Refresh Storefront StoreService Enumerations
+	if !state.EnumerationOptions.IsNull() {
+		// Get STFStoreService Enumeration Options
+		getResponse, err := getSTFStoreEnumerationOptions(ctx, r.client, state)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error fetching StoreFront Store Enumeration Options",
+				"\nError message: "+err.Error(),
+			)
+			return
+		}
+		state.RefreshEnumerationOptions(ctx, &resp.Diagnostics, getResponse)
+	}
+
+	//Refresh Storefront StoreService Launch Options
+	if !state.LaunchOptions.IsNull() {
+		// Get STFStoreService Launch Options
+		getResponse, err := getSTFStoreLaunchOptions(ctx, r.client, state)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error fetching StoreFront Store Launch Options",
+				"\nError message: "+err.Error(),
+			)
+			return
+		}
+		state.RefreshLaunchOptions(ctx, &resp.Diagnostics, getResponse)
+	}
+
+	// Fetch Pna
+	if !state.STFStorePNA.IsNull() {
+		var storeBody citrixstorefront.GetSTFStoreRequestModel
+		storeBody.SetVirtualPath(state.VirtualPath.ValueString())
+		updatedPna, err := r.client.StorefrontClient.StoreSF.STFStoreGetStorePna(ctx, storeBody).Execute()
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error fetching updated PNA for StoreFront StoreService",
+				"\nError message: "+err.Error(),
+			)
+		}
+		state.RefreshPnaValues(ctx, &resp.Diagnostics, updatedPna)
+	}
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -140,6 +326,7 @@ func (r *stfStoreServiceResource) Read(ctx context.Context, req resource.ReadReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
@@ -161,11 +348,11 @@ func (r *stfStoreServiceResource) Update(ctx context.Context, req resource.Updat
 	}
 
 	// Construct the update model
-	var editSTFStoreServiceBody = &citrixstorefront.SetSTFStoreRequestModel{}
-	editSTFStoreServiceBody.SetStoreService("(Get-STFStoreService -VirtualPath" + plan.VirtualPath.ValueString() + " )")
+	var getSTFStoreServiceBody = &citrixstorefront.GetSTFStoreRequestModel{}
+	getSTFStoreServiceBody.SetVirtualPath(plan.VirtualPath.ValueString())
 
 	// Update STFStoreService
-	editStoreServiceRequest := r.client.StorefrontClient.StoreSF.STFStoreSetSTFStore(ctx, *editSTFStoreServiceBody)
+	editStoreServiceRequest := r.client.StorefrontClient.StoreSF.STFStoreSetSTFStore(ctx, *getSTFStoreServiceBody)
 	_, err = editStoreServiceRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -181,7 +368,104 @@ func (r *stfStoreServiceResource) Update(ctx context.Context, req resource.Updat
 	}
 
 	// Update resource state with updated property values
-	plan.RefreshPropertyValues(updatedSTFStoreService)
+	plan.RefreshPropertyValues(ctx, &resp.Diagnostics, updatedSTFStoreService)
+
+	// Update StoreFarmConfiguration
+	if !plan.FarmSettings.IsNull() {
+
+		err := setFarmSettingsSetRequest(ctx, r.client, &resp.Diagnostics, plan)
+
+		if err != nil {
+			return
+		}
+
+		// Get updated STFStoreFarmConfiguration Settings
+		getResponse, err := getFarmSettingsGetRequest(ctx, r.client, plan)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error fetching STF StoreFarmConfigurations",
+				"Error message: "+err.Error(),
+			)
+			return
+		}
+		plan.RefreshFarmSettings(ctx, &resp.Diagnostics, getResponse)
+	}
+
+	//  updated STFStoreService Enumeration Options
+	if !plan.EnumerationOptions.IsNull() {
+
+		// Update Storefront Store Enumeration Options
+		setSTFStoreEnumerationOptions(ctx, r.client, &resp.Diagnostics, plan)
+
+		// Get updated STFStoreService Enumeration Options
+		getResponse, err := getSTFStoreEnumerationOptions(ctx, r.client, plan)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error fetching StoreFront Store Enumeration Options",
+				"\nError message: "+err.Error(),
+			)
+			return
+		}
+		plan.RefreshEnumerationOptions(ctx, &resp.Diagnostics, getResponse)
+	}
+	// Set PNA properties
+	if !plan.STFStorePNA.IsNull() {
+		var storeBody citrixstorefront.GetSTFStoreRequestModel
+		storeBody.SetVirtualPath(plan.VirtualPath.ValueString())
+
+		pna := util.ObjectValueToTypedObject[STFStorePNA](ctx, &resp.Diagnostics, plan.STFStorePNA)
+		if pna.Enable.ValueBool() { // Enable PNA
+			var pnaSetBody citrixstorefront.STFStorePnaSetRequestModel
+			enablePnaRequest := r.client.StorefrontClient.StoreSF.STFStoreEnableStorePna(ctx, pnaSetBody, storeBody)
+			err := enablePnaRequest.Execute()
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error enabling PNA for StoreFront StoreService",
+					"\nError message: "+err.Error(),
+				)
+			}
+		} else {
+			// Disable PNA
+			disablePnaRequest := r.client.StorefrontClient.StoreSF.STFStoreDisableStorePna(ctx, storeBody)
+			err := disablePnaRequest.Execute()
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error disabling PNA for StoreFront StoreService",
+					"\nError message: "+err.Error(),
+				)
+			}
+		}
+
+		// Fetch updated PNA
+		updatedPna, err := r.client.StorefrontClient.StoreSF.STFStoreGetStorePna(ctx, storeBody).Execute()
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error fetching updated PNA for StoreFront StoreService",
+				"\nError message: "+err.Error(),
+			)
+		}
+		plan.RefreshPnaValues(ctx, &resp.Diagnostics, updatedPna)
+	}
+
+	// Update StoreFront Store Launch Options
+	if !plan.LaunchOptions.IsNull() {
+
+		// Update Storefront Store Launch Options
+		setSTFStoreLaunchOptions(ctx, r.client, &resp.Diagnostics, plan)
+
+		// Get updated STFStoreService Launch Options
+		getResponse, err := getSTFStoreLaunchOptions(ctx, r.client, plan)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error fetching StoreFront Store Launch Options",
+				"\nError message: "+err.Error(),
+			)
+			return
+		}
+
+		// Refresh Storefront StoreService Launch Options
+		plan.RefreshLaunchOptions(ctx, &resp.Diagnostics, getResponse)
+	}
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -202,9 +486,18 @@ func (r *stfStoreServiceResource) Delete(ctx context.Context, req resource.Delet
 		return
 	}
 
-	var body citrixstorefront.ClearSTFStoreRequestModel
+	var body citrixstorefront.GetSTFStoreRequestModel
+	body.SetVirtualPath(state.VirtualPath.ValueString())
 	if state.SiteId.ValueString() != "" {
-		body.SetStoreService("(Get-STFStoreService -VirtualPath " + state.VirtualPath.ValueString() + " -SiteId " + state.SiteId.ValueString() + " )")
+		siteIdInt, err := strconv.ParseInt(state.SiteId.ValueString(), 10, 64)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error deleting StoreFront Store Service ",
+				"\nError message: "+err.Error(),
+			)
+			return
+		}
+		body.SetSiteId(siteIdInt)
 	}
 
 	// Delete existing STF StoreService
@@ -212,7 +505,7 @@ func (r *stfStoreServiceResource) Delete(ctx context.Context, req resource.Delet
 	_, err := deleteStoreServiceRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error deleting StoreFront StoreService ",
+			"Error deleting StoreFront Store Service ",
 			"\nError message: "+err.Error(),
 		)
 		return
@@ -265,7 +558,196 @@ func getSTFStoreService(ctx context.Context, client *citrixdaasclient.CitrixDaas
 	// Get refreshed STFStoreService properties from Orchestration
 	STFStoreService, err := getSTFStoreServiceRequest.Execute()
 	if err != nil {
+		if strings.EqualFold(err.Error(), util.NOT_EXIST) {
+			return nil, nil
+		}
 		return &STFStoreService, err
 	}
 	return &STFStoreService, nil
+}
+
+func setFarmSettingsSetRequest(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, plan STFStoreServiceResourceModel) error {
+	var farmSettingBody citrixstorefront.SetStoreFarmConfigurationRequestModel
+
+	plannedFarmSettings := util.ObjectValueToTypedObject[FarmSettings](ctx, diagnostics, plan.FarmSettings)
+
+	farmSettingBody.SetEnableFileTypeAssociation(plannedFarmSettings.EnableFileTypeAssociation.ValueBool())
+	farmSettingBody.SetCommunicationTimeout(plannedFarmSettings.CommunicationTimeout.ValueString())
+	farmSettingBody.SetConnectionTimeout(plannedFarmSettings.ConnectionTimeout.ValueString())
+	farmSettingBody.SetLeasingStatusExpiryFailed(plannedFarmSettings.LeasingStatusExpiryFailed.ValueString())
+	farmSettingBody.SetLeasingStatusExpiryLeasing(plannedFarmSettings.LeasingStatusExpiryLeasing.ValueString())
+	farmSettingBody.SetLeasingStatusExpiryPending(plannedFarmSettings.LeasingStatusExpiryPending.ValueString())
+	farmSettingBody.SetPooledSockets(plannedFarmSettings.PooledSockets.ValueBool())
+	farmSettingBody.SetServerCommunicationAttempts(int(plannedFarmSettings.ServerCommunicationAttempts.ValueInt64()))
+	farmSettingBody.SetBackgroundHealthCheckPollingPeriod(plannedFarmSettings.BackgroundHealthCheckPollingPeriod.ValueString())
+	farmSettingBody.SetAdvancedHealthCheck(plannedFarmSettings.AdvancedHealthCheck.ValueBool())
+	farmSettingBody.SetCertRevocationPolicy(plannedFarmSettings.CertRevocationPolicy.ValueString())
+
+	// Generate STFStoreFarmConfig body
+	getSTFStoreServiceBody := citrixstorefront.GetSTFStoreRequestModel{}
+	getSTFStoreServiceBody.SetVirtualPath(plan.VirtualPath.ValueString())
+
+	// Create the client request to Set StoreFront Enumeration Options
+	farmSettingsRequest := client.StorefrontClient.StoreSF.STFStoreFarmSetSTFStoreConfiguration(ctx, farmSettingBody, getSTFStoreServiceBody)
+
+	// Execute the request
+	_, err := farmSettingsRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error creating StoreFront Store Farm Configurations",
+			"\nError message: "+err.Error(),
+		)
+		return err
+	}
+	return nil
+
+}
+
+// Get STF-StoreFarm Config
+func getFarmSettingsGetRequest(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, plan STFStoreServiceResourceModel) (*citrixstorefront.StoreFarmConfigurationResponseModel, error) {
+	// Generate getSTFStoreService body
+	getFarmSettingsBody := citrixstorefront.GetSTFStoreRequestModel{}
+	getFarmSettingsBody.SetVirtualPath(plan.VirtualPath.ValueString())
+
+	// Get Request for STF StoreFarm Configurations
+	farmSettingsRequest := client.StorefrontClient.StoreSF.STFStoreFarmGetStoreConfiguration(ctx, getFarmSettingsBody)
+
+	// Execute the request
+	getResponse, err := farmSettingsRequest.Execute()
+	return &getResponse, err
+}
+
+// Set Storefront Store Enumeration Options
+func setSTFStoreEnumerationOptions(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, plan STFStoreServiceResourceModel) error {
+	// Generate API request body
+	var enumerationOptionsBody citrixstorefront.SetSTFStoreEnumerationOptionsRequestModel
+	enumerationOptions := util.ObjectValueToTypedObject[EnumerationOptions](ctx, diagnostics, plan.EnumerationOptions)
+	if !enumerationOptions.EnhancedEnumeration.IsNull() {
+		enumerationOptionsBody.SetEnhancedEnumeration(enumerationOptions.EnhancedEnumeration.ValueBool())
+	}
+	if !enumerationOptions.MaximumConcurrentEnumerations.IsNull() {
+		enumerationOptionsBody.SetMaximumConcurrentEnumerations(enumerationOptions.MaximumConcurrentEnumerations.ValueInt64())
+	}
+	if !enumerationOptions.FilterByTypesInclude.IsNull() {
+		enumerationOptionsBody.SetFilterByTypesInclude(util.StringListToStringArray(ctx, diagnostics, enumerationOptions.FilterByTypesInclude))
+	}
+	if !enumerationOptions.FilterByKeywordsInclude.IsNull() {
+		enumerationOptionsBody.SetFilterByKeywordsInclude(util.StringListToStringArray(ctx, diagnostics, enumerationOptions.FilterByKeywordsInclude))
+	}
+	if !enumerationOptions.FilterByKeywordsExclude.IsNull() {
+		enumerationOptionsBody.SetFilterByKeywordsExclude(util.StringListToStringArray(ctx, diagnostics, enumerationOptions.FilterByKeywordsExclude))
+	}
+
+	// Generate getSTFStoreService body
+	getSTFStoreServiceBody := citrixstorefront.GetSTFStoreRequestModel{}
+	getSTFStoreServiceBody.SetVirtualPath(plan.VirtualPath.ValueString())
+
+	// Create the client request to Set StoreFront Enumeration Options
+	enumerationOptionsRequest := client.StorefrontClient.StoreSF.STFStoreSetSTFStoreEnumerationOptions(ctx, enumerationOptionsBody, getSTFStoreServiceBody)
+
+	// Execute the request
+	_, err := enumerationOptionsRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error setting StoreFront Store Enumeration Options",
+			"\nError message: "+err.Error(),
+		)
+		return err
+	}
+	return nil
+}
+
+// Get Storefront store Enumeration Options
+func getSTFStoreEnumerationOptions(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, plan STFStoreServiceResourceModel) (*citrixstorefront.GetSTFStoreEnumerationOptionsResponseModel, error) {
+	// Generate getSTFStoreService body
+	getSTFStoreServiceBody := citrixstorefront.GetSTFStoreRequestModel{}
+	getSTFStoreServiceBody.SetVirtualPath(plan.VirtualPath.ValueString())
+
+	// Create the client request to Get StoreFront Enumeration Options
+	enumerationOptionsRequest := client.StorefrontClient.StoreSF.STFStoreGetSTFStoreEnumerationOptions(ctx, getSTFStoreServiceBody)
+
+	// Execute the request
+	getResponse, err := enumerationOptionsRequest.Execute()
+
+	return &getResponse, err
+}
+
+// Set Storefront Store Launch Options
+func setSTFStoreLaunchOptions(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, plan STFStoreServiceResourceModel) error {
+	// Generate API request body
+	var launchOptionsBody citrixstorefront.SetSTFStoreLaunchOptionsRequestModel
+	launchOptions := util.ObjectValueToTypedObject[LaunchOptions](ctx, diagnostics, plan.LaunchOptions)
+
+	if !launchOptions.AddressResolutionType.IsNull() {
+		launchOptionsBody.SetAddressResolutionType(launchOptions.AddressResolutionType.ValueString())
+	}
+	if !launchOptions.AllowFontSmoothing.IsNull() {
+		launchOptionsBody.SetAllowFontSmoothing(launchOptions.AllowFontSmoothing.ValueBool())
+	}
+	if !launchOptions.AllowSpecialFolderRedirection.IsNull() {
+		launchOptionsBody.SetAllowSpecialFolderRedirection(launchOptions.AllowSpecialFolderRedirection.ValueBool())
+	}
+	if !launchOptions.FederatedAuthenticationServiceFailover.IsNull() {
+		launchOptionsBody.SetFederatedAuthenticationServiceFailover(launchOptions.FederatedAuthenticationServiceFailover.ValueBool())
+	}
+	if !launchOptions.IcaTemplateName.IsNull() {
+		launchOptionsBody.SetIcaTemplateName(launchOptions.IcaTemplateName.ValueString())
+	}
+	if !launchOptions.IgnoreClientProvidedClientAddress.IsNull() {
+		launchOptionsBody.SetIgnoreClientProvidedClientAddress(launchOptions.IgnoreClientProvidedClientAddress.ValueBool())
+	}
+	if !launchOptions.OverlayAutoLoginCredentialsWithTicket.IsNull() {
+		launchOptionsBody.SetOverlayAutoLoginCredentialsWithTicket(launchOptions.OverlayAutoLoginCredentialsWithTicket.ValueBool())
+	}
+	if !launchOptions.OverrideIcaClientName.IsNull() {
+		launchOptionsBody.SetOverrideIcaClientName(launchOptions.OverrideIcaClientName.ValueBool())
+	}
+	if !launchOptions.RDPOnly.IsNull() {
+		launchOptionsBody.SetRDPOnly(launchOptions.RDPOnly.ValueBool())
+	}
+	if !launchOptions.RequestIcaClientSecureChannel.IsNull() {
+		launchOptionsBody.SetRequestICAClientSecureChannel(launchOptions.RequestIcaClientSecureChannel.ValueString())
+	}
+	if !launchOptions.RequireLaunchReference.IsNull() {
+		launchOptionsBody.SetRequireLaunchReference(launchOptions.RequireLaunchReference.ValueBool())
+	}
+	if !launchOptions.SetNoLoadBiasFlag.IsNull() {
+		launchOptionsBody.SetSetNoLoadBiasFlag(launchOptions.SetNoLoadBiasFlag.ValueBool())
+	}
+	if !launchOptions.VdaLogonDataProvider.IsNull() {
+		launchOptionsBody.SetVdaLogonDataProvider(launchOptions.VdaLogonDataProvider.ValueString())
+	}
+
+	// Generate getSTFStoreService body
+	getSTFStoreServiceBody := citrixstorefront.GetSTFStoreRequestModel{}
+	getSTFStoreServiceBody.SetVirtualPath(plan.VirtualPath.ValueString())
+
+	// Create the client request to Set StoreFront Enumeration Options
+	launchOptionsRequest := client.StorefrontClient.StoreSF.STFStoreSetSTFStoreLaunchOptions(ctx, launchOptionsBody, getSTFStoreServiceBody)
+
+	// Execute the request
+	err := launchOptionsRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error setting StoreFront Store Launch Options",
+			"\nError message: "+err.Error(),
+		)
+		return err
+	}
+	return nil
+}
+
+// Get Storefront store Launch Options
+func getSTFStoreLaunchOptions(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, plan STFStoreServiceResourceModel) (*citrixstorefront.GetSTFStoreLaunchOptionsResponseModel, error) {
+	// Generate getSTFStoreService body
+	getSTFStoreServiceBody := citrixstorefront.GetSTFStoreRequestModel{}
+	getSTFStoreServiceBody.SetVirtualPath(plan.VirtualPath.ValueString())
+
+	// Create the client request to Get StoreFront Launch Options
+	launchOptionsRequest := client.StorefrontClient.StoreSF.STFStoreGetSTFStoreLaunchOptions(ctx, getSTFStoreServiceBody)
+
+	// Execute the request
+	getResponse, err := launchOptionsRequest.Execute()
+
+	return &getResponse, err
 }

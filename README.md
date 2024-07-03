@@ -27,7 +27,6 @@ Citrix has developed a custom Terraform provider for automating Citrix product d
   - [Examples and Deployment Guides](#examples-and-deployment-guides)
   - [Frequently Asked Questions](#frequently-asked-questions)
       - [What resource is supported for different connection types?](#what-resource-is-supported-for-different-connection-types)
-      - [What provisioning types are supported for machine catalog?](#what-provisioning-types-are-supported-for-machine-catalog)
   - [Attributions](#attributions)
   - [License](#license)
 
@@ -115,7 +114,7 @@ Refer the [Hashicorp documentation](https://learn.hashicorp.com/tutorials/terraf
 
 ### (On-Premises Only) Enable Web Studio
 
-For on-premises sites with version >= 2308 are supported. Web Studio needs to be [installed and configured](https://docs.citrix.com/en-us/citrix-virtual-apps-desktops/install-configure/install-core/install-web-studio.html#install-web-studio-1) for the provider to work.
+For on-premises sites with version >= 2311 are supported. Web Studio needs to be [installed and configured](https://docs.citrix.com/en-us/citrix-virtual-apps-desktops/install-configure/install-core/install-web-studio.html#install-web-studio-1) for the provider to work.
 
 ### Configure your Plugin for Terraform Provider for Citrix DaaS™
 
@@ -164,38 +163,21 @@ Detailed instructions on setting up deployments on different cloud providers fro
 - [AWS EC2](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-aws/)
 - [Azure](https://community.citrix.com/tech-zone/build/deployment-guides/citrix-daas-terraform-azure/)
 - [GCP](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-gcp/)
+- [vSphere](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-vsphere8/)
 
 ## Frequently Asked Questions
 
 #### What resource is supported for different connection types?
 
-| Connection Type |   Hypervisor     |   Resource Pool  |  MCS Power Managed  | MCS Provisioning  |          PVS           |
-|-----------------|------------------|------------------|---------------------|-------------------|------------------------|
-| AzureRM         |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  | :heavy_check_mark:|In Progress             |
-| AWS EC2         |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  | :heavy_check_mark:|:heavy_multiplication_x:|
-| GCP             |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  | :heavy_check_mark:|:heavy_multiplication_x:|
-| Vsphere         |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  | :heavy_check_mark:|:heavy_multiplication_x:|
-| XenServer       |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  | :heavy_check_mark:|:heavy_multiplication_x:|
-| Nutanix         |:heavy_check_mark:|:heavy_check_mark:| :heavy_check_mark:  | :heavy_check_mark:|:heavy_multiplication_x:|
-| SCVMM           |In Progress       |In Progress       | In Progress         | In Progress       |:heavy_multiplication_x:|
-
-
-#### What provisioning types are supported for machine catalog? 
-- MCS provisioning
-  - Azure
-  - GCP
-  - AWS EC2
-  - Vsphere
-  - XenServer
-  - Nutanix
-- Manual Power Managed
-  - Azure
-  - GCP
-  - AWS EC2
-  - Vsphere
-  - XenServer
-  - Nutanix
-- Manual / Remote PC
+| Connection Type  |   Hypervisor       |   Resource Pool    |  MCS Power Managed   | MCS Provisioning     |          PVS             | Manual/Remote PC     |
+|------------------|--------------------|--------------------|----------------------|----------------------|--------------------------|----------------------|
+| AzureRM          |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_check_mark:        | :heavy_check_mark:   |
+| AWS EC2          |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
+| GCP              |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
+| vSphere          |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
+| XenServer        |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
+| Nutanix          |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
+| SCVMM            |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   |   In Progress        |:heavy_multiplication_x:  | :heavy_check_mark:   |
 
 ## Attributions
 The code in this repository makes use of the following packages:

@@ -32,6 +32,7 @@ type AzureMachineConfigModel struct {
 	ServiceOffering types.String `tfsdk:"service_offering"`
 	/** Azure Hypervisor **/
 	AzureMasterImage         types.Object `tfsdk:"azure_master_image"`
+	AzurePvsConfiguration    types.Object `tfsdk:"azure_pvs_config"`
 	MasterImageNote          types.String `tfsdk:"master_image_note"`
 	ImageUpdateRebootOptions types.Object `tfsdk:"image_update_reboot_options"`
 	VdaResourceGroup         types.String `tfsdk:"vda_resource_group"`
@@ -47,13 +48,14 @@ type AzureMachineConfigModel struct {
 
 func (AzureMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
-		Description: "Machine Configuration For Azure MCS catalog.",
+		Description: "Machine Configuration For Azure MCS and PVS Streaming catalogs.",
 		Optional:    true,
 		Attributes: map[string]schema.Attribute{
 			"service_offering": schema.StringAttribute{
 				Description: "The Azure VM Sku to use when creating machines.",
 				Required:    true,
 			},
+			"azure_pvs_config":   AzurePvsConfigurationModel{}.GetSchema(),
 			"azure_master_image": AzureMasterImageModel{}.GetSchema(),
 			"master_image_note": schema.StringAttribute{
 				Description: "The note for the master image.",
@@ -81,6 +83,13 @@ func (AzureMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 						"Updating storage_type is not allowed when using Azure Ephemeral OS Disk.",
 						"Updating storage_type is not allowed when using Azure Ephemeral OS Disk.",
 					),
+					stringplanmodifier.RequiresReplaceIf(
+						func(ctx context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+							resp.RequiresReplace = !checkIfCatalogAttributeCanBeUpdated(ctx, req.State) && req.StateValue.ValueString() != req.PlanValue.ValueString()
+						},
+						"Updating storage_type is not allowed for catalogs with PVS Streaming provisioning type.",
+						"Updating storage_type is not allowed for catalogs with PVS Streaming provisioning type.",
+					),
 				},
 			},
 			"use_azure_compute_gallery": AzureComputeGallerySettings{}.GetSchema(),
@@ -91,6 +100,15 @@ func (AzureMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 					stringvalidator.OneOf(
 						util.WindowsClientLicenseType,
 						util.WindowsServerLicenseType,
+					),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplaceIf(
+						func(ctx context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+							resp.RequiresReplace = !checkIfCatalogAttributeCanBeUpdated(ctx, req.State) && req.StateValue.ValueString() != req.PlanValue.ValueString()
+						},
+						"Updating license_type is not allowed for catalogs with PVS Streaming provisioning type.",
+						"Updating license_type is not allowed for catalogs with PVS Streaming provisioning type.",
 					),
 				},
 			},
@@ -257,7 +275,7 @@ func (GcpMachineConfigModel) GetAttributes() map[string]schema.Attribute {
 }
 
 type VsphereMachineConfigModel struct {
-	/** Vsphere Hypervisor **/
+	/** vSphere Hypervisor **/
 	MasterImageVm            types.String `tfsdk:"master_image_vm"`
 	ImageSnapshot            types.String `tfsdk:"image_snapshot"`
 	MasterImageNote          types.String `tfsdk:"master_image_note"`
@@ -265,6 +283,7 @@ type VsphereMachineConfigModel struct {
 	CpuCount                 types.Int64  `tfsdk:"cpu_count"`
 	MemoryMB                 types.Int64  `tfsdk:"memory_mb"`
 	WritebackCache           types.Object `tfsdk:"writeback_cache"` // VsphereWritebackCacheModel
+	MachineProfile           types.String `tfsdk:"machine_profile"`
 }
 
 func (VsphereMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
@@ -300,6 +319,19 @@ func (VsphereMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 				Required:    true,
 			},
 			"writeback_cache": VsphereWritebackCacheModel{}.GetSchema(),
+			"machine_profile": schema.StringAttribute{
+				Description: "The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics and host cache property of OS disk.",
+				Optional:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplaceIf(
+						func(_ context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+							resp.RequiresReplace = req.StateValue.IsNull() != req.ConfigValue.IsNull()
+						},
+						"Force replace when machine_profile is added or removed. Update is allowed only if previously set.",
+						"Force replace when machine_profile is added or removed. Update is allowed only if previously set.",
+					),
+				},
+			},
 		},
 	}
 }
@@ -473,7 +505,7 @@ type AzureMasterImageModel struct {
 func (AzureMasterImageModel) GetSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
 		Description: "Details of the Azure Image to use for creating machines.",
-		Required:    true,
+		Optional:    true,
 		Attributes: map[string]schema.Attribute{
 			"resource_group": schema.StringAttribute{
 				Description: "The Azure Resource Group where the image VHD / managed disk / snapshot for creating machines is located.",
@@ -520,6 +552,41 @@ func (AzureMasterImageModel) GetAttributes() map[string]schema.Attribute {
 	return AzureMasterImageModel{}.GetSchema().Attributes
 }
 
+type AzurePvsConfigurationModel struct {
+	PvsSiteId  types.String `tfsdk:"pvs_site_id"`
+	PvsVdiskId types.String `tfsdk:"pvs_vdisk_id"`
+}
+
+func (AzurePvsConfigurationModel) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "PVS Configuration to create machine catalog using PVSStreaming.",
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			"pvs_site_id": schema.StringAttribute{
+				Description: "The id of the PVS site to use for creating machines.",
+				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"pvs_vdisk_id": schema.StringAttribute{
+				Description: "The id of the PVS vDisk to use for creating machines.",
+				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+		},
+		Validators: []validator.Object{
+			objectvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("azure_pvs_config"), path.MatchRelative().AtParent().AtName("azure_master_image")),
+		},
+	}
+}
+
+func (AzurePvsConfigurationModel) GetAttributes() map[string]schema.Attribute {
+	return AzurePvsConfigurationModel{}.GetSchema().Attributes
+}
+
 type AzureMachineProfileModel struct {
 	MachineProfileVmName              types.String `tfsdk:"machine_profile_vm_name"`
 	MachineProfileTemplateSpecName    types.String `tfsdk:"machine_profile_template_spec_name"`
@@ -530,7 +597,7 @@ type AzureMachineProfileModel struct {
 func (AzureMachineProfileModel) GetSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
 		Description: "The name of the virtual machine or template spec that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone." + "<br />" +
-			"Required when identity_type is set to `AzureAD`",
+			"Required when provisioning_type is set to PVSStreaming or when identity_type is set to `AzureAD`",
 		Optional: true,
 		Attributes: map[string]schema.Attribute{
 			"machine_profile_vm_name": schema.StringAttribute{
@@ -600,7 +667,7 @@ func (AzureWritebackCacheModel) GetSchema() schema.SingleNestedAttribute {
 		Attributes: map[string]schema.Attribute{
 			"persist_wbc": schema.BoolAttribute{
 				Description: "Persist Write-back Cache",
-				Required:    true,
+				Optional:    true,
 			},
 			"wbc_disk_storage_type": schema.StringAttribute{
 				Description: "Type of naming scheme. Choose between Numeric and Alphabetic.",
@@ -612,18 +679,45 @@ func (AzureWritebackCacheModel) GetSchema() schema.SingleNestedAttribute {
 						"Premium_LRS",
 					),
 				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplaceIf(
+						func(ctx context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+							resp.RequiresReplace = !checkIfCatalogAttributeCanBeUpdated(ctx, req.State) && req.StateValue.ValueString() != req.PlanValue.ValueString()
+						},
+						"Updating wbc_disk_storage_type is not allowed for catalogs with PVS Streaming provisioning type.",
+						"Updating wbc_disk_storage_typ is not allowed for catalogs with PVS Streaming provisioning type.",
+					),
+				},
 			},
 			"persist_os_disk": schema.BoolAttribute{
 				Description: "Persist the OS disk when power cycling the non-persistent provisioned virtual machine.",
 				Required:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.RequiresReplaceIf(
+						func(ctx context.Context, req planmodifier.BoolRequest, resp *boolplanmodifier.RequiresReplaceIfFuncResponse) {
+							resp.RequiresReplace = !checkIfCatalogAttributeCanBeUpdated(ctx, req.State) && req.StateValue.ValueBool() != req.PlanValue.ValueBool()
+						},
+						"Updating persist_os_disk is not allowed for catalogs with PVS Streaming provisioning type.",
+						"Updating persist_os_disk is not allowed for catalogs with PVS Streaming provisioning type.",
+					),
+				},
 			},
 			"persist_vm": schema.BoolAttribute{
 				Description: "Persist the non-persistent provisioned virtual machine in Azure environments when power cycling. This property only applies when the PersistOsDisk property is set to True.",
 				Required:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.RequiresReplaceIf(
+						func(ctx context.Context, req planmodifier.BoolRequest, resp *boolplanmodifier.RequiresReplaceIfFuncResponse) {
+							resp.RequiresReplace = !checkIfCatalogAttributeCanBeUpdated(ctx, req.State) && req.StateValue.ValueBool() != req.PlanValue.ValueBool()
+						},
+						"Updating persist_vm is not allowed for catalogs with PVS Streaming provisioning type.",
+						"Updating persist_vm is not allowed for catalogs with PVS Streaming provisioning type.",
+					),
+				},
 			},
 			"storage_cost_saving": schema.BoolAttribute{
 				Description: "Save storage cost by downgrading the storage type of the disk to Standard HDD when VM shut down.",
-				Required:    true,
+				Optional:    true,
 			},
 			"writeback_cache_disk_size_gb": schema.Int64Attribute{
 				Description: "The size in GB of any temporary storage disk used by the write back cache.",
@@ -631,10 +725,19 @@ func (AzureWritebackCacheModel) GetSchema() schema.SingleNestedAttribute {
 				Validators: []validator.Int64{
 					int64validator.AtLeast(0),
 				},
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.RequiresReplaceIf(
+						func(ctx context.Context, req planmodifier.Int64Request, resp *int64planmodifier.RequiresReplaceIfFuncResponse) {
+							resp.RequiresReplace = !checkIfCatalogAttributeCanBeUpdated(ctx, req.State) && req.StateValue.ValueInt64() != req.PlanValue.ValueInt64()
+						},
+						"Updating writeback_cache_disk_size_gb is not allowed for catalogs with PVS Streaming provisioning type.",
+						"Updating writeback_cache_disk_size_gb is not allowed for catalogs with PVS Streaming provisioning type.",
+					),
+				},
 			},
 			"writeback_cache_memory_size_mb": schema.Int64Attribute{
 				Description: "The size of the in-memory write back cache in MB.",
-				Required:    true,
+				Optional:    true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(0),
 				},
@@ -908,55 +1011,70 @@ func (rebootOptions ImageUpdateRebootOptionsModel) ValidateConfig(diagnostics *d
 	}
 }
 
-func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagnostics *diag.Diagnostics, catalog citrixorchestration.MachineCatalogDetailResponseModel) {
+func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagnostics *diag.Diagnostics, catalog citrixorchestration.MachineCatalogDetailResponseModel, provisioningType *citrixorchestration.ProvisioningType) {
 	// Refresh Service Offering
 	provScheme := catalog.GetProvisioningScheme()
 	if provScheme.GetServiceOffering() != "" {
 		mc.ServiceOffering = types.StringValue(provScheme.GetServiceOffering())
 	}
 
-	// Refresh Master Image
-	masterImage := provScheme.GetMasterImage()
-	azureMasterImage := util.ObjectValueToTypedObject[AzureMasterImageModel](ctx, diagnostics, mc.AzureMasterImage)
-	masterImageXdPath := masterImage.GetXDPath()
-	if masterImageXdPath != "" {
-		segments := strings.Split(masterImage.GetXDPath(), "\\")
-		lastIndex := len(segments)
-		if lastIndex == 8 {
-			resourceTag := strings.Split(segments[lastIndex-1], ".")
-			resourceType := resourceTag[len(resourceTag)-1]
+	// Refresh Master Image for non PVS catalogs
+	if *provisioningType != citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING {
+		masterImage := provScheme.GetMasterImage()
+		azureMasterImage := util.ObjectValueToTypedObject[AzureMasterImageModel](ctx, diagnostics, mc.AzureMasterImage)
+		masterImageXdPath := masterImage.GetXDPath()
+		if masterImageXdPath != "" {
+			segments := strings.Split(masterImage.GetXDPath(), "\\")
+			lastIndex := len(segments)
+			if lastIndex == 8 {
+				resourceTag := strings.Split(segments[lastIndex-1], ".")
+				resourceType := resourceTag[len(resourceTag)-1]
 
-			if strings.EqualFold(resourceType, util.VhdResourceType) {
-				// VHD image
+				if strings.EqualFold(resourceType, util.VhdResourceType) {
+					// VHD image
+					azureMasterImage.MasterImage = types.StringValue(masterImage.GetName())
+					azureMasterImage.Container = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
+					azureMasterImage.StorageAccount = types.StringValue(strings.Split(segments[lastIndex-3], ".")[0])
+				} else if strings.EqualFold(resourceType, util.ImageVersionResourceType) {
+					/* For Azure Image Gallery image, the XDPath looks like:
+					* XDHyp:\\HostingUnits\\{resource pool}\\image.folder\\{resource group}.resourcegroup\\{gallery name}.gallery\\{image name}.imagedefinition\\{image version}.imageversion
+					* The Name property in MasterImage will be image version instead of image definition (name of the image)
+					 */
+					azureGalleryImageModel := util.ObjectValueToTypedObject[GalleryImageModel](ctx, diagnostics, azureMasterImage.GalleryImage)
+					azureGalleryImageModel.Version = types.StringValue(masterImage.GetName())
+					azureGalleryImageModel.Definition = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
+					azureGalleryImageModel.Gallery = types.StringValue(strings.Split(segments[lastIndex-3], ".")[0])
+
+					azureMasterImage.GalleryImage = util.TypedObjectToObjectValue(ctx, diagnostics, azureGalleryImageModel)
+
+				}
+				azureMasterImage.ResourceGroup = types.StringValue(strings.Split(segments[lastIndex-4], ".")[0])
+			} else {
+				// Snapshot or Managed Disk
 				azureMasterImage.MasterImage = types.StringValue(masterImage.GetName())
-				azureMasterImage.Container = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
-				azureMasterImage.StorageAccount = types.StringValue(strings.Split(segments[lastIndex-3], ".")[0])
-			} else if strings.EqualFold(resourceType, util.ImageVersionResourceType) {
-				/* For Azure Image Gallery image, the XDPath looks like:
-				* XDHyp:\\HostingUnits\\{resource pool}\\image.folder\\{resource group}.resourcegroup\\{gallery name}.gallery\\{image name}.imagedefinition\\{image version}.imageversion
-				* The Name property in MasterImage will be image version instead of image definition (name of the image)
-				 */
-				azureGalleryImageModel := util.ObjectValueToTypedObject[GalleryImageModel](ctx, diagnostics, azureMasterImage.GalleryImage)
-				azureGalleryImageModel.Version = types.StringValue(masterImage.GetName())
-				azureGalleryImageModel.Definition = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
-				azureGalleryImageModel.Gallery = types.StringValue(strings.Split(segments[lastIndex-3], ".")[0])
-
-				azureMasterImage.GalleryImage = util.TypedObjectToObjectValue(ctx, diagnostics, azureGalleryImageModel)
-
+				azureMasterImage.ResourceGroup = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
 			}
-			azureMasterImage.ResourceGroup = types.StringValue(strings.Split(segments[lastIndex-4], ".")[0])
-		} else {
-			// Snapshot or Managed Disk
-			azureMasterImage.MasterImage = types.StringValue(masterImage.GetName())
-			azureMasterImage.ResourceGroup = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
 		}
+
+		mc.AzureMasterImage = util.TypedObjectToObjectValue(ctx, diagnostics, azureMasterImage)
+
+		// Refresh Master Image Note
+		currentDiskImage := provScheme.GetCurrentDiskImage()
+		mc.MasterImageNote = types.StringValue(currentDiskImage.GetMasterImageNote())
+	} else {
+		azurePvsConfiguration := util.ObjectValueToTypedObject[AzurePvsConfigurationModel](ctx, diagnostics, mc.AzurePvsConfiguration)
+		// Set values for PVS Streaming catalogs
+		if provScheme.HasPVSSite() {
+			azurePvsConfiguration.PvsSiteId = types.StringValue(provScheme.GetPVSSite())
+		}
+
+		if provScheme.HasPVSVDisk() {
+			azurePvsConfiguration.PvsVdiskId = types.StringValue(provScheme.GetPVSVDisk())
+		}
+		mc.AzurePvsConfiguration = util.TypedObjectToObjectValue(ctx, diagnostics, azurePvsConfiguration)
+		// Set Master Image Note as empty for PVS Streaming catalogs
+		mc.MasterImageNote = types.StringValue("")
 	}
-
-	mc.AzureMasterImage = util.TypedObjectToObjectValue(ctx, diagnostics, azureMasterImage)
-
-	// Refresh Master Image Note
-	currentDiskImage := provScheme.GetCurrentDiskImage()
-	mc.MasterImageNote = types.StringValue(currentDiskImage.GetMasterImageNote())
 
 	// Refresh Machine Profile
 	if provScheme.MachineProfile != nil {
@@ -1230,11 +1348,8 @@ func (mc *VsphereMachineConfigModel) RefreshProperties(ctx context.Context, diag
 	// Refresh Writeback Cache
 	wbcDiskSize := provScheme.GetWriteBackCacheDiskSizeGB()
 	wbcMemorySize := provScheme.GetWriteBackCacheMemorySizeMB()
-	writebackCache := util.ObjectValueToTypedObject[VsphereWritebackCacheModel](ctx, diagnostics, mc.WritebackCache)
 	if wbcDiskSize != 0 {
-		if mc.WritebackCache.IsNull() {
-			writebackCache = VsphereWritebackCacheModel{}
-		}
+		writebackCache := VsphereWritebackCacheModel{}
 		writebackCache.WriteBackCacheDiskSizeGB = types.Int64Value(int64(provScheme.GetWriteBackCacheDiskSizeGB()))
 		if wbcMemorySize != 0 {
 			writebackCache.WriteBackCacheMemorySizeMB = types.Int64Value(int64(provScheme.GetWriteBackCacheMemorySizeMB()))
@@ -1242,8 +1357,17 @@ func (mc *VsphereMachineConfigModel) RefreshProperties(ctx context.Context, diag
 		if provScheme.GetWriteBackCacheDriveLetter() != "" {
 			writebackCache.WriteBackCacheDriveLetter = types.StringValue(provScheme.GetWriteBackCacheDriveLetter())
 		}
+		mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, writebackCache)
 	}
-	mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, writebackCache)
+
+	machineProfile := provScheme.GetMachineProfile()
+
+	if machineProfileXdPath := machineProfile.GetXDPath(); machineProfileXdPath != "" {
+		machineProfileParts := strings.Split(machineProfileXdPath, "\\")
+		machineProfileName := machineProfileParts[len(machineProfileParts)-1]
+		machineProfileTemplateName := strings.Split(machineProfileName, ".template")[0]
+		mc.MachineProfile = types.StringValue(machineProfileTemplateName)
+	}
 }
 
 func (mc *XenserverMachineConfigModel) RefreshProperties(ctx context.Context, diagnostics *diag.Diagnostics, catalog citrixorchestration.MachineCatalogDetailResponseModel) {

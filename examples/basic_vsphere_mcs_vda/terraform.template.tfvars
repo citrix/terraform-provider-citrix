@@ -33,7 +33,7 @@ resource_pool_name = "example-vsphere-resource-pool"
 vsphere_networks = ["<Network 1 name>", "<Network 2 name>"]
 vsphere_cluster_datacenter = "<Datacenter name>"
 vsphere_cluster_name = "<Cluster name>"
-vsphere_cluster_host = "<Host FQDN or IP>"
+vsphere_host = "<Host FQDN or IP>"
 vsphere_storage_name = "<Local or shared storage name>"
 vsphere_temporary_storage_name = "<Local or shared storage name>"
 

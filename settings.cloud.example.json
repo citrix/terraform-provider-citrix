@@ -13,6 +13,8 @@
         // "TEST_ZONE_NAME_GCP": "test-zone", 
         // "TEST_ZONE_NAME_VSPHERE": "test-zone",
         // "TEST_ZONE_NAME_XENSERVER": "test-zone",
+        // "TEST_ZONE_NAME_NUTANIX": "test-zone",
+        // "TEST_ZONE_NAME_SCVMM": "test-zone",
         "TEST_ZONE_DESCRIPTION" :"test zone description",
         
         // Hypervisor Go Tests - Azure
@@ -28,7 +30,7 @@
         "TEST_HYPERV_SERVICE_ACCOUNT_ID" :"{gcp_service_account_id}",
         "TEST_HYPERV_SERVICE_ACCOUNT_CREDENTIAL":"{gcp_service_account_credential}",
 
-        // Hypervisor Go Tests - Vsphere
+        // Hypervisor Go Tests - vSphere
         "TEST_HYPERV_NAME_VSPHERE": "{hypervisor_name}",
         "TEST_HYPERV_USERNAME_VSPHERE": "{vsphere_hypervisor_user_name}",
         "TEST_HYPERV_PASSWORD_PLAINTEXT_VSPHERE": "{vsphere_hypervisor_password}",
@@ -44,9 +46,15 @@
 
         // Hypervisor Go Tests - Nutanix
         "TEST_HYPERV_NAME_NUTANIX": "{hypervisor_name}",
-        "TEST_HYPERV_USERNAME_NUTANIX": "{vsphere_hypervisor_user_name}",
-        "TEST_HYPERV_PASSWORD_PLAINTEXT_NUTANIX": "{vsphere_hypervisor_password}",
-        "TEST_HYPERV_ADDRESS_NUTANIX": "{xenserver_hypervisor_management_ip}",
+        "TEST_HYPERV_USERNAME_NUTANIX": "{nutanix_hypervisor_user_name}",
+        "TEST_HYPERV_PASSWORD_PLAINTEXT_NUTANIX": "{nutanix_hypervisor_password}",
+        "TEST_HYPERV_ADDRESS_NUTANIX": "{nutanix_hypervisor_management_ip}",
+
+        //Hypervisor Go Tests - SCVMM
+        "TEST_HYPERV_NAME_SCVMM" : "{hypervisor_name}",
+        "TEST_HYPERV_USERNAME_SCVMM" : "{scvmm_hypervisor_user_name}",
+        "TEST_HYPERV_PASSWORD_PLAINTEXT_SCVMM" : "{scvmm_hypevisor_password}",
+        "TEST_HYPERV_ADDRESS_SCVMM" : "{scvmm_server_address}",
 
         // Hypervisor Go Tests - AWS EC2
         "TEST_ZONE_NAME_AWS_EC2": "{aws_ec2_hypervisor_zone_name}",
@@ -76,7 +84,7 @@
         "TEST_HYPERV_RP_STORAGE_XENSERVER"      :"{local_or_shared_storage}",
         "TEST_HYPERV_RP_TEMP_STORAGE_XENSERVER" :"{local_or_shared_storage}",
 
-        // Hypervisor Resource Pool VSphere Testing Env Variables
+        // Hypervisor Resource Pool vSphere Testing Env Variables
         "TEST_HYPERV_RP_NAME_VSPHERE"         : "{hypervisor_resource_pool_name}",
         "TEST_HYPERV_RP_DATACENTER_VSPHERE"   : "{datacenter_name}",
         "TEST_HYPERV_RP_HOST_VSPHERE"         : "{host_ip_pr_fqdn}",
@@ -88,6 +96,14 @@
         // Hypervisor Resource Pool Nutanix Testing Env Variables
         "TEST_HYPERV_RP_NAME_NUTANIX"   : "{hypervisor_resource_pool_name}",
         "TEST_HYPERV_RP_NETWORK_NUTANIX": "{network_name}",
+
+        // Hyeprvisor Resource Pool SCVMM Testing Env Variables
+        "TEST_HYPERV_RP_NAME_SCVMM" : "{hypervisor_resource_pool_name}",
+        "TEST_HYPERV_RP_HOST_SCVMM" : "{host_name}",
+        "TEST_HYPERV_RP_NETWORK_SCVMM" : "{network_name}",
+        "TEST_HYPERV_RP_STORAGE_1_SCVMM" : "{storage_name_0}",
+        "TEST_HYPERV_RP_STORAGE_2_SCVMM" : "{storeage_name_1}",
+        "TEST_HYPERV_RP_TEMP_STORAGE_SCVMM" : "{temp_storage_name}",
 
         // Hypervisor Resource Pool AWS EC2 Testing Env Variables
         "TEST_HYPERV_RP_NAME_AWS_EC2"              :"{hypervisor_resource_pool_name}",
@@ -240,15 +256,69 @@
         "TEST_STF_Auth_Virtual_Path" : "/Citrix/Auth" ,
         "TEST_STF_Store_Virtual_Path" : "/Citrix/Store",
         "TEST_STF_WEBRECEIVER_VIRTUAL_PATH" : "/Citrix/StoreWeb",
-
+        "TEST_STF_FARM_TYPE"              :"XenApp",
+        "TEST_STF_FARM_PORT"            :"88",
+        "TEST_STF_FARM_NAME"            :"Controller",
+        
         // StoreFront STFUserFarmMapping Resource env variables
         "TEST_STF_USER_FARM_MAPPING_NAME": "Test STFUserFarmMappingName",
         "TEST_STF_USER_FARM_MAPPING_USER1_SID": "{Active Directory User 1 Account Sid}",
         "TEST_STF_USER_FARM_MAPPING_USER2_SID": "{Active Directory User 2 Account Sid}",
         "TEST_STF_PRIMARY_FARM_NAME": "{Primary Farm Name}",
         "TEST_STF_SECONDARY_FARM_NAME": "{Secondary Farm Name}",
-        "TEST_STF_BACKUP_FARM_NAME": "{Backup Farm Name}"
+        "TEST_STF_BACKUP_FARM_NAME": "{Backup Farm Name}",
+
+        // StoreFront Roaming Gateway Resource env variables
+        "TEST_STF_ROAMING_GATEWAY_NAME": "testRoamingGateway",
+        "TEST_STF_ROAMING_GATEWAY_LOGON_TYPE": "None",
+        "TEST_STF_ROAMING_GATEWAY_LOGON_TYPE_UPDATED": "Domain",
+        "TEST_STF_ROAMING_GATEWAY_URL": "https://a.a.a/",
+        "TEST_STF_ROAMING_GATEWAY_URL_UPDATED": "https://b.b.b/",
+        "TEST_STF_ROAMING_GATEWAY_VERSION": "Version10_0_69_4",
+        "TEST_STF_ROAMING_GATEWAY_VERSION_UPDATED": "Version9x",
         
+        /**** Data Source Go Tests ****/
+        // Zone Data Source Go Tests
+        "TEST_ZONE_DATASOURCE_NAME"     :"ctx-test-zone",
+        "TEST_ZONE_DATASOURCE_ID": "{Existing zone ID for verification}",
+
+        // Hypervisor Data Source Go Tests
+        "TEST_HYPERVISOR_DATASOURCE_NAME"     :"azure",
+        "TEST_HYPERVISOR_DATASOURCE_ID": "{Existing hypervisor ID for verification}",
+
+        // Hypervisor Resource Pool Data Source Go Tests
+        "TEST_HYPERVISOR_RP_DATASOURCE_NAME"     :"zl-rp",
+        "TEST_HYPERVISOR_RP_DATASOURCE_ID": "{Existing hypervisor resource pool ID for verification}",
+        "TEST_HYPERVISOR_RP_DATASOURCE_NETWORKS": [
+            "{subnet 1}",
+            "{subnet 2}"
+        ],
+
+        // Machine Catalog Data Source Go Tests
+        "TEST_MACHINE_CATALOG_DATASOURCE_NAME": "azure-onprem-catalog",
+        "TEST_MACHINE_CATALOG_DATASOURCE_ID": "{Existing machine catalog ID for verification}",
+        "TEST_MACHINE_CATALOG_DATASOURCE_VDAS": [
+            "{VDA 1 hostname}",
+            "{VDA 2 hostname}"
+        ],
+
+        // Delivery Group Data Source Go Tests
+        "TEST_DELIVERY_GROUP_DATASOURCE_NAME": "terraform-delivery-group-1",
+        "TEST_DELIVERY_GROUP_DATASOURCE_ID": "{Existing delivery group ID for verification}",
+        "TEST_DELIVERY_GROUP_DATASOURCE_VDAS": [
+            "{VDA 1 hostname}"
+        ],
+
+         // VDA Data Source Go Tests
+         "TEST_VDA_DATASOURCE_MC_NAME": "azure-catalog",
+         "TEST_VDA_DATASOURCE_DG_NAME": "terraform-delivery-group-1",
+         "TEST_VDA_DATASOURCE_MC_VDAS": [
+            "{VDA 1 hostname}",
+            "{VDA 2 hostname}"
+         ],
+         "TEST_VDA_DATASOURCE_DG_VDAS": [
+            "{VDA 1 hostname}"
+         ]
     },
     "go.testTimeout": "30m"
 }

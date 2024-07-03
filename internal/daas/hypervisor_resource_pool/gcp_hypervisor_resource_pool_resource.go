@@ -13,13 +13,15 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &gcpHypervisorResourcePoolResource{}
-	_ resource.ResourceWithConfigure   = &gcpHypervisorResourcePoolResource{}
-	_ resource.ResourceWithImportState = &gcpHypervisorResourcePoolResource{}
+	_ resource.Resource                   = &gcpHypervisorResourcePoolResource{}
+	_ resource.ResourceWithConfigure      = &gcpHypervisorResourcePoolResource{}
+	_ resource.ResourceWithImportState    = &gcpHypervisorResourcePoolResource{}
+	_ resource.ResourceWithValidateConfig = &gcpHypervisorResourcePoolResource{}
 )
 
 // NewHypervisorResourcePoolResource is a helper function to simplify the provider implementation.
@@ -38,7 +40,7 @@ func (r *gcpHypervisorResourcePoolResource) Metadata(_ context.Context, req reso
 }
 
 func (r *gcpHypervisorResourcePoolResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = GetGcpHypervisorResourcePoolSchema()
+	resp.Schema = GcpHypervisorResourcePoolResourceModel{}.GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -261,4 +263,18 @@ func (r *gcpHypervisorResourcePoolResource) Delete(ctx context.Context, req reso
 		)
 		return
 	}
+}
+
+func (r *gcpHypervisorResourcePoolResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data GcpHypervisorResourcePoolResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }

@@ -127,7 +127,7 @@ resource "citrix_machine_catalog" "example-gcp-mtsession" {
 
 resource "citrix_machine_catalog" "example-vsphere-mtsession" {
     name                        = "example-vsphere-mtsession"
-    description                 = "Example multi-session catalog on Vsphere hypervisor"
+    description                 = "Example multi-session catalog on vSphere hypervisor"
     zone                        = "<zone Id>"
     allocation_type             = "Random"
     session_support             = "MultiSession"
@@ -214,6 +214,48 @@ resource "citrix_machine_catalog" "example-nutanix-mtsession" {
             naming_scheme_type = "Numeric"
         }
     }
+}
+
+resource "citrix_machine_catalog" "example-azure-pvs-mtsession" {
+	name                		= "example-azure-pvs-mtsession"
+	description					= "Example multi-session catalog on Azure hypervisor"
+	zone						= "<zone Id>"
+	allocation_type				= "Random"
+	session_support				= "MultiSession"
+	provisioning_type 			= "PVSStreaming"
+	provisioning_scheme			= 	{
+		hypervisor = citrix_azure_hypervisor.example-azure-hypervisor.id
+		hypervisor_resource_pool = citrix_azure_hypervisor_resource_pool.example-azure-hypervisor-resource-pool.id
+		identity_type      = "ActiveDirectory"
+		machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+			domain_ou				 = "<DomainOU>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+		azure_machine_config = {
+			storage_type = "Standard_LRS"
+            azure_pvs_config = {
+                pvs_site_id = data.citrix_pvs.example_pvs_config.pvs_site_id
+				pvs_vdisk_id = data.citrix_pvs.example_pvs_config.pvs_vdisk_id
+            }
+			use_managed_disks = true
+            service_offering = "Standard_D2_v2"
+			writeback_cache = {
+				wbc_disk_storage_type = "Standard_LRS"
+				persist_wbc = true
+				persist_os_disk = true
+				persist_vm = true
+				writeback_cache_disk_size_gb = 127
+                writeback_cache_memory_size_mb = 256
+			}
+        }
+		number_of_total_machines = 	1
+		machine_account_creation_rules ={
+			naming_scheme =     "az-pvs-multi-##"
+			naming_scheme_type ="Numeric"
+		}
+	}
 }
 
 resource "citrix_machine_catalog" "example-manual-power-managed-mtsession" {
@@ -332,7 +374,6 @@ resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
 				storage_cost_saving = true
 			}
         }
-		availability_zones = ["1","2"]
 		number_of_total_machines = 	1
 		machine_account_creation_rules ={
 			naming_scheme =     "ndj-multi-##"

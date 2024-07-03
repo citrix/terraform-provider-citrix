@@ -40,7 +40,7 @@ type NutanixHypervisorResourceModel struct {
 	MaxPowerActionsPercentageOfMachines types.Int64  `tfsdk:"max_power_actions_percentage_of_machines"`
 }
 
-func GetNutanixHypervisorSchema() schema.Schema {
+func (NutanixHypervisorResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "Manages a Nutanix AHV hypervisor.",
 		Attributes: map[string]schema.Attribute{
@@ -72,6 +72,7 @@ func GetNutanixHypervisorSchema() schema.Schema {
 			"password": schema.StringAttribute{
 				Description: "Password of the hypervisor.",
 				Required:    true,
+				Sensitive:   true,
 			},
 			"password_format": schema.StringAttribute{
 				Description: "Password format of the hypervisor. Choose between Base64 and PlainText.",
@@ -85,7 +86,7 @@ func GetNutanixHypervisorSchema() schema.Schema {
 			},
 			"addresses": schema.ListAttribute{
 				ElementType: types.StringType,
-				Description: "Hypervisor address(es).  At least one is required.",
+				Description: "Hypervisor address(es). At least one is required.",
 				Required:    true,
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
@@ -138,6 +139,10 @@ func GetNutanixHypervisorSchema() schema.Schema {
 			},
 		},
 	}
+}
+
+func (NutanixHypervisorResourceModel) GetAttributes() map[string]schema.Attribute {
+	return NutanixHypervisorResourceModel{}.GetSchema().Attributes
 }
 
 func (r NutanixHypervisorResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel) NutanixHypervisorResourceModel {

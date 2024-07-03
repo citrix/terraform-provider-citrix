@@ -165,7 +165,7 @@ variable "vsphere_cluster_name" {
   type        = string
 }
 
-variable "vsphere_cluster_host" {
+variable "vsphere_host" {
   description = "FQDN or IP address of the host"
   type        = string
 }

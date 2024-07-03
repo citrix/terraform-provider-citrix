@@ -13,14 +13,16 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &zoneResource{}
-	_ resource.ResourceWithConfigure   = &zoneResource{}
-	_ resource.ResourceWithImportState = &zoneResource{}
-	_ resource.ResourceWithModifyPlan  = &zoneResource{}
+	_ resource.Resource                   = &zoneResource{}
+	_ resource.ResourceWithConfigure      = &zoneResource{}
+	_ resource.ResourceWithImportState    = &zoneResource{}
+	_ resource.ResourceWithValidateConfig = &zoneResource{}
+	_ resource.ResourceWithModifyPlan     = &zoneResource{}
 )
 
 // NewZoneResource is a helper function to simplify the provider implementation.
@@ -40,7 +42,7 @@ func (r *zoneResource) Metadata(_ context.Context, req resource.MetadataRequest,
 
 // Schema defines the schema for the resource.
 func (r *zoneResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = GetSchema()
+	resp.Schema = ZoneResourceModel{}.GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -302,4 +304,18 @@ func readZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, re
 	getZoneRequest := client.ApiClient.ZonesAPIsDAAS.ZonesGetZone(ctx, zoneId)
 	zone, _, err := util.ReadResource[*citrixorchestration.ZoneDetailResponseModel](getZoneRequest, ctx, client, resp, "Zone", zoneId)
 	return zone, err
+}
+
+func (r *zoneResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data ZoneResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }

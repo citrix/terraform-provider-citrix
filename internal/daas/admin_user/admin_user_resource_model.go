@@ -115,7 +115,7 @@ func (r AdminUserResourceModel) refreshRights(ctx context.Context, diagnostics *
 	return rightsForState
 }
 
-func GetAdminUserSchema() schema.Schema {
+func (AdminUserResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		// This description is used by the documentation generator and the language server.
 		Description: "Manages an administrator user for on-premise environment.",
@@ -150,4 +150,8 @@ func GetAdminUserSchema() schema.Schema {
 			},
 		},
 	}
+}
+
+func (AdminUserResourceModel) GetAttributes() map[string]schema.Attribute {
+	return AdminUserResourceModel{}.GetSchema().Attributes
 }

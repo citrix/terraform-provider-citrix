@@ -4,6 +4,7 @@ package stf_deployment
 import (
 	"context"
 	"strconv"
+	"strings"
 
 	citrixstorefront "github.com/citrix/citrix-daas-rest-go/citrixstorefront/models"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -105,7 +106,7 @@ func (r *stfDeploymentResource) Create(ctx context.Context, req resource.CreateR
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating StoreFront Deployment",
-			"TransactionId: ",
+			"\nError message: "+err.Error(),
 		)
 		return
 	}
@@ -135,6 +136,14 @@ func (r *stfDeploymentResource) Read(ctx context.Context, req resource.ReadReque
 
 	STFDeployment, err := getSTFDeployment(ctx, r.client, &resp.Diagnostics, state.SiteId.ValueStringPointer())
 	if err != nil {
+		return
+	}
+	if STFDeployment == nil {
+		resp.Diagnostics.AddWarning(
+			"StoreFront Deployment not found",
+			"StoreFront Deployment was not found and will be removed from the state file. An apply action will result in the creation of a new resource.",
+		)
+		resp.State.RemoveResource(ctx)
 		return
 	}
 	state.RefreshPropertyValues(STFDeployment)
@@ -266,6 +275,9 @@ func getSTFDeployment(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 	// Get refreshed STFDeployment properties from Orchestration
 	STFDeployment, err := getSTFDeploymentRequest.Execute()
 	if err != nil {
+		if strings.EqualFold(err.Error(), util.NOT_EXIST) {
+			return nil, nil
+		}
 		return &STFDeployment, err
 	}
 	return &STFDeployment, nil

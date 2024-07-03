@@ -13,17 +13,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &applicationFolderResource{}
-	_ resource.ResourceWithConfigure   = &applicationFolderResource{}
-	_ resource.ResourceWithImportState = &applicationFolderResource{}
+	_ resource.Resource                   = &applicationFolderResource{}
+	_ resource.ResourceWithConfigure      = &applicationFolderResource{}
+	_ resource.ResourceWithImportState    = &applicationFolderResource{}
+	_ resource.ResourceWithValidateConfig = &applicationFolderResource{}
 )
 
 // NewApplicationFolderResource is a helper function to simplify the provider implementation.
@@ -52,30 +50,7 @@ func (r *applicationFolderResource) Configure(_ context.Context, req resource.Co
 
 // Schema defines the schema for the data source.
 func (r *applicationFolderResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "Manages an application folder.",
-		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "GUID identifier of the application folder.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"name": schema.StringAttribute{
-				Description: "Name of the application folder.",
-				Required:    true,
-			},
-			"parent_path": schema.StringAttribute{
-				Description: "Parent Path to the application folder.",
-				Optional:    true,
-			},
-			"path": schema.StringAttribute{
-				Description: "Path to the application folder.",
-				Computed:    true,
-			},
-		},
-	}
+	resp.Schema = ApplicationFolderResourceModel{}.GetSchema()
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -246,4 +221,18 @@ func getApplicationFolder(ctx context.Context, client *citrixdaasclient.CitrixDa
 		)
 	}
 	return application_folder, err
+}
+
+func (r *applicationFolderResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data ApplicationFolderResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }

@@ -26,7 +26,7 @@ type NutanixHypervisorResourcePoolResourceModel struct {
 	Networks types.List `tfsdk:"networks"` // List[string]
 }
 
-func GetNutanixHypervisorResourcePoolSchema() schema.Schema {
+func (NutanixHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "Manages a Nutanix AHV hypervisor resource pool.",
 		Attributes: map[string]schema.Attribute{
@@ -61,6 +61,10 @@ func GetNutanixHypervisorResourcePoolSchema() schema.Schema {
 			},
 		},
 	}
+}
+
+func (NutanixHypervisorResourcePoolResourceModel) GetAttributes() map[string]schema.Attribute {
+	return NutanixHypervisorResourcePoolResourceModel{}.GetSchema().Attributes
 }
 
 func (r NutanixHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) NutanixHypervisorResourcePoolResourceModel {

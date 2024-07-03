@@ -30,7 +30,7 @@ type AwsHypervisorResourcePoolResourceModel struct {
 	AvailabilityZone types.String `tfsdk:"availability_zone"`
 }
 
-func GetAwsHypervisorResourcePoolSchema() schema.Schema {
+func (AwsHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "Manages an AWS EC2 hypervisor resource pool.",
 		Attributes: map[string]schema.Attribute{
@@ -79,6 +79,10 @@ func GetAwsHypervisorResourcePoolSchema() schema.Schema {
 			},
 		},
 	}
+}
+
+func (AwsHypervisorResourcePoolResourceModel) GetAttributes() map[string]schema.Attribute {
+	return AwsHypervisorResourcePoolResourceModel{}.GetSchema().Attributes
 }
 
 func (r AwsHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) AwsHypervisorResourcePoolResourceModel {

@@ -18,17 +18,20 @@ import (
 	"strings"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	citrixstorefrontclient "github.com/citrix/citrix-daas-rest-go/citrixstorefront/apis"
 	citrixstorefront "github.com/citrix/citrix-daas-rest-go/citrixstorefront/models"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Domain FQDN
@@ -46,7 +49,7 @@ const SamAndUpnRegex string = `^[a-zA-Z][a-zA-Z0-9\- ]{0,61}[a-zA-Z0-9]\\\w[\w\.
 const GuidRegex string = `^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}[}]?$`
 
 // GUID
-const StoreFrontServerIdRegex string = `^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{13}[}]?$`
+const StoreFrontServerIdRegex string = `^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}[0-9]+[}]?$`
 
 // IPv4
 const IPv4Regex string = `^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$`
@@ -62,6 +65,9 @@ const DateRegex string = `^\d{4}-\d{2}-\d{2}$`
 
 // Time HH:MM
 const TimeRegex string = `^([0-1][0-9]|2[0-3]):[0-5][0-9]$`
+
+// TimeSpan dd.HH:MM:SS
+const TimeSpanRegex string = `^(\d+)\.((\d)|(1\d)|(2[0-3])):((\d)|[1-5][0-9]):((\d)|[1-5][0-9])$`
 
 // ID of the Default Site Policy Set
 const DefaultSitePolicySetId string = "00000000-0000-0000-0000-000000000000"
@@ -96,6 +102,7 @@ const TemplateResourceType string = "Template"
 const StorageResourceType string = "Storage"
 const NetworkResourceType string = "Network"
 const SecurityGroupResourceType = "SecurityGroup"
+const HostResourceType = "Host"
 
 // Azure Storage Types
 const StandardLRS = "Standard_LRS"
@@ -110,6 +117,8 @@ const WindowsServerLicenseType string = "Windows_Server"
 // GAC
 const AssignmentPriority = 0
 const GacAppName = "Workspace"
+
+const SensitiveFieldMaskedValue = "*****"
 
 var PlatformSettingsAssignedTo = []string{"AllUsersNoAuthentication"}
 
@@ -400,20 +409,46 @@ func ProcessAsyncJobResponse(ctx context.Context, client *citrixdaasclient.Citri
 	}
 
 	if jobResponseModel.GetStatus() != citrixorchestration.JOBSTATUS_COMPLETE {
-		errorDetail := "TransactionId: " + txId +
+		errorMessage := "TransactionId: " + txId +
 			"\nJobId: " + jobResponseModel.GetId()
 
 		if jobResponseModel.GetStatus() == citrixorchestration.JOBSTATUS_FAILED {
-			errorDetail = errorDetail + "\nError message: " + jobResponseModel.GetErrorString()
+			detailedErrorFound := false
+			for _, kvp := range jobResponseModel.GetErrorParameters() {
+				if kvp.GetName() == "ErrorDetails" {
+					errorDetails := kvp.GetValue()
+					tflog.Error(ctx, errContext+"\n"+errorMessage+"\nError details: "+errorDetails)
+
+					// Add additional specific error handling for Orchestration job failures here
+					if strings.Contains(errorDetails, "No Citrix Workspace Cloud Connector was found") ||
+						strings.Contains(errorDetails, "Hcl request is not allowed when connector is in outage mode") {
+						detailedErrorFound = true
+						errorMessage += "\nError Message: Ensure the Citrix Cloud Connectors in the zone are available and try again."
+					}
+					if strings.Contains(errorDetails, "Machine profile is not provided and master image has security type as trusted launch") {
+						detailedErrorFound = true
+						errorMessage += "\nError Message: Master image has security type as trusted launch, this requires machine_profile to be provided."
+					}
+					if strings.Contains(errorDetails, "The master image associated with this catalog is associated with a VM Generation that is not supported by the configured Service Offering") {
+						detailedErrorFound = true
+						errorMessage += "\nError Message: service_offering does not support the VM Generation of the master image associated with this catalog."
+					}
+					break
+				}
+			}
+
+			if !detailedErrorFound {
+				errorMessage += "\nError message: " + jobResponseModel.GetErrorString()
+			}
 		}
 
 		diagnostics.AddError(
 			errContext,
-			errorDetail,
+			errorMessage,
 		)
 
 		if returnJobError {
-			return fmt.Errorf(errorDetail)
+			return fmt.Errorf(errorMessage)
 		}
 	}
 
@@ -660,7 +695,40 @@ func CheckProductVersion(client *citrixdaasclient.CitrixDaasClient, diagnostic *
 			fmt.Sprintf("Current DDC version %d does not support operations on %s resources.", client.ClientConfig.OrchestrationApiVersion, resourceName),
 			"",
 		)
+		return false
+	}
 
+	return true
+}
+
+// <summary>
+// Helper function to check the version requirement for StoreFront.
+// </summary>
+func CheckStoreFrontVersion(client *citrixstorefrontclient.STFVersion, ctx context.Context, diagnostic *diag.Diagnostics, requiredMajorVersion int, requiredMinorVersion int) bool {
+	// Validate StoreFront version
+	versionRequest := client.STFVersionGetVersion(ctx)
+	versionResponse, err := versionRequest.Execute()
+	if err != nil {
+		diagnostic.AddError(
+			"Error fetching StoreFront version",
+			"Error message: "+err.Error(),
+		)
+		return false
+	}
+
+	if versionResponse.Major.IsSet() && versionResponse.Minor.IsSet() {
+		majorVersion := *versionResponse.Major.Get()
+		minorVersion := *versionResponse.Minor.Get()
+
+		if majorVersion < requiredMajorVersion ||
+			(majorVersion == requiredMajorVersion && minorVersion < requiredMinorVersion) {
+			return false
+		}
+	} else {
+		diagnostic.AddError(
+			"Error fetching StoreFront version",
+			"Error message: StoreFront Major and Minor version not set",
+		)
 		return false
 	}
 
@@ -797,7 +865,7 @@ func GetUsersUsingIdentity(ctx context.Context, client *citrixdaasclient.CitrixD
 
 	getIncludedUsersRequest := client.ApiClient.IdentityAPIsDAAS.IdentityGetUsers(ctx)
 	getIncludedUsersRequest = getIncludedUsersRequest.User(users).UserType(citrixorchestration.IDENTITYUSERTYPE_ALL)
-	adUsers, httpResp, err := citrixdaasclient.AddRequestData(getIncludedUsersRequest, client).Execute()
+	adUsers, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.IdentityUserResponseModelCollection](getIncludedUsersRequest, client)
 
 	if err != nil {
 		return allUsersFromIdentity, httpResp, err
@@ -807,7 +875,7 @@ func GetUsersUsingIdentity(ctx context.Context, client *citrixdaasclient.CitrixD
 
 	if len(allUsersFromIdentity) < len(users) {
 		getIncludedUsersRequest = getIncludedUsersRequest.User(users).UserType(citrixorchestration.IDENTITYUSERTYPE_ALL).Provider(citrixorchestration.IDENTITYPROVIDERTYPE_ALL)
-		azureAdUsers, httpResp, err := citrixdaasclient.AddRequestData(getIncludedUsersRequest, client).Execute()
+		azureAdUsers, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.IdentityUserResponseModelCollection](getIncludedUsersRequest, client)
 
 		if err != nil {
 			return allUsersFromIdentity, httpResp, err
@@ -859,4 +927,149 @@ func VerifyIdentityUserListCompleteness(inputUserNames []string, remoteUsers []c
 	}
 
 	return nil
+}
+
+func GetConfigValuesForSchema(ctx context.Context, diags *diag.Diagnostics, m ModelWithAttributes) (string, map[string]interface{}) {
+	sensitiveFields := GetSensitiveFieldsForAttribute(ctx, diags, m.GetAttributes())
+	dataObj := TypedObjectToObjectValue(ctx, diags, m)
+	return reflect.TypeOf(m).String(), GetConfigValuesForObject(ctx, diags, dataObj, sensitiveFields)
+}
+
+func GetConfigValuesForObject(ctx context.Context, diags *diag.Diagnostics, obj types.Object, sensitiveFields map[string]bool) map[string]interface{} {
+
+	// Get the attributes for the object
+	attributes := obj.Attributes()
+	configValues := make(map[string]interface{})
+	for name, attribute := range attributes {
+		if _, ok := sensitiveFields[name]; ok {
+			configValues[name] = SensitiveFieldMaskedValue
+			continue
+		}
+
+		configValues[name] = GetAttributeValues(ctx, diags, attribute, sensitiveFields)
+	}
+	return configValues
+}
+
+func GetConfigValuesForMap(ctx context.Context, diags *diag.Diagnostics, configMap types.Map) map[string]interface{} {
+
+	if configMap.IsNull() || configMap.IsUnknown() {
+		return nil
+	}
+	configValues := make(map[string]interface{})
+	for name, value := range configMap.Elements() {
+		configValues[name] = GetAttributeValues(ctx, diags, value, map[string]bool{})
+	}
+	return configValues
+}
+
+func GetAttributeValues(ctx context.Context, diags *diag.Diagnostics, attribute attr.Value, sensitiveFields map[string]bool) interface{} {
+	refVal := reflect.ValueOf(attribute)
+	switch attribute.(type) {
+	case types.String:
+		return refVal.Interface().(types.String).ValueString()
+	case types.Bool:
+		return refVal.Interface().(types.Bool).ValueBool()
+	case types.Int64:
+		return refVal.Interface().(types.Int64).ValueInt64()
+	case types.Float64:
+		return refVal.Interface().(types.Float64).ValueFloat64()
+	case types.List:
+		reflectedList := refVal.Interface().(types.List)
+		reflectedElementType := reflect.TypeOf(reflectedList.ElementType(ctx))
+		if reflectedElementType.String() == "basetypes.StringType" {
+			return StringListToStringArray(ctx, diags, reflectedList)
+		} else if reflectedElementType.String() == "basetypes.ObjectType" {
+			objectList := make([]map[string]interface{}, 0)
+			for _, item := range reflectedList.Elements() {
+				objectList = append(objectList, GetConfigValuesForObject(ctx, diags, item.(types.Object), sensitiveFields))
+			}
+			return objectList
+		} else {
+			diags.AddWarning("Invalid Element Type", "Following element type is not supported in lists: "+reflectedElementType.String())
+			return nil
+		}
+	case types.Set:
+		reflectedSet := refVal.Interface().(types.Set)
+		reflectedElementType := reflect.TypeOf(reflectedSet.ElementType(ctx))
+		if reflectedElementType.String() == "basetypes.StringType" {
+			return StringSetToStringArray(ctx, diags, reflectedSet)
+		} else if reflectedElementType.String() == "basetypes.ObjectType" {
+			objectList := make([]map[string]interface{}, 0)
+			for _, item := range reflectedSet.Elements() {
+				objectList = append(objectList, GetConfigValuesForObject(ctx, diags, item.(types.Object), sensitiveFields))
+			}
+			return objectList
+		} else {
+			diags.AddWarning("Invalid Element Type", "Following element type is not supported in sets: "+reflectedElementType.String())
+			return nil
+		}
+	case types.Map: // Revisit this once schema uses Maps
+		reflectedMap := refVal.Interface().(types.Map)
+		reflectedValueType := reflect.TypeOf(reflectedMap.ElementType(ctx))
+		if reflectedValueType.String() == "basetypes.StringType" || reflectedValueType.String() == "basetypes.Int64Type" || reflectedValueType.String() == "basetypes.Float64Type" || reflectedValueType.String() == "basetypes.BoolType" {
+			return GetConfigValuesForMap(ctx, diags, reflectedMap)
+		} else if reflectedValueType.String() == "basetypes.ObjectType" {
+			objectList := make(map[string]interface{})
+			for key, item := range reflectedMap.Elements() {
+				objectList[key] = GetConfigValuesForObject(ctx, diags, item.(types.Object), sensitiveFields)
+			}
+			return objectList
+		} else {
+			diags.AddWarning("Invalid Element Type", "Following element type is not supported in maps: "+reflectedValueType.String())
+			return nil
+		}
+
+	case types.Object:
+		return GetConfigValuesForObject(ctx, diags, refVal.Interface().(types.Object), sensitiveFields)
+	default:
+		// Unknown type
+		diags.AddWarning("Invalid Attribute Type", "Attribute type not supported: "+reflect.TypeOf(attribute).String())
+		return nil
+	}
+}
+
+func GetSensitiveFieldsForAttribute(ctx context.Context, diags *diag.Diagnostics, attributes map[string]schema.Attribute) map[string]bool {
+	sensitiveFields := map[string]bool{}
+	for name, attribute := range attributes {
+
+		fieldsMap, isSensitive := CheckIfFieldIsSensitive(ctx, diags, attribute)
+		if isSensitive {
+			if fieldsMap != nil {
+				for key, val := range fieldsMap {
+					sensitiveFields[key] = val
+				}
+			} else {
+				sensitiveFields[name] = true
+			}
+		}
+	}
+	return sensitiveFields
+}
+
+func CheckIfFieldIsSensitive(ctx context.Context, diags *diag.Diagnostics, attribute schema.Attribute) (map[string]bool, bool) {
+
+	// If root attribute is sensitive, return true.
+	if attribute.IsSensitive() {
+		return nil, true
+	}
+
+	switch attr := attribute.(type) {
+	case schema.StringAttribute, schema.BoolAttribute, schema.Int64Attribute, schema.Float64Attribute, schema.ListAttribute, schema.SetAttribute, schema.MapAttribute:
+		return nil, false
+	case schema.SingleNestedAttribute:
+		sensitiveFields := GetSensitiveFieldsForAttribute(ctx, diags, attr.Attributes)
+		return sensitiveFields, len(sensitiveFields) > 0
+	case schema.ListNestedAttribute:
+		sensitiveFields := GetSensitiveFieldsForAttribute(ctx, diags, attr.NestedObject.Attributes)
+		return sensitiveFields, len(sensitiveFields) > 0
+	case schema.SetNestedAttribute:
+		sensitiveFields := GetSensitiveFieldsForAttribute(ctx, diags, attr.NestedObject.Attributes)
+		return sensitiveFields, len(sensitiveFields) > 0
+	case schema.MapNestedAttribute: // Revisit this once schema uses MapNestedAttribute
+		sensitiveFields := GetSensitiveFieldsForAttribute(ctx, diags, attr.NestedObject.Attributes)
+		return sensitiveFields, len(sensitiveFields) > 0
+	}
+	diags.AddWarning("Invalid Attribute Type", "Attribute type not supported: "+reflect.TypeOf(attribute).String())
+	return nil, false
 }

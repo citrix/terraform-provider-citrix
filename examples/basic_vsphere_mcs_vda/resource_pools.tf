@@ -4,7 +4,7 @@ resource "citrix_vsphere_hypervisor_resource_pool" "example-vsphere-rp" {
     cluster             = {
         datacenter = var.vsphere_cluster_datacenter
         cluster_name = var.vsphere_cluster_name
-        host = var.vsphere_cluster_host
+        # host = var.vsphere_host // Use one of host or cluster
     }
     networks    = var.vsphere_networks
     storage     = [

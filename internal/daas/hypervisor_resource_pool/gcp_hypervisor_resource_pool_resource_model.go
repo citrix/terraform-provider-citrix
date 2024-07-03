@@ -34,7 +34,7 @@ type GcpHypervisorResourcePoolResourceModel struct {
 	SharedVpc   types.Bool   `tfsdk:"shared_vpc"`
 }
 
-func GetGcpHypervisorResourcePoolSchema() schema.Schema {
+func (GcpHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "Manages a GCP hypervisor resource pool.",
 		Attributes: map[string]schema.Attribute{
@@ -104,6 +104,10 @@ func GetGcpHypervisorResourcePoolSchema() schema.Schema {
 			},
 		},
 	}
+}
+
+func (GcpHypervisorResourcePoolResourceModel) GetAttributes() map[string]schema.Attribute {
+	return GcpHypervisorResourcePoolResourceModel{}.GetSchema().Attributes
 }
 
 func (r GcpHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) GcpHypervisorResourcePoolResourceModel {

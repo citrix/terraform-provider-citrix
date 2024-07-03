@@ -123,8 +123,8 @@ func (r *stfUserFarmMappingResource) Read(ctx context.Context, req resource.Read
 	if err != nil {
 		if strings.EqualFold(err.Error(), util.NOT_EXIST) {
 			resp.Diagnostics.AddWarning(
-				"UserFarmMapping not found",
-				"UserFarmMapping Service was not found and will be removed from the state file. An apply action will result in the creation of a new resource.",
+				"StoreFront UserFarmMapping not found",
+				"StoreFront UserFarmMapping Service was not found and will be removed from the state file. An apply action will result in the creation of a new resource.",
 			)
 			resp.State.RemoveResource(ctx)
 			return

@@ -4,7 +4,7 @@ resource "citrix_vsphere_hypervisor_resource_pool" "example-vsphere-hypervisor-r
     cluster             = {
         datacenter = "<datacenter_name>"
         cluster_name = "<cluster_name>"
-        host = "<host_fqdn_or_ip>"
+        # host = "<host_fqdn_or_ip>" // Use one of host or cluster
     }
     networks    = [
         "<network 1 name>",

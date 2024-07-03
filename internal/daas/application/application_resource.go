@@ -14,13 +14,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &applicationResource{}
-	_ resource.ResourceWithConfigure   = &applicationResource{}
-	_ resource.ResourceWithImportState = &applicationResource{}
+	_ resource.Resource                   = &applicationResource{}
+	_ resource.ResourceWithConfigure      = &applicationResource{}
+	_ resource.ResourceWithImportState    = &applicationResource{}
+	_ resource.ResourceWithValidateConfig = &applicationResource{}
 )
 
 // NewApplicationResource is a helper function to simplify the provider implementation.
@@ -49,7 +51,7 @@ func (r *applicationResource) Configure(_ context.Context, req resource.Configur
 
 // Schema defines the schema for the data source.
 func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = GetSchema()
+	resp.Schema = ApplicationResourceModel{}.GetSchema()
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -353,4 +355,18 @@ func checkIfApplicationFolderPathExist(ctx context.Context, client *citrixdaascl
 		return false
 	}
 	return true
+}
+
+func (r *applicationResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data ApplicationResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }

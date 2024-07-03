@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -41,7 +42,7 @@ func (r *adminRoleResource) Metadata(_ context.Context, req resource.MetadataReq
 
 // Schema defines the schema for the resource.
 func (r *adminRoleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = GetAdminRoleSchema()
+	resp.Schema = AdminRoleResourceModel{}.GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -256,6 +257,9 @@ func (r *adminRoleResource) ValidateConfig(ctx context.Context, req resource.Val
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }
 
 func (r *adminRoleResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {

@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -41,7 +42,7 @@ func (r *machineCatalogResource) Metadata(_ context.Context, req resource.Metada
 
 // Schema defines the schema for the resource.
 func (r *machineCatalogResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = GetSchema()
+	resp.Schema = MachineCatalogResourceModel{}.GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -75,7 +76,7 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 	provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
 
 	// Add domain credential header
-	if plan.ProvisioningType.ValueString() == string(citrixorchestration.PROVISIONINGTYPE_MCS) && !provSchemeModel.MachineDomainIdentity.IsNull() {
+	if (plan.ProvisioningType.ValueString() == string(citrixorchestration.PROVISIONINGTYPE_MCS) || plan.ProvisioningType.ValueString() == string(citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING)) && !provSchemeModel.MachineDomainIdentity.IsNull() {
 		header := generateAdminCredentialHeader(util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemeModel.MachineDomainIdentity))
 		createMachineCatalogRequest = createMachineCatalogRequest.XAdminCredential(header)
 	}
@@ -255,7 +256,7 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		deleteMachinesFromManualCatalog(ctx, r.client, resp, deleteMachinesMap, catalogId)
 	} else {
 		provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
-		err = updateCatalogImageAndMachineProfile(ctx, r.client, resp, catalog, plan)
+		err = updateCatalogImageAndMachineProfile(ctx, r.client, resp, catalog, plan, provisioningType)
 
 		if err != nil {
 			return
@@ -263,7 +264,7 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 
 		if catalog.GetTotalCount() > int32(provSchemeModel.NumTotalMachines.ValueInt64()) {
 			// delete machines from machine catalog
-			err = deleteMachinesFromMcsCatalog(ctx, r.client, resp, catalog, provSchemeModel)
+			err = deleteMachinesFromMcsPvsCatalog(ctx, r.client, resp, catalog, provSchemeModel)
 			if err != nil {
 				return
 			}
@@ -271,7 +272,7 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 
 		if catalog.GetTotalCount() < int32(provSchemeModel.NumTotalMachines.ValueInt64()) {
 			// add machines to machine catalog
-			err = addMachinesToMcsCatalog(ctx, r.client, resp, catalog, provSchemeModel)
+			err = addMachinesToMcsPvsCatalog(ctx, r.client, resp, catalog, provSchemeModel)
 			if err != nil {
 				return
 			}
@@ -348,7 +349,7 @@ func (r *machineCatalogResource) Delete(ctx context.Context, req resource.Delete
 	deleteMachineCatalogRequest := r.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsDeleteMachineCatalog(ctx, catalogId)
 	deleteAccountOption := citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE
 	deleteVmOption := false
-	if catalog.GetProvisioningType() == citrixorchestration.PROVISIONINGTYPE_MCS {
+	if catalog.GetProvisioningType() == citrixorchestration.PROVISIONINGTYPE_MCS || catalog.ProvisioningType == citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING {
 		provScheme := catalog.GetProvisioningScheme()
 		identityType := provScheme.GetIdentityType()
 
@@ -400,6 +401,9 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 		return
 	}
 
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
+
 	sessionSupportMultiSession := string(citrixorchestration.SESSIONSUPPORT_MULTI_SESSION)
 	allocationTypeStatic := string(citrixorchestration.ALLOCATIONTYPE_STATIC)
 	if data.SessionSupport.ValueString() == sessionSupportMultiSession && data.AllocationType.ValueString() == allocationTypeStatic {
@@ -412,6 +416,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 
 	provisioningTypeMcs := string(citrixorchestration.PROVISIONINGTYPE_MCS)
 	provisioningTypeManual := string(citrixorchestration.PROVISIONINGTYPE_MANUAL)
+	provisioningTypePvsStreaming := string(citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING)
 
 	azureAD := string(citrixorchestration.IDENTITYTYPE_AZURE_AD)
 
@@ -431,11 +436,36 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 				if !azureMachineConfigModel.WritebackCache.IsNull() {
 					// Validate Writeback Cache
 					azureWbcModel := util.ObjectValueToTypedObject[AzureWritebackCacheModel](ctx, &resp.Diagnostics, azureMachineConfigModel.WritebackCache)
+
+					if azureWbcModel.PersistWBC.IsNull() {
+						resp.Diagnostics.AddAttributeError(
+							path.Root("persist_wbc"),
+							"Missing Attribute Configuration",
+							fmt.Sprintf("persist_wbc for writeback_cache under azure_machine_config must be set when provisioning_type is %s.", provisioningTypeMcs),
+						)
+					}
+
+					if azureWbcModel.StorageCostSaving.IsNull() {
+						resp.Diagnostics.AddAttributeError(
+							path.Root("storage_cost_saving"),
+							"Incorrect Attribute Configuration",
+							fmt.Sprintf("storage_cost_saving for writeback_cache under azure_machine_config must be set when provisioning_type is %s.", provisioningTypeMcs),
+						)
+					}
+
+					if azureWbcModel.WriteBackCacheMemorySizeMB.IsNull() {
+						resp.Diagnostics.AddAttributeError(
+							path.Root("writeback_cache_memory_size_mb"),
+							"Incorrect Attribute Configuration",
+							fmt.Sprintf("writeback_cache_memory_size_mb for writeback_cache under azure_machine_config must be set when provisioning_type is %s.", provisioningTypeMcs),
+						)
+					}
+
 					if !azureWbcModel.PersistOsDisk.ValueBool() && azureWbcModel.PersistVm.ValueBool() {
 						resp.Diagnostics.AddAttributeError(
 							path.Root("persist_vm"),
 							"Incorrect Attribute Configuration",
-							"persist_os_disk must be enabled to enable persist_vm.",
+							"persist_os_disk for writeback_cache under azure_machine_config must be enabled to enable persist_vm.",
 						)
 					}
 
@@ -443,7 +473,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 						resp.Diagnostics.AddAttributeError(
 							path.Root("storage_cost_saving"),
 							"Incorrect Attribute Configuration",
-							"persist_wbc must be enabled to enable storage_cost_saving.",
+							"persist_wbc for writeback_cache under azure_machine_config must be enabled to enable storage_cost_saving.",
 						)
 					}
 				}
@@ -463,6 +493,14 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 						path.Root("enroll_in_intune"),
 						"Incorrect Attribute Configuration",
 						fmt.Sprintf("Azure Intune auto enrollment is only supported when `allocation_type` is %s.", allocationTypeStatic),
+					)
+				}
+
+				if !azureMachineConfigModel.AzurePvsConfiguration.IsNull() {
+					resp.Diagnostics.AddAttributeError(
+						path.Root("azure_pvs_config"),
+						"Incorrect Attribute Configuration",
+						fmt.Sprintf("azure_pvs_config is not supported when provisioning_type is %s.", provisioningTypeMcs),
 					)
 				}
 
@@ -563,6 +601,135 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 		}
 
 		data.IsPowerManaged = types.BoolValue(true) // set power managed to true for MCS catalog
+	} else if data.ProvisioningType.ValueString() == provisioningTypePvsStreaming {
+		// Add checks for PVSStreaming catalogs
+		if data.ProvisioningScheme.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("provisioning_scheme"),
+				"Missing Attribute Configuration",
+				fmt.Sprintf("Expected provisioning_scheme to be configured when value of provisioning_type is %s.", provisioningTypePvsStreaming),
+			)
+		} else {
+			// Validate Provisioning Scheme
+			provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, data.ProvisioningScheme)
+			if provSchemeModel.AzureMachineConfig.IsNull() {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("azure_machine_config"),
+					"Missing Attribute Configuration",
+					fmt.Sprintf("PVS Catalogs are currently only supported for Azure environment. Expected azure_machine_config to be configured when value of provisioning_type is %s.", provisioningTypePvsStreaming),
+				)
+			}
+
+			azureMachineConfigModel := util.ObjectValueToTypedObject[AzureMachineConfigModel](ctx, &resp.Diagnostics, provSchemeModel.AzureMachineConfig)
+
+			if azureMachineConfigModel.AzurePvsConfiguration.IsNull() {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("azure_pvs_config"),
+					"Missing Attribute Configuration",
+					fmt.Sprintf("Expected azure_pvs_config to be configured when value of provisioning_type is %s.", provisioningTypePvsStreaming),
+				)
+			}
+
+			if !azureMachineConfigModel.AzureMasterImage.IsNull() {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("azure_master_image"),
+					"Incorrect Attribute Configuration",
+					fmt.Sprintf("azure_master_image cannot be configured when value of provisioning_type is %s.", provisioningTypePvsStreaming),
+				)
+			}
+
+			if azureMachineConfigModel.MasterImageNote.ValueString() != "" {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("master_image_note"),
+					"Incorrect Attribute Configuration",
+					fmt.Sprintf("master_image_note cannot be configured when value of provisioning_type is %s.", provisioningTypePvsStreaming),
+				)
+			}
+
+			if azureMachineConfigModel.StorageType.ValueString() == util.AzureEphemeralOSDisk {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("storage_type"),
+					"Incorrect Attribute Configuration",
+					fmt.Sprintf("Storage type cannot be set to Azure_Ephemeral_OS_Disk when provisioning_type is %s.", provisioningTypePvsStreaming),
+				)
+			}
+
+			if !azureMachineConfigModel.UseAzureComputeGallery.IsNull() {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("use_azure_compute_gallery"),
+					"Incorrect Attribute Configuration",
+					fmt.Sprintf("use_azure_compute_gallery cannot be configured when provisioning_type is %s.", provisioningTypePvsStreaming),
+				)
+			}
+
+			if !azureMachineConfigModel.EnrollInIntune.IsNull() {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("enroll_in_intune"),
+					"Incorrect Attribute Configuration",
+					fmt.Sprintf("enroll_in_intune cannot be configured when provisioning_type is %s.", provisioningTypePvsStreaming),
+				)
+			}
+
+			if !azureMachineConfigModel.DiskEncryptionSet.IsNull() {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("disk_encryption_set"),
+					"Incorrect Attribute Configuration",
+					fmt.Sprintf("disk_encryption_set cannot be configured when provisioning_type is %s.", provisioningTypePvsStreaming),
+				)
+			}
+
+			if azureMachineConfigModel.MachineProfile.IsNull() {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("machine_profile"),
+					"Missing Attribute Configuration",
+					fmt.Sprintf("Expected machine_profile to be configured when value of provisioning_type is %s.", provisioningTypePvsStreaming),
+				)
+			}
+
+			if azureMachineConfigModel.WritebackCache.IsNull() {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("writeback_cache"),
+					"Missing Attribute Configuration",
+					fmt.Sprintf("Expected writeback_cache to be configured when value of provisioning_type is %s.", provisioningTypePvsStreaming),
+				)
+			} else {
+
+				azureWbcModel := util.ObjectValueToTypedObject[AzureWritebackCacheModel](ctx, &resp.Diagnostics, azureMachineConfigModel.WritebackCache)
+				if azureWbcModel.PersistWBC.IsNull() || azureWbcModel.PersistWBC.ValueBool() == false {
+					resp.Diagnostics.AddAttributeError(
+						path.Root("persist_wbc"),
+						"Incorrect Attribute Configuration",
+						fmt.Sprintf("persist_wbc for writeback_cache under azure_machine_config needs to be set to true for provisioning type %s.", provisioningTypePvsStreaming),
+					)
+				}
+
+				if !azureWbcModel.StorageCostSaving.IsNull() {
+					resp.Diagnostics.AddAttributeError(
+						path.Root("storage_cost_saving"),
+						"Incorrect Attribute Configuration",
+						fmt.Sprintf("storage_cost_saving for writeback_cache under azure_machine_config cannot be configured when provisioning_type is %s.", provisioningTypePvsStreaming),
+					)
+				}
+			}
+
+		}
+
+		if !data.MachineAccounts.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("machine_accounts"),
+				"Incorrect Attribute Configuration",
+				fmt.Sprintf("machine_accounts cannot be configured when provisioning_type is %s.", provisioningTypePvsStreaming),
+			)
+		}
+
+		if data.IsRemotePc.ValueBool() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("is_remote_pc"),
+				"Incorrect Attribute Configuration",
+				fmt.Sprintf("Remote PC access catalog cannot be created when provisioning_type is %s.", provisioningTypePvsStreaming),
+			)
+		}
+
 	} else if data.ProvisioningType.ValueString() == provisioningTypeManual {
 		// Manual provisioning type
 		if data.IsPowerManaged.IsNull() {
@@ -585,7 +752,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 			resp.Diagnostics.AddAttributeError(
 				path.Root("provisioning_scheme"),
 				"Incorrect Attribute Configuration",
-				fmt.Sprintf("provisioning_scheme cannot be configured when provisioning_type is not %s.", provisioningTypeMcs),
+				fmt.Sprintf("provisioning_scheme cannot be configured when provisioning_type is not %s or %s.", provisioningTypeMcs, provisioningTypePvsStreaming),
 			)
 		}
 

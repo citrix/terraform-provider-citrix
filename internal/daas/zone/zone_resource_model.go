@@ -26,7 +26,7 @@ type ZoneResourceModel struct {
 	Metadata    types.List   `tfsdk:"metadata"` // []utils.NameValueStringPairModel
 }
 
-func GetSchema() schema.Schema {
+func (ZoneResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "Manages a zone.\nFor cloud DDC, Zones and Cloud Connectors are managed only by Citrix Cloud. Ensure you have a resource location manually created and connectors deployed in it. You may then apply or import the zone using the zone Id.",
 		Attributes: map[string]schema.Attribute{
@@ -57,6 +57,10 @@ func GetSchema() schema.Schema {
 			},
 		},
 	}
+}
+
+func (ZoneResourceModel) GetAttributes() map[string]schema.Attribute {
+	return ZoneResourceModel{}.GetSchema().Attributes
 }
 
 func (r ZoneResourceModel) RefreshPropertyValues(ctx context.Context, diags *diag.Diagnostics, zone *citrixorchestration.ZoneDetailResponseModel, onpremises bool) ZoneResourceModel {
