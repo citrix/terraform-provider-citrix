@@ -644,7 +644,7 @@ func (networkMapping NetworkMappingModel) RefreshListItem(_ context.Context, _ *
 		* XDHyp:\\HostingUnits\\{resource pool}\\{availability zone}.availabilityzone\\{network ip}`/{prefix length} (vpc-{vpc-id}).network
 		* The Network property should be set to {network ip}/{prefix length}
 		 */
-		networkName = strings.ReplaceAll(strings.Split((strings.Split(segments[lastIndex-1], ".network"))[0], " ")[0], "`/", "/")
+		networkName = strings.ReplaceAll(strings.Split((strings.TrimSuffix(segments[lastIndex-1], ".network")), " ")[0], "`/", "/")
 	}
 	networkMapping.Network = types.StringValue(networkName)
 	return networkMapping

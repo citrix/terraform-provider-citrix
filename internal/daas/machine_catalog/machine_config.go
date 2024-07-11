@@ -1033,8 +1033,8 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 				if strings.EqualFold(resourceType, util.VhdResourceType) {
 					// VHD image
 					azureMasterImage.MasterImage = types.StringValue(masterImage.GetName())
-					azureMasterImage.Container = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
-					azureMasterImage.StorageAccount = types.StringValue(strings.Split(segments[lastIndex-3], ".")[0])
+					azureMasterImage.Container = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".container"))
+					azureMasterImage.StorageAccount = types.StringValue(strings.TrimSuffix(segments[lastIndex-3], ".storageaccount"))
 				} else if strings.EqualFold(resourceType, util.ImageVersionResourceType) {
 					/* For Azure Image Gallery image, the XDPath looks like:
 					* XDHyp:\\HostingUnits\\{resource pool}\\image.folder\\{resource group}.resourcegroup\\{gallery name}.gallery\\{image name}.imagedefinition\\{image version}.imageversion
@@ -1042,17 +1042,20 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 					 */
 					azureGalleryImageModel := util.ObjectValueToTypedObject[GalleryImageModel](ctx, diagnostics, azureMasterImage.GalleryImage)
 					azureGalleryImageModel.Version = types.StringValue(masterImage.GetName())
-					azureGalleryImageModel.Definition = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
-					azureGalleryImageModel.Gallery = types.StringValue(strings.Split(segments[lastIndex-3], ".")[0])
+					// Extract {image name} from {image name}.imagedefinition
+					azureGalleryImageModel.Definition = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".imagedefinition"))
+					// Extract {gallery name} from {gallery name}.gallery
+					azureGalleryImageModel.Gallery = types.StringValue(strings.TrimSuffix(segments[lastIndex-3], ".gallery"))
 
 					azureMasterImage.GalleryImage = util.TypedObjectToObjectValue(ctx, diagnostics, azureGalleryImageModel)
 
 				}
-				azureMasterImage.ResourceGroup = types.StringValue(strings.Split(segments[lastIndex-4], ".")[0])
+				// Extract {resource group} from {resource group}.resourcegroup
+				azureMasterImage.ResourceGroup = types.StringValue(strings.TrimSuffix(segments[lastIndex-4], ".resourcegroup"))
 			} else {
 				// Snapshot or Managed Disk
 				azureMasterImage.MasterImage = types.StringValue(masterImage.GetName())
-				azureMasterImage.ResourceGroup = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
+				azureMasterImage.ResourceGroup = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".resourcegroup"))
 			}
 		}
 
@@ -1271,7 +1274,7 @@ func (mc *GcpMachineConfigModel) RefreshProperties(ctx context.Context, diagnost
 		if lastIndex > 4 {
 			// If path slices are more than 4, that means a snapshot was used for the catalog
 			mc.MachineSnapshot = types.StringValue(masterImage.GetName())
-			mc.MasterImage = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
+			mc.MasterImage = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".snapshot"))
 		} else {
 			// If path slices equals to 4, that means a VM was used for the catalog
 			mc.MasterImage = types.StringValue(masterImage.GetName())
@@ -1365,7 +1368,7 @@ func (mc *VsphereMachineConfigModel) RefreshProperties(ctx context.Context, diag
 	if machineProfileXdPath := machineProfile.GetXDPath(); machineProfileXdPath != "" {
 		machineProfileParts := strings.Split(machineProfileXdPath, "\\")
 		machineProfileName := machineProfileParts[len(machineProfileParts)-1]
-		machineProfileTemplateName := strings.Split(machineProfileName, ".template")[0]
+		machineProfileTemplateName := strings.TrimSuffix(machineProfileName, ".template")
 		mc.MachineProfile = types.StringValue(machineProfileTemplateName)
 	}
 }
@@ -1431,7 +1434,7 @@ func parseAzureMachineProfileResponseToModel(machineProfileResponse citrixorches
 			})
 
 			if templateSpecIndex != -1 {
-				templateSpec := strings.Split(machineProfileSegments[templateSpecIndex], ".")[0]
+				templateSpec := strings.TrimSuffix(machineProfileSegments[templateSpecIndex], ".templatespecversion")
 				machineProfileModel.MachineProfileTemplateSpecName = types.StringValue(templateSpec)
 			}
 		} else {
@@ -1443,7 +1446,7 @@ func parseAzureMachineProfileResponseToModel(machineProfileResponse citrixorches
 		})
 
 		if resourceGroupIndex != -1 {
-			resourceGroup := strings.Split(machineProfileSegments[resourceGroupIndex], ".")[0]
+			resourceGroup := strings.TrimSuffix(machineProfileSegments[resourceGroupIndex], ".resourcegroup")
 			machineProfileModel.MachineProfileResourceGroup = types.StringValue(resourceGroup)
 		}
 	} else {
@@ -1466,11 +1469,11 @@ func parseOnPremImagePath(catalog citrixorchestration.MachineCatalogDetailRespon
 	 * A new snapshot will be created if it was not specified. There will always be at least one snapshot in the path.
 	 */
 	imageSegments := strings.Split(relativePath, "/")
-	masterImage = strings.Split(imageSegments[0], ".")[0]
+	masterImage = strings.TrimSuffix(imageSegments[0], ".vm")
 
-	snapshot := strings.Split(imageSegments[1], ".")[0]
+	snapshot := strings.TrimSuffix(imageSegments[1], ".snapshot")
 	for i := 2; i < len(imageSegments); i++ {
-		snapshot = snapshot + "/" + strings.Split(imageSegments[i], ".")[0]
+		snapshot = snapshot + "/" + strings.TrimSuffix(imageSegments[i], ".snapshot")
 	}
 
 	return masterImage, snapshot

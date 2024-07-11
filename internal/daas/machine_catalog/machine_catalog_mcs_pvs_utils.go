@@ -1390,7 +1390,7 @@ func getOnPremImagePath(ctx context.Context, client *citrixdaasclient.CitrixDaas
 	if snapshot != "" {
 		queryPath = fmt.Sprintf("%s.vm", image)
 		snapshotSegments := strings.Split(snapshot, "/")
-		snapshotName := strings.Split(snapshotSegments[len(snapshotSegments)-1], ".")[0]
+		snapshotName := snapshotSegments[len(snapshotSegments)-1]
 		for i := 0; i < len(snapshotSegments)-1; i++ {
 			queryPath = queryPath + "\\" + snapshotSegments[i] + ".snapshot"
 		}
