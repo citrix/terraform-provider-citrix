@@ -1434,7 +1434,7 @@ func parseAzureMachineProfileResponseToModel(machineProfileResponse citrixorches
 			})
 
 			if templateSpecIndex != -1 {
-				templateSpec := strings.TrimSuffix(machineProfileSegments[templateSpecIndex], ".templatespecversion")
+				templateSpec := strings.TrimSuffix(machineProfileSegments[templateSpecIndex], ".templatespec")
 				machineProfileModel.MachineProfileTemplateSpecName = types.StringValue(templateSpec)
 			}
 		} else {
