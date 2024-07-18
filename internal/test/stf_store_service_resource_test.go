@@ -54,6 +54,9 @@ func TestSTFStoreServiceResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_stf_store_service.testSTFStoreService", "enumeration_options.filter_by_keywords_include.1", "AppSet2"),
 					// Verify launch_options of STF Store Service
 					resource.TestCheckResourceAttr("citrix_stf_store_service.testSTFStoreService", "launch_options.vda_logon_data_provider", "FASLogonDataProvider"),
+					// Verify gateway_settings of STF Store Service
+					resource.TestCheckResourceAttr("citrix_stf_store_service.testSTFStoreService", "gateway_settings.enable", "true"),
+					resource.TestCheckResourceAttr("citrix_stf_store_service.testSTFStoreService", "gateway_settings.gateway_url", "https://test-ddc.com"),
 					// Verify Store Farm Configutations of STF Store Service
 					resource.TestCheckResourceAttr("citrix_stf_store_service.testSTFStoreService", "farm_settings.enable_file_type_association", "true"),
 					resource.TestCheckResourceAttr("citrix_stf_store_service.testSTFStoreService", "farm_settings.communication_timeout", "0.0:0:0"),
@@ -66,6 +69,8 @@ func TestSTFStoreServiceResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_stf_store_service.testSTFStoreService", "farm_settings.background_healthcheck_polling", "0.0:0:0"),
 					resource.TestCheckResourceAttr("citrix_stf_store_service.testSTFStoreService", "farm_settings.advanced_healthcheck", "false"),
 					resource.TestCheckResourceAttr("citrix_stf_store_service.testSTFStoreService", "farm_settings.cert_revocation_policy", "MustCheck"),
+					// Verify roaming_account of STF Store Service
+					resource.TestCheckResourceAttr("citrix_stf_store_service.testSTFStoreService", "roaming_account.published", "true"),
 				),
 			},
 
@@ -103,6 +108,10 @@ func TestSTFStoreServiceResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_stf_store_service.testSTFStoreService", "farm_settings.background_healthcheck_polling", "0.0:1:0"),
 					resource.TestCheckResourceAttr("citrix_stf_store_service.testSTFStoreService", "farm_settings.advanced_healthcheck", "true"),
 					resource.TestCheckResourceAttr("citrix_stf_store_service.testSTFStoreService", "farm_settings.cert_revocation_policy", "NoCheck"),
+					// Verify gateway_settings of STF Store Service
+					resource.TestCheckResourceAttr("citrix_stf_store_service.testSTFStoreService", "gateway_settings.gateway_url", "https://updated-test-ddc.com"),
+					// Verify roaming_account of STF Store Service
+					resource.TestCheckResourceAttr("citrix_stf_store_service.testSTFStoreService", "roaming_account.published", "false"),
 				),
 			},
 		},
@@ -138,9 +147,6 @@ var (
 		virtual_path = "%s"
 		friendly_name = "Store"
 		authentication_service_virtual_path =  citrix_stf_authentication_service.testSTFAuthenticationService.virtual_path
-		pna = {
-			enable = true
-		}
 		enumeration_options = {
 			enhanced_enumeration = "false"
 			filter_by_keywords_include = ["AppSet1", "AppSet2"]
@@ -161,6 +167,13 @@ var (
 		launch_options = {
         	vda_logon_data_provider = "FASLogonDataProvider"
     	}
+		gateway_settings = {
+			enable = true
+			gateway_url = "https://test-ddc.com"
+		}
+		roaming_account = {
+			published = "true"
+		}
 	  }
 	`
 	testSTFStoreServiceResources_updated = `
@@ -189,6 +202,13 @@ var (
 		launch_options = {
         	vda_logon_data_provider = "UpdatedLogonDataProvider"
     	}
+		gateway_settings = {
+			enable = true
+			gateway_url = "https://updated-test-ddc.com"
+		}
+		roaming_account = {
+			published = "false"
+		}
 	  }
 	`
 )

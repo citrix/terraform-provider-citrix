@@ -73,7 +73,7 @@ func (r *stfWebReceiverResource) ModifyPlan(ctx context.Context, req resource.Mo
 
 	webReceiverUI := util.ObjectValueToTypedObject[UserInterface](ctx, &resp.Diagnostics, plan.UserInterface)
 	if !webReceiverUI.PreventIcaDownloads.IsUnknown() && !webReceiverUI.PreventIcaDownloads.IsNull() {
-		stfSupportPreventIcaDownload := util.CheckStoreFrontVersion(r.client.StorefrontClient.VersionSF, ctx, &resp.Diagnostics, 3, 29)
+		stfSupportPreventIcaDownload := util.CheckStoreFrontVersion(r.client.StorefrontClient.VersionSF, ctx, &resp.Diagnostics, 3, 27)
 		if !stfSupportPreventIcaDownload && webReceiverUI.PreventIcaDownloads.ValueBool() {
 			resp.Diagnostics.AddError(
 				fmt.Sprintf("Error %s StoreFront Web Receiver resource", operation),
@@ -101,7 +101,7 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating StoreFront WebReceiver ",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 		return
 	}
@@ -117,7 +117,7 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating StoreFront WebReceiver",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 		return
 	}
@@ -129,7 +129,7 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating StoreFront Authentication Service ",
-				"\nError message: "+err.Error(),
+				"Error message: "+err.Error(),
 			)
 			return
 		}
@@ -148,7 +148,7 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating StoreFront WebReceiver Authentication Methods",
-				"\nError message: "+err.Error(),
+				"Error message: "+err.Error(),
 			)
 			return
 		}
@@ -180,7 +180,7 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating StoreFront WebReceiver Plugin Assistant",
-				"\nError message: "+err.Error(),
+				"Error message: "+err.Error(),
 			)
 			return
 		}
@@ -194,7 +194,7 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching StoreFront WebReceiver Authentication Methods",
-				"\nError message: "+err.Error(),
+				"Error message: "+err.Error(),
 			)
 			return
 		}
@@ -210,7 +210,7 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching StoreFront WebReceiver Plugin Assistant",
-				"\nError message: "+err.Error(),
+				"Error message: "+err.Error(),
 			)
 			return
 		}
@@ -258,8 +258,26 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 		}
 	}
 
+	//  Resources Service settings Config
+	var resourcesServiceResponse citrixstorefront.GetSTFWebReceiverResourcesServiceResponseModel
+	if !plan.ResourcesService.IsNull() {
+		resourcesServiceResponse, err = setAndGetSTFWebReceiverResourcesService(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.ResourcesService)
+		if err != nil {
+			return
+		}
+	}
+
+	var sitestyle citrixstorefront.STFWebReceiverSiteStyleResponseModel
+	if !plan.WebReceiverSiteStyle.IsNull() {
+		sitestyle, err = setAndGetSTFWebReceiverSiteStyle(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.WebReceiverSiteStyle)
+		if err != nil {
+			return
+		}
+
+	}
+
 	// Map response body to schema and populate Computed attribute values
-	plan.RefreshPropertyValues(ctx, &resp.Diagnostics, &WebReceiverDetail, &appShortcutsResponse, &communicationResponse, &stsResponse, &authManagerResponse, &uiResponse)
+	plan.RefreshPropertyValues(ctx, &resp.Diagnostics, &WebReceiverDetail, &appShortcutsResponse, &communicationResponse, &stsResponse, &authManagerResponse, &uiResponse, &resourcesServiceResponse, &sitestyle)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -302,7 +320,7 @@ func (r *stfWebReceiverResource) Read(ctx context.Context, req resource.ReadRequ
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error reading StoreFront Authentication Service ",
-				"\nError message: "+err.Error(),
+				"Error message: "+err.Error(),
 			)
 			return
 		}
@@ -316,7 +334,7 @@ func (r *stfWebReceiverResource) Read(ctx context.Context, req resource.ReadRequ
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching StoreFront WebReceiver Plugin Assistant",
-				"\nError message: "+err.Error(),
+				"Error message: "+err.Error(),
 			)
 			return
 		}
@@ -364,7 +382,25 @@ func (r *stfWebReceiverResource) Read(ctx context.Context, req resource.ReadRequ
 		}
 	}
 
-	state.RefreshPropertyValues(ctx, &resp.Diagnostics, STFWebReceiver, &appShortcutsResponse, &communicationResponse, &stsResponse, &authManagerResponse, &uiResponse)
+	//  Resources Service settings Config
+	var resourcesServiceResponse citrixstorefront.GetSTFWebReceiverResourcesServiceResponseModel
+	if !state.ResourcesService.IsNull() {
+		resourcesServiceResponse, err = getSTFWebReceiverResourcesService(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
+		if err != nil {
+			return
+		}
+	}
+
+	// Refresh Site Style
+	var sitestyle citrixstorefront.STFWebReceiverSiteStyleResponseModel
+	if !state.WebReceiverSiteStyle.IsNull() {
+		sitestyle, err = getSTFWebReceiverSiteStyle(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
+		if err != nil {
+			return
+		}
+	}
+
+	state.RefreshPropertyValues(ctx, &resp.Diagnostics, STFWebReceiver, &appShortcutsResponse, &communicationResponse, &stsResponse, &authManagerResponse, &uiResponse, &resourcesServiceResponse, &sitestyle)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -393,7 +429,7 @@ func (r *stfWebReceiverResource) Update(ctx context.Context, req resource.Update
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating StoreFront Authentication Service ",
-				"\nError message: "+err.Error(),
+				"Error message: "+err.Error(),
 			)
 			return
 		}
@@ -412,7 +448,7 @@ func (r *stfWebReceiverResource) Update(ctx context.Context, req resource.Update
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating StoreFront WebReceiver Authentication Methods",
-				"\nError message: "+err.Error(),
+				"Error message: "+err.Error(),
 			)
 			return
 		}
@@ -444,7 +480,7 @@ func (r *stfWebReceiverResource) Update(ctx context.Context, req resource.Update
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating StoreFront WebReceiver Plugin Assistant",
-				"\nError message: "+err.Error(),
+				"Error message: "+err.Error(),
 			)
 			return
 		}
@@ -493,6 +529,24 @@ func (r *stfWebReceiverResource) Update(ctx context.Context, req resource.Update
 		plan.UserInterface = plan.RefreshUserInterface(ctx, &resp.Diagnostics, &uiResponse)
 	}
 
+	//  Resources Service settings Config
+	if !plan.ResourcesService.IsNull() {
+		resourcesServiceResponse, err := setAndGetSTFWebReceiverResourcesService(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.ResourcesService)
+		if err != nil {
+			return
+		}
+		plan.ResourcesService = plan.RefreshResourcesService(ctx, &resp.Diagnostics, &resourcesServiceResponse)
+	}
+
+	if !plan.WebReceiverSiteStyle.IsNull() {
+		sitestyle, err := setAndGetSTFWebReceiverSiteStyle(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.WebReceiverSiteStyle)
+		if err != nil {
+			return
+		}
+
+		plan.WebReceiverSiteStyle = plan.RefreshWebReceiverSiteStyle(ctx, &resp.Diagnostics, &sitestyle)
+	}
+
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -519,11 +573,22 @@ func (r *stfWebReceiverResource) Delete(ctx context.Context, req resource.Delete
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error deleting StoreFront Authentication Service ",
-				"\nError message: "+err.Error(),
+				"Error message: "+err.Error(),
 			)
 			return
 		}
 		body.SetSiteId(siteIdInt)
+	}
+
+	// Delete existing STF WebReceiver SiteStyle
+	deleteWebReceiverSiteStyleRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverClearSTFWebReceiverSiteStyle(ctx, body)
+	_, res_error := deleteWebReceiverSiteStyleRequest.Execute()
+	if res_error != nil {
+		resp.Diagnostics.AddError(
+			"Error deleting StoreFront WebReceiver SiteStyle",
+			"Error message: "+res_error.Error(),
+		)
+		return
 	}
 
 	// Delete existing STF WebReceiver
@@ -532,7 +597,7 @@ func (r *stfWebReceiverResource) Delete(ctx context.Context, req resource.Delete
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting StoreFront WebReceiver ",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 		return
 	}
@@ -808,7 +873,7 @@ func setAndGetSTFWebReceiverUserInterface(ctx context.Context, diagnostics *diag
 	setUserInterfaceBody.SetShowActivityManager(plannedUserInterface.ShowActivityManager.ValueBool())
 	setUserInterfaceBody.SetShowFirstTimeUse(plannedUserInterface.ShowFirstTimeUse.ValueBool())
 
-	stfSupportPreventIcaDownload := util.CheckStoreFrontVersion(client.StorefrontClient.VersionSF, ctx, diagnostics, 3, 29)
+	stfSupportPreventIcaDownload := util.CheckStoreFrontVersion(client.StorefrontClient.VersionSF, ctx, diagnostics, 3, 27)
 	if !plannedUserInterface.PreventIcaDownloads.IsNull() && stfSupportPreventIcaDownload {
 		setUserInterfaceBody.SetPreventIcaDownloads(plannedUserInterface.PreventIcaDownloads.ValueBool())
 	}
@@ -875,4 +940,110 @@ func getSTFWebReceiverUserInterface(ctx context.Context, diagnostics *diag.Diagn
 		)
 	}
 	return userInterfaceResponse, err
+}
+
+func getSTFWebReceiverResourcesService(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteId string, virtualPath string) (citrixstorefront.GetSTFWebReceiverResourcesServiceResponseModel, error) {
+	getWebReceiverRequestBody, err := constructGetWebReceiverRequestBody(diagnostics, siteId, virtualPath)
+	if err != nil {
+		return citrixstorefront.GetSTFWebReceiverResourcesServiceResponseModel{}, err
+	}
+
+	getWebReceiverResourcesRequest := client.StorefrontClient.WebReceiverSF.GetSTFWebReceiverResourcesService(ctx, getWebReceiverRequestBody)
+	webReceiverResources, err := getWebReceiverResourcesRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error fetching StoreFront WebReceiver Resources details",
+			"Error Message: "+err.Error(),
+		)
+	}
+	return webReceiverResources, err
+}
+
+func setAndGetSTFWebReceiverResourcesService(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteId string, virtualPath string, resourcesService basetypes.ObjectValue) (citrixstorefront.GetSTFWebReceiverResourcesServiceResponseModel, error) {
+	getWebReceiverRequestBody, err := constructGetWebReceiverRequestBody(diagnostics, siteId, virtualPath)
+	if err != nil {
+		return citrixstorefront.GetSTFWebReceiverResourcesServiceResponseModel{}, err
+	}
+
+	plannedResourcesService := util.ObjectValueToTypedObject[ResourcesService](ctx, diagnostics, resourcesService)
+
+	var setResourcesServiceBody citrixstorefront.SetSTFWebReceiverResourcesServiceRequestModel
+	if !plannedResourcesService.PersistentIconCacheEnabled.IsNull() {
+		setResourcesServiceBody.SetPersistentIconCacheEnabled(plannedResourcesService.PersistentIconCacheEnabled.ValueBool())
+	}
+	if !plannedResourcesService.IcaFileCacheExpiry.IsNull() {
+		setResourcesServiceBody.SetIcaFileCacheExpiry(int(plannedResourcesService.IcaFileCacheExpiry.ValueInt64()))
+	}
+	if !plannedResourcesService.IconSize.IsNull() {
+		setResourcesServiceBody.SetIconSize(int(plannedResourcesService.IconSize.ValueInt64()))
+	}
+	if !plannedResourcesService.ShowDesktopViewer.IsNull() {
+		setResourcesServiceBody.SetShowDesktopViewer(plannedResourcesService.ShowDesktopViewer.ValueBool())
+	}
+
+	resourcesServiceRequest := client.StorefrontClient.WebReceiverSF.SetSTFWebReceiverResourcesService(ctx, getWebReceiverRequestBody, setResourcesServiceBody)
+	err = resourcesServiceRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error setting Resources Service settings for the StoreFront WebReceiver",
+			"Error message: "+err.Error(),
+		)
+		return citrixstorefront.GetSTFWebReceiverResourcesServiceResponseModel{}, err
+	}
+
+	resourcesServiceResponse, err := getSTFWebReceiverResourcesService(ctx, diagnostics, client, siteId, virtualPath)
+	return resourcesServiceResponse, err
+}
+
+func getSTFWebReceiverSiteStyle(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteId string, virtualPath string) (citrixstorefront.STFWebReceiverSiteStyleResponseModel, error) {
+	getWebReceiverRequestBody, err := constructGetWebReceiverRequestBody(diagnostics, siteId, virtualPath)
+	if err != nil {
+		return citrixstorefront.STFWebReceiverSiteStyleResponseModel{}, err
+	}
+
+	getWebReceiverSiteStyleRequest := client.StorefrontClient.WebReceiverSF.STFWebReceiverGetSTFWebReceiverSiteStyle(ctx, getWebReceiverRequestBody)
+	sitestyle, err := getWebReceiverSiteStyleRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error fetching StoreFront WebReceiver Site Style",
+			"Error message: "+err.Error(),
+		)
+	}
+	return sitestyle, err
+}
+
+func setAndGetSTFWebReceiverSiteStyle(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteId string, virtualPath string, siteStyle basetypes.ObjectValue) (citrixstorefront.STFWebReceiverSiteStyleResponseModel, error) {
+	getSTFWebReceiverSiteStyleBody, err := constructGetWebReceiverRequestBody(diagnostics, siteId, virtualPath)
+	if err != nil {
+		return citrixstorefront.STFWebReceiverSiteStyleResponseModel{}, err
+	}
+
+	plannedSiteStyle := util.ObjectValueToTypedObject[WebReceiverSiteStyle](ctx, diagnostics, siteStyle)
+
+	var setSiteStyleBody citrixstorefront.SetSTFWebReceiverSiteStyleRequestModel
+
+	setSiteStyleBody.SetHeaderBackgroundColor(plannedSiteStyle.HeaderBackgroundColor.ValueString())
+
+	setSiteStyleBody.SetHeaderForegroundColor(plannedSiteStyle.HeaderForegroundColor.ValueString())
+
+	setSiteStyleBody.SetHeaderLogoPath(plannedSiteStyle.HeaderLogoPath.ValueString())
+
+	setSiteStyleBody.SetLogonLogoPath(plannedSiteStyle.LogonLogoPath.ValueString())
+
+	setSiteStyleBody.SetLinkColor(plannedSiteStyle.LinkColor.ValueString())
+
+	setSiteStyleBody.SetIgnoreNonExistentLogos(plannedSiteStyle.IgnoreNonExistentLogos.ValueBool())
+
+	siteStyleRequest := client.StorefrontClient.WebReceiverSF.STFWebReceiverSetSTFWebReceiverSiteStyle(ctx, getSTFWebReceiverSiteStyleBody, setSiteStyleBody)
+	err = siteStyleRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error setting Site Style for the StoreFront WebReceiver",
+			"Error message: "+err.Error(),
+		)
+		return citrixstorefront.STFWebReceiverSiteStyleResponseModel{}, err
+	}
+
+	siteStyleResponse, err := getSTFWebReceiverSiteStyle(ctx, diagnostics, client, siteId, virtualPath)
+	return siteStyleResponse, err
 }

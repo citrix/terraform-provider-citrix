@@ -164,6 +164,17 @@
         "TEST_MC_DOMAIN_XENSERVER"                  :"domain.local",
         "TEST_MC_MEMORY_MB_XENSERVER"               :"8192",
         "TEST_MC_CPU_COUNT_XENSERVER"               :"4",
+
+        // Machine Catalog Go Tests - SCVMM
+        "TEST_MC_NAME_SCVMM"                 :"{catalog_name}",
+        "TEST_MC_SERVICE_ACCOUNT_SCVMM"      :"{admin_username}",
+        "TEST_MC_SERVICE_ACCOUNT_PASS_SCVMM" :"{admin_password}",
+        "TEST_MC_MASTER_IMAGE_SCVMM"         :"{vm_name}",
+        "TEST_MC_IMAGE_SNAPSHOT_SCVMM"       :"{image_snapshot_name}",
+        "TEST_MC_MASTER_IMAGE_NOTE_SCVMM"    :"{master_image_note}",
+        "TEST_MC_DOMAIN_SCVMM"               :"domain.local",
+        "TEST_MC_MEMORY_MB_SCVMM"            :"8192",
+        "TEST_MC_CPU_COUNT_SCVMM"            :"2",
         
         // Machine Catalog Go Tests - AWS EC2
         "TEST_MC_NAME_AWS_EC2"                    :"{catalog_name}",

@@ -188,16 +188,9 @@ func (r *storeFrontServerResource) Update(ctx context.Context, req resource.Upda
 		return
 	}
 
-	var state StoreFrontServerResourceModel
-	diags = req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
 	// Get refreshed StoreFront server properties from Orchestration
-	sfServerId := state.Id.ValueString()
-	sfServerName := state.Name.ValueString()
+	sfServerId := plan.Id.ValueString()
+	sfServerName := plan.Name.ValueString()
 
 	// Construct the update model
 	var editStoreFrontServerRequestBody = &citrixorchestration.StoreFrontServerRequestModel{}

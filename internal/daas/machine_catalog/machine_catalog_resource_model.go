@@ -148,6 +148,7 @@ type ProvisioningSchemeModel struct {
 	VsphereMachineConfig        types.Object `tfsdk:"vsphere_machine_config"`   // VsphereMachineConfigModel
 	XenserverMachineConfig      types.Object `tfsdk:"xenserver_machine_config"` // XenserverMachineConfigModel
 	NutanixMachineConfig        types.Object `tfsdk:"nutanix_machine_config"`   // NutanixMachineConfigModel
+	SCVMMMachineConfigModel     types.Object `tfsdk:"scvmm_machine_config"`     // SCVMMMachineConfigModel
 	NumTotalMachines            types.Int64  `tfsdk:"number_of_total_machines"`
 	NetworkMapping              types.List   `tfsdk:"network_mapping"`    // List[NetworkMappingModel]
 	AvailabilityZones           types.List   `tfsdk:"availability_zones"` // List[string]
@@ -182,6 +183,7 @@ func (ProvisioningSchemeModel) GetSchema() schema.SingleNestedAttribute {
 			"vsphere_machine_config":   VsphereMachineConfigModel{}.GetSchema(),
 			"xenserver_machine_config": XenserverMachineConfigModel{}.GetSchema(),
 			"nutanix_machine_config":   NutanixMachineConfigModel{}.GetSchema(),
+			"scvmm_machine_config":     SCVMMMachineConfigModel{}.GetSchema(),
 			"machine_domain_identity":  MachineDomainIdentityModel{}.GetSchema(),
 			"number_of_total_machines": schema.Int64Attribute{
 				Description: "Number of VDA machines allocated in the catalog.",
@@ -606,7 +608,7 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 		r.IsPowerManaged = types.BoolNull()
 	}
 
-	if catalog.ProvisioningType == citrixorchestration.PROVISIONINGTYPE_MANUAL {
+	if catalog.GetProvisioningType() == citrixorchestration.PROVISIONINGTYPE_MANUAL {
 		// Handle machines
 		r = r.updateCatalogWithMachines(ctx, diagnostics, client, machines)
 	}
@@ -644,7 +646,7 @@ func (networkMapping NetworkMappingModel) RefreshListItem(_ context.Context, _ *
 		* XDHyp:\\HostingUnits\\{resource pool}\\{availability zone}.availabilityzone\\{network ip}`/{prefix length} (vpc-{vpc-id}).network
 		* The Network property should be set to {network ip}/{prefix length}
 		 */
-		networkName = strings.ReplaceAll(strings.Split((strings.Split(segments[lastIndex-1], ".network"))[0], " ")[0], "`/", "/")
+		networkName = strings.ReplaceAll(strings.Split((strings.TrimSuffix(segments[lastIndex-1], ".network")), " ")[0], "`/", "/")
 	}
 	networkMapping.Network = types.StringValue(networkName)
 	return networkMapping

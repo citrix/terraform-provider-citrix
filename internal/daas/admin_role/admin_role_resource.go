@@ -265,6 +265,11 @@ func (r *adminRoleResource) ValidateConfig(ctx context.Context, req resource.Val
 func (r *adminRoleResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
+	if r.client != nil && r.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
+
 	// Retrieve values from plan
 	if !req.Plan.Raw.IsNull() {
 		var plan AdminRoleResourceModel

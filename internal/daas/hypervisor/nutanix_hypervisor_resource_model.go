@@ -90,9 +90,6 @@ func (NutanixHypervisorResourceModel) GetSchema() schema.Schema {
 				Required:    true,
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
-					listvalidator.ValueStringsAre(
-						stringvalidator.RegexMatches(regexp.MustCompile(util.IPv4Regex), "must be a valid IPv4 address without protocol (http:// or https://) and port number"),
-					),
 				},
 			},
 			"max_absolute_active_actions": schema.Int64Attribute{

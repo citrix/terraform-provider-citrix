@@ -10,6 +10,7 @@ import (
 	citrixstorefront "github.com/citrix/citrix-daas-rest-go/citrixstorefront/models"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -24,6 +25,68 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
+
+type WebReceiverSiteStyle struct {
+	HeaderLogoPath         types.String `tfsdk:"header_logo_path"`
+	LogonLogoPath          types.String `tfsdk:"logon_logo_path"`
+	HeaderBackgroundColor  types.String `tfsdk:"header_background_color"`
+	HeaderForegroundColor  types.String `tfsdk:"header_foreground_color"`
+	LinkColor              types.String `tfsdk:"link_color"`
+	IgnoreNonExistentLogos types.Bool   `tfsdk:"ignore_non_existent_logos"`
+}
+
+func (WebReceiverSiteStyle) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "Site Styles for the Web Receiver for Website.",
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			"header_logo_path": schema.StringAttribute{
+				Description: "Points to the Header Logo's path in the system.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("C:\\inetpub\\wwwroot\\Citrix\\StoreWeb\\receiver\\images\\2x\\CitrixStoreFrontReceiverLogo_Home@2x_B07AF017CEE39553.png"),
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(`^.*\.(png|jpg|jpeg|gif|tiff|bmp)$`), "must be a valid image file"),
+				},
+			},
+			"logon_logo_path": schema.StringAttribute{
+				Description: "Points to the Logon Logo's path in the system.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("C:\\inetpub\\wwwroot\\Citrix\\StoreWeb\\receiver\\images\\2x\\CitrixStoreFront_auth@2x_CB5D9D1BADB08AFF.png"),
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(`^.*\.(png|jpg|jpeg|gif|tiff|bmp)$`), "must be a valid image file"),
+				},
+			},
+			"header_background_color": schema.StringAttribute{
+				Description: "Sets the background color of the header.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("#312139"),
+			},
+			"header_foreground_color": schema.StringAttribute{
+				Description: "Sets the foreground color of the header.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("#fff"),
+			},
+			"link_color": schema.StringAttribute{
+				Description: "Sets the link color of the page.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("#67397a"),
+			},
+			"ignore_non_existent_logos": schema.BoolAttribute{
+				Description: "Whether to ignore non-existent logo files and continue to set colors.",
+				Optional:    true,
+			},
+		},
+	}
+}
+
+func (WebReceiverSiteStyle) GetAttributes() map[string]schema.Attribute {
+	return WebReceiverSiteStyle{}.GetSchema().Attributes
+}
 
 type PluginAssistant struct {
 	Enabled                                       types.Bool   `tfsdk:"enabled"`                                              //Enable Receiver client detection.
@@ -582,6 +645,8 @@ type STFWebReceiverResourceModel struct {
 	StrictTransportSecurity types.Object `tfsdk:"strict_transport_security"` // StrictTransportSecurity
 	AuthenticationManager   types.Object `tfsdk:"authentication_manager"`    // AuthenticationManager
 	UserInterface           types.Object `tfsdk:"user_interface"`            // UserInterface
+	ResourcesService        types.Object `tfsdk:"resources_service"`         // ResourcesServiceModel
+	WebReceiverSiteStyle    types.Object `tfsdk:"web_receiver_site_style"`   // WebReceiverSiteStyle
 }
 
 // Schema defines the schema for the resource.
@@ -590,7 +655,7 @@ func (r *stfWebReceiverResource) Schema(_ context.Context, _ resource.SchemaRequ
 		Description: "StoreFront WebReceiver.",
 		Attributes: map[string]schema.Attribute{
 			"site_id": schema.StringAttribute{
-				Description: "The IIS site id of the StoreFront webreceiver. Defaults to 1.",
+				Description: "The IIS site id of the StoreFront WebReceiver. Defaults to 1.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString("1"),
@@ -639,11 +704,60 @@ func (r *stfWebReceiverResource) Schema(_ context.Context, _ resource.SchemaRequ
 			"strict_transport_security": StrictTransportSecurity{}.GetSchema(),
 			"authentication_manager":    AuthenticationManager{}.GetSchema(),
 			"user_interface":            UserInterface{}.GetSchema(),
+			"resources_service":         ResourcesService{}.GetSchema(),
+			"web_receiver_site_style":   WebReceiverSiteStyle{}.GetSchema(),
 		},
 	}
 }
 
-func (r *STFWebReceiverResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, webreceiver *citrixstorefront.STFWebReceiverDetailModel, appShortcuts *citrixstorefront.GetWebReceiverApplicationShortcutsResponseModel, communication *citrixstorefront.GetWebReceiverCommunicationResponseModel, sts *citrixstorefront.GetWebReceiverStrictTransportSecurityResponseModel, authManager *citrixstorefront.GetWebReceiverAuthenticationManagerResponseModel, ui *citrixstorefront.GetSTFWebReceiverUserInterfaceResponseModel) {
+type ResourcesService struct {
+	PersistentIconCacheEnabled types.Bool  `tfsdk:"persistent_icon_cache_enabled"`
+	IcaFileCacheExpiry         types.Int64 `tfsdk:"ica_file_cache_expiry"`
+	IconSize                   types.Int64 `tfsdk:"icon_size"`
+	ShowDesktopViewer          types.Bool  `tfsdk:"show_desktop_viewer"`
+}
+
+func (ResourcesService) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "Resources Service settings for the WebReceiver.",
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			"persistent_icon_cache_enabled": schema.BoolAttribute{
+				Description: "Whether to cache icon data in the local file system. Defaults to `true`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
+			},
+			"ica_file_cache_expiry": schema.Int64Attribute{
+				Description: "How long the ICA file data is cached in the memory of the Web Proxy. Defaults to `90`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     int64default.StaticInt64(90),
+			},
+			"icon_size": schema.Int64Attribute{
+				Description: "The desired icon size sent to the Store Service in icon requests. Defaults to `128`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     int64default.StaticInt64(128),
+				Validators: []validator.Int64{
+					int64validator.OneOf(16, 24, 32, 48, 64, 96, 128, 256, 512),
+				},
+			},
+			"show_desktop_viewer": schema.BoolAttribute{
+				Description: "Shows the Citrix Desktop Viewer window and toolbar when users access their desktops from legacy clients. Defaults to `true`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
+			},
+		},
+	}
+}
+
+func (ResourcesService) GetAttributes() map[string]schema.Attribute {
+	return ResourcesService{}.GetSchema().Attributes
+}
+
+func (r *STFWebReceiverResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, webreceiver *citrixstorefront.STFWebReceiverDetailModel, appShortcuts *citrixstorefront.GetWebReceiverApplicationShortcutsResponseModel, communication *citrixstorefront.GetWebReceiverCommunicationResponseModel, sts *citrixstorefront.GetWebReceiverStrictTransportSecurityResponseModel, authManager *citrixstorefront.GetWebReceiverAuthenticationManagerResponseModel, ui *citrixstorefront.GetSTFWebReceiverUserInterfaceResponseModel, resourcesService *citrixstorefront.GetSTFWebReceiverResourcesServiceResponseModel, siteStyle *citrixstorefront.STFWebReceiverSiteStyleResponseModel) {
 	// Overwrite SFWebReceiverResourceModel with refreshed state
 	r.VirtualPath = types.StringValue(*webreceiver.VirtualPath.Get())
 	r.SiteId = types.StringValue(strconv.Itoa(*webreceiver.SiteId.Get()))
@@ -668,16 +782,44 @@ func (r *STFWebReceiverResourceModel) RefreshPropertyValues(ctx context.Context,
 	if !r.UserInterface.IsNull() {
 		r.UserInterface = r.RefreshUserInterface(ctx, diagnostics, ui)
 	}
+
+	if !r.ResourcesService.IsNull() {
+		r.ResourcesService = r.RefreshResourcesService(ctx, diagnostics, resourcesService)
+	}
+
+	if !r.WebReceiverSiteStyle.IsNull() {
+		r.WebReceiverSiteStyle = r.RefreshWebReceiverSiteStyle(ctx, diagnostics, siteStyle)
+	}
 }
 
 func (r *STFWebReceiverResourceModel) RefreshApplicationShortcuts(ctx context.Context, diagnostics *diag.Diagnostics, appShortcuts *citrixstorefront.GetWebReceiverApplicationShortcutsResponseModel) types.Object {
 	refreshedApplicationShortcuts := ApplicationShortcuts{}
 	refreshedApplicationShortcuts.PromptForUntrustedShortcuts = types.BoolValue(*appShortcuts.PromptForUntrustedShortcuts.Get())
-	refreshedApplicationShortcuts.TrustedUrls = util.StringArrayToStringSet(ctx, diagnostics, appShortcuts.GetTrustedUrls())
-	refreshedApplicationShortcuts.GatewayUrls = util.StringArrayToStringSet(ctx, diagnostics, appShortcuts.GetGatewayUrls())
+	if len(appShortcuts.GetTrustedUrls()) > 0 {
+		refreshedApplicationShortcuts.TrustedUrls = util.StringArrayToStringSet(ctx, diagnostics, appShortcuts.GetTrustedUrls())
+	} else {
+		refreshedApplicationShortcuts.TrustedUrls = types.SetValueMust(types.StringType, []attr.Value{})
+	}
+
+	if len(appShortcuts.GetGatewayUrls()) > 0 {
+		refreshedApplicationShortcuts.GatewayUrls = util.StringArrayToStringSet(ctx, diagnostics, appShortcuts.GetGatewayUrls())
+	} else {
+		refreshedApplicationShortcuts.GatewayUrls = types.SetValueMust(types.StringType, []attr.Value{})
+	}
 	refreshedApplicationShortcutsObject := util.TypedObjectToObjectValue(ctx, diagnostics, refreshedApplicationShortcuts)
 
 	return refreshedApplicationShortcutsObject
+}
+
+func (r *STFWebReceiverResourceModel) RefreshResourcesService(ctx context.Context, diagnostics *diag.Diagnostics, resourcesService *citrixstorefront.GetSTFWebReceiverResourcesServiceResponseModel) types.Object {
+	refreshedResourcesService := ResourcesService{}
+	refreshedResourcesService.PersistentIconCacheEnabled = types.BoolValue(*resourcesService.PersistentIconCacheEnabled.Get())
+	refreshedResourcesService.IcaFileCacheExpiry = types.Int64Value(int64(*resourcesService.IcaFileCacheExpiry.Get()))
+	refreshedResourcesService.IconSize = types.Int64Value(int64(*resourcesService.IconSize.Get()))
+	refreshedResourcesService.ShowDesktopViewer = types.BoolValue(*resourcesService.ShowDesktopViewer.Get())
+	refreshedResourcesServiceObject := util.TypedObjectToObjectValue(ctx, diagnostics, refreshedResourcesService)
+
+	return refreshedResourcesServiceObject
 }
 
 func (r *STFWebReceiverResourceModel) RefreshCommunication(ctx context.Context, diagnostics *diag.Diagnostics, communication *citrixstorefront.GetWebReceiverCommunicationResponseModel) types.Object {
@@ -693,6 +835,17 @@ func (r *STFWebReceiverResourceModel) RefreshCommunication(ctx context.Context, 
 
 	return refreshedCommunicationObject
 
+}
+
+func (r *STFWebReceiverResourceModel) RefreshWebReceiverSiteStyle(ctx context.Context, diagnostics *diag.Diagnostics, ss *citrixstorefront.STFWebReceiverSiteStyleResponseModel) types.Object {
+	refreshedSiteStyle := WebReceiverSiteStyle{}
+	refreshedSiteStyle.HeaderBackgroundColor = types.StringValue(*ss.HeaderBackgroundColor.Get())
+	refreshedSiteStyle.HeaderForegroundColor = types.StringValue(*ss.HeaderForegroundColor.Get())
+	refreshedSiteStyle.HeaderLogoPath = types.StringValue(*ss.HeaderLogoPath.Get())
+	refreshedSiteStyle.LogonLogoPath = types.StringValue(*ss.LogonLogoPath.Get())
+	refreshedSiteStyle.LinkColor = types.StringValue(*ss.LinkColor.Get())
+	refreshedSiteStyleObject := util.TypedObjectToObjectValue(ctx, diagnostics, refreshedSiteStyle)
+	return refreshedSiteStyleObject
 }
 
 func (r *STFWebReceiverResourceModel) RefreshStrictTransportSecurity(ctx context.Context, diagnostics *diag.Diagnostics, sts *citrixstorefront.GetWebReceiverStrictTransportSecurityResponseModel) types.Object {

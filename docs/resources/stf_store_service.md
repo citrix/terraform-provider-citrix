@@ -20,7 +20,6 @@ resource "citrix_stf_store_service" "example-stf-store-service" {
 	authentication_service = "${citrix_stf_authentication_service.example-stf-authentication-service.virtual_path}"
 	pna = {
 		enabled = true
-		default_pna_service = true
 	}
     enumeration_options = {
         enhanced_enumeration = false
@@ -43,6 +42,10 @@ resource "citrix_stf_store_service" "example-stf-store-service" {
 		advanced_healthcheck = false
 		cert_revocation_policy = "MustCheck"
     }
+	gateway_settings = {
+    enable = true
+    gateway_url = "https://xsl-ddc.ctx-ad.local"
+  	}
 }
 
 // Anonymous Authentication Service
@@ -68,9 +71,11 @@ resource "citrix_stf_store_service" "example-stf-store-service" {
 - `enumeration_options` (Attributes) Enumeration options for the Store (see [below for nested schema](#nestedatt--enumeration_options))
 - `farm_settings` (Attributes) Store farm configuration settings for the Store. (see [below for nested schema](#nestedatt--farm_settings))
 - `friendly_name` (String) The friendly name of the Store
+- `gateway_settings` (Attributes) Gateway service settings for the Store (see [below for nested schema](#nestedatt--gateway_settings))
 - `launch_options` (Attributes) Launch options for the Store (see [below for nested schema](#nestedatt--launch_options))
 - `load_balance` (Boolean) Whether the Store is load balanced.
 - `pna` (Attributes) StoreFront PNA (Program Neighborhood Agent) state of the Store (see [below for nested schema](#nestedatt--pna))
+- `roaming_account` (Attributes) Roaming account settings for the Store (see [below for nested schema](#nestedatt--roaming_account))
 - `site_id` (String) The IIS site id of the StoreFront storeservice. Defaults to 1.
 
 <a id="nestedatt--enumeration_options"></a>
@@ -104,6 +109,24 @@ Optional:
 - `server_communication_attempts` (Number) Number of server connection attempts before failure. Default value is 1.
 
 
+<a id="nestedatt--gateway_settings"></a>
+### Nested Schema for `gateway_settings`
+
+Optional:
+
+- `customer_id` (String) The CWC customer id
+- `enable` (Boolean) Enable use of the gateway service. Default is false.
+- `get_gateway_service_url` (String) The URL of the service used to retrieve gateway address (FQDN)
+- `handle_zones` (List of String) A value indicating that the gateway service should be used for the specified zones
+- `ignore_zones` (List of String) A value indicating that the gateway service should not be used for the specified zones
+- `instance_id` (String) The instance id for CWC trust
+- `private_key` (String, Sensitive) The private key for CWC trust
+- `secure_ticket_authority_url` (String) The URL of the CWC STA service
+- `secure_ticket_lifetime` (String) The lifetime requested for CWC STA service tickets. Default is 00:01:00.
+- `service_name` (String) The service name for CWC trust
+- `session_reliability` (Boolean) A value indicating whether session reliability should be enabled. Default is false.
+
+
 <a id="nestedatt--launch_options"></a>
 ### Nested Schema for `launch_options`
 
@@ -130,6 +153,14 @@ Optional:
 Required:
 
 - `enable` (Boolean) Whether PNA is enabled for the Store.
+
+
+<a id="nestedatt--roaming_account"></a>
+### Nested Schema for `roaming_account`
+
+Optional:
+
+- `published` (Boolean) Whether the roaming account is published. Default is false.
 
 ## Import
 

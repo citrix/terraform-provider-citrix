@@ -21,6 +21,7 @@ var (
 	_ resource.ResourceWithConfigure      = &awsHypervisorResource{}
 	_ resource.ResourceWithImportState    = &awsHypervisorResource{}
 	_ resource.ResourceWithValidateConfig = &awsHypervisorResource{}
+	_ resource.ResourceWithModifyPlan     = &awsHypervisorResource{}
 )
 
 // NewHypervisorResource is a helper function to simplify the provider implementation.
@@ -239,4 +240,13 @@ func (r *awsHypervisorResource) ValidateConfig(ctx context.Context, req resource
 
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
 	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
+}
+
+func (r *awsHypervisorResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	if r.client != nil && r.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
 }

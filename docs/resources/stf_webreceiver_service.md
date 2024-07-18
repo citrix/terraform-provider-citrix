@@ -50,38 +50,49 @@ resource "citrix_stf_webreceiver_service" "example-stf-webreceiver-service"{
 		login_form_timeout = 5
 	}
 	user_interface = {
-			auto_launch_desktop = true
-			multi_click_timeout = 3
-			enable_apps_folder_view = true
-			workspace_control = {
-				enabled = true
-				auto_reconnect_at_logon = true
-				logoff_action = "Disconnect"
-				show_reconnect_button = false
-				show_disconnect_button = false
-			}
-			receiver_configuration = {
-				enabled = true
-			}
-			app_shortcuts = {
-				enabled = true
-				show_desktop_shortcut = true	
-			}
-			ui_views = {
-				show_apps_view = true
-				show_desktops_view = true
-				default_view = "Auto"
-			}
-			category_view_collapsed = false
-			move_app_to_uncategorized = true
-			progressive_web_app = {
-				enabled = false
-				show_install_prompt = false
-			}
-			show_activity_manager = true
-			show_first_time_use = true
-			prevent_ica_downloads = false
-		}
+        auto_launch_desktop = true
+        multi_click_timeout = 3
+        enable_apps_folder_view = true
+        workspace_control = {
+            enabled = true
+            auto_reconnect_at_logon = true
+            logoff_action = "Disconnect"
+            show_reconnect_button = false
+            show_disconnect_button = false
+        }
+        receiver_configuration = {
+            enabled = true
+        }
+        app_shortcuts = {
+            enabled = true
+            show_desktop_shortcut = true	
+        }
+        ui_views = {
+            show_apps_view = true
+            show_desktops_view = true
+            default_view = "Auto"
+        }
+        category_view_collapsed = false
+        move_app_to_uncategorized = true
+        progressive_web_app = {
+            enabled = false
+            show_install_prompt = false
+        }
+        show_activity_manager = true
+        show_first_time_use = true
+        prevent_ica_downloads = false
+	}
+    resources_service = {
+        ica_file_cache_expiry = 80
+        persistent_icon_cache_enabled = true
+    }
+  web_receiver_site_style = {
+    header_logo_path = "C:\\inetpub\\wwwroot\\Citrix\\StoreWeb\\receiver\\images\\2x\\CitrixStoreFrontReceiverLogo_Home@2x_B07AF017CEE39553.png"
+    logon_logo_path = "C:\\inetpub\\wwwroot\\Citrix\\StoreWeb\\receiver\\images\\2x\\CitrixStoreFront_auth@2x_CB5D9D1BADB08AFF.png"
+    header_background_color = "Very dark desaturated violet"
+    header_foreground_color = "black"
+    link_color = "Dark moderate violet"
+  }
 }
 ```
 
@@ -101,9 +112,11 @@ resource "citrix_stf_webreceiver_service" "example-stf-webreceiver-service"{
 - `communication` (Attributes) Communication settings used for the WebReceiver proxy. (see [below for nested schema](#nestedatt--communication))
 - `friendly_name` (String) The friendly name of the WebReceiver
 - `plugin_assistant` (Attributes) Pluin Assistant configuration for the WebReceiver. (see [below for nested schema](#nestedatt--plugin_assistant))
-- `site_id` (String) The IIS site id of the StoreFront webreceiver. Defaults to 1.
+- `resources_service` (Attributes) Resources Service settings for the WebReceiver. (see [below for nested schema](#nestedatt--resources_service))
+- `site_id` (String) The IIS site id of the StoreFront WebReceiver. Defaults to 1.
 - `strict_transport_security` (Attributes) Communication settings used for the WebReceiver proxy. (see [below for nested schema](#nestedatt--strict_transport_security))
 - `user_interface` (Attributes) User interface configuration for the WebReceiver. (see [below for nested schema](#nestedatt--user_interface))
+- `web_receiver_site_style` (Attributes) Site Styles for the Web Receiver for Website. (see [below for nested schema](#nestedatt--web_receiver_site_style))
 
 <a id="nestedatt--application_shortcuts"></a>
 ### Nested Schema for `application_shortcuts`
@@ -166,6 +179,17 @@ Optional:
 - `show_after_login` (Boolean) Show Plugin Assistant after the user logs in.
 - `upgrade_at_login` (Boolean) Prompt to upgrade older clients.
 - `win32_path` (String) Path to the Windows Receiver.
+
+
+<a id="nestedatt--resources_service"></a>
+### Nested Schema for `resources_service`
+
+Optional:
+
+- `ica_file_cache_expiry` (Number) How long the ICA file data is cached in the memory of the Web Proxy. Defaults to `90`.
+- `icon_size` (Number) The desired icon size sent to the Store Service in icon requests. Defaults to `128`.
+- `persistent_icon_cache_enabled` (Boolean) Whether to cache icon data in the local file system. Defaults to `true`.
+- `show_desktop_viewer` (Boolean) Shows the Citrix Desktop Viewer window and toolbar when users access their desktops from legacy clients. Defaults to `true`.
 
 
 <a id="nestedatt--strict_transport_security"></a>
@@ -246,6 +270,20 @@ Optional:
 - `logoff_action` (String) Whether to disconnect or terminate HDX sessions when actively logging off Receiver for Web. Available values are `Disconnect`, `Terminate`, and `None`. Defaults to `Disconnect`.
 - `show_disconnect_button` (Boolean) Whether to show the disconnect button/link. Defaults to `false`.
 - `show_reconnect_button` (Boolean) Whether to show the reconnect button/link. Defaults to `false`.
+
+
+
+<a id="nestedatt--web_receiver_site_style"></a>
+### Nested Schema for `web_receiver_site_style`
+
+Optional:
+
+- `header_background_color` (String) Sets the background color of the header.
+- `header_foreground_color` (String) Sets the foreground color of the header.
+- `header_logo_path` (String) Points to the Header Logo's path in the system.
+- `ignore_non_existent_logos` (Boolean) Whether to ignore non-existent logo files and continue to set colors.
+- `link_color` (String) Sets the link color of the page.
+- `logon_logo_path` (String) Points to the Logon Logo's path in the system.
 
 ## Import
 

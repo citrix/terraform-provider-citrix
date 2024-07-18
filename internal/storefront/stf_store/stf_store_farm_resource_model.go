@@ -30,7 +30,7 @@ type STFStoreFarmResourceModel struct {
 	Servers                    types.List   `tfsdk:"servers"`                        // List[string] The list of servers in the Farm.
 	Port                       types.Int64  `tfsdk:"port"`                           // Service communication port.
 	SSLRelayPort               types.Int64  `tfsdk:"ssl_relay_port"`                 // The SSL Relay port
-	TransportType              types.Int64  `tfsdk:"transport_type"`                 // Type of transport to use. Http, Https, SSL for example
+	TransportType              types.String `tfsdk:"transport_type"`                 // Type of transport to use. Http, Https, SSL for example
 	LoadBalance                types.Bool   `tfsdk:"load_balance"`                   // Round robin load balance the xml service servers.
 	XMLValidationEnabled       types.Bool   `tfsdk:"xml_validation_enabled"`         // Enable XML service endpoint validation
 	XMLValidationSecret        types.String `tfsdk:"xml_validation_secret"`          // XML service endpoint validation shared secret
@@ -85,10 +85,16 @@ func (*stfStoreFarmResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					int64validator.AtLeast(1),
 				},
 			},
-			"transport_type": schema.Int64Attribute{
-				Description: "Type of transport to use. Http, Https, SSL for example. ",
+			"transport_type": schema.StringAttribute{
+				Description: "Type of transport to use. Http, Https, SSL for example. Default to HTTPs.",
 				Optional:    true,
 				Computed:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"HTTPS", "HTTP", "SSL",
+					),
+				},
+				Default: stringdefault.StaticString("HTTPS"),
 			},
 			"load_balance": schema.BoolAttribute{
 				Description: "Round robin load balance the xml service servers. Defaults to true.",
@@ -109,9 +115,13 @@ func (*stfStoreFarmResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Default:     stringdefault.StaticString(""),
 			},
 			"all_failed_bypass_duration": schema.Int64Attribute{
-				Description: "Period of time to skip all xml service requests should all servers fail to respond.",
+				Description: "Period of time to skip all xml service requests should all servers fail to respond. Defaults to 0.",
 				Optional:    true,
 				Computed:    true,
+				Default:     int64default.StaticInt64(0),
+				Validators: []validator.Int64{
+					int64validator.AtLeast(0),
+				},
 			},
 			"bypass_duration": schema.Int64Attribute{
 				Description: "Period of time to skip a server when is fails to respond. Defaults to 60.",
@@ -204,7 +214,7 @@ func (r *STFStoreFarmResourceModel) RefreshPropertyValues(ctx context.Context, d
 		r.SSLRelayPort = types.Int64Value(*farm.SSLRelayPort.Get())
 	}
 	if farm.TransportType.IsSet() {
-		r.TransportType = types.Int64Value(*farm.TransportType.Get())
+		r.TransportType = types.StringValue(TransportTypeFromInt(*farm.TransportType.Get()))
 	}
 	if farm.LoadBalance.IsSet() {
 		r.LoadBalance = types.BoolValue(*farm.LoadBalance.Get())
@@ -259,6 +269,19 @@ func FarmTypeFromInt(farmTypeInt int64) string {
 		return "Store"
 	case 5:
 		return "SPA"
+	default:
+		return "Unknown"
+	}
+}
+
+func TransportTypeFromInt(TransportTypeInt int64) string {
+	switch TransportTypeInt {
+	case 0:
+		return "HTTP"
+	case 1:
+		return "HTTPS"
+	case 2:
+		return "SSL"
 	default:
 		return "Unknown"
 	}

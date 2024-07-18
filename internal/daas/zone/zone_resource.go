@@ -5,9 +5,11 @@ package zone
 import (
 	"context"
 	"net/http"
+	"time"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/citrix/terraform-provider-citrix/internal/citrixcloud/resource_locations"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -66,12 +68,48 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
+	if !r.client.AuthConfig.OnPremises && !plan.Name.IsNull() && !plan.Name.IsUnknown() {
+		// For Cloud customers, resource location ID is required and name is not allowed
+		resp.Diagnostics.AddError(
+			"Error Managing Zone",
+			"For Citrix Cloud customers, Zone has to be created in terraform by providing Resource Location ID. Zone name is not allowed.",
+		)
+		return
+	}
+
+	if r.client.AuthConfig.OnPremises && !plan.ResourceLocationId.IsNull() && !plan.ResourceLocationId.IsUnknown() {
+		// For On-prem customers, name is required and resource location ID is not allowed
+		resp.Diagnostics.AddError(
+			"Error Managing Zone",
+			"For On-prem customers, Zone has to be created in terraform by providing zone name. Resource location ID is not allowed.",
+		)
+		return
+	}
+
 	if !r.client.AuthConfig.OnPremises {
 		// Zone creation is not allowed for cloud. Check if zone exists and import if it does.
 		// If zone does not exist, throw an error
-		getZoneRequest := r.client.ApiClient.ZonesAPIsDAAS.ZonesGetZone(ctx, plan.Name.ValueString())
-		zone, _, err := citrixdaasclient.AddRequestData(getZoneRequest, r.client).Execute()
+		if plan.ResourceLocationId.IsNull() || plan.ResourceLocationId.IsUnknown() {
+			resp.Diagnostics.AddError(
+				"Error creating Zone",
+				"Resource Location id is required to create a Zone.",
+			)
+			return
+		}
 
+		// If resource location id is provided, get resource location from Citrix Cloud and extract zone name to import zone
+		// Get resource location from remote using id
+		resourceLocation, err := resource_locations.GetResourceLocation(ctx, r.client, &resp.Diagnostics, plan.ResourceLocationId.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating Zone with Resource Location ID",
+				"Resource Location "+plan.ResourceLocationId.ValueString()+" not found. Ensure the resource location has been created manually or via terraform, then try again.",
+			)
+		}
+
+		zoneName := resourceLocation.GetName()
+
+		zone, err := pollZone(ctx, r.client, zoneName)
 		if err == nil && zone != nil {
 			// zone exists. Add it to the state file
 			plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, zone, false)
@@ -81,7 +119,7 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 		} else {
 			resp.Diagnostics.AddError(
 				"Error creating Zone",
-				"Zones and Cloud Connectors are managed only by Citrix Cloud. Ensure you have a resource location manually created and connectors deployed in it and then try again.",
+				"Zones and Cloud Connectors are managed only by Citrix Cloud. Ensure you have a resource location created manually or via terraform, then try again. If zone is for on-premises hypervisor, make sure you have cloud connectors deployed in it.",
 			)
 		}
 
@@ -256,6 +294,11 @@ func (r *zoneResource) ImportState(ctx context.Context, req resource.ImportState
 func (r *zoneResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
+	if r.client != nil && r.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
+
 	// Retrieve values from plan
 	if !req.Plan.Raw.IsNull() {
 		var plan ZoneResourceModel
@@ -285,6 +328,20 @@ func (r *zoneResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRe
 	}
 }
 
+func (r *zoneResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data ZoneResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
+}
+
 // Gets the zone and logs any errors
 func getZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, zoneId string) (*citrixorchestration.ZoneDetailResponseModel, error) {
 	getZoneRequest := client.ApiClient.ZonesAPIsDAAS.ZonesGetZone(ctx, zoneId)
@@ -306,16 +363,32 @@ func readZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, re
 	return zone, err
 }
 
-func (r *zoneResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	defer util.PanicHandler(&resp.Diagnostics)
+func pollZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, zoneName string) (*citrixorchestration.ZoneDetailResponseModel, error) {
+	// default polling to every 10 seconds
+	pollInterval := 10
+	startTime := time.Now()
+	getZoneRequest := client.ApiClient.ZonesAPIsDAAS.ZonesGetZone(ctx, zoneName)
 
-	var data ZoneResourceModel
-	diags := req.Config.Get(ctx, &data)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
+	var zone *citrixorchestration.ZoneDetailResponseModel
+	var err error
+	for {
+		// Zone sync should be completed within 8 minutes
+		if time.Since(startTime) > time.Minute*time.Duration(8) {
+			break
+		}
+
+		zone, httpResp, err := citrixdaasclient.AddRequestData(getZoneRequest, client).Execute()
+		if err == nil {
+			// Zone sync completed. Return the zone
+			return zone, nil
+		} else if httpResp.StatusCode != http.StatusNotFound {
+			// GET Zone call failed with an error other than 404. Return the error
+			return zone, err
+		}
+
+		time.Sleep(time.Second * time.Duration(pollInterval))
+		continue
 	}
 
-	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
-	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
+	return zone, err
 }

@@ -16,9 +16,11 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &scvmmHypervisorResource{}
-	_ resource.ResourceWithConfigure   = &scvmmHypervisorResource{}
-	_ resource.ResourceWithImportState = &scvmmHypervisorResource{}
+	_ resource.Resource                   = &scvmmHypervisorResource{}
+	_ resource.ResourceWithConfigure      = &scvmmHypervisorResource{}
+	_ resource.ResourceWithImportState    = &scvmmHypervisorResource{}
+	_ resource.ResourceWithValidateConfig = &scvmmHypervisorResource{}
+	_ resource.ResourceWithModifyPlan     = &scvmmHypervisorResource{}
 )
 
 // NewHypervisorResource is a helper function to simplify the provider implementation.
@@ -246,6 +248,15 @@ func (r *scvmmHypervisorResource) Delete(ctx context.Context, req resource.Delet
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return
+	}
+}
+
+func (r *scvmmHypervisorResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	if r.client != nil && r.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
 		return
 	}
 }

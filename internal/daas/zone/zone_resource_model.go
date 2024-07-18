@@ -9,10 +9,11 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -20,15 +21,16 @@ import (
 
 // ZoneResourceModel maps the resource schema data.
 type ZoneResourceModel struct {
-	Id          types.String `tfsdk:"id"`
-	Name        types.String `tfsdk:"name"`
-	Description types.String `tfsdk:"description"`
-	Metadata    types.List   `tfsdk:"metadata"` // []utils.NameValueStringPairModel
+	Id                 types.String `tfsdk:"id"`
+	Name               types.String `tfsdk:"name"`
+	ResourceLocationId types.String `tfsdk:"resource_location_id"`
+	Description        types.String `tfsdk:"description"`
+	Metadata           types.List   `tfsdk:"metadata"` // []utils.NameValueStringPairModel
 }
 
 func (ZoneResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Manages a zone.\nFor cloud DDC, Zones and Cloud Connectors are managed only by Citrix Cloud. Ensure you have a resource location manually created and connectors deployed in it. You may then apply or import the zone using the zone Id.",
+		Description: "Manages a zone.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the zone.",
@@ -38,17 +40,31 @@ func (ZoneResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "Name of the zone.\nFor Cloud DDC, ensure this matches the name of the existing zone that needs to be used.",
-				Required:    true,
+				Description: "Name of the zone. " +
+					"\n\n-> **Note** For Citrix Cloud Customer, `name` is not allowed to be used for creating zone and is computed only. Use `resource_location_id` to create zone Instead.",
+				Optional: true,
+				Computed: true,
+			},
+			"resource_location_id": schema.StringAttribute{
+				Description: "GUID identifier off the resource location the zone belongs to. Only applies to Citrix Cloud customers. " +
+					"\n\n-> **Note** When using `resource_location_id`, ensure that the resource location is already created, or the value must be a reference to a [`citrix_cloud_resource_location`](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/cloud_resource_location)'s `id` property.",
+				Optional: true,
+				Computed: true,
+				Validators: []validator.String{
+					stringvalidator.ExactlyOneOf(path.MatchRoot("name"), path.MatchRoot("resource_location_id")),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"description": schema.StringAttribute{
-				Description: "Description of the zone.\nFor Cloud DDC, ensure this matches the description of the existing zone that needs to be used.",
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString(""),
+				Description: "Description of the zone. " +
+					"\n\n-> **Note** For Citrix Cloud customer, ensure this matches the description of the existing zone behind the `resource_location_id` that needs to be used.",
+				Optional: true,
+				Computed: true,
 			},
 			"metadata": schema.ListNestedAttribute{
-				Description:  "Metadata of the zone. Cannot be modified in DaaS cloud.",
+				Description:  "Metadata of the zone. Cannot be modified for Citrix Cloud customer.",
 				Optional:     true,
 				NestedObject: util.NameValueStringPairModel{}.GetSchema(),
 				Validators: []validator.List{
@@ -68,6 +84,13 @@ func (r ZoneResourceModel) RefreshPropertyValues(ctx context.Context, diags *dia
 	r.Id = types.StringValue(zone.GetId())
 	r.Name = types.StringValue(zone.GetName())
 	r.Description = types.StringValue(zone.GetDescription())
+
+	if zone.ResourceLocation != nil {
+		resourceLocation := zone.GetResourceLocation()
+		r.ResourceLocationId = types.StringValue(resourceLocation.GetId())
+	} else {
+		r.ResourceLocationId = types.StringNull()
+	}
 
 	// Set optional values
 	metadata := zone.GetMetadata()

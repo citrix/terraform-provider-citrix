@@ -14,7 +14,9 @@ import (
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ datasource.DataSource = &ApplicationDataSource{}
+var (
+	_ datasource.DataSource = &ApplicationDataSource{}
+)
 
 func NewApplicationDataSourceSource() datasource.DataSource {
 	return &ApplicationDataSource{}
@@ -104,6 +106,11 @@ func (d *ApplicationDataSource) Configure(ctx context.Context, req datasource.Co
 
 func (d *ApplicationDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
+
+	if d.client != nil && d.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
 
 	var data ApplicationFolderDetailsDataSourceModel
 

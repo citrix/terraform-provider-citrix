@@ -21,6 +21,7 @@ var (
 	_ resource.ResourceWithConfigure      = &applicationIconResource{}
 	_ resource.ResourceWithImportState    = &applicationIconResource{}
 	_ resource.ResourceWithValidateConfig = &applicationIconResource{}
+	_ resource.ResourceWithModifyPlan     = &applicationIconResource{}
 )
 
 // NewApplicationIconResource is a helper function to simplify the provider implementation.
@@ -181,4 +182,13 @@ func (r *applicationIconResource) ValidateConfig(ctx context.Context, req resour
 
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
 	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
+}
+
+func (r *applicationIconResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	if r.client != nil && r.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
 }

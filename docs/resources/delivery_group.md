@@ -123,12 +123,12 @@ resource "citrix_delivery_group" "example-delivery-group" {
 
 ### Required
 
-- `associated_machine_catalogs` (Attributes List) Machine catalogs from which to assign machines to the newly created delivery group. (see [below for nested schema](#nestedatt--associated_machine_catalogs))
 - `name` (String) Name of the delivery group.
 
 ### Optional
 
 - `allow_anonymous_access` (Boolean) Give access to unauthenticated (anonymous) users; no credentials are required to access StoreFront. This feature requires a StoreFront store for unauthenticated users.
+- `associated_machine_catalogs` (Attributes List) Machine catalogs from which to assign machines to the newly created delivery group. (see [below for nested schema](#nestedatt--associated_machine_catalogs))
 - `autoscale_settings` (Attributes) The power management settings governing the machine(s) in the delivery group. (see [below for nested schema](#nestedatt--autoscale_settings))
 - `description` (String) Description of the delivery group.
 - `desktops` (Attributes List) A list of Desktop resources to publish on the delivery group. Only 1 desktop can be added to a Remote PC Delivery Group. (see [below for nested schema](#nestedatt--desktops))
@@ -138,6 +138,8 @@ resource "citrix_delivery_group" "example-delivery-group" {
 - `reboot_schedules` (Attributes List) The reboot schedule for the delivery group. (see [below for nested schema](#nestedatt--reboot_schedules))
 - `restricted_access_users` (Attributes) Restrict access to this Delivery Group by specifying users and groups in the allow and block list. If no value is specified, all authenticated users will have access to this Delivery Group. To give access to unauthenticated users, use the `allow_anonymous_access` property. (see [below for nested schema](#nestedatt--restricted_access_users))
 - `scopes` (Set of String) The IDs of the scopes for the delivery group to be a part of.
+- `session_support` (String) The session support for the delivery group. Can only be set to `SingleSession` or `MultiSession`. Specify only if you want to create a Delivery Group wthout any `associated_machine_catalogs`. Ensure session support is same as that of the prospective Machine Catalogs you will associate this Delivery Group with.
+- `sharing_kind` (String) The sharing kind for the delivery group. Can only be set to `Shared` or `Private`. Specify only if you want to create a Delivery Group wthout any `associated_machine_catalogs`.
 - `storefront_servers` (Set of String) A list of GUID identifiers of StoreFront Servers to associate with the delivery group.
 
 ### Read-Only

@@ -41,6 +41,11 @@ type vsphereHypervisorResourcePoolResource struct {
 func (r *vsphereHypervisorResourcePoolResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
+	if r.client != nil && r.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
+
 	if req.Plan.Raw.IsNull() {
 		return
 	}
@@ -120,11 +125,12 @@ func (r *vsphereHypervisorResourcePoolResource) Create(ctx context.Context, req 
 	var relativePath string
 
 	cluster := util.ObjectValueToTypedObject[VsphereHypervisorClusterModel](ctx, &resp.Diagnostics, plan.Cluster)
-	resource, err := util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, folderPath, cluster.Datacenter.ValueString(), "datacenter", "", hypervisor)
+	resource, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, folderPath, cluster.Datacenter.ValueString(), "datacenter", "", hypervisor)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor Resource Pool for vSphere",
-			fmt.Sprintf("Failed to resolve resource %s, error: %s", cluster.Datacenter.ValueString(), err.Error()),
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				fmt.Sprintf("\nFailed to resolve resource %s, error: %s", cluster.Datacenter.ValueString(), err.Error()),
 		)
 		return
 	}
@@ -132,11 +138,12 @@ func (r *vsphereHypervisorResourcePoolResource) Create(ctx context.Context, req 
 	relativePath = resource.GetRelativePath()
 
 	if !cluster.ClusterName.IsNull() {
-		resource, err = util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, folderPath, cluster.ClusterName.ValueString(), "cluster", "", hypervisor)
+		resource, httpResp, err = util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, folderPath, cluster.ClusterName.ValueString(), "cluster", "", hypervisor)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating Hypervisor Resource Pool for vSphere",
-				fmt.Sprintf("Failed to resolve resource %s, error: %s", cluster.ClusterName.ValueString(), err.Error()),
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					fmt.Sprintf("\nFailed to resolve resource %s, error: %s", cluster.ClusterName.ValueString(), err.Error()),
 			)
 			return
 		}
@@ -145,11 +152,12 @@ func (r *vsphereHypervisorResourcePoolResource) Create(ctx context.Context, req 
 	}
 
 	if !cluster.Host.IsNull() {
-		resource, err = util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, folderPath, cluster.Host.ValueString(), "computeresource", "", hypervisor)
+		resource, httpResp, err = util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, folderPath, cluster.Host.ValueString(), "computeresource", "", hypervisor)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating Hypervisor Resource Pool for vSphere",
-				fmt.Sprintf("Failed to resolve resource %s, error: %s", cluster.Host.ValueString(), err.Error()),
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					fmt.Sprintf("\nFailed to resolve resource %s, error: %s", cluster.Host.ValueString(), err.Error()),
 			)
 			return
 		}
@@ -251,13 +259,6 @@ func (r *vsphereHypervisorResourcePoolResource) Update(ctx context.Context, req 
 			"Error updating Resource Pool for Hypervisor",
 			"Unsupported hypervisor connection type.",
 		)
-		return
-	}
-
-	var state VsphereHypervisorResourcePoolResourceModel
-	diags = req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
 		return
 	}
 

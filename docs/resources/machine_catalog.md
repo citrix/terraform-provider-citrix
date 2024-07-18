@@ -231,6 +231,35 @@ resource "citrix_machine_catalog" "example-nutanix-mtsession" {
     }
 }
 
+resource "citrix_machine_catalog" "example-scvmm-mtsession" {
+    name                        = "example-scvmm-mtsession"
+    description                 = "Example multi-session catalog on SCVMM hypervisor"
+    provisioning_type = "MCS"
+    allocation_type             = "Random"
+    session_support             = "MultiSession"
+    zone                        = citrix_zone.scvmm-zone.id
+    provisioning_scheme         = {
+        hypervisor = citrix_scvmm_hypervisor.example-scvmm-hypervisor.id
+        hypervisor_resource_pool = citrix_scvmm_hypervisor_resource_pool.example-scvmm-rp.id
+        identity_type = "ActiveDirectory"
+        machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+        scvmm_machine_config = {
+            master_image = "<master image>"
+            cpu_count = 1
+            memory_mb = 2048
+        }
+        number_of_total_machines = 1
+        machine_account_creation_rules = {
+            naming_scheme = "catalog-##"
+            naming_scheme_type = "Numeric"
+        }
+    }
+}
+
 resource "citrix_machine_catalog" "example-azure-pvs-mtsession" {
 	name                		= "example-azure-pvs-mtsession"
 	description					= "Example multi-session catalog on Azure hypervisor"
@@ -477,6 +506,7 @@ Optional:
 - `machine_domain_identity` (Attributes) The domain identity for machines in the machine catalog.<br />Required when identity_type is set to `ActiveDirectory` (see [below for nested schema](#nestedatt--provisioning_scheme--machine_domain_identity))
 - `network_mapping` (Attributes List) Specifies how the attached NICs are mapped to networks. If this parameter is omitted, provisioned VMs are created with a single NIC, which is mapped to the default network in the hypervisor resource pool.  If this parameter is supplied, machines are created with the number of NICs specified in the map, and each NIC is attached to the specified network.<br />Required when `provisioning_scheme.identity_type` is `AzureAD`. (see [below for nested schema](#nestedatt--provisioning_scheme--network_mapping))
 - `nutanix_machine_config` (Attributes) Machine Configuration For Nutanix MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--nutanix_machine_config))
+- `scvmm_machine_config` (Attributes) Machine Configuration for SCVMM MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--scvmm_machine_config))
 - `vsphere_machine_config` (Attributes) Machine Configuration for vSphere MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--vsphere_machine_config))
 - `xenserver_machine_config` (Attributes) Machine Configuration For XenServer MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--xenserver_machine_config))
 
@@ -745,6 +775,51 @@ Optional:
 - `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.
 - `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot.  The optional pattern '%m%' is replaced by the number of minutes until the reboot.
 - `warning_repeat_interval` (Number) Number of minutes to wait before showing the reboot warning message again.
+
+
+
+<a id="nestedatt--provisioning_scheme--scvmm_machine_config"></a>
+### Nested Schema for `provisioning_scheme.scvmm_machine_config`
+
+Required:
+
+- `cpu_count` (Number) The number of processors that virtual machines created from the provisioning scheme should use.
+- `master_image` (String) The name of the virtual machine that will be used as master image.
+- `memory_mb` (Number) The maximum amount of memory that virtual machines created from the provisioning scheme should use.
+
+Optional:
+
+- `image_snapshot` (String) The Snapshot of the virtual machine specified in `master_image`. Specify the relative path of the snapshot. Eg: snaphost-1/snapshot-2/snapshot-3. This property is case sensitive.
+- `image_update_reboot_options` (Attributes) The options for how rebooting is performed for image update. When omitted, image update on the VDAs will be performed on next shutdown. (see [below for nested schema](#nestedatt--provisioning_scheme--scvmm_machine_config--image_update_reboot_options))
+- `master_image_note` (String) The note for the master image.
+- `use_full_disk_clone_provisioning` (Boolean) Specify if virtual machines created from the provisioning scheme should be created using the dedicated full disk clone feature. Default is `false`.
+- `writeback_cache` (Attributes) Write-back Cache config. Leave this empty to disable Write-back Cache. (see [below for nested schema](#nestedatt--provisioning_scheme--scvmm_machine_config--writeback_cache))
+
+<a id="nestedatt--provisioning_scheme--scvmm_machine_config--image_update_reboot_options"></a>
+### Nested Schema for `provisioning_scheme.scvmm_machine_config.image_update_reboot_options`
+
+Required:
+
+- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
+
+Optional:
+
+- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.
+- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot.  The optional pattern '%m%' is replaced by the number of minutes until the reboot.
+- `warning_repeat_interval` (Number) Number of minutes to wait before showing the reboot warning message again.
+
+
+<a id="nestedatt--provisioning_scheme--scvmm_machine_config--writeback_cache"></a>
+### Nested Schema for `provisioning_scheme.scvmm_machine_config.writeback_cache`
+
+Required:
+
+- `writeback_cache_disk_size_gb` (Number) The size in GB of any temporary storage disk used by the write back cache.
+- `writeback_cache_memory_size_mb` (Number) The size of the in-memory write back cache in MB.
+
+Optional:
+
+- `writeback_cache_drive_letter` (String) The drive letter assigned for write back cache disk.
 
 
 

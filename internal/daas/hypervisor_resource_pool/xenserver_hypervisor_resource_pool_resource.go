@@ -24,6 +24,7 @@ var (
 	_ resource.ResourceWithConfigure      = &xenserverHypervisorResourcePoolResource{}
 	_ resource.ResourceWithImportState    = &xenserverHypervisorResourcePoolResource{}
 	_ resource.ResourceWithValidateConfig = &xenserverHypervisorResourcePoolResource{}
+	_ resource.ResourceWithModifyPlan     = &xenserverHypervisorResourcePoolResource{}
 )
 
 // NewHypervisorResourcePoolResource is a helper function to simplify the provider implementation.
@@ -170,13 +171,6 @@ func (r *xenserverHypervisorResourcePoolResource) Update(ctx context.Context, re
 			"Error creating Azure Resource Pool for Hypervisor",
 			"Unsupported hypervisor connection type.",
 		)
-		return
-	}
-
-	var state XenserverHypervisorResourcePoolResourceModel
-	diags = req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
 		return
 	}
 
@@ -373,4 +367,13 @@ func (r *xenserverHypervisorResourcePoolResource) ValidateConfig(ctx context.Con
 
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
 	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
+}
+
+func (r *xenserverHypervisorResourcePoolResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	if r.client != nil && r.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -619,6 +620,8 @@ type DeliveryGroupResourceModel struct {
 	Id                          types.String `tfsdk:"id"`
 	Name                        types.String `tfsdk:"name"`
 	Description                 types.String `tfsdk:"description"`
+	SessionSupport              types.String `tfsdk:"session_support"`
+	SharingKind                 types.String `tfsdk:"sharing_kind"`
 	RestrictedAccessUsers       types.Object `tfsdk:"restricted_access_users"`
 	AllowAnonymousAccess        types.Bool   `tfsdk:"allow_anonymous_access"`
 	Desktops                    types.List   `tfsdk:"desktops"`                    //List[DeliveryGroupDesktop]
@@ -654,6 +657,45 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 				Computed:    true,
 				Default:     stringdefault.StaticString(""),
 			},
+			"session_support": schema.StringAttribute{
+				Description: "The session support for the delivery group. Can only be set to `SingleSession` or `MultiSession`. Specify only if you want to create a Delivery Group wthout any `associated_machine_catalogs`. Ensure session support is same as that of the prospective Machine Catalogs you will associate this Delivery Group with.",
+				Optional:    true,
+				Validators: []validator.String{
+					util.GetValidatorFromEnum(citrixorchestration.AllowedSessionSupportEnumValues),
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("sharing_kind"),
+					}...),
+					stringvalidator.ExactlyOneOf(path.Expressions{
+						path.MatchRelative().AtParent().AtName("associated_machine_catalogs"),
+					}...),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplaceIf(func(_ context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+						resp.RequiresReplace = !req.ConfigValue.IsNull() && req.StateValue != req.ConfigValue
+					},
+						"Force replacement when session_support is changed",
+						"Force replacement when session_support is changed",
+					),
+				},
+			},
+			"sharing_kind": schema.StringAttribute{
+				Description: "The sharing kind for the delivery group. Can only be set to `Shared` or `Private`. Specify only if you want to create a Delivery Group wthout any `associated_machine_catalogs`.",
+				Optional:    true,
+				Validators: []validator.String{
+					util.GetValidatorFromEnum(citrixorchestration.AllowedSharingKindEnumValues),
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("session_support"),
+					}...),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplaceIf(func(_ context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+						resp.RequiresReplace = !req.ConfigValue.IsNull() && req.StateValue != req.ConfigValue
+					},
+						"Force replacement when sharing_kind is changed",
+						"Force replacement when sharing_kind is changed",
+					),
+				},
+			},
 			"restricted_access_users": RestrictedAccessUsers{}.GetSchemaForDeliveryGroup(),
 			"allow_anonymous_access": schema.BoolAttribute{
 				Description: "Give access to unauthenticated (anonymous) users; no credentials are required to access StoreFront. This feature requires a StoreFront store for unauthenticated users.",
@@ -669,7 +711,7 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 			},
 			"associated_machine_catalogs": schema.ListNestedAttribute{
 				Description:  "Machine catalogs from which to assign machines to the newly created delivery group.",
-				Required:     true,
+				Optional:     true,
 				NestedObject: DeliveryGroupMachineCatalogModel{}.GetSchema(),
 			},
 			"autoscale_settings": DeliveryGroupPowerManagementSettings{}.GetSchema(),
@@ -768,6 +810,11 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 		r.MakeResourcesAvailableInLHC = types.BoolValue(true)
 	} else if !r.MakeResourcesAvailableInLHC.IsNull() {
 		r.MakeResourcesAvailableInLHC = types.BoolValue(false)
+	}
+
+	if len(dgMachines.GetItems()) < 1 {
+		r.SessionSupport = types.StringValue(string(deliveryGroup.GetSessionSupport()))
+		r.SharingKind = types.StringValue(string(deliveryGroup.GetSharingKind()))
 	}
 
 	r = r.updatePlanWithRestrictedAccessUsers(ctx, diagnostics, deliveryGroup)

@@ -28,6 +28,131 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+type RoamingAccount struct {
+	Published types.Bool `tfsdk:"published"` // Whether the roaming account is published
+}
+
+func (RoamingAccount) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "Roaming account settings for the Store",
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			"published": schema.BoolAttribute{
+				Description: "Whether the roaming account is published. Default is false.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+		},
+	}
+}
+
+func (RoamingAccount) GetAttributes() map[string]schema.Attribute {
+	return RoamingAccount{}.GetSchema().Attributes
+}
+
+// GatewaySettings maps the STFStoreGatewayServiceSetRequestModel struct.
+type GatewaySettings struct {
+	Enabled                  types.Bool   `tfsdk:"enable"`                      // Enable use of the gateway service
+	CustomerId               types.String `tfsdk:"customer_id"`                 // The CWC customer id
+	GetGatewayServiceUrl     types.String `tfsdk:"get_gateway_service_url"`     // The URL of the service used to retrieve gateway address (FQDN)
+	PrivateKey               types.String `tfsdk:"private_key"`                 // The private key for CWC trust
+	ServiceName              types.String `tfsdk:"service_name"`                // The service name for CWC trust
+	InstanceId               types.String `tfsdk:"instance_id"`                 // The instance id for CWC trust
+	SecureTicketAuthorityUrl types.String `tfsdk:"secure_ticket_authority_url"` // The URL of the CWC STA service
+	SecureTicketLifetime     types.String `tfsdk:"secure_ticket_lifetime"`      // The lifetime requested for CWC STA service tickets
+	SessionReliability       types.Bool   `tfsdk:"session_reliability"`         // A value indicating whether session reliability should be enabled
+	IgnoreZones              types.List   `tfsdk:"ignore_zones"`                // List[string] A value indicating that the gateway service should not be used for the specified zones
+	HandleZones              types.List   `tfsdk:"handle_zones"`                // List[string] A value indicating that the gateway service should be used for the specified zones
+}
+
+func (GatewaySettings) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "Gateway service settings for the Store",
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			"enable": schema.BoolAttribute{
+				Description: "Enable use of the gateway service. Default is false.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+			"customer_id": schema.StringAttribute{
+				Description: "The CWC customer id",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"get_gateway_service_url": schema.StringAttribute{
+				Description: "The URL of the service used to retrieve gateway address (FQDN)",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"private_key": schema.StringAttribute{
+				Description: "The private key for CWC trust",
+				Sensitive:   true,
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"service_name": schema.StringAttribute{
+				Description: "The service name for CWC trust",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"instance_id": schema.StringAttribute{
+				Description: "The instance id for CWC trust",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"secure_ticket_authority_url": schema.StringAttribute{
+				Description: "The URL of the CWC STA service",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"secure_ticket_lifetime": schema.StringAttribute{
+				Description: "The lifetime requested for CWC STA service tickets. Default is 00:01:00.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("00:01:00"),
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"session_reliability": schema.BoolAttribute{
+				Description: "A value indicating whether session reliability should be enabled. Default is false.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+			"ignore_zones": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "A value indicating that the gateway service should not be used for the specified zones",
+				Optional:    true,
+			},
+			"handle_zones": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "A value indicating that the gateway service should be used for the specified zones",
+				Optional:    true,
+			},
+		},
+	}
+}
+
+func (GatewaySettings) GetAttributes() map[string]schema.Attribute {
+	return GatewaySettings{}.GetSchema().Attributes
+}
+
 // EnumerationOptions maps the STFStoreEnumerationOptionsRequestModel struct.
 type EnumerationOptions struct {
 	EnhancedEnumeration                          types.Bool  `tfsdk:"enhanced_enumeration"`
@@ -338,10 +463,12 @@ type STFStoreServiceResourceModel struct {
 	AuthenticationService types.String `tfsdk:"authentication_service_virtual_path"`
 	Anonymous             types.Bool   `tfsdk:"anonymous"`
 	LoadBalance           types.Bool   `tfsdk:"load_balance"`
-	STFStorePNA           types.Object `tfsdk:"pna"`                 //StorePNA
+	PNA                   types.Object `tfsdk:"pna"`                 // PNA
 	EnumerationOptions    types.Object `tfsdk:"enumeration_options"` // EnumerationOptions
 	LaunchOptions         types.Object `tfsdk:"launch_options"`      // LaunchOptions
 	FarmSettings          types.Object `tfsdk:"farm_settings"`
+	GatewaySettings       types.Object `tfsdk:"gateway_settings"` // GatewaySettings
+	RoamingAccount        types.Object `tfsdk:"roaming_account"`  // RoamingAccount
 }
 
 func (*stfStoreServiceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -400,23 +527,25 @@ func (*stfStoreServiceResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 			"enumeration_options": EnumerationOptions{}.GetSchema(),
-			"pna":                 STFStorePNA{}.GetSchema(),
+			"pna":                 PNA{}.GetSchema(),
 			"launch_options":      LaunchOptions{}.GetSchema(),
 			"farm_settings":       FarmSettings{}.GetSchema(),
+			"gateway_settings":    GatewaySettings{}.GetSchema(),
+			"roaming_account":     RoamingAccount{}.GetSchema(),
 		},
 	}
 }
 
-// SFStorePNA maps the resource schema data.
-type STFStorePNA struct {
+// PNA maps the resource schema data.
+type PNA struct {
 	Enable types.Bool `tfsdk:"enable"`
 }
 
-func (STFStorePNA) GetAttributes() map[string]schema.Attribute {
-	return STFStorePNA{}.GetSchema().Attributes
+func (PNA) GetAttributes() map[string]schema.Attribute {
+	return PNA{}.GetSchema().Attributes
 }
 
-func (STFStorePNA) GetSchema() schema.SingleNestedAttribute {
+func (PNA) GetSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
 		Optional:    true,
 		Description: "StoreFront PNA (Program Neighborhood Agent) state of the Store",
@@ -443,11 +572,11 @@ func (r *STFStoreServiceResourceModel) RefreshPropertyValues(ctx context.Context
 }
 
 func (r *STFStoreServiceResourceModel) RefreshPnaValues(ctx context.Context, diagnostics *diag.Diagnostics, pna citrixstorefront.STFPna) {
-	refreshedPna := util.ObjectValueToTypedObject[STFStorePNA](ctx, diagnostics, r.STFStorePNA)
+	refreshedPna := util.ObjectValueToTypedObject[PNA](ctx, diagnostics, r.PNA)
 	if pna.PnaEnabled.IsSet() {
 		refreshedPna.Enable = types.BoolValue(*pna.PnaEnabled.Get())
 	}
-	r.STFStorePNA = util.TypedObjectToObjectValue(ctx, diagnostics, refreshedPna)
+	r.PNA = util.TypedObjectToObjectValue(ctx, diagnostics, refreshedPna)
 }
 
 func (r *STFStoreServiceResourceModel) RefreshEnumerationOptions(ctx context.Context, diagnostics *diag.Diagnostics, response *citrixstorefront.GetSTFStoreEnumerationOptionsResponseModel) {
@@ -514,6 +643,45 @@ func (r *STFStoreServiceResourceModel) RefreshLaunchOptions(ctx context.Context,
 
 	r.LaunchOptions = refreshedLaunchOptionsObject
 }
+func (r *STFStoreServiceResourceModel) RefreshGatewaySettings(ctx context.Context, diagnostics *diag.Diagnostics, gatewayService *citrixstorefront.STFStoreGatewayServiceResponseModel) {
+	refreshedGatewaySettings := util.ObjectValueToTypedObject[GatewaySettings](ctx, diagnostics, r.GatewaySettings)
+	if gatewayService.Enabled.IsSet() {
+		refreshedGatewaySettings.Enabled = types.BoolValue(*gatewayService.Enabled.Get())
+	}
+	if gatewayService.CustomerId.IsSet() && *gatewayService.CustomerId.Get() != "" {
+		refreshedGatewaySettings.CustomerId = types.StringValue(*gatewayService.CustomerId.Get())
+	}
+	if gatewayService.GetGatewayServiceUrl.IsSet() && *gatewayService.GetGatewayServiceUrl.Get() != "" {
+		refreshedGatewaySettings.GetGatewayServiceUrl = types.StringValue(*gatewayService.GetGatewayServiceUrl.Get())
+	}
+	if gatewayService.PrivateKey.IsSet() && *gatewayService.PrivateKey.Get() != "" {
+		refreshedGatewaySettings.PrivateKey = types.StringValue(*gatewayService.PrivateKey.Get())
+	}
+	if gatewayService.ServiceName.IsSet() && *gatewayService.ServiceName.Get() != "" {
+		refreshedGatewaySettings.ServiceName = types.StringValue(*gatewayService.ServiceName.Get())
+	}
+	if gatewayService.InstanceId.IsSet() && *gatewayService.InstanceId.Get() != "" {
+		refreshedGatewaySettings.InstanceId = types.StringValue(*gatewayService.InstanceId.Get())
+	}
+	if gatewayService.SecureTicketAuthorityUrl.IsSet() && *gatewayService.SecureTicketAuthorityUrl.Get() != "" {
+		refreshedGatewaySettings.SecureTicketAuthorityUrl = types.StringValue(*gatewayService.SecureTicketAuthorityUrl.Get())
+	}
+
+	if gatewayService.SessionReliability.IsSet() && *gatewayService.SessionReliability.Get() {
+		refreshedGatewaySettings.SessionReliability = types.BoolValue(*gatewayService.SessionReliability.Get())
+	}
+
+	if gatewayService.IgnoreZones != nil && len(gatewayService.IgnoreZones) >= 1 {
+		refreshedGatewaySettings.IgnoreZones = util.RefreshListValues(ctx, diagnostics, refreshedGatewaySettings.IgnoreZones, gatewayService.IgnoreZones)
+	}
+
+	if gatewayService.HandleZones != nil && len(gatewayService.HandleZones) >= 1 {
+		refreshedGatewaySettings.HandleZones = util.RefreshListValues(ctx, diagnostics, refreshedGatewaySettings.HandleZones, gatewayService.HandleZones)
+	}
+
+	refreshedGatewaySettings.SecureTicketLifetime = types.StringValue(gatewayService.SecureTicketLifetime)
+	r.GatewaySettings = util.TypedObjectToObjectValue(ctx, diagnostics, refreshedGatewaySettings)
+}
 
 func (r *STFStoreServiceResourceModel) RefreshFarmSettings(ctx context.Context, diagnostics *diag.Diagnostics, response *citrixstorefront.StoreFarmConfigurationResponseModel) {
 	refreshedStoreFarmSettings := util.ObjectValueToTypedObject[FarmSettings](ctx, diagnostics, r.FarmSettings)
@@ -549,4 +717,16 @@ func (r *STFStoreServiceResourceModel) RefreshFarmSettings(ctx context.Context, 
 	refreshedStoreFarmSettingsObject := util.TypedObjectToObjectValue(ctx, diagnostics, refreshedStoreFarmSettings)
 
 	r.FarmSettings = refreshedStoreFarmSettingsObject
+}
+
+func (r *STFStoreServiceResourceModel) RefreshRoamingAccount(ctx context.Context, diagnostics *diag.Diagnostics, roamingAccount *citrixstorefront.GetSTFRoamingAccountResponseModel) {
+	refreshedRoamingAccount := util.ObjectValueToTypedObject[RoamingAccount](ctx, diagnostics, r.RoamingAccount)
+
+	if roamingAccount.Published.IsSet() {
+		refreshedRoamingAccount.Published = types.BoolValue(*roamingAccount.Published.Get())
+	}
+	refreshedRoamingObject := util.TypedObjectToObjectValue(ctx, diagnostics, refreshedRoamingAccount)
+
+	r.RoamingAccount = refreshedRoamingObject
+
 }

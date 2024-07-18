@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
@@ -282,7 +283,7 @@ type VsphereMachineConfigModel struct {
 	ImageUpdateRebootOptions types.Object `tfsdk:"image_update_reboot_options"`
 	CpuCount                 types.Int64  `tfsdk:"cpu_count"`
 	MemoryMB                 types.Int64  `tfsdk:"memory_mb"`
-	WritebackCache           types.Object `tfsdk:"writeback_cache"` // VsphereWritebackCacheModel
+	WritebackCache           types.Object `tfsdk:"writeback_cache"` // VsphereAndSCVMMWritebackCacheModel
 	MachineProfile           types.String `tfsdk:"machine_profile"`
 }
 
@@ -318,7 +319,7 @@ func (VsphereMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 				Description: "The maximum amount of memory that virtual machines created from the provisioning scheme should use.",
 				Required:    true,
 			},
-			"writeback_cache": VsphereWritebackCacheModel{}.GetSchema(),
+			"writeback_cache": VsphereAndSCVMMWritebackCacheModel{}.GetSchema(),
 			"machine_profile": schema.StringAttribute{
 				Description: "The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics and host cache property of OS disk.",
 				Optional:    true,
@@ -446,6 +447,70 @@ func (NutanixMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 
 func (NutanixMachineConfigModel) GetAttributes() map[string]schema.Attribute {
 	return NutanixMachineConfigModel{}.GetSchema().Attributes
+}
+
+type SCVMMMachineConfigModel struct {
+	MasterImage                  types.String `tfsdk:"master_image"`
+	ImageSnapshot                types.String `tfsdk:"image_snapshot"`
+	MasterImageNote              types.String `tfsdk:"master_image_note"`
+	ImageUpdateRebootOptions     types.Object `tfsdk:"image_update_reboot_options"`
+	CpuCount                     types.Int64  `tfsdk:"cpu_count"`
+	MemoryMB                     types.Int64  `tfsdk:"memory_mb"`
+	UseFullDiskCloneProvisioning types.Bool   `tfsdk:"use_full_disk_clone_provisioning"`
+	WritebackCache               types.Object `tfsdk:"writeback_cache"` // VsphereAndSCVMMWritebackCacheModel
+}
+
+func (SCVMMMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "Machine Configuration for SCVMM MCS catalog.",
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			"master_image": schema.StringAttribute{
+				Description: "The name of the virtual machine that will be used as master image.",
+				Required:    true,
+			},
+			"image_snapshot": schema.StringAttribute{
+				Description: "The Snapshot of the virtual machine specified in `master_image`. Specify the relative path of the snapshot. Eg: snaphost-1/snapshot-2/snapshot-3. This property is case sensitive.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"master_image_note": schema.StringAttribute{
+				Description: "The note for the master image.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(""),
+			},
+			"image_update_reboot_options": ImageUpdateRebootOptionsModel{}.GetSchema(),
+			"cpu_count": schema.Int64Attribute{
+				Description: "The number of processors that virtual machines created from the provisioning scheme should use.",
+				Required:    true,
+			},
+			"memory_mb": schema.Int64Attribute{
+				Description: "The maximum amount of memory that virtual machines created from the provisioning scheme should use.",
+				Required:    true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.RequiresReplace(),
+				},
+			},
+			"use_full_disk_clone_provisioning": schema.BoolAttribute{
+				Description: "Specify if virtual machines created from the provisioning scheme should be created using the dedicated full disk clone feature. Default is `false`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.RequiresReplace(),
+				},
+			},
+			"writeback_cache": VsphereAndSCVMMWritebackCacheModel{}.GetSchema(),
+		},
+	}
+}
+
+func (SCVMMMachineConfigModel) GetAttributes() map[string]schema.Attribute {
+	return SCVMMMachineConfigModel{}.GetSchema().Attributes
 }
 
 type GalleryImageModel struct {
@@ -865,13 +930,13 @@ func (XenserverWritebackCacheModel) GetAttributes() map[string]schema.Attribute 
 	return XenserverWritebackCacheModel{}.GetSchema().Attributes
 }
 
-type VsphereWritebackCacheModel struct {
+type VsphereAndSCVMMWritebackCacheModel struct {
 	WriteBackCacheDiskSizeGB   types.Int64  `tfsdk:"writeback_cache_disk_size_gb"`
 	WriteBackCacheMemorySizeMB types.Int64  `tfsdk:"writeback_cache_memory_size_mb"`
 	WriteBackCacheDriveLetter  types.String `tfsdk:"writeback_cache_drive_letter"`
 }
 
-func (VsphereWritebackCacheModel) GetSchema() schema.SingleNestedAttribute {
+func (VsphereAndSCVMMWritebackCacheModel) GetSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
 		Description: "Write-back Cache config. Leave this empty to disable Write-back Cache.",
 		Optional:    true,
@@ -904,8 +969,8 @@ func (VsphereWritebackCacheModel) GetSchema() schema.SingleNestedAttribute {
 	}
 }
 
-func (VsphereWritebackCacheModel) GetAttributes() map[string]schema.Attribute {
-	return VsphereWritebackCacheModel{}.GetSchema().Attributes
+func (VsphereAndSCVMMWritebackCacheModel) GetAttributes() map[string]schema.Attribute {
+	return VsphereAndSCVMMWritebackCacheModel{}.GetSchema().Attributes
 }
 
 type AzureDiskEncryptionSetModel struct {
@@ -1033,8 +1098,8 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 				if strings.EqualFold(resourceType, util.VhdResourceType) {
 					// VHD image
 					azureMasterImage.MasterImage = types.StringValue(masterImage.GetName())
-					azureMasterImage.Container = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
-					azureMasterImage.StorageAccount = types.StringValue(strings.Split(segments[lastIndex-3], ".")[0])
+					azureMasterImage.Container = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".container"))
+					azureMasterImage.StorageAccount = types.StringValue(strings.TrimSuffix(segments[lastIndex-3], ".storageaccount"))
 				} else if strings.EqualFold(resourceType, util.ImageVersionResourceType) {
 					/* For Azure Image Gallery image, the XDPath looks like:
 					* XDHyp:\\HostingUnits\\{resource pool}\\image.folder\\{resource group}.resourcegroup\\{gallery name}.gallery\\{image name}.imagedefinition\\{image version}.imageversion
@@ -1042,17 +1107,20 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 					 */
 					azureGalleryImageModel := util.ObjectValueToTypedObject[GalleryImageModel](ctx, diagnostics, azureMasterImage.GalleryImage)
 					azureGalleryImageModel.Version = types.StringValue(masterImage.GetName())
-					azureGalleryImageModel.Definition = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
-					azureGalleryImageModel.Gallery = types.StringValue(strings.Split(segments[lastIndex-3], ".")[0])
+					// Extract {image name} from {image name}.imagedefinition
+					azureGalleryImageModel.Definition = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".imagedefinition"))
+					// Extract {gallery name} from {gallery name}.gallery
+					azureGalleryImageModel.Gallery = types.StringValue(strings.TrimSuffix(segments[lastIndex-3], ".gallery"))
 
 					azureMasterImage.GalleryImage = util.TypedObjectToObjectValue(ctx, diagnostics, azureGalleryImageModel)
 
 				}
-				azureMasterImage.ResourceGroup = types.StringValue(strings.Split(segments[lastIndex-4], ".")[0])
+				// Extract {resource group} from {resource group}.resourcegroup
+				azureMasterImage.ResourceGroup = types.StringValue(strings.TrimSuffix(segments[lastIndex-4], ".resourcegroup"))
 			} else {
 				// Snapshot or Managed Disk
 				azureMasterImage.MasterImage = types.StringValue(masterImage.GetName())
-				azureMasterImage.ResourceGroup = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
+				azureMasterImage.ResourceGroup = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".resourcegroup"))
 			}
 		}
 
@@ -1271,7 +1339,7 @@ func (mc *GcpMachineConfigModel) RefreshProperties(ctx context.Context, diagnost
 		if lastIndex > 4 {
 			// If path slices are more than 4, that means a snapshot was used for the catalog
 			mc.MachineSnapshot = types.StringValue(masterImage.GetName())
-			mc.MasterImage = types.StringValue(strings.Split(segments[lastIndex-2], ".")[0])
+			mc.MasterImage = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".snapshot"))
 		} else {
 			// If path slices equals to 4, that means a VM was used for the catalog
 			mc.MasterImage = types.StringValue(masterImage.GetName())
@@ -1349,7 +1417,7 @@ func (mc *VsphereMachineConfigModel) RefreshProperties(ctx context.Context, diag
 	wbcDiskSize := provScheme.GetWriteBackCacheDiskSizeGB()
 	wbcMemorySize := provScheme.GetWriteBackCacheMemorySizeMB()
 	if wbcDiskSize != 0 {
-		writebackCache := VsphereWritebackCacheModel{}
+		writebackCache := VsphereAndSCVMMWritebackCacheModel{}
 		writebackCache.WriteBackCacheDiskSizeGB = types.Int64Value(int64(provScheme.GetWriteBackCacheDiskSizeGB()))
 		if wbcMemorySize != 0 {
 			writebackCache.WriteBackCacheMemorySizeMB = types.Int64Value(int64(provScheme.GetWriteBackCacheMemorySizeMB()))
@@ -1365,7 +1433,7 @@ func (mc *VsphereMachineConfigModel) RefreshProperties(ctx context.Context, diag
 	if machineProfileXdPath := machineProfile.GetXDPath(); machineProfileXdPath != "" {
 		machineProfileParts := strings.Split(machineProfileXdPath, "\\")
 		machineProfileName := machineProfileParts[len(machineProfileParts)-1]
-		machineProfileTemplateName := strings.Split(machineProfileName, ".template")[0]
+		machineProfileTemplateName := strings.TrimSuffix(machineProfileName, ".template")
 		mc.MachineProfile = types.StringValue(machineProfileTemplateName)
 	}
 }
@@ -1418,6 +1486,40 @@ func (mc *NutanixMachineConfigModel) RefreshProperties(catalog citrixorchestrati
 	mc.Container = types.StringValue(provScheme.GetNutanixContainer())
 }
 
+func (mc *SCVMMMachineConfigModel) RefreshProperties(ctx context.Context, diagnostics *diag.Diagnostics, catalog citrixorchestration.MachineCatalogDetailResponseModel) {
+	provScheme := catalog.GetProvisioningScheme()
+
+	// Refresh Master Image
+	masterImage, imageSnapshot := parseOnPremImagePath(catalog)
+	mc.MasterImage = types.StringValue(masterImage)
+	mc.ImageSnapshot = types.StringValue(imageSnapshot)
+
+	// Refresh Master Image Note
+	currentDiskImage := provScheme.GetCurrentDiskImage()
+	mc.MasterImageNote = types.StringValue(currentDiskImage.GetMasterImageNote())
+
+	// Refresh Memory
+	mc.MemoryMB = types.Int64Value(int64(provScheme.GetMemoryMB()))
+	mc.CpuCount = types.Int64Value(int64(provScheme.GetCpuCount()))
+
+	// Refresh Writeback Cache
+	wbcDiskSize := provScheme.GetWriteBackCacheDiskSizeGB()
+	wbcMemorySize := provScheme.GetWriteBackCacheMemorySizeMB()
+	if wbcDiskSize != 0 {
+		writebackCache := VsphereAndSCVMMWritebackCacheModel{}
+		writebackCache.WriteBackCacheDiskSizeGB = types.Int64Value(int64(provScheme.GetWriteBackCacheDiskSizeGB()))
+		if wbcMemorySize != 0 {
+			writebackCache.WriteBackCacheMemorySizeMB = types.Int64Value(int64(provScheme.GetWriteBackCacheMemorySizeMB()))
+		}
+		if provScheme.GetWriteBackCacheDriveLetter() != "" {
+			writebackCache.WriteBackCacheDriveLetter = types.StringValue(provScheme.GetWriteBackCacheDriveLetter())
+		}
+		mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, writebackCache)
+	}
+
+	mc.UseFullDiskCloneProvisioning = types.BoolValue(provScheme.GetUseFullDiskCloneProvisioning())
+}
+
 func parseAzureMachineProfileResponseToModel(machineProfileResponse citrixorchestration.HypervisorResourceRefResponseModel) *AzureMachineProfileModel {
 	machineProfileModel := AzureMachineProfileModel{}
 	if machineProfileName := machineProfileResponse.GetName(); machineProfileName != "" {
@@ -1431,7 +1533,7 @@ func parseAzureMachineProfileResponseToModel(machineProfileResponse citrixorches
 			})
 
 			if templateSpecIndex != -1 {
-				templateSpec := strings.Split(machineProfileSegments[templateSpecIndex], ".")[0]
+				templateSpec := strings.TrimSuffix(machineProfileSegments[templateSpecIndex], ".templatespec")
 				machineProfileModel.MachineProfileTemplateSpecName = types.StringValue(templateSpec)
 			}
 		} else {
@@ -1443,7 +1545,7 @@ func parseAzureMachineProfileResponseToModel(machineProfileResponse citrixorches
 		})
 
 		if resourceGroupIndex != -1 {
-			resourceGroup := strings.Split(machineProfileSegments[resourceGroupIndex], ".")[0]
+			resourceGroup := strings.TrimSuffix(machineProfileSegments[resourceGroupIndex], ".resourcegroup")
 			machineProfileModel.MachineProfileResourceGroup = types.StringValue(resourceGroup)
 		}
 	} else {
@@ -1466,11 +1568,11 @@ func parseOnPremImagePath(catalog citrixorchestration.MachineCatalogDetailRespon
 	 * A new snapshot will be created if it was not specified. There will always be at least one snapshot in the path.
 	 */
 	imageSegments := strings.Split(relativePath, "/")
-	masterImage = strings.Split(imageSegments[0], ".")[0]
+	masterImage = strings.TrimSuffix(imageSegments[0], ".vm")
 
-	snapshot := strings.Split(imageSegments[1], ".")[0]
+	snapshot := strings.TrimSuffix(imageSegments[1], ".snapshot")
 	for i := 2; i < len(imageSegments); i++ {
-		snapshot = snapshot + "/" + strings.Split(imageSegments[i], ".")[0]
+		snapshot = snapshot + "/" + strings.TrimSuffix(imageSegments[i], ".snapshot")
 	}
 
 	return masterImage, snapshot

@@ -32,6 +32,7 @@ func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ct
 	}
 
 	var machinesRequest []citrixorchestration.AddMachineToMachineCatalogRequestModel
+	var httpResp *http.Response
 	var body citrixorchestration.CreateMachineCatalogRequestModel
 
 	isRemotePcCatalog := plan.IsRemotePc.ValueBool()
@@ -111,11 +112,12 @@ func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ct
 		}
 		body.SetRemotePCEnrollmentScopes(remotePCEnrollmentScopes)
 	} else {
-		machinesRequest, err = getMachinesForManualCatalogs(ctx, diagnostics, client, util.ObjectListToTypedArray[MachineAccountsModel](ctx, diagnostics, plan.MachineAccounts))
+		machinesRequest, httpResp, err = getMachinesForManualCatalogs(ctx, diagnostics, client, util.ObjectListToTypedArray[MachineAccountsModel](ctx, diagnostics, plan.MachineAccounts))
 		if err != nil {
 			diagnostics.AddError(
 				"Error creating Machine Catalog",
-				fmt.Sprintf("Failed to resolve machines, error: %s", err.Error()),
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nFailed to resolve machines, error: "+err.Error(),
 			)
 			return nil, err
 		}

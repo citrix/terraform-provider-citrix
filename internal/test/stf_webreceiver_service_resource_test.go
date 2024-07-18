@@ -97,7 +97,7 @@ func TestSTFWebReceiverServiceResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.move_app_to_uncategorized", "true"),
 					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.show_activity_manager", "true"),
 					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.show_first_time_use", "true"),
-					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.prevent_ica_downloads", "true"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.prevent_ica_downloads", "false"),
 
 					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.workspace_control.enabled", "true"),
 					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.workspace_control.auto_reconnect_at_logon", "true"),
@@ -116,6 +116,15 @@ func TestSTFWebReceiverServiceResource(t *testing.T) {
 
 					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.progressive_web_app.enabled", "true"),
 					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "user_interface.progressive_web_app.show_install_prompt", "true"),
+
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "resources_service.ica_file_cache_expiry", "64"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "resources_service.persistent_icon_cache_enabled", "true"),
+
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "web_receiver_site_style.header_logo_path", "C:\\inetpub\\wwwroot\\Citrix\\StoreWeb\\receiver\\images\\2x\\CitrixStoreFrontReceiverLogo_Home@2x_B07AF017CEE39553.png"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "web_receiver_site_style.logon_logo_path", "C:\\inetpub\\wwwroot\\Citrix\\StoreWeb\\receiver\\images\\2x\\CitrixStoreFront_auth@2x_CB5D9D1BADB08AFF.png"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "web_receiver_site_style.header_background_color", "Very dark desaturated violet"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "web_receiver_site_style.header_foreground_color", "black"),
+					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "web_receiver_site_style.link_color", "Dark moderate violet"),
 				),
 			},
 		},
@@ -220,7 +229,17 @@ var (
 			}
 			show_activity_manager = true
 			show_first_time_use = true
-			prevent_ica_downloads = true
+			prevent_ica_downloads = false
+		}
+		resources_service = {
+        	ica_file_cache_expiry = 64
+    	}	
+		web_receiver_site_style = {
+			header_logo_path = "C:\\inetpub\\wwwroot\\Citrix\\StoreWeb\\receiver\\images\\2x\\CitrixStoreFrontReceiverLogo_Home@2x_B07AF017CEE39553.png"
+			logon_logo_path = "C:\\inetpub\\wwwroot\\Citrix\\StoreWeb\\receiver\\images\\2x\\CitrixStoreFront_auth@2x_CB5D9D1BADB08AFF.png"
+			header_background_color = "Very dark desaturated violet"
+			header_foreground_color = "black"
+			link_color = "Dark moderate violet"
 		}
 	  }
 	`

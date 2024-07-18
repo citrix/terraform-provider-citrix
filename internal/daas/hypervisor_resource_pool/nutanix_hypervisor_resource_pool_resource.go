@@ -23,6 +23,7 @@ var (
 	_ resource.ResourceWithConfigure      = &nutanixHypervisorResourcePoolResource{}
 	_ resource.ResourceWithImportState    = &nutanixHypervisorResourcePoolResource{}
 	_ resource.ResourceWithValidateConfig = &nutanixHypervisorResourcePoolResource{}
+	_ resource.ResourceWithModifyPlan     = &nutanixHypervisorResourcePoolResource{}
 )
 
 // NewHypervisorResourcePoolResource is a helper function to simplify the provider implementation.
@@ -164,13 +165,6 @@ func (r *nutanixHypervisorResourcePoolResource) Update(ctx context.Context, req 
 		return
 	}
 
-	var state NutanixHypervisorResourcePoolResourceModel
-	diags = req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
 	var editHypervisorResourcePool citrixorchestration.EditHypervisorResourcePoolRequestModel
 	editHypervisorResourcePool.SetName(plan.Name.ValueString())
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM)
@@ -278,4 +272,13 @@ func (r *nutanixHypervisorResourcePoolResource) ValidateConfig(ctx context.Conte
 
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
 	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
+}
+
+func (r *nutanixHypervisorResourcePoolResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	if r.client != nil && r.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
 }

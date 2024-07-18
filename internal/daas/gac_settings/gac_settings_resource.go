@@ -21,6 +21,7 @@ var (
 	_ resource.Resource                = &gacSettingsResource{}
 	_ resource.ResourceWithConfigure   = &gacSettingsResource{}
 	_ resource.ResourceWithImportState = &gacSettingsResource{}
+	_ resource.ResourceWithModifyPlan  = &gacSettingsResource{}
 )
 
 // NewAdminUserResource is a helper function to simplify the provider implementation.
@@ -466,4 +467,13 @@ func CreateCategorySettingsForMacos(ctx context.Context, diagnostics *diag.Diagn
 		categorySettings = append(categorySettings, categorySetting)
 	}
 	return categorySettings
+}
+
+func (r *gacSettingsResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	if r.client != nil && r.client.GacClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
 }

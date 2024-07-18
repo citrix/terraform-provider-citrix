@@ -22,6 +22,7 @@ var (
 	_ resource.ResourceWithConfigure      = &awsHypervisorResourcePoolResource{}
 	_ resource.ResourceWithImportState    = &awsHypervisorResourcePoolResource{}
 	_ resource.ResourceWithValidateConfig = &awsHypervisorResourcePoolResource{}
+	_ resource.ResourceWithModifyPlan     = &awsHypervisorResourcePoolResource{}
 )
 
 // NewHypervisorResourcePoolResource is a helper function to simplify the provider implementation.
@@ -171,13 +172,6 @@ func (r *awsHypervisorResourcePoolResource) Update(ctx context.Context, req reso
 		return
 	}
 
-	var state AwsHypervisorResourcePoolResourceModel
-	diags = req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
 	var editHypervisorResourcePool citrixorchestration.EditHypervisorResourcePoolRequestModel
 	editHypervisorResourcePool.SetName(plan.Name.ValueString())
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS)
@@ -260,4 +254,13 @@ func (r *awsHypervisorResourcePoolResource) ValidateConfig(ctx context.Context, 
 
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
 	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
+}
+
+func (r *awsHypervisorResourcePoolResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	if r.client != nil && r.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
 }

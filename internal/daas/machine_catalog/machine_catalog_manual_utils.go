@@ -17,9 +17,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-func getMachinesForManualCatalogs(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, machineAccounts []MachineAccountsModel) ([]citrixorchestration.AddMachineToMachineCatalogRequestModel, error) {
+func getMachinesForManualCatalogs(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, machineAccounts []MachineAccountsModel) ([]citrixorchestration.AddMachineToMachineCatalogRequestModel, *http.Response, error) {
 	if machineAccounts == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	addMachineRequestList := []citrixorchestration.AddMachineToMachineCatalogRequestModel{}
@@ -31,16 +31,16 @@ func getMachinesForManualCatalogs(ctx context.Context, diagnostics *diag.Diagnos
 			hypervisor, err = util.GetHypervisor(ctx, client, nil, hypervisorId)
 
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		}
 
 		machines := util.ObjectListToTypedArray[MachineCatalogMachineModel](ctx, diagnostics, machineAccount.Machines)
 
 		// Verify machine accounts using Identity API
-		_, err = verifyMachinesUsingIdentity(ctx, client, machines)
+		httpResp, err := verifyMachinesUsingIdentity(ctx, client, machines)
 		if err != nil {
-			return nil, err
+			return nil, httpResp, err
 		}
 
 		for _, machine := range machines {
@@ -59,99 +59,99 @@ func getMachinesForManualCatalogs(ctx context.Context, diagnostics *diag.Diagnos
 			switch connectionType {
 			case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
 				if machine.Region.IsNull() || machine.ResourceGroupName.IsNull() {
-					return nil, fmt.Errorf("region and resource_group_name are required for Azure")
+					return nil, nil, fmt.Errorf("region and resource_group_name are required for Azure")
 				}
-				region, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, "", machine.Region.ValueString(), "Region", "", hypervisor)
+				region, httpResp, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, "", machine.Region.ValueString(), "Region", "", hypervisor)
 				if err != nil {
-					return nil, err
+					return nil, httpResp, err
 				}
 				regionPath := region.GetXDPath()
-				vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, fmt.Sprintf("%s\\vm.folder", regionPath), machineName, util.VirtualMachineResourceType, machine.ResourceGroupName.ValueString(), hypervisor)
+				vm, httpResp, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, fmt.Sprintf("%s\\vm.folder", regionPath), machineName, util.VirtualMachineResourceType, machine.ResourceGroupName.ValueString(), hypervisor)
 				if err != nil {
-					return nil, err
+					return nil, httpResp, err
 				}
 				vmId = vm.GetId()
 			case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
 				if machine.AvailabilityZone.IsNull() {
-					return nil, fmt.Errorf("availability_zone is required for AWS")
+					return nil, nil, fmt.Errorf("availability_zone is required for AWS")
 				}
-				availabilityZone, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, "", machine.AvailabilityZone.ValueString(), "", "", hypervisor)
+				availabilityZone, httpResp, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, "", machine.AvailabilityZone.ValueString(), "", "", hypervisor)
 				if err != nil {
-					return nil, err
+					return nil, httpResp, err
 				}
 				availabilityZonePath := availabilityZone.GetXDPath()
-				vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, availabilityZonePath, machineName, util.VirtualMachineResourceType, "", hypervisor)
+				vm, httpResp, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, availabilityZonePath, machineName, util.VirtualMachineResourceType, "", hypervisor)
 				if err != nil {
-					return nil, err
+					return nil, httpResp, err
 				}
 				vmId = vm.GetId()
 			case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
 				if machine.Region.IsNull() || machine.ProjectName.IsNull() {
-					return nil, fmt.Errorf("region and project_name are required for GCP")
+					return nil, nil, fmt.Errorf("region and project_name are required for GCP")
 				}
-				projectName, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, "", machine.ProjectName.ValueString(), "", "", hypervisor)
+				projectName, httpResp, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, "", machine.ProjectName.ValueString(), "", "", hypervisor)
 				if err != nil {
-					return nil, err
+					return nil, httpResp, err
 				}
 				projectNamePath := projectName.GetXDPath()
-				vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, fmt.Sprintf("%s\\%s.region", projectNamePath, machine.Region.ValueString()), machineName, util.VirtualMachineResourceType, "", hypervisor)
+				vm, httpResp, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, fmt.Sprintf("%s\\%s.region", projectNamePath, machine.Region.ValueString()), machineName, util.VirtualMachineResourceType, "", hypervisor)
 				if err != nil {
-					return nil, err
+					return nil, httpResp, err
 				}
 				vmId = vm.GetId()
 			case citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER:
 				if machine.Datacenter.IsNull() || machine.Host.IsNull() {
-					return nil, fmt.Errorf("datacenter and host are required for vSphere")
+					return nil, nil, fmt.Errorf("datacenter and host are required for vSphere")
 				}
 
 				folderPath := hypervisor.GetXDPath()
-				datacenter, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, folderPath, machine.Datacenter.ValueString(), "datacenter", "", hypervisor)
+				datacenter, httpResp, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, folderPath, machine.Datacenter.ValueString(), "datacenter", "", hypervisor)
 				if err != nil {
-					return nil, err
+					return nil, httpResp, err
 				}
 
 				folderPath = datacenter.GetXDPath()
 
 				if !machine.Cluster.IsNull() {
-					cluster, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, folderPath, machine.Cluster.ValueString(), "cluster", "", hypervisor)
+					cluster, httpResp, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, folderPath, machine.Cluster.ValueString(), "cluster", "", hypervisor)
 					if err != nil {
-						return nil, err
+						return nil, httpResp, err
 					}
 					folderPath = cluster.GetXDPath()
 				}
 
-				host, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, folderPath, machine.Host.ValueString(), "computeresource", "", hypervisor)
+				host, httpResp, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, folderPath, machine.Host.ValueString(), "computeresource", "", hypervisor)
 				if err != nil {
-					return nil, err
+					return nil, httpResp, err
 				}
 				hostPath := host.GetXDPath()
-				vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, hostPath, machineName, util.VirtualMachineResourceType, "", hypervisor)
+				vm, httpResp, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, hostPath, machineName, util.VirtualMachineResourceType, "", hypervisor)
 				if err != nil {
-					return nil, err
+					return nil, httpResp, err
 				}
 				vmId = vm.GetId()
 			case citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER:
-				vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, "", machineName, util.VirtualMachineResourceType, "", hypervisor)
+				vm, httpResp, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, "", machineName, util.VirtualMachineResourceType, "", hypervisor)
 				if err != nil {
-					return nil, err
+					return nil, httpResp, err
 				}
 				vmId = vm.GetId()
 			case citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM:
-				host, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, "", machine.Host.ValueString(), util.HostResourceType, "", hypervisor)
+				host, httpResp, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, "", machine.Host.ValueString(), util.HostResourceType, "", hypervisor)
 				if err != nil {
-					return nil, err
+					return nil, httpResp, err
 				}
-				vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, host.GetFullName(), machineName, util.VirtualMachineResourceType, "", hypervisor)
+				vm, httpResp, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, host.GetFullName(), machineName, util.VirtualMachineResourceType, "", hypervisor)
 				if err != nil {
-					return nil, err
+					return nil, httpResp, err
 				}
 				vmId = vm.GetId()
 			case citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM:
 				if hypervisor.GetPluginId() == util.NUTANIX_PLUGIN_ID {
 					hypervisorXdPath := hypervisor.GetXDPath()
-					vm, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, fmt.Sprintf("%s\\VirtualMachines.folder", hypervisorXdPath), machineName, util.VirtualMachineResourceType, "", hypervisor)
+					vm, httpResp, err := util.GetSingleHypervisorResource(ctx, client, hypervisorId, fmt.Sprintf("%s\\VirtualMachines.folder", hypervisorXdPath), machineName, util.VirtualMachineResourceType, "", hypervisor)
 					if err != nil {
-						return nil, err
+						return nil, httpResp, err
 					}
 					vmId = vm.GetId()
 				}
@@ -164,7 +164,7 @@ func getMachinesForManualCatalogs(ctx context.Context, diagnostics *diag.Diagnos
 		}
 	}
 
-	return addMachineRequestList, nil
+	return addMachineRequestList, nil, nil
 }
 
 func deleteMachinesFromManualCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, deleteMachinesList map[string]bool, catalogNameOrId string) error {
@@ -196,11 +196,12 @@ func addMachinesToManualCatalog(ctx context.Context, diagnostics *diag.Diagnosti
 		return nil
 	}
 
-	addMachinesRequest, err := getMachinesForManualCatalogs(ctx, diagnostics, client, addMachinesList)
+	addMachinesRequest, httpResp, err := getMachinesForManualCatalogs(ctx, diagnostics, client, addMachinesList)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error adding machines(s) to Machine Catalog "+catalogIdOrName,
-			fmt.Sprintf("Failed to resolve machines, error: %s", err.Error()),
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nFailed to resolve machines, err: "+err.Error(),
 		)
 
 		return err

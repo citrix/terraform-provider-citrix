@@ -89,7 +89,7 @@ func (r *stfStoreFarmResource) Create(ctx context.Context, req resource.CreateRe
 		storeFarmAddBody.SetTicketTimeToLive(plan.TicketTimeToLive.ValueInt64())
 	}
 	if !plan.TransportType.IsNull() {
-		storeFarmAddBody.SetTransportType(plan.TransportType.ValueInt64())
+		storeFarmAddBody.SetTransportType(plan.TransportType.ValueString())
 	}
 	if !plan.RadeTicketTimeToLive.IsNull() {
 		storeFarmAddBody.SetRadeTicketTimeToLive(plan.RadeTicketTimeToLive.ValueInt64())
@@ -114,7 +114,7 @@ func (r *stfStoreFarmResource) Create(ctx context.Context, req resource.CreateRe
 		storeFarmAddBody.SetSSLRelayPort(plan.SSLRelayPort.ValueInt64())
 	}
 	if !plan.TransportType.IsNull() {
-		storeFarmAddBody.SetTransportType(plan.TransportType.ValueInt64())
+		storeFarmAddBody.SetTransportType(plan.TransportType.ValueString())
 	}
 	if !plan.XMLValidationEnabled.IsNull() {
 		storeFarmAddBody.SetXMLValidationEnabled(plan.XMLValidationEnabled.ValueBool())
@@ -177,6 +177,21 @@ func (r *stfStoreFarmResource) Read(ctx context.Context, req resource.ReadReques
 	storeFarmGetBody.SetFarmName(state.FarmName.ValueString())
 	var getStoreBody citrixstorefront.GetSTFStoreRequestModel
 	getStoreBody.SetVirtualPath(state.StoreService.ValueString())
+
+	getSTFStoreServiceRequest := r.client.StorefrontClient.StoreSF.STFStoreGetSTFStore(ctx, getStoreBody)
+
+	// Make sure store exists before reading the StoreFarm
+	_, err := getSTFStoreServiceRequest.Execute()
+	if err != nil {
+		if strings.EqualFold(err.Error(), util.NOT_EXIST) {
+			resp.Diagnostics.AddWarning(
+				"StoreFront Store not found for the Store Farm",
+				"StoreFront Store Farm was not found and will be removed from the state file. An apply action will result in the creation of a new resource.",
+			)
+			resp.State.RemoveResource(ctx)
+			return
+		}
+	}
 
 	getStoreFarmRequest := r.client.StorefrontClient.StoreSF.STFStoreGetStoreFarm(ctx, storeFarmGetBody, getStoreBody)
 	storeFarm, err := getStoreFarmRequest.Execute()
@@ -251,7 +266,7 @@ func (r *stfStoreFarmResource) Update(ctx context.Context, req resource.UpdateRe
 		storeFarmSetBody.SetTicketTimeToLive(plan.TicketTimeToLive.ValueInt64())
 	}
 	if !plan.TransportType.IsNull() {
-		storeFarmSetBody.SetTransportType(plan.TransportType.ValueInt64())
+		storeFarmSetBody.SetTransportType(plan.TransportType.ValueString())
 	}
 	if !plan.RadeTicketTimeToLive.IsNull() {
 		storeFarmSetBody.SetRadeTicketTimeToLive(plan.RadeTicketTimeToLive.ValueInt64())
@@ -276,7 +291,7 @@ func (r *stfStoreFarmResource) Update(ctx context.Context, req resource.UpdateRe
 		storeFarmSetBody.SetSSLRelayPort(plan.SSLRelayPort.ValueInt64())
 	}
 	if !plan.TransportType.IsNull() {
-		storeFarmSetBody.SetTransportType(plan.TransportType.ValueInt64())
+		storeFarmSetBody.SetTransportType(plan.TransportType.ValueString())
 	}
 	if !plan.XMLValidationEnabled.IsNull() {
 		storeFarmSetBody.SetXMLValidationEnabled(plan.XMLValidationEnabled.ValueBool())
@@ -304,7 +319,7 @@ func (r *stfStoreFarmResource) Update(ctx context.Context, req resource.UpdateRe
 	storeFarm, err := getStoreFarmRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error reading Store Farm after Upate",
+			"Error reading Store Farm after Update",
 			"\nError message: "+err.Error(),
 		)
 		return

@@ -216,6 +216,35 @@ resource "citrix_machine_catalog" "example-nutanix-mtsession" {
     }
 }
 
+resource "citrix_machine_catalog" "example-scvmm-mtsession" {
+    name                        = "example-scvmm-mtsession"
+    description                 = "Example multi-session catalog on SCVMM hypervisor"
+    provisioning_type = "MCS"
+    allocation_type             = "Random"
+    session_support             = "MultiSession"
+    zone                        = citrix_zone.scvmm-zone.id
+    provisioning_scheme         = {
+        hypervisor = citrix_scvmm_hypervisor.example-scvmm-hypervisor.id
+        hypervisor_resource_pool = citrix_scvmm_hypervisor_resource_pool.example-scvmm-rp.id
+        identity_type = "ActiveDirectory"
+        machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+        scvmm_machine_config = {
+            master_image = "<master image>"
+            cpu_count = 1
+            memory_mb = 2048
+        }
+        number_of_total_machines = 1
+        machine_account_creation_rules = {
+            naming_scheme = "catalog-##"
+            naming_scheme_type = "Numeric"
+        }
+    }
+}
+
 resource "citrix_machine_catalog" "example-azure-pvs-mtsession" {
 	name                		= "example-azure-pvs-mtsession"
 	description					= "Example multi-session catalog on Azure hypervisor"

@@ -189,7 +189,7 @@ func validateAndReturnMachineCatalogSessionSupport(ctx context.Context, client c
 		}
 
 		if provisioningType == nil {
-			provisioningType = &catalog.ProvisioningType
+			provisioningType = catalog.ProvisioningType
 			isPowerManaged = catalog.GetIsPowerManaged()
 			isRemotePc = catalog.GetIsRemotePC()
 			provScheme := catalog.GetProvisioningScheme()
@@ -553,7 +553,6 @@ func validateRebootSchedules(ctx context.Context, diagnostics *diag.Diagnostics,
 }
 
 func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, plan DeliveryGroupResourceModel, associatedMachineCatalogProperties AssociatedMachineCatalogProperties) (citrixorchestration.CreateDeliveryGroupRequestModel, error) {
-	deliveryGroupMachineCatalogsArray := getDeliveryGroupAddMachinesRequest(util.ObjectListToTypedArray[DeliveryGroupMachineCatalogModel](ctx, diagnostics, plan.AssociatedMachineCatalogs))
 	desktops := util.ObjectListToTypedArray[DeliveryGroupDesktop](ctx, diagnostics, plan.Desktops)
 	deliveryGroupDesktopsArray, err := verifyUsersAndParseDeliveryGroupDesktopsToClientModel(ctx, diagnostics, client, desktops)
 
@@ -610,8 +609,36 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 	var body citrixorchestration.CreateDeliveryGroupRequestModel
 	body.SetName(plan.Name.ValueString())
 	body.SetDescription(plan.Description.ValueString())
-	body.SetMachineCatalogs(deliveryGroupMachineCatalogsArray)
 	body.SetRebootSchedules(deliveryGroupRebootScheduleArray)
+
+	if !plan.AssociatedMachineCatalogs.IsNull() {
+		deliveryGroupMachineCatalogsArray := getDeliveryGroupAddMachinesRequest(util.ObjectListToTypedArray[DeliveryGroupMachineCatalogModel](ctx, diagnostics, plan.AssociatedMachineCatalogs))
+		body.SetMachineCatalogs(deliveryGroupMachineCatalogsArray)
+	}
+
+	if !plan.SessionSupport.IsNull() {
+		sessionSupport, err := citrixorchestration.NewSessionSupportFromValue(plan.SessionSupport.ValueString())
+		if err != nil {
+			diagnostics.AddError(
+				"Error creating Delivery Group",
+				"Unsupported session support.",
+			)
+			return body, err
+		}
+		body.SetSessionSupport(*sessionSupport)
+	}
+
+	if !plan.SharingKind.IsNull() {
+		sharingKind, err := citrixorchestration.NewSharingKindFromValue(plan.SharingKind.ValueString())
+		if err != nil {
+			diagnostics.AddError(
+				"Error creating Delivery Group",
+				"Unsupported sharing kind.",
+			)
+			return body, err
+		}
+		body.SetSharingKind(*sharingKind)
+	}
 
 	functionalLevel, err := citrixorchestration.NewFunctionalLevelFromValue(plan.MinimumFunctionalLevel.ValueString())
 	if err != nil {
@@ -1189,13 +1216,14 @@ func (r DeliveryGroupResourceModel) updatePlanWithAssociatedCatalogs(ctx context
 		machineCatalogMap[machineCatalogId] += 1
 	}
 
-	associatedMachineCatalogs := []DeliveryGroupMachineCatalogModel{}
+	var associatedMachineCatalogs []DeliveryGroupMachineCatalogModel
 	for key, val := range machineCatalogMap {
 		var deliveryGroupMachineCatalogModel DeliveryGroupMachineCatalogModel
 		deliveryGroupMachineCatalogModel.MachineCatalog = types.StringValue(key)
 		deliveryGroupMachineCatalogModel.MachineCount = types.Int64Value(int64(val))
 		associatedMachineCatalogs = append(associatedMachineCatalogs, deliveryGroupMachineCatalogModel)
 	}
+
 	r.AssociatedMachineCatalogs = util.TypedArrayToObjectList[DeliveryGroupMachineCatalogModel](ctx, diags, associatedMachineCatalogs)
 
 	return r

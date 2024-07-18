@@ -22,6 +22,7 @@ var (
 	_ resource.ResourceWithConfigure      = &azureHypervisorResourcePoolResource{}
 	_ resource.ResourceWithImportState    = &azureHypervisorResourcePoolResource{}
 	_ resource.ResourceWithValidateConfig = &azureHypervisorResourcePoolResource{}
+	_ resource.ResourceWithModifyPlan     = &azureHypervisorResourcePoolResource{}
 )
 
 // NewHypervisorResourcePoolResource is a helper function to simplify the provider implementation.
@@ -89,22 +90,24 @@ func (r *azureHypervisorResourcePoolResource) Create(ctx context.Context, req re
 		)
 		return
 	}
-	region, err := util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, "", plan.Region.ValueString(), "Region", "", hypervisor)
+	region, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, "", plan.Region.ValueString(), "Region", "", hypervisor)
 	regionPath := region.GetXDPath()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor Resource Pool for Azure",
-			fmt.Sprintf("Cloud Region %s, error: %s", plan.Region.ValueString(), err.Error()),
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				fmt.Sprintf("\nFailed to resolve region %s, error: %s", plan.Region.ValueString(), err.Error()),
 		)
 		return
 	}
 	resourcePoolDetails.SetRegion(regionPath)
-	vnet, err := util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, fmt.Sprintf("%s/virtualprivatecloud.folder", regionPath), plan.VirtualNetwork.ValueString(), util.VirtualPrivateCloudResourceType, plan.VirtualNetworkResourceGroup.ValueString(), hypervisor)
+	vnet, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, fmt.Sprintf("%s/virtualprivatecloud.folder", regionPath), plan.VirtualNetwork.ValueString(), util.VirtualPrivateCloudResourceType, plan.VirtualNetworkResourceGroup.ValueString(), hypervisor)
 	vnetPath := vnet.GetXDPath()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor Resource Pool for Azure",
-			fmt.Sprintf("Virtual Network %s in region %s, error: %s", plan.VirtualNetwork.ValueString(), plan.Region.ValueString(), err.Error()),
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				fmt.Sprintf("\nFailed to resolve virtual network %s in region %s, error: %s", plan.VirtualNetwork.ValueString(), plan.Region.ValueString(), err.Error()),
 		)
 		return
 	}
@@ -195,13 +198,6 @@ func (r *azureHypervisorResourcePoolResource) Update(ctx context.Context, req re
 		return
 	}
 
-	var state AzureHypervisorResourcePoolResourceModel
-	diags = req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
 	var editHypervisorResourcePool citrixorchestration.EditHypervisorResourcePoolRequestModel
 	editHypervisorResourcePool.SetName(plan.Name.ValueString())
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM)
@@ -286,4 +282,13 @@ func (r *azureHypervisorResourcePoolResource) ValidateConfig(ctx context.Context
 
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
 	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
+}
+
+func (r *azureHypervisorResourcePoolResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	if r.client != nil && r.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
 }

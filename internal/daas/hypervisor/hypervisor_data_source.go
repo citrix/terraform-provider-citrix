@@ -45,6 +45,11 @@ func (d *HypervisorDataSource) Configure(ctx context.Context, req datasource.Con
 func (d *HypervisorDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
+	if d.client != nil && d.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
+
 	var data HypervisorDataSourceModel
 
 	// Read Terraform configuration data into the model

@@ -46,6 +46,11 @@ type policySetResource struct {
 func (r *policySetResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
+	if r.client != nil && r.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
+
 	// Skip modify plan when doing destroy action
 	if req.Plan.Raw.IsNull() {
 		return
@@ -66,8 +71,37 @@ func (r *policySetResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 	}
 
 	// Validate DDC Version
-	isDdcVersionSupported := util.CheckProductVersion(r.client, &resp.Diagnostics, 118, 7, 41, "policy set")
+	isDdcVersionSupported, err := util.CheckProductVersion(r.client, 118, 7, 41)
+
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"An error occurred while checking the DDC version",
+			"Error : "+err.Error(),
+		)
+
+		return
+	}
+
 	if !isDdcVersionSupported {
+		if r.client.AuthConfig.OnPremises {
+			productMajorVersion, productMinorVersion, err := util.GetProductMajorAndMinorVersion(r.client)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"An error occurred while checking the DDC version",
+					"Error : "+err.Error(),
+				)
+				return
+			}
+			resp.Diagnostics.AddError(
+				fmt.Sprintf("Current DDC version %d.%d does not support operations on policy set resources.", productMajorVersion, productMinorVersion),
+				fmt.Sprintf("Please upgrade your DDC product version to %d.%d or above to operate on policy set resources.", 7, 41),
+			)
+		} else {
+			resp.Diagnostics.AddError(
+				fmt.Sprintf("Current DDC version %d does not support operations on policy set resources.", r.client.ClientConfig.OrchestrationApiVersion),
+				fmt.Sprintf("Please upgrade your DDC product version to %d or above to operate on policy set resources.", 118),
+			)
+		}
 		return
 	}
 

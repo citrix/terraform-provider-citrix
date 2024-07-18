@@ -28,32 +28,32 @@ func TestResourceLocationResource(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildResourceLocationResource(t, resourceLocationTestResource),
+				Config: BuildResourceLocationResource(t, resourceLocationTestResource, name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the resource location
-					resource.TestCheckResourceAttr("citrix_resource_location.test_resource_location", "name", name),
+					resource.TestCheckResourceAttr("citrix_cloud_resource_location.test_resource_location", "name", name),
 					// Verify the value of the internal_only flag (Set to false by default)
-					resource.TestCheckResourceAttr("citrix_resource_location.test_resource_location", "internal_only", "false"),
+					resource.TestCheckResourceAttr("citrix_cloud_resource_location.test_resource_location", "internal_only", "false"),
 					// Verify the value of the time_zone attribute (Set to "UTC" by default)
-					resource.TestCheckResourceAttr("citrix_resource_location.test_resource_location", "time_zone", "GMT Standard Time"),
+					resource.TestCheckResourceAttr("citrix_cloud_resource_location.test_resource_location", "time_zone", "GMT Standard Time"),
 				),
 			},
 			// ImportState testing
 			{
-				ResourceName:      "citrix_resource_location.test_resource_location",
+				ResourceName:      "citrix_cloud_resource_location.test_resource_location",
 				ImportState:       true,
 				ImportStateVerify: true,
 			},
 			// Update and Read testing
 			{
-				Config: BuildResourceLocationResource(t, resourceLocationTestResource_updated),
+				Config: BuildResourceLocationResource(t, resourceLocationTestResource_updated, name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the resource location
-					resource.TestCheckResourceAttr("citrix_resource_location.test_resource_location", "name", fmt.Sprintf("%s-updated", name)),
+					resource.TestCheckResourceAttr("citrix_cloud_resource_location.test_resource_location", "name", fmt.Sprintf("%s-updated", name)),
 					// Verify the value of the internal_only flag (Set to false by default)
-					resource.TestCheckResourceAttr("citrix_resource_location.test_resource_location", "internal_only", "false"),
+					resource.TestCheckResourceAttr("citrix_cloud_resource_location.test_resource_location", "internal_only", "false"),
 					// Verify the value of the time_zone attribute (Set to "UTC" by default)
-					resource.TestCheckResourceAttr("citrix_resource_location.test_resource_location", "time_zone", "Eastern Standard Time"),
+					resource.TestCheckResourceAttr("citrix_cloud_resource_location.test_resource_location", "time_zone", "Eastern Standard Time"),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
@@ -63,19 +63,19 @@ func TestResourceLocationResource(t *testing.T) {
 
 var (
 	resourceLocationTestResource = `
-	resource "citrix_resource_location" "test_resource_location" {
-		name = "%s"
-
-	}
-	`
+resource "citrix_cloud_resource_location" "test_resource_location" {
+	name = "%s"
+}
+`
 	resourceLocationTestResource_updated = `
-	resource "citrix_resource_location" "test_resource_location" {
-		name = "%s-updated"
-		time_zone = "Eastern Standard Time"
-	}
-	`
+resource "citrix_cloud_resource_location" "test_resource_location" {
+	name = "%s-updated"
+	time_zone = "Eastern Standard Time"
+}
+`
 )
 
-func BuildResourceLocationResource(t *testing.T, resourceLocation string) string {
-	return fmt.Sprintf(resourceLocation, os.Getenv("TEST_RESOURCE_LOCATION_NAME"))
+func BuildResourceLocationResource(t *testing.T, resourceLocation string, resourceLocationName string) string {
+	tfbody := fmt.Sprintf(resourceLocation, resourceLocationName)
+	return tfbody
 }

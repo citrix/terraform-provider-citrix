@@ -43,6 +43,11 @@ func (d *AdminScopeDataSource) Configure(ctx context.Context, req datasource.Con
 func (d *AdminScopeDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
+	if d.client != nil && d.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
+
 	var data AdminScopeDataSourceModel
 
 	// Read Terraform configuration data into the model

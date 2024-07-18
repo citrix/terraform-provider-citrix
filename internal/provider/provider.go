@@ -20,13 +20,15 @@ import (
 	"time"
 
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
+	cc_admin_user "github.com/citrix/terraform-provider-citrix/internal/citrixcloud/admin_user"
+	"github.com/citrix/terraform-provider-citrix/internal/citrixcloud/resource_locations"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_role"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_user"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/application"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/gac_settings"
-	"github.com/citrix/terraform-provider-citrix/internal/daas/resource_locations"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/storefront_server"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/vda"
+	"github.com/citrix/terraform-provider-citrix/internal/quickcreate/qcs_account"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_authentication"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_deployment"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_multi_site"
@@ -186,6 +188,35 @@ func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 	}
 }
 
+func middlewareAuthWithCustomerIdHeaderFunc(authClient *citrixclient.CitrixDaasClient, r *http.Request) {
+	// Auth
+	if authClient != nil && r.Header.Get("Authorization") == "" {
+		token, _, err := authClient.SignIn()
+		if err != nil {
+			tflog.Error(r.Context(), "Could not sign into Citrix DaaS, error: "+err.Error())
+		}
+		r.Header["Authorization"] = []string{token}
+	}
+
+	r.Header["Citrix-CustomerId"] = []string{authClient.ClientConfig.CustomerId}
+	r.Header["Accept"] = []string{"application/json"}
+	r.URL.Path = strings.Replace(r.URL.Path, "/"+authClient.ClientConfig.CustomerId+"/administrators", "", 1)
+
+	// TransactionId
+	transactionId := r.Header.Get("Citrix-TransactionId")
+	if transactionId == "" {
+		transactionId = uuid.NewString()
+		r.Header.Add("Citrix-TransactionId", transactionId)
+	}
+
+	// Log the request
+	tflog.Info(r.Context(), "Orchestration API request", map[string]interface{}{
+		"url":           r.URL.String(),
+		"method":        r.Method,
+		"transactionId": transactionId,
+	})
+}
+
 func middlewareAuthFunc(authClient *citrixclient.CitrixDaasClient, r *http.Request) {
 	// Auth
 	if authClient != nil && r.Header.Get("Authorization") == "" {
@@ -304,320 +335,366 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		return
 	}
 
-	// If practitioner provided a configuration value for any of the
-	// attributes, it must be a known value.
+	// Set StoreFront Client
+	client := &citrixclient.CitrixDaasClient{}
 
-	if config.Hostname.IsUnknown() {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("hostname"),
-			"Unknown Citrix DaaS API Hostname",
-			"The provider cannot create the Citrix API client as there is an unknown configuration value for the Citrix DaaS API hostname. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the CITRIX_HOSTNAME environment variable.",
-		)
-	}
-
-	if config.Environment.IsUnknown() {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("environment"),
-			"Unknown Citrix Cloud Environment",
-			"The provider cannot create the Citrix API client as there is an unknown configuration value for the Citrix Cloud environment. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the CITRIX_ENVIRONMENT environment variable.",
-		)
-	}
-
-	if config.CustomerId.IsUnknown() {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("customer_id"),
-			"Unknown Citrix Cloud Customer ID",
-			"The provider cannot create the Citrix API client as there is an unknown configuration value for the Citrix Cloud Customer ID. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the CITRIX_CUSTOMER_ID environment variable.",
-		)
-	}
-
-	if config.ClientId.IsUnknown() {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("client_id"),
-			"Unknown Citrix API Client Id",
-			"The provider cannot create the Citrix API client as there is an unknown configuration value for the Citrix API ClientId. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the CITRIX_CLIENT_ID environment variable.",
-		)
-	}
-
-	if config.ClientSecret.IsUnknown() {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("client_secret"),
-			"Unknown Citrix API Client Secret",
-			"The provider cannot create the Citrix API client as there is an unknown configuration value for the Citrix API ClientSecret. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the CITRIX_CLIENT_SECRET environment variable.",
-		)
-	}
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// Default values to environment variables, but override
-	// with Terraform configuration value if set.
-	hostname := os.Getenv("CITRIX_HOSTNAME")
-	environment := os.Getenv("CITRIX_ENVIRONMENT")
-	customerId := os.Getenv("CITRIX_CUSTOMER_ID")
-	clientId := os.Getenv("CITRIX_CLIENT_ID")
-	clientSecret := os.Getenv("CITRIX_CLIENT_SECRET")
-	disableSslVerification := strings.EqualFold(os.Getenv("CITRIX_DISABLE_SSL_VERIFICATION"), "true")
 	storefront_computer_name := os.Getenv("SF_COMPUTER_NAME")
 	storefront_ad_admin_username := os.Getenv("SF_AD_ADMIN_USERNAME")
 	storefront_ad_admin_password := os.Getenv("SF_AD_ADMIN_PASSWORD")
 
-	if !config.Hostname.IsNull() {
-		hostname = config.Hostname.ValueString()
-	}
-
-	if !config.Environment.IsNull() {
-		environment = config.Environment.ValueString()
-	}
-
-	if !config.CustomerId.IsNull() {
-		customerId = config.CustomerId.ValueString()
-	}
-
-	if !config.ClientId.IsNull() {
-		clientId = config.ClientId.ValueString()
-	}
-
-	if !config.ClientSecret.IsNull() {
-		clientSecret = config.ClientSecret.ValueString()
-	}
-
-	if !config.DisableSslVerification.IsNull() {
-		disableSslVerification = config.DisableSslVerification.ValueBool()
-	}
-
-	if config.StoreFrontRemoteHost != nil {
-		if !config.StoreFrontRemoteHost.ComputerName.IsNull() {
-			storefront_computer_name = config.StoreFrontRemoteHost.ComputerName.ValueString()
-		}
-		if !config.StoreFrontRemoteHost.ADadminUserName.IsNull() {
-			storefront_ad_admin_username = config.StoreFrontRemoteHost.ADadminUserName.ValueString()
-		}
-		if !config.StoreFrontRemoteHost.AdAdminPassword.IsNull() {
-			storefront_ad_admin_password = config.StoreFrontRemoteHost.AdAdminPassword.ValueString()
-		}
-	}
-
-	if environment == "" {
-		environment = "Production" // default to production
-	}
-
-	if customerId == "" {
-		customerId = "CitrixOnPremises"
-	}
-
-	onPremises := false
-	if customerId == "CitrixOnPremises" {
-		onPremises = true
-	}
-
-	// If any of the expected configurations are missing, return
-	// errors with provider-specific guidance.
-
-	// On-Premises customer must specify hostname with DDC hostname / IP address
-	if onPremises && hostname == "" {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("hostname"),
-			"Missing Citrix DaaS API Host",
-			"The provider cannot create the Citrix API client as there is a missing or empty value for the Citrix DaaS API hostname for on-premises customers. "+
-				"Set the host value in the configuration. Ensure the value is not empty. ",
-		)
-	}
-
-	if !onPremises && disableSslVerification {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("disable_ssl_verification"),
-			"Cannot disable SSL verification for Citrix Cloud customer",
-			"The provider cannot disable SSL verification in the Citrix API client against a Citrix Cloud customer as all Citrix Cloud requests has to go through secured TLS / SSL connection. "+
-				"Omit disable_ssl_verification or set to false for Citrix Cloud customer. ",
-		)
-	}
-
-	if clientId == "" {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("client_id"),
-			"Missing Citrix API key ClientId",
-			"The provider cannot create the Citrix API client as there is a missing or empty value for the Citrix API ClientId. "+
-				"Set the clientId value in the configuration. Ensure the value is not empty. ",
-		)
-	}
-
-	if clientSecret == "" {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("client_secret"),
-			"Missing Citrix API key ClientSecret",
-			"The provider cannot create the Citrix API client as there is a missing or empty value for the Citrix API ClientSecret. "+
-				"Set the clientSecret value in the configuration. Ensure the value is not empty. ",
-		)
-	}
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// Indicate whether Citrix Cloud requests should go through API Gateway
-	apiGateway := true
-	ccUrl := ""
-	if !onPremises {
-		if environment == "Production" {
-			ccUrl = "api.cloud.com"
-		} else if environment == "Staging" {
-			ccUrl = "api.cloudburrito.com"
-		} else if environment == "Japan" {
-			ccUrl = "api.citrixcloud.jp"
-		} else if environment == "JapanStaging" {
-			ccUrl = "api.citrixcloudstaging.jp"
-		} else if environment == "Gov" {
-			ccUrl = fmt.Sprintf("registry.citrixworkspacesapi.us/%s", customerId)
-		} else if environment == "GovStaging" {
-			ccUrl = fmt.Sprintf("registry.ctxwsstgapi.us/%s", customerId)
-		}
-		if hostname == "" {
-			if environment == "Gov" {
-				hostname = fmt.Sprintf("%s.xendesktop.us", customerId)
-				apiGateway = false
-			} else if environment == "GovStaging" {
-				hostname = fmt.Sprintf("%s.xdstaging.us", customerId)
-				apiGateway = false
-			} else {
-				hostname = ccUrl
+	// If practitioner provide a storefront configuration
+	if storefront_computer_name != "" || storefront_ad_admin_username != "" || storefront_ad_admin_password != "" || config.StoreFrontRemoteHost != nil {
+		if config.StoreFrontRemoteHost != nil {
+			if !config.StoreFrontRemoteHost.ComputerName.IsNull() {
+				storefront_computer_name = config.StoreFrontRemoteHost.ComputerName.ValueString()
 			}
-		} else if !strings.HasPrefix(hostname, "api.") {
-			// When a cloud customer sets explicit hostname to the cloud DDC, bypass API Gateway
-			apiGateway = false
+			if !config.StoreFrontRemoteHost.ADadminUserName.IsNull() {
+				storefront_ad_admin_username = config.StoreFrontRemoteHost.ADadminUserName.ValueString()
+			}
+			if !config.StoreFrontRemoteHost.AdAdminPassword.IsNull() {
+				storefront_ad_admin_password = config.StoreFrontRemoteHost.AdAdminPassword.ValueString()
+			}
 		}
 	}
+	client.NewStoreFrontClient(ctx, storefront_computer_name, storefront_ad_admin_username, storefront_ad_admin_password)
 
-	authUrl := ""
-	isGov := false
-	if onPremises {
-		authUrl = fmt.Sprintf("https://%s/citrix/orchestration/api/tokens", hostname)
-	} else {
-		if environment == "Production" {
-			authUrl = fmt.Sprintf("https://api.cloud.com/cctrustoauth2/%s/tokens/clients", customerId)
-		} else if environment == "Staging" {
-			authUrl = fmt.Sprintf("https://api.cloudburrito.com/cctrustoauth2/%s/tokens/clients", customerId)
-		} else if environment == "Japan" {
-			authUrl = fmt.Sprintf("https://api.citrixcloud.jp/cctrustoauth2/%s/tokens/clients", customerId)
-		} else if environment == "JapanStaging" {
-			authUrl = fmt.Sprintf("https://api.citrixcloudstaging.jp/cctrustoauth2/%s/tokens/clients", customerId)
-		} else if environment == "Gov" {
-			authUrl = fmt.Sprintf("https://trust.citrixworkspacesapi.us/%s/tokens/clients", customerId)
-			isGov = true
-		} else if environment == "GovStaging" {
-			authUrl = fmt.Sprintf("https://trust.ctxwsstgapi.us/%s/tokens/clients", customerId)
-			isGov = true
+	clientId := os.Getenv("CITRIX_CLIENT_ID")
+	clientSecret := os.Getenv("CITRIX_CLIENT_SECRET")
+	if config.ClientId.ValueString() != "" || config.ClientSecret.ValueString() != "" || clientId != "" || clientSecret != "" {
+		// If practitioner provided a configuration value for any of the
+		// attributes, it must be a known value.
+
+		if config.Hostname.IsUnknown() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("hostname"),
+				"Unknown Citrix DaaS API Hostname",
+				"The provider cannot create the Citrix API client as there is an unknown configuration value for the Citrix DaaS API hostname. "+
+					"Either target apply the source of the value first, set the value statically in the configuration, or use the CITRIX_HOSTNAME environment variable.",
+			)
+		}
+
+		if config.Environment.IsUnknown() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("environment"),
+				"Unknown Citrix Cloud Environment",
+				"The provider cannot create the Citrix API client as there is an unknown configuration value for the Citrix Cloud environment. "+
+					"Either target apply the source of the value first, set the value statically in the configuration, or use the CITRIX_ENVIRONMENT environment variable.",
+			)
+		}
+
+		if config.CustomerId.IsUnknown() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("customer_id"),
+				"Unknown Citrix Cloud Customer ID",
+				"The provider cannot create the Citrix API client as there is an unknown configuration value for the Citrix Cloud Customer ID. "+
+					"Either target apply the source of the value first, set the value statically in the configuration, or use the CITRIX_CUSTOMER_ID environment variable.",
+			)
+		}
+
+		if config.ClientId.IsUnknown() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("client_id"),
+				"Unknown Citrix API Client Id",
+				"The provider cannot create the Citrix API client as there is an unknown configuration value for the Citrix API ClientId. "+
+					"Either target apply the source of the value first, set the value statically in the configuration, or use the CITRIX_CLIENT_ID environment variable.",
+			)
+		}
+
+		if config.ClientSecret.IsUnknown() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("client_secret"),
+				"Unknown Citrix API Client Secret",
+				"The provider cannot create the Citrix API client as there is an unknown configuration value for the Citrix API ClientSecret. "+
+					"Either target apply the source of the value first, set the value statically in the configuration, or use the CITRIX_CLIENT_SECRET environment variable.",
+			)
+		}
+
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		// Default values to environment variables, but override
+		// with Terraform configuration value if set.
+		hostname := os.Getenv("CITRIX_HOSTNAME")
+		environment := os.Getenv("CITRIX_ENVIRONMENT")
+		customerId := os.Getenv("CITRIX_CUSTOMER_ID")
+		disableSslVerification := strings.EqualFold(os.Getenv("CITRIX_DISABLE_SSL_VERIFICATION"), "true")
+		quick_create_host_name := os.Getenv("CITRIX_QUICK_CREATE_HOST_NAME")
+
+		if !config.Hostname.IsNull() {
+			hostname = config.Hostname.ValueString()
+		}
+
+		if !config.Environment.IsNull() {
+			environment = config.Environment.ValueString()
+		}
+
+		if !config.CustomerId.IsNull() {
+			customerId = config.CustomerId.ValueString()
+		}
+
+		if !config.ClientId.IsNull() {
+			clientId = config.ClientId.ValueString()
+		}
+
+		if !config.ClientSecret.IsNull() {
+			clientSecret = config.ClientSecret.ValueString()
+		}
+
+		if !config.DisableSslVerification.IsNull() {
+			disableSslVerification = config.DisableSslVerification.ValueBool()
+		}
+
+		if environment == "" {
+			environment = "Production" // default to production
+		}
+
+		if customerId == "" {
+			customerId = "CitrixOnPremises"
+		}
+
+		onPremises := false
+		if customerId == "CitrixOnPremises" {
+			onPremises = true
+		}
+
+		// If any of the expected configurations are missing, return
+		// errors with provider-specific guidance.
+
+		// On-Premises customer must specify hostname with DDC hostname / IP address
+		if onPremises && hostname == "" {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("hostname"),
+				"Missing Citrix DaaS API Host",
+				"The provider cannot create the Citrix API client as there is a missing or empty value for the Citrix DaaS API hostname for on-premises customers. "+
+					"Set the host value in the configuration. Ensure the value is not empty. ",
+			)
+		}
+
+		if !onPremises && disableSslVerification {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("disable_ssl_verification"),
+				"Cannot disable SSL verification for Citrix Cloud customer",
+				"The provider cannot disable SSL verification in the Citrix API client against a Citrix Cloud customer as all Citrix Cloud requests has to go through secured TLS / SSL connection. "+
+					"Omit disable_ssl_verification or set to false for Citrix Cloud customer. ",
+			)
+		}
+
+		if clientId == "" {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("client_id"),
+				"Missing Citrix API key ClientId",
+				"The provider cannot create the Citrix API client as there is a missing or empty value for the Citrix API ClientId. "+
+					"Set the clientId value in the configuration. Ensure the value is not empty. ",
+			)
+		}
+
+		if clientSecret == "" {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("client_secret"),
+				"Missing Citrix API key ClientSecret",
+				"The provider cannot create the Citrix API client as there is a missing or empty value for the Citrix API ClientSecret. "+
+					"Set the clientSecret value in the configuration. Ensure the value is not empty. ",
+			)
+		}
+
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		// Indicate whether Citrix Cloud requests should go through API Gateway
+		apiGateway := true
+		ccUrl := ""
+		if !onPremises {
+			if environment == "Production" {
+				ccUrl = "api.cloud.com"
+			} else if environment == "Staging" {
+				ccUrl = "api.cloudburrito.com"
+			} else if environment == "Japan" {
+				ccUrl = "api.citrixcloud.jp"
+			} else if environment == "JapanStaging" {
+				ccUrl = "api.citrixcloudstaging.jp"
+			} else if environment == "Gov" {
+				ccUrl = fmt.Sprintf("registry.citrixworkspacesapi.us/%s", customerId)
+			} else if environment == "GovStaging" {
+				ccUrl = fmt.Sprintf("registry.ctxwsstgapi.us/%s", customerId)
+			}
+			if hostname == "" {
+				if environment == "Gov" {
+					hostname = fmt.Sprintf("%s.xendesktop.us", customerId)
+					apiGateway = false
+				} else if environment == "GovStaging" {
+					hostname = fmt.Sprintf("%s.xdstaging.us", customerId)
+					apiGateway = false
+				} else {
+					hostname = ccUrl
+				}
+			} else if !strings.HasPrefix(hostname, "api.") {
+				// When a cloud customer sets explicit hostname to the cloud DDC, bypass API Gateway
+				apiGateway = false
+			}
+		}
+
+		authUrl := ""
+		isGov := false
+		if onPremises {
+			authUrl = fmt.Sprintf("https://%s/citrix/orchestration/api/tokens", hostname)
 		} else {
-			authUrl = fmt.Sprintf("https://%s/cctrustoauth2/%s/tokens/clients", hostname, customerId)
+			if environment == "Production" {
+				authUrl = fmt.Sprintf("https://api.cloud.com/cctrustoauth2/%s/tokens/clients", customerId)
+			} else if environment == "Staging" {
+				authUrl = fmt.Sprintf("https://api.cloudburrito.com/cctrustoauth2/%s/tokens/clients", customerId)
+			} else if environment == "Japan" {
+				authUrl = fmt.Sprintf("https://api.citrixcloud.jp/cctrustoauth2/%s/tokens/clients", customerId)
+			} else if environment == "JapanStaging" {
+				authUrl = fmt.Sprintf("https://api.citrixcloudstaging.jp/cctrustoauth2/%s/tokens/clients", customerId)
+			} else if environment == "Gov" {
+				authUrl = fmt.Sprintf("https://trust.citrixworkspacesapi.us/%s/tokens/clients", customerId)
+				isGov = true
+			} else if environment == "GovStaging" {
+				authUrl = fmt.Sprintf("https://trust.ctxwsstgapi.us/%s/tokens/clients", customerId)
+				isGov = true
+			} else {
+				authUrl = fmt.Sprintf("https://%s/cctrustoauth2/%s/tokens/clients", hostname, customerId)
+			}
 		}
-	}
 
-	ctx = tflog.SetField(ctx, "citrix_hostname", hostname)
-	if !onPremises {
-		ctx = tflog.SetField(ctx, "citrix_customer_id", customerId)
-	}
-	ctx = tflog.SetField(ctx, "citrix_client_id", clientId)
-	ctx = tflog.SetField(ctx, "citrix_client_secret", clientSecret)
-	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "citrix_client_secret")
-	ctx = tflog.SetField(ctx, "citrix_on_premises", onPremises)
-	if !onPremises {
-		// customerId is considered sensitive information for Citrix Cloud customers
-		ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "customerId", "customer_id", "citrix_customer_id")
-		ctx = tflog.MaskAllFieldValuesStrings(ctx, customerId)
-	}
+		quickCreateHostname := ""
+		if quick_create_host_name != "" {
+			// If customer specified a quick create host name, use it
+			quickCreateHostname = quick_create_host_name
+		} else {
+			if environment == "Production" {
+				quickCreateHostname = "api.cloud.com/quickcreateservice"
+			} else if environment == "Staging" {
+				quickCreateHostname = "api.cloudburrito.com/quickcreateservice"
+			} else if environment == "Japan" {
+				quickCreateHostname = "api.citrixcloud.jp/quickcreateservice"
+			} else if environment == "JapanStaging" {
+				quickCreateHostname = "api.citrixcloudstaging.jp/quickcreateservice"
+			} else if environment == "Gov" {
+				quickCreateHostname = "quickcreate.apps.cloud.us"
+			} else if environment == "GovStaging" {
+				quickCreateHostname = "quickcreate.apps.cloudstaging.us"
+			}
+		}
 
-	tflog.Debug(ctx, "Creating Citrix API client")
+		ctx = tflog.SetField(ctx, "citrix_hostname", hostname)
+		if !onPremises {
+			ctx = tflog.SetField(ctx, "citrix_customer_id", customerId)
+		}
+		ctx = tflog.SetField(ctx, "citrix_client_id", clientId)
+		ctx = tflog.SetField(ctx, "citrix_client_secret", clientSecret)
+		ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "citrix_client_secret")
+		ctx = tflog.SetField(ctx, "citrix_on_premises", onPremises)
+		if !onPremises {
+			// customerId is considered sensitive information for Citrix Cloud customers
+			ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "customerId", "customer_id", "citrix_customer_id")
+			ctx = tflog.MaskAllFieldValuesStrings(ctx, customerId)
+		}
+		ctx = tflog.SetField(ctx, "citrix_hostname", hostname)
+		if !onPremises {
+			ctx = tflog.SetField(ctx, "citrix_customer_id", customerId)
+		}
+		ctx = tflog.SetField(ctx, "citrix_client_id", clientId)
+		ctx = tflog.SetField(ctx, "citrix_client_secret", clientSecret)
+		ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "citrix_client_secret")
+		ctx = tflog.SetField(ctx, "citrix_on_premises", onPremises)
+		if !onPremises {
+			// customerId is considered sensitive information for Citrix Cloud customers
+			ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "customerId", "customer_id", "citrix_customer_id")
+			ctx = tflog.MaskAllFieldValuesStrings(ctx, customerId)
+		}
 
-	userAgent := "citrix-terraform-provider/" + p.version + " (https://github.com/citrix/terraform-provider-citrix)"
-	// Create a new Citrix API client using the configuration values
-	client, httpResp, err := citrixclient.NewCitrixDaasClient(ctx, authUrl, ccUrl, hostname, customerId, clientId, clientSecret, onPremises, apiGateway, isGov, disableSslVerification, &userAgent, middlewareAuthFunc)
-	if err != nil {
-		if httpResp != nil {
-			if httpResp.StatusCode == 401 {
-				resp.Diagnostics.AddError(
-					"Invalid credential in provider config",
-					"Make sure client_id and client_secret is correct in provider config. ",
-				)
-			} else if httpResp.StatusCode >= 500 {
-				if onPremises {
+		tflog.Debug(ctx, "Creating Citrix API client")
+
+		userAgent := "citrix-terraform-provider/" + p.version + " (https://github.com/citrix/terraform-provider-citrix)"
+		// Create a new Citrix API client using the configuration values
+		httpResp, err := client.NewCitrixDaasClient(ctx, authUrl, ccUrl, hostname, customerId, clientId, clientSecret, onPremises, apiGateway, isGov, disableSslVerification, &userAgent, middlewareAuthFunc, middlewareAuthWithCustomerIdHeaderFunc)
+		if err != nil {
+			if httpResp != nil {
+				if httpResp.StatusCode == 401 {
 					resp.Diagnostics.AddError(
-						"Citrix DaaS service unavailable",
-						"Please check if you can access Web Studio. \n\n"+
-							"Please ensure that Citrix Orchestration Service on the target DDC(s) are running reachable from this Machine.",
+						"Invalid credential in provider config",
+						"Make sure client_id and client_secret is correct in provider config. ",
 					)
+				} else if httpResp.StatusCode >= 500 {
+					if onPremises {
+						resp.Diagnostics.AddError(
+							"Citrix DaaS service unavailable",
+							"Please check if you can access Web Studio. \n\n"+
+								"Please ensure that Citrix Orchestration Service on the target DDC(s) are running reachable from this Machine.",
+						)
+					} else {
+						resp.Diagnostics.AddError(
+							"Citrix DaaS service unavailable",
+							"The DDC(s) for the customer cannot be reached. Please check if you can access DaaS UI.",
+						)
+					}
 				} else {
 					resp.Diagnostics.AddError(
-						"Citrix DaaS service unavailable",
-						"The DDC(s) for the customer cannot be reached. Please check if you can access DaaS UI.",
+						"Unable to Create Citrix API Client",
+						"An unexpected error occurred when creating the Citrix API client. \n\n"+
+							"Error: "+err.Error(),
 					)
 				}
 			} else {
+				// Case 1: DDC off
+				urlErr := new(url.Error)
+				opErr := new(net.OpError)
+				syscallErr := new(os.SyscallError)
+				if errors.As(err, &urlErr) && errors.As(urlErr.Err, &opErr) && errors.As(opErr.Err, &syscallErr) && syscallErr.Err == syscall.Errno(10060) {
+					resp.Diagnostics.AddError(
+						"DDC(s) cannot be reached",
+						"Ensure that the DDC(s) are running. Make sure this machine has proper network routing to reach the DDC(s) and is not blocked by any firewall rules.",
+					)
+
+					return
+				}
+
+				// Case 2: Invalid certificate
+				cryptoErr := new(tls.CertificateVerificationError)
+				errors.As(urlErr.Err, &cryptoErr)
+				if len(cryptoErr.UnverifiedCertificates) > 0 {
+					resp.Diagnostics.AddError(
+						"DDC(s) does not have a valid SSL certificate issued by a trusted Certificate Authority",
+						"If you are running against on-premises DDC(s) that does not have an SSL certificate issue by a trusted CA, consider setting \"disable_ssl_verification\" to \"true\" in provider config.",
+					)
+
+					return
+				}
+
+				// Case 3: Malformed hostname
+				if urlErr != nil && opErr.Err == nil {
+					resp.Diagnostics.AddError(
+						"Invalid DDC(s) hostname",
+						"Please revise the hostname in provider config and make sure it is a valid hostname or IP address.",
+					)
+
+					return
+				}
+
+				// Case 4: Catch all other errors
 				resp.Diagnostics.AddError(
 					"Unable to Create Citrix API Client",
 					"An unexpected error occurred when creating the Citrix API client. \n\n"+
 						"Error: "+err.Error(),
 				)
 			}
-		} else {
-			// Case 1: DDC off
-			urlErr := new(url.Error)
-			opErr := new(net.OpError)
-			syscallErr := new(os.SyscallError)
-			if errors.As(err, &urlErr) && errors.As(urlErr.Err, &opErr) && errors.As(opErr.Err, &syscallErr) && syscallErr.Err == syscall.Errno(10060) {
-				resp.Diagnostics.AddError(
-					"DDC(s) cannot be reached",
-					"Ensure that the DDC(s) are running. Make sure this machine has proper network routing to reach the DDC(s) and is not blocked by any firewall rules.",
-				)
 
-				return
-			}
-
-			// Case 2: Invalid certificate
-			cryptoErr := new(tls.CertificateVerificationError)
-			errors.As(urlErr.Err, &cryptoErr)
-			if len(cryptoErr.UnverifiedCertificates) > 0 {
-				resp.Diagnostics.AddError(
-					"DDC(s) does not have a valid SSL certificate issued by a trusted Certificate Authority",
-					"If you are running against on-premises DDC(s) that does not have an SSL certificate issue by a trusted CA, consider setting \"disable_ssl_verification\" to \"true\" in provider config.",
-				)
-
-				return
-			}
-
-			// Case 3: Malformed hostname
-			if urlErr != nil && opErr.Err == nil {
-				resp.Diagnostics.AddError(
-					"Invalid DDC(s) hostname",
-					"Please revise the hostname in provider config and make sure it is a valid hostname or IP address.",
-				)
-
-				return
-			}
-
-			// Case 4: Catch all other errors
-			resp.Diagnostics.AddError(
-				"Unable to Create Citrix API Client",
-				"An unexpected error occurred when creating the Citrix API client. \n\n"+
-					"Error: "+err.Error(),
-			)
+			return
 		}
-
-		return
+		// Set Quick Create Client
+		if quickCreateHostname != "" {
+			client.NewQuickCreateClient(ctx, quickCreateHostname, middlewareAuthFunc)
+		}
 	}
-
-	// Set StoreFront Client
-	client = citrixclient.NewStoreFrontClient(ctx, storefront_computer_name, storefront_ad_admin_username, storefront_ad_admin_password, client)
 
 	// Make the Citrix API client available during DataSource and Resource
 	// type Configure methods.
 	resp.DataSourceData = client
 	resp.ResourceData = client
+
 	tflog.Info(ctx, "Configured Citrix API client", map[string]any{"success": true})
 }
 
@@ -669,14 +746,19 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		admin_user.NewAdminUserResource,
 		gac_settings.NewAGacSettingsResource,
 		resource_locations.NewResourceLocationResource,
+		cc_admin_user.NewCCAdminUserResource,
 		// StoreFront Resources
 		stf_deployment.NewSTFDeploymentResource,
 		stf_authentication.NewSTFAuthenticationServiceResource,
 		stf_store.NewSTFStoreServiceResource,
 		stf_store.NewSTFStoreFarmResource,
+		stf_store.NewXenappDefaultStoreResource,
 		stf_webreceiver.NewSTFWebReceiverResource,
 		stf_multi_site.NewSTFUserFarmMappingResource,
 		stf_roaming.NewSTFRoamingGatewayResource,
+		stf_roaming.NewSTFRoamingBeaconResource,
+		// QuickCreate Resources
+		qcs_account.NewAccountResource,
 		// Add resource here
 	}
 }

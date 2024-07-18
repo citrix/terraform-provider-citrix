@@ -9,7 +9,6 @@ import (
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -36,7 +35,7 @@ type resourceLocationResource struct {
 
 // Metadata returns the resource type name.
 func (r *resourceLocationResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_resource_location"
+	resp.TypeName = req.ProviderTypeName + "_cloud_resource_location"
 }
 
 // Schema defines the schema for the resource.
@@ -88,7 +87,7 @@ func (r *resourceLocationResource) Create(ctx context.Context, req resource.Crea
 	resourceLocationId := resourceLocation.GetId()
 
 	// Get resource location from remote using id
-	resourceLocation, err = getResourceLocation(ctx, r.client, &resp.Diagnostics, resourceLocationId)
+	resourceLocation, err = GetResourceLocation(ctx, r.client, &resp.Diagnostics, resourceLocationId)
 	if err != nil {
 		return
 	}
@@ -165,7 +164,7 @@ func (r *resourceLocationResource) Update(ctx context.Context, req resource.Upda
 	}
 
 	// Get resource location from remote using id
-	updatedResourceLocation, err := getResourceLocation(ctx, r.client, &resp.Diagnostics, plan.Id.ValueString())
+	updatedResourceLocation, err := GetResourceLocation(ctx, r.client, &resp.Diagnostics, plan.Id.ValueString())
 	if err != nil {
 		return
 	}
@@ -209,21 +208,6 @@ func (r *resourceLocationResource) ImportState(ctx context.Context, req resource
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-func getResourceLocation(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, resourceLocationId string) (*resourcelocations.CitrixCloudServicesRegistryApiModelsLocationsResourceLocationModel, error) {
-	// Get resource location
-	getResourceLocationRequest := client.ResourceLocationsClient.LocationsDAAS.LocationsGet(ctx, resourceLocationId)
-	resourceLocation, httpResp, err := citrixdaasclient.ExecuteWithRetry[*resourcelocations.CitrixCloudServicesRegistryApiModelsLocationsResourceLocationModel](getResourceLocationRequest, client)
-	if err != nil {
-		diagnostics.AddError(
-			"Error reading resource location with id: "+resourceLocationId,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-	}
-
-	return resourceLocation, err
-}
-
 func readResourceLocation(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, resourceLocationId string) (*resourcelocations.CitrixCloudServicesRegistryApiModelsLocationsResourceLocationModel, error) {
 	getResourceLocationRequest := client.ResourceLocationsClient.LocationsDAAS.LocationsGet(ctx, resourceLocationId)
 	resourceLocation, _, err := util.ReadResource[*resourcelocations.CitrixCloudServicesRegistryApiModelsLocationsResourceLocationModel](getResourceLocationRequest, ctx, client, resp, "Resource Location", resourceLocationId)
@@ -247,6 +231,11 @@ func (r *resourceLocationResource) ValidateConfig(ctx context.Context, req resou
 // Resource Location is a cloud concept which is not supported for on-prem environment
 func (r *resourceLocationResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
+
+	if r.client != nil && r.client.ResourceLocationsClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
 
 	if r.client.AuthConfig.OnPremises {
 		resp.Diagnostics.AddError("Error managing resource location", "Resource locations are only supported for Cloud customers. On-premises customers can use the Zone resource directly.")

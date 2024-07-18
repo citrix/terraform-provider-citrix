@@ -12,7 +12,11 @@ import (
 
 func TestZonePreCheck(t *testing.T) {
 	if v := os.Getenv("CITRIX_CUSTOMER_ID"); v != "" && v != "CitrixOnPremises" {
-
+		rlName := os.Getenv("TEST_RESOURCE_LOCATION_NAME")
+		if rlName == "" {
+			t.Fatal("TEST_RESOURCE_LOCATION_NAME is required when running tests in cloud env")
+		}
+	} else {
 		zoneName := os.Getenv("TEST_ZONE_NAME")
 		zoneDescription := os.Getenv("TEST_ZONE_DESCRIPTION")
 
@@ -32,6 +36,7 @@ func TestZoneResource(t *testing.T) {
 	}
 
 	zoneName := os.Getenv("TEST_ZONE_NAME")
+	rlName := os.Getenv("TEST_RESOURCE_LOCATION_NAME")
 
 	zoneDescription := os.Getenv("TEST_ZONE_DESCRIPTION")
 	if zoneName == "" {
@@ -45,8 +50,9 @@ func TestZoneResource(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildZoneResource(t, zone_testResource, zoneName),
-				Check:  getAggregateTestFunc(isOnPremises, zoneName, zoneDescription),
+				Config:   BuildZoneResource(t, zoneName, false),
+				Check:    getAggregateTestFunc(isOnPremises, zoneName, zoneDescription),
+				SkipFunc: skipForCloud(isOnPremises),
 			},
 			// ImportState testing
 			{
@@ -56,10 +62,11 @@ func TestZoneResource(t *testing.T) {
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
 				ImportStateVerifyIgnore: []string{"last_updated", "metadata"},
+				SkipFunc:                skipForCloud(isOnPremises),
 			},
 			// Update and Read testing
 			{
-				Config: BuildZoneResource(t, zone_testResource_updated, zoneName),
+				Config: BuildZoneResource(t, zoneName, true),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of zone
 					resource.TestCheckResourceAttr("citrix_zone.test", "name", fmt.Sprintf("%s-updated", zoneName)),
@@ -72,6 +79,28 @@ func TestZoneResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_zone.test", "metadata.3.value", "value4"),
 				),
 				SkipFunc: skipForCloud(isOnPremises),
+			},
+			// Create Zone from Resource Location
+			{
+				Config: composeTestResourceTf(
+					zone_testResource_resource_location,
+					BuildResourceLocationResource(t, resourceLocationTestResource, rlName),
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify name of zone
+					resource.TestCheckResourceAttr("citrix_zone.rl-zone", "name", rlName),
+				),
+				SkipFunc: skipForOnPrem(isOnPremises),
+			},
+			// ImportState testing
+			{
+				ResourceName:      "citrix_zone.rl-zone",
+				ImportState:       true,
+				ImportStateVerify: true,
+				// The last_updated attribute does not exist in the Orchestration
+				// API, therefore there is no value for it during import.
+				ImportStateVerifyIgnore: []string{"last_updated", "metadata"},
+				SkipFunc:                skipForOnPrem(isOnPremises),
 			},
 			// Delete testing automatically occurs in TestCase
 		},
@@ -124,16 +153,39 @@ resource "citrix_zone" "test" {
 	]
 }
 `
+
+	zone_testResource_resource_location = `
+resource "citrix_zone" "rl-zone" {
+	resource_location_id = citrix_cloud_resource_location.test_resource_location.id
+}
+`
+
+	zone_testResource_cloud_base = `
+resource "citrix_zone" "rl-zone" {
+	resource_location_id = "%s"
+	description = "%s"
+}
+`
 )
 
-func BuildZoneResource(t *testing.T, zone string, zoneName string) string {
+func BuildZoneResource(t *testing.T, zoneInput string, onPremZoneUpdate bool) string {
 	zoneDescription := os.Getenv("TEST_ZONE_DESCRIPTION")
 
-	if zoneName == "" {
-		zoneName = "second zone"
+	if v := os.Getenv("CITRIX_CUSTOMER_ID"); v != "" && v != "CitrixOnPremises" {
+		// Build cloud zone
+		return fmt.Sprintf(zone_testResource_cloud_base, zoneInput, zoneDescription)
+	}
+
+	if zoneInput == "" {
+		zoneInput = "second zone"
 		zoneDescription = "description for go test zone"
 	}
-	return fmt.Sprintf(zone, zoneName, zoneDescription)
+
+	if onPremZoneUpdate {
+		return fmt.Sprintf(zone_testResource_updated, zoneInput, zoneDescription)
+	} else {
+		return fmt.Sprintf(zone_testResource, zoneInput, zoneDescription)
+	}
 }
 
 func getAggregateTestFunc(isOnPremises bool, zoneName string, zoneDescription string) resource.TestCheckFunc {

@@ -22,6 +22,7 @@ var (
 	_ resource.ResourceWithConfigure      = &applicationGroupResource{}
 	_ resource.ResourceWithImportState    = &applicationGroupResource{}
 	_ resource.ResourceWithValidateConfig = &applicationGroupResource{}
+	_ resource.ResourceWithModifyPlan     = &applicationGroupResource{}
 )
 
 // NewApplicationGroupResource is a helper function to simplify the provider implementation.
@@ -331,4 +332,13 @@ func (r *applicationGroupResource) ValidateConfig(ctx context.Context, req resou
 
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
 	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
+}
+
+func (r *applicationGroupResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	if r.client != nil && r.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
 }
