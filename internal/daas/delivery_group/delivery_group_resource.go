@@ -4,6 +4,7 @@ package delivery_group
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
@@ -412,6 +413,11 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
+	if r.client != nil && r.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
+
 	if req.Plan.Raw.IsNull() {
 		return
 	}
@@ -425,6 +431,55 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 		return
 	}
 
+	operation := "updating"
+	if create {
+		operation = "creating"
+	}
+
+	if plan.AssociatedMachineCatalogs.IsNull() {
+		isFeatureSupported, err := util.CheckProductVersion(r.client, 118, 7, 42)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"An error occurred while checking the DDC version",
+				"Error :"+err.Error(),
+			)
+
+			return
+		}
+
+		if !isFeatureSupported {
+			if r.client.AuthConfig.OnPremises {
+				productMajorVersion, productMinorVersion, err := util.GetProductMajorAndMinorVersion(r.client)
+				if err != nil {
+					resp.Diagnostics.AddError(
+						"An error occurred while checking the DDC version",
+						"Error : "+err.Error(),
+					)
+					return
+				}
+				resp.Diagnostics.AddError(
+					fmt.Sprintf("Current DDC version %d.%d does not support %s Delivery Group without associated Machine Catalogs.", productMajorVersion, productMinorVersion, operation),
+					fmt.Sprintf("Please upgrade your DDC product version to %d.%d or above to %s Delivery Group resource without associated Machine Catalogs.", 7, 42, operation),
+				)
+			} else {
+				resp.Diagnostics.AddError(
+					fmt.Sprintf("Current DDC version %d does not support %s Delivery Group without associated Machine Catalogs.", r.client.ClientConfig.OrchestrationApiVersion, operation),
+					fmt.Sprintf("Please upgrade your DDC product version to %d or above to %s Delivery Group resource without associated Machine Catalogs.", 118, operation),
+				)
+			}
+			return
+		}
+
+		if !plan.AutoscaleSettings.IsNull() && !plan.AutoscaleSettings.IsUnknown() {
+			resp.Diagnostics.AddError(
+				fmt.Sprintf("Cannot %s Delivery Group", operation),
+				"Autoscale settings can only be configured if associated machine catalogs are specified.",
+			)
+		}
+
+		return
+	}
+
 	associatedMachineCatalogs := util.ObjectListToTypedArray[DeliveryGroupMachineCatalogModel](ctx, &resp.Diagnostics, plan.AssociatedMachineCatalogs)
 	associatedMachineCatalogProperties, err := validateAndReturnMachineCatalogSessionSupport(ctx, *r.client, &resp.Diagnostics, associatedMachineCatalogs, !create)
 	if err != nil || associatedMachineCatalogProperties.SessionSupport == "" {
@@ -432,10 +487,7 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 	}
 
 	isValid, errMsg := validatePowerManagementSettings(ctx, &resp.Diagnostics, plan, associatedMachineCatalogProperties.SessionSupport)
-	operation := "updating"
-	if create {
-		operation = "creating"
-	}
+
 	if !isValid {
 		resp.Diagnostics.AddError(
 			"Error "+operation+" Delivery Group "+plan.Name.ValueString(),

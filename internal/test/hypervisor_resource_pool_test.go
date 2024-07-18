@@ -33,6 +33,7 @@ func TestHypervisorResourcePoolPreCheck_Azure(t *testing.T) {
 
 func TestHypervisorResourcePoolAzureRM(t *testing.T) {
 	name := os.Getenv("TEST_HYPERV_RP_NAME")
+	zoneName := os.Getenv("TEST_ZONE_NAME_AZURE")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -47,7 +48,7 @@ func TestHypervisorResourcePoolAzureRM(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+					BuildZoneResource(t, zoneName, false),
 				),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -75,7 +76,7 @@ func TestHypervisorResourcePoolAzureRM(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE")),
+					BuildZoneResource(t, zoneName, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
@@ -105,6 +106,7 @@ func TestHypervisorResourcePoolPreCheck_GCP(t *testing.T) {
 
 func TestHypervisorResourcePoolGCP(t *testing.T) {
 	name := os.Getenv("TEST_HYPERV_RP_NAME_GCP")
+	zoneName := os.Getenv("TEST_ZONE_NAME_GCP")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -119,7 +121,7 @@ func TestHypervisorResourcePoolGCP(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildHypervisorResourcePoolResourceGCP(t, hypervisor_resource_pool_testResource_gcp),
 					BuildHypervisorResourceGCP(t, hypervisor_testResources_gcp),
-					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_GCP")),
+					BuildZoneResource(t, zoneName, false),
 				),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -146,7 +148,7 @@ func TestHypervisorResourcePoolGCP(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildHypervisorResourcePoolResourceGCP(t, hypervisor_resource_pool_updated_testResource_gcp),
 					BuildHypervisorResourceGCP(t, hypervisor_testResources_gcp),
-					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_GCP")),
+					BuildZoneResource(t, zoneName, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_gcp_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
@@ -176,6 +178,7 @@ func TestHypervisorResourcePoolPreCheck_Xenserver(t *testing.T) {
 
 func TestHypervisorResourcePoolXenserver(t *testing.T) {
 	name := os.Getenv("TEST_HYPERV_RP_NAME_XENSERVER")
+	zoneName := os.Getenv("TEST_ZONE_NAME_XENSERVER")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -190,7 +193,7 @@ func TestHypervisorResourcePoolXenserver(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildHypervisorResourcePoolResourceXenServer(t, hypervisor_resource_pool_testResource_xenserver),
 					BuildHypervisorResourceXenserver(t, hypervisor_testResources_xenserver),
-					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_XENSERVER")),
+					BuildZoneResource(t, zoneName, false),
 				),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -218,7 +221,7 @@ func TestHypervisorResourcePoolXenserver(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildHypervisorResourcePoolResourceXenServerUpdated(t, hypervisor_resource_pool_updated_testResource_xenserver),
 					BuildHypervisorResourceXenserver(t, hypervisor_testResources_xenserver),
-					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_XENSERVER")),
+					BuildZoneResource(t, zoneName, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_xenserver_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
@@ -255,6 +258,7 @@ func TestHypervisorResourcePoolPreCheck_Vsphere(t *testing.T) {
 
 func TestHypervisorResourcePoolVsphere(t *testing.T) {
 	name := os.Getenv("TEST_HYPERV_RP_NAME_VSPHERE")
+	zoneName := os.Getenv("TEST_ZONE_NAME_VSPHERE")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -269,7 +273,7 @@ func TestHypervisorResourcePoolVsphere(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildHypervisorResourcePoolResourceVsphere(t, hypervisor_resource_pool_testResource_vsphere),
 					BuildHypervisorResourceVsphere(t, hypervisor_testResources_vsphere),
-					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_VSPHERE")),
+					BuildZoneResource(t, zoneName, false),
 				),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -298,7 +302,7 @@ func TestHypervisorResourcePoolVsphere(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildHypervisorResourcePoolResourceVsphereUpdated(t, hypervisor_resource_pool_updated_testResource_vsphere),
 					BuildHypervisorResourceVsphere(t, hypervisor_testResources_vsphere),
-					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_VSPHERE")),
+					BuildZoneResource(t, zoneName, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
@@ -320,6 +324,7 @@ func TestHypervisorResourcePoolPreCheck_Nutanix(t *testing.T) {
 
 func TestHypervisorResourcePoolNutanix(t *testing.T) {
 	name := os.Getenv("TEST_HYPERV_RP_NAME_NUTANIX")
+	zoneName := os.Getenv("TEST_ZONE_NAME_NUTANIX")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -334,7 +339,7 @@ func TestHypervisorResourcePoolNutanix(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildHypervisorResourcePoolResourceNutanix(t, hypervisor_resource_pool_testResource_nutanix),
 					BuildHypervisorResourceNutanix(t, hypervisor_testResources_nutanix),
-					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_NUTANIX")),
+					BuildZoneResource(t, zoneName, false),
 				),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -356,7 +361,7 @@ func TestHypervisorResourcePoolNutanix(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildHypervisorResourcePoolResourceNutanix(t, hypervisor_resource_pool_updated_testResource_nutanix),
 					BuildHypervisorResourceNutanix(t, hypervisor_testResources_nutanix),
-					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_NUTANIX")),
+					BuildZoneResource(t, zoneName, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_nutanix_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
@@ -389,6 +394,7 @@ func TestHypervisorResourcePoolPreCheck_SCVMM(t *testing.T) {
 
 func TestHypervisorResourcePoolSCVMM(t *testing.T) {
 	name := os.Getenv("TEST_HYPERV_RP_NAME_SCVMM")
+	zoneName := os.Getenv("TEST_ZONE_NAME_SCVMM")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -403,7 +409,7 @@ func TestHypervisorResourcePoolSCVMM(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildHypervisorResourcePoolResourceSCVMM(t, hypervisor_resource_pool_testResource_scvmm),
 					BuildHypervisorResourceSCVMM(t, hypervisor_testResources_scvmm),
-					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_SCVMM")),
+					BuildZoneResource(t, zoneName, false),
 				),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -431,7 +437,7 @@ func TestHypervisorResourcePoolSCVMM(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildHypervisorResourcePoolResourceSCVMMUpdated(t, hypervisor_resource_pool_updated_testResource_scvmm),
 					BuildHypervisorResourceSCVMM(t, hypervisor_testResources_scvmm),
-					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_SCVMM")),
+					BuildZoneResource(t, zoneName, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_scvmm_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
@@ -459,6 +465,7 @@ func TestHypervisorResourcePoolPreCheck_Aws_Ec2(t *testing.T) {
 
 func TestHypervisorResourcePoolAwsEc2(t *testing.T) {
 	name := os.Getenv("TEST_HYPERV_RP_NAME_AWS_EC2")
+	zoneName := os.Getenv("TEST_ZONE_NAME_AWS_EC2")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -473,7 +480,7 @@ func TestHypervisorResourcePoolAwsEc2(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildHypervisorResourcePoolResourceAwsEc2(t, hypervisor_resource_pool_testResource_aws_ec2),
 					BuildHypervisorResourceAwsEc2(t, hypervisor_testResources_aws_ec2),
-					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AWS_EC2")),
+					BuildZoneResource(t, zoneName, false),
 				),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -496,7 +503,7 @@ func TestHypervisorResourcePoolAwsEc2(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildHypervisorResourcePoolResourceAwsEc2(t, hypervisor_resource_pool_updated_testResource_aws_ec2),
 					BuildHypervisorResourceAwsEc2(t, hypervisor_testResources_aws_ec2),
-					BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AWS_EC2")),
+					BuildZoneResource(t, zoneName, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_aws_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),

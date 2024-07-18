@@ -5,7 +5,6 @@ resource "citrix_stf_store_service" "example-stf-store-service" {
 	authentication_service = "${citrix_stf_authentication_service.example-stf-authentication-service.virtual_path}"
 	pna = {
 		enabled = true
-		default_pna_service = true
 	}
     enumeration_options = {
         enhanced_enumeration = false
@@ -28,6 +27,10 @@ resource "citrix_stf_store_service" "example-stf-store-service" {
 		advanced_healthcheck = false
 		cert_revocation_policy = "MustCheck"
     }
+	gateway_settings = {
+    enable = true
+    gateway_url = "https://xsl-ddc.ctx-ad.local"
+  	}
 }
 
 // Anonymous Authentication Service

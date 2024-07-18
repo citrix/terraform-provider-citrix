@@ -23,6 +23,7 @@ var (
 	_ resource.ResourceWithConfigure      = &machineCatalogResource{}
 	_ resource.ResourceWithImportState    = &machineCatalogResource{}
 	_ resource.ResourceWithValidateConfig = &machineCatalogResource{}
+	_ resource.ResourceWithModifyPlan     = &machineCatalogResource{}
 )
 
 // NewMachineCatalogResource is a helper function to simplify the provider implementation.
@@ -206,12 +207,6 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	diags = req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
 	// Get refreshed machine catalogs from Orchestration
 	catalogId := plan.Id.ValueString()
 	catalogName := plan.Name.ValueString()
@@ -349,7 +344,7 @@ func (r *machineCatalogResource) Delete(ctx context.Context, req resource.Delete
 	deleteMachineCatalogRequest := r.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsDeleteMachineCatalog(ctx, catalogId)
 	deleteAccountOption := citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE
 	deleteVmOption := false
-	if catalog.GetProvisioningType() == citrixorchestration.PROVISIONINGTYPE_MCS || catalog.ProvisioningType == citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING {
+	if catalog.GetProvisioningType() == citrixorchestration.PROVISIONINGTYPE_MCS || catalog.GetProvisioningType() == citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING {
 		provScheme := catalog.GetProvisioningScheme()
 		identityType := provScheme.GetIdentityType()
 
@@ -574,6 +569,15 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 					rebootOptions.ValidateConfig(&resp.Diagnostics)
 				}
 			}
+
+			if !provSchemeModel.SCVMMMachineConfigModel.IsNull() {
+				scvmmMachineConfigModel := util.ObjectValueToTypedObject[SCVMMMachineConfigModel](ctx, &resp.Diagnostics, provSchemeModel.SCVMMMachineConfigModel)
+				if !scvmmMachineConfigModel.ImageUpdateRebootOptions.IsNull() {
+					// Validate Image Update Reboot Options
+					rebootOptions := util.ObjectValueToTypedObject[ImageUpdateRebootOptionsModel](ctx, &resp.Diagnostics, scvmmMachineConfigModel.ImageUpdateRebootOptions)
+					rebootOptions.ValidateConfig(&resp.Diagnostics)
+				}
+			}
 		}
 
 		if !data.MachineAccounts.IsNull() {
@@ -695,7 +699,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 			} else {
 
 				azureWbcModel := util.ObjectValueToTypedObject[AzureWritebackCacheModel](ctx, &resp.Diagnostics, azureMachineConfigModel.WritebackCache)
-				if azureWbcModel.PersistWBC.IsNull() || azureWbcModel.PersistWBC.ValueBool() == false {
+				if azureWbcModel.PersistWBC.IsNull() || !azureWbcModel.PersistWBC.ValueBool() {
 					resp.Diagnostics.AddAttributeError(
 						path.Root("persist_wbc"),
 						"Incorrect Attribute Configuration",
@@ -823,5 +827,14 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 				)
 			}
 		}
+	}
+}
+
+func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	if r.client != nil && r.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
 	}
 }

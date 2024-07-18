@@ -327,6 +327,11 @@ func (r *adminUserResource) ValidateConfig(ctx context.Context, req resource.Val
 func (r *adminUserResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
+	if r.client != nil && r.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
+
 	if !r.client.AuthConfig.OnPremises {
 		resp.Diagnostics.AddError("Environment Not Supported", "This terraform resource is only supported for on-premise deployments")
 	}

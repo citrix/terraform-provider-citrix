@@ -35,7 +35,7 @@ resource "citrix_stf_store_farm" "example-stf-store-farm" {
 
 ### Optional
 
-- `all_failed_bypass_duration` (Number) Period of time to skip all xml service requests should all servers fail to respond.
+- `all_failed_bypass_duration` (Number) Period of time to skip all xml service requests should all servers fail to respond. Defaults to 0.
 - `bypass_duration` (Number) Period of time to skip a server when is fails to respond. Defaults to 60.
 - `farm_guid` (String) A tag indicating the scope of the farm. Valid for cloud deployments only.
 - `load_balance` (Boolean) Round robin load balance the xml service servers. Defaults to true.
@@ -47,7 +47,7 @@ resource "citrix_stf_store_farm" "example-stf-store-farm" {
 - `server_urls` (List of String) The url to the service location used to provide web and SaaS apps via this farm.
 - `ssl_relay_port` (Number) The SSL Relay port. Default is 443
 - `ticket_time_to_live` (Number) Period of time an ICA launch ticket is valid once requested on pre 7.0 XenApp and XenDesktop farms. Defaults to 0
-- `transport_type` (Number) Type of transport to use. Http, Https, SSL for example.
+- `transport_type` (String) Type of transport to use. Http, Https, SSL for example. Default to HTTPs.
 - `xml_validation_enabled` (Boolean) Enable XML service endpoint validation.
 - `xml_validation_secret` (String) XML service endpoint validation shared secret.
 - `zones` (List of String) The list of Zone names associated with the farm.

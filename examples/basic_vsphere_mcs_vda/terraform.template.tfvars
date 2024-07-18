@@ -24,7 +24,6 @@ domain_service_account = "<Admin Username>"
 domain_service_account_password = "<Admin Password>"
 vsphere_master_image_vm = "<Image VM or snapshot name>"
 vsphere_cpu_count = 2
-nutanix_core_per_cpu_count = 2
 vsphere_memory_size = 4096
 machine_catalog_naming_scheme = "ctx-vsphere-##"
 

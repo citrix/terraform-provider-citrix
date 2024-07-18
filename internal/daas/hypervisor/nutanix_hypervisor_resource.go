@@ -20,6 +20,7 @@ var (
 	_ resource.ResourceWithConfigure      = &nutanixHypervisorResource{}
 	_ resource.ResourceWithImportState    = &nutanixHypervisorResource{}
 	_ resource.ResourceWithValidateConfig = &nutanixHypervisorResource{}
+	_ resource.ResourceWithModifyPlan     = &nutanixHypervisorResource{}
 )
 
 // NewHypervisorResource is a helper function to simplify the provider implementation.
@@ -251,4 +252,13 @@ func (r *nutanixHypervisorResource) ValidateConfig(ctx context.Context, req reso
 
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
 	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
+}
+
+func (r *nutanixHypervisorResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	if r.client != nil && r.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
 }

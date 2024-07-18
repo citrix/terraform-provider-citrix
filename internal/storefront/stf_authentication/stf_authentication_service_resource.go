@@ -154,17 +154,9 @@ func (r *stfAuthenticationServiceResource) Update(ctx context.Context, req resou
 		return
 	}
 
-	// Get current state
-	var state STFAuthenticationServiceResourceModel
-	diags = req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
 	var getBody citrixstorefront.GetSTFAuthenticationServiceRequestModel
-	if !state.SiteId.IsNull() {
-		siteIdInt, err := strconv.ParseInt(state.SiteId.ValueString(), 10, 64)
+	if !plan.SiteId.IsNull() {
+		siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating StoreFront Authentication Service ",
@@ -174,8 +166,8 @@ func (r *stfAuthenticationServiceResource) Update(ctx context.Context, req resou
 		}
 		getBody.SetSiteId(siteIdInt)
 	}
-	if state.VirtualPath.ValueString() != "" {
-		getBody.SetVirtualPath(state.VirtualPath.ValueString())
+	if plan.VirtualPath.ValueString() != "" {
+		getBody.SetVirtualPath(plan.VirtualPath.ValueString())
 	}
 
 	// Remove existing STF Authentication Service

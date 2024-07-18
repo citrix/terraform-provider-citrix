@@ -34,6 +34,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
+// AWS Role ARN Regex
+const AwsRoleArnRegex string = `^arn:aws(-us-gov)?:iam::[0-9]{12}:role\/[a-zA-Z0-9+=,.@\-_]{1,64}$`
+
+// Aws Access Key Id Regex
+const AwsAccessKeyIdRegex string = `^[\w]+$`
+
+// Aws Region Regex
+const AwsRegionRegex string = `^[a-zA-Z0-9\-]+$`
+
 // Domain FQDN
 const DomainFqdnRegex string = `^(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}$`
 
@@ -119,6 +128,9 @@ const AssignmentPriority = 0
 const GacAppName = "Workspace"
 
 const SensitiveFieldMaskedValue = "*****"
+
+const ProviderInitializationErrorMsg = "Provider initialization error"
+const MissingProviderClientIdAndSecretErrorMsg = "client_id and client_secret fields must be set in the provider configuration to manage this resource via terraform."
 
 var PlatformSettingsAssignedTo = []string{"AllUsersNoAuthentication"}
 
@@ -657,48 +669,43 @@ func GetAllowedFunctionalLevelValues() []string {
 // <summary>
 // Helper function to check the version requirement for DDC.
 // </summary>
-func CheckProductVersion(client *citrixdaasclient.CitrixDaasClient, diagnostic *diag.Diagnostics, requiredOrchestrationApiVersion int32, requiredProductMajorVersion int, requiredProductMinorVersion int, resourceName string) bool {
+func CheckProductVersion(client *citrixdaasclient.CitrixDaasClient, requiredOrchestrationApiVersion int32, requiredProductMajorVersion int, requiredProductMinorVersion int) (bool, error) {
 	// Validate DDC version
 	if client.AuthConfig.OnPremises {
-		productVersionSplit := strings.Split(client.ClientConfig.ProductVersion, ".")
-		productMajorVersion, err := strconv.Atoi(productVersionSplit[0])
+		productMajorVersion, productMinorVersion, err := GetProductMajorAndMinorVersion(client)
 		if err != nil {
-			diagnostic.AddError(
-				"Error parsing product major version",
-				"Error message: "+err.Error(),
-			)
-			return false
-		}
-
-		productMinorVersion, err := strconv.Atoi(productVersionSplit[1])
-		if err != nil {
-			diagnostic.AddError(
-				"Error parsing product minor version",
-				"Error message: "+err.Error(),
-			)
-			return false
+			return false, err
 		}
 
 		if productMajorVersion < requiredProductMajorVersion ||
 			(productMajorVersion == requiredProductMajorVersion && productMinorVersion < requiredProductMinorVersion) {
-			diagnostic.AddError(
-				fmt.Sprintf("Current DDC version %d.%d does not support operations on %s resources.", productMajorVersion, productMinorVersion, resourceName),
-				fmt.Sprintf("Please upgrade your DDC product version to %d.%d or above to operate on %s resources.", requiredProductMajorVersion, requiredProductMinorVersion, resourceName),
-			)
-			return false
+			return false, nil
 		}
+
+		return true, nil
 	}
 
 	// Validate Orchestration version
 	if client.ClientConfig.OrchestrationApiVersion < requiredOrchestrationApiVersion {
-		diagnostic.AddError(
-			fmt.Sprintf("Current DDC version %d does not support operations on %s resources.", client.ClientConfig.OrchestrationApiVersion, resourceName),
-			"",
-		)
-		return false
+		return false, nil
 	}
 
-	return true
+	return true, nil
+}
+
+func GetProductMajorAndMinorVersion(client *citrixdaasclient.CitrixDaasClient) (int, int, error) {
+	productVersionSplit := strings.Split(client.ClientConfig.ProductVersion, ".")
+	productMajorVersion, err := strconv.Atoi(productVersionSplit[0])
+	if err != nil {
+		return 0, 0, err
+	}
+
+	productMinorVersion, err := strconv.Atoi(productVersionSplit[1])
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return productMajorVersion, productMinorVersion, nil
 }
 
 // <summary>

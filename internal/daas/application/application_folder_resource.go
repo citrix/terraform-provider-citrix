@@ -22,6 +22,7 @@ var (
 	_ resource.ResourceWithConfigure      = &applicationFolderResource{}
 	_ resource.ResourceWithImportState    = &applicationFolderResource{}
 	_ resource.ResourceWithValidateConfig = &applicationFolderResource{}
+	_ resource.ResourceWithModifyPlan     = &applicationFolderResource{}
 )
 
 // NewApplicationFolderResource is a helper function to simplify the provider implementation.
@@ -235,4 +236,13 @@ func (r *applicationFolderResource) ValidateConfig(ctx context.Context, req reso
 
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
 	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
+}
+
+func (r *applicationFolderResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	if r.client != nil && r.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
 }

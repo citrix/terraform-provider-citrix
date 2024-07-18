@@ -35,6 +35,7 @@ func TestHypervisorPreCheck_Azure(t *testing.T) {
 
 func TestHypervisorResourceAzureRM(t *testing.T) {
 	name := os.Getenv("TEST_HYPERV_NAME_AZURE")
+	zoneName := os.Getenv("TEST_ZONE_NAME_AZURE")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -46,7 +47,7 @@ func TestHypervisorResourceAzureRM(t *testing.T) {
 
 			// Create and Read testing
 			{
-				Config: composeTestResourceTf(BuildHypervisorResourceAzure(t, hypervisor_testResources), BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE"))),
+				Config: composeTestResourceTf(BuildHypervisorResourceAzure(t, hypervisor_testResources), BuildZoneResource(t, zoneName, false)),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
@@ -65,7 +66,7 @@ func TestHypervisorResourceAzureRM(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: composeTestResourceTf(BuildHypervisorResourceAzure(t, hypervisor_testResources_updated), BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AZURE"))),
+				Config: composeTestResourceTf(BuildHypervisorResourceAzure(t, hypervisor_testResources_updated), BuildZoneResource(t, zoneName, false)),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
 					resource.TestCheckResourceAttr("citrix_azure_hypervisor.testHypervisor", "name", fmt.Sprintf("%s-updated", name)),
@@ -92,6 +93,7 @@ func TestHypervisorPreCheck_GCP(t *testing.T) {
 
 func TestHypervisorResourceGCP(t *testing.T) {
 	name := os.Getenv("TEST_HYPERV_NAME_GCP")
+	zoneName := os.Getenv("TEST_ZONE_NAME_GCP")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -103,7 +105,7 @@ func TestHypervisorResourceGCP(t *testing.T) {
 
 			// Create and Read testing
 			{
-				Config: composeTestResourceTf(BuildHypervisorResourceGCP(t, hypervisor_testResources_gcp), BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_GCP"))),
+				Config: composeTestResourceTf(BuildHypervisorResourceGCP(t, hypervisor_testResources_gcp), BuildZoneResource(t, zoneName, false)),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
 					resource.TestCheckResourceAttr("citrix_gcp_hypervisor.testHypervisor", "name", name),
@@ -121,7 +123,7 @@ func TestHypervisorResourceGCP(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: composeTestResourceTf(BuildHypervisorResourceGCP(t, hypervisor_testResources_updated_gcp), BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_GCP"))),
+				Config: composeTestResourceTf(BuildHypervisorResourceGCP(t, hypervisor_testResources_updated_gcp), BuildZoneResource(t, zoneName, false)),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
 					resource.TestCheckResourceAttr("citrix_gcp_hypervisor.testHypervisor", "name", fmt.Sprintf("%s-updated", name)),
@@ -156,6 +158,7 @@ func TestHypervisorPreCheck_Vsphere(t *testing.T) {
 func TestHypervisorResourceVsphere(t *testing.T) {
 	name := os.Getenv("TEST_HYPERV_NAME_VSPHERE")
 	username := os.Getenv("TEST_HYPERV_USERNAME_VSPHERE")
+	zoneName := os.Getenv("TEST_ZONE_NAME_VSPHERE")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -166,7 +169,7 @@ func TestHypervisorResourceVsphere(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: composeTestResourceTf(BuildHypervisorResourceVsphere(t, hypervisor_testResources_vsphere), BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_VSPHERE"))),
+				Config: composeTestResourceTf(BuildHypervisorResourceVsphere(t, hypervisor_testResources_vsphere), BuildZoneResource(t, zoneName, false)),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
 					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor.testHypervisor", "name", name),
@@ -187,7 +190,7 @@ func TestHypervisorResourceVsphere(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: composeTestResourceTf(BuildHypervisorResourceVsphere(t, hypervisor_testResources_updated_vsphere), BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_VSPHERE"))),
+				Config: composeTestResourceTf(BuildHypervisorResourceVsphere(t, hypervisor_testResources_updated_vsphere), BuildZoneResource(t, zoneName, false)),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
 					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor.testHypervisor", "name", fmt.Sprintf("%s-updated", name)),
@@ -221,6 +224,7 @@ func TestHypervisorPreCheck_Xenserver(t *testing.T) {
 func TestHypervisorResourceXenserver(t *testing.T) {
 	name := os.Getenv("TEST_HYPERV_NAME_XENSERVER")
 	username := os.Getenv("TEST_HYPERV_USERNAME_XENSERVER")
+	zoneName := os.Getenv("TEST_ZONE_NAME_XENSERVER")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -231,7 +235,7 @@ func TestHypervisorResourceXenserver(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: composeTestResourceTf(BuildHypervisorResourceXenserver(t, hypervisor_testResources_xenserver), BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_XENSERVER"))),
+				Config: composeTestResourceTf(BuildHypervisorResourceXenserver(t, hypervisor_testResources_xenserver), BuildZoneResource(t, zoneName, false)),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
 					resource.TestCheckResourceAttr("citrix_xenserver_hypervisor.testHypervisor", "name", name),
@@ -252,7 +256,7 @@ func TestHypervisorResourceXenserver(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: composeTestResourceTf(BuildHypervisorResourceXenserver(t, hypervisor_testResources_updated_xenserver), BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_XENSERVER"))),
+				Config: composeTestResourceTf(BuildHypervisorResourceXenserver(t, hypervisor_testResources_updated_xenserver), BuildZoneResource(t, zoneName, false)),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
 					resource.TestCheckResourceAttr("citrix_xenserver_hypervisor.testHypervisor", "name", fmt.Sprintf("%s-updated", name)),
@@ -283,6 +287,7 @@ func TestHypervisorPreCheck_Nutanix(t *testing.T) {
 func TestHypervisorResourceNutanix(t *testing.T) {
 	name := os.Getenv("TEST_HYPERV_NAME_NUTANIX")
 	username := os.Getenv("TEST_HYPERV_USERNAME_NUTANIX")
+	zoneName := os.Getenv("TEST_ZOE_NAME_NUTANIX")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -293,7 +298,7 @@ func TestHypervisorResourceNutanix(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: composeTestResourceTf(BuildHypervisorResourceNutanix(t, hypervisor_testResources_nutanix), BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_NUTANIX"))),
+				Config: composeTestResourceTf(BuildHypervisorResourceNutanix(t, hypervisor_testResources_nutanix), BuildZoneResource(t, zoneName, false)),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
 					resource.TestCheckResourceAttr("citrix_nutanix_hypervisor.testHypervisor", "name", name),
@@ -312,7 +317,7 @@ func TestHypervisorResourceNutanix(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: composeTestResourceTf(BuildHypervisorResourceNutanix(t, hypervisor_testResources_updated_nutanix), BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_NUTANIX"))),
+				Config: composeTestResourceTf(BuildHypervisorResourceNutanix(t, hypervisor_testResources_updated_nutanix), BuildZoneResource(t, zoneName, false)),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
 					resource.TestCheckResourceAttr("citrix_nutanix_hypervisor.testHypervisor", "name", fmt.Sprintf("%s-updated", name)),
@@ -343,6 +348,7 @@ func TestHypervisorPreCheck_SCVMM(t *testing.T) {
 func TestHypervisorResourceSCVMM(t *testing.T) {
 	name := os.Getenv("TEST_HYPERV_NAME_SCVMM")
 	username := os.Getenv("TEST_HYPERV_USERNAME_SCVMM")
+	zoneName := os.Getenv("TEST_ZONE_NAME_SCVMM")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -353,7 +359,7 @@ func TestHypervisorResourceSCVMM(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: composeTestResourceTf(BuildHypervisorResourceSCVMM(t, hypervisor_testResources_scvmm), BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_SCVMM"))),
+				Config: composeTestResourceTf(BuildHypervisorResourceSCVMM(t, hypervisor_testResources_scvmm), BuildZoneResource(t, zoneName, false)),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
 					resource.TestCheckResourceAttr("citrix_scvmm_hypervisor.testHypervisor", "name", name),
@@ -375,7 +381,7 @@ func TestHypervisorResourceSCVMM(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: composeTestResourceTf(BuildHypervisorResourceSCVMM(t, hypervisor_testResources_updated_scvmm), BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_SCVMM"))),
+				Config: composeTestResourceTf(BuildHypervisorResourceSCVMM(t, hypervisor_testResources_updated_scvmm), BuildZoneResource(t, zoneName, false)),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
 					resource.TestCheckResourceAttr("citrix_scvmm_hypervisor.testHypervisor", "name", fmt.Sprintf("%s-updated", name)),
@@ -408,6 +414,7 @@ func TestHypervisorPreCheck_AWS_EC2(t *testing.T) {
 
 func TestHypervisorResourceAwsEc2(t *testing.T) {
 	name := os.Getenv("TEST_HYPERV_NAME_AWS_EC2")
+	zoneName := os.Getenv("TEST_ZONE_NAME_AWS_EC2")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -418,7 +425,7 @@ func TestHypervisorResourceAwsEc2(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: composeTestResourceTf(BuildHypervisorResourceAwsEc2(t, hypervisor_testResources_aws_ec2), BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AWS_EC2"))),
+				Config: composeTestResourceTf(BuildHypervisorResourceAwsEc2(t, hypervisor_testResources_aws_ec2), BuildZoneResource(t, zoneName, false)),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
 					resource.TestCheckResourceAttr("citrix_aws_hypervisor.testHypervisor", "name", name),
@@ -435,7 +442,7 @@ func TestHypervisorResourceAwsEc2(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: composeTestResourceTf(BuildHypervisorResourceAwsEc2(t, hypervisor_testResources_updated_aws_ec2), BuildZoneResource(t, zone_testResource, os.Getenv("TEST_ZONE_NAME_AWS_EC2"))),
+				Config: composeTestResourceTf(BuildHypervisorResourceAwsEc2(t, hypervisor_testResources_updated_aws_ec2), BuildZoneResource(t, zoneName, false)),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
 					resource.TestCheckResourceAttr("citrix_aws_hypervisor.testHypervisor", "name", fmt.Sprintf("%s-updated", name)),

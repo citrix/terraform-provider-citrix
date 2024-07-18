@@ -22,6 +22,7 @@ var (
 	_ resource.ResourceWithConfigure      = &gcpHypervisorResourcePoolResource{}
 	_ resource.ResourceWithImportState    = &gcpHypervisorResourcePoolResource{}
 	_ resource.ResourceWithValidateConfig = &gcpHypervisorResourcePoolResource{}
+	_ resource.ResourceWithModifyPlan     = &gcpHypervisorResourcePoolResource{}
 )
 
 // NewHypervisorResourcePoolResource is a helper function to simplify the provider implementation.
@@ -183,13 +184,6 @@ func (r *gcpHypervisorResourcePoolResource) Update(ctx context.Context, req reso
 		return
 	}
 
-	var state GcpHypervisorResourcePoolResourceModel
-	diags = req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
 	var editHypervisorResourcePool citrixorchestration.EditHypervisorResourcePoolRequestModel
 	editHypervisorResourcePool.SetName(plan.Name.ValueString())
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM)
@@ -277,4 +271,13 @@ func (r *gcpHypervisorResourcePoolResource) ValidateConfig(ctx context.Context, 
 
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
 	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
+}
+
+func (r *gcpHypervisorResourcePoolResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	if r.client != nil && r.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
 }

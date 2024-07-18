@@ -16,6 +16,8 @@
         // "TEST_ZONE_NAME_NUTANIX": "test-zone",
         // "TEST_ZONE_NAME_SCVMM": "test-zone",
         "TEST_ZONE_DESCRIPTION" :"test zone description",
+
+        "TEST_ZONE_CLOUD_RL_ID": "{cloud_resource_location_id}", // Use the resource location which contains connectors for the corresponding hypervisor
         
         // Hypervisor Go Tests - Azure
         "TEST_HYPERV_NAME_AZURE"        :"{hypervisor_name}",
@@ -164,6 +166,17 @@
         "TEST_MC_DOMAIN_XENSERVER"                  :"domain.local",
         "TEST_MC_MEMORY_MB_XENSERVER"               :"8192",
         "TEST_MC_CPU_COUNT_XENSERVER"               :"4",
+
+        // Machine Catalog Go Tests - SCVMM
+        "TEST_MC_NAME_SCVMM"                 :"{catalog_name}",
+        "TEST_MC_SERVICE_ACCOUNT_SCVMM"      :"{admin_username}",
+        "TEST_MC_SERVICE_ACCOUNT_PASS_SCVMM" :"{admin_password}",
+        "TEST_MC_MASTER_IMAGE_SCVMM"         :"{vm_name}",
+        "TEST_MC_IMAGE_SNAPSHOT_SCVMM"       :"{image_snapshot_name}",
+        "TEST_MC_MASTER_IMAGE_NOTE_SCVMM"    :"{master_image_note}",
+        "TEST_MC_DOMAIN_SCVMM"               :"domain.local",
+        "TEST_MC_MEMORY_MB_SCVMM"            :"8192",
+        "TEST_MC_CPU_COUNT_SCVMM"            :"2",
 
         // Machine Catalog Go Tests - AWS EC2
         "TEST_MC_NAME_AWS_EC2"                    :"{catalog_name}",
@@ -318,7 +331,17 @@
          ],
          "TEST_VDA_DATASOURCE_DG_VDAS": [
             "{VDA 1 hostname}"
-         ]
+         ],
+
+         // AWS Workspaces Account Go Tests
+        "TEST_AWS_WORKSPACES_ACCOUNT_NAME": "test-aws-workspaces-account",
+        "TEST_AWS_WORKSPACES_ACCOUNT_NAME_UPDATED": "test-aws-workspaces-account-updated",
+        "TEST_AWS_WORKSPACES_ACCOUNT_REGION": "us-east-1",
+        "TEST_AWS_WORKSPACES_ACCOUNT_BYOL_FEATURE_ENABLED": "true",
+        "TEST_AWS_WORKSPACES_ACCOUNT_ROLE_ARN": "{aws_workspaces_account_role_arn}",
+        "TEST_AWS_WORKSPACES_ACCOUNT_ACCESS_KEY_ID": "{aws_workspaces_account_access_key}",
+        "TEST_AWS_WORKSPACES_ACCOUNT_SECRET_ACCESS_KEY": "{aws_workspaces_account_secret_access_key}"
+
     },
     "go.testTimeout": "30m"
 }

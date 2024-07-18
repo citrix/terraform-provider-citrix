@@ -156,6 +156,9 @@ Resource locations contain the resources (e.g. cloud connectors) required to del
 ### Managing StoreFront resources
 Please refer to the [StoreFront.md](StoreFront.md) to configure StoreFront resources via terraform.
 
+### Managing QuickCreate resources
+Please refer to the [QuickCreate.md](QuickCreate.md) to configure QuickCreate resources via terraform.
+
 ## Examples and Deployment Guides
 Basic example templates for getting started: [/examples](/examples)
 
@@ -177,7 +180,7 @@ Detailed instructions on setting up deployments on different cloud providers fro
 | vSphere          |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
 | XenServer        |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
 | Nutanix          |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
-| SCVMM            |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   |   In Progress        |:heavy_multiplication_x:  | :heavy_check_mark:   |
+| SCVMM            |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
 
 ## Attributions
 The code in this repository makes use of the following packages:

@@ -74,6 +74,11 @@ func (r *scvmmHypervisorResourcePoolResource) Configure(_ context.Context, req r
 func (r *scvmmHypervisorResourcePoolResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
+	if r.client != nil && r.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
+
 	if req.Plan.Raw.IsNull() {
 		return
 	}
@@ -142,11 +147,12 @@ func (r *scvmmHypervisorResourcePoolResource) Create(ctx context.Context, req re
 		return
 	}
 
-	host, err := util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, "", plan.Host.ValueString(), util.HostResourceType, "", hypervisor)
+	host, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, "", plan.Host.ValueString(), util.HostResourceType, "", hypervisor)
 	if err != nil {
 		diags.AddError(
 			"Error creating Hypervisor Resource Pool for SCVMM",
-			fmt.Sprintf("Failed to resolve resource %s, error: %s", plan.Host.ValueString(), err.Error()),
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				fmt.Sprintf("\nFailed to resolve resource %s, error: %s", plan.Host.ValueString(), err.Error()),
 		)
 	}
 
@@ -259,22 +265,16 @@ func (r *scvmmHypervisorResourcePoolResource) Update(ctx context.Context, req re
 		return
 	}
 
-	var state SCVMMHypervisorResourcePoolResourceModel
-	diags = req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
 	var editHypervisorResourcePool citrixorchestration.EditHypervisorResourcePoolRequestModel
 	editHypervisorResourcePool.SetName(plan.Name.ValueString())
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM)
 
-	host, err := util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, "", plan.Host.ValueString(), util.HostResourceType, "", hypervisor)
+	host, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, "", plan.Host.ValueString(), util.HostResourceType, "", hypervisor)
 	if err != nil {
 		diags.AddError(
 			"Error creating Hypervisor Resource Pool for SCVMM",
-			fmt.Sprintf("Failed to resolve resource %s, error: %s", plan.Host.ValueString(), err.Error()),
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				fmt.Sprintf("\nFailed to resolve resource %s, error: %s", plan.Host.ValueString(), err.Error()),
 		)
 	}
 

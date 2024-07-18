@@ -20,6 +20,7 @@ var (
 	_ resource.ResourceWithConfigure      = &xenserverHypervisorResource{}
 	_ resource.ResourceWithImportState    = &xenserverHypervisorResource{}
 	_ resource.ResourceWithValidateConfig = &xenserverHypervisorResource{}
+	_ resource.ResourceWithModifyPlan     = &xenserverHypervisorResource{}
 )
 
 // NewHypervisorResource is a helper function to simplify the provider implementation.
@@ -259,4 +260,13 @@ func (r *xenserverHypervisorResource) ValidateConfig(ctx context.Context, req re
 
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
 	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
+}
+
+func (r *xenserverHypervisorResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	if r.client != nil && r.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
 }
