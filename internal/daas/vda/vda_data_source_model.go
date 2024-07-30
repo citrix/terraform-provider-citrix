@@ -77,7 +77,7 @@ func (VdaModel) GetSchema() schema.NestedAttributeObject {
 
 func (r VdaDataSourceModel) RefreshPropertyValues(vdas *citrixorchestration.MachineResponseModelCollection) VdaDataSourceModel {
 
-	var res []VdaModel
+	res := []VdaModel{}
 	for _, model := range vdas.GetItems() {
 		machineName := model.GetName()
 		hosting := model.GetHosting()

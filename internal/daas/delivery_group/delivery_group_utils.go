@@ -611,7 +611,7 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 	body.SetDescription(plan.Description.ValueString())
 	body.SetRebootSchedules(deliveryGroupRebootScheduleArray)
 
-	if !plan.AssociatedMachineCatalogs.IsNull() {
+	if !plan.AssociatedMachineCatalogs.IsNull() && len(plan.AssociatedMachineCatalogs.Elements()) > 0 {
 		deliveryGroupMachineCatalogsArray := getDeliveryGroupAddMachinesRequest(util.ObjectListToTypedArray[DeliveryGroupMachineCatalogModel](ctx, diagnostics, plan.AssociatedMachineCatalogs))
 		body.SetMachineCatalogs(deliveryGroupMachineCatalogsArray)
 	}
@@ -1217,6 +1217,9 @@ func (r DeliveryGroupResourceModel) updatePlanWithAssociatedCatalogs(ctx context
 	}
 
 	var associatedMachineCatalogs []DeliveryGroupMachineCatalogModel
+	if !r.AssociatedMachineCatalogs.IsNull() {
+		associatedMachineCatalogs = []DeliveryGroupMachineCatalogModel{}
+	}
 	for key, val := range machineCatalogMap {
 		var deliveryGroupMachineCatalogModel DeliveryGroupMachineCatalogModel
 		deliveryGroupMachineCatalogModel.MachineCatalog = types.StringValue(key)

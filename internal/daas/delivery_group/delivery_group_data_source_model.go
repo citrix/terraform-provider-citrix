@@ -41,7 +41,7 @@ func (r DeliveryGroupDataSourceModel) RefreshPropertyValues(deliveryGroup *citri
 	r.Id = types.StringValue(deliveryGroup.GetId())
 	r.Name = types.StringValue(deliveryGroup.GetName())
 
-	var res []vda.VdaModel
+	res := []vda.VdaModel{}
 	for _, model := range vdas.GetItems() {
 		machineName := model.GetName()
 		hosting := model.GetHosting()

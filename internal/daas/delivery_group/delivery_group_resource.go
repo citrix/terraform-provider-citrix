@@ -392,6 +392,31 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 		return
 	}
 
+	if data.AssociatedMachineCatalogs.IsNull() || len(data.AssociatedMachineCatalogs.Elements()) < 1 {
+		// if no machine catalogs are associated, sharing_kind and session_support must be specified
+
+		errorSummary := "Incorrect Attribute Configuration"
+		errorDetail := "session_support and sharing_kind must be specified if no machine catalogs are associated."
+
+		if data.SessionSupport.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("session_support"),
+				errorSummary,
+				errorDetail,
+			)
+
+			return
+		}
+
+		if data.SharingKind.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("sharing_kind"),
+				errorSummary,
+				errorDetail,
+			)
+		}
+	}
+
 	if data.AutoscaleSettings.IsNull() {
 		return
 	}

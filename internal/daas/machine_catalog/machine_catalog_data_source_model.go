@@ -41,7 +41,7 @@ func (r MachineCatalogDataSourceModel) RefreshPropertyValues(catalog *citrixorch
 	r.Id = types.StringValue(catalog.GetId())
 	r.Name = types.StringValue(catalog.GetName())
 
-	var res []vda.VdaModel
+	res := []vda.VdaModel{}
 	for _, model := range vdas.GetItems() {
 		machineName := model.GetName()
 		hosting := model.GetHosting()

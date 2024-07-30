@@ -665,9 +665,6 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 					stringvalidator.AlsoRequires(path.Expressions{
 						path.MatchRelative().AtParent().AtName("sharing_kind"),
 					}...),
-					stringvalidator.ExactlyOneOf(path.Expressions{
-						path.MatchRelative().AtParent().AtName("associated_machine_catalogs"),
-					}...),
 				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplaceIf(func(_ context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
@@ -812,7 +809,7 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 		r.MakeResourcesAvailableInLHC = types.BoolValue(false)
 	}
 
-	if len(dgMachines.GetItems()) < 1 {
+	if len(dgMachines.GetItems()) < 1 || !r.SessionSupport.IsNull() {
 		r.SessionSupport = types.StringValue(string(deliveryGroup.GetSessionSupport()))
 		r.SharingKind = types.StringValue(string(deliveryGroup.GetSharingKind()))
 	}
