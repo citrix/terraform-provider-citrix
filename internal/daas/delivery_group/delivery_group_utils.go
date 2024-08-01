@@ -651,9 +651,11 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 	body.SetMinimumFunctionalLevel(*functionalLevel)
 
 	deliveryKind := citrixorchestration.DELIVERYKIND_DESKTOPS_AND_APPS
-	if associatedMachineCatalogProperties.SessionSupport != "" && associatedMachineCatalogProperties.SessionSupport != citrixorchestration.SESSIONSUPPORT_MULTI_SESSION {
+	if plan.SessionSupport.ValueString() == string(citrixorchestration.SESSIONSUPPORT_SINGLE_SESSION) ||
+		associatedMachineCatalogProperties.SessionSupport == citrixorchestration.SESSIONSUPPORT_SINGLE_SESSION {
 		deliveryKind = citrixorchestration.DELIVERYKIND_DESKTOPS_ONLY
 	}
+
 	body.SetDeliveryType(deliveryKind)
 	body.SetDesktops(deliveryGroupDesktopsArray)
 	body.SetDefaultDesktopPublishedName(plan.Name.ValueString())
