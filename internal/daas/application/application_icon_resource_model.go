@@ -18,7 +18,7 @@ type ApplicationIconResourceModel struct {
 
 func (ApplicationIconResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Resource for managing application icons.",
+		Description: "CVAD --- Resource for managing application icons.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the application icon.",

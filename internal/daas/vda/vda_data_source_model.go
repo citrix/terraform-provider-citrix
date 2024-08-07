@@ -21,7 +21,7 @@ type VdaDataSourceModel struct {
 func (VdaDataSourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		// This description is used by the documentation generator and the language server.
-		MarkdownDescription: "Data source for the list of VDAs that belong to either a machine catalog or a delivery group. Machine catalog and delivery group cannot be specified at the same time.",
+		MarkdownDescription: "CVAD --- Data source for the list of VDAs that belong to either a machine catalog or a delivery group. Machine catalog and delivery group cannot be specified at the same time.",
 
 		Attributes: map[string]schema.Attribute{
 			"machine_catalog": schema.StringAttribute{
@@ -77,7 +77,7 @@ func (VdaModel) GetSchema() schema.NestedAttributeObject {
 
 func (r VdaDataSourceModel) RefreshPropertyValues(vdas *citrixorchestration.MachineResponseModelCollection) VdaDataSourceModel {
 
-	var res []VdaModel
+	res := []VdaModel{}
 	for _, model := range vdas.GetItems() {
 		machineName := model.GetName()
 		hosting := model.GetHosting()

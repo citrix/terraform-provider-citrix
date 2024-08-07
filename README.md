@@ -1,6 +1,6 @@
 # Plugin for Terraform Provider for Citrix®
 
-Citrix has developed a custom Terraform provider for automating Citrix product deployments and configurations. Using [Terraform](https://www.terraform.io) with Citrix provider, you can manage your Citrix products via Infrastructure as Code, giving you higher efficiency and consistency on infrastructure management, as well as better reusability on infrastructure configuration. The provider is developed and maintained by Citrix. Please note that this provider is still in tech preview.
+Citrix has developed a custom Terraform provider for automating Citrix product deployments and configurations. Using [Terraform](https://www.terraform.io) with Citrix provider, you can manage your Citrix products via Infrastructure as Code, giving you higher efficiency and consistency on infrastructure management, as well as better reusability on infrastructure configuration. The provider is developed and maintained by Citrix.
 
 ## Table of Contents
 - [Plugin for Terraform Provider for Citrix®](#plugin-for-terraform-provider-for-citrix)
@@ -55,9 +55,11 @@ Example for on-premises site:
 
 ```hcl
 provider "citrix" {
-    hostname      = "10.71.136.250"  # Optionally set with `CITRIX_HOSTNAME` environment variable.
-    client_id     = "${var.domain_admin_id}"  # Optionally set with `CITRIX_CLIENT_ID` environment variable.
-    client_secret = "${var.domain_admin_secret}"  # Optionally set with `CITRIX_CLIENT_SECRET` environment variable.
+    cvad_config = {
+      hostname      = "10.71.136.250"  # Optionally set with `CITRIX_HOSTNAME` environment variable.
+      client_id     = "${var.domain_admin_id}"  # Optionally set with `CITRIX_CLIENT_ID` environment variable.
+      client_secret = "${var.domain_admin_secret}"  # Optionally set with `CITRIX_CLIENT_SECRET` environment variable.
+    }
 }
 ```
 
@@ -65,9 +67,11 @@ Example for Cloud site:
 
 ```hcl
 provider "citrix" {
-    customer_id   = "${var.customer_id}"  # Optionally set with `CITRIX_CUSTOMER_ID` environment variable.
-    client_id     = "${var.api_key_clientId}"  # Optionally set with `CITRIX_CLIENT_ID` environment variable.
-    client_secret = "${var.api_key_clientSecret}"  # Optionally set with `CITRIX_CLIENT_SECRET` environment variable.
+    cvad_config = {
+      customer_id   = "${var.customer_id}"  # Optionally set with `CITRIX_CUSTOMER_ID` environment variable.
+      client_id     = "${var.api_key_clientId}"  # Optionally set with `CITRIX_CLIENT_ID` environment variable.
+      client_secret = "${var.api_key_clientSecret}"  # Optionally set with `CITRIX_CLIENT_SECRET` environment variable.
+    }
 }
 ```
 

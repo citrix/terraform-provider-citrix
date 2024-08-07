@@ -207,11 +207,11 @@ func (r *zoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	// Get refreshed zone properties from Orchestration
-	zoneId := plan.Id.ValueString()
-	zoneName := plan.Name.ValueString()
-	_, err := getZone(ctx, r.client, &resp.Diagnostics, zoneId)
-	if err != nil {
+	// Retrieve state from plan
+	var state ZoneResourceModel
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
@@ -227,19 +227,19 @@ func (r *zoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 
 	// Update zone
-	editZoneRequest := r.client.ApiClient.ZonesAPIsDAAS.ZonesEditZone(ctx, zoneId)
+	editZoneRequest := r.client.ApiClient.ZonesAPIsDAAS.ZonesEditZone(ctx, state.Id.ValueString())
 	editZoneRequest = editZoneRequest.EditZoneRequestModel(*editZoneRequestBody)
 	httpResp, err := citrixdaasclient.AddRequestData(editZoneRequest, r.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error updating Zone "+zoneName,
+			"Error updating Zone "+state.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 	}
 
 	// Fetch updated zone from GetZone.
-	updatedZone, err := getZone(ctx, r.client, &resp.Diagnostics, zoneId)
+	updatedZone, err := getZone(ctx, r.client, &resp.Diagnostics, state.Id.ValueString())
 	if err != nil {
 		return
 	}

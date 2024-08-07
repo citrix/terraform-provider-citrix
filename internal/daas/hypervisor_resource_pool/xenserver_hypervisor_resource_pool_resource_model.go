@@ -33,7 +33,7 @@ type XenserverHypervisorResourcePoolResourceModel struct {
 
 func (XenserverHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Manages an XenServer hypervisor resource pool.",
+		Description: "CVAD --- Manages an XenServer hypervisor resource pool.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the resource pool.",

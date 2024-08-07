@@ -34,15 +34,15 @@ func (d *ApplicationDataSource) Metadata(ctx context.Context, req datasource.Met
 // Schema defines the data source schema.
 func (d *ApplicationDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Data source for retrieving details of applications belonging to a specific folder.",
+		Description: "CVAD --- Data source for retrieving details of applications belonging to a specific folder.",
 		Attributes: map[string]schema.Attribute{
 			"path": schema.StringAttribute{
-				MarkdownDescription: "The path of the folder to get the applications from.",
-				Required:            true,
+				Description: "The path of the folder to get the applications from.",
+				Required:    true,
 			},
 			"total_applications": schema.Int64Attribute{
-				MarkdownDescription: "The total number of applications in the folder.",
-				Computed:            true,
+				Description: "The total number of applications in the folder.",
+				Computed:    true,
 			},
 			"applications_list": schema.ListNestedAttribute{
 				Description: "The applications list associated with the specified folder.",
@@ -50,43 +50,43 @@ func (d *ApplicationDataSource) Schema(ctx context.Context, req datasource.Schem
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"name": schema.StringAttribute{
-							MarkdownDescription: "The name of the application.",
-							Computed:            true,
+							Description: "The name of the application.",
+							Computed:    true,
 						},
 						"published_name": schema.StringAttribute{
-							MarkdownDescription: "The published name of the application.",
-							Computed:            true,
+							Description: "The published name of the application.",
+							Computed:    true,
 						},
 						"description": schema.StringAttribute{
-							MarkdownDescription: "The description of the application.",
-							Computed:            true,
+							Description: "The description of the application.",
+							Computed:    true,
 						},
 						"installed_app_properties": schema.SingleNestedAttribute{
-							MarkdownDescription: "The installed application properties of the application.",
-							Computed:            true,
+							Description: "The installed application properties of the application.",
+							Computed:    true,
 							Attributes: map[string]schema.Attribute{
 								"command_line_arguments": schema.StringAttribute{
-									MarkdownDescription: "The command-line arguments to use when launching the executable. Environment variables can be used.",
-									Computed:            true,
+									Description: "The command-line arguments to use when launching the executable. Environment variables can be used.",
+									Computed:    true,
 								},
 								"command_line_executable": schema.StringAttribute{
-									MarkdownDescription: "The name of the executable file to launch. The full path need not be provided if it's already in the path. Environment variables can also be used.",
-									Computed:            true,
+									Description: "The name of the executable file to launch. The full path need not be provided if it's already in the path. Environment variables can also be used.",
+									Computed:    true,
 								},
 								"working_directory": schema.StringAttribute{
-									MarkdownDescription: "The working directory which the executable is launched from. Environment variables can be used.",
-									Computed:            true,
+									Description: "The working directory which the executable is launched from. Environment variables can be used.",
+									Computed:    true,
 								},
 							},
 						},
 						"delivery_groups": schema.SetAttribute{
-							ElementType:         types.StringType,
-							MarkdownDescription: "The delivery groups which the application is associated with.",
-							Computed:            true,
+							ElementType: types.StringType,
+							Description: "The delivery groups which the application is associated with.",
+							Computed:    true,
 						},
 						"application_folder_path": schema.StringAttribute{
-							MarkdownDescription: "The path of the folder which the application belongs to",
-							Computed:            true,
+							Description: "The path of the folder which the application belongs to",
+							Computed:    true,
 						},
 					},
 				},

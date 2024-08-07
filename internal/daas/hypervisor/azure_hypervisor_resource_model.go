@@ -42,7 +42,7 @@ type AzureHypervisorResourceModel struct {
 
 func (AzureHypervisorResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Manages an Azure hypervisor.",
+		Description: "CVAD --- Manages an Azure hypervisor.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the hypervisor.",
@@ -75,8 +75,9 @@ func (AzureHypervisorResourceModel) GetSchema() schema.Schema {
 				Sensitive:   true,
 			},
 			"application_secret_expiration_date": schema.StringAttribute{
-				Description: "The expiration date of the application secret of the service principal used to access the Azure APIs. Format is YYYY-MM-DD.",
-				Optional:    true,
+				Description: "The expiration date of the application secret of the service principal used to access the Azure APIs. " +
+					"\n\n-> **Note** Expiration date format is `YYYY-MM-DD`.",
+				Optional: true,
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(`^((?:19|20|21)\d\d)[-](0[1-9]|1[012])[-](0[1-9]|[12][0-9]|3[01])$`), "ensure date is valid and is in the format YYYY-MM-DD"),
 				},

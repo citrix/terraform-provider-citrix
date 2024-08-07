@@ -1556,7 +1556,7 @@ func getMacosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 
 func GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Manages the Global App Configuration settings for a service url.",
+		Description: "Citrix Cloud --- Manages the Global App Configuration settings for a service url.",
 		Attributes: map[string]schema.Attribute{
 			"service_url": schema.StringAttribute{
 				Description: "Citrix workspace application store url for which settings are to be configured. The value is case sensitive and requires the protocol (\"https\" or \"http\") and port number.",

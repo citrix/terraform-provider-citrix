@@ -60,7 +60,7 @@ func (d *STFRoamingServiceDataSource) Read(ctx context.Context, req datasource.R
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error parsing site_id of StoreFront Roaming Service ",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 		return
 	}

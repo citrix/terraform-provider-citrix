@@ -22,7 +22,7 @@ type HypervisorResourcePoolDataSourceModel struct {
 
 func (HypervisorResourcePoolDataSourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Read data of an existing hypervisor resource pool.",
+		Description: "CVAD --- Read data of an existing hypervisor resource pool.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the hypervisor resource pool.",

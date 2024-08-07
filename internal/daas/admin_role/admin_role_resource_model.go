@@ -52,7 +52,7 @@ func (r AdminRoleResourceModel) RefreshPropertyValues(ctx context.Context, diagn
 func (AdminRoleResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		// This description is used by the documentation generator and the language server.
-		Description: "Manages an administrator role.",
+		Description: "CVAD --- Manages an administrator role.",
 
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -77,21 +77,24 @@ func (AdminRoleResourceModel) GetSchema() schema.Schema {
 				Computed:    true,
 			},
 			"can_launch_manage": schema.BoolAttribute{
-				Description: "Flag to determine if the user will have access to the Manage tab on the console. This field is only applicable for cloud admins. For on-premise admins, the only acceptable value is `true`. Defaults to `true`.",
-				Optional:    true,
-				Computed:    true,
-				Default:     booldefault.StaticBool(true), // Default value gets set for an attribute after Validation and before applying configuration changes
+				Description: "Flag to determine if the user will have access to the Manage tab on the console. Defaults to `true`. " +
+					"\n\n~> **Please Note** This field is only applicable for cloud admins. For on-premise admins, the only acceptable value is `true`.",
+				Optional: true,
+				Computed: true,
+				Default:  booldefault.StaticBool(true), // Default value gets set for an attribute after Validation and before applying configuration changes
 			},
 			"can_launch_monitor": schema.BoolAttribute{
-				Description: "Flag to determine if the user will have access to the Monitor tab on the console. This field is only applicable for cloud admins. For on-premise admins, the only acceptable value is `true`. Defaults to `true`.",
-				Optional:    true,
-				Computed:    true,
-				Default:     booldefault.StaticBool(true),
+				Description: "Flag to determine if the user will have access to the Monitor tab on the console. Defaults to `true`. " +
+					"\n\n~> **Please Note** This field is only applicable for cloud admins. For on-premise admins, the only acceptable value is `true`.",
+				Optional: true,
+				Computed: true,
+				Default:  booldefault.StaticBool(true),
 			},
 			"permissions": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "Permissions to be associated with the admin role. To get a list of supported permissions, please refer to [Admin Predefined Permissions for Cloud](https://developer-docs.citrix.com/en-us/citrix-daas-service-apis/citrix-daas-rest-apis/apis/#/Admin-APIs/Admin-GetPredefinedPermissions) and [Admin Predefined Permissions for On-Premise](https://developer-docs.citrix.com/en-us/citrix-virtual-apps-desktops/citrix-cvad-rest-apis/apis/#/Admin-APIs/Admin-GetPredefinedPermissions).",
-				Required:    true,
+				Description: "Permissions to be associated with the admin role. " +
+					"\n\n-> **Note** To get a list of supported permissions, please refer to [Admin Predefined Permissions for Cloud](https://developer-docs.citrix.com/en-us/citrix-daas-service-apis/citrix-daas-rest-apis/apis/#/Admin-APIs/Admin-GetPredefinedPermissions) and [Admin Predefined Permissions for On-Premise](https://developer-docs.citrix.com/en-us/citrix-virtual-apps-desktops/citrix-cvad-rest-apis/apis/#/Admin-APIs/Admin-GetPredefinedPermissions).",
+				Required: true,
 				Validators: []validator.Set{
 					setvalidator.SizeAtLeast(1),
 				},

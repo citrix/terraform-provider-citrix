@@ -78,4 +78,10 @@ resource "citrix_stf_webreceiver_service" "example-stf-webreceiver-service"{
     header_foreground_color = "black"
     link_color = "Dark moderate violet"
   }
+
+  // Add depends_on attribute to ensure the Web Receiver Service is created after the Deployment and Store Service
+    depends_on = [
+        citrix_stf_deployment.example-stf-deployment,
+        citrix_stf_store_service.example-stf-store-service
+    ]
 }

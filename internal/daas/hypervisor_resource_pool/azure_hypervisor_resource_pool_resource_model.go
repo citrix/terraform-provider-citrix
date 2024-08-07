@@ -34,7 +34,7 @@ type AzureHypervisorResourcePoolResourceModel struct {
 
 func (AzureHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Manages an Azure hypervisor resource pool.",
+		Description: "CVAD --- Manages an Azure hypervisor resource pool.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the resource pool.",

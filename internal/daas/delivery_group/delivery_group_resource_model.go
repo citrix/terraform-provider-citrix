@@ -65,8 +65,9 @@ func (PowerTimeSchemePoolSizeScheduleRequestModel) GetSchema() schema.NestedAttr
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
 			"time_range": schema.StringAttribute{
-				Description: "Time range during which the pool size applies. Format is HH:mm-HH:mm. e.g. 09:00-17:00",
-				Required:    true,
+				Description: "Time range during which the pool size applies. " +
+					"\n\n-> **Note** Time range format is `HH:mm-HH:mm`, e.g. `09:00-17:00`",
+				Required: true,
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(`^([0-1][0-9]|2[0-3]):[0|3]0-([0-1][0-9]|2[0-3]):[0|3]0$`), "must be specified in format HH:mm-HH:mm and range between 00:00-00:00 with minutes being 00 or 30."),
 				},
@@ -128,7 +129,8 @@ func (DeliveryGroupPowerTimeScheme) GetSchema() schema.NestedAttributeObject {
 				Required:    true,
 			},
 			"pool_size_schedules": schema.ListNestedAttribute{
-				Description:  "Pool size schedules during the day. Each is specified as a time range and an indicator of the number of machines that should be powered on during that time range. Do not specify schedules when no machines should be powered on.",
+				Description: "Pool size schedules during the day. Each is specified as a time range and an indicator of the number of machines that should be powered on during that time range. " +
+					"\n\n~> **Please Note** Do not specify schedules when no machines should be powered on.",
 				Optional:     true,
 				NestedObject: PowerTimeSchemePoolSizeScheduleRequestModel{}.GetSchema(),
 				Validators: []validator.List{
@@ -156,11 +158,12 @@ type DeliveryGroupRebootNotificationToUsers struct {
 
 func (DeliveryGroupRebootNotificationToUsers) GetSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
-		Description: "The reboot notification for the reboot schedule. Not available for natural reboot.",
-		Optional:    true,
+		Description: "The reboot notification for the reboot schedule. " +
+			"\n\n~> **Please Note** Not available for natural reboot.",
+		Optional: true,
 		Attributes: map[string]schema.Attribute{
 			"notification_duration_minutes": schema.Int64Attribute{
-				Description: "Send notification to users X minutes before user is logged off. Can only be 0, 1, 5 or 15. 0 means no notification.",
+				Description: "Send notification to users X minutes before user is logged off. Can only be `0`, `1`, `5` or `15`. `0` means no notification.",
 				Required:    true,
 				Validators: []validator.Int64{
 					int64validator.OneOf(0, 1, 5, 15),
@@ -175,8 +178,9 @@ func (DeliveryGroupRebootNotificationToUsers) GetSchema() schema.SingleNestedAtt
 				Required:    true,
 			},
 			"notification_repeat_every_5_minutes": schema.BoolAttribute{
-				Description: "Repeat notification every 5 minutes, only available for 15 minutes notification duration. ",
-				Optional:    true,
+				Description: "Repeat notification every 5 minutes. " +
+					"\n\n~> **Please Note** notification repeat is available only when `notification_duration_minutes` is set to `15`.",
+				Optional: true,
 			},
 		},
 	}
@@ -249,29 +253,31 @@ func (DeliveryGroupRebootSchedule) GetSchema() schema.NestedAttributeObject {
 				},
 			},
 			"frequency_factor": schema.Int64Attribute{
-				Description: "Repeats every X days/weeks/months. Minimum value is 1.",
+				Description: "Repeats every X days/weeks/months. Minimum value is `1`.",
 				Required:    true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(1),
 				},
 			},
 			"start_date": schema.StringAttribute{
-				Description: "The date on which the reboot schedule starts. The date format is `YYYY-MM-DD`.",
-				Required:    true,
+				Description: "The date on which the reboot schedule starts. " +
+					"\n\n-> **Note** The date format is `YYYY-MM-DD`.",
+				Required: true,
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(util.DateRegex), "Date must be in the format YYYY-MM-DD"),
 				},
 			},
 			"start_time": schema.StringAttribute{
-				Description: "The time at which the reboot schedule starts. The time format is `HH:MM`.",
-				Required:    true,
+				Description: "The time at which the reboot schedule starts. " +
+					"\n\n-> **Note** The time format is `HH:MM`.",
+				Required: true,
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(util.TimeRegex), "Time must be in the format HH:MM"),
 				},
 			},
 			"reboot_duration_minutes": schema.Int64Attribute{
 				Description: "Restart all machines within x minutes. 0 means restarting all machines at the same time. To restart machines after draining sessions, set natural_reboot_schedule to true instead. ",
-				Required:    true,
+				Optional:    true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(0),
 				},
@@ -462,10 +468,12 @@ func (DeliveryGroupPowerManagementSettings) GetSchema() schema.SingleNestedAttri
 				Default:     int64default.StaticInt64(0),
 			},
 			"power_off_delay_minutes": schema.Int64Attribute{
-				Description: "Delay before machines are powered off, when scaling down. Specified in minutes. By default, the power-off delay is 30 minutes. You can set it in a range of 0 to 60 minutes. Applies only to multi-session machines.",
-				Optional:    true,
-				Computed:    true,
-				Default:     int64default.StaticInt64(30),
+				Description: "Delay before machines are powered off, when scaling down. Specified in minutes. " +
+					"\n\n~> **Please Note** Applies only to multi-session machines. " +
+					"\n\n-> **Note** By default, the power-off delay is 30 minutes. You can set it in a range of 0 to 60 minutes. ",
+				Optional: true,
+				Computed: true,
+				Default:  int64default.StaticInt64(30),
 				Validators: []validator.Int64{
 					int64validator.Between(0, 60),
 				},
@@ -495,7 +503,8 @@ func (DeliveryGroupPowerManagementSettings) GetSchema() schema.SingleNestedAttri
 				Default:     int64default.StaticInt64(0),
 			},
 			"power_time_schemes": schema.ListNestedAttribute{
-				Description:  "Power management time schemes.  No two schemes for the same delivery group may cover the same day of the week.",
+				Description: "Power management time schemes." +
+					"\n\n~> **Please Note** It is not allowed to have more than one power time scheme that cover the same day of the week for the same delivery group.",
 				Required:     true,
 				NestedObject: DeliveryGroupPowerTimeScheme{}.GetSchema(),
 				Validators: []validator.List{
@@ -528,16 +537,16 @@ func (RestrictedAccessUsers) getSchemaInternal(forDeliveryGroup bool) schema.Sin
 	description := "Restrict access to this Delivery Group by specifying users and groups in the allow and block list. If no value is specified, all authenticated users will have access to this Delivery Group. To give access to unauthenticated users, use the `allow_anonymous_access` property."
 	if !forDeliveryGroup {
 		resource = "Desktop"
-		description = "Restrict access to this Desktop by specifying users and groups in the allow and block list. If no value is specified, all users that have access to this Delivery Group will have access to the Desktop. Required for Remote PC Delivery Groups."
+		description = "Restrict access to this Desktop by specifying users and groups in the allow and block list. If no value is specified, all users that have access to this Delivery Group will have access to the Desktop. " +
+			"\n\n~> **Please Note** For Remote PC Delivery Groups desktops, `restricted_access_users` has to be set."
 	}
 
-	return schema.SingleNestedAttribute{
-		Description: description,
-		Optional:    true,
+	return schema.SingleNestedAttribute{Description: description,
+		Optional: true,
 		Attributes: map[string]schema.Attribute{
 			"allow_list": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: fmt.Sprintf("Users who can use this %s. Must be in `DOMAIN\\UserOrGroupName` or `user@domain.com` format", resource),
+				Description: fmt.Sprintf("Users who can use this %s. \n\n-> **Note** Users must be in `DOMAIN\\UserOrGroupName` or `user@domain.com` format", resource),
 				Optional:    true,
 				Validators: []validator.Set{
 					setvalidator.ValueStringsAre(
@@ -550,7 +559,7 @@ func (RestrictedAccessUsers) getSchemaInternal(forDeliveryGroup bool) schema.Sin
 			},
 			"block_list": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: fmt.Sprintf("Users who cannot use this %s. A block list is meaningful only when used to block users in the allow list. Must be in `DOMAIN\\UserOrGroupName` or `user@domain.com` format", resource),
+				Description: fmt.Sprintf("Users who cannot use this %s. A block list is meaningful only when used to block users in the allow list. \n\n-> **Note** Users must be in `DOMAIN\\UserOrGroupName` or `user@domain.com` format", resource),
 				Optional:    true,
 				Validators: []validator.Set{
 					setvalidator.ValueStringsAre(
@@ -603,8 +612,9 @@ func (DeliveryGroupDesktop) GetSchema() schema.NestedAttributeObject {
 				Required:    true,
 			},
 			"enable_session_roaming": schema.BoolAttribute{
-				Description: "When enabled, if the user launches this desktop and then moves to another device, the same session is used, and applications are available on both devices. When disabled, the session no longer roams between devices. Should be set to false for Remote PC Delivery Group.",
-				Required:    true,
+				Description: "When enabled, if the user launches this desktop and then moves to another device, the same session is used, and applications are available on both devices. When disabled, the session no longer roams between devices. " +
+					"\n\n~> **Please Note** Session roaming should be set to `false` for Remote PC Delivery Group.",
+				Required: true,
 			},
 			"restricted_access_users": restrictedAccessUsers.GetSchema(),
 		},
@@ -613,6 +623,34 @@ func (DeliveryGroupDesktop) GetSchema() schema.NestedAttributeObject {
 
 func (DeliveryGroupDesktop) GetAttributes() map[string]schema.Attribute {
 	return DeliveryGroupDesktop{}.GetSchema().Attributes
+}
+
+type DeliveryGroupAppProtection struct {
+	EnableAntiKeyLogging    types.Bool `tfsdk:"enable_anti_key_logging"`
+	EnableAntiScreenCapture types.Bool `tfsdk:"enable_anti_screen_capture"`
+}
+
+func (DeliveryGroupAppProtection) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "App Protection, an add-on feature for the Citrix Workspace app, provides enhanced security for Citrix published apps and desktops. The feature provides anti-keylogging and anti-screen capture capabilities for client sessions, helping protect data from keyloggers and screen scrapers." +
+			"\n\n~> **Please Note** Before using the feature, make sure that these [requirements](https://docs.citrix.com/en-us/citrix-workspace-app/app-protection.html#system-requirements) are met.",
+		Optional: true,
+		Attributes: map[string]schema.Attribute{
+			"enable_anti_key_logging": schema.BoolAttribute{
+				Description: "When enabled, anti-keylogging is applied when a protected window is in focus.",
+				Required:    true,
+			},
+			"enable_anti_screen_capture": schema.BoolAttribute{
+				Description: "Specify whether to use anti-screen capture." +
+					"\n\n-> **Note** For Windows and macOS, only the window with protected content is blank. Anti-screen capture is only applied when the window is open. For Linux, the entire screen will appear blank. Anti-screen capture is only applied when the window is open or minimized.",
+				Required: true,
+			},
+		},
+	}
+}
+
+func (DeliveryGroupAppProtection) GetAttributes() map[string]schema.Attribute {
+	return DeliveryGroupAppProtection{}.GetSchema().Attributes
 }
 
 // DeliveryGroupResourceModel maps the resource schema data.
@@ -634,11 +672,12 @@ type DeliveryGroupResourceModel struct {
 	StoreFrontServers           types.Set    `tfsdk:"storefront_servers"` //Set[string]
 	Scopes                      types.Set    `tfsdk:"scopes"`             //Set[String]
 	MakeResourcesAvailableInLHC types.Bool   `tfsdk:"make_resources_available_in_lhc"`
+	AppProtection               types.Object `tfsdk:"app_protection"` //DeliveryGroupAppProtection
 }
 
 func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Manages a delivery group.",
+		Description: "CVAD --- Manages a delivery group.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the delivery group.",
@@ -664,9 +703,6 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 					util.GetValidatorFromEnum(citrixorchestration.AllowedSessionSupportEnumValues),
 					stringvalidator.AlsoRequires(path.Expressions{
 						path.MatchRelative().AtParent().AtName("sharing_kind"),
-					}...),
-					stringvalidator.ExactlyOneOf(path.Expressions{
-						path.MatchRelative().AtParent().AtName("associated_machine_catalogs"),
 					}...),
 				},
 				PlanModifiers: []planmodifier.String{
@@ -698,8 +734,9 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 			},
 			"restricted_access_users": RestrictedAccessUsers{}.GetSchemaForDeliveryGroup(),
 			"allow_anonymous_access": schema.BoolAttribute{
-				Description: "Give access to unauthenticated (anonymous) users; no credentials are required to access StoreFront. This feature requires a StoreFront store for unauthenticated users.",
-				Optional:    true,
+				Description: "Give access to unauthenticated (anonymous) users. When set to `True`, no credentials are required to access StoreFront. " +
+					"\n\n~> **Please Note** This feature requires a StoreFront store for unauthenticated users.",
+				Optional: true,
 			},
 			"desktops": schema.ListNestedAttribute{
 				Description:  "A list of Desktop resources to publish on the delivery group. Only 1 desktop can be added to a Remote PC Delivery Group.",
@@ -773,11 +810,12 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 			},
 			"make_resources_available_in_lhc": schema.BoolAttribute{
 				Description: "In the event of a service disruption or loss of connectivity, select if you want Local Host Cache to keep resources in the delivery group available to launch new sessions. Existing sessions are not impacted. " +
-					"This setting only impacts Single Session OS Random (pooled) desktops which are power managed. LHC is always enabled for Single Session OS static and Multi Session OS desktops." +
-					"When set to `true`, machines will remain available and allow new connections and changes to the machine caused by a user might be present in subsequent sessions. " +
+					"\n\n~> **Please Note** This setting only impacts Single Session OS Random (pooled) desktops which are power managed. LHC is always enabled for Single Session OS static and Multi Session OS desktops." +
+					"\n\n-> **Note** When set to `true`, machines will remain available and allow new connections and changes to the machine caused by a user might be present in subsequent sessions. " +
 					"When set to `false`, machines in the delivery group will be unavailable for new connections during a Local Host Cache event. ",
 				Optional: true,
 			},
+			"app_protection": DeliveryGroupAppProtection{}.GetSchema(),
 		},
 	}
 }
@@ -812,9 +850,25 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 		r.MakeResourcesAvailableInLHC = types.BoolValue(false)
 	}
 
-	if len(dgMachines.GetItems()) < 1 {
+	if len(dgMachines.GetItems()) < 1 || !r.SessionSupport.IsNull() {
 		r.SessionSupport = types.StringValue(string(deliveryGroup.GetSessionSupport()))
 		r.SharingKind = types.StringValue(string(deliveryGroup.GetSharingKind()))
+	}
+
+	antiKeyLoggingEnabled := deliveryGroup.GetAppProtectionKeyLoggingRequired()
+	antiScreenCaptureEnabled := deliveryGroup.GetAppProtectionScreenCaptureRequired()
+
+	if antiKeyLoggingEnabled || antiScreenCaptureEnabled {
+		appProtectionModel := DeliveryGroupAppProtection{}
+		appProtectionModel.EnableAntiKeyLogging = types.BoolValue(antiKeyLoggingEnabled)
+		appProtectionModel.EnableAntiScreenCapture = types.BoolValue(antiScreenCaptureEnabled)
+		r.AppProtection = util.TypedObjectToObjectValue(ctx, diagnostics, appProtectionModel)
+	} else if !r.AppProtection.IsNull() {
+		appProtectionModel := util.ObjectValueToTypedObject[DeliveryGroupAppProtection](ctx, diagnostics, r.AppProtection)
+		appProtectionModel.EnableAntiKeyLogging = types.BoolValue(false)
+		appProtectionModel.EnableAntiScreenCapture = types.BoolValue(false)
+
+		r.AppProtection = util.TypedObjectToObjectValue(ctx, diagnostics, appProtectionModel)
 	}
 
 	r = r.updatePlanWithRestrictedAccessUsers(ctx, diagnostics, deliveryGroup)

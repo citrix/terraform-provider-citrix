@@ -13,17 +13,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &stfDeploymentResource{}
-	_ resource.ResourceWithConfigure   = &stfDeploymentResource{}
-	_ resource.ResourceWithImportState = &stfDeploymentResource{}
+	_ resource.Resource                   = &stfDeploymentResource{}
+	_ resource.ResourceWithConfigure      = &stfDeploymentResource{}
+	_ resource.ResourceWithImportState    = &stfDeploymentResource{}
+	_ resource.ResourceWithValidateConfig = &stfDeploymentResource{}
 )
 
 // stfDeploymentResource is a helper function to simplify the provider implementation.
@@ -36,6 +34,21 @@ type stfDeploymentResource struct {
 	client *citrixdaasclient.CitrixDaasClient
 }
 
+// ValidateConfig implements resource.ResourceWithValidateConfig.
+func (*stfDeploymentResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data STFDeploymentResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
+}
+
 // Metadata returns the resource type name.
 func (r *stfDeploymentResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_stf_deployment"
@@ -43,24 +56,7 @@ func (r *stfDeploymentResource) Metadata(_ context.Context, req resource.Metadat
 
 // Schema defines the schema for the resource.
 func (r *stfDeploymentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "StoreFront Deployment.",
-		Attributes: map[string]schema.Attribute{
-			"site_id": schema.StringAttribute{
-				Description: "The IIS site id of the StoreFront deployment. Defaults to 1.",
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString("1"),
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"host_base_url": schema.StringAttribute{
-				Description: "Url used to access the StoreFront server group.",
-				Required:    true,
-			},
-		},
-	}
+	resp.Schema = STFDeploymentResourceModel{}.GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -91,7 +87,7 @@ func (r *stfDeploymentResource) Create(ctx context.Context, req resource.CreateR
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating StoreFront Deployment ",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 		return
 	}
@@ -106,7 +102,7 @@ func (r *stfDeploymentResource) Create(ctx context.Context, req resource.CreateR
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating StoreFront Deployment",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 		return
 	}
@@ -134,11 +130,11 @@ func (r *stfDeploymentResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
-	STFDeployment, err := getSTFDeployment(ctx, r.client, &resp.Diagnostics, state.SiteId.ValueStringPointer())
+	deployment, err := GetSTFDeployment(ctx, r.client, &resp.Diagnostics, state.SiteId.ValueStringPointer())
 	if err != nil {
 		return
 	}
-	if STFDeployment == nil {
+	if deployment == nil {
 		resp.Diagnostics.AddWarning(
 			"StoreFront Deployment not found",
 			"StoreFront Deployment was not found and will be removed from the state file. An apply action will result in the creation of a new resource.",
@@ -146,7 +142,7 @@ func (r *stfDeploymentResource) Read(ctx context.Context, req resource.ReadReque
 		resp.State.RemoveResource(ctx)
 		return
 	}
-	state.RefreshPropertyValues(STFDeployment)
+	state.RefreshPropertyValues(deployment)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -169,15 +165,13 @@ func (r *stfDeploymentResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	// Get refreshed STFDeployment
-	_, err := getSTFDeployment(ctx, r.client, &resp.Diagnostics, plan.SiteId.ValueStringPointer())
-	if err != nil {
+	deployment, err := GetSTFDeployment(ctx, r.client, &resp.Diagnostics, plan.SiteId.ValueStringPointer())
+	if err != nil || deployment == nil {
 		return
 	}
 
 	// Construct the update model
-	var editSTFDeploymentBody = &citrixstorefront.SetSTFDeploymentRequestModel{}
-	editSTFDeploymentBody.SetHostBaseUrl(plan.HostBaseUrl.String())
-
+	var editSTFDeploymentBody citrixstorefront.SetSTFDeploymentRequestModel
 	siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -187,19 +181,20 @@ func (r *stfDeploymentResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 	editSTFDeploymentBody.SetSiteId(siteIdInt)
+	editSTFDeploymentBody.SetHostBaseUrl(plan.HostBaseUrl.ValueString())
 
 	// Update STFDeployment
-	editDeploymentRequest := r.client.StorefrontClient.DeploymentSF.STFDeploymentSetSTFDeployment(ctx, *editSTFDeploymentBody)
+	editDeploymentRequest := r.client.StorefrontClient.DeploymentSF.STFDeploymentSetSTFDeployment(ctx, editSTFDeploymentBody)
 	_, err = editDeploymentRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating StoreFront Deployment ",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 	}
 
 	// Fetch updated STFDeployment
-	updatedSTFDeployment, err := getSTFDeployment(ctx, r.client, &resp.Diagnostics, plan.SiteId.ValueStringPointer())
+	updatedSTFDeployment, err := GetSTFDeployment(ctx, r.client, &resp.Diagnostics, plan.SiteId.ValueStringPointer())
 	if err != nil {
 		return
 	}
@@ -226,6 +221,13 @@ func (r *stfDeploymentResource) Delete(ctx context.Context, req resource.DeleteR
 		return
 	}
 
+	// Check if STFDeployment exists
+	deployment, err := GetSTFDeployment(ctx, r.client, &resp.Diagnostics, state.SiteId.ValueStringPointer())
+	if err != nil || deployment == nil {
+		return
+	}
+
+	// Delete existing STF Deployment
 	var body citrixstorefront.ClearSTFDeploymentRequestModel
 	if state.SiteId.ValueString() != "" {
 		siteIdInt, err := strconv.ParseInt(state.SiteId.ValueString(), 10, 64)
@@ -238,14 +240,12 @@ func (r *stfDeploymentResource) Delete(ctx context.Context, req resource.DeleteR
 		}
 		body.SetSiteId(siteIdInt)
 	}
-
-	// Delete existing STF Deployment
 	deleteDeploymentRequest := r.client.StorefrontClient.DeploymentSF.STFDeploymentClearSTFDeployment(ctx, body)
-	_, err := deleteDeploymentRequest.Execute()
+	_, err = deleteDeploymentRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting StoreFront Deployment ",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 		return
 	}
@@ -257,7 +257,7 @@ func (r *stfDeploymentResource) ImportState(ctx context.Context, req resource.Im
 }
 
 // Gets the STFDeployment and logs any errors
-func getSTFDeployment(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, siteId *string) (*citrixstorefront.STFDeploymentDetailModel, error) {
+func GetSTFDeployment(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, siteId *string) (*citrixstorefront.STFDeploymentDetailModel, error) {
 	var body citrixstorefront.GetSTFDeploymentRequestModel
 	if siteId != nil {
 		siteIdInt, err := strconv.ParseInt(*siteId, 10, 64)

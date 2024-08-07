@@ -28,6 +28,19 @@ func TestProviderPreCheck(t *testing.T) {
 	}
 }
 
+func TestStorefrontProviderPreCheck(t *testing.T) {
+	if v := os.Getenv("SF_COMPUTER_NAME"); v == "" {
+		t.Fatal("SF_COMPUTER_NAME must be set for acceptance tests")
+	}
+	if v := os.Getenv("SF_AD_ADMIN_USERNAME"); v == "" {
+		t.Fatal("SF_AD_ADMIN_USERNAME must be set for acceptance tests")
+	}
+
+	if v := os.Getenv("SF_AD_ADMIN_PASSWORD"); v == "" {
+		testOnPremProviderPreCheck(t)
+	}
+}
+
 func testOnPremProviderPreCheck(t *testing.T) {
 	if v := os.Getenv("CITRIX_HOSTNAME"); v == "" {
 		t.Fatal("CITRIX_HOSTNAME must be set for acceptance tests")

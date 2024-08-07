@@ -7,7 +7,6 @@ import (
 
 	"github.com/citrix/citrix-daas-rest-go/citrixstorefront/models"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -18,9 +17,18 @@ type STFXenappDefaultStoreResourceModel struct {
 	StoreSiteID      types.String `tfsdk:"store_site_id"`      // The Site ID of the StoreFront Default Store for XenApp Service.
 }
 
-func (*stfXenappDefaultStoreResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "Default Storefront Store for XenApp Service.",
+func (r *STFXenappDefaultStoreResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, defaultStore models.STFPna) {
+	if defaultStore.FeatureData.SiteID.IsSet() {
+		r.StoreSiteID = types.StringValue(*defaultStore.FeatureData.SiteID.Get())
+	}
+	if defaultStore.FeatureData.VirtualPath.IsSet() && *defaultStore.DefaultPnaService.Get() {
+		r.StoreVirtualPath = types.StringValue(*defaultStore.FeatureData.VirtualPath.Get())
+	}
+}
+
+func (STFXenappDefaultStoreResourceModel) GetSchema() schema.Schema {
+	return schema.Schema{
+		Description: "StoreFront --- Default Storefront Store for XenApp Service.",
 		Attributes: map[string]schema.Attribute{
 			"store_site_id": schema.StringAttribute{
 				Description: "The Site ID of the StoreFront Default Store for XenApp Service.",
@@ -34,11 +42,6 @@ func (*stfXenappDefaultStoreResource) Schema(_ context.Context, _ resource.Schem
 	}
 }
 
-func (r *STFXenappDefaultStoreResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, defaultStore models.STFPna) {
-	if defaultStore.FeatureData.SiteID.IsSet() {
-		r.StoreSiteID = types.StringValue(*defaultStore.FeatureData.SiteID.Get())
-	}
-	if defaultStore.FeatureData.VirtualPath.IsSet() && *defaultStore.DefaultPnaService.Get() {
-		r.StoreVirtualPath = types.StringValue(*defaultStore.FeatureData.VirtualPath.Get())
-	}
+func (STFXenappDefaultStoreResourceModel) GetAttributes() map[string]schema.Attribute {
+	return STFXenappDefaultStoreResourceModel{}.GetSchema().Attributes
 }

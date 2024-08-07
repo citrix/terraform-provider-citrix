@@ -12,7 +12,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
@@ -170,10 +169,28 @@ type STFUserFarmMappingResourceModel struct {
 	EquivalentFarmSets types.List   `tfsdk:"equivalent_farm_sets"` // List of EquivalentFarmSets
 }
 
-// Schema implements resource.Resource.
-func (r *stfUserFarmMappingResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "StoreFront User Farm Mapping Resource",
+// Map response body to schema and populate Computed attribute values
+func (r *STFUserFarmMappingResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, result citrixstorefront.STFUserFarmMappingResponseModel) {
+	// Implement the logic to refresh the property values based on the result
+	r.Name = types.StringValue(*result.Name.Get())
+	r.VirtualPath = types.StringValue(*result.VirtualPath.Get())
+
+	updatedGroupMembers := util.TypedArrayToObjectList[UserFarmMappingGroup](ctx, diagnostics, []UserFarmMappingGroup{})
+	if result.GroupMembers != nil && len(result.GroupMembers) > 0 {
+		updatedGroupMembers = util.RefreshListValueProperties[UserFarmMappingGroup, citrixstorefront.STFGroupMemberResponseModel](ctx, diagnostics, r.GroupMembers, result.GroupMembers, util.GetSTFGroupMemberKey)
+	}
+	r.GroupMembers = updatedGroupMembers
+
+	updatedEquivalentFarmSets := util.TypedArrayToObjectList[EquivalentFarmSet](ctx, diagnostics, []EquivalentFarmSet{})
+	if result.FarmSets != nil && len(result.FarmSets) > 0 {
+		updatedEquivalentFarmSets = util.RefreshListValueProperties[EquivalentFarmSet, citrixstorefront.STFFarmSetResponseModel](ctx, diagnostics, r.EquivalentFarmSets, result.FarmSets, util.GetSTFFarmSetKey)
+	}
+	r.EquivalentFarmSets = updatedEquivalentFarmSets
+}
+
+func (STFUserFarmMappingResourceModel) GetSchema() schema.Schema {
+	return schema.Schema{
+		Description: "StoreFront --- StoreFront User Farm Mapping Resource",
 		Attributes: map[string]schema.Attribute{
 			"store_virtual_path": schema.StringAttribute{
 				Description: "The IIS VirtualPath at which the Store is configured to be accessed by Receivers.",
@@ -218,21 +235,6 @@ func (r *stfUserFarmMappingResource) Schema(_ context.Context, _ resource.Schema
 	}
 }
 
-// Map response body to schema and populate Computed attribute values
-func (r *STFUserFarmMappingResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, result citrixstorefront.STFUserFarmMappingResponseModel) {
-	// Implement the logic to refresh the property values based on the result
-	r.Name = types.StringValue(*result.Name.Get())
-	r.VirtualPath = types.StringValue(*result.VirtualPath.Get())
-
-	updatedGroupMembers := util.TypedArrayToObjectList[UserFarmMappingGroup](ctx, diagnostics, []UserFarmMappingGroup{})
-	if result.GroupMembers != nil && len(result.GroupMembers) > 0 {
-		updatedGroupMembers = util.RefreshListValueProperties[UserFarmMappingGroup, citrixstorefront.STFGroupMemberResponseModel](ctx, diagnostics, r.GroupMembers, result.GroupMembers, util.GetSTFGroupMemberKey)
-	}
-	r.GroupMembers = updatedGroupMembers
-
-	updatedEquivalentFarmSets := util.TypedArrayToObjectList[EquivalentFarmSet](ctx, diagnostics, []EquivalentFarmSet{})
-	if result.FarmSets != nil && len(result.FarmSets) > 0 {
-		updatedEquivalentFarmSets = util.RefreshListValueProperties[EquivalentFarmSet, citrixstorefront.STFFarmSetResponseModel](ctx, diagnostics, r.EquivalentFarmSets, result.FarmSets, util.GetSTFFarmSetKey)
-	}
-	r.EquivalentFarmSets = updatedEquivalentFarmSets
+func (STFUserFarmMappingResourceModel) GetAttributes() map[string]schema.Attribute {
+	return STFUserFarmMappingResourceModel{}.GetSchema().Attributes
 }

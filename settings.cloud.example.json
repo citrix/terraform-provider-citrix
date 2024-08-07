@@ -7,18 +7,16 @@
         "CITRIX_CLIENT_SECRET": "{client_secret}",
 
         // Zone Go Tests
-        "TEST_ZONE_NAME": "zone-name", // for zone tests
+        "TEST_ZONE_INPUT": "{resource_location_id}", // Use the resource location ID which contains connectors for the corresponding hypervisor
 
-        // "TEST_ZONE_NAME_AZURE" :"test-zone", // Use the appropriate zone based on hypervisor for hypervisor and other tests
-        // "TEST_ZONE_NAME_GCP": "test-zone", 
-        // "TEST_ZONE_NAME_VSPHERE": "test-zone",
-        // "TEST_ZONE_NAME_XENSERVER": "test-zone",
-        // "TEST_ZONE_NAME_NUTANIX": "test-zone",
-        // "TEST_ZONE_NAME_SCVMM": "test-zone",
+        // "TEST_ZONE_INPUT_AZURE" :"test-zone", // Use the appropriate zone based on hypervisor for hypervisor and other tests
+        // "TEST_ZONE_INPUT_GCP": "test-zone", 
+        // "TEST_ZONE_INPUT_VSPHERE": "test-zone",
+        // "TEST_ZONE_INPUT_XENSERVER": "test-zone",
+        // "TEST_ZONE_INPUT_NUTANIX": "test-zone",
+        // "TEST_ZONE_INPUT_SCVMM": "test-zone",
         "TEST_ZONE_DESCRIPTION" :"test zone description",
 
-        "TEST_ZONE_CLOUD_RL_ID": "{cloud_resource_location_id}", // Use the resource location which contains connectors for the corresponding hypervisor
-        
         // Hypervisor Go Tests - Azure
         "TEST_HYPERV_NAME_AZURE"        :"{hypervisor_name}",
         "TEST_HYPERV_AD_ID"             :"{hypervisor_ad_id}",
@@ -59,7 +57,7 @@
         "TEST_HYPERV_ADDRESS_SCVMM" : "{scvmm_server_address}",
 
         // Hypervisor Go Tests - AWS EC2
-        "TEST_ZONE_NAME_AWS_EC2": "{aws_ec2_hypervisor_zone_name}",
+        "TEST_ZONE_INPUT_AWS_EC2": "{aws_ec2_hypervisor_zone_name}",
         "TEST_HYPERV_NAME_AWS_EC2": "{aws_ec2_hypervisor_name}",
         "TEST_HYPERV_API_KEY_AWS_EC2": "{aws_ec2_hypervisor_api_key}",
         "TEST_HYPERV_SECRET_KEY_AWS_EC2": "{aws_ec2_hypervisor_secret_key}",
@@ -340,8 +338,70 @@
         "TEST_AWS_WORKSPACES_ACCOUNT_BYOL_FEATURE_ENABLED": "true",
         "TEST_AWS_WORKSPACES_ACCOUNT_ROLE_ARN": "{aws_workspaces_account_role_arn}",
         "TEST_AWS_WORKSPACES_ACCOUNT_ACCESS_KEY_ID": "{aws_workspaces_account_access_key}",
-        "TEST_AWS_WORKSPACES_ACCOUNT_SECRET_ACCESS_KEY": "{aws_workspaces_account_secret_access_key}"
+        "TEST_AWS_WORKSPACES_ACCOUNT_SECRET_ACCESS_KEY": "{aws_workspaces_account_secret_access_key}",
 
+        // AWS Workspaces Image Resource Go Tests
+        "TEST_AWS_WORKSPACES_IMAGE_NAME": "test-aws-workspaces-image",
+        "TEST_AWS_WORKSPACES_AWS_IMAGE_ID": "{aws_image_id}",
+        "TEST_AWS_WORKSPACES_IMAGE_SESSION_SUPPORT": "SingleSession",
+        "TEST_AWS_WORKSPACES_IMAGE_OS": "WINDOWS",
+        "TEST_AWS_WORKSPACES_IMAGE_INGESTION_PROCESS": "BYOL_REGULAR_BYOP",
+
+        "TEST_AWS_WORKSPACES_IMAGE_NAME_UPDATED": "test-aws-workspaces-image-updated",
+        "TEST_AWS_WORKSPACES_AWS_IMAGE_ID_UPDATED": "{aws_image_id}",
+        "TEST_AWS_WORKSPACES_IMAGE_SESSION_SUPPORT_UPDATED": "SingleSession",
+        "TEST_AWS_WORKSPACES_IMAGE_OS_UPDATED": "WINDOWS",
+        "TEST_AWS_WORKSPACES_IMAGE_INGESTION_PROCESS_UPDATED": "BYOL_REGULAR_BYOP",
+
+        // AWS Workspaces Image Data Source Go Tests
+        "TEST_AWS_WORKSPACES_IMAGE_DATA_SOURCE_ID": "{image_guid}",
+        "TEST_AWS_WORKSPACES_IMAGE_DATA_SOURCE_NAME": "{image_name}",
+        "TEST_AWS_WORKSPACES_ACCOUNT_ID": "{account_guid}",
+        "TEST_AWS_WORKSPACES_IMAGE_EXPECTED_SESSION_SUPPORT": "SingleSession",
+
+        // AWS Workspaces Directory Connection Go Tests
+        "TEST_AWS_WORKSPACES_DIRECTORY_CONNECTION_NAME": "{AWS Workspaces Directory Connection Name}",
+        "TEST_AWS_WORKSPACES_DIRECTORY_CONNECTION_RESOURCE_LOCATION": "{AWS Workspaces Directory Connection Resource Location ID}",
+        "TEST_AWS_WORKSPACES_DIRECTORY_CONNECTION_ZONE_ID": "{AWS Workspaces Directory Connection Zone ID}",
+        "TEST_AWS_WORKSPACES_DIRECTORY_CONNECTION_DIRECTORY": "{AWS Workspaces Directory ID}",
+        "TEST_AWS_WORKSPACES_DIRECTORY_CONNECTION_SUBNET1": "{AWS Workspaces Directory Subnet 1}",
+        "TEST_AWS_WORKSPACES_DIRECTORY_CONNECTION_SUBNET2": "{AWS Workspaces Directory Subnet 2}",
+        "TEST_AWS_WORKSPACES_DIRECTORY_CONNECTION_TENANCY": "{AWS Workspaces Directory Tenancy}",
+        "TEST_AWS_WORKSPACES_DIRECTORY_CONNECTION_SECURITY_GROUP": "{AWS Workspaces Directory Security Group}",
+        "TEST_AWS_WORKSPACES_DIRECTORY_CONNECTION_DEFAULT_OU": "{AWS Workspaces Directory Default OU for VDAs}",
+
+        "TEST_AWS_WORKSPACES_DIRECTORY_CONNECTION_RESOURCE_LOCATION_UPDATED": "{Updated AWS Workspaces Directory Connection Resource Location ID}",
+        "TEST_AWS_WORKSPACES_DIRECTORY_CONNECTION_ZONE_ID_UPDATED": "{Updated AWS Workspaces Directory Connection Zone ID}",
+        "TEST_AWS_WORKSPACES_DIRECTORY_CONNECTION_DIRECTORY_UPDATED": "{Updated AWS Workspaces Directory ID}",
+        "TEST_AWS_WORKSPACES_DIRECTORY_CONNECTION_SUBNET1_UPDATED": "{Updated AWS Workspaces Directory Subnet 1}",
+        "TEST_AWS_WORKSPACES_DIRECTORY_CONNECTION_SUBNET2_UPDATED": "{Updated AWS Workspaces Directory Subnet 2}",
+        "TEST_AWS_WORKSPACES_DIRECTORY_CONNECTION_TENANCY_UPDATED": "{Updated AWS Workspaces Directory Tenancy}",
+        "TEST_AWS_WORKSPACES_DIRECTORY_CONNECTION_SECURITY_GROUP_UPDATED": "{Updated AWS Workspaces Directory Security Group}",
+        "TEST_AWS_WORKSPACES_DIRECTORY_CONNECTION_DEFAULT_OU_UPDATED": "{Updated AWS Workspaces Directory Default OU for VDAs}",
+        
+        // AWS Workspaces Directory Connection Data Source Go Tests
+        "TEST_AWS_WORKSPACES_DIRECTORY_CONNECTION_DATA_SOURCE_ID": "{directory_connection_guid}",
+        "TEST_AWS_WORKSPACES_DIRECTORY_CONNECTION_DATA_SOURCE_NAME": "{directory_connection_name}",
+        "TEST_AWS_WORKSPACES_DIRECTORY_CONNECTION_EXPECTED_TENANCY": "DEDICATED",
+        
+        // AWS Workspaces User CoupledDeployment Resource Go Tests
+        "TEST_AWS_WORKSPACES_DEPLOYMENT_NAME": "{aws_workspaces_deployment_name}",
+        "TEST_AWS_WORKSPACES_DEPLOYMENT_SESSION_IDLE_TIMEOUT": "{aws_workspaces_deployment_session_idle_timeout}",
+        "TEST_AWS_WORKSPACES_DEPLOYMENT_SESSION_IDLE_TIMEOUT_UPDATED": "{aws_workspaces_deployment_session_idle_timeout_updated}",
+        "TEST_AWS_WORKSPACES_DEPLOYMENT_USER1": "{aws_workspaces_deployment_user1}",
+        "TEST_AWS_WORKSPACES_DEPLOYMENT_USER2": "{aws_workspaces_deployment_user2}",
+
+        // Quickcreate Account Data Source Go Tests
+        "TEST_AWS_WORKSPACES_ACCOUNT_DATA_SOURCE_GUID": "{QCS aws internal account guid}",
+        "TEST_AWS_WORKSPACES_ACCOUNT_DATA_SOURCE_NAME": "{QCS aws account_name}",
+        "TEST_AWS_WORKSPACES_ACCOUNT_DATA_SOURCE_AWS_ACCOUNT_ID": "{AWS Account Id}",
+
+        // Quickcreate Deployment Data Source Go Tests
+        "TEST_AWS_WORKSPACES_DEPLOYMENT_DATA_SOURCE_GUID": "{QCS aws internal deployment guid}",
+        "TEST_AWS_WORKSPACES_DEPLOYMENT_DATA_SOURCE_NAME": "{QCS aws deployment name}",
+        "TEST_AWS_WORKSPACES_DEPLOYMENT_DATA_SOURCE_ACCOUNT_GUID": "{QCS aws internal account guid}",
+        "TEST_AWS_WORKSPACES_DEPLOYMENT_DATA_SOURCE_IMAGE_GUID": "{QCS aws image guid}",
+        "TEST_AWS_WORKSPACES_DEPLOYMENT_DATA_SOURCE_CONNECTION_GUID": "{QCS aws directory connection guid}"
     },
-    "go.testTimeout": "30m"
+    "go.testTimeout": "120m"
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
-func TestAWSWorkspacesAccountDeploymentPreCheck(t *testing.T) {
+func TestAWSWorkspacesAccountResourcePreCheck(t *testing.T) {
 	if v := os.Getenv("TEST_AWS_WORKSPACES_ACCOUNT_NAME"); v == "" {
 		t.Fatal("TEST_AWS_WORKSPACES_ACCOUNT_NAME must be set for acceptance tests")
 	}
@@ -51,13 +51,13 @@ func TestAWSWorkspacesAccountResourceWithARN(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		PreCheck: func() {
 			TestProviderPreCheck(t)
-			TestAWSWorkspacesAccountDeploymentPreCheck(t)
+			TestAWSWorkspacesAccountResourcePreCheck(t)
 		},
 		Steps: []resource.TestStep{
 
 			// Create and Read testing for QCS AWS Workspaces Account resource with Role ARN
 			{
-				Config: BuildAWSWorkspacesAccountResourceWithARN(t, testAWSWorkspacesAccountResource_withARN, accountName, region, byolFeatureEnabled, roleArn),
+				Config: BuildAWSWorkspacesAccountResourceWithARN(t),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// AWS Account with Role ARN Tests
 					resource.TestCheckResourceAttr("citrix_quickcreate_aws_workspaces_account.test_aws_workspaces_account_role_arn", "name", accountName),
@@ -77,7 +77,7 @@ func TestAWSWorkspacesAccountResourceWithARN(t *testing.T) {
 
 			// Update testing for QCS AWS Workspaces Account resource
 			{
-				Config: BuildAWSWorkspacesAccountResourceWithARN(t, testAWSWorkspacesAccountResource_withARN_updated, accountNameUpdated, region, byolFeatureEnabled, roleArn),
+				Config: BuildAWSWorkspacesAccountResourceWithARNUpdated(t),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_quickcreate_aws_workspaces_account.test_aws_workspaces_account_role_arn", "name", accountNameUpdated),
 					resource.TestCheckResourceAttr("citrix_quickcreate_aws_workspaces_account.test_aws_workspaces_account_role_arn", "aws_region", region),
@@ -100,13 +100,13 @@ func TestAWSWorkspacesAccountResourceWithAccessKey(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		PreCheck: func() {
 			TestProviderPreCheck(t)
-			TestAWSWorkspacesAccountDeploymentPreCheck(t)
+			TestAWSWorkspacesAccountResourcePreCheck(t)
 		},
 		Steps: []resource.TestStep{
 
 			// Create and Read testing for QCS AWS Workspaces Account resource with Role ARN
 			{
-				Config: BuildAWSWorkspacesAccountResourceWithAccessKey(t, testAWSWorkspacesAccountResource_withAccessKey, accountName, region, byolFeatureEnabled, accessKeyId, secretAccessKey),
+				Config: BuildAWSWorkspacesAccountResourceWithAccessKey(t),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// AWS Account with Role ARN Tests
 					resource.TestCheckResourceAttr("citrix_quickcreate_aws_workspaces_account.test_aws_workspaces_account_access_key_id", "name", accountName),
@@ -128,12 +128,32 @@ func TestAWSWorkspacesAccountResourceWithAccessKey(t *testing.T) {
 	})
 }
 
-func BuildAWSWorkspacesAccountResourceWithARN(t *testing.T, workspacesAccountResource string, accountName string, region string, byolFeatureEnabled string, roleArn string) string {
-	return fmt.Sprintf(workspacesAccountResource, accountName, region, byolFeatureEnabled, roleArn)
+func BuildAWSWorkspacesAccountResourceWithARN(t *testing.T) string {
+	accountName := os.Getenv("TEST_AWS_WORKSPACES_ACCOUNT_NAME") + "-role-arn"
+	region := os.Getenv("TEST_AWS_WORKSPACES_ACCOUNT_REGION")
+	byolFeatureEnabled := os.Getenv("TEST_AWS_WORKSPACES_ACCOUNT_BYOL_FEATURE_ENABLED")
+	roleArn := os.Getenv("TEST_AWS_WORKSPACES_ACCOUNT_ROLE_ARN")
+
+	return fmt.Sprintf(testAWSWorkspacesAccountResource_withARN, accountName, region, byolFeatureEnabled, roleArn)
 }
 
-func BuildAWSWorkspacesAccountResourceWithAccessKey(t *testing.T, workspacesAccountResource string, accountName string, region string, byolFeatureEnabled string, accessKeyId string, secretAccessKey string) string {
-	return fmt.Sprintf(workspacesAccountResource, accountName, region, byolFeatureEnabled, accessKeyId, secretAccessKey)
+func BuildAWSWorkspacesAccountResourceWithARNUpdated(t *testing.T) string {
+	accountNameUpdated := os.Getenv("TEST_AWS_WORKSPACES_ACCOUNT_NAME_UPDATED") + "-role-arn"
+	region := os.Getenv("TEST_AWS_WORKSPACES_ACCOUNT_REGION")
+	byolFeatureEnabled := os.Getenv("TEST_AWS_WORKSPACES_ACCOUNT_BYOL_FEATURE_ENABLED")
+	roleArn := os.Getenv("TEST_AWS_WORKSPACES_ACCOUNT_ROLE_ARN")
+
+	return fmt.Sprintf(testAWSWorkspacesAccountResource_withARN_updated, accountNameUpdated, region, byolFeatureEnabled, roleArn)
+}
+
+func BuildAWSWorkspacesAccountResourceWithAccessKey(t *testing.T) string {
+	accountName := os.Getenv("TEST_AWS_WORKSPACES_ACCOUNT_NAME") + "-access-key"
+	region := os.Getenv("TEST_AWS_WORKSPACES_ACCOUNT_REGION")
+	byolFeatureEnabled := os.Getenv("TEST_AWS_WORKSPACES_ACCOUNT_BYOL_FEATURE_ENABLED")
+	accessKeyId := os.Getenv("TEST_AWS_WORKSPACES_ACCOUNT_ACCESS_KEY_ID")
+	secretAccessKey := os.Getenv("TEST_AWS_WORKSPACES_ACCOUNT_SECRET_ACCESS_KEY")
+
+	return fmt.Sprintf(testAWSWorkspacesAccountResource_withAccessKey, accountName, region, byolFeatureEnabled, accessKeyId, secretAccessKey)
 }
 
 var (

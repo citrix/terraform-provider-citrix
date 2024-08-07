@@ -15,17 +15,25 @@ resource "citrix_stf_user_farm_mapping" "example-stf-user-farm-mapping" {
         {
             name = "EU1",
             aggregation_group_name = "EU1Users"
-            primary_farms = ["Primary"]
-            backup_farms = ["Backup"]
+            primary_farms = [ citrix_stf_store_farm.example-primary-store-farm.farm_name ]
+            backup_farms = [ citrix_stf_store_farm.example-backup-store-farm.farm_name ]
             load_balance_mode = "LoadBalanced"
             farms_are_identical = true
         },
         {
             name = "EU2",
             aggregation_group_name = "EU2Users"
-            primary_farms = ["Secondary"]
+            primary_farms = [ citrix_stf_store_farm.example-secondary-store-farm.farm_name ]
             load_balance_mode = "Failover"
             farms_are_identical = false
         }
+    ]
+
+    // Add depends_on attribute to ensure the User Farm Mapping is created after the Store Service and Store Farms
+    depends_on = [
+        citrix_stf_store_service.example-stf-store-service,
+        citrix_stf_store_farm.example-primary-store-farm,
+        citrix_stf_store_farm.example-secondary-store-farm,
+        citrix_stf_store_farm.example-backup-store-farm
     ]
 }

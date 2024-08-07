@@ -21,8 +21,8 @@ description: |-
 {{ else }}
 {{ .Description | trimspace }}
 {{- end }}
-
 ## Zone For Citrix Cloud Customers
+
 - For Citrix Cloud customers, Zones and Cloud Connectors are managed only by Citrix Cloud. Ensure you have a resource location created either manually or using [`citrix_cloud_resource_location`](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/cloud_resource_location) in terraform. For more information regarding Citrix Cloud Resource Location [click here](https://docs.citrix.com/en-us/citrix-cloud/citrix-cloud-resource-locations/resource-locations.html).
 - Use `resource_location_id` instead of `name` to create a cloud zone resource via Terraform.
 - If the zone from the resource location specified in `resource_location_id` has description, please make sure that the `description` field matches the description of the existing zone.

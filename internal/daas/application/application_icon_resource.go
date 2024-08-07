@@ -125,9 +125,9 @@ func (r *applicationIconResource) Read(ctx context.Context, req resource.ReadReq
 
 }
 
-func (r *applicationIconResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *applicationIconResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
 	resp.Diagnostics.AddError("Unsupported Operation", "Update is not supported for this resource")
-	return
 }
 
 func (r *applicationIconResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

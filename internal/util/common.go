@@ -16,8 +16,10 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"github.com/citrix/citrix-daas-rest-go/citrixquickcreate"
 	citrixstorefrontclient "github.com/citrix/citrix-daas-rest-go/citrixstorefront/apis"
 	citrixstorefront "github.com/citrix/citrix-daas-rest-go/citrixstorefront/models"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -43,16 +45,25 @@ const AwsAccessKeyIdRegex string = `^[\w]+$`
 // Aws Region Regex
 const AwsRegionRegex string = `^[a-zA-Z0-9\-]+$`
 
+// Aws Security Group ID Regex
+const AwsSecurityGroupId = `^sg-[a-zA-Z0-9]+$`
+
+// Aws Directory ID Regex
+const AwsDirectoryId = `^d-[a-zA-Z0-9]+$`
+
+// Aws Directory ID Regex
+const AwsSubnetIdFormat = `^subnet-[a-zA-Z0-9]+$`
+
 // Domain FQDN
 const DomainFqdnRegex string = `^(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}$`
 
 // SAM
-const SamRegex string = `^[a-zA-Z][a-zA-Z0-9\- ]{0,61}[a-zA-Z0-9]\\\w[\w\.\- ]+$`
+const SamRegex string = `^[a-zA-Z][a-zA-Z0-9\-_]{0,61}[a-zA-Z0-9]\\\w[\w\.\- ]+$`
 
 // UPN
 const UpnRegex string = `^[^@]+@\b(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}$`
 
-const SamAndUpnRegex string = `^[a-zA-Z][a-zA-Z0-9\- ]{0,61}[a-zA-Z0-9]\\\w[\w\.\- ]+$|^[^@]+@\b(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}$`
+const SamAndUpnRegex string = `^[a-zA-Z][a-zA-Z0-9\-_]{0,61}[a-zA-Z0-9]\\\w[\w\.\- ]+$|^[^@]+@\b(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}$`
 
 // GUID
 const GuidRegex string = `^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}[}]?$`
@@ -90,6 +101,17 @@ const AwsEc2InstanceTypeRegex string = `^[a-z0-9]{1,15}\.[a-z0-9]{1,15}$`
 // Active Directory Sid
 const ActiveDirectorySidRegex string = `^S-1-[0-59]-\d{2}-\d{8,10}-\d{8,10}-\d{8,10}-[1-9]\d{3}$`
 
+// AWS Machine Image ID REGEX
+const AwsAmiRegex string = `^ami-[0-9a-f]{8,17}$`
+
+// AWS Workspace Image ID REGEX
+const AwsWsiRegex string = `^wsi-[0-9a-z]{9,63}$`
+
+const AwsAmiAndWsiRegex string = `^ami-[0-9a-f]{8,17}$|^wsi-[0-9a-z]{9,63}$`
+
+// OU Path
+const OuPathFormat string = `^OU=.+,DC=.+$`
+
 // NOT_EXIST error code
 const NOT_EXIST string = "NOT_EXIST"
 
@@ -98,6 +120,15 @@ const AllScopeId string = "00000000-0000-0000-0000-000000000000"
 
 // ID of the Citrix Managed Users Scope
 const CtxManagedScopeId string = "f71a1148-7030-467a-a6d3-4a6bcf6a6532"
+
+// ID of the Citrix Managed Users Scope
+const UsernameForDecoupledWorkspaces string = "[UNDEFINED]"
+
+// Default QuickCreateService AWS Workspaces Scale Settings
+const DefaultQcsAwsWorkspacesSessionIdleTimeoutMinutes int64 = 15
+const DefaultQcsAwsWorkspacesOffPeakDisconnectTimeoutMinutes int64 = 15
+const DefaultQcsAwsWorkspacesOffPeakLogOffTimeoutMinutes int64 = 5
+const DefaultQcsAwsWorkspacesOffPeakBufferSizePercent int64 = 0
 
 // Resource Types
 const ImageVersionResourceType string = "ImageVersion"
@@ -246,6 +277,26 @@ func ReadClientError(err error) string {
 			return err.Error()
 		}
 		return msgObj.GetErrorMessage()
+	}
+
+	return err.Error()
+}
+
+func ReadQcsClientError(err error) string {
+	genericOpenApiError, ok := err.(*citrixquickcreate.GenericOpenAPIError)
+	if !ok {
+		return err.Error()
+	}
+	msg := genericOpenApiError.Body()
+	if msg != nil {
+		var msgObj citrixquickcreate.ErrorResponse
+		unmarshalError := json.Unmarshal(msg, &msgObj)
+		if unmarshalError != nil {
+			return err.Error()
+		}
+		if msgObj.Detail.IsSet() {
+			return msgObj.GetDetail()
+		}
 	}
 
 	return err.Error()
@@ -467,6 +518,27 @@ func ProcessAsyncJobResponse(ctx context.Context, client *citrixdaasclient.Citri
 	return nil
 }
 
+func WaitForQcsDeploymentTaskWithDiags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, maxWaitTimeInSeconds int, taskId string, taskName, deploymentName string, errorContext string) error {
+	task, httpResp, err := PollQcsTask(ctx, client, diagnostics, taskId, 10, maxWaitTimeInSeconds)
+	if err != nil {
+		diagnostics.AddError(
+			fmt.Sprintf("Error %s AWS Workspaces Deployment: %s", errorContext, deploymentName),
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+ReadClientError(err),
+		)
+		return err
+	}
+	if task.DeploymentTask.GetTaskState() != citrixquickcreate.TASKSTATE_COMPLETED {
+		diagnostics.AddError(
+			fmt.Sprintf("Error %s AWS Workspaces Deployment: %s", errorContext, deploymentName),
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				fmt.Sprintf("\nError message: %s was not completed. It has state: %s", taskName, TaskStateEnumToString(task.DeploymentTask.GetTaskState())),
+		)
+		return err
+	}
+	return nil
+}
+
 // Represents a list item which supports being refreshed from a client model
 type RefreshableListItemWithAttributes[clientType any] interface {
 	// Gets the key to compare the item with the client model
@@ -506,6 +578,10 @@ func GetSTFGroupMemberKey(remote citrixstorefront.STFGroupMemberResponseModel) s
 
 func GetSTFFarmSetKey(remote citrixstorefront.STFFarmSetResponseModel) string {
 	return *remote.Name.Get()
+}
+
+func GetQcsAwsWorkspacesWithUsernameKey(remote citrixquickcreate.AwsEdcDeploymentMachine) string {
+	return remote.GetUsername()
 }
 
 // <summary>
@@ -669,28 +745,48 @@ func GetAllowedFunctionalLevelValues() []string {
 // <summary>
 // Helper function to check the version requirement for DDC.
 // </summary>
-func CheckProductVersion(client *citrixdaasclient.CitrixDaasClient, requiredOrchestrationApiVersion int32, requiredProductMajorVersion int, requiredProductMinorVersion int) (bool, error) {
+func CheckProductVersion(client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, requiredOrchestrationApiVersion int32, requiredProductMajorVersion int, requiredProductMinorVersion int, errorSummary, feature string) bool {
 	// Validate DDC version
 	if client.AuthConfig.OnPremises {
-		productMajorVersion, productMinorVersion, err := GetProductMajorAndMinorVersion(client)
+		productVersionSplit := strings.Split(client.ClientConfig.ProductVersion, ".")
+		productMajorVersion, err := strconv.Atoi(productVersionSplit[0])
 		if err != nil {
-			return false, err
+			diagnostics.AddError(
+				errorSummary,
+				"Error parsing product major version. Error: "+err.Error(),
+			)
+			return false
+		}
+
+		productMinorVersion, err := strconv.Atoi(productVersionSplit[1])
+		if err != nil {
+			diagnostics.AddError(
+				errorSummary,
+				"Error parsing product minor version. Error: "+err.Error(),
+			)
+			return false
 		}
 
 		if productMajorVersion < requiredProductMajorVersion ||
 			(productMajorVersion == requiredProductMajorVersion && productMinorVersion < requiredProductMinorVersion) {
-			return false, nil
+			diagnostics.AddError(
+				errorSummary,
+				fmt.Sprintf("%s is not supported for current DDC version %d.%d. Please upgrade your DDC product version to %d.%d or above.", feature, productMajorVersion, productMinorVersion, requiredProductMajorVersion, requiredProductMinorVersion),
+			)
+			return false
 		}
-
-		return true, nil
 	}
 
 	// Validate Orchestration version
 	if client.ClientConfig.OrchestrationApiVersion < requiredOrchestrationApiVersion {
-		return false, nil
+		diagnostics.AddError(
+			errorSummary,
+			fmt.Sprintf("%s is not supported for current DDC version %d. Please upgrade your DDC product version to %d or above.", feature, client.ClientConfig.OrchestrationApiVersion, requiredOrchestrationApiVersion),
+		)
+		return false
 	}
 
-	return true, nil
+	return true
 }
 
 func GetProductMajorAndMinorVersion(client *citrixdaasclient.CitrixDaasClient) (int, int, error) {
@@ -1079,4 +1175,59 @@ func CheckIfFieldIsSensitive(ctx context.Context, diags *diag.Diagnostics, attri
 	}
 	diags.AddWarning("Invalid Attribute Type", "Attribute type not supported: "+reflect.TypeOf(attribute).String())
 	return nil, false
+}
+
+// <summary>
+// Helper function to poll the task until either the task completed or error out or timed out.
+// </summary>
+func PollQcsTask(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, taskId string, pollIntervalSeconds int, maxWaitTimeSeconds int) (*citrixquickcreate.GetTaskAsync200Response, *http.Response, error) {
+	if pollIntervalSeconds == 0 {
+		// Default to 10 seconds
+		pollIntervalSeconds = 10
+	}
+	if maxWaitTimeSeconds == 0 {
+		// Default to 5 minutes
+		maxWaitTimeSeconds = 300
+	}
+
+	startTime := time.Now()
+	getTaskRequest := client.QuickCreateClient.TasksQCS.GetTaskAsync(ctx, client.ClientConfig.CustomerId, taskId)
+
+	var taskResponse *citrixquickcreate.GetTaskAsync200Response
+	var httpResp *http.Response
+	var err error
+
+	for {
+		if time.Since(startTime) > time.Second*time.Duration(maxWaitTimeSeconds) {
+			break
+		}
+
+		taskResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickcreate.GetTaskAsync200Response](getTaskRequest, client)
+		if err != nil {
+			diagnostics.AddError(
+				"Error polling task: "+taskId,
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+ReadQcsClientError(err),
+			)
+			return nil, httpResp, err
+		} else if taskResponse != nil &&
+			(taskResponse.ResourceConnectionTask.GetTaskState() == citrixquickcreate.TASKSTATE_ERROR ||
+				taskResponse.DeploymentTask.GetTaskState() == citrixquickcreate.TASKSTATE_ERROR) {
+			diagnostics.AddError(
+				"Task failed: "+taskId,
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+ReadQcsClientError(err),
+			)
+			return nil, httpResp, err
+		} else if taskResponse != nil &&
+			(taskResponse.ResourceConnectionTask.GetTaskState() == citrixquickcreate.TASKSTATE_COMPLETED ||
+				taskResponse.DeploymentTask.GetTaskState() == citrixquickcreate.TASKSTATE_COMPLETED) {
+			return taskResponse, httpResp, nil
+		}
+
+		time.Sleep(time.Second * time.Duration(pollIntervalSeconds))
+		continue
+	}
+
+	return taskResponse, httpResp, err
 }

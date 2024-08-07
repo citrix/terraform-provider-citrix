@@ -491,9 +491,6 @@ func (SCVMMMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 			"memory_mb": schema.Int64Attribute{
 				Description: "The maximum amount of memory that virtual machines created from the provisioning scheme should use.",
 				Required:    true,
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
-				},
 			},
 			"use_full_disk_clone_provisioning": schema.BoolAttribute{
 				Description: "Specify if virtual machines created from the provisioning scheme should be created using the dedicated full disk clone feature. Default is `false`.",

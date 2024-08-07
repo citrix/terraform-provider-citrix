@@ -18,7 +18,7 @@ type DeliveryGroupDataSourceModel struct {
 
 func (DeliveryGroupDataSourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Read data of an existing delivery group.",
+		Description: "CVAD --- Read data of an existing delivery group.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the delivery group.",
@@ -41,7 +41,7 @@ func (r DeliveryGroupDataSourceModel) RefreshPropertyValues(deliveryGroup *citri
 	r.Id = types.StringValue(deliveryGroup.GetId())
 	r.Name = types.StringValue(deliveryGroup.GetName())
 
-	var res []vda.VdaModel
+	res := []vda.VdaModel{}
 	for _, model := range vdas.GetItems() {
 		machineName := model.GetName()
 		hosting := model.GetHosting()

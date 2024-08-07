@@ -34,5 +34,5 @@ azure_vnet_resource_group = "<VNet resource group name>"
 azure_vnet = "<VNet name>"
 azure_subnets = ["<Subnet name>"]
 
-# zones.tf variables
-zone_name = "example-azure-zone"
+# resource_location.tf variables
+resource_locaiton_name = "example-resource-location"

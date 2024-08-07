@@ -290,7 +290,7 @@ func TypedArrayToObjectList[objTyp ModelWithAttributes](ctx context.Context, dia
 // </summary>
 // <param name="ctx">context</param>
 // <param name="diagnostics">Any issues will be appended to these diagnostics</param>
-// <param name="v">List of object in the native terraform types.List wrapper</param>
+// <param name="v">Set of object in the native terraform types.Set wrapper</param>
 // <returns>Array of the specified type</returns>
 func ObjectSetToTypedArray[objTyp any](ctx context.Context, diagnostics *diag.Diagnostics, v types.Set) []objTyp {
 	res := make([]types.Object, 0, len(v.Elements()))
@@ -319,7 +319,7 @@ func ObjectSetToTypedArray[objTyp any](ctx context.Context, diagnostics *diag.Di
 // </summary>
 // <param name="diagnostics">Any issues will be appended to these diagnostics</param>
 // <param name="v">Slice of objects</param>
-// <returns>types.List</returns>
+// <returns>types.Set</returns>
 func TypedArrayToObjectSet[objTyp ModelWithAttributes](ctx context.Context, diagnostics *diag.Diagnostics, v []objTyp) types.Set {
 	var t objTyp
 	attributesMap, err := AttributeMapFromObject(t)

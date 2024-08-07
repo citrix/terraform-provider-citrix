@@ -26,7 +26,7 @@ func TestAdminUserResource(t *testing.T) {
 		// Tests being run in cloud env
 		isOnPremises = false
 	}
-	zoneName := os.Getenv("TEST_ZONE_NAME_AZURE")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_AZURE")
 	userName := os.Getenv("TEST_ADMIN_USER_NAME")
 	userDomainName := os.Getenv("TEST_ADMIN_USER_DOMAIN")
 	roleName := os.Getenv("TEST_ROLE_NAME")
@@ -56,7 +56,7 @@ func TestAdminUserResource(t *testing.T) {
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the admin user
@@ -91,7 +91,7 @@ func TestAdminUserResource(t *testing.T) {
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the admin user

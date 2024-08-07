@@ -3,28 +3,32 @@
 page_title: "Citrix Provider"
 subcategory: ""
 description: |-
-  Manage and deploy Citrix resources easily using the Citrix Terraform provider. The provider currently supports both Citrix Virtual Apps & Desktops(CVAD) and Citrix Desktop as a Service (DaaS) solutions. You can automate creation of site setup including host connections, machine catalogs and delivery groups etc for both CVAD and Citrix DaaS. You can deploy resources in Citrix supported hypervisors and public clouds. Currently, we support deployments in Nutanix, VMware vSphere, XenServer, Microsoft Azure, AWS EC2 and Google Cloud Compute. Additionally, you can also use Manual provisioning or RemotePC to add workloads. The provider is developed and maintained by Citrix. Please note that this provider is still in Tech Preview.
+  Manage and deploy Citrix resources easily using the Citrix Terraform provider. The provider currently supports both Citrix Virtual Apps & Desktops(CVAD) and Citrix Desktop as a Service (DaaS) solutions. You can automate creation of site setup including host connections, machine catalogs and delivery groups etc for both CVAD and Citrix DaaS. You can deploy resources in Citrix supported hypervisors and public clouds. Currently, we support deployments in Nutanix, VMware vSphere, XenServer, Microsoft Azure, AWS EC2 and Google Cloud Compute. Additionally, you can also use Manual provisioning or RemotePC to add workloads. The provider is developed and maintained by Citrix.
 ---
 
 # Citrix Provider
 
-Manage and deploy Citrix resources easily using the Citrix Terraform provider. The provider currently supports both Citrix Virtual Apps & Desktops(CVAD) and Citrix Desktop as a Service (DaaS) solutions. You can automate creation of site setup including host connections, machine catalogs and delivery groups etc for both CVAD and Citrix DaaS. You can deploy resources in Citrix supported hypervisors and public clouds. Currently, we support deployments in Nutanix, VMware vSphere, XenServer, Microsoft Azure, AWS EC2 and Google Cloud Compute. Additionally, you can also use Manual provisioning or RemotePC to add workloads. The provider is developed and maintained by Citrix. Please note that this provider is still in **Tech Preview**.
+Manage and deploy Citrix resources easily using the Citrix Terraform provider. The provider currently supports both Citrix Virtual Apps & Desktops(CVAD) and Citrix Desktop as a Service (DaaS) solutions. You can automate creation of site setup including host connections, machine catalogs and delivery groups etc for both CVAD and Citrix DaaS. You can deploy resources in Citrix supported hypervisors and public clouds. Currently, we support deployments in Nutanix, VMware vSphere, XenServer, Microsoft Azure, AWS EC2 and Google Cloud Compute. Additionally, you can also use Manual provisioning or RemotePC to add workloads. The provider is developed and maintained by Citrix.
 
 ## Example Usage
 
 ```terraform
 # Cloud Provider
 provider "citrix" {
-    customer_id   = ""
-    client_id     = ""
-    # secret can be specified via the CITRIX_CLIENT_SECRET environment variable
+    cvad_config = {
+      customer_id   = ""
+      client_id     = ""
+      # secret can be specified via the CITRIX_CLIENT_SECRET environment variable
+    }
 }
 
 # On-Premises Provider
 provider "citrix" {
+    cvad_config = {
       hostname      = "10.0.0.6"
       client_id     = "foo.local\\admin"
       # secret can be specified via the CITRIX_CLIENT_SECRET environment variable
+    }
 }
 
 # Storefront Provider
@@ -43,13 +47,21 @@ provider "citrix" {
 
 ### Optional
 
+- `cvad_config` (Attributes) Configuration for CVAD service. (see [below for nested schema](#nestedatt--cvad_config))
+- `storefront_remote_host` (Attributes) StoreFront Remote Host for Citrix DaaS service. <br />Only applicable for Citrix on-premises StoreFront. Use this to specify StoreFront Remote Host. <br /> (see [below for nested schema](#nestedatt--storefront_remote_host))
+
+<a id="nestedatt--cvad_config"></a>
+### Nested Schema for `cvad_config`
+
+Optional:
+
 - `client_id` (String) Client Id for Citrix DaaS service authentication. <br />For Citrix On-Premises customers: Use this to specify a DDC administrator username. <br />For Citrix Cloud customers: Use this to specify Cloud API Key Client Id.<br />Can be set via Environment Variable **CITRIX_CLIENT_ID**.
 - `client_secret` (String, Sensitive) Client Secret for Citrix DaaS service authentication. <br />For Citrix on-premises customers: Use this to specify a DDC administrator password. <br />For Citrix Cloud customers: Use this to specify Cloud API Key Client Secret.<br />Can be set via Environment Variable **CITRIX_CLIENT_SECRET**.
 - `customer_id` (String) Citrix Cloud customer ID. Only applicable for Citrix Cloud customers.<br />Can be set via Environment Variable **CITRIX_CUSTOMER_ID**.
 - `disable_ssl_verification` (Boolean) Disable SSL verification against the target DDC. <br />Only applicable to on-premises customers. Citrix Cloud customers should omit this option. Set to true to skip SSL verification only when the target DDC does not have a valid SSL certificate issued by a trusted CA. <br />When set to true, please make sure that your provider config is set for a known DDC hostname. <br />[It is recommended to configure a valid certificate for the target DDC](https://docs.citrix.com/en-us/citrix-virtual-apps-desktops/install-configure/install-core/secure-web-studio-deployment) <br />Can be set via Environment Variable **CITRIX_DISABLE_SSL_VERIFICATION**.
 - `environment` (String) Citrix Cloud environment of the customer. Only applicable for Citrix Cloud customers. Available options: `Production`, `Staging`, `Japan`, `JapanStaging`, `Gov`, `GovStaging`. <br />Can be set via Environment Variable **CITRIX_ENVIRONMENT**.
 - `hostname` (String) Host name / base URL of Citrix DaaS service. <br />For Citrix on-premises customers (Required): Use this to specify Delivery Controller hostname. <br />For Citrix Cloud customers (Optional): Use this to force override the Citrix DaaS service hostname.<br />Can be set via Environment Variable **CITRIX_HOSTNAME**.
-- `storefront_remote_host` (Attributes) StoreFront Remote Host for Citrix DaaS service. <br />Only applicable for Citrix on-premises StoreFront. Use this to specify StoreFront Remote Host. <br /> (see [below for nested schema](#nestedatt--storefront_remote_host))
+
 
 <a id="nestedatt--storefront_remote_host"></a>
 ### Nested Schema for `storefront_remote_host`

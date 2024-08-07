@@ -8,14 +8,14 @@
         "CITRIX_DISABLE_SSL_VERIFICATION": "true",
 
         // Zone Go Tests
-        "TEST_ZONE_NAME": "zone-name", // for zone tests
+        "TEST_ZONE_INPUT": "zone-name", // for zone tests
 
-        // "TEST_ZONE_NAME_AZURE" :"test-zone", // Use the appropriate zone based on hypervisor for hypervisor and other tests
-        // "TEST_ZONE_NAME_GCP": "test-zone", 
-        // "TEST_ZONE_NAME_VSPHERE": "test-zone",
-        // "TEST_ZONE_NAME_XENSERVER": "test-zone",
-        // "TEST_ZONE_NAME_NUTANIX": "test-zone",
-        // "TEST_ZONE_NAME_SCVMM": "test-zone",
+        // "TEST_ZONE_INPUT_AZURE" :"test-zone", // Use the appropriate zone based on hypervisor for hypervisor and other tests
+        // "TEST_ZONE_INPUT_GCP": "test-zone", 
+        // "TEST_ZONE_INPUT_VSPHERE": "test-zone",
+        // "TEST_ZONE_INPUT_XENSERVER": "test-zone",
+        // "TEST_ZONE_INPUT_NUTANIX": "test-zone",
+        // "TEST_ZONE_INPUT_SCVMM": "test-zone",
         "TEST_ZONE_DESCRIPTION" :"test zone description",
         
         // Hypervisor Go Tests - Azure
@@ -58,7 +58,7 @@
         "TEST_HYPERV_ADDRESS_SCVMM" : "{scvmm_server_address}",
 
         // Hypervisor Go Tests - AWS EC2
-        "TEST_ZONE_NAME_AWS_EC2": "{aws_ec2_hypervisor_zone_name}",
+        "TEST_ZONE_INPUT_AWS_EC2": "{aws_ec2_hypervisor_zone_name}",
         "TEST_HYPERV_NAME_AWS_EC2": "{aws_ec2_hypervisor_name}",
         "TEST_HYPERV_API_KEY_AWS_EC2": "{aws_ec2_hypervisor_api_key}",
         "TEST_HYPERV_SECRET_KEY_AWS_EC2": "{aws_ec2_hypervisor_secret_key}",

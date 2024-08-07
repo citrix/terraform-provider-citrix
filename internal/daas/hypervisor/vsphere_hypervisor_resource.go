@@ -169,10 +169,10 @@ func (r *vsphereHypervisorResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
-	// Get refreshed hypervisor properties from Orchestration
-	hypervisorId := plan.Id.ValueString()
-	hypervisor, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, hypervisorId)
-	if err != nil {
+	var state VsphereHypervisorResourceModel
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
@@ -205,7 +205,7 @@ func (r *vsphereHypervisorResource) Update(ctx context.Context, req resource.Upd
 	}
 
 	// Patch hypervisor
-	updatedHypervisor, err := UpdateHypervisor(ctx, r.client, &resp.Diagnostics, hypervisor, editHypervisorRequestBody)
+	updatedHypervisor, err := UpdateHypervisor(ctx, r.client, &resp.Diagnostics, editHypervisorRequestBody, state.Id.ValueString(), state.Name.ValueString())
 	if err != nil {
 		return
 	}

@@ -73,26 +73,26 @@ func CreateHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
-func UpdateHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel, editHypervisorRequestBody citrixorchestration.EditHypervisorConnectionRequestModel) (*citrixorchestration.HypervisorDetailResponseModel, error) {
+func UpdateHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, editHypervisorRequestBody citrixorchestration.EditHypervisorConnectionRequestModel, hypervisorId, hypervisorName string) (*citrixorchestration.HypervisorDetailResponseModel, error) {
 	// Patch hypervisor
-	patchHypervisorRequest := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsPatchHypervisor(ctx, hypervisor.GetId())
+	patchHypervisorRequest := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsPatchHypervisor(ctx, hypervisorId)
 	patchHypervisorRequest = patchHypervisorRequest.EditHypervisorConnectionRequestModel(editHypervisorRequestBody).Async(true)
 	httpResp, err := citrixdaasclient.AddRequestData(patchHypervisorRequest, client).Execute()
 	if err != nil {
 		diagnostics.AddError(
-			"Error updating Hypervisor "+hypervisor.GetName(),
+			"Error updating Hypervisor "+hypervisorName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating Hypervisor "+hypervisor.GetName(), diagnostics, 10, true)
+	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating Hypervisor "+hypervisorName, diagnostics, 10, true)
 	if err != nil {
 		return nil, err
 	}
 
 	// Fetch updated hypervisor from GetHypervisor
-	updatedHypervisor, err := util.GetHypervisor(ctx, client, diagnostics, hypervisor.GetId())
+	updatedHypervisor, err := util.GetHypervisor(ctx, client, diagnostics, hypervisorId)
 	if err != nil {
 		return nil, err
 	}

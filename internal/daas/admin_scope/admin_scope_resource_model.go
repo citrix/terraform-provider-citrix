@@ -35,7 +35,7 @@ func (r AdminScopeResourceModel) RefreshPropertyValues(ctx context.Context, diag
 func (AdminScopeResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		// This description is used by the documentation generator and the language server.
-		Description: "Manages an administrator scope.",
+		Description: "CVAD --- Manages an administrator scope.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "ID of the admin scope.",

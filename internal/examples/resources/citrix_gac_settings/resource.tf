@@ -1,4 +1,3 @@
-// Currently, only settings objects with value type of integer, boolean, strings and list of strings is supported.
 resource "citrix_gac_settings" "test_settings_configuration" {
     service_url = "https://<your_service_url>:443"
     name = "test-settings"

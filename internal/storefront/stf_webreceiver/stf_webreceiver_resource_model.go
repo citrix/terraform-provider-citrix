@@ -14,7 +14,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
@@ -649,67 +648,6 @@ type STFWebReceiverResourceModel struct {
 	WebReceiverSiteStyle    types.Object `tfsdk:"web_receiver_site_style"`   // WebReceiverSiteStyle
 }
 
-// Schema defines the schema for the resource.
-func (r *stfWebReceiverResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "StoreFront WebReceiver.",
-		Attributes: map[string]schema.Attribute{
-			"site_id": schema.StringAttribute{
-				Description: "The IIS site id of the StoreFront WebReceiver. Defaults to 1.",
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString("1"),
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"virtual_path": schema.StringAttribute{
-				Description: "The IIS VirtualPath at which the WebReceiver will be configured to be accessed by Receivers.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-			},
-			"friendly_name": schema.StringAttribute{
-				Description: "The friendly name of the WebReceiver",
-				Optional:    true,
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"store_virtual_path": schema.StringAttribute{
-				Description: "The Virtual Path of the StoreFront Store Service linked to the WebReceiver.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-			},
-			"authentication_methods": schema.SetAttribute{
-				ElementType: types.StringType,
-				Description: "The authentication methods supported by the WebReceiver.",
-				Optional:    true,
-				Computed:    true,
-				Default:     setdefault.StaticValue(types.SetNull(types.StringType)),
-			},
-			"plugin_assistant":          PluginAssistant{}.GetSchema(),
-			"application_shortcuts":     ApplicationShortcuts{}.GetSchema(),
-			"communication":             Communication{}.GetSchema(),
-			"strict_transport_security": StrictTransportSecurity{}.GetSchema(),
-			"authentication_manager":    AuthenticationManager{}.GetSchema(),
-			"user_interface":            UserInterface{}.GetSchema(),
-			"resources_service":         ResourcesService{}.GetSchema(),
-			"web_receiver_site_style":   WebReceiverSiteStyle{}.GetSchema(),
-		},
-	}
-}
-
 type ResourcesService struct {
 	PersistentIconCacheEnabled types.Bool  `tfsdk:"persistent_icon_cache_enabled"`
 	IcaFileCacheExpiry         types.Int64 `tfsdk:"ica_file_cache_expiry"`
@@ -1041,4 +979,68 @@ func (r *STFWebReceiverResourceModel) RefreshUserInterface(ctx context.Context, 
 	refreshedUserInterfaceObject := util.TypedObjectToObjectValue(ctx, diagnostics, refreshedUserInterface)
 
 	return refreshedUserInterfaceObject
+}
+
+func (STFWebReceiverResourceModel) GetSchema() schema.Schema {
+	return schema.Schema{
+		Description: "StoreFront --- StoreFront WebReceiver.",
+		Attributes: map[string]schema.Attribute{
+			"site_id": schema.StringAttribute{
+				Description: "The IIS site id of the StoreFront WebReceiver. Defaults to 1.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("1"),
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"virtual_path": schema.StringAttribute{
+				Description: "The IIS VirtualPath at which the WebReceiver will be configured to be accessed by Receivers.",
+				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"friendly_name": schema.StringAttribute{
+				Description: "The friendly name of the WebReceiver",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"store_virtual_path": schema.StringAttribute{
+				Description: "The Virtual Path of the StoreFront Store Service linked to the WebReceiver.",
+				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"authentication_methods": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "The authentication methods supported by the WebReceiver.",
+				Optional:    true,
+				Computed:    true,
+				Default:     setdefault.StaticValue(types.SetNull(types.StringType)),
+			},
+			"plugin_assistant":          PluginAssistant{}.GetSchema(),
+			"application_shortcuts":     ApplicationShortcuts{}.GetSchema(),
+			"communication":             Communication{}.GetSchema(),
+			"strict_transport_security": StrictTransportSecurity{}.GetSchema(),
+			"authentication_manager":    AuthenticationManager{}.GetSchema(),
+			"user_interface":            UserInterface{}.GetSchema(),
+			"resources_service":         ResourcesService{}.GetSchema(),
+			"web_receiver_site_style":   WebReceiverSiteStyle{}.GetSchema(),
+		},
+	}
+}
+
+func (STFWebReceiverResourceModel) GetAttributes() map[string]schema.Attribute {
+	return STFWebReceiverResourceModel{}.GetSchema().Attributes
 }
