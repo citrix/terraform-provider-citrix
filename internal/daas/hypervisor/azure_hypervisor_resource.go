@@ -173,17 +173,11 @@ func (r *azureHypervisorResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
-	// Get refreshed hypervisor properties from Orchestration
-	hypervisorId := plan.Id.ValueString()
-	hypervisor, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, hypervisorId)
-	if err != nil {
-		return
-	}
-	if hypervisor.GetConnectionType() != citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM {
-		resp.Diagnostics.AddError(
-			"Error updating Hypervisor",
-			"Hypervisor "+hypervisor.GetName()+" is not an Azure connection type hypervisor.",
-		)
+	// Retrieve values from state
+	var state AzureHypervisorResourceModel
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
@@ -197,6 +191,13 @@ func (r *azureHypervisorResource) Update(ctx context.Context, req resource.Updat
 	editHypervisorRequestBody.SetMetadata(metadata)
 	if !plan.Scopes.IsNull() {
 		editHypervisorRequestBody.SetScopes(util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes))
+	}
+
+	// Get refreshed hypervisor properties from Orchestration
+	hypervisorId := plan.Id.ValueString()
+	hypervisor, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, hypervisorId)
+	if err != nil {
+		return
 	}
 
 	// Modify custom properties
@@ -224,7 +225,7 @@ func (r *azureHypervisorResource) Update(ctx context.Context, req resource.Updat
 	editHypervisorRequestBody.SetCustomProperties(string(customPropertiesByte))
 
 	// Fetch updated hypervisor from GetHypervisor
-	updatedHypervisor, err := UpdateHypervisor(ctx, r.client, &resp.Diagnostics, hypervisor, editHypervisorRequestBody)
+	updatedHypervisor, err := UpdateHypervisor(ctx, r.client, &resp.Diagnostics, editHypervisorRequestBody, state.Id.ValueString(), state.Name.ValueString())
 	if err != nil {
 		return
 	}

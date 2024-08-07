@@ -10,7 +10,6 @@ import (
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -137,13 +136,15 @@ func (r *applicationFolderResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
-	// Get refreshed application folder properties from Orchestration
-	applicationFolderId := plan.Id.ValueString()
-	applicationFoldeName := plan.Name.ValueString()
-	_, err := getApplicationFolder(ctx, r.client, &resp.Diagnostics, applicationFolderId)
-	if err != nil {
+	var state ApplicationFolderResourceModel
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	applicationFolderId := state.Id.ValueString()
+	applicationFoldeName := state.Name.ValueString()
 
 	// Construct the update model
 	var editApplicationFolderRequestBody = &citrixorchestration.EditAdminFolderRequestModel{}
@@ -209,19 +210,6 @@ func readApplicationFolder(ctx context.Context, client *citrixdaasclient.CitrixD
 	getApplicationFolderRequest := client.ApiClient.AdminFoldersAPIsDAAS.AdminFoldersGetAdminFolder(ctx, applicationFolderId)
 	applicationFolderResource, _, err := util.ReadResource[*citrixorchestration.AdminFolderResponseModel](getApplicationFolderRequest, ctx, client, resp, "Application Folder", applicationFolderId)
 	return applicationFolderResource, err
-}
-
-func getApplicationFolder(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, applicationFolderId string) (*citrixorchestration.AdminFolderResponseModel, error) {
-	getApplicationFolderRequest := client.ApiClient.AdminFoldersAPIsDAAS.AdminFoldersGetAdminFolder(ctx, applicationFolderId)
-	application_folder, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.AdminFolderResponseModel](getApplicationFolderRequest, client)
-	if err != nil {
-		diagnostics.AddError(
-			"Error Reading Application Folder "+applicationFolderId,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-	}
-	return application_folder, err
 }
 
 func (r *applicationFolderResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {

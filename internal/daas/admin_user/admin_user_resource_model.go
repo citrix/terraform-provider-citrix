@@ -118,7 +118,7 @@ func (r AdminUserResourceModel) refreshRights(ctx context.Context, diagnostics *
 func (AdminUserResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		// This description is used by the documentation generator and the language server.
-		Description: "Manages an administrator user for on-premise environment.",
+		Description: "CVAD --- Manages an administrator user for on-premise environment.",
 
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{

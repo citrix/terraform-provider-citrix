@@ -29,7 +29,7 @@ func TestSTFDeploymentResource(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		PreCheck: func() {
-			TestProviderPreCheck(t)
+			TestStorefrontProviderPreCheck(t)
 			TestSTFDeploymentPreCheck(t)
 		},
 		Steps: []resource.TestStep{
@@ -42,7 +42,7 @@ func TestSTFDeploymentResource(t *testing.T) {
 					// Verify site_id of STF deployment
 					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "site_id", siteId),
 					// Verify host_base_url of STF deployment
-					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "host_base_url", "https://test.com"),
+					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "host_base_url", "http://test"),
 				),
 			},
 
@@ -64,7 +64,7 @@ func TestSTFDeploymentResource(t *testing.T) {
 					// Verify site_id of STF deployment
 					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "site_id", siteId_updated),
 					// Verify host_base_url of STF deployment
-					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "host_base_url", "https://test-updated.com"),
+					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "host_base_url", "http://test_updated"),
 				),
 			},
 		},
@@ -79,13 +79,13 @@ var (
 	testSTFDeploymentResources = `
 	resource "citrix_stf_deployment" "testSTFDeployment" {
 		site_id      = "%s"
-		host_base_url = "https://test.com"
+		host_base_url = "http://test"
 	}
 	`
 	testSTFDeploymentResources_updated = `
 	resource "citrix_stf_deployment" "testSTFDeployment" {
 		site_id      = "%s"
-		host_base_url = "https://test-updated.com"
+		host_base_url = "http://test_updated"
 	}
 	`
 )

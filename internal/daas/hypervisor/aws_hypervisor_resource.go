@@ -156,17 +156,11 @@ func (r *awsHypervisorResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
-	// Get refreshed hypervisor properties from Orchestration
-	hypervisorId := plan.Id.ValueString()
-	hypervisor, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, hypervisorId)
-	if err != nil {
-		return
-	}
-	if hypervisor.GetConnectionType() != citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS {
-		resp.Diagnostics.AddError(
-			"Error updating Hypervisor",
-			"Hypervisor "+hypervisor.GetName()+" is not an AWS connection type hypervisor.",
-		)
+	// Retrieve values from state
+	var state AwsHypervisorResourceModel
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
@@ -181,7 +175,7 @@ func (r *awsHypervisorResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	// Patch hypervisor
-	updatedHypervisor, err := UpdateHypervisor(ctx, r.client, &resp.Diagnostics, hypervisor, editHypervisorRequestBody)
+	updatedHypervisor, err := UpdateHypervisor(ctx, r.client, &resp.Diagnostics, editHypervisorRequestBody, state.Id.ValueString(), state.Name.ValueString())
 	if err != nil {
 		return
 	}

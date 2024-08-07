@@ -10,7 +10,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
@@ -30,10 +29,36 @@ type STFAuthenticationServiceResourceModel struct {
 	ClaimsFactoryName types.String `tfsdk:"claims_factory_name"`
 }
 
-// Schema defines the schema for the resource.
-func (r *stfAuthenticationServiceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "StoreFront Authentication Service.",
+func (r *STFAuthenticationServiceResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, authService *citrixstorefront.STFAuthenticationServiceResponseModel) {
+	// Overwrite STFAuthenticationServiceResourceModel with refreshed state
+	r.SiteId = types.StringValue(strconv.Itoa(*authService.SiteId.Get()))
+	r.VirtualPath = types.StringValue(*authService.VirtualPath.Get())
+	r.FriendlyName = types.StringValue(*authService.FriendlyName.Get())
+
+	authSettings := authService.AuthenticationSettings
+	claimsFactoryNamesMap := map[string]bool{}
+	claimsFactoryNamesMap[*authSettings.IntegratedWindowsAuthentication.ClaimsFactoryName.Get()] = true
+	claimsFactoryNamesMap[*authSettings.CitrixAGBasicAuthentication.ClaimsFactoryName.Get()] = true
+	claimsFactoryNamesMap[*authSettings.ExplicitAuthentication.ClaimsFactoryName.Get()] = true
+	claimsFactoryNamesMap[*authSettings.HttpBasicAuthentication.ClaimsFactoryName.Get()] = true
+	claimsFactoryNamesMap[*authSettings.CertificateAuthentication.ClaimsFactoryName.Get()] = true
+	claimsFactoryNamesMap[*authSettings.CitrixFederationAuthentication.ClaimsFactoryName.Get()] = true
+	claimsFactoryNamesMap[*authSettings.SamlForms.ClaimsFactoryName.Get()] = true
+
+	claimsFactoryNamesMapKeys := maps.Keys(claimsFactoryNamesMap)
+	if len(claimsFactoryNamesMapKeys) != 1 {
+		diagnostics.AddError(
+			"Error refreshing STFAuthenticationService",
+			"Claims factory names are not consistent across authentication settings.",
+		)
+		return
+	}
+	r.ClaimsFactoryName = types.StringValue(claimsFactoryNamesMapKeys[0])
+}
+
+func (STFAuthenticationServiceResourceModel) GetSchema() schema.Schema {
+	return schema.Schema{
+		Description: "StoreFront --- StoreFront Authentication Service.",
 		Attributes: map[string]schema.Attribute{
 			"site_id": schema.StringAttribute{
 				Description: "The IIS site to configure the authentication service for. Defaults to `1`.",
@@ -75,29 +100,6 @@ func (r *stfAuthenticationServiceResource) Schema(_ context.Context, _ resource.
 	}
 }
 
-func (r *STFAuthenticationServiceResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, authService *citrixstorefront.STFAuthenticationServiceResponseModel) {
-	// Overwrite STFAuthenticationServiceResourceModel with refreshed state
-	r.SiteId = types.StringValue(strconv.Itoa(*authService.SiteId.Get()))
-	r.VirtualPath = types.StringValue(*authService.VirtualPath.Get())
-	r.FriendlyName = types.StringValue(*authService.FriendlyName.Get())
-
-	authSettings := authService.AuthenticationSettings
-	claimsFactoryNamesMap := map[string]bool{}
-	claimsFactoryNamesMap[*authSettings.IntegratedWindowsAuthentication.ClaimsFactoryName.Get()] = true
-	claimsFactoryNamesMap[*authSettings.CitrixAGBasicAuthentication.ClaimsFactoryName.Get()] = true
-	claimsFactoryNamesMap[*authSettings.ExplicitAuthentication.ClaimsFactoryName.Get()] = true
-	claimsFactoryNamesMap[*authSettings.HttpBasicAuthentication.ClaimsFactoryName.Get()] = true
-	claimsFactoryNamesMap[*authSettings.CertificateAuthentication.ClaimsFactoryName.Get()] = true
-	claimsFactoryNamesMap[*authSettings.CitrixFederationAuthentication.ClaimsFactoryName.Get()] = true
-	claimsFactoryNamesMap[*authSettings.SamlForms.ClaimsFactoryName.Get()] = true
-
-	claimsFactoryNamesMapKeys := maps.Keys(claimsFactoryNamesMap)
-	if len(claimsFactoryNamesMapKeys) != 1 {
-		diagnostics.AddError(
-			"Error refreshing STFAuthenticationService",
-			"Claims factory names are not consistent across authentication settings.",
-		)
-		return
-	}
-	r.ClaimsFactoryName = types.StringValue(claimsFactoryNamesMapKeys[0])
+func (STFAuthenticationServiceResourceModel) GetAttributes() map[string]schema.Attribute {
+	return STFAuthenticationServiceResourceModel{}.GetSchema().Attributes
 }

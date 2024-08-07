@@ -54,7 +54,7 @@ func (r STFRoamingServiceDataSourceModel) RefreshPropertyValues(ctx context.Cont
 func GetSTFRoamingServiceDataSourceSchema() schema.Schema {
 	return schema.Schema{
 		// This description is used by the documentation generator and the language server.
-		MarkdownDescription: "Data source to get details regarding a specific StoreFront Roaming Service instance.",
+		MarkdownDescription: "StoreFront --- Data source to get details regarding a specific StoreFront Roaming Service instance.",
 		Attributes: map[string]schema.Attribute{
 			"site_id": schema.StringAttribute{
 				MarkdownDescription: "ID of the site where the StoreFront Roaming Service instance is created.",

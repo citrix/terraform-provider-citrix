@@ -14,13 +14,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &stfUserFarmMappingResource{}
-	_ resource.ResourceWithConfigure   = &stfUserFarmMappingResource{}
-	_ resource.ResourceWithImportState = &stfUserFarmMappingResource{}
+	_ resource.Resource                   = &stfUserFarmMappingResource{}
+	_ resource.ResourceWithConfigure      = &stfUserFarmMappingResource{}
+	_ resource.ResourceWithImportState    = &stfUserFarmMappingResource{}
+	_ resource.ResourceWithValidateConfig = &stfUserFarmMappingResource{}
 )
 
 // stfUserFarmMappingResource is a helper function to simplify the provider implementation.
@@ -31,6 +33,21 @@ func NewSTFUserFarmMappingResource() resource.Resource {
 // stfUserFarmMappingResource is the resource implementation.
 type stfUserFarmMappingResource struct {
 	client *citrixdaasclient.CitrixDaasClient
+}
+
+// ValidateConfig implements resource.ResourceWithValidateConfig.
+func (*stfUserFarmMappingResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data STFUserFarmMappingResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }
 
 // Metadata returns the resource type name.
@@ -45,6 +62,11 @@ func (r *stfUserFarmMappingResource) Configure(_ context.Context, req resource.C
 	}
 
 	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+}
+
+// Schema implements resource.Resource.
+func (r *stfUserFarmMappingResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = STFUserFarmMappingResourceModel{}.GetSchema()
 }
 
 // Create implements resource.Resource.
@@ -147,7 +169,13 @@ func (r *stfUserFarmMappingResource) Read(ctx context.Context, req resource.Read
 }
 
 // Update implements resource.Resource.
-func (r *stfUserFarmMappingResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *stfUserFarmMappingResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	resp.Diagnostics.AddError(
+		"Unsupported Operation",
+		"Update is not supported for this resource",
+	)
 }
 
 // Delete implements resource.ResourceWithConfigure.
@@ -174,7 +202,7 @@ func (r *stfUserFarmMappingResource) Delete(ctx context.Context, req resource.De
 	if err != nil {
 		resp.Diagnostics.AddError(
 			fmt.Sprintf("Error deleting StoreFront UserFarmMapping `%s` with virtual path `%s`", userFarmMappingName, storeVirtualPath),
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 		return
 	}

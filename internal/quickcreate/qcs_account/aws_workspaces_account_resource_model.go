@@ -30,7 +30,7 @@ type AwsWorkspacesAccountResourceModel struct {
 
 func (AwsWorkspacesAccountResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Manages an AWS Workspaces account.",
+		Description: "DaaS Quick Deploy - AWS Workspaces Core --- Manages an AWS Workspaces account.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the account.",

@@ -71,37 +71,11 @@ func (r *policySetResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 	}
 
 	// Validate DDC Version
-	isDdcVersionSupported, err := util.CheckProductVersion(r.client, 118, 7, 41)
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"An error occurred while checking the DDC version",
-			"Error : "+err.Error(),
-		)
-
-		return
-	}
+	errorSummary := fmt.Sprintf("Error %s Policy Set", operation)
+	feature := "Policy Set resource"
+	isDdcVersionSupported := util.CheckProductVersion(r.client, &resp.Diagnostics, 118, 7, 41, errorSummary, feature)
 
 	if !isDdcVersionSupported {
-		if r.client.AuthConfig.OnPremises {
-			productMajorVersion, productMinorVersion, err := util.GetProductMajorAndMinorVersion(r.client)
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"An error occurred while checking the DDC version",
-					"Error : "+err.Error(),
-				)
-				return
-			}
-			resp.Diagnostics.AddError(
-				fmt.Sprintf("Current DDC version %d.%d does not support operations on policy set resources.", productMajorVersion, productMinorVersion),
-				fmt.Sprintf("Please upgrade your DDC product version to %d.%d or above to operate on policy set resources.", 7, 41),
-			)
-		} else {
-			resp.Diagnostics.AddError(
-				fmt.Sprintf("Current DDC version %d does not support operations on policy set resources.", r.client.ClientConfig.OrchestrationApiVersion),
-				fmt.Sprintf("Please upgrade your DDC product version to %d or above to operate on policy set resources.", 118),
-			)
-		}
 		return
 	}
 
@@ -335,14 +309,16 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	// Get refreshed policy set properties from Orchestration
-	policySetId := plan.Id.ValueString()
-	policySetName := plan.Name.ValueString()
-
-	_, err := getPolicySet(ctx, r.client, &resp.Diagnostics, policySetId)
-	if err != nil {
+	var state PolicySetResourceModel
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	// Get refreshed policy set properties from Orchestration
+	policySetId := state.Id.ValueString()
+	policySetName := state.Name.ValueString()
 
 	policySets, err := getPolicySets(ctx, r.client, &resp.Diagnostics)
 	if err != nil {

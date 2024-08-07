@@ -48,7 +48,7 @@ func TestMachineCatalogPreCheck_Azure(t *testing.T) {
 }
 func TestActiveDirectoryMachineCatalogResourceAzure(t *testing.T) {
 	name := os.Getenv("TEST_MC_NAME")
-	zoneName := os.Getenv("TEST_ZONE_NAME_AZURE")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_AZURE")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -65,7 +65,7 @@ func TestActiveDirectoryMachineCatalogResourceAzure(t *testing.T) {
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "-AD", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
@@ -95,7 +95,7 @@ func TestActiveDirectoryMachineCatalogResourceAzure(t *testing.T) {
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "-AD", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
@@ -116,7 +116,7 @@ func TestActiveDirectoryMachineCatalogResourceAzure(t *testing.T) {
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "-AD", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
@@ -134,7 +134,7 @@ func TestActiveDirectoryMachineCatalogResourceAzure(t *testing.T) {
 
 func TestHybridAzureADMachineCatalogResourceAzure(t *testing.T) {
 	name := os.Getenv("TEST_MC_NAME") + "-HybAAD"
-	zoneName := os.Getenv("TEST_ZONE_NAME_AZURE")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_AZURE")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -151,7 +151,7 @@ func TestHybridAzureADMachineCatalogResourceAzure(t *testing.T) {
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "-HybAAD", "HybridAzureAD"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
@@ -181,7 +181,7 @@ func TestHybridAzureADMachineCatalogResourceAzure(t *testing.T) {
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "-HybAAD", "HybridAzureAD"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
@@ -236,7 +236,7 @@ func TestMachineCatalogPreCheck_AzureAd(t *testing.T) {
 
 func TestAzureADMachineCatalogResourceAzure(t *testing.T) {
 	name := os.Getenv("TEST_MC_NAME") + "-AAD"
-	zoneName := os.Getenv("TEST_ZONE_NAME_AZURE")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_AZURE")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -253,7 +253,7 @@ func TestAzureADMachineCatalogResourceAzure(t *testing.T) {
 					BuildMachineCatalogResourceAzureAd(t, machinecatalog_testResources_azure_ad),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
@@ -281,7 +281,7 @@ func TestAzureADMachineCatalogResourceAzure(t *testing.T) {
 					BuildMachineCatalogResourceAzureAd(t, machinecatalog_testResources_azure_ad_updated),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
@@ -327,7 +327,7 @@ func TestMachineCatalogPreCheck_Workgroup(t *testing.T) {
 
 func TestWorkgroupMachineCatalogResourceAzure(t *testing.T) {
 	name := os.Getenv("TEST_MC_NAME") + "-WRKGRP"
-	zoneName := os.Getenv("TEST_ZONE_NAME_AZURE")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_AZURE")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -344,7 +344,7 @@ func TestWorkgroupMachineCatalogResourceAzure(t *testing.T) {
 					BuildMachineCatalogResourceWorkgroup(t, machinecatalog_testResources_workgroup),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
@@ -370,7 +370,7 @@ func TestWorkgroupMachineCatalogResourceAzure(t *testing.T) {
 					BuildMachineCatalogResourceWorkgroup(t, machinecatalog_testResources_workgroup_updated),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
@@ -426,7 +426,7 @@ func TestMachineCatalogPreCheck_GCP(t *testing.T) {
 
 func TestMachineCatalogResourceGCP(t *testing.T) {
 	name := os.Getenv("TEST_MC_NAME_GCP")
-	zoneName := os.Getenv("TEST_ZONE_NAME_GCP")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_GCP")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -443,7 +443,7 @@ func TestMachineCatalogResourceGCP(t *testing.T) {
 					BuildMachineCatalogResourceGCP(t, machinecatalog_testResources_gcp),
 					BuildHypervisorResourcePoolResourceGCP(t, hypervisor_resource_pool_testResource_gcp),
 					BuildHypervisorResourceGCP(t, hypervisor_testResources_gcp),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
@@ -471,7 +471,7 @@ func TestMachineCatalogResourceGCP(t *testing.T) {
 					BuildMachineCatalogResourceGCP(t, machinecatalog_testResources_gcp_updated),
 					BuildHypervisorResourcePoolResourceGCP(t, hypervisor_resource_pool_testResource_gcp),
 					BuildHypervisorResourceGCP(t, hypervisor_testResources_gcp),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
@@ -513,7 +513,7 @@ func TestMachineCatalogPreCheck_Vsphere(t *testing.T) {
 
 func TestMachineCatalogResourceVsphere(t *testing.T) {
 	name := os.Getenv("TEST_MC_NAME_VSPHERE")
-	zoneName := os.Getenv("TEST_ZONE_NAME_VSPHERE")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_VSPHERE")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -530,7 +530,7 @@ func TestMachineCatalogResourceVsphere(t *testing.T) {
 					BuildMachineCatalogResourceVsphere(t, machine_catalog_testResources_vsphere),
 					BuildHypervisorResourcePoolResourceVsphere(t, hypervisor_resource_pool_testResource_vsphere),
 					BuildHypervisorResourceVsphere(t, hypervisor_testResources_vsphere),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
@@ -558,7 +558,7 @@ func TestMachineCatalogResourceVsphere(t *testing.T) {
 					BuildMachineCatalogResourceVsphere(t, machine_catalog_testResources_vsphere_updated),
 					BuildHypervisorResourcePoolResourceVsphere(t, hypervisor_resource_pool_testResource_vsphere),
 					BuildHypervisorResourceVsphere(t, hypervisor_testResources_vsphere),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
@@ -600,7 +600,7 @@ func TestMachineCatalogPreCheck_Xenserver(t *testing.T) {
 
 func TestMachineCatalogResourceXenserver(t *testing.T) {
 	name := os.Getenv("TEST_MC_NAME_XENSERVER")
-	zoneName := os.Getenv("TEST_ZONE_NAME_XENSERVER")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_XENSERVER")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -617,7 +617,7 @@ func TestMachineCatalogResourceXenserver(t *testing.T) {
 					BuildMachineCatalogResourceXenserver(t, machine_catalog_testResources_xenserver),
 					BuildHypervisorResourcePoolResourceXenServer(t, hypervisor_resource_pool_testResource_xenserver),
 					BuildHypervisorResourceXenserver(t, hypervisor_testResources_xenserver),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
@@ -645,7 +645,7 @@ func TestMachineCatalogResourceXenserver(t *testing.T) {
 					BuildMachineCatalogResourceXenserver(t, machine_catalog_testResources_xenserver_updated),
 					BuildHypervisorResourcePoolResourceXenServer(t, hypervisor_resource_pool_testResource_xenserver),
 					BuildHypervisorResourceXenserver(t, hypervisor_testResources_xenserver),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
@@ -693,7 +693,7 @@ func TestMachineCatalogPreCheck_Nutanix(t *testing.T) {
 
 func TestMachineCatalogResourceNutanix(t *testing.T) {
 	name := os.Getenv("TEST_MC_NAME_NUTANIX")
-	zoneName := os.Getenv("TEST_ZONE_NAME_NUTANIX")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_NUTANIX")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -710,7 +710,7 @@ func TestMachineCatalogResourceNutanix(t *testing.T) {
 					BuildMachineCatalogResourceNutanix(t, machine_catalog_testResources_nutanix),
 					BuildHypervisorResourcePoolResourceNutanix(t, hypervisor_resource_pool_testResource_nutanix),
 					BuildHypervisorResourceNutanix(t, hypervisor_testResources_nutanix),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
@@ -738,7 +738,7 @@ func TestMachineCatalogResourceNutanix(t *testing.T) {
 					BuildMachineCatalogResourceNutanix(t, machine_catalog_testResources_nutanix_updated),
 					BuildHypervisorResourcePoolResourceNutanix(t, hypervisor_resource_pool_testResource_nutanix),
 					BuildHypervisorResourceNutanix(t, hypervisor_testResources_nutanix),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
@@ -786,7 +786,7 @@ func TestMachineCatalogPreCheck_SCVMM(t *testing.T) {
 
 func TestMachineCatalogResourceSCVMM(t *testing.T) {
 	name := os.Getenv("TEST_MC_NAME_SCVMM")
-	zoneName := os.Getenv("TEST_ZONE_NAME_SCVMM")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_SCVMM")
 	masterImageNote := os.Getenv("TEST_MC_MASTER_IMAGE_NOTE_SCVMM")
 
 	resource.Test(t, resource.TestCase{
@@ -804,7 +804,7 @@ func TestMachineCatalogResourceSCVMM(t *testing.T) {
 					BuildMachineCatalogResourceSCVMM(t, machine_catalog_testResources_scvmm),
 					BuildHypervisorResourcePoolResourceSCVMM(t, hypervisor_resource_pool_testResource_scvmm),
 					BuildHypervisorResourceSCVMM(t, hypervisor_testResources_scvmm),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
@@ -834,7 +834,7 @@ func TestMachineCatalogResourceSCVMM(t *testing.T) {
 					BuildMachineCatalogResourceSCVMM(t, machine_catalog_testResources_scvmm_updated),
 					BuildHypervisorResourcePoolResourceSCVMM(t, hypervisor_resource_pool_testResource_scvmm),
 					BuildHypervisorResourceSCVMM(t, hypervisor_testResources_scvmm),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
@@ -881,7 +881,7 @@ func TestMachineCatalogPreCheck_Aws_Ec2(t *testing.T) {
 
 func TestMachineCatalogResourceAwsEc2(t *testing.T) {
 	name := os.Getenv("TEST_MC_NAME_AWS_EC2")
-	zoneName := os.Getenv("TEST_ZONE_NAME_AWS_EC2")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_AWS_EC2")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -898,7 +898,7 @@ func TestMachineCatalogResourceAwsEc2(t *testing.T) {
 					BuildMachineCatalogResourceAwsEc2(t, machinecatalog_testResources_aws_ec2),
 					BuildHypervisorResourcePoolResourceAwsEc2(t, hypervisor_resource_pool_testResource_aws_ec2),
 					BuildHypervisorResourceAwsEc2(t, hypervisor_testResources_aws_ec2),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
@@ -928,7 +928,7 @@ func TestMachineCatalogResourceAwsEc2(t *testing.T) {
 					BuildMachineCatalogResourceAwsEc2(t, machinecatalog_testResources_aws_ec2_updated),
 					BuildHypervisorResourcePoolResourceAwsEc2(t, hypervisor_resource_pool_testResource_aws_ec2),
 					BuildHypervisorResourceAwsEc2(t, hypervisor_testResources_aws_ec2),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
@@ -970,7 +970,7 @@ func TestMachineCatalogPreCheck_Manual_Power_Managed_Azure(t *testing.T) {
 
 func TestMachineCatalogResource_Manual_Power_Managed_Azure(t *testing.T) {
 	name := os.Getenv("TEST_MC_NAME_MANUAL")
-	zoneName := os.Getenv("TEST_ZONE_NAME_AZURE")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_AZURE")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -985,7 +985,7 @@ func TestMachineCatalogResource_Manual_Power_Managed_Azure(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildMachineCatalogResourceManualPowerManagedAzure(t, machinecatalog_testResources_manual_power_managed_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
@@ -1034,7 +1034,7 @@ func TestMachineCatalogPreCheck_Manual_Power_Managed_GCP(t *testing.T) {
 
 func TestMachineCatalogResource_Manual_Power_Managed_GCP(t *testing.T) {
 	name := os.Getenv("TEST_MC_NAME_MANUAL")
-	zoneName := os.Getenv("TEST_ZONE_NAME_GCP")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_GCP")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -1049,7 +1049,7 @@ func TestMachineCatalogResource_Manual_Power_Managed_GCP(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildMachineCatalogResourceManualPowerManagedGCP(t, machinecatalog_testResources_manual_power_managed_gcp),
 					BuildHypervisorResourceGCP(t, hypervisor_testResources_gcp),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
@@ -1098,7 +1098,7 @@ func TestMachineCatalogPreCheck_Manual_Power_Managed_Vsphere(t *testing.T) {
 
 func TestMachineCatalogResource_Manual_Power_Managed_Vsphere(t *testing.T) {
 	name := os.Getenv("TEST_MC_NAME_MANUAL")
-	zoneName := os.Getenv("TEST_ZONE_NAME_VSPHERE")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_VSPHERE")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -1113,7 +1113,7 @@ func TestMachineCatalogResource_Manual_Power_Managed_Vsphere(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildMachineCatalogResourceManualPowerManagedVsphere(t, machinecatalog_testResources_manual_power_managed_vsphere),
 					BuildHypervisorResourceVsphere(t, hypervisor_testResources_vsphere),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
@@ -1156,7 +1156,7 @@ func TestMachineCatalogPreCheck_Manual_Power_Managed_Xenserver(t *testing.T) {
 
 func TestMachineCatalogResource_Manual_Power_Managed_Xenserver(t *testing.T) {
 	name := os.Getenv("TEST_MC_NAME_MANUAL")
-	zoneName := os.Getenv("TEST_ZONE_NAME_XENSERVER")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_XENSERVER")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -1171,7 +1171,7 @@ func TestMachineCatalogResource_Manual_Power_Managed_Xenserver(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildMachineCatalogResourceManualPowerManagedXenserver(t, machinecatalog_testResources_manual_power_managed_xenserver),
 					BuildHypervisorResourceXenserver(t, hypervisor_testResources_xenserver),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
@@ -1214,7 +1214,7 @@ func TestMachineCatalogPreCheck_Manual_Power_Managed_Nutanix(t *testing.T) {
 
 func TestMachineCatalogResource_Manual_Power_Managed_Nutanix(t *testing.T) {
 	name := os.Getenv("TEST_MC_NAME_MANUAL")
-	zoneName := os.Getenv("TEST_ZONE_NAME_NUTANIX")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_NUTANIX")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -1229,7 +1229,7 @@ func TestMachineCatalogResource_Manual_Power_Managed_Nutanix(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildMachineCatalogResourceManualPowerManagedNutanix(t, machinecatalog_testResources_manual_power_managed_nutanix),
 					BuildHypervisorResourceNutanix(t, hypervisor_testResources_nutanix),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
@@ -1275,7 +1275,7 @@ func TestMachineCatalogPreCheck_Manual_Power_Managed_SCVMM(t *testing.T) {
 
 func TestMachineCatalogResource_Manual_Power_Managed_SCVMM(t *testing.T) {
 	name := os.Getenv("TEST_MC_NAME_MANUAL")
-	zoneName := os.Getenv("TEST_ZONE_NAME_SCVMM")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_SCVMM")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -1290,7 +1290,7 @@ func TestMachineCatalogResource_Manual_Power_Managed_SCVMM(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildMachineCatalogResourceManualPowerManagedSCVMM(t, machinecatalog_testResources_manual_power_managed_scvmm),
 					BuildHypervisorResourceSCVMM(t, hypervisor_testResources_scvmm),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
@@ -1336,7 +1336,7 @@ func TestMachineCatalogPreCheck_Manual_Power_Managed_AWS_EC2(t *testing.T) {
 
 func TestMachineCatalogResource_Manual_Power_Managed_Aws_Ec2(t *testing.T) {
 	name := os.Getenv("TEST_MC_NAME_MANUAL")
-	zoneName := os.Getenv("TEST_ZONE_NAME_AWS_EC2")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_AWS_EC2")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -1351,7 +1351,7 @@ func TestMachineCatalogResource_Manual_Power_Managed_Aws_Ec2(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildMachineCatalogResourceManualPowerManagedAwsEc2(t, machinecatalog_testResources_manual_power_managed_aws_ec2),
 					BuildHypervisorResourceAwsEc2(t, hypervisor_testResources_aws_ec2),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
@@ -1391,7 +1391,7 @@ func TestMachineCatalogPreCheck_Manual_Non_Power_Managed(t *testing.T) {
 
 func TestMachineCatalogResource_Manual_Non_Power_Managed(t *testing.T) {
 	name := os.Getenv("TEST_MC_NAME_MANUAL")
-	zoneName := os.Getenv("TEST_ZONE_NAME")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -1405,7 +1405,7 @@ func TestMachineCatalogResource_Manual_Non_Power_Managed(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildMachineCatalogResourceManualNonPowerManaged(t, machinecatalog_testResources_manual_non_power_managed),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
@@ -1450,7 +1450,7 @@ func TestMachineCatalogPreCheck_RemotePC(t *testing.T) {
 
 func TestMachineCatalogResource_RemotePC(t *testing.T) {
 	name := os.Getenv("TEST_MC_NAME_REMOTE_PC")
-	zoneName := os.Getenv("TEST_ZONE_NAME")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -1464,7 +1464,7 @@ func TestMachineCatalogResource_RemotePC(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildMachineCatalogResourceRemotePC(t, machinecatalog_testResources_remote_pc),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog

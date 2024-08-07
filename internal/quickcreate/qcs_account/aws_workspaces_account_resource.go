@@ -4,9 +4,10 @@ package qcs_account
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
-	citrixquickcreate "github.com/citrix/citrix-daas-rest-go/citrixquickcreate"
+	"github.com/citrix/citrix-daas-rest-go/citrixquickcreate"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -17,33 +18,34 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                   = &awsWorkspaceAaccountResource{}
-	_ resource.ResourceWithConfigure      = &awsWorkspaceAaccountResource{}
-	_ resource.ResourceWithImportState    = &awsWorkspaceAaccountResource{}
-	_ resource.ResourceWithValidateConfig = &awsWorkspaceAaccountResource{}
+	_ resource.Resource                   = &awsWorkspaceAccountResource{}
+	_ resource.ResourceWithConfigure      = &awsWorkspaceAccountResource{}
+	_ resource.ResourceWithImportState    = &awsWorkspaceAccountResource{}
+	_ resource.ResourceWithValidateConfig = &awsWorkspaceAccountResource{}
+	_ resource.ResourceWithModifyPlan     = &awsWorkspaceAccountResource{}
 )
 
-func NewAccountResource() resource.Resource {
-	return &awsWorkspaceAaccountResource{}
+func NewAwsWorkspacesAccountResource() resource.Resource {
+	return &awsWorkspaceAccountResource{}
 }
 
-// accountResource is the resource implementation.
-type awsWorkspaceAaccountResource struct {
+// awsWorkspaceAccountResource is the resource implementation.
+type awsWorkspaceAccountResource struct {
 	client *citrixdaasclient.CitrixDaasClient
 }
 
 // Metadata returns the resource type name.
-func (r *awsWorkspaceAaccountResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+func (r *awsWorkspaceAccountResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_quickcreate_aws_workspaces_account"
 }
 
 // Schema defines the schema for the resource.
-func (r *awsWorkspaceAaccountResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *awsWorkspaceAccountResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = AwsWorkspacesAccountResourceModel{}.GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
-func (r *awsWorkspaceAaccountResource) Configure(_ context.Context, req resource.ConfigureRequest, _ *resource.ConfigureResponse) {
+func (r *awsWorkspaceAccountResource) Configure(_ context.Context, req resource.ConfigureRequest, _ *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -52,7 +54,7 @@ func (r *awsWorkspaceAaccountResource) Configure(_ context.Context, req resource
 }
 
 // Create creates the resource and sets the initial Terraform state.
-func (r *awsWorkspaceAaccountResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *awsWorkspaceAccountResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
@@ -92,13 +94,13 @@ func (r *awsWorkspaceAaccountResource) Create(ctx context.Context, req resource.
 		resp.Diagnostics.AddError(
 			"Error adding AWS Workspaces Account: "+plan.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
+				"\nError message: "+util.ReadQcsClientError(err),
 		)
 		return
 	}
 
 	// Try getting the new AWS Workspaces Account
-	account, _, err := getAwsWorkspacesAccount(ctx, r.client, &resp.Diagnostics, *addAccountResponse.AccountId.Get())
+	account, _, err := getAwsWorkspacesAccountUsingId(ctx, r.client, &resp.Diagnostics, *addAccountResponse.AccountId.Get(), true)
 	if err != nil {
 		return
 	}
@@ -115,7 +117,7 @@ func (r *awsWorkspaceAaccountResource) Create(ctx context.Context, req resource.
 }
 
 // Read refreshes the Terraform state with the latest data.
-func (r *awsWorkspaceAaccountResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *awsWorkspaceAccountResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from state
@@ -127,8 +129,16 @@ func (r *awsWorkspaceAaccountResource) Read(ctx context.Context, req resource.Re
 	}
 
 	// Try getting the AWS Workspaces Account
-	account, _, err := getAwsWorkspacesAccount(ctx, r.client, &resp.Diagnostics, state.AccountId.ValueString())
+	account, httpResp, err := getAwsWorkspacesAccountUsingId(ctx, r.client, &resp.Diagnostics, state.AccountId.ValueString(), false)
 	if err != nil {
+		if httpResp.StatusCode == http.StatusNotFound {
+			resp.Diagnostics.AddWarning(
+				fmt.Sprintf("AWS Workspaces Account with ID: %s not found", state.AccountId.ValueString()),
+				fmt.Sprintf("AWS Workspaces Account with ID: %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", state.AccountId.ValueString()),
+			)
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		return
 	}
 
@@ -144,7 +154,7 @@ func (r *awsWorkspaceAaccountResource) Read(ctx context.Context, req resource.Re
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
-func (r *awsWorkspaceAaccountResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *awsWorkspaceAccountResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
@@ -169,7 +179,7 @@ func (r *awsWorkspaceAaccountResource) Update(ctx context.Context, req resource.
 
 	// Get refreshed account properties from QCS
 	accountId := plan.AccountId.ValueString()
-	account, httpResp, err := getAwsWorkspacesAccount(ctx, r.client, &resp.Diagnostics, accountId)
+	account, httpResp, err := getAwsWorkspacesAccountUsingId(ctx, r.client, &resp.Diagnostics, accountId, true)
 	if err != nil {
 		return
 	}
@@ -195,7 +205,7 @@ func (r *awsWorkspaceAaccountResource) Update(ctx context.Context, req resource.
 			resp.Diagnostics.AddError(
 				"Error updating AWS Workspaces Account Name: "+plan.Name.ValueString(),
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+util.ReadClientError(err),
+					"\nError message: "+util.ReadQcsClientError(err),
 			)
 			return
 		}
@@ -231,14 +241,14 @@ func (r *awsWorkspaceAaccountResource) Update(ctx context.Context, req resource.
 			resp.Diagnostics.AddError(
 				"Error updating AWS Workspaces Account Credentials: "+plan.Name.ValueString(),
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+util.ReadClientError(err),
+					"\nError message: "+util.ReadQcsClientError(err),
 			)
 			return
 		}
 	}
 
 	// Get updated account details
-	account, _, getAcctErr := getAwsWorkspacesAccount(ctx, r.client, &resp.Diagnostics, accountId)
+	account, _, getAcctErr := getAwsWorkspacesAccountUsingId(ctx, r.client, &resp.Diagnostics, accountId, true)
 	if getAcctErr != nil {
 		return
 	}
@@ -254,7 +264,7 @@ func (r *awsWorkspaceAaccountResource) Update(ctx context.Context, req resource.
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
-func (r *awsWorkspaceAaccountResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *awsWorkspaceAccountResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from state
@@ -273,18 +283,18 @@ func (r *awsWorkspaceAaccountResource) Delete(ctx context.Context, req resource.
 		resp.Diagnostics.AddError(
 			"Error removing AWS Workspaces Account: "+state.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
+				"\nError message: "+util.ReadQcsClientError(err),
 		)
 		return
 	}
 }
 
-func (r *awsWorkspaceAaccountResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *awsWorkspaceAccountResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Retrieve import ID and save to id attribute
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-func (r *awsWorkspaceAaccountResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+func (r *awsWorkspaceAccountResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	var data AwsWorkspacesAccountResourceModel
@@ -298,15 +308,27 @@ func (r *awsWorkspaceAaccountResource) ValidateConfig(ctx context.Context, req r
 	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }
 
-func getAwsWorkspacesAccount(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, accountId string) (*citrixquickcreate.AwsEdcAccount, *http.Response, error) {
+func (r *awsWorkspaceAccountResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	if r.client != nil && r.client.QuickCreateClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
+}
+
+func getAwsWorkspacesAccountUsingId(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, accountId string, addErrorIfNotFound bool) (*citrixquickcreate.AwsEdcAccount, *http.Response, error) {
 	getAccountRequest := client.QuickCreateClient.AccountQCS.GetCustomerAccountAsync(ctx, client.ClientConfig.CustomerId, accountId)
 	account, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickcreate.AwsEdcAccount](getAccountRequest, client)
 
 	if err != nil {
+		if !addErrorIfNotFound {
+			return nil, httpResp, err
+		}
 		diagnostics.AddError(
 			"Error getting AWS Workspaces Account: "+accountId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
+				"\nError message: "+util.ReadQcsClientError(err),
 		)
 		return nil, httpResp, err
 	}
@@ -325,7 +347,7 @@ func updateAwsWorkspacesAccount(ctx context.Context, client *citrixdaasclient.Ci
 		diagnostics.AddError(
 			"Error performing "+accountOperationTypeEnumToString(requestBody.UpdateAccount.GetAccountOperationType())+" on AWS Workspaces Account: "+accountId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
+				"\nError message: "+util.ReadQcsClientError(err),
 		)
 		return httpResp, err
 	}
@@ -341,14 +363,5 @@ func accountOperationTypeEnumToString(operationType citrixquickcreate.UpdateAcco
 		return "UpdateAwsEdcAccountCredentials"
 	default:
 		return ""
-	}
-}
-
-func (r *awsWorkspaceAaccountResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
-	defer util.PanicHandler(&resp.Diagnostics)
-
-	if r.client != nil && r.client.QuickCreateClient == nil {
-		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
-		return
 	}
 }

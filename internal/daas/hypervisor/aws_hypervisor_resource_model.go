@@ -36,7 +36,7 @@ type AwsHypervisorResourceModel struct {
 
 func (AwsHypervisorResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Manages an AWS EC2 hypervisor.",
+		Description: "CVAD --- Manages an AWS EC2 hypervisor.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the hypervisor.",

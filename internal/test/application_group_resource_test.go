@@ -18,7 +18,7 @@ func TestApplicationGroupResourcePreCheck(t *testing.T) {
 
 func TestApplicationGroupResource(t *testing.T) {
 	name := os.Getenv("TEST_APP_GROUP_NAME")
-	zoneName := os.Getenv("TEST_ZONE_NAME_AZURE")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_AZURE")
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		PreCheck: func() {
@@ -39,7 +39,7 @@ func TestApplicationGroupResource(t *testing.T) {
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of application
@@ -69,7 +69,7 @@ func TestApplicationGroupResource(t *testing.T) {
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of application

@@ -175,14 +175,16 @@ func (r *applicationGroupResource) Update(ctx context.Context, req resource.Upda
 		return
 	}
 
-	// Get refreshed application properties from Orchestration
-	applicationGroupId := plan.Id.ValueString()
-	applicationGroupName := plan.Name.ValueString()
-
-	_, err := getApplicationGroup(ctx, r.client, &resp.Diagnostics, applicationGroupId)
-	if err != nil {
+	// Retrieve values from plan
+	var state ApplicationGroupResourceModel
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	applicationGroupId := state.Id.ValueString()
+	applicationGroupName := state.Name.ValueString()
 
 	// Construct the update model
 	var editApplicationGroupRequestBody = &citrixorchestration.EditApplicationGroupRequestModel{}

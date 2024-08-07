@@ -219,19 +219,19 @@ func (ProvisioningSchemeModel) GetSchema() schema.SingleNestedAttribute {
 						string(citrixorchestration.IDENTITYTYPE_HYBRID_AZURE_AD),
 						string(citrixorchestration.IDENTITYTYPE_WORKGROUP),
 					),
-					validators.AlsoRequiresOnValues(
+					validators.AlsoRequiresOnStringValues(
 						[]string{
 							string(citrixorchestration.IDENTITYTYPE_ACTIVE_DIRECTORY),
 						},
 						path.MatchRelative().AtParent().AtName("machine_domain_identity"),
 					),
-					validators.AlsoRequiresOnValues(
+					validators.AlsoRequiresOnStringValues(
 						[]string{
 							string(citrixorchestration.IDENTITYTYPE_HYBRID_AZURE_AD),
 						},
 						path.MatchRelative().AtParent().AtName("machine_domain_identity"),
 					),
-					validators.AlsoRequiresOnValues(
+					validators.AlsoRequiresOnStringValues(
 						[]string{
 							string(citrixorchestration.IDENTITYTYPE_AZURE_AD),
 						},
@@ -435,7 +435,7 @@ func (RemotePcOuModel) GetAttributes() map[string]schema.Attribute {
 
 func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Manages a machine catalog.",
+		Description: "CVAD --- Manages a machine catalog.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the machine catalog.",

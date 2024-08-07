@@ -35,7 +35,7 @@ type ApplicationGroupResourceModel struct {
 
 func (ApplicationGroupResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Resource for creating and managing application group.",
+		Description: "CVAD --- Resource for creating and managing application group.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the application group.",
@@ -60,8 +60,9 @@ func (ApplicationGroupResourceModel) GetSchema() schema.Schema {
 			},
 			"included_users": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "Users who can use this application group. Must be in `Domain\\UserOrGroupName` or `user@domain.com` format",
-				Optional:    true,
+				Description: "Users who can use this application group. " +
+					"\n\n-> **Note** User must be in `Domain\\UserOrGroupName` or `user@domain.com` format",
+				Optional: true,
 				Validators: []validator.Set{
 					setvalidator.ValueStringsAre(
 						validator.String(

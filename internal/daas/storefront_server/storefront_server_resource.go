@@ -42,7 +42,7 @@ func (r *storeFrontServerResource) Metadata(_ context.Context, req resource.Meta
 // Schema defines the schema for the resource.
 func (r *storeFrontServerResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a StoreFront server.",
+		Description: "CVAD --- Manages a StoreFront server.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the StoreFront server.",

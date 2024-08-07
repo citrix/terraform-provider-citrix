@@ -501,7 +501,7 @@ type PolicySetResourceModel struct {
 
 func (PolicySetResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Manages a policy set and the policies within it. The order of the policies specified in this resource reflect the policy priority. This feature will be officially supported for On-Premises with DDC version 2402 and above and will be made available for Cloud soon. For detailed information about policy settings and filters, please refer to [this document](https://github.com/citrix/terraform-provider-citrix/blob/main/internal/daas/policies/policy_set_resource.md).", // TODO: Update this comment when policy set is available for cloud
+		Description: "CVAD --- Manages a policy set and the policies within it. The order of the policies specified in this resource reflect the policy priority.", // TODO: Update this comment when policy set is available for cloud
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the policy set.",
@@ -552,7 +552,7 @@ func (PolicySetResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"policies": schema.ListNestedAttribute{
-				Description:  "Ordered list of policies. The order of policies in the list determines the priority of the policies.",
+				Description:  "Ordered list of policies. \n\n-> **Note** The order of policies in the list determines the priority of the policies.",
 				Required:     true,
 				NestedObject: PolicyModel{}.GetSchema(),
 			},

@@ -29,7 +29,7 @@ func (r PvsDataSourceModel) RefreshPropertyValues(ctx context.Context, diagnosti
 
 func (PvsDataSourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "PVS Configuration to create machine catalog using PVSStreaming.",
+		Description: "CVAD --- PVS Configuration to create machine catalog using PVSStreaming.",
 		Attributes: map[string]schema.Attribute{
 			"pvs_farm_name": schema.StringAttribute{
 				Description: "Name of the PVS farm.",

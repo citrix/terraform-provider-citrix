@@ -198,14 +198,16 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	// Get refreshed application properties from Orchestration
-	applicationId := plan.Id.ValueString()
-	applicationName := plan.Name.ValueString()
-
-	_, err := getApplication(ctx, r.client, &resp.Diagnostics, applicationId)
-	if err != nil {
+	// Retrieve values from state
+	var state ApplicationResourceModel
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	applicationId := state.Id.ValueString()
+	applicationName := state.Name.ValueString()
 
 	// Construct the update model
 	var editApplicationRequestBody = &citrixorchestration.EditApplicationRequestModel{}

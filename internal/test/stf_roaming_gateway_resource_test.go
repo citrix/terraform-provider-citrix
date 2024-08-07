@@ -58,7 +58,7 @@ func TestSTFRoamingServiceResource(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		PreCheck: func() {
-			TestProviderPreCheck(t)
+			TestStorefrontProviderPreCheck(t)
 			TestSTFDeploymentPreCheck(t)
 			TestSTFRoamingGatewayPreCheck(t)
 		},

@@ -44,7 +44,7 @@ type VsphereHypervisorResourceModel struct {
 
 func (VsphereHypervisorResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Manages a VMware vSphere hypervisor.",
+		Description: "CVAD --- Manages a VMware vSphere hypervisor.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the hypervisor.",

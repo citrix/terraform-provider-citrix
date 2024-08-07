@@ -80,7 +80,7 @@ type ApplicationResourceModel struct {
 // Schema defines the schema for the data source.
 func (ApplicationResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Resource for creating and managing applications.",
+		Description: "CVAD --- Resource for creating and managing applications.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the application.",
@@ -128,8 +128,9 @@ func (ApplicationResourceModel) GetSchema() schema.Schema {
 			},
 			"limit_visibility_to_users": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "By default, the application is visible to all users within a delivery group. However, you can restrict its visibility to only certain users by specifying them in the 'limit_visibility_to_users' list. Must be in `DOMAIN\\UserOrGroupName` or `user@domain.com` format",
-				Optional:    true,
+				Description: "By default, the application is visible to all users within a delivery group. However, you can restrict its visibility to only certain users by specifying them in the `limit_visibility_to_users` list. " +
+					"\n\n-> **Note** Users must be in `DOMAIN\\UserOrGroupName` or `user@domain.com` format",
+				Optional: true,
 				Validators: []validator.Set{
 					setvalidator.ValueStringsAre(
 						validator.String(

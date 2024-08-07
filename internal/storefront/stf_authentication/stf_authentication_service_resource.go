@@ -10,18 +10,21 @@ import (
 
 	citrixstorefront "github.com/citrix/citrix-daas-rest-go/citrixstorefront/models"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_deployment"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &stfAuthenticationServiceResource{}
-	_ resource.ResourceWithConfigure   = &stfAuthenticationServiceResource{}
-	_ resource.ResourceWithImportState = &stfAuthenticationServiceResource{}
+	_ resource.Resource                   = &stfAuthenticationServiceResource{}
+	_ resource.ResourceWithConfigure      = &stfAuthenticationServiceResource{}
+	_ resource.ResourceWithImportState    = &stfAuthenticationServiceResource{}
+	_ resource.ResourceWithValidateConfig = &stfAuthenticationServiceResource{}
 )
 
 // NewSTFAuthenticationServiceResource is a helper function to simplify the provider implementation.
@@ -32,6 +35,21 @@ func NewSTFAuthenticationServiceResource() resource.Resource {
 // stfAuthenticationServiceResource is the resource implementation.
 type stfAuthenticationServiceResource struct {
 	client *citrixdaasclient.CitrixDaasClient
+}
+
+// ValidateConfig implements resource.ResourceWithValidateConfig.
+func (*stfAuthenticationServiceResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data STFAuthenticationServiceResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }
 
 // Metadata returns the resource type name.
@@ -46,6 +64,11 @@ func (r *stfAuthenticationServiceResource) Configure(_ context.Context, req reso
 	}
 
 	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+}
+
+// Schema defines the schema for the resource.
+func (r *stfAuthenticationServiceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = STFAuthenticationServiceResourceModel{}.GetSchema()
 }
 
 // Create implements resource.Resource.
@@ -67,7 +90,7 @@ func (r *stfAuthenticationServiceResource) Create(ctx context.Context, req resou
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating StoreFront Authentication Service ",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 		return
 	}
@@ -94,6 +117,9 @@ func (r *stfAuthenticationServiceResource) Create(ctx context.Context, req resou
 	}
 
 	getAuthServiceResponse, err := getSTFAuthenticationService(ctx, &resp.Diagnostics, r.client, plan)
+	if err != nil {
+		return
+	}
 
 	// Map response body to schema and populate Computed attribute values
 	plan.RefreshPropertyValues(ctx, &resp.Diagnostics, getAuthServiceResponse)
@@ -160,7 +186,7 @@ func (r *stfAuthenticationServiceResource) Update(ctx context.Context, req resou
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating StoreFront Authentication Service ",
-				"\nError message: "+err.Error(),
+				"Error message: "+err.Error(),
 			)
 			return
 		}
@@ -176,7 +202,7 @@ func (r *stfAuthenticationServiceResource) Update(ctx context.Context, req resou
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating StoreFront Authentication Service ",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 		return
 	}
@@ -188,7 +214,7 @@ func (r *stfAuthenticationServiceResource) Update(ctx context.Context, req resou
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating StoreFront Authentication Service ",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 		return
 	}
@@ -214,6 +240,10 @@ func (r *stfAuthenticationServiceResource) Update(ctx context.Context, req resou
 	}
 
 	getAuthServiceResponse, err := getSTFAuthenticationService(ctx, &resp.Diagnostics, r.client, plan)
+
+	if err != nil {
+		return
+	}
 
 	// Map response body to schema and populate Computed attribute values
 	plan.RefreshPropertyValues(ctx, &resp.Diagnostics, getAuthServiceResponse)
@@ -244,7 +274,7 @@ func (r *stfAuthenticationServiceResource) Delete(ctx context.Context, req resou
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error removing StoreFront Authentication Service ",
-				"\nError message: "+err.Error(),
+				"Error message: "+err.Error(),
 			)
 			return
 		}
@@ -254,13 +284,19 @@ func (r *stfAuthenticationServiceResource) Delete(ctx context.Context, req resou
 		getBody.SetVirtualPath(state.VirtualPath.ValueString())
 	}
 
+	// Get refreshed STFDeployment, if no STFDeployment found, return
+	deployment, err := stf_deployment.GetSTFDeployment(ctx, r.client, &resp.Diagnostics, state.SiteId.ValueStringPointer())
+	if err != nil || deployment == nil {
+		return
+	}
+
 	// Remove STF Authentication Service
 	removeAuthenticationServiceRequest := r.client.StorefrontClient.AuthenticationServiceSF.STFAuthenticationRemoveSTFAuthenticationService(ctx, getBody)
-	err := removeAuthenticationServiceRequest.Execute()
+	err = removeAuthenticationServiceRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error removing StoreFront Authentication Service ",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 		return
 	}

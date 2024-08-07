@@ -9,20 +9,22 @@ import (
 
 	citrixstorefront "github.com/citrix/citrix-daas-rest-go/citrixstorefront/models"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_deployment"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
-
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &stfWebReceiverResource{}
-	_ resource.ResourceWithConfigure   = &stfWebReceiverResource{}
-	_ resource.ResourceWithImportState = &stfWebReceiverResource{}
-	_ resource.ResourceWithModifyPlan  = &stfWebReceiverResource{}
+	_ resource.Resource                   = &stfWebReceiverResource{}
+	_ resource.ResourceWithConfigure      = &stfWebReceiverResource{}
+	_ resource.ResourceWithImportState    = &stfWebReceiverResource{}
+	_ resource.ResourceWithModifyPlan     = &stfWebReceiverResource{}
+	_ resource.ResourceWithValidateConfig = &stfWebReceiverResource{}
 )
 
 // stfWebReceiverResource is a helper function to simplify the provider implementation.
@@ -33,6 +35,21 @@ func NewSTFWebReceiverResource() resource.Resource {
 // stfWebReceiverResource is the resource implementation.
 type stfWebReceiverResource struct {
 	client *citrixdaasclient.CitrixDaasClient
+}
+
+// ValidateConfig implements resource.ResourceWithValidateConfig.
+func (*stfWebReceiverResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data STFWebReceiverResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }
 
 // Metadata returns the resource type name.
@@ -47,6 +64,11 @@ func (r *stfWebReceiverResource) Configure(_ context.Context, req resource.Confi
 	}
 
 	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+}
+
+// Schema defines the schema for the resource.
+func (r *stfWebReceiverResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = STFWebReceiverResourceModel{}.GetSchema()
 }
 
 // ModifyPlan modifies the resource plan before it is applied.
@@ -580,6 +602,12 @@ func (r *stfWebReceiverResource) Delete(ctx context.Context, req resource.Delete
 		body.SetSiteId(siteIdInt)
 	}
 
+	// Get refreshed STFDeployment, if no STFDeployment found, return
+	deployment, err := stf_deployment.GetSTFDeployment(ctx, r.client, &resp.Diagnostics, state.SiteId.ValueStringPointer())
+	if err != nil || deployment == nil {
+		return
+	}
+
 	// Delete existing STF WebReceiver SiteStyle
 	deleteWebReceiverSiteStyleRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverClearSTFWebReceiverSiteStyle(ctx, body)
 	_, res_error := deleteWebReceiverSiteStyleRequest.Execute()
@@ -593,7 +621,7 @@ func (r *stfWebReceiverResource) Delete(ctx context.Context, req resource.Delete
 
 	// Delete existing STF WebReceiver
 	deleteWebReceiverRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverClearSTFWebReceiver(ctx, body)
-	_, err := deleteWebReceiverRequest.Execute()
+	_, err = deleteWebReceiverRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting StoreFront WebReceiver ",

@@ -24,7 +24,7 @@ type ResourceLocationResourceModel struct {
 func (ResourceLocationResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		// This description is used by the documentation generator and the language server.
-		Description: "Manages a Citrix Cloud resource location.",
+		Description: "Citrix Cloud --- Manages a Citrix Cloud resource location.",
 
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{

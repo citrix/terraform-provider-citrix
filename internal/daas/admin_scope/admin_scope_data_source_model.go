@@ -42,43 +42,43 @@ func (r AdminScopeDataSourceModel) RefreshPropertyValues(ctx context.Context, di
 func GetAdminScopeDataSourceSchema() schema.Schema {
 	return schema.Schema{
 		// This description is used by the documentation generator and the language server.
-		MarkdownDescription: "Data source to get details regarding a specific Administrator scope.",
+		Description: "CVAD --- Data source to get details regarding a specific Administrator scope.",
 
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription: "ID of the Admin Scope.",
-				Optional:            true,
+				Description: "ID of the Admin Scope.",
+				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.ExactlyOneOf(path.MatchRoot("id"), path.MatchRoot("name")), // Ensures that only one of either Id or Name is provided. It will also cause a validation error if none are specified.
 				},
 			},
 			"name": schema.StringAttribute{
-				MarkdownDescription: "Name of the Admin Scope.",
-				Optional:            true,
+				Description: "Name of the Admin Scope.",
+				Optional:    true,
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription: "Description of the Admin Scope.",
-				Computed:            true,
+				Description: "Description of the Admin Scope.",
+				Computed:    true,
 			},
 			"is_built_in": schema.BoolAttribute{
-				MarkdownDescription: "Indicates whether the Admin Scope is built-in or not.",
-				Computed:            true,
+				Description: "Indicates whether the Admin Scope is built-in or not.",
+				Computed:    true,
 			},
 			"is_all_scope": schema.BoolAttribute{
-				MarkdownDescription: "Indicates whether the Admin Scope is all scope or not.",
-				Computed:            true,
+				Description: "Indicates whether the Admin Scope is all scope or not.",
+				Computed:    true,
 			},
 			"is_tenant_scope": schema.BoolAttribute{
-				MarkdownDescription: "Indicates whether the Admin Scope is tenant scope or not.",
-				Computed:            true,
+				Description: "Indicates whether the Admin Scope is tenant scope or not.",
+				Computed:    true,
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "ID of the tenant to which the Admin Scope belongs.",
-				Computed:            true,
+				Description: "ID of the tenant to which the Admin Scope belongs.",
+				Computed:    true,
 			},
 			"tenant_name": schema.StringAttribute{
-				MarkdownDescription: "Name of the tenant to which the Admin Scope belongs.",
-				Computed:            true,
+				Description: "Name of the tenant to which the Admin Scope belongs.",
+				Computed:    true,
 			},
 		},
 	}

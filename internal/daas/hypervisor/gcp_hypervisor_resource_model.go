@@ -35,7 +35,7 @@ type GcpHypervisorResourceModel struct {
 
 func (GcpHypervisorResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Manages a GCP hypervisor.",
+		Description: "CVAD --- Manages a GCP hypervisor.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the hypervisor.",

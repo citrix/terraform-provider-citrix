@@ -529,12 +529,34 @@ func validateRebootSchedules(ctx context.Context, diagnostics *diag.Diagnostics,
 
 		}
 
-		if rebootSchedule.UseNaturalRebootSchedule.ValueBool() && !rebootSchedule.DeliveryGroupRebootNotificationToUsers.IsNull() {
-			diagnostics.AddAttributeError(
-				path.Root("reboot_notification_to_users"),
-				"Incorrect Attribute Configuration",
-				"Reboot notification to users can not be set for using natural reboot",
-			)
+		if rebootSchedule.UseNaturalRebootSchedule.ValueBool() {
+			if !rebootSchedule.DeliveryGroupRebootNotificationToUsers.IsNull() {
+				diagnostics.AddAttributeError(
+					path.Root("reboot_notification_to_users"),
+					"Incorrect Attribute Configuration",
+					"Reboot notification to users cannot be set when using natural reboot",
+				)
+				return
+			}
+
+			if !rebootSchedule.RebootDurationMinutes.IsNull() {
+				diagnostics.AddAttributeError(
+					path.Root("reboot_duration_minutes"),
+					"Missing Attribute Configuration",
+					"Reboot duration minutes cannot be set when using natural reboot.",
+				)
+				return
+			}
+
+		} else {
+			if rebootSchedule.RebootDurationMinutes.IsNull() {
+				diagnostics.AddAttributeError(
+					path.Root("reboot_duration_minutes"),
+					"Missing Attribute Configuration",
+					"Reboot duration minutes must be specified when natural_reboot_schedule is set to false.",
+				)
+				return
+			}
 		}
 
 		if !rebootSchedule.DeliveryGroupRebootNotificationToUsers.IsNull() {
@@ -548,7 +570,6 @@ func validateRebootSchedules(ctx context.Context, diagnostics *diag.Diagnostics,
 				)
 			}
 		}
-
 	}
 }
 
@@ -611,7 +632,7 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 	body.SetDescription(plan.Description.ValueString())
 	body.SetRebootSchedules(deliveryGroupRebootScheduleArray)
 
-	if !plan.AssociatedMachineCatalogs.IsNull() {
+	if !plan.AssociatedMachineCatalogs.IsNull() && len(plan.AssociatedMachineCatalogs.Elements()) > 0 {
 		deliveryGroupMachineCatalogsArray := getDeliveryGroupAddMachinesRequest(util.ObjectListToTypedArray[DeliveryGroupMachineCatalogModel](ctx, diagnostics, plan.AssociatedMachineCatalogs))
 		body.SetMachineCatalogs(deliveryGroupMachineCatalogsArray)
 	}
@@ -651,9 +672,11 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 	body.SetMinimumFunctionalLevel(*functionalLevel)
 
 	deliveryKind := citrixorchestration.DELIVERYKIND_DESKTOPS_AND_APPS
-	if associatedMachineCatalogProperties.SessionSupport != "" && associatedMachineCatalogProperties.SessionSupport != citrixorchestration.SESSIONSUPPORT_MULTI_SESSION {
+	if plan.SessionSupport.ValueString() == string(citrixorchestration.SESSIONSUPPORT_SINGLE_SESSION) ||
+		associatedMachineCatalogProperties.SessionSupport == citrixorchestration.SESSIONSUPPORT_SINGLE_SESSION {
 		deliveryKind = citrixorchestration.DELIVERYKIND_DESKTOPS_ONLY
 	}
+
 	body.SetDeliveryType(deliveryKind)
 	body.SetDesktops(deliveryGroupDesktopsArray)
 	body.SetDefaultDesktopPublishedName(plan.Name.ValueString())
@@ -710,6 +733,12 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 			storeFrontServersList = append(storeFrontServersList, storeFrontServerModel)
 		}
 		body.SetStoreFrontServersForHostedReceiver(storeFrontServersList)
+	}
+
+	if !plan.AppProtection.IsNull() {
+		appProtectionModel := util.ObjectValueToTypedObject[DeliveryGroupAppProtection](ctx, diagnostics, plan.AppProtection)
+		body.SetAppProtectionKeyLoggingRequired(appProtectionModel.EnableAntiKeyLogging.ValueBool())
+		body.SetAppProtectionScreenCaptureRequired(appProtectionModel.EnableAntiScreenCapture.ValueBool())
 	}
 
 	return body, nil
@@ -858,6 +887,15 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 	}
 	editDeliveryGroupRequestBody.SetMinimumFunctionalLevel(*functionalLevel)
 
+	if plan.AppProtection.IsNull() {
+		editDeliveryGroupRequestBody.SetAppProtectionKeyLoggingRequired(false)
+		editDeliveryGroupRequestBody.SetAppProtectionScreenCaptureRequired(false)
+	} else {
+		appProtectionModel := util.ObjectValueToTypedObject[DeliveryGroupAppProtection](ctx, diagnostics, plan.AppProtection)
+		editDeliveryGroupRequestBody.SetAppProtectionKeyLoggingRequired(appProtectionModel.EnableAntiKeyLogging.ValueBool())
+		editDeliveryGroupRequestBody.SetAppProtectionScreenCaptureRequired(appProtectionModel.EnableAntiScreenCapture.ValueBool())
+	}
+
 	return editDeliveryGroupRequestBody, nil
 }
 
@@ -960,7 +998,7 @@ func parseDeliveryGroupRebootScheduleToClientModel(ctx context.Context, diags *d
 			rebootScheduleRequest.SetDayInMonth(getRebootScheduleDaysActionValue(rebootSchedule.DayInMonth.ValueString()))
 		}
 
-		if !rebootSchedule.DeliveryGroupRebootNotificationToUsers.IsNull() && !rebootSchedule.UseNaturalRebootSchedule.ValueBool() {
+		if !rebootSchedule.DeliveryGroupRebootNotificationToUsers.IsNull() {
 			notification := util.ObjectValueToTypedObject[DeliveryGroupRebootNotificationToUsers](ctx, diags, rebootSchedule.DeliveryGroupRebootNotificationToUsers)
 
 			rebootScheduleRequest.SetWarningDurationMinutes(int32(notification.NotificationDurationMinutes.ValueInt64())) //can only be 1 5 15, or 0 means no warning
@@ -971,9 +1009,6 @@ func parseDeliveryGroupRebootScheduleToClientModel(ctx context.Context, diags *d
 			} else {
 				rebootScheduleRequest.SetWarningRepeatIntervalMinutes(0)
 			}
-		} else {
-			rebootScheduleRequest.SetRebootDurationMinutes(0)
-			rebootScheduleRequest.SetWarningDurationMinutes(0) //can only be 1 5 15, or 0 means no warning
 		}
 
 		res = append(res, rebootScheduleRequest)
@@ -1217,6 +1252,9 @@ func (r DeliveryGroupResourceModel) updatePlanWithAssociatedCatalogs(ctx context
 	}
 
 	var associatedMachineCatalogs []DeliveryGroupMachineCatalogModel
+	if !r.AssociatedMachineCatalogs.IsNull() {
+		associatedMachineCatalogs = []DeliveryGroupMachineCatalogModel{}
+	}
 	for key, val := range machineCatalogMap {
 		var deliveryGroupMachineCatalogModel DeliveryGroupMachineCatalogModel
 		deliveryGroupMachineCatalogModel.MachineCatalog = types.StringValue(key)

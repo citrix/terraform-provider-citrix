@@ -13,8 +13,12 @@ resource "citrix_stf_roaming_gateway" "example-stf-roaming-gateway" {
     request_ticket_two_stas        = false
     stas_use_load_balancing        = false
     is_cloud_gateway               = false
-    secure_ticket_authority_urls   = [
-        "https://example.sta1.url/",
-        "https://example.sta2.url/"
-    ]
+    secure_ticket_authority_urls = [ {
+      sta_url = "https://example.url/scripts/ctxsta.dll"
+      sta_validation_enabled = true
+      sta_validation_secret = "<STA Validation Secret>"
+    }]
+
+    // Add depends_on attribute to ensure the StoreFront Roaming Gateway is created after the Deployment
+    depends_on = [ citrix_stf_deployment.example-stf-deployment ]
 }

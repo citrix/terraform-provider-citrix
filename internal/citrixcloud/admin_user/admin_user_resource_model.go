@@ -31,7 +31,7 @@ type CCAdminUserResourceModel struct {
 
 func (CCAdminUserResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Manages an administrator user for cloud environment.",
+		Description: "Citrix Cloud --- Manages an administrator user for cloud environment.",
 
 		Attributes: map[string]schema.Attribute{
 			"user_id": schema.StringAttribute{

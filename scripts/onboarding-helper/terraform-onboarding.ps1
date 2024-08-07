@@ -209,10 +209,12 @@ function New-RequiredFiles {
         $disable_ssl_verification = $script:disable_ssl.ToString().ToLower()
         $config = @"
 provider "citrix" {
-    hostname                    = "$script:hostname"
-    client_id                   = "$script:domainFqdn\\$script:clientId"
-    # client_secret               = "<Input client secret value>"
-    disable_ssl_verification    = $disable_ssl_verification
+    cvad_config = {
+        hostname                    = "$script:hostname"
+        client_id                   = "$script:domainFqdn\\$script:clientId"
+        # client_secret               = "<Input client secret value>"
+        disable_ssl_verification    = $disable_ssl_verification
+    }
 }
 "@
         Set-Content -Path ".\citrix.tf" -Value $config
@@ -220,11 +222,13 @@ provider "citrix" {
     else {
         $config = @"
 provider "citrix" {
-    customer_id                 = "$script:customerId"
-    client_id                   = "$script:domainFqdn\\$script:clientId"
-    # client_secret               = "<Input client secret value>"
-    hostname                    = "$script:hostname"
-    environment                 = "$script:environment"
+    cvad_config = {
+        customer_id                 = "$script:customerId"
+        client_id                   = "$script:domainFqdn\\$script:clientId"
+        # client_secret               = "<Input client secret value>"
+        hostname                    = "$script:hostname"
+        environment                 = "$script:environment"
+    }
 }
 "@
         Set-Content -Path ".\citrix.tf" -Value $config

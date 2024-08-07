@@ -1,3 +1,3 @@
 resource "citrix_zone" "example-zone" {
-    name        = var.zone_name
+    resource_location_id = citrix_cloud_resource_location.example-resource-location.id
 }

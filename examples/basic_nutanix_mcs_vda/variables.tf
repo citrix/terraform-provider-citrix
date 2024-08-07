@@ -168,7 +168,16 @@ variable "nutanix_networks" {
 
 
 # zones.tf variables
+## CVAD zone configuration
 variable "zone_name" {
-  description = "Name of the Zone to create. For Citrix Cloud customers the zone should already exist."
+  description = "Name of the Zone to create. For Citrix Cloud customers please use aws_resource_location_id."
   type        = string
+  default     = ""
+}
+
+## DaaS zone configuration
+variable "nutanix_resource_location_id" {
+  description = "The resource location id of the Nutanix resource location for creating zone, which should have connector(s) provisioned."
+  type        = string
+  default     = ""
 }

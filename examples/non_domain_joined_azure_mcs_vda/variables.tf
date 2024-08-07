@@ -160,8 +160,8 @@ variable "azure_subnets" {
 }
 
 
-# zones.tf variables
-variable "zone_name" {
-  description = "Name of the Zone to create. For Citrix Cloud customers the zone should already exist."
+# resource_location.tf variables
+variable "resource_location_name" {
+  description = "Name of the Citrix Cloud Resource Location to create."
   type        = string
 }

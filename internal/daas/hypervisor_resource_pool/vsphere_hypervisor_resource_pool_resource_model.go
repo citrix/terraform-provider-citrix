@@ -71,7 +71,7 @@ type VsphereHypervisorResourcePoolResourceModel struct {
 
 func (VsphereHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Manages a VMware vSphere hypervisor resource pool.",
+		Description: "CVAD --- Manages a VMware vSphere hypervisor resource pool.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the resource pool.",

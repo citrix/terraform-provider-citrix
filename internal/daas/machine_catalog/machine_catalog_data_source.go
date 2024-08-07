@@ -61,7 +61,7 @@ func (d *MachineCatalogDataSource) Read(ctx context.Context, req datasource.Read
 
 	// Get refreshed machine catalog state from Orchestration
 	machineCatalogName := data.Name.ValueString()
-	getMachineCatalogRequest := d.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogName)
+	getMachineCatalogRequest := d.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogName).Fields("Id,Name,Description,ProvisioningType,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC")
 	machineCatalog, httpResp, err := citrixdaasclient.AddRequestData(getMachineCatalogRequest, d.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(

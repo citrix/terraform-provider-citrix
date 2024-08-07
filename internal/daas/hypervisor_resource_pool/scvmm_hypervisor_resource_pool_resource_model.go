@@ -35,7 +35,7 @@ type SCVMMHypervisorResourcePoolResourceModel struct {
 
 func (SCVMMHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Manages a Microsoft System Virtual Machines Manager hypervisor resource pool.",
+		Description: "CVAD --- Manages a Microsoft System Virtual Machines Manager hypervisor resource pool.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the resource pool.",

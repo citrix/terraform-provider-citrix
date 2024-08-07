@@ -50,10 +50,10 @@ func TestAzureMcs(t *testing.T) {
 		isOnPremises = false
 	}
 
-	zoneName := os.Getenv("TEST_ZONE_NAME_AZURE")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_AZURE")
 	zoneDescription := os.Getenv("TEST_ZONE_DESCRIPTION")
-	if zoneName == "" {
-		zoneName = "second zone"
+	if zoneInput == "" {
+		zoneInput = "second zone"
 		zoneDescription = "description for go test zone"
 	}
 
@@ -90,8 +90,8 @@ func TestAzureMcs(t *testing.T) {
 			/****************** Zone Test ******************/
 			// Zone - Create and Read testing
 			{
-				Config: BuildZoneResource(t, zoneName, false),
-				Check:  getAggregateTestFunc(isOnPremises, zoneName, zoneDescription),
+				Config: BuildZoneResource(t, zoneInput, false),
+				Check:  getAggregateTestFunc(isOnPremises, zoneInput, zoneDescription),
 			},
 			// ImportState testing
 			{
@@ -104,10 +104,10 @@ func TestAzureMcs(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: BuildZoneResource(t, zoneName, true),
+				Config: BuildZoneResource(t, zoneInput, true),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of zone
-					resource.TestCheckResourceAttr("citrix_zone.test", "name", fmt.Sprintf("%s-updated", zoneName)),
+					resource.TestCheckResourceAttr("citrix_zone.test", "name", fmt.Sprintf("%s-updated", zoneInput)),
 					// Verify description of zone
 					resource.TestCheckResourceAttr("citrix_zone.test", "description", fmt.Sprintf("updated %s", zoneDescription)),
 					// Verify number of meta data of zone
@@ -124,7 +124,7 @@ func TestAzureMcs(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zoneName, true),
+					BuildZoneResource(t, zoneInput, true),
 				),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -145,7 +145,7 @@ func TestAzureMcs(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneName, true),
+					BuildZoneResource(t, zoneInput, true),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
@@ -159,7 +159,7 @@ func TestAzureMcs(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneName, true),
+					BuildZoneResource(t, zoneInput, true),
 				),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -186,7 +186,7 @@ func TestAzureMcs(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneName, true),
+					BuildZoneResource(t, zoneInput, true),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", resourcePoolName)),
@@ -288,7 +288,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneName, true),
+					BuildZoneResource(t, zoneInput, true),
 				),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -325,7 +325,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneName, true),
+					BuildZoneResource(t, zoneInput, true),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					/*** Verify Machine Catalog ***/
@@ -365,7 +365,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneName, true),
+					BuildZoneResource(t, zoneInput, true),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the policy set id assigned to the delivery group
@@ -383,7 +383,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneName, true),
+					BuildZoneResource(t, zoneInput, true),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify total number of machines in delivery group
@@ -408,7 +408,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneName, true),
+					BuildZoneResource(t, zoneInput, true),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of application
@@ -435,7 +435,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneName, true),
+					BuildZoneResource(t, zoneInput, true),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of application
@@ -458,7 +458,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneName, true),
+					BuildZoneResource(t, zoneInput, true),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					/*** Verify Application ***/
@@ -564,7 +564,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneName, true),
+					BuildZoneResource(t, zoneInput, true),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					/*** Verify Application ***/
@@ -627,7 +627,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneName, true),
+					BuildZoneResource(t, zoneInput, true),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the admin user
@@ -651,6 +651,7 @@ func TestAzureMcs(t *testing.T) {
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
 				ImportStateVerifyIgnore: []string{"last_updated"},
+				SkipFunc:                skipForCloud(isOnPremises),
 			},
 			// Update and Read testing
 			{
@@ -662,7 +663,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneName, true),
+					BuildZoneResource(t, zoneInput, true),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the admin user
@@ -685,7 +686,7 @@ func TestAzureMcs(t *testing.T) {
 }
 
 func composeAzureMachineCatalogTestResourceTf(t *testing.T, isOnPremises bool) string {
-	zoneName := os.Getenv("TEST_ZONE_NAME_AZURE")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_AZURE")
 
 	if isOnPremises {
 		return composeTestResourceTf(
@@ -694,7 +695,7 @@ func composeAzureMachineCatalogTestResourceTf(t *testing.T, isOnPremises bool) s
 			BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "", "ActiveDirectory"),
 			BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 			BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-			BuildZoneResource(t, zoneName, true),
+			BuildZoneResource(t, zoneInput, true),
 		)
 	}
 	return composeTestResourceTf(
@@ -705,7 +706,7 @@ func composeAzureMachineCatalogTestResourceTf(t *testing.T, isOnPremises bool) s
 		BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "", "ActiveDirectory"),
 		BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 		BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-		BuildZoneResource(t, zoneName, true),
+		BuildZoneResource(t, zoneInput, true),
 	)
 }
 

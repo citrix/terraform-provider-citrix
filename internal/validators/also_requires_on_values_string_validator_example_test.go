@@ -8,18 +8,31 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
 
-func ExampleAlsoRequiresOnValues() {
+func ExampleAlsoRequiresOnStringValues() {
 	// Used within a Schema method of a DataSource, Provider, or Resource
 	_ = schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"example_attr": schema.StringAttribute{
+			"example_string_attr": schema.StringAttribute{
 				Optional: true,
 				Validators: []validator.String{
 					// Validate other_attr must be configured if this attribute is set to one of ["value1", "value2"].
-					AlsoRequiresOnValues(
+					AlsoRequiresOnStringValues(
 						[]string{
 							"value1",
 							"value2",
+						},
+						path.Expressions{
+							path.MatchRoot("other_attr"),
+						}...),
+				},
+			},
+			"example_bool_attr": schema.BoolAttribute{
+				Optional: true,
+				Validators: []validator.Bool{
+					// Validate other_attr must be configured if this attribute is set to one of [true].
+					AlsoRequiresOnBoolValues(
+						[]bool{
+							true,
 						},
 						path.Expressions{
 							path.MatchRoot("other_attr"),

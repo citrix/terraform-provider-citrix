@@ -18,7 +18,7 @@ type MachineCatalogDataSourceModel struct {
 
 func (MachineCatalogDataSourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Read data of an existing machine catalog.",
+		Description: "CVAD --- Read data of an existing machine catalog.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the machine catalog.",
@@ -41,7 +41,7 @@ func (r MachineCatalogDataSourceModel) RefreshPropertyValues(catalog *citrixorch
 	r.Id = types.StringValue(catalog.GetId())
 	r.Name = types.StringValue(catalog.GetName())
 
-	var res []vda.VdaModel
+	res := []vda.VdaModel{}
 	for _, model := range vdas.GetItems() {
 		machineName := model.GetName()
 		hosting := model.GetHosting()

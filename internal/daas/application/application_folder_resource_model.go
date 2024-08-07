@@ -22,7 +22,7 @@ type ApplicationFolderResourceModel struct {
 
 func (ApplicationFolderResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Manages an application folder.",
+		Description: "CVAD --- Manages an application folder.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the application folder.",

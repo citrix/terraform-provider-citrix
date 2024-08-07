@@ -392,22 +392,45 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 		return
 	}
 
-	if data.AutoscaleSettings.IsNull() {
-		return
+	if data.AssociatedMachineCatalogs.IsNull() || len(data.AssociatedMachineCatalogs.Elements()) < 1 {
+		// if no machine catalogs are associated, sharing_kind and session_support must be specified
+
+		errorSummary := "Incorrect Attribute Configuration"
+		errorDetail := "session_support and sharing_kind must be specified if no machine catalogs are associated."
+
+		if data.SessionSupport.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("session_support"),
+				errorSummary,
+				errorDetail,
+			)
+
+			return
+		}
+
+		if data.SharingKind.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("sharing_kind"),
+				errorSummary,
+				errorDetail,
+			)
+
+			return
+		}
+	}
+
+	if !data.AutoscaleSettings.IsNull() {
+		autoscale := util.ObjectValueToTypedObject[DeliveryGroupPowerManagementSettings](ctx, &resp.Diagnostics, data.AutoscaleSettings)
+		validatePowerTimeSchemes(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[DeliveryGroupPowerTimeScheme](ctx, &resp.Diagnostics, autoscale.PowerTimeSchemes))
+	}
+
+	if !data.RebootSchedules.IsNull() {
+		validateRebootSchedules(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[DeliveryGroupRebootSchedule](ctx, &resp.Diagnostics, data.RebootSchedules))
 	}
 
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
 	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 
-	autoscale := util.ObjectValueToTypedObject[DeliveryGroupPowerManagementSettings](ctx, &resp.Diagnostics, data.AutoscaleSettings)
-
-	validatePowerTimeSchemes(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[DeliveryGroupPowerTimeScheme](ctx, &resp.Diagnostics, autoscale.PowerTimeSchemes))
-
-	if data.RebootSchedules.IsNull() {
-		return
-	}
-
-	validateRebootSchedules(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[DeliveryGroupRebootSchedule](ctx, &resp.Diagnostics, data.RebootSchedules))
 }
 
 func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
@@ -437,42 +460,17 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 	}
 
 	if plan.AssociatedMachineCatalogs.IsNull() {
-		isFeatureSupported, err := util.CheckProductVersion(r.client, 118, 7, 42)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"An error occurred while checking the DDC version",
-				"Error :"+err.Error(),
-			)
+		errorSummary := fmt.Sprintf("Error %s Delivery Group", operation)
+		feature := "Delivery Groups without associated machine catalogs"
+		isFeatureSupportedForCurrentDDC := util.CheckProductVersion(r.client, &resp.Diagnostics, 118, 7, 42, errorSummary, feature)
 
-			return
-		}
-
-		if !isFeatureSupported {
-			if r.client.AuthConfig.OnPremises {
-				productMajorVersion, productMinorVersion, err := util.GetProductMajorAndMinorVersion(r.client)
-				if err != nil {
-					resp.Diagnostics.AddError(
-						"An error occurred while checking the DDC version",
-						"Error : "+err.Error(),
-					)
-					return
-				}
-				resp.Diagnostics.AddError(
-					fmt.Sprintf("Current DDC version %d.%d does not support %s Delivery Group without associated Machine Catalogs.", productMajorVersion, productMinorVersion, operation),
-					fmt.Sprintf("Please upgrade your DDC product version to %d.%d or above to %s Delivery Group resource without associated Machine Catalogs.", 7, 42, operation),
-				)
-			} else {
-				resp.Diagnostics.AddError(
-					fmt.Sprintf("Current DDC version %d does not support %s Delivery Group without associated Machine Catalogs.", r.client.ClientConfig.OrchestrationApiVersion, operation),
-					fmt.Sprintf("Please upgrade your DDC product version to %d or above to %s Delivery Group resource without associated Machine Catalogs.", 118, operation),
-				)
-			}
+		if !isFeatureSupportedForCurrentDDC {
 			return
 		}
 
 		if !plan.AutoscaleSettings.IsNull() && !plan.AutoscaleSettings.IsUnknown() {
 			resp.Diagnostics.AddError(
-				fmt.Sprintf("Cannot %s Delivery Group", operation),
+				fmt.Sprintf("Error %s Delivery Group", operation),
 				"Autoscale settings can only be configured if associated machine catalogs are specified.",
 			)
 		}

@@ -1,6 +1,6 @@
 # citrix.tf variables, uncomment the ones you need for on-premises or cloud
-# provider_hostname = "<DDC public IP / hostname>" # on-premises only
-# provider_domain_fqdn = "<DomainFqdn>" # on-premises only
+provider_hostname = "<DDC public IP / hostname>" # on-premises only
+provider_domain_fqdn = "<DomainFqdn>" # on-premises only
 provider_client_id = "<Admin Username>" # or Citrx Cloud secure client ID for cloud
 provider_client_secret = "<Admin Password>" # or Citrix Cloud secure client secret for cloud
 # provider_customer_id = "<Citrix Cloud CustomerID>" # cloud only
@@ -34,3 +34,4 @@ xenserver_temporary_storage_name = "<Local or shared storage name>"
 
 # zones.tf variables
 zone_name = "example-xen-zone"
+# xenserver_resource_location_id = "<XenServer Resource Location ID>" # cloud only

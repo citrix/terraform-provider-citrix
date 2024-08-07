@@ -50,6 +50,10 @@ func (r *stfXenappDefaultStoreResource) Configure(_ context.Context, req resourc
 	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
 }
 
+func (*stfXenappDefaultStoreResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = STFXenappDefaultStoreResourceModel{}.GetSchema()
+}
+
 // Create creates the resource and sets the initial Terraform state.
 func (r *stfXenappDefaultStoreResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
@@ -90,7 +94,7 @@ func (r *stfXenappDefaultStoreResource) Create(ctx context.Context, req resource
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Setting Default XenApp Store ",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 	}
 
@@ -99,7 +103,7 @@ func (r *stfXenappDefaultStoreResource) Create(ctx context.Context, req resource
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error fetching updated XenApp Store",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 	}
 	plan.RefreshPropertyValues(ctx, &resp.Diagnostics, defaultStore)

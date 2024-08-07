@@ -141,7 +141,7 @@ func BuildPolicySetResource(t *testing.T, policySet string) string {
 }
 
 func TestPolicySetResource(t *testing.T) {
-	zoneName := os.Getenv("TEST_ZONE_NAME_AZURE")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_AZURE")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -163,7 +163,7 @@ func TestPolicySetResource(t *testing.T) {
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of the policy set
@@ -197,7 +197,7 @@ func TestPolicySetResource(t *testing.T) {
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of the policy set
@@ -234,7 +234,7 @@ func TestPolicySetResource(t *testing.T) {
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zoneName, false),
+					BuildZoneResource(t, zoneInput, false),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of the policy set

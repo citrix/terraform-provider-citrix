@@ -11,11 +11,11 @@ import (
 	citrixstorefront "github.com/citrix/citrix-daas-rest-go/citrixstorefront/models"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
@@ -27,6 +27,186 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
+
+type StoreFarm struct {
+	// StoreService               types.String `tfsdk:"store_virtual_path"`             // The virtual path of the StoreService.
+	FarmName                   types.String `tfsdk:"farm_name"`                      // The name of the Farm.
+	FarmType                   types.String `tfsdk:"farm_type"`                      // The type of the Farm.
+	Servers                    types.List   `tfsdk:"servers"`                        // List[string] The list of servers in the Farm.
+	Port                       types.Int64  `tfsdk:"port"`                           // Service communication port.
+	SSLRelayPort               types.Int64  `tfsdk:"ssl_relay_port"`                 // The SSL Relay port
+	TransportType              types.String `tfsdk:"transport_type"`                 // Type of transport to use. Http, Https, SSL for example
+	LoadBalance                types.Bool   `tfsdk:"load_balance"`                   // Round robin load balance the xml service servers.
+	XMLValidationEnabled       types.Bool   `tfsdk:"xml_validation_enabled"`         // Enable XML service endpoint validation
+	XMLValidationSecret        types.String `tfsdk:"xml_validation_secret"`          // XML service endpoint validation shared secret
+	ServiceUrls                types.List   `tfsdk:"server_urls"`                    // List[string] The url to the service location used to provide web and SaaS apps via this farm.
+	AllFailedBypassDuration    types.Int64  `tfsdk:"all_failed_bypass_duration"`     // Period of time to skip all xml service requests should all servers fail to respond.
+	BypassDuration             types.Int64  `tfsdk:"bypass_duration"`                // Period of time to skip a server when is fails to respond.
+	TicketTimeToLive           types.Int64  `tfsdk:"ticket_time_to_live"`            // Period of time an ICA launch ticket is valid once requested on pre 7.0 XenApp and XenDesktop farms.
+	RadeTicketTimeToLive       types.Int64  `tfsdk:"rade_ticket_time_to_live"`       // Period of time a RADE launch ticket is valid once requested on pre 7.0 XenApp and XenDesktop farms.
+	MaxFailedServersPerRequest types.Int64  `tfsdk:"max_failed_servers_per_request"` // Maximum number of servers within a single farm that can fail before aborting a request.
+	Zones                      types.List   `tfsdk:"zones"`                          // List[string] The list of Zone names associated with the farm.
+	Product                    types.String `tfsdk:"product"`                        // Cloud deployments only otherwise ignored. The product name of the farm configured.
+	RestrictPoPs               types.String `tfsdk:"restrict_pops"`                  // Cloud deployments only otherwise ignored. Restricts GWaaS traffic to the specified POP.
+	FarmGuid                   types.String `tfsdk:"farm_guid"`                      // Cloud deployments only otherwise ignored. A tag indicating the scope of the farm.
+
+}
+
+func (StoreFarm) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"farm_name": schema.StringAttribute{
+				Description: "The name of the Farm.",
+				Required:    true,
+			},
+			"farm_type": schema.StringAttribute{
+				Description: "The type of the Farm. Can be XenApp, XenDesktop, AppController, VDIinaBox, Store or SPA.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"XenApp", "XenDesktop", "AppController", "VDIinaBox", "Store", "SPA",
+					),
+				},
+			},
+			"port": schema.Int64Attribute{
+				Description: "Service communication port. Default is 443",
+				Optional:    true,
+				Computed:    true,
+				Default:     int64default.StaticInt64(443),
+				Validators: []validator.Int64{
+					int64validator.AtLeast(1),
+					int64validator.Between(1, 65535),
+				},
+			},
+			"ssl_relay_port": schema.Int64Attribute{
+				Description: "The SSL Relay port. Default is 443",
+				Optional:    true,
+				Computed:    true,
+				Default:     int64default.StaticInt64(443),
+				Validators: []validator.Int64{
+					int64validator.AtLeast(1),
+					int64validator.Between(1, 65535),
+				},
+			},
+			"transport_type": schema.StringAttribute{
+				Description: "Type of transport to use. Http, Https, SSL for example. Default to HTTPs.",
+				Optional:    true,
+				Computed:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"HTTPS", "HTTP", "SSL",
+					),
+				},
+				Default: stringdefault.StaticString("HTTPS"),
+			},
+			"load_balance": schema.BoolAttribute{
+				Description: "Round robin load balance the xml service servers. Defaults to true.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
+			},
+			"xml_validation_enabled": schema.BoolAttribute{
+				Description: "Enable XML service endpoint validation. Defaults to false.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+			"xml_validation_secret": schema.StringAttribute{
+				Description: "XML service endpoint validation shared secret.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(""),
+			},
+			"all_failed_bypass_duration": schema.Int64Attribute{
+				Description: "Period of time to skip all xml service requests should all servers fail to respond. Defaults to 0.",
+				Optional:    true,
+				Computed:    true,
+				Default:     int64default.StaticInt64(0),
+				Validators: []validator.Int64{
+					int64validator.AtLeast(0),
+				},
+			},
+			"bypass_duration": schema.Int64Attribute{
+				Description: "Period of time to skip a server when is fails to respond. Defaults to 60.",
+				Optional:    true,
+				Computed:    true,
+				Default:     int64default.StaticInt64(60),
+				Validators: []validator.Int64{
+					int64validator.AtLeast(0),
+				},
+			},
+			"ticket_time_to_live": schema.Int64Attribute{
+				Description: "Period of time an ICA launch ticket is valid once requested on pre 7.0 XenApp and XenDesktop farms. Defaults to 200",
+				Optional:    true,
+				Computed:    true,
+				Default:     int64default.StaticInt64(200),
+				Validators: []validator.Int64{
+					int64validator.AtLeast(0),
+				},
+			},
+			"rade_ticket_time_to_live": schema.Int64Attribute{
+				Description: "Period of time a RADE launch ticket is valid once requested on pre 7.0 XenApp and XenDesktop farms. Defaults to 100.",
+				Optional:    true,
+				Computed:    true,
+				Default:     int64default.StaticInt64(100),
+				Validators: []validator.Int64{
+					int64validator.AtLeast(0),
+				},
+			},
+			"max_failed_servers_per_request": schema.Int64Attribute{
+				Description: "Maximum number of servers within a single farm that can fail before aborting a request.",
+				Optional:    true,
+				Computed:    true,
+				Default:     int64default.StaticInt64(0),
+				Validators: []validator.Int64{
+					int64validator.AtLeast(0),
+				},
+			},
+			"product": schema.StringAttribute{
+				Description: "Cloud deployments only otherwise ignored. The product name of the farm configured. Defaults to empty string.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(""),
+			},
+			"restrict_pops": schema.StringAttribute{
+				Description: "Cloud deployments only otherwise ignored. Restricts GWaaS traffic to the specified POP. Defaults to empty string.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(""),
+			},
+			"farm_guid": schema.StringAttribute{
+				Description: "A tag indicating the scope of the farm. Valid for cloud deployments only. Defaults to empty string.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(""),
+			},
+			"zones": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "The list of Zone names associated with the farm.",
+				Optional:    true,
+				Computed:    true,
+				Default:     listdefault.StaticValue(types.ListValueMust(types.StringType, []attr.Value{})),
+			},
+			"server_urls": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "The url to the service location used to provide web and SaaS apps via this farm.",
+				Optional:    true,
+				Computed:    true,
+				Default:     listdefault.StaticValue(types.ListValueMust(types.StringType, []attr.Value{})),
+			},
+			"servers": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "The list of servers in the Farm.",
+				Required:    true,
+			},
+		},
+	}
+
+}
+
+func (StoreFarm) GetAttributes() map[string]schema.Attribute {
+	return StoreFarm{}.GetSchema().Attributes
+}
 
 type RoamingAccount struct {
 	Published types.Bool `tfsdk:"published"` // Whether the roaming account is published
@@ -49,108 +229,6 @@ func (RoamingAccount) GetSchema() schema.SingleNestedAttribute {
 
 func (RoamingAccount) GetAttributes() map[string]schema.Attribute {
 	return RoamingAccount{}.GetSchema().Attributes
-}
-
-// GatewaySettings maps the STFStoreGatewayServiceSetRequestModel struct.
-type GatewaySettings struct {
-	Enabled                  types.Bool   `tfsdk:"enable"`                      // Enable use of the gateway service
-	CustomerId               types.String `tfsdk:"customer_id"`                 // The CWC customer id
-	GetGatewayServiceUrl     types.String `tfsdk:"get_gateway_service_url"`     // The URL of the service used to retrieve gateway address (FQDN)
-	PrivateKey               types.String `tfsdk:"private_key"`                 // The private key for CWC trust
-	ServiceName              types.String `tfsdk:"service_name"`                // The service name for CWC trust
-	InstanceId               types.String `tfsdk:"instance_id"`                 // The instance id for CWC trust
-	SecureTicketAuthorityUrl types.String `tfsdk:"secure_ticket_authority_url"` // The URL of the CWC STA service
-	SecureTicketLifetime     types.String `tfsdk:"secure_ticket_lifetime"`      // The lifetime requested for CWC STA service tickets
-	SessionReliability       types.Bool   `tfsdk:"session_reliability"`         // A value indicating whether session reliability should be enabled
-	IgnoreZones              types.List   `tfsdk:"ignore_zones"`                // List[string] A value indicating that the gateway service should not be used for the specified zones
-	HandleZones              types.List   `tfsdk:"handle_zones"`                // List[string] A value indicating that the gateway service should be used for the specified zones
-}
-
-func (GatewaySettings) GetSchema() schema.SingleNestedAttribute {
-	return schema.SingleNestedAttribute{
-		Description: "Gateway service settings for the Store",
-		Optional:    true,
-		Attributes: map[string]schema.Attribute{
-			"enable": schema.BoolAttribute{
-				Description: "Enable use of the gateway service. Default is false.",
-				Optional:    true,
-				Computed:    true,
-				Default:     booldefault.StaticBool(false),
-			},
-			"customer_id": schema.StringAttribute{
-				Description: "The CWC customer id",
-				Optional:    true,
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-			},
-			"get_gateway_service_url": schema.StringAttribute{
-				Description: "The URL of the service used to retrieve gateway address (FQDN)",
-				Optional:    true,
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-			},
-			"private_key": schema.StringAttribute{
-				Description: "The private key for CWC trust",
-				Sensitive:   true,
-				Optional:    true,
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-			},
-			"service_name": schema.StringAttribute{
-				Description: "The service name for CWC trust",
-				Optional:    true,
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-			},
-			"instance_id": schema.StringAttribute{
-				Description: "The instance id for CWC trust",
-				Optional:    true,
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-			},
-			"secure_ticket_authority_url": schema.StringAttribute{
-				Description: "The URL of the CWC STA service",
-				Optional:    true,
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-			},
-			"secure_ticket_lifetime": schema.StringAttribute{
-				Description: "The lifetime requested for CWC STA service tickets. Default is 00:01:00.",
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString("00:01:00"),
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-			},
-			"session_reliability": schema.BoolAttribute{
-				Description: "A value indicating whether session reliability should be enabled. Default is false.",
-				Optional:    true,
-				Computed:    true,
-				Default:     booldefault.StaticBool(false),
-			},
-			"ignore_zones": schema.ListAttribute{
-				ElementType: types.StringType,
-				Description: "A value indicating that the gateway service should not be used for the specified zones",
-				Optional:    true,
-			},
-			"handle_zones": schema.ListAttribute{
-				ElementType: types.StringType,
-				Description: "A value indicating that the gateway service should be used for the specified zones",
-				Optional:    true,
-			},
-		},
-	}
-}
-
-func (GatewaySettings) GetAttributes() map[string]schema.Attribute {
-	return GatewaySettings{}.GetSchema().Attributes
 }
 
 // EnumerationOptions maps the STFStoreEnumerationOptionsRequestModel struct.
@@ -463,77 +541,12 @@ type STFStoreServiceResourceModel struct {
 	AuthenticationService types.String `tfsdk:"authentication_service_virtual_path"`
 	Anonymous             types.Bool   `tfsdk:"anonymous"`
 	LoadBalance           types.Bool   `tfsdk:"load_balance"`
+	StoreFarm             types.List   `tfsdk:"farms"`               // List[StoreFarm]
 	PNA                   types.Object `tfsdk:"pna"`                 // PNA
 	EnumerationOptions    types.Object `tfsdk:"enumeration_options"` // EnumerationOptions
 	LaunchOptions         types.Object `tfsdk:"launch_options"`      // LaunchOptions
 	FarmSettings          types.Object `tfsdk:"farm_settings"`
-	GatewaySettings       types.Object `tfsdk:"gateway_settings"` // GatewaySettings
-	RoamingAccount        types.Object `tfsdk:"roaming_account"`  // RoamingAccount
-}
-
-func (*stfStoreServiceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "StoreFront StoreService.",
-		Attributes: map[string]schema.Attribute{
-			"site_id": schema.StringAttribute{
-				Description: "The IIS site id of the StoreFront storeservice. Defaults to 1.",
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString("1"),
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"virtual_path": schema.StringAttribute{
-				Description: "The IIS VirtualPath at which the Store will be configured to be accessed by Receivers.",
-				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-			},
-			"friendly_name": schema.StringAttribute{
-				Description: "The friendly name of the Store",
-				Optional:    true,
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"authentication_service_virtual_path": schema.StringAttribute{
-				Description: "The Virtual Path of the StoreFront Authentication Service to use for authenticating users.",
-				Optional:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-			},
-			"anonymous": schema.BoolAttribute{
-				Description: "Whether the Store is anonymous. Anonymous Store not requiring authentication.",
-				Optional:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.RequiresReplace(),
-				},
-			},
-			"load_balance": schema.BoolAttribute{
-				Description: "Whether the Store is load balanced.",
-				Optional:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.RequiresReplace(),
-				},
-			},
-			"enumeration_options": EnumerationOptions{}.GetSchema(),
-			"pna":                 PNA{}.GetSchema(),
-			"launch_options":      LaunchOptions{}.GetSchema(),
-			"farm_settings":       FarmSettings{}.GetSchema(),
-			"gateway_settings":    GatewaySettings{}.GetSchema(),
-			"roaming_account":     RoamingAccount{}.GetSchema(),
-		},
-	}
+	RoamingAccount        types.Object `tfsdk:"roaming_account"` // RoamingAccount
 }
 
 // PNA maps the resource schema data.
@@ -558,7 +571,7 @@ func (PNA) GetSchema() schema.SingleNestedAttribute {
 	}
 }
 
-func (r *STFStoreServiceResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, storeService *citrixstorefront.STFStoreDetailModel) {
+func (r *STFStoreServiceResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, storeService *citrixstorefront.STFStoreDetailModel, farms []citrixstorefront.StoreFarmModel) {
 	// Overwrite STFStoreServiceResourceModel with refreshed state
 	if storeService.VirtualPath.IsSet() {
 		r.VirtualPath = types.StringValue(*storeService.VirtualPath.Get())
@@ -569,9 +582,67 @@ func (r *STFStoreServiceResourceModel) RefreshPropertyValues(ctx context.Context
 	if storeService.FriendlyName.IsSet() {
 		r.FriendlyName = types.StringValue(*storeService.FriendlyName.Get())
 	}
+	var farmList []StoreFarm
+	for _, farm := range farms {
+		storefarm := StoreFarm{
+			FarmName:                   types.StringValue(*farm.FarmName.Get()),
+			FarmType:                   types.StringValue(FarmTypeFromInt(*farm.FarmType.Get())),
+			Port:                       types.Int64Value(*farm.Port.Get()),
+			SSLRelayPort:               types.Int64Value(*farm.SSLRelayPort.Get()),
+			Product:                    types.StringValue(*farm.Product.Get()),
+			RestrictPoPs:               types.StringValue(*farm.RestrictPoPs.Get()),
+			FarmGuid:                   types.StringValue(*farm.FarmGuid.Get()),
+			TransportType:              types.StringValue(TransportTypeFromInt(*farm.TransportType.Get())),
+			LoadBalance:                types.BoolValue(*farm.LoadBalance.Get()),
+			XMLValidationEnabled:       types.BoolValue(*farm.XMLValidationEnabled.Get()),
+			XMLValidationSecret:        types.StringValue(*farm.XMLValidationSecret.Get()),
+			AllFailedBypassDuration:    types.Int64Value(*farm.AllFailedBypassDuration.Get()),
+			BypassDuration:             types.Int64Value(*farm.BypassDuration.Get()),
+			TicketTimeToLive:           types.Int64Value(*farm.TicketTimeToLive.Get()),
+			RadeTicketTimeToLive:       types.Int64Value(*farm.RadeTicketTimeToLive.Get()),
+			MaxFailedServersPerRequest: types.Int64Value(*farm.MaxFailedServersPerRequest.Get()),
+		}
+		storefarm.Servers = util.RefreshListValues(ctx, diagnostics, storefarm.Servers, farm.Servers)
+		storefarm.Zones = util.RefreshListValues(ctx, diagnostics, storefarm.Zones, farm.Zones)
+		storefarm.ServiceUrls = util.RefreshListValues(ctx, diagnostics, storefarm.ServiceUrls, farm.ServiceUrls)
+		farmList = append(farmList, storefarm)
+	}
+	r.StoreFarm = util.TypedArrayToObjectList[StoreFarm](ctx, diagnostics, farmList)
 }
 
-func (r *STFStoreServiceResourceModel) RefreshPnaValues(ctx context.Context, diagnostics *diag.Diagnostics, pna citrixstorefront.STFPna) {
+func FarmTypeFromInt(farmTypeInt int64) string {
+	switch farmTypeInt {
+	case 0:
+		return "XenApp"
+	case 1:
+		return "XenDesktop"
+	case 2:
+		return "AppController"
+	case 3:
+		return "VDIinaBox"
+	case 4:
+		return "Store"
+	case 5:
+		return "SPA"
+	default:
+		return "Unknown"
+	}
+}
+
+func TransportTypeFromInt(TransportTypeInt int64) string {
+	switch TransportTypeInt {
+	case 0:
+		return "HTTP"
+	case 1:
+		return "HTTPS"
+	case 2:
+		return "SSL"
+	default:
+		return "Unknown"
+	}
+}
+
+func (r *STFStoreServiceResourceModel) RefreshPnaValues(ctx context.Context, diagnostics *diag.Diagnostics, pna *citrixstorefront.STFPna) {
 	refreshedPna := util.ObjectValueToTypedObject[PNA](ctx, diagnostics, r.PNA)
 	if pna.PnaEnabled.IsSet() {
 		refreshedPna.Enable = types.BoolValue(*pna.PnaEnabled.Get())
@@ -643,45 +714,6 @@ func (r *STFStoreServiceResourceModel) RefreshLaunchOptions(ctx context.Context,
 
 	r.LaunchOptions = refreshedLaunchOptionsObject
 }
-func (r *STFStoreServiceResourceModel) RefreshGatewaySettings(ctx context.Context, diagnostics *diag.Diagnostics, gatewayService *citrixstorefront.STFStoreGatewayServiceResponseModel) {
-	refreshedGatewaySettings := util.ObjectValueToTypedObject[GatewaySettings](ctx, diagnostics, r.GatewaySettings)
-	if gatewayService.Enabled.IsSet() {
-		refreshedGatewaySettings.Enabled = types.BoolValue(*gatewayService.Enabled.Get())
-	}
-	if gatewayService.CustomerId.IsSet() && *gatewayService.CustomerId.Get() != "" {
-		refreshedGatewaySettings.CustomerId = types.StringValue(*gatewayService.CustomerId.Get())
-	}
-	if gatewayService.GetGatewayServiceUrl.IsSet() && *gatewayService.GetGatewayServiceUrl.Get() != "" {
-		refreshedGatewaySettings.GetGatewayServiceUrl = types.StringValue(*gatewayService.GetGatewayServiceUrl.Get())
-	}
-	if gatewayService.PrivateKey.IsSet() && *gatewayService.PrivateKey.Get() != "" {
-		refreshedGatewaySettings.PrivateKey = types.StringValue(*gatewayService.PrivateKey.Get())
-	}
-	if gatewayService.ServiceName.IsSet() && *gatewayService.ServiceName.Get() != "" {
-		refreshedGatewaySettings.ServiceName = types.StringValue(*gatewayService.ServiceName.Get())
-	}
-	if gatewayService.InstanceId.IsSet() && *gatewayService.InstanceId.Get() != "" {
-		refreshedGatewaySettings.InstanceId = types.StringValue(*gatewayService.InstanceId.Get())
-	}
-	if gatewayService.SecureTicketAuthorityUrl.IsSet() && *gatewayService.SecureTicketAuthorityUrl.Get() != "" {
-		refreshedGatewaySettings.SecureTicketAuthorityUrl = types.StringValue(*gatewayService.SecureTicketAuthorityUrl.Get())
-	}
-
-	if gatewayService.SessionReliability.IsSet() && *gatewayService.SessionReliability.Get() {
-		refreshedGatewaySettings.SessionReliability = types.BoolValue(*gatewayService.SessionReliability.Get())
-	}
-
-	if gatewayService.IgnoreZones != nil && len(gatewayService.IgnoreZones) >= 1 {
-		refreshedGatewaySettings.IgnoreZones = util.RefreshListValues(ctx, diagnostics, refreshedGatewaySettings.IgnoreZones, gatewayService.IgnoreZones)
-	}
-
-	if gatewayService.HandleZones != nil && len(gatewayService.HandleZones) >= 1 {
-		refreshedGatewaySettings.HandleZones = util.RefreshListValues(ctx, diagnostics, refreshedGatewaySettings.HandleZones, gatewayService.HandleZones)
-	}
-
-	refreshedGatewaySettings.SecureTicketLifetime = types.StringValue(gatewayService.SecureTicketLifetime)
-	r.GatewaySettings = util.TypedObjectToObjectValue(ctx, diagnostics, refreshedGatewaySettings)
-}
 
 func (r *STFStoreServiceResourceModel) RefreshFarmSettings(ctx context.Context, diagnostics *diag.Diagnostics, response *citrixstorefront.StoreFarmConfigurationResponseModel) {
 	refreshedStoreFarmSettings := util.ObjectValueToTypedObject[FarmSettings](ctx, diagnostics, r.FarmSettings)
@@ -728,5 +760,76 @@ func (r *STFStoreServiceResourceModel) RefreshRoamingAccount(ctx context.Context
 	refreshedRoamingObject := util.TypedObjectToObjectValue(ctx, diagnostics, refreshedRoamingAccount)
 
 	r.RoamingAccount = refreshedRoamingObject
+}
 
+func (STFStoreServiceResourceModel) GetSchema() schema.Schema {
+	return schema.Schema{
+		Description: "StoreFront --- StoreFront StoreService.",
+		Attributes: map[string]schema.Attribute{
+			"site_id": schema.StringAttribute{
+				Description: "The IIS site id of the StoreFront storeservice. Defaults to 1.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("1"),
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"virtual_path": schema.StringAttribute{
+				Description: "The IIS VirtualPath at which the Store will be configured to be accessed by Receivers.",
+				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"friendly_name": schema.StringAttribute{
+				Description: "The friendly name of the Store",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"authentication_service_virtual_path": schema.StringAttribute{
+				Description: "The Virtual Path of the StoreFront Authentication Service to use for authenticating users.",
+				Optional:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"anonymous": schema.BoolAttribute{
+				Description: "Whether the Store is anonymous. Anonymous Store not requiring authentication.",
+				Optional:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.RequiresReplace(),
+				},
+			},
+			"load_balance": schema.BoolAttribute{
+				Description: "Whether the Store is load balanced.",
+				Optional:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.RequiresReplace(),
+				},
+			},
+			"farms": schema.ListNestedAttribute{
+				Description:  "A list of StoreFront Controller.",
+				Required:     true,
+				NestedObject: StoreFarm{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+			"enumeration_options": EnumerationOptions{}.GetSchema(),
+			"pna":                 PNA{}.GetSchema(),
+			"launch_options":      LaunchOptions{}.GetSchema(),
+			"farm_settings":       FarmSettings{}.GetSchema(),
+			"roaming_account":     RoamingAccount{}.GetSchema(),
+		},
+	}
 }

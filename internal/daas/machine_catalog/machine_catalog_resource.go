@@ -207,6 +207,12 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	// Get refreshed machine catalogs from Orchestration
 	catalogId := plan.Id.ValueString()
 	catalogName := plan.Name.ValueString()

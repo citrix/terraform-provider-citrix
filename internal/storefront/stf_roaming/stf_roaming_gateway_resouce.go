@@ -9,16 +9,19 @@ import (
 
 	citrixstorefront "github.com/citrix/citrix-daas-rest-go/citrixstorefront/models"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_deployment"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &stfRoamingGatewayResource{}
-	_ resource.ResourceWithConfigure   = &stfRoamingGatewayResource{}
-	_ resource.ResourceWithImportState = &stfRoamingGatewayResource{}
+	_ resource.Resource                   = &stfRoamingGatewayResource{}
+	_ resource.ResourceWithConfigure      = &stfRoamingGatewayResource{}
+	_ resource.ResourceWithImportState    = &stfRoamingGatewayResource{}
+	_ resource.ResourceWithValidateConfig = &stfRoamingGatewayResource{}
 )
 
 // NewSTFRoamingGatewayResource is a helper function to simplify the provider implementation.
@@ -29,6 +32,44 @@ func NewSTFRoamingGatewayResource() resource.Resource {
 // stfRoamingGatewayResource is the resource implementation.
 type stfRoamingGatewayResource struct {
 	client *citrixdaasclient.CitrixDaasClient
+}
+
+// ValidateConfig implements resource.ResourceWithValidateConfig.
+func (*stfRoamingGatewayResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data STFRoamingGatewayResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if !data.SecureTicketAuthorityUrls.IsNull() {
+		staUrlList := util.ObjectListToTypedArray[STFSecureTicketAuthority](ctx, &resp.Diagnostics, data.SecureTicketAuthorityUrls)
+
+		for _, staUrl := range staUrlList {
+			if staUrl.StaValidationEnabled.ValueBool() {
+				if staUrl.StaValidationSecret.IsNull() {
+					resp.Diagnostics.AddAttributeError(
+						path.Root("sta_validation_secret"),
+						"Incorrect Attribute Configuration",
+						"STA Validation Secret is required when STA Validation is enabled",
+					)
+				}
+			} else if !staUrl.StaValidationSecret.IsNull() {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("sta_validation_secret"),
+					"Incorrect Attribute Configuration",
+					"STA Validation Secret should be empty when STA Validation is disabled",
+				)
+			}
+		}
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
+
 }
 
 // Metadata returns the resource type name.
@@ -43,6 +84,11 @@ func (r *stfRoamingGatewayResource) Configure(_ context.Context, req resource.Co
 	}
 
 	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+}
+
+// Schema implements resource.Resource.
+func (r *stfRoamingGatewayResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = STFRoamingGatewayResourceModel{}.GetSchema()
 }
 
 // Create implements resource.Resource.
@@ -61,7 +107,7 @@ func (r *stfRoamingGatewayResource) Create(ctx context.Context, req resource.Cre
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating StoreFront WebReceiver ",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 		return
 	}
@@ -79,6 +125,10 @@ func (r *stfRoamingGatewayResource) Create(ctx context.Context, req resource.Cre
 	addRoamingGatewayBody.SetStasBypassDuration(plan.StasBypassDuration.ValueString())
 	addRoamingGatewayBody.SetGslbUrl(plan.GslbUrl.ValueString())
 	addRoamingGatewayBody.SetIsCloudGateway(plan.IsCloudGateway.ValueBool())
+	addRoamingGatewayBody.SetCallbackUrl(plan.CallbackUrl.ValueString())
+	addRoamingGatewayBody.SetSessionReliability(plan.SessionReliability.ValueBool())
+	addRoamingGatewayBody.SetRequestTicketTwoSTAs(plan.RequestTicketTwoSTAs.ValueBool())
+	addRoamingGatewayBody.SetStasUseLoadBalancing(plan.StasUseLoadBalancing.ValueBool())
 
 	stfStaUrls := []citrixstorefront.STFSTAUrlModel{}
 	plannedStaUrls := util.ObjectListToTypedArray[STFSecureTicketAuthority](ctx, &resp.Diagnostics, plan.SecureTicketAuthorityUrls)
@@ -92,12 +142,12 @@ func (r *stfRoamingGatewayResource) Create(ctx context.Context, req resource.Cre
 	}
 
 	// Create new STF Roaming Gateway
-	createRoamingGatewayRequest := r.client.StorefrontClient.RoamingSF.STFRoamingGatewayAdd(ctx, addRoamingGatewayBody, getRoamingServiceBody, stfStaUrls, plan.SessionReliability.ValueBool(), plan.RequestTicketTwoSTAs.ValueBool(), plan.StasUseLoadBalancing.ValueBool())
+	createRoamingGatewayRequest := r.client.StorefrontClient.RoamingSF.STFRoamingGatewayAdd(ctx, addRoamingGatewayBody, getRoamingServiceBody, stfStaUrls)
 	_, err = createRoamingGatewayRequest.Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating StoreFront Roaming Gateway ",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 		return
 	}
@@ -112,7 +162,7 @@ func (r *stfRoamingGatewayResource) Create(ctx context.Context, req resource.Cre
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error refreshing StoreFront Roaming Gateway details ",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 		return
 	}
@@ -142,8 +192,13 @@ func (r *stfRoamingGatewayResource) Read(ctx context.Context, req resource.ReadR
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error fetching StoreFront Roaming Gateway details",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
+		return
+	}
+
+	deployment, err := stf_deployment.GetSTFDeployment(ctx, r.client, &resp.Diagnostics, state.SiteId.ValueStringPointer())
+	if err != nil || deployment == nil {
 		return
 	}
 
@@ -160,7 +215,7 @@ func (r *stfRoamingGatewayResource) Read(ctx context.Context, req resource.ReadR
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error fetching StoreFront Roaming Gateway details ",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 		return
 	}
@@ -190,7 +245,7 @@ func (r *stfRoamingGatewayResource) Update(ctx context.Context, req resource.Upd
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating StoreFront Roaming Gateway configurations",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 		return
 	}
@@ -232,7 +287,7 @@ func (r *stfRoamingGatewayResource) Update(ctx context.Context, req resource.Upd
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating StoreFront Roaming Gateway configurations",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 		return
 	}
@@ -243,7 +298,7 @@ func (r *stfRoamingGatewayResource) Update(ctx context.Context, req resource.Upd
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating StoreFront Roaming Gateway details ",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 		return
 	}
@@ -276,7 +331,7 @@ func (r *stfRoamingGatewayResource) Delete(ctx context.Context, req resource.Del
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting StoreFront Roaming Gateway ",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 		return
 	}
@@ -288,7 +343,7 @@ func (r *stfRoamingGatewayResource) Delete(ctx context.Context, req resource.Del
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting StoreFront Roaming Gateway ",
-			"\nError message: "+err.Error(),
+			"Error message: "+err.Error(),
 		)
 		return
 	}

@@ -30,7 +30,7 @@ type ZoneResourceModel struct {
 
 func (ZoneResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Manages a zone.",
+		Description: "CVAD --- Manages a zone.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the zone.",
