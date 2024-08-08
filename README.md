@@ -138,7 +138,7 @@ Hypervisor is needed to use your preferred public cloud provider with Citrix Daa
 
 ### Create a Hypervisor Resource Pool
 
-The hypervisor resource pool defines the network configuration for a hypervisor connection. Refer the [DaaS Hypervisor Resource Pool documentaion](docs/resources/azure_hypervisor_resource_pool.md) to configure an Azure hypervisr resource pool via terraform.
+The hypervisor resource pool defines the network configuration for a hypervisor connection. Refer the [DaaS Hypervisor Resource Pool documentation](docs/resources/azure_hypervisor_resource_pool.md) to configure an Azure hypervisr resource pool via terraform.
 
 ### Create a Machine Catalog
 
@@ -151,17 +151,18 @@ A delivery group is a collection of machines selected from one or more machine c
 
 ### Configure Global App Configuration (GAC) Settings
 
-The Global App Configuration service provides a centralized setup for IT admins to easily configure Citrix Workspace app settings on Windows, Mac, Android, iOS, HTML5, Chrome OS platforms. Currently, configuration of GAC settings is only supported for citrix cloud customers. Please refer to [Global App Configuration settings documentation](docs/resources/gac_settings.md) to configure GAC settings via terraform.
+The Global App Configuration service provides a centralized setup for IT admins to easily configure Citrix Workspace app settings on Windows, Mac, Android, iOS, HTML5, Chrome OS platforms. Please refer to [Global App Configuration settings documentation](docs/resources/gac_settings.md) to configure GAC settings via terraform.
 
 ### Create Citrix Cloud Resource Locations
 
-Resource locations contain the resources (e.g. cloud connectors) required to deliver applications and desktops to users. Resource locations are only supported for Cloud customers. On-premises customers can use the zone resource directly. Please refer to [Citrix Resource Location](docs/resources/resource_location.md) documentation to configure citrix cloud resource locations via terraform.
+Resource locations contain the resources (e.g. cloud connectors) required to deliver applications and desktops to users. Resource locations are only supported for Cloud customers. On-premises customers can use the zone resource directly. Please refer to [Citrix Resource Location documentation](docs/resources/resource_location.md) to configure citrix cloud resource locations via terraform.
 
 ### Managing StoreFront resources
-Please refer to the [StoreFront.md](StoreFront.md) to configure StoreFront resources via terraform.
+Please refer to the [StoreFront.md](StoreFront.md) to configure StoreFront resources via terraform. Note that this feature is in Tech Preview.
 
 ### Managing QuickCreate resources
-Please refer to the [QuickCreate.md](QuickCreate.md) to configure QuickCreate resources via terraform.
+
+QuickCreate service allows customers to create and manage Amazon WorkSpaces Core instances in Amazon Web Services (AWS). Please refer to the [QuickCreate documentation](https://docs.citrix.com/en-us/citrix-daas/install-configure/amazon-workspaces-core.html) to learn more. Note that this feature is in Tech Preview.
 
 ## Examples and Deployment Guides
 Basic example templates for getting started: [/examples](/examples)
