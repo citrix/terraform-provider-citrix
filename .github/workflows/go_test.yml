@@ -29,28 +29,25 @@ jobs:
       # Checkout repo
       - name: Checkout Repo
         uses: actions/checkout@v4
-      
-      - name: Login via Az module
-        uses: azure/login@v2
-        with:
-          creds: ${{secrets.AZURE_CREDENTIALS}}
-          enable-AzPSSession: true 
+        with: 
+          ref: test-github-action
+          token: ${{secrets.CHECKOUT_TOKEN}}
       
       - name: Run Azure PowerShell inline script
         uses: azure/powershell@v2
         with:
           inlineScript: |
-            ./scripts/test-env-power-management.ps1 `
-              -ClientId ${{secrets.ClientId}} `
-              -ClientSecret ${{secrets.ClientSecret}} `
-              -DomainFqdn ${{env.DomainFqdn}} `
-              -Hostname ${{env.Hostname}} `
-              -AzureClientId ${{secrets.AzureClientId}} `
-              -AzureClientSecret ${{secrets.AzureClientSecret}} `
-              -AzureTenantId ${{secrets.AzureTenantId}} `
-              -AzureSubscriptionId ${{env.AzureSubscriptionId}} `
-              -AzureResourceGroupName ${{env.AzureResourceGroupName}} `
-              -AzureDdcVmName ${{env.AzureDdcVmName}} `
-              -AzureAdVmName ${{env.AzureAdVmName}} `
+            ./scripts/test-env-power-management/azure_env.ps1 `
+              -ClientId ${{secrets.CLIENT_ID}} `
+              -ClientSecret ${{secrets.CLIENT_SECRET}} `
+              -DomainFqdn ${{secrets.DOMAIN_FQDN}} `
+              -Hostname ${{secrets.HOSTNAME}} `
+              -AzureClientId ${{secrets.AZURE_CLIENT_ID}} `
+              -AzureClientSecret ${{secrets.AZURE_CLIENT_SECRET}} `
+              -AzureTenantId ${{secrets.AZURE_TENANT_ID}} `
+              -AzureSubscriptionId ${{secrets.AZURE_SUBSCRIPTION_ID}} `
+              -AzureResourceGroupName ${{env.AZURE_RESOURCE_GROUP_NAME}} `
+              -AzureDdcVmName ${{env.AZURE_DDC_VM_NAME}} `
+              -AzureAdVmName ${{env.AZURE_AD_VM_NAME}} `
               -DisableSSLValidation $true
           azPSVersion: "latest"
