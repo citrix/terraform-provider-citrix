@@ -83,7 +83,11 @@ Param (
 function Get-Me {
     $base64Auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$DomainFqdn\$ClientId", $ClientSecret)))
     try {
-        $response = Invoke-RestMethod -Uri "https://$Hostname/citrix/orchestration/api/techpreview/tokens" -Method POST -Headers @{ "Authorization" = "Basic $base64Auth" }
+        if ($DisableSSLValidation) {
+            $response = Invoke-RestMethod -Uri "https://$Hostname/citrix/orchestration/api/techpreview/tokens" -Method POST -Headers @{ "Authorization" = "Basic $base64Auth" } -SkipCertificateCheck
+        } else {
+            $response = Invoke-RestMethod -Uri "https://$Hostname/citrix/orchestration/api/techpreview/tokens" -Method POST -Headers @{ "Authorization" = "Basic $base64Auth" }
+        }
     } catch {
         if ($_.Exception.Response.StatusCode.value__ -ne 200) {
             Write-Host "Failed to get auth token. Status Code: $($_.Exception.Response.StatusCode.value__)"
@@ -94,7 +98,11 @@ function Get-Me {
 
     $token = $response.Token
     try {
-        Invoke-RestMethod -Uri "https://$Hostname/citrix/orchestration/api/techpreview/me" -Method GET -Headers @{ "Authorization" = "Bearer $token" }
+        if ($DisableSSLValidation) {
+            Invoke-RestMethod -Uri "https://$Hostname/citrix/orchestration/api/techpreview/me" -Method GET -Headers @{ "Authorization" = "Bearer $token" } -SkipCertificateCheck
+        } else {
+            Invoke-RestMethod -Uri "https://$Hostname/citrix/orchestration/api/techpreview/me" -Method GET -Headers @{ "Authorization" = "Bearer $token" }
+        }
     } catch {
         if ($_.Exception.Response.StatusCode.value__ -ne 200) {
             Write-Host "Failed to get Site"
@@ -125,33 +133,6 @@ if ($adVm.Statuses[1].Code -ne "PowerState/running") {
 }
 
 # Poll for the orchestration service to be available
-## Disable SSL validation for test env
-if ($DisableSSLValidation) {
-    Write-Host "Disabling SSL..."
-    if (-not("dummy" -as [type])) {
-        add-type -TypeDefinition @"
-using System;
-using System.Net;
-using System.Net.Security;
-using System.Security.Cryptography.X509Certificates;
-
-public static class Dummy {
-    public static bool ReturnTrue(object sender,
-        X509Certificate certificate,
-        X509Chain chain,
-        SslPolicyErrors sslPolicyErrors) { return true; }
-
-    public static RemoteCertificateValidationCallback GetDelegate() {
-        return new RemoteCertificateValidationCallback(Dummy.ReturnTrue);
-    }
-}
-"@
-    }
-    
-    [System.Net.ServicePointManager]::ServerCertificateValidationCallback = [dummy]::GetDelegate()
-    [Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls"
-}
-
 ## Poll for GetMe API to return 200
 $timeout = 300
 $curTime = Get-Date
