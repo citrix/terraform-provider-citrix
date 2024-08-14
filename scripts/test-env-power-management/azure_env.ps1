@@ -126,17 +126,7 @@ if ($adVm.Statuses[1].Code -ne "PowerState/running") {
 # Poll for the orchestration service to be available
 ## Disable SSL validation for test env
 if ($DisableSSLValidation) {
-    $code = @"
-using System.Net;
-using System.Security.Cryptography.X509Certificates;
-public class TrustAllCertsPolicy : ICertificatePolicy {
-    public bool CheckValidationResult(ServicePoint srvPoint, X509Certificate certificate, WebRequest request, int certificateProblem) {
-        return true;
-    }
-}
-"@
-    Add-Type -TypeDefinition $code -Language CSharp
-    [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
+    [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true} ;
 }
 
 ## Poll for GetMe API to return 200
