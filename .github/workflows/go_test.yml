@@ -32,6 +32,11 @@ jobs:
         with: 
           ref: test-github-action
           token: ${{secrets.CHECKOUT_TOKEN}}
+
+      # - name: Install Az PowerShell
+      #   shell: pwsh
+      #   run: |
+      #     Install-Module -Name Az.Compute -Repository PSGallery -Force -ErrorAction Stop
       
       - name: Run Azure PowerShell inline script
         uses: azure/powershell@v2
@@ -46,8 +51,8 @@ jobs:
               -AzureClientSecret ${{secrets.AZURE_CLIENT_SECRET}} `
               -AzureTenantId ${{secrets.AZURE_TENANT_ID}} `
               -AzureSubscriptionId ${{secrets.AZURE_SUBSCRIPTION_ID}} `
-              -AzureResourceGroupName ${{env.AZURE_RESOURCE_GROUP_NAME}} `
-              -AzureDdcVmName ${{env.AZURE_DDC_VM_NAME}} `
-              -AzureAdVmName ${{env.AZURE_AD_VM_NAME}} `
+              -AzureResourceGroupName ${{vars.AZURE_RESOURCE_GROUP_NAME}} `
+              -AzureDdcVmName ${{vars.AZURE_DDC_VM_NAME}} `
+              -AzureAdVmName ${{vars.AZURE_AD_VM_NAME}} `
               -DisableSSLValidation $true
           azPSVersion: "latest"
