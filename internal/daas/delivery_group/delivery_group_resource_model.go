@@ -6,9 +6,12 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
+	"github.com/citrix/terraform-provider-citrix/internal/validators"
+	"github.com/hashicorp/terraform-plugin-framework-validators/boolvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
@@ -626,6 +629,7 @@ func (DeliveryGroupDesktop) GetAttributes() map[string]schema.Attribute {
 }
 
 type DeliveryGroupAppProtection struct {
+	ApplyContextually       types.List `tfsdk:"apply_contextually"` //DeliveryGroupAppProtectionApplyContextually
 	EnableAntiKeyLogging    types.Bool `tfsdk:"enable_anti_key_logging"`
 	EnableAntiScreenCapture types.Bool `tfsdk:"enable_anti_screen_capture"`
 }
@@ -636,6 +640,66 @@ func (DeliveryGroupAppProtection) GetSchema() schema.SingleNestedAttribute {
 			"\n\n~> **Please Note** Before using the feature, make sure that these [requirements](https://docs.citrix.com/en-us/citrix-workspace-app/app-protection.html#system-requirements) are met.",
 		Optional: true,
 		Attributes: map[string]schema.Attribute{
+			"enable_anti_key_logging": schema.BoolAttribute{
+				Description: "When enabled, anti-keylogging is applied when a protected window is in focus.",
+				Optional:    true,
+				Validators: []validator.Bool{
+					boolvalidator.AlsoRequires(
+						path.MatchRelative().AtParent().AtName("enable_anti_screen_capture"),
+					),
+				},
+			},
+			"enable_anti_screen_capture": schema.BoolAttribute{
+				Description: "Specify whether to use anti-screen capture." +
+					"\n\n-> **Note** For Windows and macOS, only the window with protected content is blank. Anti-screen capture is only applied when the window is open. For Linux, the entire screen will appear blank. Anti-screen capture is only applied when the window is open or minimized.",
+				Optional: true,
+			},
+			"apply_contextually": schema.ListNestedAttribute{
+				Description:  "Implement contextual App Protection using the connection filters defined in the Access Policy rule.",
+				Optional:     true,
+				NestedObject: DeliveryGroupAppProtectionApplyContextuallyModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.ExactlyOneOf(
+						path.MatchRelative().AtParent().AtName("enable_anti_key_logging"),
+					),
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+		},
+	}
+}
+
+func (DeliveryGroupAppProtection) GetAttributes() map[string]schema.Attribute {
+	return DeliveryGroupAppProtection{}.GetSchema().Attributes
+}
+
+var _ util.RefreshableListItemWithAttributes[citrixorchestration.AdvancedAccessPolicyResponseModel] = DeliveryGroupAppProtectionApplyContextuallyModel{}
+
+type DeliveryGroupAppProtectionApplyContextuallyModel struct {
+	PolicyName              types.String `tfsdk:"policy_name"`
+	EnableAntiKeyLogging    types.Bool   `tfsdk:"enable_anti_key_logging"`
+	EnableAntiScreenCapture types.Bool   `tfsdk:"enable_anti_screen_capture"`
+}
+
+// GetKey implements util.RefreshableListItemWithAttributes.
+func (r DeliveryGroupAppProtectionApplyContextuallyModel) GetKey() string {
+	if strings.EqualFold(r.PolicyName.ValueString(), util.CitrixGatewayConnections) {
+		return util.CitrixGatewayConnections
+	}
+	if strings.EqualFold(r.PolicyName.ValueString(), util.NonCitrixGatewayConnections) {
+		return util.NonCitrixGatewayConnections
+	}
+	return r.PolicyName.ValueString()
+}
+
+func (DeliveryGroupAppProtectionApplyContextuallyModel) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"policy_name": schema.StringAttribute{
+				Description: "The name of the policy." +
+					"\n\n-> **Note** To refer to default policies, use `Citrix Gateway connections` as the name for the default policy that is Via Access Gateway and `Non-Citrix Gateway connections` as the name for the defauly policy that is Not Via Access Gateway.",
+				Required: true,
+			},
 			"enable_anti_key_logging": schema.BoolAttribute{
 				Description: "When enabled, anti-keylogging is applied when a protected window is in focus.",
 				Required:    true,
@@ -649,8 +713,133 @@ func (DeliveryGroupAppProtection) GetSchema() schema.SingleNestedAttribute {
 	}
 }
 
-func (DeliveryGroupAppProtection) GetAttributes() map[string]schema.Attribute {
-	return DeliveryGroupAppProtection{}.GetSchema().Attributes
+func (DeliveryGroupAppProtectionApplyContextuallyModel) GetAttributes() map[string]schema.Attribute {
+	return DeliveryGroupAppProtectionApplyContextuallyModel{}.GetSchema().Attributes
+}
+
+var _ util.RefreshableListItemWithAttributes[citrixorchestration.AdvancedAccessPolicyResponseModel] = DeliveryGroupAccessPolicyModel{}
+
+type DeliveryGroupAccessPolicyModel struct {
+	Id                                  types.String `tfsdk:"id"`
+	Name                                types.String `tfsdk:"name"`
+	Enabled                             types.Bool   `tfsdk:"enabled"`
+	AllowedConnection                   types.String `tfsdk:"allowed_connection"`
+	EnableCriteriaForIncludeConnections types.Bool   `tfsdk:"enable_criteria_for_include_connections"`
+	IncludeConnectionsCriteriaType      types.String `tfsdk:"include_connections_criteria_type"`
+	EnableCriteriaForExcludeConnections types.Bool   `tfsdk:"enable_criteria_for_exclude_connections"`
+	IncludeCriteriaFilters              types.List   `tfsdk:"include_criteria_filters"` //List[DeliveryGroupAccessPolicyCriteriaTagsModel]
+	ExcludeCriteriaFilters              types.List   `tfsdk:"exclude_criteria_filters"` //List[DeliveryGroupAccessPolicyCriteriaTagsModel]
+}
+
+func (r DeliveryGroupAccessPolicyModel) GetKey() string {
+	return r.Name.ValueString()
+}
+
+func (DeliveryGroupAccessPolicyModel) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Description: "ID of the resource location.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"name": schema.StringAttribute{
+				Description: "The name of the access policy.",
+				Required:    true,
+			},
+			"enabled": schema.BoolAttribute{
+				Description: "Whether the access policy is enabled.",
+				Required:    true,
+			},
+			"allowed_connection": schema.StringAttribute{
+				Description: "The behavior of the include filter. Choose between `Filtered`, `ViaAG`, and `NotViaAG`.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"Filtered",
+						"ViaAG",
+						"NotViaAG",
+					),
+				},
+			},
+			"enable_criteria_for_include_connections": schema.BoolAttribute{
+				Description: "Whether to enable criteria for include connections.",
+				Required:    true,
+				Validators: []validator.Bool{
+					validators.AlsoRequiresOnBoolValues(
+						[]bool{true},
+						path.MatchRelative().AtParent().AtName("include_connections_criteria_type"),
+					),
+				},
+			},
+			"include_connections_criteria_type": schema.StringAttribute{
+				Description: "The type of criteria for include connections. Choose between `MatchAny` and `MatchAll`.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"MatchAny",
+						"MatchAll",
+					),
+				},
+			},
+			"include_criteria_filters": schema.ListNestedAttribute{
+				Description:  "The list of filters that meet the criteria for include connections.",
+				Optional:     true,
+				NestedObject: DeliveryGroupAccessPolicyCriteriaTagsModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+			"enable_criteria_for_exclude_connections": schema.BoolAttribute{
+				Description: "Whether to enable criteria for exclude connections.",
+				Required:    true,
+			},
+			"exclude_criteria_filters": schema.ListNestedAttribute{
+				Description:  "The list of filters that meet the criteria for exclude connections.",
+				Optional:     true,
+				NestedObject: DeliveryGroupAccessPolicyCriteriaTagsModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+		},
+	}
+}
+
+func (DeliveryGroupAccessPolicyModel) GetAttributes() map[string]schema.Attribute {
+	return DeliveryGroupAccessPolicyModel{}.GetSchema().Attributes
+}
+
+var _ util.RefreshableListItemWithAttributes[citrixorchestration.SmartAccessTagResponseModel] = DeliveryGroupAccessPolicyCriteriaTagsModel{}
+
+type DeliveryGroupAccessPolicyCriteriaTagsModel struct {
+	FilterName  types.String `tfsdk:"filter_name"`
+	FilterValue types.String `tfsdk:"filter_value"`
+}
+
+func (r DeliveryGroupAccessPolicyCriteriaTagsModel) GetKey() string {
+	return r.FilterName.ValueString()
+}
+
+func (DeliveryGroupAccessPolicyCriteriaTagsModel) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"filter_name": schema.StringAttribute{
+				Description: "The name of the filter.",
+				Required:    true,
+			},
+			"filter_value": schema.StringAttribute{
+				Description: "The value of the filter.",
+				Required:    true,
+			},
+		},
+	}
+}
+
+func (DeliveryGroupAccessPolicyCriteriaTagsModel) GetAttributes() map[string]schema.Attribute {
+	return DeliveryGroupAccessPolicyCriteriaTagsModel{}.GetSchema().Attributes
 }
 
 // DeliveryGroupResourceModel maps the resource schema data.
@@ -672,7 +861,9 @@ type DeliveryGroupResourceModel struct {
 	StoreFrontServers           types.Set    `tfsdk:"storefront_servers"` //Set[string]
 	Scopes                      types.Set    `tfsdk:"scopes"`             //Set[String]
 	MakeResourcesAvailableInLHC types.Bool   `tfsdk:"make_resources_available_in_lhc"`
-	AppProtection               types.Object `tfsdk:"app_protection"` //DeliveryGroupAppProtection
+	AppProtection               types.Object `tfsdk:"app_protection"`  //DeliveryGroupAppProtection
+	AccessPolicies              types.List   `tfsdk:"access_policies"` //List[DeliveryGroupAccessPolicyModel]
+	DeliveryGroupFolderPath     types.String `tfsdk:"delivery_group_folder_path"`
 }
 
 func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
@@ -816,6 +1007,19 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 				Optional: true,
 			},
 			"app_protection": DeliveryGroupAppProtection{}.GetSchema(),
+			"access_policies": schema.ListNestedAttribute{
+				Description: "Access policies for the delivery group. " +
+					"\n\n~> **Please Note** Modifying built-in access policies is currently not supported.",
+				Optional:     true,
+				NestedObject: DeliveryGroupAccessPolicyModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+			"delivery_group_folder_path": schema.StringAttribute{
+				Description: "The path of the folder in which the delivery group is located.",
+				Optional:    true,
+			},
 		},
 	}
 }
@@ -855,27 +1059,13 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 		r.SharingKind = types.StringValue(string(deliveryGroup.GetSharingKind()))
 	}
 
-	antiKeyLoggingEnabled := deliveryGroup.GetAppProtectionKeyLoggingRequired()
-	antiScreenCaptureEnabled := deliveryGroup.GetAppProtectionScreenCaptureRequired()
-
-	if antiKeyLoggingEnabled || antiScreenCaptureEnabled {
-		appProtectionModel := DeliveryGroupAppProtection{}
-		appProtectionModel.EnableAntiKeyLogging = types.BoolValue(antiKeyLoggingEnabled)
-		appProtectionModel.EnableAntiScreenCapture = types.BoolValue(antiScreenCaptureEnabled)
-		r.AppProtection = util.TypedObjectToObjectValue(ctx, diagnostics, appProtectionModel)
-	} else if !r.AppProtection.IsNull() {
-		appProtectionModel := util.ObjectValueToTypedObject[DeliveryGroupAppProtection](ctx, diagnostics, r.AppProtection)
-		appProtectionModel.EnableAntiKeyLogging = types.BoolValue(false)
-		appProtectionModel.EnableAntiScreenCapture = types.BoolValue(false)
-
-		r.AppProtection = util.TypedObjectToObjectValue(ctx, diagnostics, appProtectionModel)
-	}
-
 	r = r.updatePlanWithRestrictedAccessUsers(ctx, diagnostics, deliveryGroup)
 	r = r.updatePlanWithDesktops(ctx, diagnostics, dgDesktops)
 	r = r.updatePlanWithAssociatedCatalogs(ctx, diagnostics, dgMachines)
 	r = r.updatePlanWithAutoscaleSettings(ctx, diagnostics, deliveryGroup, dgPowerTimeSchemes)
 	r = r.updatePlanWithRebootSchedule(ctx, diagnostics, dgRebootSchedule)
+	r = r.updatePlanWithAppProtection(ctx, diagnostics, deliveryGroup)
+	r = r.updatePlanWithAccessPolicies(ctx, diagnostics, deliveryGroup.GetAdvancedAccessPolicy())
 
 	if len(deliveryGroup.GetStoreFrontServersForHostedReceiver()) > 0 || !r.StoreFrontServers.IsNull() {
 		var remoteAssociatedStoreFrontServers []string
@@ -885,6 +1075,14 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 		r.StoreFrontServers = util.StringArrayToStringSet(ctx, diagnostics, remoteAssociatedStoreFrontServers)
 	} else {
 		r.StoreFrontServers = types.SetNull(types.StringType)
+	}
+
+	adminFolder := deliveryGroup.GetAdminFolder()
+	adminFolderPath := adminFolder.GetName()
+	if adminFolderPath != "" {
+		r.DeliveryGroupFolderPath = types.StringValue(adminFolderPath)
+	} else {
+		r.DeliveryGroupFolderPath = types.StringNull()
 	}
 
 	return r

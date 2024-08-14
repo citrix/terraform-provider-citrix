@@ -128,10 +128,52 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 	}
 
 	deliveryGroupId := deliveryGroup.GetId()
+	existingAdvancedAccessPolicies := deliveryGroup.GetAdvancedAccessPolicy()
 
 	//Create Reboot Schedule after delivery group is created
 	var editbody citrixorchestration.EditDeliveryGroupRequestModel
 	editbody.SetRebootSchedules(body.GetRebootSchedules())
+
+	if !plan.AccessPolicies.IsNull() {
+		simpleAccessPolicy := body.GetSimpleAccessPolicy()
+		advancedAccessPolicies := []citrixorchestration.AdvancedAccessPolicyRequestModel{}
+		for _, existingAdvancedAccessPolicy := range existingAdvancedAccessPolicies {
+			var advancedAccessPolicyRequest citrixorchestration.AdvancedAccessPolicyRequestModel
+			advancedAccessPolicyRequest.SetId(existingAdvancedAccessPolicy.GetId())
+			advancedAccessPolicyRequest.SetName(existingAdvancedAccessPolicy.GetName())
+			advancedAccessPolicyRequest.SetIncludedUserFilterEnabled(simpleAccessPolicy.GetIncludedUserFilterEnabled())
+			advancedAccessPolicyRequest.SetIncludedUsers(simpleAccessPolicy.GetIncludedUsers())
+			advancedAccessPolicyRequest.SetExcludedUserFilterEnabled(simpleAccessPolicy.GetExcludedUserFilterEnabled())
+			advancedAccessPolicyRequest.SetExcludedUsers(simpleAccessPolicy.GetExcludedUsers())
+			advancedAccessPolicyRequest.SetAllowedUsers(existingAdvancedAccessPolicy.GetAllowedUsers())
+			advancedAccessPolicies = append(advancedAccessPolicies, advancedAccessPolicyRequest)
+		}
+
+		accessPolicies := util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, &resp.Diagnostics, plan.AccessPolicies)
+		for _, accessPolicy := range accessPolicies {
+			accessPolicyRequest, err := getAdvancedAccessPolicyRequest(ctx, &resp.Diagnostics, accessPolicy)
+			if err != nil {
+				return
+			}
+			advancedAccessPolicies = append(advancedAccessPolicies, accessPolicyRequest)
+		}
+
+		if !plan.AppProtection.IsNull() {
+			appProtection := util.ObjectValueToTypedObject[DeliveryGroupAppProtection](ctx, &resp.Diagnostics, plan.AppProtection)
+			if !appProtection.ApplyContextually.IsNull() {
+				appProtectionApplyContextually := util.ObjectListToTypedArray[DeliveryGroupAppProtectionApplyContextuallyModel](ctx, &resp.Diagnostics, appProtection.ApplyContextually)
+				for _, applyContextually := range appProtectionApplyContextually {
+					advancedAccessPolicies, err = setAppProtectionOnAdvancedAccessPolicies(&resp.Diagnostics, applyContextually, advancedAccessPolicies, deliveryGroup.GetName())
+					if err != nil {
+						return
+					}
+				}
+			}
+		}
+
+		editbody.SetAdvancedAccessPolicy(advancedAccessPolicies)
+	}
+
 	updateDeliveryGroupRequest := r.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsPatchDeliveryGroup(ctx, deliveryGroupId)
 	updateDeliveryGroupRequest = updateDeliveryGroupRequest.EditDeliveryGroupRequestModel(editbody)
 	httpResp, err = citrixdaasclient.AddRequestData(updateDeliveryGroupRequest, r.client).Execute()
@@ -141,6 +183,11 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+	}
+
+	deliveryGroup, err = getDeliveryGroup(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
+	if err != nil {
+		return
 	}
 
 	// Get desktops
@@ -390,6 +437,26 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	if !data.AccessPolicies.IsNull() {
+		accessPolicies := util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, &resp.Diagnostics, data.AccessPolicies)
+		for index, accessPolicy := range accessPolicies {
+			isValid := accessPolicy.ValidateConfig(&resp.Diagnostics, index)
+
+			if !isValid {
+				return
+			}
+		}
+	}
+
+	if !data.AppProtection.IsNull() {
+		appPrtoection := util.ObjectValueToTypedObject[DeliveryGroupAppProtection](ctx, &resp.Diagnostics, data.AppProtection)
+		isValid := appPrtoection.ValidateConfig(ctx, &resp.Diagnostics)
+
+		if !isValid {
+			return
+		}
 	}
 
 	if data.AssociatedMachineCatalogs.IsNull() || len(data.AssociatedMachineCatalogs.Elements()) < 1 {

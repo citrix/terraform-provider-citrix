@@ -28,7 +28,7 @@ func TestApplicationResource(t *testing.T) {
 			TestHypervisorResourcePoolPreCheck_Azure(t)
 			TestMachineCatalogPreCheck_Azure(t)
 			TestDeliveryGroupPreCheck(t)
-			TestApplicationFolderPreCheck(t)
+			TestAdminFolderPreCheck(t)
 			TestApplicationResourcePreCheck(t)
 		},
 		Steps: []resource.TestStep{
@@ -36,7 +36,7 @@ func TestApplicationResource(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildApplicationResource(t, testApplicationResource),
-					BuildApplicationFolderResource(t, testApplicationFolderResource_updated),
+					BuildAdminFolderResource(t, testAdminFolderResource_updated, "ContainsApplications"),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
 					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
@@ -68,7 +68,7 @@ func TestApplicationResource(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildApplicationResource(t, testApplicationResource_updated),
-					BuildApplicationFolderResource(t, testApplicationFolderResource_updated),
+					BuildAdminFolderResource(t, testAdminFolderResource_updated, "ContainsApplications"),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
 					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
@@ -117,7 +117,7 @@ resource "citrix_application" "testApplication" {
 		working_directory       = "test directory"
 	}
 	delivery_groups = [citrix_delivery_group.testDeliveryGroup.id]
-	application_folder_path = citrix_application_folder.testApplicationFolder2.path
+	application_folder_path = citrix_admin_folder.testAdminFolder2.path
 }`
 )
 

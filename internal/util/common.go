@@ -163,6 +163,9 @@ const SensitiveFieldMaskedValue = "*****"
 const ProviderInitializationErrorMsg = "Provider initialization error"
 const MissingProviderClientIdAndSecretErrorMsg = "client_id and client_secret fields must be set in the provider configuration to manage this resource via terraform."
 
+const CitrixGatewayConnections = "Citrix Gateway connections"
+const NonCitrixGatewayConnections = "Non-Citrix Gateway Connections"
+
 var PlatformSettingsAssignedTo = []string{"AllUsersNoAuthentication"}
 
 // Terraform model for name value string pair
@@ -570,6 +573,28 @@ func GetOrchestrationNetworkMappingKey(remote citrixorchestration.NetworkMapResp
 
 func GetOrchestrationRemotePcOuKey(remote citrixorchestration.RemotePCEnrollmentScopeResponseModel) string {
 	return remote.GetOU()
+}
+
+func GetOrchestrationSmartAccessTagKey(remote citrixorchestration.SmartAccessTagResponseModel) string {
+	return remote.GetFarm()
+}
+
+func GetOrchestrationAccessPolicyKey(remote citrixorchestration.AdvancedAccessPolicyResponseModel) string {
+	return remote.GetName()
+}
+
+func GetOrchestrationAppProtectionApplyContextuallyKey(remote citrixorchestration.AdvancedAccessPolicyResponseModel) string {
+	if remote.GetIsBuiltIn() {
+		if strings.HasSuffix(remote.GetName(), "_AG") {
+			return CitrixGatewayConnections
+		}
+
+		if strings.HasSuffix(remote.GetName(), "_Direct") {
+			return NonCitrixGatewayConnections
+		}
+	}
+
+	return remote.GetName()
 }
 
 func GetSTFGroupMemberKey(remote citrixstorefront.STFGroupMemberResponseModel) string {

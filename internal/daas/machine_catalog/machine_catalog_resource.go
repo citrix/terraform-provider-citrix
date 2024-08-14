@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -105,7 +106,8 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 	}
 
 	// Get the new catalog
-	catalog, err := util.GetMachineCatalog(ctx, r.client, &resp.Diagnostics, plan.Name.ValueString(), true)
+	machineCatalogPath := strings.ReplaceAll(plan.MachineCatalogFolderPath.ValueString(), "\\", "|") + plan.Name.ValueString()
+	catalog, err := util.GetMachineCatalog(ctx, r.client, &resp.Diagnostics, machineCatalogPath, true)
 
 	if err != nil {
 		return

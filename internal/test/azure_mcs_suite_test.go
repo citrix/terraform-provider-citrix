@@ -28,7 +28,7 @@ func TestAzureMcsSuitePreCheck(t *testing.T) {
 	TestMachineCatalogPreCheck_Azure(t)
 	TestMachineCatalogPreCheck_Manual_Power_Managed_Azure(t)
 	TestDeliveryGroupPreCheck(t)
-	TestApplicationFolderPreCheck(t)
+	TestAdminFolderPreCheck(t)
 	TestApplicationResourcePreCheck(t)
 	TestAdminScopeResourcePreCheck(t)
 	TestAdminRolePreCheck(t)
@@ -68,6 +68,7 @@ func TestAzureMcs(t *testing.T) {
 	applicationName := os.Getenv("TEST_APP_NAME")
 	appFolderName := os.Getenv("TEST_APP_FOLDER_NAME")
 	folder_name_1 := fmt.Sprintf("%s-1", appFolderName)
+	folder_name_1_updated := fmt.Sprintf("%s-1-updated", appFolderName)
 	folder_name_2 := fmt.Sprintf("%s-2", appFolderName)
 	adminScopeName := os.Getenv("TEST_ADMIN_SCOPE_NAME")
 	adminRoleName := os.Getenv("TEST_ROLE_NAME")
@@ -83,7 +84,7 @@ func TestAzureMcs(t *testing.T) {
 			TestMachineCatalogPreCheck_Azure(t)
 			TestMachineCatalogPreCheck_Manual_Power_Managed_Azure(t)
 			TestDeliveryGroupPreCheck(t)
-			TestApplicationFolderPreCheck(t)
+			TestAdminFolderPreCheck(t)
 			TestApplicationResourcePreCheck(t)
 		},
 		Steps: []resource.TestStep{
@@ -399,11 +400,11 @@ func TestAzureMcs(t *testing.T) {
 				),
 			},
 
-			/****************** Application Folder Test ******************/
+			/****************** Admin Folder Test ******************/
 			// Create and Read testing
 			{
 				Config: composeTestResourceTf(
-					BuildApplicationFolderResource(t, testApplicationFolderResource),
+					BuildAdminFolderResource(t, testAdminFolderResource, "ContainsApplications"),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
@@ -411,26 +412,30 @@ func TestAzureMcs(t *testing.T) {
 					BuildZoneResource(t, zoneInput, true),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					// Verify name of application
-					resource.TestCheckResourceAttr("citrix_application_folder.testApplicationFolder1", "name", folder_name_1),
-					// Verify name of application
-					resource.TestCheckResourceAttr("citrix_application_folder.testApplicationFolder2", "name", folder_name_2),
-					// Verify parent path of application
-					resource.TestCheckResourceAttr("citrix_application_folder.testApplicationFolder2", "parent_path", fmt.Sprintf("%s\\", folder_name_1)),
-					// Verify path of application
-					resource.TestCheckResourceAttr("citrix_application_folder.testApplicationFolder2", "path", fmt.Sprintf("%s\\%s\\", folder_name_1, folder_name_2)),
+					// Verify name of admin folder
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "name", folder_name_1),
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "name", folder_name_2),
+					// Verify parent path of admin folder
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "parent_path", ""),
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "parent_path", fmt.Sprintf("%s\\", folder_name_1)),
+					// Verify path of admin folder
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "path", fmt.Sprintf("%s\\", folder_name_1)),
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "path", fmt.Sprintf("%s\\%s\\", folder_name_1, folder_name_2)),
+					// Verify type of admin folder
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "type", "ContainsApplications"),
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "type", "ContainsApplications"),
 				),
 			},
 			// ImportState testing
 			{
-				ResourceName:      "citrix_application_folder.testApplicationFolder2",
+				ResourceName:      "citrix_admin_folder.testAdminFolder2",
 				ImportState:       true,
 				ImportStateVerify: true,
 			},
 			// Update and Read testing
 			{
 				Config: composeTestResourceTf(
-					BuildApplicationFolderResource(t, testApplicationFolderResource_updated),
+					BuildAdminFolderResource(t, testAdminFolderResource_updated, "ContainsDeliveryGroups"),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
@@ -438,10 +443,15 @@ func TestAzureMcs(t *testing.T) {
 					BuildZoneResource(t, zoneInput, true),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					// Verify name of application
-					resource.TestCheckResourceAttr("citrix_application_folder.testApplicationFolder1", "name", fmt.Sprintf("%s-updated", folder_name_1)),
-					// Verify parent path of application
-					resource.TestCheckResourceAttr("citrix_application_folder.testApplicationFolder2", "path", fmt.Sprintf("%s\\", folder_name_2)),
+					// Verify name of admin folder
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "name", folder_name_1_updated),
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "name", folder_name_2),
+					// Verify path of admin folder
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "path", fmt.Sprintf("%s\\", folder_name_1_updated)),
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "path", fmt.Sprintf("%s\\", folder_name_2)),
+					// Verify type of admin folder
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "type", "ContainsDeliveryGroups"),
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "type", "ContainsDeliveryGroups"),
 				),
 			},
 
@@ -453,7 +463,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildAdminScopeResource(t, adminScopeTestResource),
 					// BuildPolicySetResource(t, policy_set_testResource),
 					BuildApplicationResource(t, testApplicationResource),
-					BuildApplicationFolderResource(t, testApplicationFolderResource_updated),
+					BuildAdminFolderResource(t, testAdminFolderResource_updated, "ContainsApplications"),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
@@ -559,7 +569,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildAdminScopeResource(t, adminScopeTestResource_updated),
 					// BuildPolicySetResource(t, policy_set_updated_testResource),
 					BuildApplicationResource(t, testApplicationResource_updated),
-					BuildApplicationFolderResource(t, testApplicationFolderResource_updated),
+					BuildAdminFolderResource(t, testAdminFolderResource_updated, "ContainsApplications"),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),

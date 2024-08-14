@@ -388,9 +388,9 @@ function Get-ExistingCVADResources {
             "resourceApi"          = "Applications"
             "resourceProviderName" = "application"
         }
-        "application_folder" = @{
+        "admin_folder" = @{
             "resourceApi"          = "ApplicationFolders"
-            "resourceProviderName" = "application_folder"
+            "resourceProviderName" = "admin_folder"
         }
         "admin_scope"        = @{
             "resourceApi"          = "Admin/Scopes"
@@ -501,7 +501,7 @@ function ReplaceDependencyRelationships {
     # Create dependency relationships between resources with path references
     foreach ( $applicationFolderPath in $script:applicationFolderPathMap.Keys) {
         $path = $applicationFolderPath.replace("\", "\\\\")
-        $content = $content -replace "`"$path`"", "citrix_application_folder.$($script:applicationFolderPathMap[$applicationFolderPath]).path"
+        $content = $content -replace "`"$path`"", "citrix_admin_folder.$($script:applicationFolderPathMap[$applicationFolderPath]).path"
     }
 
     return $content

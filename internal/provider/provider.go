@@ -39,6 +39,7 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_store"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_webreceiver"
 
+	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_folder"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_scope"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/delivery_group"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/hypervisor"
@@ -709,11 +710,11 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		delivery_group.NewDeliveryGroupResource,
 		storefront_server.NewStoreFrontServerResource,
 		application.NewApplicationResource,
-		application.NewApplicationFolderResource,
 		application.NewApplicationGroupResource,
 		application.NewApplicationIconResource,
-		admin_scope.NewAdminScopeResource,
+		admin_folder.NewAdminFolderResource,
 		admin_role.NewAdminRoleResource,
+		admin_scope.NewAdminScopeResource,
 		policies.NewPolicySetResource,
 		admin_user.NewAdminUserResource,
 		gac_settings.NewAGacSettingsResource,

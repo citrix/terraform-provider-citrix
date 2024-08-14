@@ -127,6 +127,9 @@ resource "citrix_delivery_group" "example-delivery-group" {
 
 ### Optional
 
+- `access_policies` (Attributes List) Access policies for the delivery group. 
+
+~> **Please Note** Modifying built-in access policies is currently not supported. (see [below for nested schema](#nestedatt--access_policies))
 - `allow_anonymous_access` (Boolean) Give access to unauthenticated (anonymous) users. When set to `True`, no credentials are required to access StoreFront. 
 
 ~> **Please Note** This feature requires a StoreFront store for unauthenticated users.
@@ -135,6 +138,7 @@ resource "citrix_delivery_group" "example-delivery-group" {
 ~> **Please Note** Before using the feature, make sure that these [requirements](https://docs.citrix.com/en-us/citrix-workspace-app/app-protection.html#system-requirements) are met. (see [below for nested schema](#nestedatt--app_protection))
 - `associated_machine_catalogs` (Attributes List) Machine catalogs from which to assign machines to the newly created delivery group. (see [below for nested schema](#nestedatt--associated_machine_catalogs))
 - `autoscale_settings` (Attributes) The power management settings governing the machine(s) in the delivery group. (see [below for nested schema](#nestedatt--autoscale_settings))
+- `delivery_group_folder_path` (String) The path of the folder in which the delivery group is located.
 - `description` (String) Description of the delivery group.
 - `desktops` (Attributes List) A list of Desktop resources to publish on the delivery group. Only 1 desktop can be added to a Remote PC Delivery Group. (see [below for nested schema](#nestedatt--desktops))
 - `make_resources_available_in_lhc` (Boolean) In the event of a service disruption or loss of connectivity, select if you want Local Host Cache to keep resources in the delivery group available to launch new sessions. Existing sessions are not impacted. 
@@ -156,8 +160,59 @@ resource "citrix_delivery_group" "example-delivery-group" {
 - `id` (String) GUID identifier of the delivery group.
 - `total_machines` (Number) The total number of machines in the delivery group.
 
+<a id="nestedatt--access_policies"></a>
+### Nested Schema for `access_policies`
+
+Required:
+
+- `allowed_connection` (String) The behavior of the include filter. Choose between `Filtered`, `ViaAG`, and `NotViaAG`.
+- `enable_criteria_for_exclude_connections` (Boolean) Whether to enable criteria for exclude connections.
+- `enable_criteria_for_include_connections` (Boolean) Whether to enable criteria for include connections.
+- `enabled` (Boolean) Whether the access policy is enabled.
+- `name` (String) The name of the access policy.
+
+Optional:
+
+- `exclude_criteria_filters` (Attributes List) The list of filters that meet the criteria for exclude connections. (see [below for nested schema](#nestedatt--access_policies--exclude_criteria_filters))
+- `include_connections_criteria_type` (String) The type of criteria for include connections. Choose between `MatchAny` and `MatchAll`.
+- `include_criteria_filters` (Attributes List) The list of filters that meet the criteria for include connections. (see [below for nested schema](#nestedatt--access_policies--include_criteria_filters))
+
+Read-Only:
+
+- `id` (String) ID of the resource location.
+
+<a id="nestedatt--access_policies--exclude_criteria_filters"></a>
+### Nested Schema for `access_policies.exclude_criteria_filters`
+
+Required:
+
+- `filter_name` (String) The name of the filter.
+- `filter_value` (String) The value of the filter.
+
+
+<a id="nestedatt--access_policies--include_criteria_filters"></a>
+### Nested Schema for `access_policies.include_criteria_filters`
+
+Required:
+
+- `filter_name` (String) The name of the filter.
+- `filter_value` (String) The value of the filter.
+
+
+
 <a id="nestedatt--app_protection"></a>
 ### Nested Schema for `app_protection`
+
+Optional:
+
+- `apply_contextually` (Attributes List) Implement contextual App Protection using the connection filters defined in the Access Policy rule. (see [below for nested schema](#nestedatt--app_protection--apply_contextually))
+- `enable_anti_key_logging` (Boolean) When enabled, anti-keylogging is applied when a protected window is in focus.
+- `enable_anti_screen_capture` (Boolean) Specify whether to use anti-screen capture.
+
+-> **Note** For Windows and macOS, only the window with protected content is blank. Anti-screen capture is only applied when the window is open. For Linux, the entire screen will appear blank. Anti-screen capture is only applied when the window is open or minimized.
+
+<a id="nestedatt--app_protection--apply_contextually"></a>
+### Nested Schema for `app_protection.apply_contextually`
 
 Required:
 
@@ -165,6 +220,10 @@ Required:
 - `enable_anti_screen_capture` (Boolean) Specify whether to use anti-screen capture.
 
 -> **Note** For Windows and macOS, only the window with protected content is blank. Anti-screen capture is only applied when the window is open. For Linux, the entire screen will appear blank. Anti-screen capture is only applied when the window is open or minimized.
+- `policy_name` (String) The name of the policy.
+
+-> **Note** To refer to default policies, use `Citrix Gateway connections` as the name for the default policy that is Via Access Gateway and `Non-Citrix Gateway connections` as the name for the defauly policy that is Not Via Access Gateway.
+
 
 
 <a id="nestedatt--associated_machine_catalogs"></a>

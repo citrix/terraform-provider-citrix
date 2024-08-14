@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -741,6 +742,8 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 		body.SetAppProtectionScreenCaptureRequired(appProtectionModel.EnableAntiScreenCapture.ValueBool())
 	}
 
+	body.SetAdminFolder(plan.DeliveryGroupFolderPath.ValueString())
+
 	return body, nil
 }
 
@@ -804,15 +807,53 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 	}
 
 	existingAdvancedAccessPolicies := currentDeliveryGroup.GetAdvancedAccessPolicy()
+	existingAdvancedAccessPolicies = slices.DeleteFunc(existingAdvancedAccessPolicies, func(policy citrixorchestration.AdvancedAccessPolicyResponseModel) bool {
+		return !policy.GetIsBuiltIn()
+	})
+
 	for _, existingAdvancedAccessPolicy := range existingAdvancedAccessPolicies {
 		var advancedAccessPolicyRequest citrixorchestration.AdvancedAccessPolicyRequestModel
 		advancedAccessPolicyRequest.SetId(existingAdvancedAccessPolicy.GetId())
+		advancedAccessPolicyRequest.SetName(existingAdvancedAccessPolicy.GetName())
 		advancedAccessPolicyRequest.SetIncludedUserFilterEnabled(includedUsersFilterEnabled)
 		advancedAccessPolicyRequest.SetIncludedUsers(includedUserIds)
 		advancedAccessPolicyRequest.SetExcludedUserFilterEnabled(excludedUsersFilterEnabled)
 		advancedAccessPolicyRequest.SetExcludedUsers(excludedUserIds)
 		advancedAccessPolicyRequest.SetAllowedUsers(allowedUser)
+		advancedAccessPolicyRequest.SetAppProtectionKeyLoggingRequired(false)
+		advancedAccessPolicyRequest.SetAppProtectionScreenCaptureRequired(false)
 		advancedAccessPolicies = append(advancedAccessPolicies, advancedAccessPolicyRequest)
+	}
+
+	if !plan.AccessPolicies.IsNull() {
+		accessPolicies := util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, diagnostics, plan.AccessPolicies)
+		for _, accessPolicy := range accessPolicies {
+			advancedAccessPolicyRequest, err := getAdvancedAccessPolicyRequest(ctx, diagnostics, accessPolicy)
+			if err != nil {
+				return citrixorchestration.EditDeliveryGroupRequestModel{}, err
+			}
+			advancedAccessPolicyRequest.SetIncludedUserFilterEnabled(includedUsersFilterEnabled)
+			advancedAccessPolicyRequest.SetIncludedUsers(includedUserIds)
+			advancedAccessPolicyRequest.SetExcludedUserFilterEnabled(excludedUsersFilterEnabled)
+			advancedAccessPolicyRequest.SetExcludedUsers(excludedUserIds)
+			advancedAccessPolicyRequest.SetAllowedUsers(allowedUser)
+			advancedAccessPolicyRequest.SetAppProtectionKeyLoggingRequired(false)
+			advancedAccessPolicyRequest.SetAppProtectionScreenCaptureRequired(false)
+			advancedAccessPolicies = append(advancedAccessPolicies, advancedAccessPolicyRequest)
+		}
+	}
+
+	if !plan.AppProtection.IsNull() {
+		appProtection := util.ObjectValueToTypedObject[DeliveryGroupAppProtection](ctx, diagnostics, plan.AppProtection)
+		if !appProtection.ApplyContextually.IsNull() {
+			appProtectionApplyContextually := util.ObjectListToTypedArray[DeliveryGroupAppProtectionApplyContextuallyModel](ctx, diagnostics, appProtection.ApplyContextually)
+			for _, applyContextually := range appProtectionApplyContextually {
+				advancedAccessPolicies, err = setAppProtectionOnAdvancedAccessPolicies(diagnostics, applyContextually, advancedAccessPolicies, currentDeliveryGroup.GetName())
+				if err != nil {
+					return citrixorchestration.EditDeliveryGroupRequestModel{}, err
+				}
+			}
+		}
 	}
 
 	// Construct the update model
@@ -895,6 +936,8 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 		editDeliveryGroupRequestBody.SetAppProtectionKeyLoggingRequired(appProtectionModel.EnableAntiKeyLogging.ValueBool())
 		editDeliveryGroupRequestBody.SetAppProtectionScreenCaptureRequired(appProtectionModel.EnableAntiScreenCapture.ValueBool())
 	}
+
+	editDeliveryGroupRequestBody.SetAdminFolder(plan.DeliveryGroupFolderPath.ValueString())
 
 	return editDeliveryGroupRequestBody, nil
 }
@@ -1114,6 +1157,60 @@ func (dgDesktop DeliveryGroupDesktop) RefreshListItem(ctx context.Context, diagn
 	return dgDesktop
 }
 
+func (dgAccessPolicy DeliveryGroupAccessPolicyModel) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicy citrixorchestration.AdvancedAccessPolicyResponseModel) util.ModelWithAttributes {
+	dgAccessPolicy.Id = types.StringValue(accessPolicy.GetId())
+	if !strings.EqualFold(dgAccessPolicy.Name.ValueString(), accessPolicy.GetName()) {
+		dgAccessPolicy.Name = types.StringValue(accessPolicy.GetName())
+	}
+	dgAccessPolicy.Enabled = types.BoolValue(accessPolicy.GetEnabled())
+	dgAccessPolicy.AllowedConnection = types.StringValue(string(accessPolicy.GetAllowedConnection()))
+	dgAccessPolicy.EnableCriteriaForIncludeConnections = types.BoolValue(accessPolicy.GetIncludedSmartAccessFilterEnabled())
+	dgAccessPolicy.EnableCriteriaForExcludeConnections = types.BoolValue(accessPolicy.GetExcludedSmartAccessFilterEnabled())
+	dgAccessPolicy.IncludeCriteriaFilters = util.RefreshListValueProperties[DeliveryGroupAccessPolicyCriteriaTagsModel, citrixorchestration.SmartAccessTagResponseModel](ctx, diagnostics, dgAccessPolicy.IncludeCriteriaFilters, accessPolicy.GetIncludedSmartAccessTags(), util.GetOrchestrationSmartAccessTagKey)
+	dgAccessPolicy.ExcludeCriteriaFilters = util.RefreshListValueProperties[DeliveryGroupAccessPolicyCriteriaTagsModel, citrixorchestration.SmartAccessTagResponseModel](ctx, diagnostics, dgAccessPolicy.ExcludeCriteriaFilters, accessPolicy.GetExcludedSmartAccessTags(), util.GetOrchestrationSmartAccessTagKey)
+
+	if dgAccessPolicy.EnableCriteriaForIncludeConnections.ValueBool() {
+		dgAccessPolicy.IncludeConnectionsCriteriaType = types.StringValue(string(accessPolicy.GetIncludedSmartAccessFilterType()))
+	} else {
+		dgAccessPolicy.IncludeConnectionsCriteriaType = types.StringNull()
+	}
+
+	return dgAccessPolicy
+}
+
+func (dgAccessPolicyTags DeliveryGroupAccessPolicyCriteriaTagsModel) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicyTag citrixorchestration.SmartAccessTagResponseModel) util.ModelWithAttributes {
+	if !strings.EqualFold(dgAccessPolicyTags.FilterName.ValueString(), accessPolicyTag.GetFarm()) {
+		dgAccessPolicyTags.FilterName = types.StringValue(accessPolicyTag.GetFarm())
+	}
+	if !strings.EqualFold(dgAccessPolicyTags.FilterValue.ValueString(), accessPolicyTag.GetFilter()) {
+		dgAccessPolicyTags.FilterValue = types.StringValue(accessPolicyTag.GetFilter())
+	}
+
+	return dgAccessPolicyTags
+}
+
+func (dgAppProtectionApplyContextually DeliveryGroupAppProtectionApplyContextuallyModel) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicy citrixorchestration.AdvancedAccessPolicyResponseModel) util.ModelWithAttributes {
+	policyName := accessPolicy.GetName()
+	if accessPolicy.GetIsBuiltIn() {
+		policyName = dgAppProtectionApplyContextually.PolicyName.ValueString()
+		if strings.HasSuffix(accessPolicy.GetName(), "_AG") &&
+			!strings.EqualFold(dgAppProtectionApplyContextually.PolicyName.ValueString(), util.CitrixGatewayConnections) {
+			policyName = util.CitrixGatewayConnections
+		}
+
+		if strings.HasSuffix(accessPolicy.GetName(), "_Direct") &&
+			!strings.EqualFold(dgAppProtectionApplyContextually.PolicyName.ValueString(), util.NonCitrixGatewayConnections) {
+			policyName = util.NonCitrixGatewayConnections
+		}
+	}
+
+	dgAppProtectionApplyContextually.PolicyName = types.StringValue(policyName)
+	dgAppProtectionApplyContextually.EnableAntiKeyLogging = types.BoolValue(accessPolicy.GetAppProtectionKeyLoggingRequired())
+	dgAppProtectionApplyContextually.EnableAntiScreenCapture = types.BoolValue(accessPolicy.GetAppProtectionScreenCaptureRequired())
+
+	return dgAppProtectionApplyContextually
+}
+
 func getFrequencyActionValue(v string) citrixorchestration.RebootScheduleFrequency {
 	frequency, err := citrixorchestration.NewRebootScheduleFrequencyFromValue(v)
 
@@ -1273,17 +1370,64 @@ func (r DeliveryGroupResourceModel) updatePlanWithDesktops(ctx context.Context, 
 	return r
 }
 
-func updateDeliveryGroupAndDesktopUsers(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, deliveryGroupDesktops *citrixorchestration.DesktopResponseModelCollection) (*citrixorchestration.DeliveryGroupDetailResponseModel, *citrixorchestration.DesktopResponseModelCollection, error) {
-	simpleAccessPolicy := deliveryGroup.GetSimpleAccessPolicy()
-	updatedIncludedUsers, updatedExcludedUsers, err := updateIdentityUserDetails(ctx, client, diagnostics, simpleAccessPolicy.GetIncludedUsers(), simpleAccessPolicy.GetExcludedUsers())
-	if err != nil {
-		return deliveryGroup, deliveryGroupDesktops, err
+func (r DeliveryGroupResourceModel) updatePlanWithAccessPolicies(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicies []citrixorchestration.AdvancedAccessPolicyResponseModel) DeliveryGroupResourceModel {
+	accessPolicies = slices.DeleteFunc(accessPolicies, func(policy citrixorchestration.AdvancedAccessPolicyResponseModel) bool {
+		return policy.GetIsBuiltIn()
+	})
+
+	if len(accessPolicies) < 1 {
+		attributesMap, err := util.AttributeMapFromObject(DeliveryGroupAccessPolicyModel{})
+		if err != nil {
+			diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
+			return r
+		}
+		r.AccessPolicies = types.ListNull(types.ObjectType{AttrTypes: attributesMap})
+	} else {
+		r.AccessPolicies = util.RefreshListValueProperties[DeliveryGroupAccessPolicyModel, citrixorchestration.AdvancedAccessPolicyResponseModel](ctx, diagnostics, r.AccessPolicies, accessPolicies, util.GetOrchestrationAccessPolicyKey)
 	}
 
-	simpleAccessPolicy.SetIncludedUsers(updatedIncludedUsers)
-	simpleAccessPolicy.SetExcludedUsers(updatedExcludedUsers)
-	deliveryGroup.SetSimpleAccessPolicy(simpleAccessPolicy)
+	return r
+}
 
+func (r DeliveryGroupResourceModel) updatePlanWithAppProtection(ctx context.Context, diagnostics *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel) DeliveryGroupResourceModel {
+	antiKeyLoggingEnabled := deliveryGroup.GetAppProtectionKeyLoggingRequired()
+	antiScreenCaptureEnabled := deliveryGroup.GetAppProtectionScreenCaptureRequired()
+	advancedAccessPolicies := slices.Clone(deliveryGroup.GetAdvancedAccessPolicy())
+
+	if antiKeyLoggingEnabled || antiScreenCaptureEnabled {
+		appProtectionModel := DeliveryGroupAppProtection{}
+		appProtectionModel.EnableAntiKeyLogging = types.BoolValue(antiKeyLoggingEnabled)
+		appProtectionModel.EnableAntiScreenCapture = types.BoolValue(antiScreenCaptureEnabled)
+
+		attributesMap, err := util.AttributeMapFromObject(DeliveryGroupAppProtectionApplyContextuallyModel{})
+		if err != nil {
+			diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
+			return r
+		}
+
+		appProtectionModel.ApplyContextually = types.ListNull(types.ObjectType{AttrTypes: attributesMap})
+		r.AppProtection = util.TypedObjectToObjectValue(ctx, diagnostics, appProtectionModel)
+	} else if checkIfAppProtectionAppliedContextually(advancedAccessPolicies) {
+		advancedAccessPolicies = slices.DeleteFunc(advancedAccessPolicies, func(policy citrixorchestration.AdvancedAccessPolicyResponseModel) bool {
+			return !policy.GetAppProtectionKeyLoggingRequired() && !policy.GetAppProtectionScreenCaptureRequired()
+		})
+		appProtection := util.ObjectValueToTypedObject[DeliveryGroupAppProtection](ctx, diagnostics, r.AppProtection)
+		appProtection.ApplyContextually = util.RefreshListValueProperties[DeliveryGroupAppProtectionApplyContextuallyModel, citrixorchestration.AdvancedAccessPolicyResponseModel](ctx, diagnostics, appProtection.ApplyContextually, advancedAccessPolicies, util.GetOrchestrationAppProtectionApplyContextuallyKey)
+		appProtection.EnableAntiKeyLogging = types.BoolNull()
+		appProtection.EnableAntiScreenCapture = types.BoolNull()
+		r.AppProtection = util.TypedObjectToObjectValue(ctx, diagnostics, appProtection)
+	} else {
+		if attributes, err := util.AttributeMapFromObject(DeliveryGroupAppProtection{}); err == nil {
+			r.AppProtection = types.ObjectNull(attributes)
+		} else {
+			diagnostics.AddWarning("Error when creating null DeliveryGroupAppProtection", err.Error())
+		}
+	}
+
+	return r
+}
+
+func updateDeliveryGroupAndDesktopUsers(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, deliveryGroupDesktops *citrixorchestration.DesktopResponseModelCollection) (*citrixorchestration.DeliveryGroupDetailResponseModel, *citrixorchestration.DesktopResponseModelCollection, error) {
 	updatedDeliveryGroupDesktops := []citrixorchestration.DesktopResponseModel{}
 	for _, desktop := range deliveryGroupDesktops.GetItems() {
 		updatedIncludedUsers, updatedExcludedUsers, err := updateIdentityUserDetails(ctx, client, diagnostics, desktop.GetIncludedUsers(), desktop.GetExcludedUsers())
@@ -1348,13 +1492,18 @@ func updateIdentityUserDetails(ctx context.Context, client *citrixdaasclient.Cit
 }
 
 func (r DeliveryGroupResourceModel) updatePlanWithRestrictedAccessUsers(ctx context.Context, diagnostics *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel) DeliveryGroupResourceModel {
-	simpleAccessPolicy := deliveryGroup.GetSimpleAccessPolicy()
-
+	advancedAccessPolicies := deliveryGroup.GetAdvancedAccessPolicy()
+	accessPolicy := advancedAccessPolicies[0]
 	if !r.AllowAnonymousAccess.IsNull() {
-		r.AllowAnonymousAccess = types.BoolValue(simpleAccessPolicy.GetAllowAnonymous())
+		allowedUsers := accessPolicy.GetAllowedUsers()
+		if allowedUsers == citrixorchestration.ALLOWEDUSER_ANY ||
+			allowedUsers == citrixorchestration.ALLOWEDUSER_ANONYMOUS_ONLY ||
+			allowedUsers == citrixorchestration.ALLOWEDUSER_FILTERED_OR_ANONYMOUS {
+			r.AllowAnonymousAccess = types.BoolValue(true)
+		}
 	}
 
-	if !simpleAccessPolicy.GetIncludedUserFilterEnabled() || r.RestrictedAccessUsers.IsNull() {
+	if !accessPolicy.GetIncludedUserFilterEnabled() || r.RestrictedAccessUsers.IsNull() {
 		if attributes, err := util.AttributeMapFromObject(RestrictedAccessUsers{}); err == nil {
 			r.RestrictedAccessUsers = types.ObjectNull(attributes)
 		} else {
@@ -1365,18 +1514,18 @@ func (r DeliveryGroupResourceModel) updatePlanWithRestrictedAccessUsers(ctx cont
 
 	users := util.ObjectValueToTypedObject[RestrictedAccessUsers](ctx, diagnostics, r.RestrictedAccessUsers)
 
-	remoteIncludedUsers := simpleAccessPolicy.GetIncludedUsers()
+	remoteIncludedUsers := accessPolicy.GetIncludedUsers()
 	if len(remoteIncludedUsers) == 0 {
 		users.AllowList = types.SetNull(types.StringType)
 	} else {
-		users.AllowList = util.RefreshUsersList(ctx, diagnostics, users.AllowList, simpleAccessPolicy.GetIncludedUsers())
+		users.AllowList = util.RefreshUsersList(ctx, diagnostics, users.AllowList, accessPolicy.GetIncludedUsers())
 	}
 
-	if simpleAccessPolicy.GetExcludedUserFilterEnabled() {
-		if len(simpleAccessPolicy.GetExcludedUsers()) == 0 {
+	if accessPolicy.GetExcludedUserFilterEnabled() {
+		if len(accessPolicy.GetExcludedUsers()) == 0 {
 			users.BlockList = types.SetNull(types.StringType)
 		} else {
-			users.BlockList = util.RefreshUsersList(ctx, diagnostics, users.BlockList, simpleAccessPolicy.GetExcludedUsers())
+			users.BlockList = util.RefreshUsersList(ctx, diagnostics, users.BlockList, accessPolicy.GetExcludedUsers())
 		}
 	}
 
@@ -1480,4 +1629,156 @@ func preserveOrderInPoolSizeSchedule(poolSizeScheduleInPlan, poolSizeScheduleInR
 	}
 
 	return poolSizeSchedules
+}
+
+func getAdvancedAccessPolicyRequest(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicy DeliveryGroupAccessPolicyModel) (citrixorchestration.AdvancedAccessPolicyRequestModel, error) {
+	var advancedAccessPolicyRequest citrixorchestration.AdvancedAccessPolicyRequestModel
+	if !accessPolicy.Id.IsNull() {
+		advancedAccessPolicyRequest.SetId(accessPolicy.Id.ValueString())
+	}
+	advancedAccessPolicyRequest.SetName(accessPolicy.Name.ValueString())
+	advancedAccessPolicyRequest.SetEnabled(accessPolicy.Enabled.ValueBool())
+	allowedConnection, err := citrixorchestration.NewAllowedConnectionFromValue(accessPolicy.AllowedConnection.ValueString())
+	if err != nil {
+		diagnostics.AddError(
+			"Error updating Delivery Group",
+			fmt.Sprintf("Unsupported allowed connection %s.", accessPolicy.AllowedConnection.ValueString()),
+		)
+		return advancedAccessPolicyRequest, err
+	}
+	advancedAccessPolicyRequest.SetAllowedConnection(*allowedConnection)
+
+	advancedAccessPolicyRequest.SetIncludedSmartAccessFilterEnabled(accessPolicy.EnableCriteriaForIncludeConnections.ValueBool())
+
+	if !accessPolicy.IncludeConnectionsCriteriaType.IsNull() {
+		includedSmartAccessFilterType, err := citrixorchestration.NewFilterMatchTypeFromValue(accessPolicy.IncludeConnectionsCriteriaType.ValueString())
+		if err != nil {
+			diagnostics.AddError(
+				"Error updating Delivery Group",
+				fmt.Sprintf("Unsupported criteria type %s.", accessPolicy.IncludeConnectionsCriteriaType.ValueString()),
+			)
+			return advancedAccessPolicyRequest, err
+		}
+		advancedAccessPolicyRequest.SetIncludedSmartAccessFilterType(*includedSmartAccessFilterType)
+	}
+
+	includedSmartAccessTags := getSmartAccessTagsRequest(ctx, diagnostics, util.ObjectListToTypedArray[DeliveryGroupAccessPolicyCriteriaTagsModel](ctx, diagnostics, accessPolicy.IncludeCriteriaFilters))
+	advancedAccessPolicyRequest.SetIncludedSmartAccessTags(includedSmartAccessTags)
+
+	advancedAccessPolicyRequest.SetExcludedSmartAccessFilterEnabled(accessPolicy.EnableCriteriaForExcludeConnections.ValueBool())
+	excludedSmartAccessTags := getSmartAccessTagsRequest(ctx, diagnostics, util.ObjectListToTypedArray[DeliveryGroupAccessPolicyCriteriaTagsModel](ctx, diagnostics, accessPolicy.ExcludeCriteriaFilters))
+	advancedAccessPolicyRequest.SetExcludedSmartAccessTags(excludedSmartAccessTags)
+
+	return advancedAccessPolicyRequest, nil
+}
+
+func getSmartAccessTagsRequest(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicyCriteriaTags []DeliveryGroupAccessPolicyCriteriaTagsModel) []citrixorchestration.SmartAccessTagRequestModel {
+	smartAccessTagRequests := []citrixorchestration.SmartAccessTagRequestModel{}
+	for _, smartAccessTag := range accessPolicyCriteriaTags {
+		var smartAccessTagRequestModel citrixorchestration.SmartAccessTagRequestModel
+		smartAccessTagRequestModel.SetFarm(smartAccessTag.FilterName.ValueString())
+		smartAccessTagRequestModel.SetFilter(smartAccessTag.FilterValue.ValueString())
+		smartAccessTagRequests = append(smartAccessTagRequests, smartAccessTagRequestModel)
+	}
+	return smartAccessTagRequests
+}
+
+func (accessPolicy DeliveryGroupAccessPolicyModel) ValidateConfig(diagnostics *diag.Diagnostics, index int) bool {
+	if !accessPolicy.EnableCriteriaForIncludeConnections.ValueBool() {
+		if !accessPolicy.IncludeConnectionsCriteriaType.IsNull() {
+			diagnostics.AddAttributeError(
+				path.Root("access_policies").AtListIndex(index),
+				"Incorrect Attribute Configuration",
+				"include_connections_criteria_type cannot be set if enable_criteria_for_include_connections is set to false.",
+			)
+			return false
+		}
+
+		if len(accessPolicy.IncludeCriteriaFilters.Elements()) > 0 {
+			diagnostics.AddAttributeError(
+				path.Root("access_policies").AtListIndex(index),
+				"Incorrect Attribute Configuration",
+				"include_criteria_filters cannot be set if enable_criteria_for_include_connections is set to false.",
+			)
+			return false
+		}
+	}
+
+	if !accessPolicy.EnableCriteriaForExcludeConnections.ValueBool() && len(accessPolicy.ExcludeCriteriaFilters.Elements()) > 0 {
+		diagnostics.AddAttributeError(
+			path.Root("access_policies").AtListIndex(index),
+			"Incorrect Attribute Configuration",
+			"exclude_criteria_filters cannot be set if enable_criteria_for_exclude_connections is set to false.",
+		)
+
+		return false
+	}
+
+	return true
+}
+
+func (appProtection DeliveryGroupAppProtection) ValidateConfig(ctx context.Context, diagnostics *diag.Diagnostics) bool {
+	if !appProtection.EnableAntiKeyLogging.IsNull() {
+		if !appProtection.EnableAntiKeyLogging.ValueBool() && !appProtection.EnableAntiScreenCapture.ValueBool() {
+			diagnostics.AddAttributeError(
+				path.Root("app_protection"),
+				"Incorrect Attribute Configuration",
+				"When choosing to apply app_protection, either enable_anti_key_logging or enable_anti_screen_capture must be set to true.",
+			)
+			return false
+		}
+	}
+
+	if !appProtection.ApplyContextually.IsNull() {
+		appProtectionApplyContextually := util.ObjectListToTypedArray[DeliveryGroupAppProtectionApplyContextuallyModel](ctx, diagnostics, appProtection.ApplyContextually)
+		for _, applyContextually := range appProtectionApplyContextually {
+			if !applyContextually.EnableAntiKeyLogging.ValueBool() && !applyContextually.EnableAntiScreenCapture.ValueBool() {
+				diagnostics.AddAttributeError(
+					path.Root("app_protection"),
+					"Incorrect Attribute Configuration",
+					"When choosing to apply app_protection conextually, for each policy, either enable_anti_key_logging or enable_anti_screen_capture must be set to true.",
+				)
+
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+func setAppProtectionOnAdvancedAccessPolicies(diagnostics *diag.Diagnostics, applyContextually DeliveryGroupAppProtectionApplyContextuallyModel, advancedAccessPolicies []citrixorchestration.AdvancedAccessPolicyRequestModel, deliveryGroupName string) ([]citrixorchestration.AdvancedAccessPolicyRequestModel, error) {
+	policyName := applyContextually.PolicyName.ValueString()
+	if strings.EqualFold(policyName, util.CitrixGatewayConnections) {
+		policyName = deliveryGroupName + "_AG"
+	} else if strings.EqualFold(policyName, util.NonCitrixGatewayConnections) {
+		policyName = deliveryGroupName + "_Direct"
+	}
+
+	index := slices.IndexFunc(advancedAccessPolicies, func(advancedAccessPolicy citrixorchestration.AdvancedAccessPolicyRequestModel) bool {
+		return advancedAccessPolicy.GetName() == policyName
+	})
+
+	if index == -1 {
+		diagnostics.AddError(
+			"Error updating Delivery Group",
+			fmt.Sprintf("Policy name %s does not exist in Access Policies for Delivery Group %s", policyName, deliveryGroupName),
+		)
+		return advancedAccessPolicies, fmt.Errorf("policy name does not exist in access policies")
+	}
+
+	advancedAccessPolicies[index].SetAppProtectionKeyLoggingRequired(applyContextually.EnableAntiKeyLogging.ValueBool())
+	advancedAccessPolicies[index].SetAppProtectionScreenCaptureRequired(applyContextually.EnableAntiScreenCapture.ValueBool())
+
+	return advancedAccessPolicies, nil
+}
+
+func checkIfAppProtectionAppliedContextually(accessPolicies []citrixorchestration.AdvancedAccessPolicyResponseModel) bool {
+	for _, policy := range accessPolicies {
+		if policy.GetAppProtectionKeyLoggingRequired() || policy.GetAppProtectionScreenCaptureRequired() {
+			return true
+		}
+	}
+
+	return false
 }
