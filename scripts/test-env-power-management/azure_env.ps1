@@ -149,6 +149,7 @@ public static class Dummy {
     }
     
     [System.Net.ServicePointManager]::ServerCertificateValidationCallback = [dummy]::GetDelegate()
+    [Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls"
 }
 
 ## Poll for GetMe API to return 200
