@@ -127,7 +127,28 @@ if ($adVm.Statuses[1].Code -ne "PowerState/running") {
 # Poll for the orchestration service to be available
 ## Disable SSL validation for test env
 if ($DisableSSLValidation) {
-    [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true} ;
+    Write-Host "Disabling SSL Validation..."
+    if (-not("dummy" -as [type])) {
+        add-type -TypeDefinition @"
+using System;
+using System.Net;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
+
+public static class Dummy {
+    public static bool ReturnTrue(object sender,
+        X509Certificate certificate,
+        X509Chain chain,
+        SslPolicyErrors sslPolicyErrors) { return true; }
+
+    public static RemoteCertificateValidationCallback GetDelegate() {
+        return new RemoteCertificateValidationCallback(Dummy.ReturnTrue);
+    }
+}
+"@
+    }
+    
+    [System.Net.ServicePointManager]::ServerCertificateValidationCallback = [dummy]::GetDelegate()
 }
 
 ## Poll for GetMe API to return 200
