@@ -7,7 +7,7 @@ name: GoTest
 on:
   pull_request:
     branches:
-      - test-github-action
+      - main
   # workflow_dispatch:
   #   # Inputs the workflow accepts.
   #   inputs:
