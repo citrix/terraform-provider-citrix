@@ -86,7 +86,8 @@ function Get-Me {
         $response = Invoke-RestMethod -Uri "https://$Hostname/citrix/orchestration/api/techpreview/tokens" -Method POST -Headers @{ "Authorization" = "Basic $base64Auth" }
     } catch {
         if ($_.Exception.Response.StatusCode.value__ -ne 200) {
-            Write-Host "Failed to get auth token"
+            Write-Host "Failed to get auth token. Status Code: $($_.Exception.Response.StatusCode.value__)"
+            Write-Host "Error: $($_.Exception.Message)"
             return $false
         }
     }
