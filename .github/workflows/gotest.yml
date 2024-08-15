@@ -89,6 +89,7 @@ jobs:
       # Set env
       - name: Set env
         run: | 
+          echo "TF_ACC=1" >> $GITHUB_ENV
           echo "CITRIX_CLIENT_ID=${{secrets.CITRIX_CLIENT_ID}}" >> $GITHUB_ENV
           echo "CITRIX_CLIENT_SECRET=${{secrets.CITRIX_CLIENT_SECRET}}" >> $GITHUB_ENV
           echo "CITRIX_HOSTNAME=${{secrets.CITRIX_HOSTNAME}}" >> $GITHUB_ENV
