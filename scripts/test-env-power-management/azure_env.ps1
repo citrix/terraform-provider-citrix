@@ -134,7 +134,7 @@ if ($adVm.Statuses[1].Code -ne "PowerState/running") {
 
 # Poll for the orchestration service to be available
 ## Poll for GetMe API to return 200
-$timeout = 300
+$timeout = 600
 $curTime = Get-Date
 $endTime = $curTime.AddSeconds($timeout)
 $success = $false
