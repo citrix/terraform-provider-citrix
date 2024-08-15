@@ -20,8 +20,8 @@ on:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "gotest"
-  gotest:
+  # This workflow contains a job for preparing test env, and a job for running go tests
+  gotest-prep:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
@@ -56,3 +56,33 @@ jobs:
               -AzureAdVmName ${{vars.AZURE_AD_VM_NAME}} `
               -DisableSSLValidation $true
           azPSVersion: "latest"
+
+  gotest:
+    needs: gotest-prep
+
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout repo
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with: 
+          ref: test-github-action
+          # token: ${{secrets.CHECKOUT_TOKEN}}
+
+      # Set up Go
+      - name: Setup Go 1.21.x
+        uses: actions/setup-go@v5
+        with:
+          # Semantic version range syntax or exact version of Go
+          go-version: '1.21.x'
+
+      # Install dependencies
+      - name: Install dependencies
+        run: |
+          go get .
+
+      # Test
+      - name: Test
+        run: go test -v ./internal/test -run "^TestProviderPreCheck$"
