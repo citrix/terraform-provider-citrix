@@ -83,6 +83,14 @@ jobs:
         run: |
           go get .
 
+      # Set env
+      - name: Set env
+        run: | 
+          echo "CITRIX_CLIENT_ID=${{secrets.CITRIX_CLIENT_ID}}" >> $GITHUB_ENV
+          echo "CITRIX_CLIENT_SECRET=${{secrets.CITRIX_CLIENT_SECRET}}" >> $GITHUB_ENV
+          echo "CITRIX_HOSTNAME=${{secrets.CITRIX_HOSTNAME}}" >> $GITHUB_ENV
+          echo "CITRIX_DISABLE_SSL_VERIFICATION=${{secrets.CITRIX_DISABLE_SSL_VERIFICATION}}" >> $GITHUB_ENV
+
       # Test
       - name: Test
         run: go test -v ./internal/test -run "^TestProviderPreCheck$"
