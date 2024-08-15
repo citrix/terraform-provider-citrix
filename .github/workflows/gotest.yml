@@ -133,6 +133,10 @@ jobs:
           echo "TEST_ADMIN_USER_NAME=${{secrets.TEST_ADMIN_USER_NAME}}" >> $GITHUB_ENV
           echo "TEST_ADMIN_USER_DOMAIN=${{secrets.TEST_ADMIN_USER_DOMAIN}}" >> $GITHUB_ENV
 
-      # Test
+      # Test PreCheck
       - name: Test
         run: go test -v ./internal/test -run "^TestAzureMcsSuitePreCheck$"
+
+      # Test
+      - name: Test
+        run: go test -v ./internal/test -run "^TestAzureMcs$"
