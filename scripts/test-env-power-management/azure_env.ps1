@@ -71,14 +71,38 @@ Param (
     [string] $AzureResourceGroupName,
 
     [Parameter(Mandatory = $true)]
-    [string] $AzureDdcVmName,
-
-    [Parameter(Mandatory = $true)]
     [string] $AzureAdVmName,
 
     [Parameter(Mandatory = $false)]
-    [bool] $DisableSSLValidation = $false
+    [string] $AzureDdcVmName,
+
+    [Parameter(Mandatory = $false)]
+    [string] $AzureConnectorVm1Name,
+
+    [Parameter(Mandatory = $false)]
+    [string] $AzureConnectorVm2Name,
+
+    [Parameter(Mandatory = $false)]
+    [bool] $DisableSSLValidation = $false,
+
+    [Parameter(Mandatory = $false)]
+    [bool] $OnPremises = $true
 )
+
+function Start-AzureVm {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string] $ResourceGroupName,
+
+        [Parameter(Mandatory = $true)]
+        [string] $VmName
+    )
+
+    $vm = Get-AzVM -ResourceGroupName $ResourceGroupName -Name $VmName -Status
+    if ($vm.Statuses[1].Code -ne "PowerState/running") {
+        Start-AzVM -ResourceGroupName $ResourceGroupName -Name $VmName
+    }
+}
 
 function Get-Me {
     $base64Auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$DomainFqdn\$ClientId", $ClientSecret)))
@@ -119,17 +143,19 @@ $SecureStringPwd = $AzureClientSecret | ConvertTo-SecureString -AsPlainText -For
 $pscredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $AzureClientId, $SecureStringPwd
 Connect-AzAccount -ServicePrincipal -Credential $pscredential -TenantId $AzureTenantId -SubscriptionId $AzureSubscriptionId
 
-## Get the VMs
-$ddcVm = Get-AzVM -ResourceGroupName $AzureResourceGroupName -Name $AzureDdcVmName -Status
-$adVm = Get-AzVM -ResourceGroupName $AzureResourceGroupName -Name $AzureAdVmName -Status
+## Get the VMs and power them up if they are not running
+Start-AzureVm -ResourceGroupName $AzureResourceGroupName -VmName $AzureAdVmName
 
-## Check the power state of the VMs
-if ($ddcVm.Statuses[1].Code -ne "PowerState/running") {
-    Start-AzVM -ResourceGroupName $AzureResourceGroupName -Name $AzureDdcVmName
+if ($OnPremises -eq $true) {
+    Start-AzureVm -ResourceGroupName $AzureResourceGroupName -VmName $AzureDdcVmName
+} else {
+    Start-AzureVm -ResourceGroupName $AzureResourceGroupName -VmName $AzureConnectorVm1Name
+    Start-AzureVm -ResourceGroupName $AzureResourceGroupName -VmName $AzureConnectorVm2Name
 }
 
-if ($adVm.Statuses[1].Code -ne "PowerState/running") {
-    Start-AzVM -ResourceGroupName $AzureResourceGroupName -Name $AzureAdVmName
+# Skip polling for orchestration if the environment is cloud
+if ($OnPremises -eq $false) {
+    exit 0
 }
 
 # Poll for the orchestration service to be available

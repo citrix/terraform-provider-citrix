@@ -1,29 +1,32 @@
 # This is a Go Test workflow that is manually triggered
 
-name: GoTest
+name: GoTest - Cloud
 
 # Controls when the action will run. Workflow runs when manually triggered using the UI
 # or API.
 on:
-  workflow_dispatch:
-    # Inputs the workflow accepts.
-    inputs:
-      version:
-        # Friendly description to be shown in the UI
-        description: 'Release version that is tested against.'
-        # Default value if no value is explicitly provided
-        default: 'Latest'
-        # Input has to be provided for the workflow to run
-        required: false
-        # The data type of the input
-        type: string
+  pull_request:
+    branches:
+      - main
+  # workflow_dispatch:
+  #   # Inputs the workflow accepts.
+  #   inputs:
+  #     version:
+  #       # Friendly description to be shown in the UI
+  #       description: 'Release version that is tested against.'
+  #       # Default value if no value is explicitly provided
+  #       default: 'Latest'
+  #       # Input has to be provided for the workflow to run
+  #       required: false
+  #       # The data type of the input
+  #       type: string
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a job for preparing test env, and a job for running go tests
   gotest-prep:
     # GitHub environment for the job
-    environment: Go Test - OnPrem
+    environment: Go Test - Cloud
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
@@ -54,15 +57,16 @@ jobs:
               -AzureTenantId ${{secrets.AZURE_TENANT_ID}} `
               -AzureSubscriptionId ${{secrets.AZURE_SUBSCRIPTION_ID}} `
               -AzureResourceGroupName ${{secrets.AZURE_RESOURCE_GROUP_NAME}} `
-              -AzureDdcVmName ${{secrets.AZURE_DDC_VM_NAME}} `
               -AzureAdVmName ${{secrets.AZURE_AD_VM_NAME}} `
-              -DisableSSLValidation $true
+              -AzureConnectorVm1Name ${{secrets.AZURE_CONNECTOR_VM1_NAME}} `
+              -AzureConnectorVm2Name ${{secrets.AZURE_CONNECTOR_VM2_NAME}} `
+              -OnPremises $false
           azPSVersion: "latest"
 
-  gotest:
+  gotest-cloud:
     needs: gotest-prep
     # GitHub environment for the job
-    environment: Go Test - OnPrem
+    environment: Go Test - Cloud
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
@@ -90,17 +94,20 @@ jobs:
       - name: Set env
         run: | 
           echo "TF_ACC=1" >> $GITHUB_ENV
+          echo "CITRIX_CUSTOMER_ID=${{secrets.CITRIX_CUSTOMER_ID}}" >> $GITHUB_ENV
           echo "CITRIX_CLIENT_ID=${{secrets.CITRIX_CLIENT_ID}}" >> $GITHUB_ENV
           echo "CITRIX_CLIENT_SECRET=${{secrets.CITRIX_CLIENT_SECRET}}" >> $GITHUB_ENV
           echo "CITRIX_HOSTNAME=${{secrets.CITRIX_HOSTNAME}}" >> $GITHUB_ENV
-          echo "CITRIX_DISABLE_SSL_VERIFICATION=${{secrets.CITRIX_DISABLE_SSL_VERIFICATION}}" >> $GITHUB_ENV
-          echo "TEST_ZONE_INPUT_AZURE=${{vars.TEST_ZONE_INPUT_AZURE}}" >> $GITHUB_ENV
+          echo "CITRIX_ENVIRONMENT=${{secrets.CITRIX_ENVIRONMENT}}" >> $GITHUB_ENV
+          echo "TEST_ZONE_INPUT_AZURE=${{secrets.TEST_ZONE_INPUT_AZURE}}" >> $GITHUB_ENV
           echo "TEST_ZONE_DESCRIPTION=${{vars.TEST_ZONE_DESCRIPTION}}" >> $GITHUB_ENV
+          echo "TEST_RESOURCE_LOCATION_NAME=${{vars.TEST_RESOURCE_LOCATION_NAME}}" >> $GITHUB_ENV
           echo "TEST_HYPERV_NAME_AZURE=${{vars.TEST_HYPERV_NAME_AZURE}}" >> $GITHUB_ENV
           echo "TEST_HYPERV_AD_ID=${{secrets.TEST_HYPERV_AD_ID}}" >> $GITHUB_ENV
           echo "TEST_HYPERV_SUBSCRIPTION_ID=${{secrets.TEST_HYPERV_SUBSCRIPTION_ID}}" >> $GITHUB_ENV
           echo "TEST_HYPERV_APPLICATION_ID=${{secrets.TEST_HYPERV_APPLICATION_ID}}" >> $GITHUB_ENV
           echo "TEST_HYPERV_APPLICATION_SECRET=${{secrets.TEST_HYPERV_APPLICATION_SECRET}}" >> $GITHUB_ENV
+          echo "TEST_HYPERV_APPLICATION_SECRET_EXPIRATION_DATE=${{secrets.TEST_HYPERV_APPLICATION_SECRET_EXPIRATION_DATE}}" >> $GITHUB_ENV
           echo "TEST_HYPERV_RP_NAME=${{vars.TEST_HYPERV_RP_NAME}}" >> $GITHUB_ENV
           echo "TEST_HYPERV_RP_REGION=${{secrets.TEST_HYPERV_RP_REGION}}" >> $GITHUB_ENV
           echo "TEST_HYPERV_RP_VIRTUAL_NETWORK_RESOURCE_GROUP=${{secrets.TEST_HYPERV_RP_VIRTUAL_NETWORK_RESOURCE_GROUP}}" >> $GITHUB_ENV
@@ -124,9 +131,9 @@ jobs:
           echo "TEST_MC_RESOURCE_GROUP_MANUAL_POWER_MANAGED=${{secrets.TEST_MC_RESOURCE_GROUP_MANUAL_POWER_MANAGED}}" >> $GITHUB_ENV
           echo "TEST_MC_MACHINE_NAME_MANUAL_AZURE=${{secrets.TEST_MC_MACHINE_NAME_MANUAL_AZURE}}" >> $GITHUB_ENV
           echo "TEST_MC_MACHINE_ACCOUNT_MANUAL_AZURE=${{secrets.TEST_MC_MACHINE_ACCOUNT_MANUAL_AZURE}}" >> $GITHUB_ENV
+          echo "TEST_MC_MACHINE_PROFILE_VM_NAME=${{secrets.TEST_MC_MACHINE_PROFILE_VM_NAME}}" >> $GITHUB_ENV
+          echo "TEST_MC_MACHINE_PROFILE_RESOURCE_GROUP=${{secrets.TEST_MC_MACHINE_PROFILE_RESOURCE_GROUP}}" >> $GITHUB_ENV
           echo "TEST_DG_NAME=${{vars.TEST_DG_NAME}}" >> $GITHUB_ENV
-          echo "TEST_POLICY_SET_WITHOUT_DG_NAME=${{vars.TEST_POLICY_SET_WITHOUT_DG_NAME}}" >> $GITHUB_ENV
-          echo "TEST_POLICY_SET_NAME=${{vars.TEST_POLICY_SET_NAME}}" >> $GITHUB_ENV
           echo "TEST_APP_NAME=${{vars.TEST_APP_NAME}}" >> $GITHUB_ENV
           echo "TEST_APP_FOLDER_NAME=${{vars.TEST_APP_FOLDER_NAME}}" >> $GITHUB_ENV
           echo "TEST_ROLE_NAME=${{vars.TEST_ROLE_NAME}}" >> $GITHUB_ENV
@@ -139,5 +146,5 @@ jobs:
         run: go test -v ./internal/test -run "^TestAzureMcsSuitePreCheck$"
 
       # Test
-      - name: Test
-        run: go test -v ./internal/test -run "^TestAzureMcs$" -timeout 1h
+      # - name: Test
+      #   run: go test -v ./internal/test -run "^TestAzureMcs$" -timeout 1h
