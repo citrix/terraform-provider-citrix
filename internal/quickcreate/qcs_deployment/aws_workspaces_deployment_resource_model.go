@@ -131,7 +131,7 @@ func (AwsWorkspacesDeploymentWorkspaceModel) GetSchema() schema.NestedAttributeO
 				Default:     booldefault.StaticBool(false),
 			},
 			"workspace_id": schema.StringAttribute{
-				Description: "Id of the AWS Workspaces machine.",
+				Description: "Id of the AWS WorkSpaces machine.",
 				Computed:    true,
 			},
 			"machine_id": schema.StringAttribute{
@@ -186,7 +186,7 @@ type AwsWorkspacesDeploymentResourceModel struct {
 
 func (AwsWorkspacesDeploymentResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "DaaS Quick Deploy - AWS Workspaces Core --- Manages an AWS Workspaces deployment.",
+		Description: "DaaS Quick Deploy - AWS WorkSpaces Core --- Manages an AWS WorkSpaces deployment.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the deployment.",
@@ -346,7 +346,9 @@ func (r AwsWorkspacesDeploymentResourceModel) RefreshPropertyValues(ctx context.
 	r.RootVolumeSize = types.Int64Value(int64(deployment.GetRootVolumeSize()))
 	r.UserVolumeSize = types.Int64Value(int64(deployment.GetUserVolumeSize()))
 	r.VolumesEncrypted = types.BoolValue(deployment.GetVolumesEncrypted())
-	r.VolumesEncryptionKey = types.StringValue(deployment.GetVolumesEncryptionKey())
+	if !r.VolumesEncryptionKey.IsNull() {
+		r.VolumesEncryptionKey = types.StringValue(deployment.GetVolumesEncryptionKey())
+	}
 	r.RunningMode = types.StringValue(util.RunningModeEnumToString(deployment.GetRunningMode()))
 
 	if !r.ScaleSettings.IsNull() && deployment.HasScaleSettings() {

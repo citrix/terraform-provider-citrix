@@ -119,7 +119,7 @@
         "TEST_MC_SERVICE_OFFERING"      :"Standard_D2_v2",
         "TEST_MC_MASTER_IMAGE"          :"m19g1-2305-1-vda.vhd",
         "TEST_MC_MASTER_IMAGE_UPDATED"  :"m19g1-2305-1-vda.vhd",
-        "TEST_MC_IMAGE_RESOUCE_GROUP"   :"ctx-rg",
+        "TEST_MC_IMAGE_RESOURCE_GROUP"   :"ctx-rg",
         "TEST_MC_IMAGE_STORAGE_ACCOUNT" :"{storage_account}",
         "TEST_MC_IMAGE_CONTAINER"       :"vda-images",
         "TEST_MC_SUBNET"                :"ctx-cvad-subnet",
@@ -258,8 +258,12 @@
 
         // Application Go Tests
         "TEST_APP_NAME"                 :"app-test",
-        // Application Folder Go Tests
-        "TEST_APP_FOLDER_NAME"          :"app-folder",
+        // Admin Folder Go Tests
+        "TEST_ADMIN_FOLDER_NAME"          :"app-folder",
+        // Admin Folder Data Source Testing Env Variables
+        "TEST_ADMIN_FOLDER_DATA_SOURCE_ID": "{ADMIN_FOLDER_ID}",
+        "TEST_ADMIN_FOLDER_DATA_SOURCE_PATH": "{ADMIN_FOLDER_PATH}",
+        "TEST_ADMIN_FOLDER_DATA_SOURCE_EXPECTED_NAME": "{ADMIN_FOLDER_NAME}",
         // Application Group Go Tests
         "TEST_APP_GROUP_NAME"          :"app-group",
         
@@ -345,7 +349,10 @@
          ],
          "TEST_VDA_DATASOURCE_DG_VDAS": [
             "{VDA 1 hostname}"
-         ]
+         ],
+
+         // Site Data Source Go Tests Env Variables
+        "TEST_SITE_DATA_SOURCE_EXPECTED_SITE_ID": "{Expected Site ID}"
     },
     "go.testTimeout": "30m"
 }

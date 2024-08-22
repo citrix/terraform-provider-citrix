@@ -54,7 +54,7 @@ func (d *AwsWorkspacesImageDataSource) Read(ctx context.Context, req datasource.
 		return
 	}
 
-	// Try getting the AWS Workspaces Image
+	// Try getting the AWS WorkSpaces Image
 	var image *citrixquickcreate.AwsEdcImage
 	var err error
 	if data.Id.ValueString() != "" {
@@ -79,7 +79,7 @@ func getAwsWorkspacesImageWithName(ctx context.Context, client *citrixdaasclient
 	images, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickcreate.Images](getImageRequest, client)
 	if err != nil {
 		diagnostics.AddError(
-			"Error getting AWS Workspaces Image: "+imageName,
+			"Error getting AWS WorkSpaces Image: "+imageName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadQcsClientError(err),
 		)
@@ -92,5 +92,5 @@ func getAwsWorkspacesImageWithName(ctx context.Context, client *citrixdaasclient
 		}
 	}
 
-	return nil, httpResp, fmt.Errorf("AWS Workspaces Image not found: %s", imageName)
+	return nil, httpResp, fmt.Errorf("AWS WorkSpaces Image not found: %s", imageName)
 }

@@ -100,4 +100,59 @@ resource "citrix_delivery_group" "example-delivery-group" {
 	]
     policy_set_id            = citrix_policy_set.example-policy-set.id
     minimum_functional_level = "L7_20"
+    app_protection = {
+        # apply_contextually = [
+        #     {
+        #         policy_name = "Citrix Gateway connections"
+        #         enable_anti_key_logging = true
+        #         enable_anti_screen_capture = false
+        #     },
+        #     {
+        #         policy_name = "test_access_policy"
+        #         enable_anti_key_logging = true
+        #         enable_anti_screen_capture = false
+        #     }
+        # ]
+        enable_anti_key_logging = true
+        enable_anti_screen_capture = true
+    }
+    default_access_policies = [
+        {
+            name = "Citrix Gateway Connections"
+            enabled = true
+            allowed_connection = "ViaAG"
+            enable_criteria_for_include_connections = true
+            enable_criteria_for_exclude_connections = true
+            include_connections_criteria_type = "MatchAny"
+        },
+        {
+            name = "Non-Citrix Gateway Connections"
+            enabled = true
+            allowed_connection = "NotViaAG"
+            enable_criteria_for_include_connections = false
+            enable_criteria_for_exclude_connections = true
+        }
+    ]
+    custom_access_policies = [
+        {
+            name = "test_access_policy"
+            enabled = true
+            allowed_connection = "ViaAG"
+            enable_criteria_for_include_connections = true
+            enable_criteria_for_exclude_connections = true
+            include_connections_criteria_type = "MatchAny"
+            include_criteria_filters = [
+                {
+                    filter_name = "test"
+                    filter_value = "test"
+                },
+            ]
+            exclude_criteria_filters = [
+                {
+                    filter_name = "test"
+                    filter_value = "test"
+                },
+            ]
+        }
+    ]
 }

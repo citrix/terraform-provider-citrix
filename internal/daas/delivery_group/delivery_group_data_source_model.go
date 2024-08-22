@@ -11,9 +11,10 @@ import (
 
 // DeliveryGroupDataSourceModel defines the Delivery Group data source implementation.
 type DeliveryGroupDataSourceModel struct {
-	Id   types.String   `tfsdk:"id"`
-	Name types.String   `tfsdk:"name"`
-	Vdas []vda.VdaModel `tfsdk:"vdas"` // List[VdaModel]
+	Id                      types.String   `tfsdk:"id"`
+	Name                    types.String   `tfsdk:"name"`
+	DeliveryGroupFolderPath types.String   `tfsdk:"delivery_group_folder_path"`
+	Vdas                    []vda.VdaModel `tfsdk:"vdas"` // List[VdaModel]
 }
 
 func (DeliveryGroupDataSourceModel) GetSchema() schema.Schema {
@@ -28,6 +29,10 @@ func (DeliveryGroupDataSourceModel) GetSchema() schema.Schema {
 				Description: "Name of the delivery group.",
 				Required:    true,
 			},
+			"delivery_group_folder_path": schema.StringAttribute{
+				Description: "The path to the folder in which the delivery group is located.",
+				Optional:    true,
+			},
 			"vdas": schema.ListNestedAttribute{
 				Description:  "The VDAs associated with the delivery group.",
 				Computed:     true,
@@ -40,6 +45,14 @@ func (DeliveryGroupDataSourceModel) GetSchema() schema.Schema {
 func (r DeliveryGroupDataSourceModel) RefreshPropertyValues(deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, vdas *citrixorchestration.MachineResponseModelCollection) DeliveryGroupDataSourceModel {
 	r.Id = types.StringValue(deliveryGroup.GetId())
 	r.Name = types.StringValue(deliveryGroup.GetName())
+
+	adminFolder := deliveryGroup.GetAdminFolder()
+	adminFolderPath := adminFolder.GetName()
+	if adminFolderPath != "" {
+		r.DeliveryGroupFolderPath = types.StringValue(adminFolderPath)
+	} else {
+		r.DeliveryGroupFolderPath = types.StringNull()
+	}
 
 	res := []vda.VdaModel{}
 	for _, model := range vdas.GetItems() {

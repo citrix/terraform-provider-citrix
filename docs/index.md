@@ -71,3 +71,7 @@ Required:
 - `ad_admin_password` (String) Active Directory Admin Password to connect to storefront server <br />Only applicable for Citrix on-premises customers. Use this to specify AD admin password<br />Can be set via Environment Variable **SF_AD_ADMIN_PASSWORD**.
 - `ad_admin_username` (String) Active Directory Admin Username to connect to storefront server <br />Only applicable for Citrix on-premises customers. Use this to specify AD admin username <br />Can be set via Environment Variable **SF_AD_ADMIN_USERNAME**.
 - `computer_name` (String) StoreFront server computer Name <br />Only applicable for Citrix on-premises customers. Use this to specify StoreFront server computer name <br />Can be set via Environment Variable **SF_COMPUTER_NAME**.
+
+Optional:
+
+- `disable_ssl_verification` (Boolean) Disable SSL verification against the target storefront server. <br />Only applicable to customers connecting to storefront server remotely. Customers should omit this option when running storefront provider locally. Set to true to skip SSL verification only when the target DDC does not have a valid SSL certificate issued by a trusted CA. <br />When set to true, please make sure that your provider storefront_remote_host is set for a known storefront hostname. <br />Can be set via Environment Variable **SF_DISABLE_SSL_VERIFICATION**.

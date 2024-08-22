@@ -25,6 +25,10 @@ data "citrix_machine_catalog" "example_machine_catalog" {
 
 - `name` (String) Name of the machine catalog.
 
+### Optional
+
+- `machine_catalog_folder_path` (String) The path to the folder in which the machine catalog is located.
+
 ### Read-Only
 
 - `id` (String) GUID identifier of the machine catalog.

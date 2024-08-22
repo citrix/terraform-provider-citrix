@@ -33,8 +33,8 @@ func TestMachineCatalogPreCheck_Azure(t *testing.T) {
 	if v := os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED"); v == "" {
 		t.Fatal("TEST_MC_MASTER_IMAGE_UPDATED must be set for acceptance tests")
 	}
-	if v := os.Getenv("TEST_MC_IMAGE_RESOUCE_GROUP"); v == "" {
-		t.Fatal("TEST_MC_IMAGE_RESOUCE_GROUP must be set for acceptance tests")
+	if v := os.Getenv("TEST_MC_IMAGE_RESOURCE_GROUP"); v == "" {
+		t.Fatal("TEST_MC_IMAGE_RESOURCE_GROUP must be set for acceptance tests")
 	}
 	if v := os.Getenv("TEST_MC_IMAGE_STORAGE_ACCOUNT"); v == "" {
 		t.Fatal("TEST_MC_IMAGE_STORAGE_ACCOUNT must be set for acceptance tests")
@@ -214,8 +214,8 @@ func TestMachineCatalogPreCheck_AzureAd(t *testing.T) {
 	if v := os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED"); v == "" {
 		t.Fatal("TEST_MC_MASTER_IMAGE_UPDATED must be set for acceptance tests")
 	}
-	if v := os.Getenv("TEST_MC_IMAGE_RESOUCE_GROUP"); v == "" {
-		t.Fatal("TEST_MC_IMAGE_RESOUCE_GROUP must be set for acceptance tests")
+	if v := os.Getenv("TEST_MC_IMAGE_RESOURCE_GROUP"); v == "" {
+		t.Fatal("TEST_MC_IMAGE_RESOURCE_GROUP must be set for acceptance tests")
 	}
 	if v := os.Getenv("TEST_MC_IMAGE_STORAGE_ACCOUNT"); v == "" {
 		t.Fatal("TEST_MC_IMAGE_STORAGE_ACCOUNT must be set for acceptance tests")
@@ -314,8 +314,8 @@ func TestMachineCatalogPreCheck_Workgroup(t *testing.T) {
 	if v := os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED"); v == "" {
 		t.Fatal("TEST_MC_MASTER_IMAGE_UPDATED must be set for acceptance tests")
 	}
-	if v := os.Getenv("TEST_MC_IMAGE_RESOUCE_GROUP"); v == "" {
-		t.Fatal("TEST_MC_IMAGE_RESOUCE_GROUP must be set for acceptance tests")
+	if v := os.Getenv("TEST_MC_IMAGE_RESOURCE_GROUP"); v == "" {
+		t.Fatal("TEST_MC_IMAGE_RESOURCE_GROUP must be set for acceptance tests")
 	}
 	if v := os.Getenv("TEST_MC_IMAGE_STORAGE_ACCOUNT"); v == "" {
 		t.Fatal("TEST_MC_IMAGE_STORAGE_ACCOUNT must be set for acceptance tests")
@@ -2478,7 +2478,7 @@ func BuildMachineCatalogResourceAzure(t *testing.T, machineResource, catalogName
 	service_account_pass := os.Getenv("TEST_MC_SERVICE_ACCOUNT_PASS")
 	service_offering := os.Getenv("TEST_MC_SERVICE_OFFERING")
 	master_image := os.Getenv("TEST_MC_MASTER_IMAGE")
-	resource_group := os.Getenv("TEST_MC_IMAGE_RESOUCE_GROUP")
+	resource_group := os.Getenv("TEST_MC_IMAGE_RESOURCE_GROUP")
 	storage_account := os.Getenv("TEST_MC_IMAGE_STORAGE_ACCOUNT")
 	container := os.Getenv("TEST_MC_IMAGE_CONTAINER")
 	subnet := os.Getenv("TEST_MC_SUBNET")
@@ -2496,7 +2496,7 @@ func BuildMachineCatalogResourceAzureAd(t *testing.T, machineResource string) st
 	name := os.Getenv("TEST_MC_NAME") + "-AAD"
 	service_offering := os.Getenv("TEST_MC_SERVICE_OFFERING")
 	master_image := os.Getenv("TEST_MC_MASTER_IMAGE")
-	resource_group := os.Getenv("TEST_MC_IMAGE_RESOUCE_GROUP")
+	resource_group := os.Getenv("TEST_MC_IMAGE_RESOURCE_GROUP")
 	storage_account := os.Getenv("TEST_MC_IMAGE_STORAGE_ACCOUNT")
 	container := os.Getenv("TEST_MC_IMAGE_CONTAINER")
 	subnet := os.Getenv("TEST_MC_SUBNET")
@@ -2515,7 +2515,7 @@ func BuildMachineCatalogResourceWorkgroup(t *testing.T, machineResource string) 
 	name := os.Getenv("TEST_MC_NAME") + "-WRKGRP"
 	service_offering := os.Getenv("TEST_MC_SERVICE_OFFERING")
 	master_image := os.Getenv("TEST_MC_MASTER_IMAGE")
-	resource_group := os.Getenv("TEST_MC_IMAGE_RESOUCE_GROUP")
+	resource_group := os.Getenv("TEST_MC_IMAGE_RESOURCE_GROUP")
 	storage_account := os.Getenv("TEST_MC_IMAGE_STORAGE_ACCOUNT")
 	container := os.Getenv("TEST_MC_IMAGE_CONTAINER")
 	namingScheme := "vda-##-WG"

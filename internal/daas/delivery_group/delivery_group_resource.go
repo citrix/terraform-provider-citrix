@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -128,10 +129,84 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 	}
 
 	deliveryGroupId := deliveryGroup.GetId()
+	existingAdvancedAccessPolicies := deliveryGroup.GetAdvancedAccessPolicy()
 
 	//Create Reboot Schedule after delivery group is created
 	var editbody citrixorchestration.EditDeliveryGroupRequestModel
 	editbody.SetRebootSchedules(body.GetRebootSchedules())
+	advancedAccessPoliciesRequest := []citrixorchestration.AdvancedAccessPolicyRequestModel{}
+
+	var allowedUsers citrixorchestration.AllowedUser
+	if len(existingAdvancedAccessPolicies) > 0 {
+		// This should always be true since there are default access policies associated with the dg.
+		allowedUsers = existingAdvancedAccessPolicies[0].GetAllowedUsers()
+	}
+
+	if !plan.DefaultAccessPolicies.IsNull() {
+		simpleAccessPolicy := body.GetSimpleAccessPolicy()
+		defaultAccessPolicies := util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, &resp.Diagnostics, plan.DefaultAccessPolicies)
+		for _, defaultAccessPolicy := range defaultAccessPolicies {
+			advancedAccessPolicyRequest, err := getAdvancedAccessPolicyRequestForDefaultPolicy(ctx, &resp.Diagnostics, defaultAccessPolicy, existingAdvancedAccessPolicies)
+			if err != nil {
+				return
+			}
+			advancedAccessPolicyRequest.SetIncludedUserFilterEnabled(simpleAccessPolicy.GetIncludedUserFilterEnabled())
+			advancedAccessPolicyRequest.SetIncludedUsers(simpleAccessPolicy.GetIncludedUsers())
+			advancedAccessPolicyRequest.SetExcludedUserFilterEnabled(simpleAccessPolicy.GetExcludedUserFilterEnabled())
+			advancedAccessPolicyRequest.SetExcludedUsers(simpleAccessPolicy.GetExcludedUsers())
+			advancedAccessPolicyRequest.SetAllowedUsers(allowedUsers)
+			advancedAccessPoliciesRequest = append(advancedAccessPoliciesRequest, advancedAccessPolicyRequest)
+		}
+
+		editbody.SetAdvancedAccessPolicy(advancedAccessPoliciesRequest)
+	}
+
+	if !plan.CustomAccessPolicies.IsNull() {
+		simpleAccessPolicy := body.GetSimpleAccessPolicy()
+		if len(advancedAccessPoliciesRequest) == 0 { // if default policies are not defined by user, then use remote
+			for _, existingAdvancedAccessPolicy := range existingAdvancedAccessPolicies {
+				var advancedAccessPolicyRequest citrixorchestration.AdvancedAccessPolicyRequestModel
+				advancedAccessPolicyRequest.SetId(existingAdvancedAccessPolicy.GetId())
+				advancedAccessPolicyRequest.SetName(existingAdvancedAccessPolicy.GetName())
+				advancedAccessPolicyRequest.SetIncludedUserFilterEnabled(simpleAccessPolicy.GetIncludedUserFilterEnabled())
+				advancedAccessPolicyRequest.SetIncludedUsers(simpleAccessPolicy.GetIncludedUsers())
+				advancedAccessPolicyRequest.SetExcludedUserFilterEnabled(simpleAccessPolicy.GetExcludedUserFilterEnabled())
+				advancedAccessPolicyRequest.SetExcludedUsers(simpleAccessPolicy.GetExcludedUsers())
+				advancedAccessPolicyRequest.SetAllowedUsers(existingAdvancedAccessPolicy.GetAllowedUsers())
+				advancedAccessPoliciesRequest = append(advancedAccessPoliciesRequest, advancedAccessPolicyRequest)
+			}
+		}
+
+		accessPolicies := util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, &resp.Diagnostics, plan.CustomAccessPolicies)
+		for _, accessPolicy := range accessPolicies {
+			accessPolicyRequest, err := getAdvancedAccessPolicyRequest(ctx, &resp.Diagnostics, accessPolicy)
+			if err != nil {
+				return
+			}
+			accessPolicyRequest.SetIncludedUserFilterEnabled(simpleAccessPolicy.GetIncludedUserFilterEnabled())
+			accessPolicyRequest.SetIncludedUsers(simpleAccessPolicy.GetIncludedUsers())
+			accessPolicyRequest.SetExcludedUserFilterEnabled(simpleAccessPolicy.GetExcludedUserFilterEnabled())
+			accessPolicyRequest.SetExcludedUsers(simpleAccessPolicy.GetExcludedUsers())
+			accessPolicyRequest.SetAllowedUsers(allowedUsers)
+			advancedAccessPoliciesRequest = append(advancedAccessPoliciesRequest, accessPolicyRequest)
+		}
+
+		if !plan.AppProtection.IsNull() {
+			appProtection := util.ObjectValueToTypedObject[DeliveryGroupAppProtection](ctx, &resp.Diagnostics, plan.AppProtection)
+			if !appProtection.ApplyContextually.IsNull() {
+				appProtectionApplyContextually := util.ObjectListToTypedArray[DeliveryGroupAppProtectionApplyContextuallyModel](ctx, &resp.Diagnostics, appProtection.ApplyContextually)
+				for _, applyContextually := range appProtectionApplyContextually {
+					advancedAccessPoliciesRequest, err = setAppProtectionOnAdvancedAccessPolicies(&resp.Diagnostics, applyContextually, advancedAccessPoliciesRequest, deliveryGroup.GetName())
+					if err != nil {
+						return
+					}
+				}
+			}
+		}
+
+		editbody.SetAdvancedAccessPolicy(advancedAccessPoliciesRequest)
+	}
+
 	updateDeliveryGroupRequest := r.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsPatchDeliveryGroup(ctx, deliveryGroupId)
 	updateDeliveryGroupRequest = updateDeliveryGroupRequest.EditDeliveryGroupRequestModel(editbody)
 	httpResp, err = citrixdaasclient.AddRequestData(updateDeliveryGroupRequest, r.client).Execute()
@@ -141,6 +216,11 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+	}
+
+	deliveryGroup, err = getDeliveryGroup(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
+	if err != nil {
+		return
 	}
 
 	// Get desktops
@@ -392,6 +472,63 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 		return
 	}
 
+	if !data.DefaultAccessPolicies.IsNull() {
+		accesPolicies := util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, &resp.Diagnostics, data.DefaultAccessPolicies)
+
+		if len(accesPolicies) != 2 {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("default_access_policies"),
+				"Incorrect Attribute Configuration",
+				"In-built policies cannot be added or removed, default_access_policies must have corresponding values for the two in-built policies.",
+			)
+			return
+		}
+
+		isGatewayConnectionPresent := false
+		isNonGatewayConnectionPresent := false
+		for index, accessPolicy := range accesPolicies {
+			isValid := accessPolicy.ValidateConfig(ctx, &resp.Diagnostics, index)
+			isValid = isValid && accessPolicy.ValidateConfigForDefaultPolicy(ctx, &resp.Diagnostics, index)
+			if !isValid {
+				return
+			}
+			if strings.EqualFold(accessPolicy.Name.ValueString(), util.CitrixGatewayConnections) {
+				isGatewayConnectionPresent = true
+			} else if strings.EqualFold(accessPolicy.Name.ValueString(), util.NonCitrixGatewayConnections) {
+				isNonGatewayConnectionPresent = true
+			}
+		}
+
+		if !isGatewayConnectionPresent || !isNonGatewayConnectionPresent {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("default_access_policies"),
+				"Incorrect Attribute Configuration",
+				"In-built policies cannot be added or removed, default_access_policies must have corresponding values for the two in-built policies. "+
+					"\nUse `Citrix Gateway connections` as the name for the default policy that is Via Access Gateway and `Non-Citrix Gateway connections` as the name for the default policy that is Not Via Access",
+			)
+		}
+	}
+
+	if !data.CustomAccessPolicies.IsNull() {
+		accessPolicies := util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, &resp.Diagnostics, data.CustomAccessPolicies)
+		for index, accessPolicy := range accessPolicies {
+			isValid := accessPolicy.ValidateConfig(ctx, &resp.Diagnostics, index)
+
+			if !isValid {
+				return
+			}
+		}
+	}
+
+	if !data.AppProtection.IsNull() {
+		appPrtoection := util.ObjectValueToTypedObject[DeliveryGroupAppProtection](ctx, &resp.Diagnostics, data.AppProtection)
+		isValid := appPrtoection.ValidateConfig(ctx, &resp.Diagnostics)
+
+		if !isValid {
+			return
+		}
+	}
+
 	if data.AssociatedMachineCatalogs.IsNull() || len(data.AssociatedMachineCatalogs.Elements()) < 1 {
 		// if no machine catalogs are associated, sharing_kind and session_support must be specified
 
@@ -484,7 +621,7 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 		return
 	}
 
-	isValid, errMsg := validatePowerManagementSettings(ctx, &resp.Diagnostics, plan, associatedMachineCatalogProperties.SessionSupport)
+	isValid, errMsg := validatePowerManagementSettings(ctx, &resp.Diagnostics, plan, associatedMachineCatalogProperties.AllocationType, associatedMachineCatalogProperties.SessionSupport)
 
 	if !isValid {
 		resp.Diagnostics.AddError(
@@ -540,5 +677,13 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 			"Incorrect Attribute Configuration",
 			"make_resources_available_in_lhc can only be set for power managed Single Session OS Random (pooled) VDAs.",
 		)
+	}
+
+	if !r.client.ClientConfig.IsCspCustomer && !plan.Tenants.IsNull() {
+		resp.Diagnostics.AddError(
+			"Error "+operation+" Delivery Group "+plan.Name.ValueString(),
+			"`tenants` attribute can only be set for Citrix Service Provider customer.",
+		)
+		return
 	}
 }

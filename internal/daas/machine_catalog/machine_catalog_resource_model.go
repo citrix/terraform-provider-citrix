@@ -31,21 +31,23 @@ import (
 
 // MachineCatalogResourceModel maps the resource schema data.
 type MachineCatalogResourceModel struct {
-	Id                     types.String `tfsdk:"id"`
-	Name                   types.String `tfsdk:"name"`
-	Description            types.String `tfsdk:"description"`
-	IsPowerManaged         types.Bool   `tfsdk:"is_power_managed"`
-	IsRemotePc             types.Bool   `tfsdk:"is_remote_pc"`
-	AllocationType         types.String `tfsdk:"allocation_type"`
-	SessionSupport         types.String `tfsdk:"session_support"`
-	Zone                   types.String `tfsdk:"zone"`
-	VdaUpgradeType         types.String `tfsdk:"vda_upgrade_type"`
-	ProvisioningType       types.String `tfsdk:"provisioning_type"`
-	ProvisioningScheme     types.Object `tfsdk:"provisioning_scheme"` // ProvisioningSchemeModel
-	MachineAccounts        types.List   `tfsdk:"machine_accounts"`    // List[MachineAccountsModel]
-	RemotePcOus            types.List   `tfsdk:"remote_pc_ous"`       // List[RemotePcOuModel]
-	MinimumFunctionalLevel types.String `tfsdk:"minimum_functional_level"`
-	Scopes                 types.Set    `tfsdk:"scopes"` //Set[String]
+	Id                       types.String `tfsdk:"id"`
+	Name                     types.String `tfsdk:"name"`
+	Description              types.String `tfsdk:"description"`
+	IsPowerManaged           types.Bool   `tfsdk:"is_power_managed"`
+	IsRemotePc               types.Bool   `tfsdk:"is_remote_pc"`
+	AllocationType           types.String `tfsdk:"allocation_type"`
+	SessionSupport           types.String `tfsdk:"session_support"`
+	Zone                     types.String `tfsdk:"zone"`
+	VdaUpgradeType           types.String `tfsdk:"vda_upgrade_type"`
+	ProvisioningType         types.String `tfsdk:"provisioning_type"`
+	ProvisioningScheme       types.Object `tfsdk:"provisioning_scheme"` // ProvisioningSchemeModel
+	MachineAccounts          types.List   `tfsdk:"machine_accounts"`    // List[MachineAccountsModel]
+	RemotePcOus              types.List   `tfsdk:"remote_pc_ous"`       // List[RemotePcOuModel]
+	MinimumFunctionalLevel   types.String `tfsdk:"minimum_functional_level"`
+	Scopes                   types.Set    `tfsdk:"scopes"` //Set[String]
+	MachineCatalogFolderPath types.String `tfsdk:"machine_catalog_folder_path"`
+	Tenants                  types.Set    `tfsdk:"tenants"` // Set[String]
 }
 
 type MachineAccountsModel struct {
@@ -447,9 +449,6 @@ func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 			"name": schema.StringAttribute{
 				Description: "Name of the machine catalog.",
 				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"description": schema.StringAttribute{
 				Description: "Description of the machine catalog.",
@@ -551,7 +550,6 @@ func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 				Computed:    true,
 				Default:     setdefault.StaticValue(types.SetValueMust(types.StringType, []attr.Value{})),
 				Validators: []validator.Set{
-					setvalidator.SizeAtLeast(1),
 					setvalidator.ValueStringsAre(
 						validator.String(
 							stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
@@ -560,6 +558,18 @@ func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"provisioning_scheme": ProvisioningSchemeModel{}.GetSchema(),
+			"machine_catalog_folder_path": schema.StringAttribute{
+				Description: "The path to the folder in which the machine catalog is located.",
+				Optional:    true,
+			},
+			"tenants": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "A set of identifiers of tenants to associate with the machine catalog.",
+				Optional:    true,
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
+				},
+			},
 		},
 	}
 }
@@ -629,6 +639,24 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 
 	// Provisioning Scheme Properties
 	r = r.updateCatalogWithProvScheme(ctx, diagnostics, client, catalog, connectionType, pluginId, provScheme)
+
+	adminFolder := catalog.GetAdminFolder()
+	adminFolderPath := adminFolder.GetName()
+	if adminFolderPath != "" {
+		r.MachineCatalogFolderPath = types.StringValue(adminFolderPath)
+	} else {
+		r.MachineCatalogFolderPath = types.StringNull()
+	}
+
+	if len(catalog.GetTenants()) > 0 || !r.Tenants.IsNull() {
+		var remoteTenants []string
+		for _, tenant := range catalog.GetTenants() {
+			remoteTenants = append(remoteTenants, tenant.GetId())
+		}
+		r.Tenants = util.StringArrayToStringSet(ctx, diagnostics, remoteTenants)
+	} else {
+		r.Tenants = types.SetNull(types.StringType)
+	}
 
 	return r
 }

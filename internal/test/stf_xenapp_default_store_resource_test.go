@@ -35,7 +35,12 @@ func TestSTFXenappDefaultStoreResource(t *testing.T) {
 
 			// Create and Read testing
 			{
-				Config: BuildSTFXenappDefaultStoreResource(t, testSTFXenappDefaultStoreResources),
+				Config: composeTestResourceTf(
+					BuildSTFDeploymentResource(t, testSTFDeploymentResources, siteId),
+					BuildSTFAuthenticationServiceResource(t, testSTFAuthenticationServiceResources),
+					BuildSTFStoreServiceResource(t, testSTFStoreServiceResources),
+					BuildSTFXenappDefaultStoreResource(t, testSTFXenappDefaultStoreResources),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify parameters of the STF Default Store
 					resource.TestCheckResourceAttr("citrix_stf_xenapp_default_store.testSTFXenappDefaultStore", "store_site_id", siteId),
@@ -55,8 +60,12 @@ func TestSTFXenappDefaultStoreResource(t *testing.T) {
 
 			// Update testing for STF authentication service
 			{
-				Config: BuildSTFXenappDefaultStoreResource(t, testSTFXenappDefaultStoreResources_updated),
-
+				Config: composeTestResourceTf(
+					BuildSTFDeploymentResource(t, testSTFDeploymentResources, siteId),
+					BuildSTFAuthenticationServiceResource(t, testSTFAuthenticationServiceResources),
+					BuildSTFStoreServiceResource(t, testSTFStoreServiceResources),
+					BuildSTFXenappDefaultStoreResource(t, testSTFXenappDefaultStoreResources_updated),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify parameters of the STF Default Store
 					resource.TestCheckResourceAttr("citrix_stf_xenapp_default_store.testSTFXenappDefaultStore", "store_site_id", siteId),
@@ -70,7 +79,7 @@ func TestSTFXenappDefaultStoreResource(t *testing.T) {
 func BuildSTFXenappDefaultStoreResource(t *testing.T, XenappDefaultStore string) string {
 	siteId := os.Getenv("TEST_STF_SITE_ID")
 	virtualPath := os.Getenv("TEST_STF_STORE_VIRTUAL_PATH")
-	return BuildSTFStoreServiceResource(t, testSTFStoreServiceResources) + fmt.Sprintf(XenappDefaultStore, siteId, virtualPath)
+	return fmt.Sprintf(XenappDefaultStore, siteId, virtualPath)
 }
 
 func generateImportStateId_STFXenappDefaultStore(state *terraform.State) (string, error) {

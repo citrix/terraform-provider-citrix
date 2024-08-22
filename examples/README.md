@@ -11,6 +11,7 @@ This folder contains examples of how to configure Citrix environments in various
   - [Examples](#examples)
     - [Basic MCS](#basic-mcs)
     - [Non-domain joined MCS](#non-domain-joined-mcs)
+    - [Quick Deploy](#quick-deploy)
     - [Detailed instructions for cloud providers:](#detailed-instructions-for-cloud-providers)
 
 ## How to use the examples
@@ -59,6 +60,11 @@ A single example of how to create a non-domain joined VDA, based on the [basic_a
   * If using an Azure image gallery, uncomment the `gallery_image` in [machine_catalogs.tf](basic_azure_mcs_vda/machine_catalogs.tf) and remove the VHD parameters.
 
 The difference is in [machine_catalogs.tf](non_domain_joined_azure_mcs_vda/machine_catalogs.tf), `provisioning_scheme.identity_type = "Workgroup"` and the addition of a Citrix Group Policy in [policy_sets.tf](non_domain_joined_azure_mcs_vda/policy_sets.tf).
+
+### Quick Deploy
+Examples of creating resources using DaaS Quick Deploy. This includes the account, directory or resource connection, image, and finally the deployment which is assigned to a list of usernames provided in the variables.
+* [AWS WorkSpaces Core](basic_aws_workspace_core_deployment)
+
 
 ### Detailed instructions for cloud providers:
 Detailed instructions on setting up deployments on different cloud providers from Citrix Tech Zone:

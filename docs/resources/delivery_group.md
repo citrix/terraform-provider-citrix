@@ -115,6 +115,61 @@ resource "citrix_delivery_group" "example-delivery-group" {
 	]
     policy_set_id            = citrix_policy_set.example-policy-set.id
     minimum_functional_level = "L7_20"
+    app_protection = {
+        # apply_contextually = [
+        #     {
+        #         policy_name = "Citrix Gateway connections"
+        #         enable_anti_key_logging = true
+        #         enable_anti_screen_capture = false
+        #     },
+        #     {
+        #         policy_name = "test_access_policy"
+        #         enable_anti_key_logging = true
+        #         enable_anti_screen_capture = false
+        #     }
+        # ]
+        enable_anti_key_logging = true
+        enable_anti_screen_capture = true
+    }
+    default_access_policies = [
+        {
+            name = "Citrix Gateway Connections"
+            enabled = true
+            allowed_connection = "ViaAG"
+            enable_criteria_for_include_connections = true
+            enable_criteria_for_exclude_connections = true
+            include_connections_criteria_type = "MatchAny"
+        },
+        {
+            name = "Non-Citrix Gateway Connections"
+            enabled = true
+            allowed_connection = "NotViaAG"
+            enable_criteria_for_include_connections = false
+            enable_criteria_for_exclude_connections = true
+        }
+    ]
+    custom_access_policies = [
+        {
+            name = "test_access_policy"
+            enabled = true
+            allowed_connection = "ViaAG"
+            enable_criteria_for_include_connections = true
+            enable_criteria_for_exclude_connections = true
+            include_connections_criteria_type = "MatchAny"
+            include_criteria_filters = [
+                {
+                    filter_name = "test"
+                    filter_value = "test"
+                },
+            ]
+            exclude_criteria_filters = [
+                {
+                    filter_name = "test"
+                    filter_value = "test"
+                },
+            ]
+        }
+    ]
 }
 ```
 
@@ -135,6 +190,13 @@ resource "citrix_delivery_group" "example-delivery-group" {
 ~> **Please Note** Before using the feature, make sure that these [requirements](https://docs.citrix.com/en-us/citrix-workspace-app/app-protection.html#system-requirements) are met. (see [below for nested schema](#nestedatt--app_protection))
 - `associated_machine_catalogs` (Attributes List) Machine catalogs from which to assign machines to the newly created delivery group. (see [below for nested schema](#nestedatt--associated_machine_catalogs))
 - `autoscale_settings` (Attributes) The power management settings governing the machine(s) in the delivery group. (see [below for nested schema](#nestedatt--autoscale_settings))
+- `custom_access_policies` (Attributes List) Custom Access Policies for the delivery group. To manage built-in access policies use the `default_access_policies` instead. (see [below for nested schema](#nestedatt--custom_access_policies))
+- `default_access_policies` (Attributes List) Manage built-in Access Policies for the delivery group. These are the Citrix Gateway Connections (via Access Gateway) and Non-Citrix Gateway Connections (not via Access Gateway) access policies.
+
+~> **Please Note** Default Access Policies can only be modified; they cannot be deleted. If using this property, both default policies have to be specified.
+
+-> **Note** Use `Citrix Gateway connections` as the name for the default policy that is Via Access Gateway and `Non-Citrix Gateway connections` as the name for the default policy that is Not Via Access Gateway. (see [below for nested schema](#nestedatt--default_access_policies))
+- `delivery_group_folder_path` (String) The path of the folder in which the delivery group is located.
 - `description` (String) Description of the delivery group.
 - `desktops` (Attributes List) A list of Desktop resources to publish on the delivery group. Only 1 desktop can be added to a Remote PC Delivery Group. (see [below for nested schema](#nestedatt--desktops))
 - `make_resources_available_in_lhc` (Boolean) In the event of a service disruption or loss of connectivity, select if you want Local Host Cache to keep resources in the delivery group available to launch new sessions. Existing sessions are not impacted. 
@@ -150,6 +212,7 @@ resource "citrix_delivery_group" "example-delivery-group" {
 - `session_support` (String) The session support for the delivery group. Can only be set to `SingleSession` or `MultiSession`. Specify only if you want to create a Delivery Group wthout any `associated_machine_catalogs`. Ensure session support is same as that of the prospective Machine Catalogs you will associate this Delivery Group with.
 - `sharing_kind` (String) The sharing kind for the delivery group. Can only be set to `Shared` or `Private`. Specify only if you want to create a Delivery Group wthout any `associated_machine_catalogs`.
 - `storefront_servers` (Set of String) A list of GUID identifiers of StoreFront Servers to associate with the delivery group.
+- `tenants` (Set of String) A set of identifiers of tenants to associate with the delivery group.
 
 ### Read-Only
 
@@ -159,12 +222,27 @@ resource "citrix_delivery_group" "example-delivery-group" {
 <a id="nestedatt--app_protection"></a>
 ### Nested Schema for `app_protection`
 
+Optional:
+
+- `apply_contextually` (Attributes List) Implement contextual App Protection using the connection filters defined in the Access Policy rule. (see [below for nested schema](#nestedatt--app_protection--apply_contextually))
+- `enable_anti_key_logging` (Boolean) When enabled, anti-keylogging is applied when a protected window is in focus.
+- `enable_anti_screen_capture` (Boolean) Specify whether to use anti-screen capture.
+
+-> **Note** For Windows and macOS, only the window with protected content is blank. Anti-screen capture is only applied when the window is open. For Linux, the entire screen will appear blank. Anti-screen capture is only applied when the window is open or minimized.
+
+<a id="nestedatt--app_protection--apply_contextually"></a>
+### Nested Schema for `app_protection.apply_contextually`
+
 Required:
 
 - `enable_anti_key_logging` (Boolean) When enabled, anti-keylogging is applied when a protected window is in focus.
 - `enable_anti_screen_capture` (Boolean) Specify whether to use anti-screen capture.
 
 -> **Note** For Windows and macOS, only the window with protected content is blank. Anti-screen capture is only applied when the window is open. For Linux, the entire screen will appear blank. Anti-screen capture is only applied when the window is open or minimized.
+- `policy_name` (String) The name of the policy.
+
+-> **Note** To refer to default policies, use `Citrix Gateway connections` as the name for the default policy that is Via Access Gateway and `Non-Citrix Gateway connections` as the name for the default policy that is Not Via Access Gateway.
+
 
 
 <a id="nestedatt--associated_machine_catalogs"></a>
@@ -193,17 +271,21 @@ Optional:
 - `log_off_off_peak_disconnected_session_after_seconds` (Number) Specifies the time in seconds after which a disconnected session belonging to the delivery group is terminated during off peak time.
 - `log_off_peak_disconnected_session_after_seconds` (Number) Specifies the time in seconds after which a disconnected session belonging to the delivery group is terminated during peak time.
 - `off_peak_buffer_size_percent` (Number) The percentage of machines in the delivery group that should be kept available in an idle state outside peak hours.
-- `off_peak_disconnect_action` (String) The action to be performed after a configurable period of a user session disconnecting outside peak hours.
+- `off_peak_disconnect_action` (String) The action to be performed after a configurable period of a user session disconnecting outside peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.
 - `off_peak_disconnect_timeout_minutes` (Number) The number of minutes before the configured action should be performed after a user session disconnectts outside peak hours.
-- `off_peak_extended_disconnect_action` (String) The action to be performed after a second configurable period of a user session disconnecting outside peak hours.
+- `off_peak_extended_disconnect_action` (String) The action to be performed after a second configurable period of a user session disconnecting outside peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.
 - `off_peak_extended_disconnect_timeout_minutes` (Number) The number of minutes before the second configured action should be performed after a user session disconnects outside peak hours.
-- `off_peak_log_off_action` (String) The action to be performed after a configurable period of a user session ending outside peak hours.
+- `off_peak_log_off_action` (String) The action to be performed after a configurable period of a user session ending outside peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.
+- `off_peak_log_off_timeout_minutes` (Number) The number of minutes before the configured action should be performed after a user session ends outside peak hours.
+- `peak_autoscale_assigned_power_on_idle_action` (String) The action to be performed on an assigned machine previously started by autoscale that subsequently remains unused. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.
+- `peak_autoscale_assigned_power_on_idle_timeout_minutes` (Number) The number of minutes before the configured action is performed on an assigned machine previously started by autoscale that subsequently remains unused.
 - `peak_buffer_size_percent` (Number) The percentage of machines in the delivery group that should be kept available in an idle state in peak hours.
-- `peak_disconnect_action` (String) The action to be performed after a configurable period of a user session disconnecting in peak hours.
+- `peak_disconnect_action` (String) The action to be performed after a configurable period of a user session disconnecting in peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.
 - `peak_disconnect_timeout_minutes` (Number) The number of minutes before the configured action should be performed after a user session disconnects in peak hours.
-- `peak_extended_disconnect_action` (String) The action to be performed after a second configurable period of a user session disconnecting in peak hours.
+- `peak_extended_disconnect_action` (String) The action to be performed after a second configurable period of a user session disconnecting in peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.
 - `peak_extended_disconnect_timeout_minutes` (Number) The number of minutes before the second configured action should be performed after a user session disconnects in peak hours.
-- `peak_log_off_action` (String) The action to be performed after a configurable period of a user session ending in peak hours.
+- `peak_log_off_action` (String) The action to be performed after a configurable period of a user session ending in peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.
+- `peak_log_off_timeout_minutes` (Number) The number of minutes before the configured action should be performed after a user session ends in peak hours.
 - `power_off_delay_minutes` (Number) Delay before machines are powered off, when scaling down. Specified in minutes. 
 
 ~> **Please Note** Applies only to multi-session machines. 
@@ -240,6 +322,90 @@ Required:
 
 
 
+<a id="nestedatt--custom_access_policies"></a>
+### Nested Schema for `custom_access_policies`
+
+Required:
+
+- `allowed_connection` (String) The behavior of the include filter. Choose between `Filtered`, `ViaAG`, and `NotViaAG`.
+- `enable_criteria_for_exclude_connections` (Boolean) Whether to enable criteria for exclude connections.
+- `enable_criteria_for_include_connections` (Boolean) Whether to enable criteria for include connections.
+- `name` (String) The name of the access policy.
+
+-> **Note** For default_access_policies, use `Citrix Gateway connections` as the name for the policy that is Via Access Gateway and `Non-Citrix Gateway connections` as the name for the policy that is Not Via Access Gateway.
+
+Optional:
+
+- `enabled` (Boolean) Whether the access policy is enabled. Default is `true`.
+- `exclude_criteria_filters` (Attributes List) The list of filters that meet the criteria for exclude connections. (see [below for nested schema](#nestedatt--custom_access_policies--exclude_criteria_filters))
+- `include_connections_criteria_type` (String) The type of criteria for include connections. Choose between `MatchAny` and `MatchAll`.
+- `include_criteria_filters` (Attributes List) The list of filters that meet the criteria for include connections. (see [below for nested schema](#nestedatt--custom_access_policies--include_criteria_filters))
+
+Read-Only:
+
+- `id` (String) ID of the resource location.
+
+<a id="nestedatt--custom_access_policies--exclude_criteria_filters"></a>
+### Nested Schema for `custom_access_policies.exclude_criteria_filters`
+
+Required:
+
+- `filter_name` (String) The name of the filter.
+- `filter_value` (String) The value of the filter.
+
+
+<a id="nestedatt--custom_access_policies--include_criteria_filters"></a>
+### Nested Schema for `custom_access_policies.include_criteria_filters`
+
+Required:
+
+- `filter_name` (String) The name of the filter.
+- `filter_value` (String) The value of the filter.
+
+
+
+<a id="nestedatt--default_access_policies"></a>
+### Nested Schema for `default_access_policies`
+
+Required:
+
+- `allowed_connection` (String) The behavior of the include filter. Choose between `Filtered`, `ViaAG`, and `NotViaAG`.
+- `enable_criteria_for_exclude_connections` (Boolean) Whether to enable criteria for exclude connections.
+- `enable_criteria_for_include_connections` (Boolean) Whether to enable criteria for include connections.
+- `name` (String) The name of the access policy.
+
+-> **Note** For default_access_policies, use `Citrix Gateway connections` as the name for the policy that is Via Access Gateway and `Non-Citrix Gateway connections` as the name for the policy that is Not Via Access Gateway.
+
+Optional:
+
+- `enabled` (Boolean) Whether the access policy is enabled. Default is `true`.
+- `exclude_criteria_filters` (Attributes List) The list of filters that meet the criteria for exclude connections. (see [below for nested schema](#nestedatt--default_access_policies--exclude_criteria_filters))
+- `include_connections_criteria_type` (String) The type of criteria for include connections. Choose between `MatchAny` and `MatchAll`.
+- `include_criteria_filters` (Attributes List) The list of filters that meet the criteria for include connections. (see [below for nested schema](#nestedatt--default_access_policies--include_criteria_filters))
+
+Read-Only:
+
+- `id` (String) ID of the resource location.
+
+<a id="nestedatt--default_access_policies--exclude_criteria_filters"></a>
+### Nested Schema for `default_access_policies.exclude_criteria_filters`
+
+Required:
+
+- `filter_name` (String) The name of the filter.
+- `filter_value` (String) The value of the filter.
+
+
+<a id="nestedatt--default_access_policies--include_criteria_filters"></a>
+### Nested Schema for `default_access_policies.include_criteria_filters`
+
+Required:
+
+- `filter_name` (String) The name of the filter.
+- `filter_value` (String) The value of the filter.
+
+
+
 <a id="nestedatt--desktops"></a>
 ### Nested Schema for `desktops`
 
@@ -248,12 +414,12 @@ Required:
 - `enable_session_roaming` (Boolean) When enabled, if the user launches this desktop and then moves to another device, the same session is used, and applications are available on both devices. When disabled, the session no longer roams between devices. 
 
 ~> **Please Note** Session roaming should be set to `false` for Remote PC Delivery Group.
-- `enabled` (Boolean) Specify whether to enable the delivery of this desktop.
 - `published_name` (String) A display name for the desktop.
 
 Optional:
 
 - `description` (String) A description for the published desktop. The name and description are shown in Citrix Workspace app.
+- `enabled` (Boolean) Specify whether to enable the delivery of this desktop. Default is `true`.
 - `restricted_access_users` (Attributes) Restrict access to this Desktop by specifying users and groups in the allow and block list. If no value is specified, all users that have access to this Delivery Group will have access to the Desktop. 
 
 ~> **Please Note** For Remote PC Delivery Groups desktops, `restricted_access_users` has to be set. (see [below for nested schema](#nestedatt--desktops--restricted_access_users))

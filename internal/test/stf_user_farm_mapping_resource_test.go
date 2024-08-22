@@ -38,6 +38,7 @@ func TestSTFUserFarmMappingResourcePreCheck(t *testing.T) {
 }
 
 func TestSTFUserFarmMappingResource(t *testing.T) {
+	siteId := os.Getenv("TEST_STF_SITE_ID")
 	virtualPath := os.Getenv("TEST_STF_Store_Virtual_Path")
 	name := os.Getenv("TEST_STF_USER_FARM_MAPPING_NAME")
 	user1Sid := os.Getenv("TEST_STF_USER_FARM_MAPPING_USER1_SID")
@@ -59,8 +60,12 @@ func TestSTFUserFarmMappingResource(t *testing.T) {
 
 			// Create and Read testing
 			{
-				Config: BuildSTFUserFarmMappingResource(t, testSTFUserFarmMappingResources),
-
+				Config: composeTestResourceTf(
+					BuildSTFDeploymentResource(t, testSTFDeploymentResources, siteId),
+					BuildSTFAuthenticationServiceResource(t, testSTFAuthenticationServiceResources),
+					BuildSTFStoreServiceResource(t, testSTFStoreServiceResources),
+					BuildSTFUserFarmMappingResource(t, testSTFUserFarmMappingResources),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_stf_user_farm_mapping.testSTFUserFarmMappingResource", "name", name),
 					// Verify store_virtual_path of STF UserFarmMapping Resource
@@ -103,8 +108,12 @@ func TestSTFUserFarmMappingResource(t *testing.T) {
 
 			// Update testing for STF WebReceiver Service
 			{
-				Config: BuildSTFUserFarmMappingResource(t, testSTFUserFarmMappingResources_updated),
-
+				Config: composeTestResourceTf(
+					BuildSTFDeploymentResource(t, testSTFDeploymentResources, siteId),
+					BuildSTFAuthenticationServiceResource(t, testSTFAuthenticationServiceResources),
+					BuildSTFStoreServiceResource(t, testSTFStoreServiceResources),
+					BuildSTFUserFarmMappingResource(t, testSTFUserFarmMappingResources_updated),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_stf_user_farm_mapping.testSTFUserFarmMappingResource", "name", fmt.Sprintf("%s-updated", name)),
 					// Verify store_virtual_path of STF UserFarmMapping Resource
@@ -147,7 +156,7 @@ func BuildSTFUserFarmMappingResource(t *testing.T, userFarmMappingResource strin
 	secondaryFarmName := os.Getenv("TEST_STF_SECONDARY_FARM_NAME")
 	backupFarmName := os.Getenv("TEST_STF_BACKUP_FARM_NAME")
 
-	return BuildSTFStoreServiceResource(t, testSTFStoreServiceResources) + fmt.Sprintf(userFarmMappingResource, name, user1Sid, user2Sid, primaryFarmName, secondaryFarmName, backupFarmName)
+	return fmt.Sprintf(userFarmMappingResource, name, user1Sid, user2Sid, primaryFarmName, secondaryFarmName, backupFarmName)
 }
 
 func generateImportStateId_STFUserFarmMappingResource(state *terraform.State) (string, error) {

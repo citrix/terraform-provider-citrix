@@ -39,8 +39,12 @@ func TestSTFWebReceiverServiceResource(t *testing.T) {
 
 			// Create and Read testing
 			{
-				Config: BuildSTFWebReceiverServiceResource(t, testSTFWebReceiverServiceResources),
-
+				Config: composeTestResourceTf(
+					BuildSTFDeploymentResource(t, testSTFDeploymentResources, siteId),
+					BuildSTFAuthenticationServiceResource(t, testSTFAuthenticationServiceResources),
+					BuildSTFStoreServiceResource(t, testSTFStoreServiceResources),
+					BuildSTFWebReceiverServiceResource(t, testSTFWebReceiverServiceResources),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify site_id of STF WebReceiver Service
 					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "site_id", siteId),
@@ -61,8 +65,12 @@ func TestSTFWebReceiverServiceResource(t *testing.T) {
 
 			// Update testing for STF WebReceiver Service
 			{
-				Config: BuildSTFWebReceiverServiceResource(t, testSTFWebReceiverServiceResources_updated),
-
+				Config: composeTestResourceTf(
+					BuildSTFDeploymentResource(t, testSTFDeploymentResources, siteId),
+					BuildSTFAuthenticationServiceResource(t, testSTFAuthenticationServiceResources),
+					BuildSTFStoreServiceResource(t, testSTFStoreServiceResources),
+					BuildSTFWebReceiverServiceResource(t, testSTFWebReceiverServiceResources_updated),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify friendly_name of STF WebReceiver Service
 					resource.TestCheckResourceAttr("citrix_stf_webreceiver_service.testSTFWebReceiverService", "friendly_name", "WebReceiver_Updated"),
@@ -135,7 +143,7 @@ func BuildSTFWebReceiverServiceResource(t *testing.T, webreceiverService string)
 	siteId := os.Getenv("TEST_STF_SITE_ID")
 	virtualPath := os.Getenv("TEST_STF_WEBRECEIVER_VIRTUAL_PATH")
 
-	return BuildSTFStoreServiceResource(t, testSTFStoreServiceResources) + fmt.Sprintf(webreceiverService, siteId, virtualPath)
+	return fmt.Sprintf(webreceiverService, siteId, virtualPath)
 
 }
 

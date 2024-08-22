@@ -26,6 +26,17 @@ func ExampleAlsoRequiresOnStringValues() {
 						}...),
 				},
 			},
+			"other_attr": schema.StringAttribute{
+				Optional: true,
+			},
+		},
+	}
+}
+
+func ExampleAlsoRequiresOnBoolValues() {
+	// Used within a Schema method of a DataSource, Provider, or Resource
+	_ = schema.Schema{
+		Attributes: map[string]schema.Attribute{
 			"example_bool_attr": schema.BoolAttribute{
 				Optional: true,
 				Validators: []validator.Bool{

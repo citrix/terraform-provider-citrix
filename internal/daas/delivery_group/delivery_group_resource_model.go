@@ -6,9 +6,12 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
+	"github.com/citrix/terraform-provider-citrix/internal/validators"
+	"github.com/hashicorp/terraform-plugin-framework-validators/boolvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
@@ -17,7 +20,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
@@ -342,26 +347,30 @@ func (DeliveryGroupRebootSchedule) GetAttributes() map[string]schema.Attribute {
 }
 
 type DeliveryGroupPowerManagementSettings struct {
-	AutoscaleEnabled                             types.Bool   `tfsdk:"autoscale_enabled"`
-	Timezone                                     types.String `tfsdk:"timezone"`
-	PeakDisconnectTimeoutMinutes                 types.Int64  `tfsdk:"peak_disconnect_timeout_minutes"`
-	PeakLogOffAction                             types.String `tfsdk:"peak_log_off_action"`
-	PeakDisconnectAction                         types.String `tfsdk:"peak_disconnect_action"`
-	PeakExtendedDisconnectAction                 types.String `tfsdk:"peak_extended_disconnect_action"`
-	PeakExtendedDisconnectTimeoutMinutes         types.Int64  `tfsdk:"peak_extended_disconnect_timeout_minutes"`
-	OffPeakDisconnectTimeoutMinutes              types.Int64  `tfsdk:"off_peak_disconnect_timeout_minutes"`
-	OffPeakLogOffAction                          types.String `tfsdk:"off_peak_log_off_action"`
-	OffPeakDisconnectAction                      types.String `tfsdk:"off_peak_disconnect_action"`
-	OffPeakExtendedDisconnectAction              types.String `tfsdk:"off_peak_extended_disconnect_action"`
-	OffPeakExtendedDisconnectTimeoutMinutes      types.Int64  `tfsdk:"off_peak_extended_disconnect_timeout_minutes"`
-	PeakBufferSizePercent                        types.Int64  `tfsdk:"peak_buffer_size_percent"`
-	OffPeakBufferSizePercent                     types.Int64  `tfsdk:"off_peak_buffer_size_percent"`
-	PowerOffDelayMinutes                         types.Int64  `tfsdk:"power_off_delay_minutes"`
-	DisconnectPeakIdleSessionAfterSeconds        types.Int64  `tfsdk:"disconnect_peak_idle_session_after_seconds"`
-	DisconnectOffPeakIdleSessionAfterSeconds     types.Int64  `tfsdk:"disconnect_off_peak_idle_session_after_seconds"`
-	LogoffPeakDisconnectedSessionAfterSeconds    types.Int64  `tfsdk:"log_off_peak_disconnected_session_after_seconds"`
-	LogoffOffPeakDisconnectedSessionAfterSeconds types.Int64  `tfsdk:"log_off_off_peak_disconnected_session_after_seconds"`
-	PowerTimeSchemes                             types.List   `tfsdk:"power_time_schemes"` //List[DeliveryGroupPowerTimeScheme]
+	AutoscaleEnabled                               types.Bool   `tfsdk:"autoscale_enabled"`
+	Timezone                                       types.String `tfsdk:"timezone"`
+	PeakDisconnectTimeoutMinutes                   types.Int64  `tfsdk:"peak_disconnect_timeout_minutes"`
+	PeakLogOffAction                               types.String `tfsdk:"peak_log_off_action"`
+	PeakLogOffTimeoutMinutes                       types.Int64  `tfsdk:"peak_log_off_timeout_minutes"`
+	PeakDisconnectAction                           types.String `tfsdk:"peak_disconnect_action"`
+	PeakExtendedDisconnectAction                   types.String `tfsdk:"peak_extended_disconnect_action"`
+	PeakExtendedDisconnectTimeoutMinutes           types.Int64  `tfsdk:"peak_extended_disconnect_timeout_minutes"`
+	OffPeakDisconnectTimeoutMinutes                types.Int64  `tfsdk:"off_peak_disconnect_timeout_minutes"`
+	OffPeakLogOffAction                            types.String `tfsdk:"off_peak_log_off_action"`
+	OffPeakLogOffTimeoutMinutes                    types.Int64  `tfsdk:"off_peak_log_off_timeout_minutes"`
+	OffPeakDisconnectAction                        types.String `tfsdk:"off_peak_disconnect_action"`
+	OffPeakExtendedDisconnectAction                types.String `tfsdk:"off_peak_extended_disconnect_action"`
+	OffPeakExtendedDisconnectTimeoutMinutes        types.Int64  `tfsdk:"off_peak_extended_disconnect_timeout_minutes"`
+	PeakBufferSizePercent                          types.Int64  `tfsdk:"peak_buffer_size_percent"`
+	OffPeakBufferSizePercent                       types.Int64  `tfsdk:"off_peak_buffer_size_percent"`
+	PowerOffDelayMinutes                           types.Int64  `tfsdk:"power_off_delay_minutes"`
+	PeakAutoscaleAssignedPowerOnIdleAction         types.String `tfsdk:"peak_autoscale_assigned_power_on_idle_action"`
+	PeakAutoscaleAssignedPowerOnIdleTimeoutMinutes types.Int64  `tfsdk:"peak_autoscale_assigned_power_on_idle_timeout_minutes"`
+	DisconnectPeakIdleSessionAfterSeconds          types.Int64  `tfsdk:"disconnect_peak_idle_session_after_seconds"`
+	DisconnectOffPeakIdleSessionAfterSeconds       types.Int64  `tfsdk:"disconnect_off_peak_idle_session_after_seconds"`
+	LogoffPeakDisconnectedSessionAfterSeconds      types.Int64  `tfsdk:"log_off_peak_disconnected_session_after_seconds"`
+	LogoffOffPeakDisconnectedSessionAfterSeconds   types.Int64  `tfsdk:"log_off_off_peak_disconnected_session_after_seconds"`
+	PowerTimeSchemes                               types.List   `tfsdk:"power_time_schemes"` //List[DeliveryGroupPowerTimeScheme]
 }
 
 func (DeliveryGroupPowerManagementSettings) GetSchema() schema.SingleNestedAttribute {
@@ -384,7 +393,7 @@ func (DeliveryGroupPowerManagementSettings) GetSchema() schema.SingleNestedAttri
 				Default:     int64default.StaticInt64(0),
 			},
 			"peak_log_off_action": schema.StringAttribute{
-				Description: "The action to be performed after a configurable period of a user session ending in peak hours.",
+				Description: "The action to be performed after a configurable period of a user session ending in peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(string(citrixorchestration.SESSIONCHANGEHOSTINGACTION_NOTHING)),
@@ -392,8 +401,14 @@ func (DeliveryGroupPowerManagementSettings) GetSchema() schema.SingleNestedAttri
 					sessionHostingActionEnumValidator(),
 				},
 			},
+			"peak_log_off_timeout_minutes": schema.Int64Attribute{
+				Description: "The number of minutes before the configured action should be performed after a user session ends in peak hours.",
+				Optional:    true,
+				Computed:    true,
+				Default:     int64default.StaticInt64(0),
+			},
 			"peak_disconnect_action": schema.StringAttribute{
-				Description: "The action to be performed after a configurable period of a user session disconnecting in peak hours.",
+				Description: "The action to be performed after a configurable period of a user session disconnecting in peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(string(citrixorchestration.SESSIONCHANGEHOSTINGACTION_NOTHING)),
@@ -402,7 +417,7 @@ func (DeliveryGroupPowerManagementSettings) GetSchema() schema.SingleNestedAttri
 				},
 			},
 			"peak_extended_disconnect_action": schema.StringAttribute{
-				Description: "The action to be performed after a second configurable period of a user session disconnecting in peak hours.",
+				Description: "The action to be performed after a second configurable period of a user session disconnecting in peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(string(citrixorchestration.SESSIONCHANGEHOSTINGACTION_NOTHING)),
@@ -423,7 +438,7 @@ func (DeliveryGroupPowerManagementSettings) GetSchema() schema.SingleNestedAttri
 				Default:     int64default.StaticInt64(0),
 			},
 			"off_peak_log_off_action": schema.StringAttribute{
-				Description: "The action to be performed after a configurable period of a user session ending outside peak hours.",
+				Description: "The action to be performed after a configurable period of a user session ending outside peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(string(citrixorchestration.SESSIONCHANGEHOSTINGACTION_NOTHING)),
@@ -431,8 +446,14 @@ func (DeliveryGroupPowerManagementSettings) GetSchema() schema.SingleNestedAttri
 					sessionHostingActionEnumValidator(),
 				},
 			},
+			"off_peak_log_off_timeout_minutes": schema.Int64Attribute{
+				Description: "The number of minutes before the configured action should be performed after a user session ends outside peak hours.",
+				Optional:    true,
+				Computed:    true,
+				Default:     int64default.StaticInt64(0),
+			},
 			"off_peak_disconnect_action": schema.StringAttribute{
-				Description: "The action to be performed after a configurable period of a user session disconnecting outside peak hours.",
+				Description: "The action to be performed after a configurable period of a user session disconnecting outside peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(string(citrixorchestration.SESSIONCHANGEHOSTINGACTION_NOTHING)),
@@ -441,7 +462,7 @@ func (DeliveryGroupPowerManagementSettings) GetSchema() schema.SingleNestedAttri
 				},
 			},
 			"off_peak_extended_disconnect_action": schema.StringAttribute{
-				Description: "The action to be performed after a second configurable period of a user session disconnecting outside peak hours.",
+				Description: "The action to be performed after a second configurable period of a user session disconnecting outside peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(string(citrixorchestration.SESSIONCHANGEHOSTINGACTION_NOTHING)),
@@ -477,6 +498,21 @@ func (DeliveryGroupPowerManagementSettings) GetSchema() schema.SingleNestedAttri
 				Validators: []validator.Int64{
 					int64validator.Between(0, 60),
 				},
+			},
+			"peak_autoscale_assigned_power_on_idle_action": schema.StringAttribute{
+				Description: "The action to be performed on an assigned machine previously started by autoscale that subsequently remains unused. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(string(citrixorchestration.SESSIONCHANGEHOSTINGACTION_NOTHING)),
+				Validators: []validator.String{
+					sessionHostingActionEnumValidator(),
+				},
+			},
+			"peak_autoscale_assigned_power_on_idle_timeout_minutes": schema.Int64Attribute{
+				Description: "The number of minutes before the configured action is performed on an assigned machine previously started by autoscale that subsequently remains unused.",
+				Optional:    true,
+				Computed:    true,
+				Default:     int64default.StaticInt64(0),
 			},
 			"disconnect_peak_idle_session_after_seconds": schema.Int64Attribute{
 				Description: "Specifies the time in seconds after which an idle session belonging to the delivery group is disconnected during peak time.",
@@ -608,8 +644,10 @@ func (DeliveryGroupDesktop) GetSchema() schema.NestedAttributeObject {
 				Default:     stringdefault.StaticString(""),
 			},
 			"enabled": schema.BoolAttribute{
-				Description: "Specify whether to enable the delivery of this desktop.",
-				Required:    true,
+				Description: "Specify whether to enable the delivery of this desktop. Default is `true`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
 			},
 			"enable_session_roaming": schema.BoolAttribute{
 				Description: "When enabled, if the user launches this desktop and then moves to another device, the same session is used, and applications are available on both devices. When disabled, the session no longer roams between devices. " +
@@ -626,6 +664,7 @@ func (DeliveryGroupDesktop) GetAttributes() map[string]schema.Attribute {
 }
 
 type DeliveryGroupAppProtection struct {
+	ApplyContextually       types.List `tfsdk:"apply_contextually"` //DeliveryGroupAppProtectionApplyContextually
 	EnableAntiKeyLogging    types.Bool `tfsdk:"enable_anti_key_logging"`
 	EnableAntiScreenCapture types.Bool `tfsdk:"enable_anti_screen_capture"`
 }
@@ -636,6 +675,66 @@ func (DeliveryGroupAppProtection) GetSchema() schema.SingleNestedAttribute {
 			"\n\n~> **Please Note** Before using the feature, make sure that these [requirements](https://docs.citrix.com/en-us/citrix-workspace-app/app-protection.html#system-requirements) are met.",
 		Optional: true,
 		Attributes: map[string]schema.Attribute{
+			"enable_anti_key_logging": schema.BoolAttribute{
+				Description: "When enabled, anti-keylogging is applied when a protected window is in focus.",
+				Optional:    true,
+				Validators: []validator.Bool{
+					boolvalidator.AlsoRequires(
+						path.MatchRelative().AtParent().AtName("enable_anti_screen_capture"),
+					),
+				},
+			},
+			"enable_anti_screen_capture": schema.BoolAttribute{
+				Description: "Specify whether to use anti-screen capture." +
+					"\n\n-> **Note** For Windows and macOS, only the window with protected content is blank. Anti-screen capture is only applied when the window is open. For Linux, the entire screen will appear blank. Anti-screen capture is only applied when the window is open or minimized.",
+				Optional: true,
+			},
+			"apply_contextually": schema.ListNestedAttribute{
+				Description:  "Implement contextual App Protection using the connection filters defined in the Access Policy rule.",
+				Optional:     true,
+				NestedObject: DeliveryGroupAppProtectionApplyContextuallyModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.ExactlyOneOf(
+						path.MatchRelative().AtParent().AtName("enable_anti_key_logging"),
+					),
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+		},
+	}
+}
+
+func (DeliveryGroupAppProtection) GetAttributes() map[string]schema.Attribute {
+	return DeliveryGroupAppProtection{}.GetSchema().Attributes
+}
+
+var _ util.RefreshableListItemWithAttributes[citrixorchestration.AdvancedAccessPolicyResponseModel] = DeliveryGroupAppProtectionApplyContextuallyModel{}
+
+type DeliveryGroupAppProtectionApplyContextuallyModel struct {
+	PolicyName              types.String `tfsdk:"policy_name"`
+	EnableAntiKeyLogging    types.Bool   `tfsdk:"enable_anti_key_logging"`
+	EnableAntiScreenCapture types.Bool   `tfsdk:"enable_anti_screen_capture"`
+}
+
+// GetKey implements util.RefreshableListItemWithAttributes.
+func (r DeliveryGroupAppProtectionApplyContextuallyModel) GetKey() string {
+	if strings.EqualFold(r.PolicyName.ValueString(), util.CitrixGatewayConnections) {
+		return util.CitrixGatewayConnections
+	}
+	if strings.EqualFold(r.PolicyName.ValueString(), util.NonCitrixGatewayConnections) {
+		return util.NonCitrixGatewayConnections
+	}
+	return r.PolicyName.ValueString()
+}
+
+func (DeliveryGroupAppProtectionApplyContextuallyModel) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"policy_name": schema.StringAttribute{
+				Description: "The name of the policy." +
+					"\n\n-> **Note** To refer to default policies, use `Citrix Gateway connections` as the name for the default policy that is Via Access Gateway and `Non-Citrix Gateway connections` as the name for the default policy that is Not Via Access Gateway.",
+				Required: true,
+			},
 			"enable_anti_key_logging": schema.BoolAttribute{
 				Description: "When enabled, anti-keylogging is applied when a protected window is in focus.",
 				Required:    true,
@@ -649,8 +748,142 @@ func (DeliveryGroupAppProtection) GetSchema() schema.SingleNestedAttribute {
 	}
 }
 
-func (DeliveryGroupAppProtection) GetAttributes() map[string]schema.Attribute {
-	return DeliveryGroupAppProtection{}.GetSchema().Attributes
+func (DeliveryGroupAppProtectionApplyContextuallyModel) GetAttributes() map[string]schema.Attribute {
+	return DeliveryGroupAppProtectionApplyContextuallyModel{}.GetSchema().Attributes
+}
+
+var _ util.RefreshableListItemWithAttributes[citrixorchestration.AdvancedAccessPolicyResponseModel] = DeliveryGroupAccessPolicyModel{}
+
+type DeliveryGroupAccessPolicyModel struct {
+	Id                                  types.String `tfsdk:"id"`
+	Name                                types.String `tfsdk:"name"`
+	Enabled                             types.Bool   `tfsdk:"enabled"`
+	AllowedConnection                   types.String `tfsdk:"allowed_connection"`
+	EnableCriteriaForIncludeConnections types.Bool   `tfsdk:"enable_criteria_for_include_connections"`
+	IncludeConnectionsCriteriaType      types.String `tfsdk:"include_connections_criteria_type"`
+	EnableCriteriaForExcludeConnections types.Bool   `tfsdk:"enable_criteria_for_exclude_connections"`
+	IncludeCriteriaFilters              types.List   `tfsdk:"include_criteria_filters"` //List[DeliveryGroupAccessPolicyCriteriaTagsModel]
+	ExcludeCriteriaFilters              types.List   `tfsdk:"exclude_criteria_filters"` //List[DeliveryGroupAccessPolicyCriteriaTagsModel]
+}
+
+func (r DeliveryGroupAccessPolicyModel) GetKey() string {
+	if strings.EqualFold(r.Name.ValueString(), util.CitrixGatewayConnections) {
+		return util.CitrixGatewayConnections
+	}
+	if strings.EqualFold(r.Name.ValueString(), util.NonCitrixGatewayConnections) {
+		return util.NonCitrixGatewayConnections
+	}
+	return r.Name.ValueString()
+}
+
+func (DeliveryGroupAccessPolicyModel) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Description: "ID of the resource location.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"name": schema.StringAttribute{
+				Description: "The name of the access policy." +
+					"\n\n-> **Note** For default_access_policies, use `Citrix Gateway connections` as the name for the policy that is Via Access Gateway and `Non-Citrix Gateway connections` as the name for the policy that is Not Via Access Gateway.",
+				Required: true,
+			},
+			"enabled": schema.BoolAttribute{
+				Description: "Whether the access policy is enabled. Default is `true`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
+			},
+			"allowed_connection": schema.StringAttribute{
+				Description: "The behavior of the include filter. Choose between `Filtered`, `ViaAG`, and `NotViaAG`.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"Filtered",
+						"ViaAG",
+						"NotViaAG",
+					),
+				},
+			},
+			"enable_criteria_for_include_connections": schema.BoolAttribute{
+				Description: "Whether to enable criteria for include connections.",
+				Required:    true,
+				Validators: []validator.Bool{
+					validators.AlsoRequiresOnBoolValues(
+						[]bool{true},
+						path.MatchRelative().AtParent().AtName("include_connections_criteria_type"),
+					),
+				},
+			},
+			"include_connections_criteria_type": schema.StringAttribute{
+				Description: "The type of criteria for include connections. Choose between `MatchAny` and `MatchAll`.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"MatchAny",
+						"MatchAll",
+					),
+				},
+			},
+			"include_criteria_filters": schema.ListNestedAttribute{
+				Description:  "The list of filters that meet the criteria for include connections.",
+				Optional:     true,
+				NestedObject: DeliveryGroupAccessPolicyCriteriaTagsModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+			"enable_criteria_for_exclude_connections": schema.BoolAttribute{
+				Description: "Whether to enable criteria for exclude connections.",
+				Required:    true,
+			},
+			"exclude_criteria_filters": schema.ListNestedAttribute{
+				Description:  "The list of filters that meet the criteria for exclude connections.",
+				Optional:     true,
+				NestedObject: DeliveryGroupAccessPolicyCriteriaTagsModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+		},
+	}
+}
+
+func (DeliveryGroupAccessPolicyModel) GetAttributes() map[string]schema.Attribute {
+	return DeliveryGroupAccessPolicyModel{}.GetSchema().Attributes
+}
+
+var _ util.RefreshableListItemWithAttributes[citrixorchestration.SmartAccessTagResponseModel] = DeliveryGroupAccessPolicyCriteriaTagsModel{}
+
+type DeliveryGroupAccessPolicyCriteriaTagsModel struct {
+	FilterName  types.String `tfsdk:"filter_name"`
+	FilterValue types.String `tfsdk:"filter_value"`
+}
+
+func (r DeliveryGroupAccessPolicyCriteriaTagsModel) GetKey() string {
+	return r.FilterName.ValueString() + r.FilterValue.ValueString()
+}
+
+func (DeliveryGroupAccessPolicyCriteriaTagsModel) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"filter_name": schema.StringAttribute{
+				Description: "The name of the filter.",
+				Required:    true,
+			},
+			"filter_value": schema.StringAttribute{
+				Description: "The value of the filter.",
+				Required:    true,
+			},
+		},
+	}
+}
+
+func (DeliveryGroupAccessPolicyCriteriaTagsModel) GetAttributes() map[string]schema.Attribute {
+	return DeliveryGroupAccessPolicyCriteriaTagsModel{}.GetSchema().Attributes
 }
 
 // DeliveryGroupResourceModel maps the resource schema data.
@@ -672,7 +905,11 @@ type DeliveryGroupResourceModel struct {
 	StoreFrontServers           types.Set    `tfsdk:"storefront_servers"` //Set[string]
 	Scopes                      types.Set    `tfsdk:"scopes"`             //Set[String]
 	MakeResourcesAvailableInLHC types.Bool   `tfsdk:"make_resources_available_in_lhc"`
-	AppProtection               types.Object `tfsdk:"app_protection"` //DeliveryGroupAppProtection
+	AppProtection               types.Object `tfsdk:"app_protection"`          //DeliveryGroupAppProtection
+	DefaultAccessPolicies       types.List   `tfsdk:"default_access_policies"` //List[DeliveryGroupAccessPolicyModel]
+	CustomAccessPolicies        types.List   `tfsdk:"custom_access_policies"`  //List[DeliveryGroupAccessPolicyModel]
+	DeliveryGroupFolderPath     types.String `tfsdk:"delivery_group_folder_path"`
+	Tenants                     types.Set    `tfsdk:"tenants"` //Set[String]
 }
 
 func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
@@ -787,7 +1024,6 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 				Computed:    true,
 				Default:     setdefault.StaticValue(types.SetValueMust(types.StringType, []attr.Value{})),
 				Validators: []validator.Set{
-					setvalidator.SizeAtLeast(1),
 					setvalidator.ValueStringsAre(
 						validator.String(
 							stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
@@ -816,6 +1052,41 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 				Optional: true,
 			},
 			"app_protection": DeliveryGroupAppProtection{}.GetSchema(),
+			"default_access_policies": schema.ListNestedAttribute{
+				Description: "Manage built-in Access Policies for the delivery group. These are the Citrix Gateway Connections (via Access Gateway) and Non-Citrix Gateway Connections (not via Access Gateway) access policies." +
+					"\n\n~> **Please Note** Default Access Policies can only be modified; they cannot be deleted. If using this property, both default policies have to be specified." +
+					"\n\n-> **Note** Use `Citrix Gateway connections` as the name for the default policy that is Via Access Gateway and `Non-Citrix Gateway connections` as the name for the default policy that is Not Via Access Gateway.",
+				Optional:     true,
+				NestedObject: DeliveryGroupAccessPolicyModel{}.GetSchema(),
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.RequiresReplaceIf(func(_ context.Context, req planmodifier.ListRequest, resp *listplanmodifier.RequiresReplaceIfFuncResponse) {
+						resp.RequiresReplace = !req.StateValue.IsNull() && req.ConfigValue.IsNull()
+					},
+						"Force replacement when discarding changes in default access policies",
+						"Force replacement when discarding changes in default access policies"),
+				},
+				// Default: getDefaultAccessPolicies(ctx, diagnostics),
+			},
+			"custom_access_policies": schema.ListNestedAttribute{
+				Description:  "Custom Access Policies for the delivery group. To manage built-in access policies use the `default_access_policies` instead.",
+				Optional:     true,
+				NestedObject: DeliveryGroupAccessPolicyModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+			"delivery_group_folder_path": schema.StringAttribute{
+				Description: "The path of the folder in which the delivery group is located.",
+				Optional:    true,
+			},
+			"tenants": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "A set of identifiers of tenants to associate with the delivery group.",
+				Optional:    true,
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
+				},
+			},
 		},
 	}
 }
@@ -855,27 +1126,14 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 		r.SharingKind = types.StringValue(string(deliveryGroup.GetSharingKind()))
 	}
 
-	antiKeyLoggingEnabled := deliveryGroup.GetAppProtectionKeyLoggingRequired()
-	antiScreenCaptureEnabled := deliveryGroup.GetAppProtectionScreenCaptureRequired()
-
-	if antiKeyLoggingEnabled || antiScreenCaptureEnabled {
-		appProtectionModel := DeliveryGroupAppProtection{}
-		appProtectionModel.EnableAntiKeyLogging = types.BoolValue(antiKeyLoggingEnabled)
-		appProtectionModel.EnableAntiScreenCapture = types.BoolValue(antiScreenCaptureEnabled)
-		r.AppProtection = util.TypedObjectToObjectValue(ctx, diagnostics, appProtectionModel)
-	} else if !r.AppProtection.IsNull() {
-		appProtectionModel := util.ObjectValueToTypedObject[DeliveryGroupAppProtection](ctx, diagnostics, r.AppProtection)
-		appProtectionModel.EnableAntiKeyLogging = types.BoolValue(false)
-		appProtectionModel.EnableAntiScreenCapture = types.BoolValue(false)
-
-		r.AppProtection = util.TypedObjectToObjectValue(ctx, diagnostics, appProtectionModel)
-	}
-
 	r = r.updatePlanWithRestrictedAccessUsers(ctx, diagnostics, deliveryGroup)
 	r = r.updatePlanWithDesktops(ctx, diagnostics, dgDesktops)
 	r = r.updatePlanWithAssociatedCatalogs(ctx, diagnostics, dgMachines)
 	r = r.updatePlanWithAutoscaleSettings(ctx, diagnostics, deliveryGroup, dgPowerTimeSchemes)
 	r = r.updatePlanWithRebootSchedule(ctx, diagnostics, dgRebootSchedule)
+	r = r.updatePlanWithAppProtection(ctx, diagnostics, deliveryGroup)
+	r = r.updatePlanWithDefaultAccessPolicies(ctx, diagnostics, deliveryGroup.GetAdvancedAccessPolicy())
+	r = r.updatePlanWithCustomAccessPolicies(ctx, diagnostics, deliveryGroup.GetAdvancedAccessPolicy())
 
 	if len(deliveryGroup.GetStoreFrontServersForHostedReceiver()) > 0 || !r.StoreFrontServers.IsNull() {
 		var remoteAssociatedStoreFrontServers []string
@@ -885,6 +1143,24 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 		r.StoreFrontServers = util.StringArrayToStringSet(ctx, diagnostics, remoteAssociatedStoreFrontServers)
 	} else {
 		r.StoreFrontServers = types.SetNull(types.StringType)
+	}
+
+	adminFolder := deliveryGroup.GetAdminFolder()
+	adminFolderPath := adminFolder.GetName()
+	if adminFolderPath != "" {
+		r.DeliveryGroupFolderPath = types.StringValue(adminFolderPath)
+	} else {
+		r.DeliveryGroupFolderPath = types.StringNull()
+	}
+
+	if len(deliveryGroup.GetTenants()) > 0 || !r.Tenants.IsNull() {
+		var remoteTenants []string
+		for _, tenant := range deliveryGroup.GetTenants() {
+			remoteTenants = append(remoteTenants, tenant.GetId())
+		}
+		r.Tenants = util.StringArrayToStringSet(ctx, diagnostics, remoteTenants)
+	} else {
+		r.Tenants = types.SetNull(types.StringType)
 	}
 
 	return r

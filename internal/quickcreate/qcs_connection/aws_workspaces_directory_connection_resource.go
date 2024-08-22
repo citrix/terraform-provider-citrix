@@ -88,7 +88,7 @@ func (r *awsWorkspacesDirectoryConnectionResource) Create(ctx context.Context, r
 		return
 	}
 
-	// Try getting the new AWS Workspaces Directory Connection
+	// Try getting the new AWS WorkSpaces Directory Connection
 	directoryConnection, _, err := getAwsWorkspacesDirectoryConnection(ctx, r.client, &resp.Diagnostics, plan.AccountId.ValueString(), addDirectoryConnectionResponse.GetResourceConnectionId(), false)
 	if err != nil {
 		return
@@ -117,14 +117,14 @@ func (r *awsWorkspacesDirectoryConnectionResource) Read(ctx context.Context, req
 		return
 	}
 
-	// Try getting the AWS Workspaces Directory Connection
+	// Try getting the AWS WorkSpaces Directory Connection
 	directoryConnection, httpResp, err := getAwsWorkspacesDirectoryConnection(ctx, r.client, &resp.Diagnostics, state.AccountId.ValueString(), state.DirectoryConnectionId.ValueString(), true)
 	if err != nil {
 		if httpResp.StatusCode == http.StatusNotFound {
 			// Remove from state
 			resp.Diagnostics.AddWarning(
-				fmt.Sprintf("AWS Workspaces Directory Connection with ID: %s not found", state.DirectoryConnectionId.ValueString()),
-				fmt.Sprintf("AWS Workspaces Directory Connection with ID: %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", state.DirectoryConnectionId.ValueString()),
+				fmt.Sprintf("AWS WorkSpaces Directory Connection with ID: %s not found", state.DirectoryConnectionId.ValueString()),
+				fmt.Sprintf("AWS WorkSpaces Directory Connection with ID: %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", state.DirectoryConnectionId.ValueString()),
 			)
 			resp.State.RemoveResource(ctx)
 			return
@@ -174,14 +174,14 @@ func (r *awsWorkspacesDirectoryConnectionResource) Update(ctx context.Context, r
 		return
 	}
 
-	// Try getting the AWS Workspaces Directory Connection
+	// Try getting the AWS WorkSpaces Directory Connection
 	directoryConnection, httpResp, err := getAwsWorkspacesDirectoryConnection(ctx, r.client, &resp.Diagnostics, plan.AccountId.ValueString(), connectionId, true)
 	if err != nil {
 		if httpResp.StatusCode == http.StatusNotFound {
 			// Remove from state
 			resp.Diagnostics.AddWarning(
-				fmt.Sprintf("AWS Workspaces Directory Connection with ID: %s not found", connectionId),
-				fmt.Sprintf("AWS Workspaces Directory Connection with ID: %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", connectionId),
+				fmt.Sprintf("AWS WorkSpaces Directory Connection with ID: %s not found", connectionId),
+				fmt.Sprintf("AWS WorkSpaces Directory Connection with ID: %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", connectionId),
 			)
 			resp.State.RemoveResource(ctx)
 			return
@@ -211,7 +211,7 @@ func (r *awsWorkspacesDirectoryConnectionResource) Delete(ctx context.Context, r
 		return
 	}
 
-	// Try getting the AWS Workspaces Directory Connection
+	// Try getting the AWS WorkSpaces Directory Connection
 	_, httpResp, err := getAwsWorkspacesDirectoryConnection(ctx, r.client, &resp.Diagnostics, state.AccountId.ValueString(), state.DirectoryConnectionId.ValueString(), true)
 	if err != nil {
 		if httpResp.StatusCode == http.StatusNotFound {
@@ -220,7 +220,7 @@ func (r *awsWorkspacesDirectoryConnectionResource) Delete(ctx context.Context, r
 		return
 	}
 
-	// Remove the AWS Workspaces Directory Connection
+	// Remove the AWS WorkSpaces Directory Connection
 	removeAwsWorkspacesDirectoryConnection(ctx, r.client, &resp.Diagnostics, state.AccountId.ValueString(), state.DirectoryConnectionId.ValueString())
 }
 
@@ -266,7 +266,7 @@ func addAwsWorkspacesDirectoryConnection(ctx context.Context, client *citrixdaas
 	directoryConnectionTask, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickcreate.ResourceConnectionTask](addDirectoryConnectionRequest, client)
 	if err != nil {
 		diagnostics.AddError(
-			"Error adding AWS Workspaces Directory Connection: "+requestBody.GetName(),
+			"Error adding AWS WorkSpaces Directory Connection: "+requestBody.GetName(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadQcsClientError(err),
 		)
@@ -293,7 +293,7 @@ func getAwsWorkspacesDirectoryConnection(ctx context.Context, client *citrixdaas
 			return nil, httpResp, err
 		}
 		diagnostics.AddError(
-			"Error getting AWS Workspaces Directory Connection: "+directoryConnectionId,
+			"Error getting AWS WorkSpaces Directory Connection: "+directoryConnectionId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadQcsClientError(err),
 		)
@@ -309,7 +309,7 @@ func updateAwsWorkspacesDirectoryConnection(ctx context.Context, client *citrixd
 	directoryConnection, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickcreate.AwsEdcDirectoryConnection](updateDirectoryConnectionRequest, client)
 	if err != nil {
 		diagnostics.AddError(
-			"Error updating AWS Workspaces Directory Connection: "+connectionId,
+			"Error updating AWS WorkSpaces Directory Connection: "+connectionId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadQcsClientError(err),
 		)
@@ -324,7 +324,7 @@ func removeAwsWorkspacesDirectoryConnection(ctx context.Context, client *citrixd
 	taskResp, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickcreate.ResourceConnectionTask](removeDirectoryConnectionRequest, client)
 	if err != nil {
 		diagnostics.AddError(
-			"Error removing AWS Workspaces Directory Connection: "+connectionId,
+			"Error removing AWS WorkSpaces Directory Connection: "+connectionId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadQcsClientError(err),
 		)

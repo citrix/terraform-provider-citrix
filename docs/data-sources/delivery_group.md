@@ -25,6 +25,10 @@ data "citrix_delivery_group" "example_delivery_group" {
 
 - `name` (String) Name of the delivery group.
 
+### Optional
+
+- `delivery_group_folder_path` (String) The path to the folder in which the delivery group is located.
+
 ### Read-Only
 
 - `id` (String) GUID identifier of the delivery group.

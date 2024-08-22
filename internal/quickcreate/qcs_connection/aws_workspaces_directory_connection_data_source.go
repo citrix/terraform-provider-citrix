@@ -54,7 +54,7 @@ func (d *AwsWorkspacesDirectoryConnectionDataSource) Read(ctx context.Context, r
 		return
 	}
 
-	// Try getting the AWS Workspaces Image
+	// Try getting the AWS WorkSpaces Image
 	var directoryConnection *citrixquickcreate.AwsEdcDirectoryConnection
 	var directoryConnectionIdentifier string
 	var err error
@@ -72,8 +72,8 @@ func (d *AwsWorkspacesDirectoryConnectionDataSource) Read(ctx context.Context, r
 
 	if directoryConnection == nil {
 		resp.Diagnostics.AddError(
-			"Error getting AWS Workspaces Directory Connection",
-			fmt.Sprintf("Unable to read AWS Workspaces Directory Connection: %s", directoryConnectionIdentifier),
+			"Error getting AWS WorkSpaces Directory Connection",
+			fmt.Sprintf("Unable to read AWS WorkSpaces Directory Connection: %s", directoryConnectionIdentifier),
 		)
 		return
 	}
@@ -90,7 +90,7 @@ func getAwsWorkspacesDirectoryConnectionWithName(ctx context.Context, client *ci
 
 	if err != nil {
 		diagnostics.AddError(
-			"Error getting AWS Workspaces Directory Connection: "+directoryConnectionName,
+			"Error getting AWS WorkSpaces Directory Connection: "+directoryConnectionName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadQcsClientError(err),
 		)

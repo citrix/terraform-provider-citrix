@@ -39,8 +39,11 @@ func TestSTFStoreServiceResource(t *testing.T) {
 
 			// Create and Read testing
 			{
-				Config: BuildSTFStoreServiceResource(t, testSTFStoreServiceResources),
-
+				Config: composeTestResourceTf(
+					BuildSTFDeploymentResource(t, testSTFDeploymentResources, siteId),
+					BuildSTFAuthenticationServiceResource(t, testSTFAuthenticationServiceResources),
+					BuildSTFStoreServiceResource(t, testSTFStoreServiceResources),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify site_id of STF Store Service
 					resource.TestCheckResourceAttr("citrix_stf_store_service.testSTFStoreService", "site_id", siteId),
@@ -87,8 +90,11 @@ func TestSTFStoreServiceResource(t *testing.T) {
 
 			// Update testing for STF Store Service
 			{
-				Config: BuildSTFStoreServiceResource(t, testSTFStoreServiceResources_updated),
-
+				Config: composeTestResourceTf(
+					BuildSTFDeploymentResource(t, testSTFDeploymentResources, siteId),
+					BuildSTFAuthenticationServiceResource(t, testSTFAuthenticationServiceResources),
+					BuildSTFStoreServiceResource(t, testSTFStoreServiceResources_updated),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify friendly_name of STF Store Service
 					resource.TestCheckResourceAttr("citrix_stf_store_service.testSTFStoreService", "friendly_name", "Store_Updated"),
@@ -125,7 +131,7 @@ func BuildSTFStoreServiceResource(t *testing.T, storeService string) string {
 	siteId := os.Getenv("TEST_STF_SITE_ID")
 	virtualPath := os.Getenv("TEST_STF_STORE_VIRTUAL_PATH")
 
-	return BuildSTFAuthenticationServiceResource(t, testSTFAuthenticationServiceResources) + fmt.Sprintf(storeService, siteId, virtualPath)
+	return fmt.Sprintf(storeService, siteId, virtualPath)
 
 }
 

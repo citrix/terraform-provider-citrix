@@ -33,7 +33,10 @@ func TestSTFAuthenticationServiceResource(t *testing.T) {
 
 			// Create and Read testing
 			{
-				Config: BuildSTFAuthenticationServiceResource(t, testSTFAuthenticationServiceResources),
+				Config: composeTestResourceTf(
+					BuildSTFDeploymentResource(t, testSTFDeploymentResources, siteId),
+					BuildSTFAuthenticationServiceResource(t, testSTFAuthenticationServiceResources),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify parameters of the STF authentication service
 					resource.TestCheckResourceAttr("citrix_stf_authentication_service.testSTFAuthenticationService", "site_id", siteId),
@@ -55,8 +58,10 @@ func TestSTFAuthenticationServiceResource(t *testing.T) {
 
 			// Update testing for STF authentication service
 			{
-				Config: BuildSTFAuthenticationServiceResource(t, testSTFAuthenticationServiceResources_updated),
-
+				Config: composeTestResourceTf(
+					BuildSTFDeploymentResource(t, testSTFDeploymentResources, siteId),
+					BuildSTFAuthenticationServiceResource(t, testSTFAuthenticationServiceResources_updated),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify parameters of the updated STF authentication service
 					resource.TestCheckResourceAttr("citrix_stf_authentication_service.testSTFAuthenticationService", "site_id", siteId),
@@ -70,9 +75,8 @@ func TestSTFAuthenticationServiceResource(t *testing.T) {
 }
 
 func BuildSTFAuthenticationServiceResource(t *testing.T, authService string) string {
-	siteId := os.Getenv("TEST_STF_SITE_ID")
 	authVirtualPath := os.Getenv("TEST_STF_AUTH_VIRTUAL_PATH")
-	return BuildSTFDeploymentResource(t, testSTFDeploymentResources, siteId) + fmt.Sprintf(authService, authVirtualPath)
+	return fmt.Sprintf(authService, authVirtualPath)
 }
 
 func generateImportStateId_STFAuthenService(state *terraform.State) (string, error) {
