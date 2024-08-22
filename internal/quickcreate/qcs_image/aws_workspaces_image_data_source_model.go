@@ -30,7 +30,7 @@ type AwsWorkspacesImageDataSourceModel struct {
 
 func (AwsWorkspacesImageDataSourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "DaaS Quick Deploy - AWS Workspaces Core --- Data Source of an AWS Workspaces image.",
+		Description: "DaaS Quick Deploy - AWS WorkSpaces Core --- Data Source of an AWS WorkSpaces image.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the image.",

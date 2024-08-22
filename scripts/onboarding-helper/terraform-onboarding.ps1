@@ -224,7 +224,7 @@ provider "citrix" {
 provider "citrix" {
     cvad_config = {
         customer_id                 = "$script:customerId"
-        client_id                   = "$script:domainFqdn\\$script:clientId"
+        client_id                   = "$script:clientId"
         # client_secret               = "<Input client secret value>"
         hostname                    = "$script:hostname"
         environment                 = "$script:environment"
@@ -274,14 +274,14 @@ function Get-ResourceList {
     foreach ($item in $items) {
 
         # Handle special case for Machine Catalogs
-        if ($requestPath -eq "machinecatalogs" -and $item.provisioningType -ne "Manual" -and $item.provisioningType -ne "MCS") {
+        if ($requestPath -eq "machinecatalogs" -and $item.provisioningType -ne "Manual" -and $item.provisioningType -ne "MCS" -and $item.provisioningType -ne "PVSStreaming") {
             Write-Warning "Currently the citrix terraform provider only supports Manual and MCS Machine Catalogs. Ignoring the Machine Catalog with Name: $($item.name) and Type: $($item.provisioningType)"
             continue;
         }
 
         # Handle special case for hypervisors
         if ($requestPath -eq "hypervisors") {
-            if ($item.ConnectionType -eq $script:hypervisorResourceMap.$resourceProviderName) {
+            if (($item.ConnectionType -eq $script:hypervisorResourceMap.$resourceProviderName) -and ($item.ConnectionType -ne "Custom" -or $item.PluginId -eq $NUTANIX_PLUGIN_ID)) {
                 $resourceList += $item.Id
             }
             # Skip other hypervisors
@@ -299,7 +299,7 @@ function Get-ResourceList {
         }
         
         # Create a path map for ApplicationFolder paths
-        if ($requestPath -eq "ApplicationFolders") {
+        if ($requestPath -eq "AdminFolders") {
             $pathMap[$item.Id] = $item.Path
         }
     }
@@ -335,7 +335,7 @@ function Get-ImportMap {
             $resourceMapKey = $id
         }
         
-        if ($resourceApi -eq "ApplicationFolders" -and $pathMap.Count -gt 0) {
+        if ($resourceApi -eq "AdminFolders" -and $pathMap.Count -gt 0) {
             $applicationFolderPathMap[$pathMap.$id] = $resourceName
         }
         
@@ -352,49 +352,73 @@ function Get-ImportMap {
 function Get-ExistingCVADResources {
    
     $resources = @{
-        "zone"               = @{
+        "zone"                 = @{
             "resourceApi"          = "zones"
             "resourceProviderName" = "zone"
         }
-        "azure_hypervisor"   = @{
+        "azure_hypervisor"     = @{
             "resourceApi"          = "hypervisors"
             "resourceProviderName" = "azure_hypervisor"
         }
-        "aws_hypervisor"     = @{
+        "aws_hypervisor"       = @{
             "resourceApi"          = "hypervisors"
             "resourceProviderName" = "aws_hypervisor"
         }
-        "gcp_hypervisor"     = @{
+        "gcp_hypervisor"       = @{
             "resourceApi"          = "hypervisors"
             "resourceProviderName" = "gcp_hypervisor"
         }
-        "xenserver_hypervisor"     = @{
+        "scvmm_hypervisor"     = @{
+            "resourceApi"          = "hypervisors"
+            "resourceProviderName" = "scvmm_hypervisor"
+        }
+        "xenserver_hypervisor" = @{
             "resourceApi"          = "hypervisors"
             "resourceProviderName" = "xenserver_hypervisor"
         }
-        "vsphere_hypervisor"     = @{
+        "vsphere_hypervisor"   = @{
             "resourceApi"          = "hypervisors"
             "resourceProviderName" = "vsphere_hypervisor"
         }
-        "machine_catalog"    = @{
+        "nutanix_hypervisor"   = @{
+            "resourceApi"          = "hypervisors"
+            "resourceProviderName" = "nutanix_hypervisor"
+        }
+        "machine_catalog"      = @{
             "resourceApi"          = "machinecatalogs"
             "resourceProviderName" = "machine_catalog"
         }
-        "delivery_group"     = @{
+        "delivery_group"       = @{
             "resourceApi"          = "deliverygroups"
             "resourceProviderName" = "delivery_group"
         }
-        "application"        = @{
+        "admin_scope"          = @{
+            "resourceApi"          = "Admin/Scopes"
+            "resourceProviderName" = "admin_scope"
+        }
+        "admin_role"           = @{
+            "resourceApi"          = "Admin/Roles"
+            "resourceProviderName" = "admin_role"
+        }
+        "policy_set"           = @{
+            "resourceApi"          = "/gpo/policySets"
+            "resourceProviderName" = "policy_set"
+        }
+        "application"      = @{
             "resourceApi"          = "Applications"
             "resourceProviderName" = "application"
         }
-        "application_folder" = @{
-            "resourceApi"          = "ApplicationFolders"
-            "resourceProviderName" = "application_folder"
+        "admin_folder"         = @{
+            "resourceApi"          = "AdminFolders"
+            "resourceProviderName" = "admin_folder"
         }
-        "admin_scope"        = @{
-            "resourceApi"          = "Admin/Scopes"
-            "resourceProviderName" = "admin_scope"
+        "application_group"    = @{
+            "resourceApi"          = "ApplicationGroups"
+            "resourceProviderName" = "application_group"
+        }
+        "application_icon" = @{
+            "resourceApi"          = "Icons"
+            "resourceProviderName" = "application_icon"
         }
     }
 
@@ -421,7 +445,7 @@ function Get-ExistingCVADResources {
 function Import-ResourcesToState {
     foreach ($resource in  $script:cvadResourcesMap.Keys) {
         foreach ($id in  $script:cvadResourcesMap[$resource].Keys) {
-            terraform import "citrix_$($resource).$($script:cvadResourcesMap[$resource][$id])" "$id"
+            terraform import "citrix_$($resource).$($script:cvadResourcesMap[$resource][$id])" "$id" 
         }
     }
 }
@@ -448,11 +472,46 @@ function InjectSecretValues {
             $format = $target -replace $targetProperty, "password_format"
             $format = $format -replace "`"\S+`"", "`"PlainText`""
             $content = $content -replace $regex, "$($target)$($newContent)$($format)"
-        } else {
+        }
+        else {
             $content = $content -replace $regex, "$($target)$($newContent)"
         }
     }
 
+    return $content
+}
+
+function RemoveComputedPropertiesForZone {
+    param(
+        [parameter(Mandatory = $true)]
+        [string] $content
+    )
+
+    if ($script:onPremise) {
+        # Remove resource_location_id property from each zone resource for on-premises 
+        $resourceLocationIdRegex = "(\s+)resource_location_id(\s+)= (\S+)"
+        $content = $content -replace $resourceLocationIdRegex, ""
+    }
+    else {
+        # Remove name property from each zone resource in cloud
+        $filteredOutput = @()
+        $lines = $content -split "`r?`n"
+        foreach ($line in $lines) {
+            if ($line -like 'resource "citrix_zone"*') {
+                $insideCitrixZone = $true
+            }
+        
+            if ($insideCitrixZone -and $line -like '*name*') {
+                continue
+            }
+        
+            if ($insideCitrixZone -and $line -like '}*') {
+                $insideCitrixZone = $false
+            }
+            $filteredOutput += $line
+        }
+        $content = $filteredOutput -join "`n"
+    }
     return $content
 }
 
@@ -478,6 +537,13 @@ function RemoveComputedProperties {
     $isAssignedRegex = "(\s+)assigned(\s+)= (\S+)"
     $content = $content -replace $isAssignedRegex, ""
 
+    # Remove is_built_in property from admin_role since it is computed
+    $isBuiltInRegex = "(\s+)is_built_in(\s+)= (\S+)"
+    $content = $content -replace $isBuiltInRegex, ""
+
+    # Remove contents for zone respource
+    $content = RemoveComputedPropertiesForZone -content $content
+    
     return $content
 }
 
@@ -501,7 +567,7 @@ function ReplaceDependencyRelationships {
     # Create dependency relationships between resources with path references
     foreach ( $applicationFolderPath in $script:applicationFolderPathMap.Keys) {
         $path = $applicationFolderPath.replace("\", "\\\\")
-        $content = $content -replace "`"$path`"", "citrix_application_folder.$($script:applicationFolderPathMap[$applicationFolderPath]).path"
+        $content = $content -replace "`"$path`"", "citrix_admin_folder.$($script:applicationFolderPathMap[$applicationFolderPath]).path"
     }
 
     return $content
@@ -523,11 +589,56 @@ function InjectPlaceHolderSensitiveValues {
     ###### XenServer / vSphere ######
     $content = InjectSecretValues -targetProperty "username" -newProperty "password" -content $content
 
-
     ### machine catalog service accounts ###
     $content = InjectSecretValues -targetProperty "domain" -newProperty "service_account" -content $content
     $content = InjectSecretValues -targetProperty "domain" -newProperty "service_account_password" -content $content
 
+    return $content
+}
+function ExtractAndSaveApplicationIcons {
+    param(
+        [parameter(Mandatory = $true)]
+        [string] $content
+    )
+
+    # Check if application icon exists; if not, then exit
+    if ($content -notmatch 'citrix_application_icon') {
+        return
+    }
+
+    $filteredOutput = @()
+    $lines = $content -split "`r?`n"
+    $iconCounter = 0
+
+    # Create the icons folder
+    $iconsFolder = "icons"
+    if (-not (Test-Path -Path $iconsFolder)) {
+        New-Item -ItemType Directory -Path $iconsFolder | Out-Null
+    }
+
+    foreach ($line in $lines) {
+        if ($line -match 'raw_data\s*=\s*"([^"]+)"') {
+            $rawDataValue = $matches[1]
+            $iconBytes = [System.Convert]::FromBase64String($rawDataValue)
+            $iconFileName = "$iconsFolder\\app_icon_$iconCounter.ico"
+
+            try {
+                [System.IO.File]::WriteAllBytes($iconFileName, $iconBytes)
+            }
+            catch {
+                Write-Error "Failed to write icon file: $_"
+                continue
+            }
+
+            $iconCounter++
+
+            # Replace raw_data value with icon file path using filebase64 to encode a file's content in base64 format
+            $line =  'raw_data = filebase64("' + $iconFileName + '")'
+        }
+        $filteredOutput += $line
+    }
+
+    $content = $filteredOutput -join "`n"
     return $content
 }
 
@@ -545,8 +656,12 @@ function PostProcessTerraformOutput {
     # Inject placeholder for sensitive values in tf
     $content = InjectPlaceHolderSensitiveValues -content $content
     
+    # Extract and save citrix application icons
+    $content = ExtractAndSaveApplicationIcons -content $content
+
     # Overwrite extracted terraform with processed value
     Set-Content -Path ".\resource.tf" -Value $content
+
 }
 
 function PostProcessProviderConfig {
@@ -555,7 +670,7 @@ function PostProcessProviderConfig {
     $content = Get-Content -Path ".\citrix.tf" -Raw
 
     # Uncomment field for client secret in provider config
-    $content =$content -replace "# ", ""
+    $content = $content -replace "# ", ""
 
     # Overwrite provider config with processed value
     Set-Content -Path ".\citrix.tf" -Value $content
@@ -585,12 +700,15 @@ $script:hostname = $Hostname
 $script:environment = $Environment
 $script:disable_ssl = $DisableSSLValidation
 $script:hypervisorResourceMap = @{
-    "azure_hypervisor" = "AzureRM"
-    "aws_hypervisor"   = "AWS"
-    "gcp_hypervisor"   = "GoogleCloudPlatform"
+    "azure_hypervisor"     = "AzureRM"
+    "aws_hypervisor"       = "AWS"
+    "gcp_hypervisor"       = "GoogleCloudPlatform"
+    "scvmm_hypervisor"     = "SCVMM"
     "xenserver_hypervisor" = "XenServer"
-    "vsphere_hypervisor" = "VCenter"
+    "vsphere_hypervisor"   = "VCenter"
+    "nutanix_hypervisor"   = "Custom"
 }
+$NUTANIX_PLUGIN_ID = "AcropolisFactory"
 $script:applicationFolderPathMap = @{}
 
 # Set environment variables for client secret
@@ -624,7 +742,8 @@ try {
 
     # Format terraform files
     terraform fmt
-} finally {
+}
+finally {
     # Clean up environment variables for client secret
     $env:CITRIX_CLIENT_SECRET = ''
 }

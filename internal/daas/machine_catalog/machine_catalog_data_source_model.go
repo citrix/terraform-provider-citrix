@@ -11,9 +11,10 @@ import (
 
 // MachineCatalogDataSourceModel defines the Machine Catalog data source implementation.
 type MachineCatalogDataSourceModel struct {
-	Id   types.String   `tfsdk:"id"`
-	Name types.String   `tfsdk:"name"`
-	Vdas []vda.VdaModel `tfsdk:"vdas"` // List[VdaModel]
+	Id                       types.String   `tfsdk:"id"`
+	Name                     types.String   `tfsdk:"name"`
+	MachineCatalogFolderPath types.String   `tfsdk:"machine_catalog_folder_path"`
+	Vdas                     []vda.VdaModel `tfsdk:"vdas"` // List[VdaModel]
 }
 
 func (MachineCatalogDataSourceModel) GetSchema() schema.Schema {
@@ -28,6 +29,10 @@ func (MachineCatalogDataSourceModel) GetSchema() schema.Schema {
 				Description: "Name of the machine catalog.",
 				Required:    true,
 			},
+			"machine_catalog_folder_path": schema.StringAttribute{
+				Description: "The path to the folder in which the machine catalog is located.",
+				Optional:    true,
+			},
 			"vdas": schema.ListNestedAttribute{
 				Description:  "The VDAs associated with the machine catalog.",
 				Computed:     true,
@@ -40,6 +45,14 @@ func (MachineCatalogDataSourceModel) GetSchema() schema.Schema {
 func (r MachineCatalogDataSourceModel) RefreshPropertyValues(catalog *citrixorchestration.MachineCatalogDetailResponseModel, vdas *citrixorchestration.MachineResponseModelCollection) MachineCatalogDataSourceModel {
 	r.Id = types.StringValue(catalog.GetId())
 	r.Name = types.StringValue(catalog.GetName())
+
+	adminFolder := catalog.GetAdminFolder()
+	adminFolderPath := adminFolder.GetName()
+	if adminFolderPath != "" {
+		r.MachineCatalogFolderPath = types.StringValue(adminFolderPath)
+	} else {
+		r.MachineCatalogFolderPath = types.StringNull()
+	}
 
 	res := []vda.VdaModel{}
 	for _, model := range vdas.GetItems() {

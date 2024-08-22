@@ -4,7 +4,6 @@ package qcs_account
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixquickcreate"
@@ -80,7 +79,7 @@ func (r *awsWorkspaceAccountResource) Create(ctx context.Context, req resource.C
 		accountDetails.AwsRoleArn = *citrixquickcreate.NewNullableString(plan.AwsRoleArn.ValueStringPointer())
 	} else {
 		// Return error if both AWS Access Key ID and Secret Access Key are empty
-		resp.Diagnostics.AddError("Error adding AWS Workspaces Account: "+plan.Name.ValueString(), "Error message: You must provide either AWS Access Key ID and Secret Access Key or Role ARN")
+		resp.Diagnostics.AddError("Error adding AWS WorkSpaces Account: "+plan.Name.ValueString(), "Error message: You must provide either AWS Access Key ID and Secret Access Key or Role ARN")
 		return
 	}
 
@@ -88,19 +87,19 @@ func (r *awsWorkspaceAccountResource) Create(ctx context.Context, req resource.C
 	createAccountRequest := r.client.QuickCreateClient.AccountQCS.AddAccountAsync(ctx, r.client.ClientConfig.CustomerId)
 	createAccountRequest = createAccountRequest.Body(accountDetails)
 
-	// Create new AWS Workspaces Account
+	// Create new AWS WorkSpaces Account
 	addAccountResponse, httpResp, err := citrixdaasclient.AddRequestData(createAccountRequest, r.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error adding AWS Workspaces Account: "+plan.Name.ValueString(),
+			"Error adding AWS WorkSpaces Account: "+plan.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadQcsClientError(err),
 		)
 		return
 	}
 
-	// Try getting the new AWS Workspaces Account
-	account, _, err := getAwsWorkspacesAccountUsingId(ctx, r.client, &resp.Diagnostics, *addAccountResponse.AccountId.Get(), true)
+	// Try getting the new AWS WorkSpaces Account
+	account, _, err := getAwsWorkspacesAccountUsingId(ctx, r.client, &resp.Diagnostics, *addAccountResponse.AccountId.Get())
 	if err != nil {
 		return
 	}
@@ -128,17 +127,9 @@ func (r *awsWorkspaceAccountResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
-	// Try getting the AWS Workspaces Account
-	account, httpResp, err := getAwsWorkspacesAccountUsingId(ctx, r.client, &resp.Diagnostics, state.AccountId.ValueString(), false)
+	// Try getting the AWS WorkSpaces Account
+	account, err := readAwsWorkspacesAccountUsingId(ctx, r.client, resp, state.AccountId.ValueString())
 	if err != nil {
-		if httpResp.StatusCode == http.StatusNotFound {
-			resp.Diagnostics.AddWarning(
-				fmt.Sprintf("AWS Workspaces Account with ID: %s not found", state.AccountId.ValueString()),
-				fmt.Sprintf("AWS Workspaces Account with ID: %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", state.AccountId.ValueString()),
-			)
-			resp.State.RemoveResource(ctx)
-			return
-		}
 		return
 	}
 
@@ -173,21 +164,21 @@ func (r *awsWorkspaceAccountResource) Update(ctx context.Context, req resource.U
 		return
 	}
 
-	// Two possible options for Workspaces accounts
+	// Two possible options for WorkSpaces accounts
 	// 1. Update account name
 	// 2. Update account credentials
 
 	// Get refreshed account properties from QCS
 	accountId := plan.AccountId.ValueString()
-	account, httpResp, err := getAwsWorkspacesAccountUsingId(ctx, r.client, &resp.Diagnostics, accountId, true)
+	account, httpResp, err := getAwsWorkspacesAccountUsingId(ctx, r.client, &resp.Diagnostics, accountId)
 	if err != nil {
 		return
 	}
 	if account.AccountType != citrixquickcreate.ACCOUNTTYPE_AWSEDC {
 		resp.Diagnostics.AddError(
-			"Error updating AWS Workspaces Account: "+plan.Name.ValueString(),
+			"Error updating AWS WorkSpaces Account: "+plan.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: Account is not an AWS Workspaces account",
+				"\nError message: Account is not an AWS WorkSpaces account",
 		)
 		return
 	}
@@ -203,7 +194,7 @@ func (r *awsWorkspaceAccountResource) Update(ctx context.Context, req resource.U
 
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error updating AWS Workspaces Account Name: "+plan.Name.ValueString(),
+				"Error updating AWS WorkSpaces Account Name: "+plan.Name.ValueString(),
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadQcsClientError(err),
 			)
@@ -215,7 +206,7 @@ func (r *awsWorkspaceAccountResource) Update(ctx context.Context, req resource.U
 	if (plan.AwsAccessKeyId.ValueString() != state.AwsAccessKeyId.ValueString() && plan.AwsSecretAccessKey.ValueString() == state.AwsSecretAccessKey.ValueString()) ||
 		(plan.AwsAccessKeyId.ValueString() == state.AwsAccessKeyId.ValueString() && plan.AwsSecretAccessKey.ValueString() != state.AwsSecretAccessKey.ValueString()) {
 		resp.Diagnostics.AddError(
-			"Error updating AWS Workspaces Account Credentials: "+plan.Name.ValueString(),
+			"Error updating AWS WorkSpaces Account Credentials: "+plan.Name.ValueString(),
 			"Error message: You must update both AWS Access Key ID and Secret Access Key",
 		)
 		return
@@ -239,7 +230,7 @@ func (r *awsWorkspaceAccountResource) Update(ctx context.Context, req resource.U
 
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error updating AWS Workspaces Account Credentials: "+plan.Name.ValueString(),
+				"Error updating AWS WorkSpaces Account Credentials: "+plan.Name.ValueString(),
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadQcsClientError(err),
 			)
@@ -248,7 +239,7 @@ func (r *awsWorkspaceAccountResource) Update(ctx context.Context, req resource.U
 	}
 
 	// Get updated account details
-	account, _, getAcctErr := getAwsWorkspacesAccountUsingId(ctx, r.client, &resp.Diagnostics, accountId, true)
+	account, _, getAcctErr := getAwsWorkspacesAccountUsingId(ctx, r.client, &resp.Diagnostics, accountId)
 	if getAcctErr != nil {
 		return
 	}
@@ -275,13 +266,13 @@ func (r *awsWorkspaceAccountResource) Delete(ctx context.Context, req resource.D
 		return
 	}
 
-	// Delete AWS Workspaces Account
+	// Delete AWS WorkSpaces Account
 	deleteAccountRequest := r.client.QuickCreateClient.AccountQCS.DeleteCustomerAccountAsync(ctx, r.client.ClientConfig.CustomerId, state.AccountId.ValueString())
 	httpResp, err := r.client.QuickCreateClient.AccountQCS.DeleteCustomerAccountAsyncExecute(deleteAccountRequest)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error removing AWS Workspaces Account: "+state.Name.ValueString(),
+			"Error removing AWS WorkSpaces Account: "+state.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadQcsClientError(err),
 		)
@@ -317,16 +308,20 @@ func (r *awsWorkspaceAccountResource) ModifyPlan(ctx context.Context, req resour
 	}
 }
 
-func getAwsWorkspacesAccountUsingId(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, accountId string, addErrorIfNotFound bool) (*citrixquickcreate.AwsEdcAccount, *http.Response, error) {
+func readAwsWorkspacesAccountUsingId(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, accountId string) (*citrixquickcreate.AwsEdcAccount, error) {
+	getAccountRequest := client.QuickCreateClient.AccountQCS.GetCustomerAccountAsync(ctx, client.ClientConfig.CustomerId, accountId)
+	account, _, err := util.ReadResource[*citrixquickcreate.AwsEdcAccount](getAccountRequest, ctx, client, resp, "AWS WorkSpaces Account", accountId)
+
+	return account, err
+}
+
+func getAwsWorkspacesAccountUsingId(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, accountId string) (*citrixquickcreate.AwsEdcAccount, *http.Response, error) {
 	getAccountRequest := client.QuickCreateClient.AccountQCS.GetCustomerAccountAsync(ctx, client.ClientConfig.CustomerId, accountId)
 	account, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickcreate.AwsEdcAccount](getAccountRequest, client)
 
 	if err != nil {
-		if !addErrorIfNotFound {
-			return nil, httpResp, err
-		}
 		diagnostics.AddError(
-			"Error getting AWS Workspaces Account: "+accountId,
+			"Error getting AWS WorkSpaces Account: "+accountId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadQcsClientError(err),
 		)
@@ -345,7 +340,7 @@ func updateAwsWorkspacesAccount(ctx context.Context, client *citrixdaasclient.Ci
 
 	if err != nil {
 		diagnostics.AddError(
-			"Error performing "+accountOperationTypeEnumToString(requestBody.UpdateAccount.GetAccountOperationType())+" on AWS Workspaces Account: "+accountId,
+			"Error performing "+accountOperationTypeEnumToString(requestBody.UpdateAccount.GetAccountOperationType())+" on AWS WorkSpaces Account: "+accountId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadQcsClientError(err),
 		)

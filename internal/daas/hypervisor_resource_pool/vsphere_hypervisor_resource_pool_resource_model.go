@@ -5,6 +5,7 @@ package hypervisor_resource_pool
 import (
 	"context"
 	"regexp"
+	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
@@ -153,6 +154,34 @@ func (r VsphereHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx co
 	r.Networks = util.RefreshListValues(ctx, diagnostics, r.Networks, remoteNetwork)
 	r.Storage = util.RefreshListValueProperties[HypervisorStorageModel, citrixorchestration.HypervisorStorageResourceResponseModel](ctx, diagnostics, r.Storage, resourcePool.GetStorage(), util.GetOrchestrationHypervisorStorageKey)
 	r.TemporaryStorage = util.RefreshListValueProperties[HypervisorStorageModel, citrixorchestration.HypervisorStorageResourceResponseModel](ctx, diagnostics, r.TemporaryStorage, resourcePool.GetTemporaryStorage(), util.GetOrchestrationHypervisorStorageKey)
+	r = r.updatePlanWithCluster(ctx, diagnostics, resourcePool)
+	return r
+}
 
+func (r VsphereHypervisorResourcePoolResourceModel) updatePlanWithCluster(ctx context.Context, diagnostics *diag.Diagnostics, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) VsphereHypervisorResourcePoolResourceModel {
+	relativePath := resourcePool.RootPath.GetRelativePath()
+	var vsphereHypervisorClusterModel = util.ObjectValueToTypedObject[VsphereHypervisorClusterModel](ctx, diagnostics, r.Cluster)
+	if relativePath != "" {
+		resourceSegments := strings.Split(relativePath, "/")
+		for _, segment := range resourceSegments {
+			if strings.Contains(segment, ".datacenter") {
+				datacenter := strings.TrimSuffix(segment, ".datacenter")
+				if !strings.EqualFold(vsphereHypervisorClusterModel.Datacenter.ValueString(), datacenter) {
+					vsphereHypervisorClusterModel.Datacenter = types.StringValue(datacenter)
+				}
+			} else if strings.Contains(segment, ".cluster") {
+				clusterName := strings.TrimSuffix(segment, ".cluster")
+				if !strings.EqualFold(vsphereHypervisorClusterModel.ClusterName.ValueString(), clusterName) {
+					vsphereHypervisorClusterModel.ClusterName = types.StringValue(clusterName)
+				}
+			} else if strings.Contains(segment, ".computeresource") {
+				host := strings.TrimSuffix(segment, ".computeresource")
+				if !strings.EqualFold(vsphereHypervisorClusterModel.Host.ValueString(), host) {
+					vsphereHypervisorClusterModel.Host = types.StringValue(host)
+				}
+			}
+		}
+	}
+	r.Cluster = util.TypedObjectToObjectValue(ctx, diagnostics, vsphereHypervisorClusterModel)
 	return r
 }

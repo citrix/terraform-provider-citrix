@@ -24,13 +24,15 @@ import (
 
 // ApplicationGroupResource maps the resource schema data.
 type ApplicationGroupResourceModel struct {
-	Id             types.String `tfsdk:"id"`
-	Name           types.String `tfsdk:"name"`
-	Description    types.String `tfsdk:"description"`
-	RestrictToTag  types.String `tfsdk:"restrict_to_tag"`
-	IncludedUsers  types.Set    `tfsdk:"included_users"`  // Set[string]
-	DeliveryGroups types.Set    `tfsdk:"delivery_groups"` // Set[string]
-	Scopes         types.Set    `tfsdk:"scopes"`          // Set[string]
+	Id                         types.String `tfsdk:"id"`
+	Name                       types.String `tfsdk:"name"`
+	Description                types.String `tfsdk:"description"`
+	RestrictToTag              types.String `tfsdk:"restrict_to_tag"`
+	IncludedUsers              types.Set    `tfsdk:"included_users"`  // Set[string]
+	DeliveryGroups             types.Set    `tfsdk:"delivery_groups"` // Set[string]
+	Scopes                     types.Set    `tfsdk:"scopes"`          // Set[string]
+	ApplicationGroupFolderPath types.String `tfsdk:"application_group_folder_path"`
+	Tenants                    types.Set    `tfsdk:"tenants"`         // Set[string]
 }
 
 func (ApplicationGroupResourceModel) GetSchema() schema.Schema {
@@ -90,12 +92,23 @@ func (ApplicationGroupResourceModel) GetSchema() schema.Schema {
 				Computed:    true,
 				Default:     setdefault.StaticValue(types.SetValueMust(types.StringType, []attr.Value{})),
 				Validators: []validator.Set{
-					setvalidator.SizeAtLeast(1),
 					setvalidator.ValueStringsAre(
 						validator.String(
 							stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
 						),
 					),
+				},
+			},
+			"application_group_folder_path": schema.StringAttribute{
+				Description: "The path of the folder in which the application group is located.",
+				Optional:    true,
+			},
+			"tenants": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "A set of identifiers of tenants to associate with the application group.",
+				Optional:    true,
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 			},
 		},
@@ -106,44 +119,62 @@ func (ApplicationGroupResourceModel) GetAttributes() map[string]schema.Attribute
 	return ApplicationGroupResourceModel{}.GetSchema().Attributes
 }
 
-func (appGroup ApplicationGroupResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, application *citrixorchestration.ApplicationGroupDetailResponseModel, dgs *citrixorchestration.ApplicationGroupDeliveryGroupResponseModelCollection) ApplicationGroupResourceModel {
+func (r ApplicationGroupResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, applicationGroup *citrixorchestration.ApplicationGroupDetailResponseModel, dgs *citrixorchestration.ApplicationGroupDeliveryGroupResponseModelCollection) ApplicationGroupResourceModel {
 	// Overwrite application with refreshed state
-	appGroup.Id = types.StringValue(application.GetId())
-	appGroup.Name = types.StringValue(application.GetName())
+	r.Id = types.StringValue(applicationGroup.GetId())
+	r.Name = types.StringValue(applicationGroup.GetName())
 
 	// Set optional values
-	if application.GetDescription() != "" {
-		appGroup.Description = types.StringValue(application.GetDescription())
+	if applicationGroup.GetDescription() != "" {
+		r.Description = types.StringValue(applicationGroup.GetDescription())
 	} else {
-		appGroup.Description = types.StringNull()
+		r.Description = types.StringNull()
 	}
 
-	restrictToTag := application.GetRestrictToTag()
+	restrictToTag := applicationGroup.GetRestrictToTag()
 	retrictToTagName := restrictToTag.GetName()
 	if retrictToTagName != "" {
-		appGroup.RestrictToTag = types.StringValue(retrictToTagName)
+		r.RestrictToTag = types.StringValue(retrictToTagName)
 	} else {
-		appGroup.RestrictToTag = types.StringNull()
+		r.RestrictToTag = types.StringNull()
 	}
 
-	if application.GetScopes() != nil {
-		scopeIds := util.GetIdsForScopeObjects(application.GetScopes())
-		appGroup.Scopes = util.StringArrayToStringSet(ctx, diagnostics, scopeIds)
+	if applicationGroup.GetScopes() != nil {
+		scopeIds := util.GetIdsForScopeObjects(applicationGroup.GetScopes())
+		r.Scopes = util.StringArrayToStringSet(ctx, diagnostics, scopeIds)
 	}
 
 	// Set included users
-	includedUsers := application.GetIncludedUsers() //only set IncludedUsers to null when it is null in the configuration
-	if len(includedUsers) == 0 && appGroup.IncludedUsers.IsNull() {
-		appGroup.IncludedUsers = types.SetNull(types.StringType)
+	includedUsers := applicationGroup.GetIncludedUsers() //only set IncludedUsers to null when it is null in the configuration
+	if len(includedUsers) == 0 && r.IncludedUsers.IsNull() {
+		r.IncludedUsers = types.SetNull(types.StringType)
 	} else { // If included users is not null or empty list, we need to update the list
-		appGroup.IncludedUsers = util.RefreshUsersList(ctx, diagnostics, appGroup.IncludedUsers, includedUsers)
+		r.IncludedUsers = util.RefreshUsersList(ctx, diagnostics, r.IncludedUsers, includedUsers)
 	}
 
 	resultDeliveryGroupIds := []string{}
 	for _, deliveryGroup := range dgs.Items {
 		resultDeliveryGroupIds = append(resultDeliveryGroupIds, deliveryGroup.GetId())
 	}
-	appGroup.DeliveryGroups = util.StringArrayToStringSet(ctx, diagnostics, resultDeliveryGroupIds)
+	r.DeliveryGroups = util.StringArrayToStringSet(ctx, diagnostics, resultDeliveryGroupIds)
 
-	return appGroup
+	adminFolder := applicationGroup.GetAdminFolder()
+	adminFolderPath := adminFolder.GetName()
+	if adminFolderPath != "" {
+		r.ApplicationGroupFolderPath = types.StringValue(adminFolderPath)
+	} else {
+		r.ApplicationGroupFolderPath = types.StringNull()
+	}
+	
+	if len(applicationGroup.GetTenants()) > 0 || !r.Tenants.IsNull() {
+		var remoteTenants []string
+		for _, tenant := range applicationGroup.GetTenants() {
+			remoteTenants = append(remoteTenants, tenant.GetId())
+		}
+		r.Tenants = util.StringArrayToStringSet(ctx, diagnostics, remoteTenants)
+	} else {
+		r.Tenants = types.SetNull(types.StringType)
+	}
+
+	return r
 }

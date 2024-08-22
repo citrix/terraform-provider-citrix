@@ -4,6 +4,7 @@ package machine_catalog
 
 import (
 	"context"
+	"strings"
 
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
@@ -60,24 +61,24 @@ func (d *MachineCatalogDataSource) Read(ctx context.Context, req datasource.Read
 	}
 
 	// Get refreshed machine catalog state from Orchestration
-	machineCatalogName := data.Name.ValueString()
-	getMachineCatalogRequest := d.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogName).Fields("Id,Name,Description,ProvisioningType,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC")
+	machineCatalogPath := strings.ReplaceAll(data.MachineCatalogFolderPath.ValueString(), "\\", "|") + data.Name.ValueString()
+	getMachineCatalogRequest := d.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogPath).Fields("Id,Name,Description,ProvisioningType,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC")
 	machineCatalog, httpResp, err := citrixdaasclient.AddRequestData(getMachineCatalogRequest, d.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error reading Machine Catalog "+machineCatalogName,
+			"Error reading Machine Catalog "+data.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 	}
 
 	// Get VDAs associated with the machine catalog
-	getMachineCatalogMachinesRequest := d.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogMachines(ctx, machineCatalogName)
+	getMachineCatalogMachinesRequest := d.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogMachines(ctx, machineCatalogPath)
 	machineCatalogVdas, httpResp, err := citrixdaasclient.AddRequestData(getMachineCatalogMachinesRequest, d.client).Execute()
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error listing VDAs in Machine Catalog "+machineCatalogName,
+			"Error listing VDAs in Machine Catalog "+data.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)

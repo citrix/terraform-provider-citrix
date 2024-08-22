@@ -35,12 +35,12 @@ type applicationGroupResource struct {
 	client *citrixdaasclient.CitrixDaasClient
 }
 
-// Metadata returns the data source type name.
+// Metadata returns the resource type name.
 func (r *applicationGroupResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_application_group"
 }
 
-// Configure adds the provider configured client to the data source.
+// Configure adds the provider configured client to the resource.
 func (r *applicationGroupResource) Configure(_ context.Context, req resource.ConfigureRequest, _ *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
@@ -49,7 +49,7 @@ func (r *applicationGroupResource) Configure(_ context.Context, req resource.Con
 	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
 }
 
-// Schema defines the schema for the data source.
+// Schema defines the schema for the resource.
 func (r *applicationGroupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = ApplicationGroupResourceModel{}.GetSchema()
 }
@@ -101,6 +101,13 @@ func (r *applicationGroupResource) Create(ctx context.Context, req resource.Crea
 
 	createApplicationGroupRequest.SetDeliveryGroups(deliveryGroups)
 
+	createApplicationGroupRequest.SetAdminFolder(plan.ApplicationGroupFolderPath.ValueString())
+	
+	if !plan.Tenants.IsNull() {
+		associatedTenants := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Tenants)
+		createApplicationGroupRequest.SetTenants(associatedTenants)
+	}
+
 	addApplicationsGroupRequest := r.client.ApiClient.ApplicationGroupsAPIsDAAS.ApplicationGroupsCreateApplicationGroup(ctx)
 	addApplicationsGroupRequest = addApplicationsGroupRequest.CreateApplicationGroupRequestModel(createApplicationGroupRequest)
 
@@ -108,7 +115,7 @@ func (r *applicationGroupResource) Create(ctx context.Context, req resource.Crea
 	addAppGroupResp, httpResp, err := citrixdaasclient.AddRequestData(addApplicationsGroupRequest, r.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error creating Application",
+			"Error creating Application Group "+plan.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
@@ -148,7 +155,7 @@ func (r *applicationGroupResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
-	//AppGroup response does not return delivery groups so we are making another call to fetch delivery groups
+	// AppGroup response does not return delivery groups so we are making another call to fetch delivery groups
 	dgs, err := getDeliveryGroups(ctx, r.client, &resp.Diagnostics, applicationGroup.GetId())
 	if err != nil {
 		return
@@ -198,7 +205,7 @@ func (r *applicationGroupResource) Update(ctx context.Context, req resource.Upda
 		includedUserIds, httpResp, err := util.GetUserIdsUsingIdentity(ctx, r.client, includedUsers)
 		if err != nil {
 			diags.AddError(
-				"Error fetching user details for application group",
+				"Error fetching user details for application group"+applicationGroupName,
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadClientError(err),
 			)
@@ -223,6 +230,13 @@ func (r *applicationGroupResource) Update(ctx context.Context, req resource.Upda
 
 	editApplicationGroupRequestBody.SetDeliveryGroups(deliveryGroups)
 
+	editApplicationGroupRequestBody.SetAdminFolder(plan.ApplicationGroupFolderPath.ValueString())
+
+	if !plan.Tenants.IsNull() {
+		associatedTenants := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Tenants)
+		editApplicationGroupRequestBody.SetTenants(associatedTenants)
+	}
+
 	// Update Application
 	editApplicationRequest := r.client.ApiClient.ApplicationGroupsAPIsDAAS.ApplicationGroupsUpdateApplicationGroup(ctx, applicationGroupId)
 	editApplicationRequest = editApplicationRequest.EditApplicationGroupRequestModel(*editApplicationGroupRequestBody)
@@ -235,13 +249,13 @@ func (r *applicationGroupResource) Update(ctx context.Context, req resource.Upda
 		)
 	}
 
-	// Get updated applicationGroup from GetApplication
+	// Get updated applicationGroup from getApplicationGroup
 	applicationGroup, err := getApplicationGroup(ctx, r.client, &resp.Diagnostics, applicationGroupId)
 	if err != nil {
 		return
 	}
 
-	//Create AppGroup response does not return delivery groups so we are making another call to fetch delivery groups
+	// Get AppGroup response does not return delivery groups so we are making another call to fetch delivery groups
 	dgs, err := getDeliveryGroups(ctx, r.client, &resp.Diagnostics, applicationGroup.GetId())
 	if err != nil {
 		return
@@ -275,7 +289,7 @@ func (r *applicationGroupResource) Delete(ctx context.Context, req resource.Dele
 	httpResp, err := citrixdaasclient.AddRequestData(deleteApplicationRequest, r.client).Execute()
 	if err != nil && httpResp.StatusCode != http.StatusNotFound {
 		resp.Diagnostics.AddError(
-			"Error deleting Application "+applicationGroupName,
+			"Error deleting Application Group "+applicationGroupName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
@@ -299,7 +313,7 @@ func getApplicationGroup(ctx context.Context, client *citrixdaasclient.CitrixDaa
 	applicationGroup, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ApplicationGroupDetailResponseModel](getApplicationRequest, client)
 	if err != nil {
 		diagnostics.AddError(
-			"Error Reading Application "+applicationGroupId,
+			"Error Reading Application Group "+applicationGroupId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
@@ -341,6 +355,27 @@ func (r *applicationGroupResource) ModifyPlan(ctx context.Context, req resource.
 
 	if r.client != nil && r.client.ApiClient == nil {
 		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
+
+	var plan ApplicationGroupResourceModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	create := req.State.Raw.IsNull()
+	operation := "updating"
+	if create {
+		operation = "creating"
+	}
+
+	if !r.client.ClientConfig.IsCspCustomer && !plan.Tenants.IsNull() {
+		resp.Diagnostics.AddError(
+			"Error "+operation+" Application Group "+plan.Name.ValueString(),
+			"`tenants` attribute can only be set for Citrix Service Provider customer.",
+		)
 		return
 	}
 }

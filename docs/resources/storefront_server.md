@@ -27,9 +27,12 @@ resource "citrix_storefront_server" "example-storefront_server" {
 ### Required
 
 - `description` (String) Description of the StoreFront server.
-- `enabled` (Boolean) Indicates if the StoreFront server is enabled.
 - `name` (String) Name of the StoreFront server.
 - `url` (String) URL for connecting to the StoreFront server.
+
+### Optional
+
+- `enabled` (Boolean) Indicates if the StoreFront server is enabled. Default is `true`.
 
 ### Read-Only
 

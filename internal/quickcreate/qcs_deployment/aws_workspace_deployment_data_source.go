@@ -67,7 +67,7 @@ func (r *awsWorkspacesDeploymentDataSource) Read(ctx context.Context, req dataso
 
 	var deployment *citrixquickcreate.AwsEdcDeployment
 	var err error
-	// Try getting the AWS Workspaces Deployment
+	// Try getting the AWS WorkSpaces Deployment
 	if data.Id.ValueString() != "" {
 		deployment, _, err = getAwsWorkspacesDeploymentUsingId(ctx, r.client, &resp.Diagnostics, data.Id.ValueString(), true)
 	} else if data.Name.ValueString() != "" {
@@ -90,7 +90,7 @@ func getAwsWorkspacesDeploymentByName(ctx context.Context, client *citrixdaascli
 
 	if err != nil {
 		diagnostics.AddError(
-			"Error getting AWS Workspaces Deployment: "+deploymentName,
+			"Error getting AWS WorkSpaces Deployment: "+deploymentName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadQcsClientError(err),
 		)
@@ -103,9 +103,9 @@ func getAwsWorkspacesDeploymentByName(ctx context.Context, client *citrixdaascli
 		}
 	}
 
-	err = fmt.Errorf("AWS Workspaces Deployment not found: " + deploymentName)
+	err = fmt.Errorf("AWS WorkSpaces Deployment not found: " + deploymentName)
 	diagnostics.AddError(
-		"Error getting AWS Workspaces Deployment",
+		"Error getting AWS WorkSpaces Deployment",
 		util.ReadQcsClientError(err),
 	)
 

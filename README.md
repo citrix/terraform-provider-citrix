@@ -24,6 +24,7 @@ Citrix has developed a custom Terraform provider for automating Citrix product d
     - [Configure Global App Configuration (GAC) Settings](#configure-global-app-configuration-gac-settings)
     - [Create Citrix Cloud Resource Locations](#create-citrix-cloud-resource-locations)
     - [Managing StoreFront resources](#managing-storefront-resources)
+    - [Managing DaaS Quick Deploy resources](#managing-daas-quick-deploy-resources)
   - [Examples and Deployment Guides](#examples-and-deployment-guides)
   - [Frequently Asked Questions](#frequently-asked-questions)
       - [What resource is supported for different connection types?](#what-resource-is-supported-for-different-connection-types)
@@ -160,8 +161,7 @@ Resource locations contain the resources (e.g. cloud connectors) required to del
 ### Managing StoreFront resources
 Please refer to the [StoreFront.md](StoreFront.md) to configure StoreFront resources via terraform. Note that this feature is in Tech Preview.
 
-### Managing QuickCreate resources
-
+### Managing DaaS Quick Deploy resources
 QuickCreate service allows customers to create and manage Amazon WorkSpaces Core instances in Amazon Web Services (AWS). Please refer to the [QuickCreate documentation](https://docs.citrix.com/en-us/citrix-daas/install-configure/amazon-workspaces-core.html) to learn more. Note that this feature is in Tech Preview.
 
 ## Examples and Deployment Guides

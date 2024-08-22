@@ -29,7 +29,9 @@ Param (
     [string] $ADAdminUsername,
 
     [Parameter(Mandatory = $true)]
-    [string] $ADAdminPassword
+    [string] $ADAdminPassword,
+
+    [switch] $DisableSSLValidation
 )
 
 ### Helper Functions ###
@@ -71,15 +73,27 @@ function Start-GetRequest {
     param(
         [parameter(Mandatory = $true)][string] $requestCmdlet
     )
-    $auth = BuildAuth -remoteCompName $script:computerName -username $script:adUsername -password $script:adPassword
-    $session = New-PSSession @auth
+    # Create session options with certificate checks skipped
+    $sessionOptions = New-PSSessionOption -SkipCACheck -SkipCNCheck -SkipRevocationCheck
 
-    $response = Invoke-Command -Session $session -ScriptBlock {
-        param($command)
-        Invoke-Expression $command
-    } -ArgumentList $requestCmdlet
+    $auth = BuildAuth -remoteCompName $script:computerName -username $script:adUsername -password $script:adPassword 
+    $session = New-PSSession @auth -SessionOption $sessionOptions
 
-    Remove-PSSession  $session
+    $response = if ($script:disableSSL) {
+        Invoke-Command -Session $session -ScriptBlock {
+            param($command)
+            Invoke-Expression $command
+        } -ArgumentList $requestCmdlet
+    } else {
+        Invoke-Command -ScriptBlock {
+            param($command)
+            Invoke-Expression $command
+        } -ArgumentList $requestCmdlet
+    }
+
+    if ($session) {
+        Remove-PSSession $session
+    }
 
     return $response
 }
@@ -91,12 +105,14 @@ function New-RequiredFiles {
         New-Item -path ".\" -name "citrix.tf" -type "file" -Force
         Write-Verbose "Created new file for terraform citrix provider configuration."
     }
+    $disableSSL = if ($DisableSSLValidation) { "true" } else { "false" }
     $config = @"
 provider "citrix" {
     storefront_remote_host = {
         computer_name                = "$script:computerName"
         ad_admin_username            = "$script:processedadUsername"
         ad_admin_password            = "$script:adPassword"
+        disable_ssl_validation       =  $disableSSL
     }
 }
 "@
@@ -127,15 +143,27 @@ provider "citrix" {
 function Get-ResourceList {
     param(
         [parameter(Mandatory = $true)]
-        [string] $requestCmdlet
+        [string] $requestCmdlet,
+        [parameter(Mandatory = $false)]
+        [string] $siteId = ""
     )
-
-    $response = Start-GetRequest -requestCmdlet $requestCmdlet
     $resourceList = @()
     $pathMap = @{}
-    foreach ($item in $response) {
-        $resourceList += $item.SiteId
+
+    if($siteId -ne "") {
+        $requestCmdlet = $requestCmdlet + " -SiteId $siteId"
+        $response =  Start-GetRequest -requestCmdlet $requestCmdlet
+        foreach ($item in $response) {
+            $resourceList += $item.VirtualPath
+        }
+
+    }else{
+        $response = Start-GetRequest -requestCmdlet $requestCmdlet
+        foreach ($item in $response) {
+            $resourceList += $item.SiteId+""
+        }
     }
+   
     return $resourceList, $pathMap
 }
 
@@ -152,7 +180,7 @@ function Get-ImportMap {
         [string] $parentId = ""
     )
 
-    $list, $pathMap = Get-ResourceList -requestCmdlet $resourceApi 
+    $list, $pathMap = Get-ResourceList -requestCmdlet $resourceApi -siteId $parentId
     $resourceMap = @{}
     $index = 0
     foreach ($id in $list) {
@@ -162,7 +190,8 @@ function Get-ImportMap {
         }
         else {
             $resourceName = "$($resourceProviderName)_$($index)"
-            $resourceMapKey = $id
+            $resourceMapKey = "$($id)"
+            $script:cvadSiteIdArray.Add($id)
         }
         
         $resourceMap[$resourceMapKey] = $resourceName
@@ -178,25 +207,40 @@ function Get-ImportMap {
 function Get-ExistingSFResources {
    
     $resources = @{
-        "stf_deployment"               = @{
+        "stf_deployment"           = @{
             "resourceApi"          = "Get-STFDeployment"
             "resourceProviderName" = "stf_deployment"
         }
-    }
-
-    $script:cvadResourcesMap = @{}
-    #iterate through all resources
-    foreach ($resource in $resources.Keys) {
-        $api = $resources[$resource].resourceApi
-        $resourceProviderName = $resources[$resource].resourceProviderName
-           
-        # Create resource hash map for each resource
-        if ($resource -like "*deployment") {
-            $script:cvadResourcesMap[$resource] = Get-ImportMap -resourceApi $api -resourceProviderName $resourceProviderName
-        }else{
-            $script:cvadResourcesMap[$resource] = Get-ImportMap -resourceApi $api -resourceProviderName $resourceProviderName -parentId $id 
+        "stf_store_service"        = @{
+            "resourceApi"          = "Get-STFStoreService"
+            "resourceProviderName" = "stf_store_service"
         }
-
+        "stf_authentication_service" = @{
+            "resourceApi"          = "Get-STFAuthenticationService"
+            "resourceProviderName" = "stf_authentication_service"
+        }
+        "stf_webreceiver_service" = @{
+            "resourceApi"          = "Get-STFWebReceiverService"
+            "resourceProviderName" = "stf_webreceiver_service"
+        }
+    }
+    $script:cvadResourcesMap = @{}
+    $script:cvadSiteIdArray = New-Object System.Collections.ArrayList
+    # Fetch all deployment first
+    $deployment = Get-ImportMap -resourceApi "Get-STFDeployment" -resourceProviderName "stf_deployment"
+    $script:cvadResourcesMap["stf_deployment"]  = $deployment[1..($deployment.Length - 1)][0]
+    foreach($siteId in $script:cvadSiteIdArray) {
+        #iterate through all resources
+        foreach ($resource in $resources.Keys) {
+            if($resource -eq "stf_deployment"){
+                continue
+            }
+            $api = $resources[$resource].resourceApi
+            $resourceProviderName = $resources[$resource].resourceProviderName
+            
+            # Create resource hash map for each resource
+            $script:cvadResourcesMap[$resource] = Get-ImportMap -resourceApi $api -resourceProviderName $resourceProviderName -parentId $siteId
+        }
     }
 }
 
@@ -316,6 +360,7 @@ function PostProcessProviderConfig {
 $script:computerName = $StorefrontHostname
 $script:adUsername = $ADAdminUsername
 $script:adPassword = $ADAdminPassword
+$script:disableSSL = $DisableSSLValidation
 
 # Set environment variables for client secret
 $env:CITRIX_CLIENT_SECRET = $ClientSecret

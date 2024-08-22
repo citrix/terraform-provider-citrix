@@ -24,7 +24,7 @@ type AwsWorkspacesAccountDataSourceModel struct {
 
 func (AwsWorkspacesAccountDataSourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "DaaS Quick Deploy - AWS Workspaces Core --- Data source to get details of an AWS Workspaces account.",
+		Description: "DaaS Quick Deploy - AWS WorkSpaces Core --- Data source to get details of an AWS WorkSpaces account.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the account.",

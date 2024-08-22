@@ -444,10 +444,12 @@ resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
 - `is_power_managed` (Boolean) Specify if the machines in the machine catalog will be power managed.
 - `is_remote_pc` (Boolean) Specify if this catalog is for Remote PC access.
 - `machine_accounts` (Attributes List) Machine accounts to add to the catalog. Only to be used when using `provisioning_type = MANUAL` (see [below for nested schema](#nestedatt--machine_accounts))
+- `machine_catalog_folder_path` (String) The path to the folder in which the machine catalog is located.
 - `minimum_functional_level` (String) Specifies the minimum functional level for the VDA machines in the catalog. Defaults to `L7_20`.
 - `provisioning_scheme` (Attributes) Machine catalog provisioning scheme. Required when `provisioning_type = MCS` or `provisioning_type = PVS_STREAMING`. (see [below for nested schema](#nestedatt--provisioning_scheme))
 - `remote_pc_ous` (Attributes List) Organizational Units to be included in the Remote PC machine catalog. Only to be used when `is_remote_pc = true`. For adding machines, use `machine_accounts`. (see [below for nested schema](#nestedatt--remote_pc_ous))
 - `scopes` (Set of String) The IDs of the scopes for the machine catalog to be a part of.
+- `tenants` (Set of String) A set of identifiers of tenants to associate with the machine catalog.
 - `vda_upgrade_type` (String) Type of Vda Upgrade. Choose between LTSR and CR. When omitted, Vda Upgrade is disabled.
 
 ### Read-Only

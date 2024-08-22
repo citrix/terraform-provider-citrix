@@ -126,7 +126,6 @@ func (NutanixHypervisorResourceModel) GetSchema() schema.Schema {
 				Computed:    true,
 				Default:     setdefault.StaticValue(types.SetValueMust(types.StringType, []attr.Value{})),
 				Validators: []validator.Set{
-					setvalidator.SizeAtLeast(1),
 					setvalidator.ValueStringsAre(
 						validator.String(
 							stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),

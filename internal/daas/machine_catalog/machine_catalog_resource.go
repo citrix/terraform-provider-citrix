@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -105,7 +106,8 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 	}
 
 	// Get the new catalog
-	catalog, err := util.GetMachineCatalog(ctx, r.client, &resp.Diagnostics, plan.Name.ValueString(), true)
+	machineCatalogPath := strings.ReplaceAll(plan.MachineCatalogFolderPath.ValueString(), "\\", "|") + plan.Name.ValueString()
+	catalog, err := util.GetMachineCatalog(ctx, r.client, &resp.Diagnostics, machineCatalogPath, true)
 
 	if err != nil {
 		return
@@ -841,6 +843,27 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 
 	if r.client != nil && r.client.ApiClient == nil {
 		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
+
+	var plan MachineCatalogResourceModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	create := req.State.Raw.IsNull()
+	operation := "updating"
+	if create {
+		operation = "creating"
+	}
+
+	if !r.client.ClientConfig.IsCspCustomer && !plan.Tenants.IsNull() {
+		resp.Diagnostics.AddError(
+			"Error "+operation+" Machine Catalog "+plan.Name.ValueString(),
+			"`tenants` attribute can only be set for Citrix Service Provider customer.",
+		)
 		return
 	}
 }

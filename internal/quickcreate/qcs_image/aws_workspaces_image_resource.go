@@ -95,22 +95,22 @@ func (r *awsWorkspacesImageResource) Create(ctx context.Context, req resource.Cr
 	importImageRequest := r.client.QuickCreateClient.ImageQCS.ImportImageAsync(ctx, r.client.ClientConfig.CustomerId, plan.AccountId.ValueString())
 	importImageRequest = importImageRequest.Body(importImageBody)
 
-	// Import new AWS Workspaces Image
+	// Import new AWS WorkSpaces Image
 	importImageResponse, httpResp, err := citrixdaasclient.AddRequestData(importImageRequest, r.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error importing AWS Workspaces Image: "+plan.Name.ValueString(),
+			"Error importing AWS WorkSpaces Image: "+plan.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadQcsClientError(err),
 		)
 		return
 	}
 
-	// Try getting the new AWS Workspaces Image
+	// Try getting the new AWS WorkSpaces Image
 	image, httpResp, err := waitForImageImportCompletion(ctx, r.client, &resp.Diagnostics, importImageResponse)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error getting AWS Workspaces Image: "+plan.Name.ValueString(),
+			"Error getting AWS WorkSpaces Image: "+plan.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadQcsClientError(err),
 		)
@@ -118,7 +118,7 @@ func (r *awsWorkspacesImageResource) Create(ctx context.Context, req resource.Cr
 	}
 	if image.GetWorkspaceImageState() != citrixquickcreate.AWSEDCWORKSPACEIMAGESTATE_AVAILABLE {
 		resp.Diagnostics.AddError(
-			"Error importing AWS Workspaces Image: "+plan.Name.ValueString(),
+			"Error importing AWS WorkSpaces Image: "+plan.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: Image state is "+util.AwsEdcWorkspaceImageStateEnumToString(image.GetWorkspaceImageState()),
 		)
@@ -147,7 +147,7 @@ func (r *awsWorkspacesImageResource) Read(ctx context.Context, req resource.Read
 		return
 	}
 
-	// Try getting the AWS Workspaces Image
+	// Try getting the AWS WorkSpaces Image
 	image, _, err := getAwsWorkspacesImageWithId(ctx, r.client, &resp.Diagnostics, state.AccountId.ValueString(), state.Id.ValueString(), true)
 	if err != nil {
 		// Remove from state
@@ -171,8 +171,8 @@ func (r *awsWorkspacesImageResource) Update(ctx context.Context, req resource.Up
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	resp.Diagnostics.AddError(
-		"Error updating AWS Workspaces Image",
-		"Update operation is not supported for AWS Workspaces Image",
+		"Error updating AWS WorkSpaces Image",
+		"Update operation is not supported for AWS WorkSpaces Image",
 	)
 }
 
@@ -188,13 +188,13 @@ func (r *awsWorkspacesImageResource) Delete(ctx context.Context, req resource.De
 		return
 	}
 
-	// Delete AWS Workspaces Image
+	// Delete AWS WorkSpaces Image
 	deleteImageRequest := r.client.QuickCreateClient.ImageQCS.RemoveImageAsync(ctx, r.client.ClientConfig.CustomerId, state.AccountId.ValueString(), state.Id.ValueString())
 	httpResp, err := r.client.QuickCreateClient.ImageQCS.RemoveImageAsyncExecute(deleteImageRequest)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error removing AWS Workspaces Image: "+state.Name.ValueString(),
+			"Error removing AWS WorkSpaces Image: "+state.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadQcsClientError(err),
 		)
@@ -249,13 +249,13 @@ func getAwsWorkspacesImageWithId(ctx context.Context, client *citrixdaasclient.C
 	if err != nil {
 		if addWarningIfNotFound && httpResp.StatusCode == http.StatusNotFound {
 			diagnostics.AddWarning(
-				fmt.Sprintf("AWS Workspaces Image with ID: %s not found", imageId),
-				fmt.Sprintf("AWS Workspaces Image with ID: %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", imageId),
+				fmt.Sprintf("AWS WorkSpaces Image with ID: %s not found", imageId),
+				fmt.Sprintf("AWS WorkSpaces Image with ID: %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", imageId),
 			)
 			return nil, httpResp, err
 		}
 		diagnostics.AddError(
-			"Error getting AWS Workspaces Image: "+imageId,
+			"Error getting AWS WorkSpaces Image: "+imageId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadQcsClientError(err),
 		)

@@ -163,6 +163,9 @@ const SensitiveFieldMaskedValue = "*****"
 const ProviderInitializationErrorMsg = "Provider initialization error"
 const MissingProviderClientIdAndSecretErrorMsg = "client_id and client_secret fields must be set in the provider configuration to manage this resource via terraform."
 
+const CitrixGatewayConnections = "Citrix Gateway connections"
+const NonCitrixGatewayConnections = "Non-Citrix Gateway Connections"
+
 var PlatformSettingsAssignedTo = []string{"AllUsersNoAuthentication"}
 
 // Terraform model for name value string pair
@@ -522,7 +525,7 @@ func WaitForQcsDeploymentTaskWithDiags(ctx context.Context, diagnostics *diag.Di
 	task, httpResp, err := PollQcsTask(ctx, client, diagnostics, taskId, 10, maxWaitTimeInSeconds)
 	if err != nil {
 		diagnostics.AddError(
-			fmt.Sprintf("Error %s AWS Workspaces Deployment: %s", errorContext, deploymentName),
+			fmt.Sprintf("Error %s AWS WorkSpaces Deployment: %s", errorContext, deploymentName),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+ReadClientError(err),
 		)
@@ -530,7 +533,7 @@ func WaitForQcsDeploymentTaskWithDiags(ctx context.Context, diagnostics *diag.Di
 	}
 	if task.DeploymentTask.GetTaskState() != citrixquickcreate.TASKSTATE_COMPLETED {
 		diagnostics.AddError(
-			fmt.Sprintf("Error %s AWS Workspaces Deployment: %s", errorContext, deploymentName),
+			fmt.Sprintf("Error %s AWS WorkSpaces Deployment: %s", errorContext, deploymentName),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				fmt.Sprintf("\nError message: %s was not completed. It has state: %s", taskName, TaskStateEnumToString(task.DeploymentTask.GetTaskState())),
 		)
@@ -570,6 +573,24 @@ func GetOrchestrationNetworkMappingKey(remote citrixorchestration.NetworkMapResp
 
 func GetOrchestrationRemotePcOuKey(remote citrixorchestration.RemotePCEnrollmentScopeResponseModel) string {
 	return remote.GetOU()
+}
+
+func GetOrchestrationSmartAccessTagKey(remote citrixorchestration.SmartAccessTagResponseModel) string {
+	return remote.GetFarm() + remote.GetFilter()
+}
+
+func GetOrchestrationAccessPolicyKey(remote citrixorchestration.AdvancedAccessPolicyResponseModel) string {
+	if remote.GetIsBuiltIn() {
+		if remote.GetAllowedConnection() == citrixorchestration.ALLOWEDCONNECTION_VIA_AG {
+			return CitrixGatewayConnections
+		}
+
+		if remote.GetAllowedConnection() == citrixorchestration.ALLOWEDCONNECTION_NOT_VIA_AG {
+			return NonCitrixGatewayConnections
+		}
+	}
+
+	return remote.GetName()
 }
 
 func GetSTFGroupMemberKey(remote citrixstorefront.STFGroupMemberResponseModel) string {
@@ -1211,8 +1232,8 @@ func PollQcsTask(ctx context.Context, client *citrixdaasclient.CitrixDaasClient,
 			)
 			return nil, httpResp, err
 		} else if taskResponse != nil &&
-			(taskResponse.ResourceConnectionTask.GetTaskState() == citrixquickcreate.TASKSTATE_ERROR ||
-				taskResponse.DeploymentTask.GetTaskState() == citrixquickcreate.TASKSTATE_ERROR) {
+			((taskResponse.ResourceConnectionTask != nil && taskResponse.ResourceConnectionTask.GetTaskState() == citrixquickcreate.TASKSTATE_ERROR) ||
+				(taskResponse.DeploymentTask != nil && taskResponse.DeploymentTask.GetTaskState() == citrixquickcreate.TASKSTATE_ERROR)) {
 			diagnostics.AddError(
 				"Task failed: "+taskId,
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
@@ -1220,8 +1241,8 @@ func PollQcsTask(ctx context.Context, client *citrixdaasclient.CitrixDaasClient,
 			)
 			return nil, httpResp, err
 		} else if taskResponse != nil &&
-			(taskResponse.ResourceConnectionTask.GetTaskState() == citrixquickcreate.TASKSTATE_COMPLETED ||
-				taskResponse.DeploymentTask.GetTaskState() == citrixquickcreate.TASKSTATE_COMPLETED) {
+			((taskResponse.ResourceConnectionTask != nil && taskResponse.ResourceConnectionTask.GetTaskState() == citrixquickcreate.TASKSTATE_COMPLETED) ||
+				(taskResponse.DeploymentTask != nil && taskResponse.DeploymentTask.GetTaskState() == citrixquickcreate.TASKSTATE_COMPLETED)) {
 			return taskResponse, httpResp, nil
 		}
 

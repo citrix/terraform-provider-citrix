@@ -78,7 +78,7 @@ func TestAWSWorkspacesUserCoupledDeploymentResource(t *testing.T) {
 				ResourceName:            "citrix_quickcreate_aws_workspaces_deployment.test_aws_workspaces_deployment",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{},
+				ImportStateVerifyIgnore: []string{"scale_settings", "workspaces"},
 				SkipFunc:                skipForOnPrem(isOnPremises),
 			},
 
@@ -172,7 +172,7 @@ func TestAWSWorkspacesUserDecoupledDeploymentResource(t *testing.T) {
 				ResourceName:            "citrix_quickcreate_aws_workspaces_deployment.test_aws_workspaces_deployment",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{},
+				ImportStateVerifyIgnore: []string{"scale_settings", "workspaces"},
 				SkipFunc:                skipForOnPrem(isOnPremises),
 			},
 

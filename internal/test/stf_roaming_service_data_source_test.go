@@ -28,11 +28,16 @@ func TestSTFRoamingServiceDataSource(t *testing.T) {
 		},
 		Steps: []resource.TestStep{
 			{
-				Config: BuildSTFDeploymentResource(t, testSTFDeploymentResources, siteId),
+				Config: composeTestResourceTf(
+					BuildSTFDeploymentResource(t, testSTFDeploymentResources, siteId),
+				),
 			},
 			// Read testing using site_id
 			{
-				Config: BuildSTFRoamingServiceDataSource(t, stf_roaming_service_test_data_source),
+				Config: composeTestResourceTf(
+					BuildSTFDeploymentResource(t, testSTFDeploymentResources, siteId),
+					BuildSTFRoamingServiceDataSource(t, stf_roaming_service_test_data_source),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the Site ID of the StoreFront Roaming Service
 					resource.TestCheckResourceAttr("data.citrix_stf_roaming_service.test_stf_roaming_service", "site_id", siteId),
@@ -47,7 +52,7 @@ func TestSTFRoamingServiceDataSource(t *testing.T) {
 func BuildSTFRoamingServiceDataSource(t *testing.T, roamingService string) string {
 	siteId := os.Getenv("TEST_STF_SITE_ID")
 
-	return BuildSTFDeploymentResource(t, testSTFDeploymentResources, siteId) + fmt.Sprintf(roamingService, siteId)
+	return fmt.Sprintf(roamingService, siteId)
 }
 
 var (

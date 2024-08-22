@@ -4,8 +4,11 @@ package application
 
 import (
 	"context"
+	"encoding/base64"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -66,7 +69,29 @@ func (r *applicationIconResource) Create(ctx context.Context, req resource.Creat
 
 	// Generate API request body from plan
 	var createApplicationIconRequest citrixorchestration.AddIconRequestModel
-	createApplicationIconRequest.SetRawData(plan.RawData.ValueString())
+	if !plan.RawData.IsNull() {
+		createApplicationIconRequest.SetRawData(plan.RawData.ValueString())
+	} else {
+		bytes, err := os.ReadFile(plan.FilePath.ValueString())
+		if err != nil {
+			if os.IsPermission(err) {
+				resp.Diagnostics.AddError(
+					"Error reading icon file",
+					"Permission denied to read icon file: "+plan.FilePath.ValueString()+
+						"\nError message: "+err.Error(),
+				)
+				return
+			}
+			resp.Diagnostics.AddError(
+				"Error reading file",
+				err.Error(),
+			)
+			return
+		}
+		base64String := base64.StdEncoding.EncodeToString(bytes)
+		createApplicationIconRequest.SetRawData(base64String)
+	}
+
 	// Set default icon format to 32x32x24 png format
 	createApplicationIconRequest.SetIconFormat("image/png;32x32x24")
 
@@ -177,6 +202,14 @@ func (r *applicationIconResource) ValidateConfig(ctx context.Context, req resour
 	diags := req.Config.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if !data.FilePath.IsNull() && !strings.HasSuffix(strings.ToLower(data.FilePath.ValueString()), ".ico") {
+		resp.Diagnostics.AddError(
+			"Invalid file format",
+			"Only `.ico` icon file format is supported",
+		)
 		return
 	}
 

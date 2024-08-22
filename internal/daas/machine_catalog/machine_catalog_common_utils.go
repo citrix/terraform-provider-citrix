@@ -82,6 +82,13 @@ func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ct
 	}
 	body.SetMinimumFunctionalLevel(*functionalLevel)
 
+	body.SetAdminFolder(plan.MachineCatalogFolderPath.ValueString())
+
+	if !plan.Tenants.IsNull() {
+		associatedTenants := util.StringSetToStringArray(ctx, diagnostics, plan.Tenants)
+		body.SetTenants(associatedTenants)
+	}
+
 	if !plan.Scopes.IsNull() {
 		plannedScopes := util.StringSetToStringArray(ctx, diagnostics, plan.Scopes)
 		body.SetScopes(plannedScopes)
@@ -149,6 +156,13 @@ func getRequestModelForUpdateMachineCatalog(plan MachineCatalogResourceModel, ct
 	}
 	body.SetMinimumFunctionalLevel(*functionalLevel)
 
+	body.SetAdminFolder(plan.MachineCatalogFolderPath.ValueString())
+
+	if !plan.Tenants.IsNull() {
+		associatedTenants := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Tenants)
+		body.SetTenants(associatedTenants)
+	}
+
 	if !plan.Scopes.IsNull() {
 		plannedScopes := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes)
 		body.SetScopes(plannedScopes)
@@ -157,7 +171,7 @@ func getRequestModelForUpdateMachineCatalog(plan MachineCatalogResourceModel, ct
 	provisioningType, err := citrixorchestration.NewProvisioningTypeFromValue(plan.ProvisioningType.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error creating Machine Catalog",
+			"Error updating Machine Catalog",
 			"Unsupported provisioning type.",
 		)
 

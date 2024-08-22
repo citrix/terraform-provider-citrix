@@ -5,7 +5,7 @@ This automation script is designed to onboard an existing site to Terraform. It 
 ## Environment Requirements
 
 - PowerShell version `5.0` or higher
-- Citrix Provider version `0.5.2` or higher
+- Citrix Provider version `1.0.1` or higher
 - For On-Premises Customers: CVAD DDC `version 2311` or newer.
 
 ## Workflow:
@@ -57,7 +57,7 @@ This automation script is designed to onboard an existing site to Terraform. It 
     - `Environment`: 
       - For Citrix Cloud customers **only** (Optional): Your Citrix Cloud environment. The available options are `Production` and `Staging`. The default value is `Production`.
     - `SetDependencyRelationship` (Switch): Add this switch to create dependency relationships between resources by replacing resouce ID with resource references.
-    - `DisableSSLValidation` (Switch): 
+    - `DisableSSLValidation` (Switch):
       - For Citrix on-premises customers **only**: Add this switch to disable SSL validation on both the PowerShell session and the provider client. SSL validation has to be disabled for this script to work if your on-premises DDC does not have a valid SSL certificate.
 
 7. Wait for the script to complete. The execution time will depend on the complexity of the onboarding process and the resources being imported.

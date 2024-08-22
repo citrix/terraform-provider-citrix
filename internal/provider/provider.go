@@ -26,6 +26,8 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_role"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_user"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/application"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/bearer_token"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/cvad_site"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/storefront_server"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/vda"
 	"github.com/citrix/terraform-provider-citrix/internal/quickcreate/qcs_account"
@@ -39,6 +41,7 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_store"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_webreceiver"
 
+	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_folder"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_scope"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/delivery_group"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/hypervisor"
@@ -100,9 +103,10 @@ type cvadConfig struct {
 }
 
 type storefrontConfig struct {
-	ComputerName    types.String `tfsdk:"computer_name"`
-	ADadminUserName types.String `tfsdk:"ad_admin_username"`
-	AdAdminPassword types.String `tfsdk:"ad_admin_password"`
+	ComputerName           types.String `tfsdk:"computer_name"`
+	ADadminUserName        types.String `tfsdk:"ad_admin_username"`
+	AdAdminPassword        types.String `tfsdk:"ad_admin_password"`
+	DisableSslVerification types.Bool   `tfsdk:"disable_ssl_verification"`
 }
 
 // Metadata returns the provider type name.
@@ -194,6 +198,13 @@ func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 							"Only applicable for Citrix on-premises customers. Use this to specify AD admin password" + "<br />" +
 							"Can be set via Environment Variable **SF_AD_ADMIN_PASSWORD**.",
 						Required: true,
+					},
+					"disable_ssl_verification": schema.BoolAttribute{
+						Description: "Disable SSL verification against the target storefront server. " + "<br />" +
+							"Only applicable to customers connecting to storefront server remotely. Customers should omit this option when running storefront provider locally. Set to true to skip SSL verification only when the target DDC does not have a valid SSL certificate issued by a trusted CA. " + "<br />" +
+							"When set to true, please make sure that your provider storefront_remote_host is set for a known storefront hostname. " + "<br />" +
+							"Can be set via Environment Variable **SF_DISABLE_SSL_VERIFICATION**.",
+						Optional: true,
 					},
 				},
 			},
@@ -354,6 +365,7 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	storefront_computer_name := os.Getenv("SF_COMPUTER_NAME")
 	storefront_ad_admin_username := os.Getenv("SF_AD_ADMIN_USERNAME")
 	storefront_ad_admin_password := os.Getenv("SF_AD_ADMIN_PASSWORD")
+	storefront_disable_ssl_verification := strings.EqualFold(os.Getenv("SF_DISABLE_SSL_VERIFICATION"), "true")
 
 	// If practitioner provide a storefront configuration
 	if storefront_computer_name != "" || storefront_ad_admin_username != "" || storefront_ad_admin_password != "" || config.StoreFrontRemoteHost != nil {
@@ -367,8 +379,11 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 			if !config.StoreFrontRemoteHost.AdAdminPassword.IsNull() {
 				storefront_ad_admin_password = config.StoreFrontRemoteHost.AdAdminPassword.ValueString()
 			}
+			if !config.StoreFrontRemoteHost.DisableSslVerification.IsNull() {
+				storefront_disable_ssl_verification = config.StoreFrontRemoteHost.DisableSslVerification.ValueBool()
+			}
 		}
-		client.NewStoreFrontClient(ctx, storefront_computer_name, storefront_ad_admin_username, storefront_ad_admin_password)
+		client.NewStoreFrontClient(ctx, storefront_computer_name, storefront_ad_admin_username, storefront_ad_admin_password, storefront_disable_ssl_verification)
 	}
 
 	// Initialize cvad client
@@ -675,8 +690,11 @@ func (p *citrixProvider) DataSources(_ context.Context) []func() datasource.Data
 		delivery_group.NewDeliveryGroupDataSource,
 		vda.NewVdaDataSource,
 		application.NewApplicationDataSourceSource,
+		admin_folder.NewAdminFolderDataSource,
 		admin_scope.NewAdminScopeDataSource,
 		machine_catalog.NewPvsDataSource,
+		bearer_token.NewBearerTokenDataSource,
+		cvad_site.NewSiteDataSource,
 		// StoreFront DataSources
 		stf_roaming.NewSTFRoamingServiceDataSource,
 		// QuickCreate DataSources
@@ -709,11 +727,11 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		delivery_group.NewDeliveryGroupResource,
 		storefront_server.NewStoreFrontServerResource,
 		application.NewApplicationResource,
-		application.NewApplicationFolderResource,
 		application.NewApplicationGroupResource,
 		application.NewApplicationIconResource,
-		admin_scope.NewAdminScopeResource,
+		admin_folder.NewAdminFolderResource,
 		admin_role.NewAdminRoleResource,
+		admin_scope.NewAdminScopeResource,
 		policies.NewPolicySetResource,
 		admin_user.NewAdminUserResource,
 		gac_settings.NewAGacSettingsResource,

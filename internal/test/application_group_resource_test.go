@@ -27,7 +27,7 @@ func TestApplicationGroupResource(t *testing.T) {
 			TestHypervisorResourcePoolPreCheck_Azure(t)
 			TestMachineCatalogPreCheck_Azure(t)
 			TestDeliveryGroupPreCheck(t)
-			TestApplicationFolderPreCheck(t)
+			TestAdminFolderPreCheck(t)
 			TestApplicationGroupResourcePreCheck(t)
 		},
 		Steps: []resource.TestStep{
@@ -63,7 +63,7 @@ func TestApplicationGroupResource(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildApplicationGroupResource(t, testApplicationGroupResource_updated),
-					BuildApplicationFolderResource(t, testApplicationFolderResource_updated),
+					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
 					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),

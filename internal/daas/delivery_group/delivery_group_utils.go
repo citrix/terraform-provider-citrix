@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 type AssociatedMachineCatalogProperties struct {
@@ -117,8 +119,8 @@ func sessionHostingActionEnumValidator() validator.String {
 	return util.GetValidatorFromEnum(citrixorchestration.AllowedSessionChangeHostingActionEnumValues)
 }
 
-func validatePowerManagementSettings(ctx context.Context, diags *diag.Diagnostics, plan DeliveryGroupResourceModel, sessionSupport citrixorchestration.SessionSupport) (bool, string) {
-	if plan.AutoscaleSettings.IsNull() || sessionSupport == citrixorchestration.SESSIONSUPPORT_SINGLE_SESSION {
+func validatePowerManagementSettings(ctx context.Context, diags *diag.Diagnostics, plan DeliveryGroupResourceModel, allocationType citrixorchestration.AllocationType, sessionSupport citrixorchestration.SessionSupport) (bool, string) {
+	if plan.AutoscaleSettings.IsNull() || allocationType == citrixorchestration.ALLOCATIONTYPE_STATIC {
 		return true, ""
 	}
 	autoscale := util.ObjectValueToTypedObject[DeliveryGroupPowerManagementSettings](ctx, diags, plan.AutoscaleSettings)
@@ -129,40 +131,58 @@ func validatePowerManagementSettings(ctx context.Context, diags *diag.Diagnostic
 		return false, "PeakLogOffAction " + errStringSuffix
 	}
 
+	if autoscale.PeakLogOffTimeoutMinutes.ValueInt64() != 0 {
+		return false, "PeakLogOffTimeoutMinutes " + errStringSuffix
+	}
+
 	if autoscale.OffPeakLogOffAction.ValueString() != "Nothing" {
 		return false, "OffPeakLogOffAction " + errStringSuffix
 	}
 
-	if autoscale.PeakDisconnectAction.ValueString() != "Nothing" {
-		return false, "PeakDisconnectAction " + errStringSuffix
+	if autoscale.OffPeakLogOffTimeoutMinutes.ValueInt64() != 0 {
+		return false, "OffPeakLogOffTimeoutMinutes " + errStringSuffix
 	}
 
-	if autoscale.PeakExtendedDisconnectAction.ValueString() != "Nothing" {
-		return false, "PeakDisconnectTimeoutMinutes " + errStringSuffix
+	if autoscale.PeakAutoscaleAssignedPowerOnIdleAction.ValueString() != "Nothing" {
+		return false, "PeakAutoscaleAssignedPowerOnIdleAction " + errStringSuffix
 	}
 
-	if autoscale.OffPeakDisconnectAction.ValueString() != "Nothing" {
-		return false, "OffPeakDisconnectAction " + errStringSuffix
+	if autoscale.PeakAutoscaleAssignedPowerOnIdleTimeoutMinutes.ValueInt64() != 0 {
+		return false, "PeakAutoscaleAssignedPowerOnIdleTimeoutMinutes " + errStringSuffix
 	}
 
-	if autoscale.OffPeakExtendedDisconnectAction.ValueString() != "Nothing" {
-		return false, "OffPeakDisconnectTimeoutMinutes " + errStringSuffix
-	}
+	if sessionSupport == citrixorchestration.SESSIONSUPPORT_MULTI_SESSION {
+		if autoscale.PeakDisconnectAction.ValueString() != "Nothing" {
+			return false, "PeakDisconnectAction " + errStringSuffix
+		}
 
-	if autoscale.PeakDisconnectTimeoutMinutes.ValueInt64() != 0 {
-		return false, "PeakDisconnectTimeoutMinutes " + errStringSuffix
-	}
+		if autoscale.PeakExtendedDisconnectAction.ValueString() != "Nothing" {
+			return false, "PeakDisconnectTimeoutMinutes " + errStringSuffix
+		}
 
-	if autoscale.PeakExtendedDisconnectTimeoutMinutes.ValueInt64() != 0 {
-		return false, "PeakExtendedDisconnectTimeoutMinutes " + errStringSuffix
-	}
+		if autoscale.OffPeakDisconnectAction.ValueString() != "Nothing" {
+			return false, "OffPeakDisconnectAction " + errStringSuffix
+		}
 
-	if autoscale.OffPeakDisconnectTimeoutMinutes.ValueInt64() != 0 {
-		return false, "OffPeakDisconnectTimeoutMinutes " + errStringSuffix
-	}
+		if autoscale.OffPeakExtendedDisconnectAction.ValueString() != "Nothing" {
+			return false, "OffPeakDisconnectTimeoutMinutes " + errStringSuffix
+		}
 
-	if autoscale.OffPeakExtendedDisconnectTimeoutMinutes.ValueInt64() != 0 {
-		return false, "OffPeakExtendedDisconnectTimeoutMinutes " + errStringSuffix
+		if autoscale.PeakDisconnectTimeoutMinutes.ValueInt64() != 0 {
+			return false, "PeakDisconnectTimeoutMinutes " + errStringSuffix
+		}
+
+		if autoscale.PeakExtendedDisconnectTimeoutMinutes.ValueInt64() != 0 {
+			return false, "PeakExtendedDisconnectTimeoutMinutes " + errStringSuffix
+		}
+
+		if autoscale.OffPeakDisconnectTimeoutMinutes.ValueInt64() != 0 {
+			return false, "OffPeakDisconnectTimeoutMinutes " + errStringSuffix
+		}
+
+		if autoscale.OffPeakExtendedDisconnectTimeoutMinutes.ValueInt64() != 0 {
+			return false, "OffPeakExtendedDisconnectTimeoutMinutes " + errStringSuffix
+		}
 	}
 
 	return true, ""
@@ -700,9 +720,11 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 		body.SetTimeZone(autoscale.Timezone.ValueString())
 		body.SetPeakDisconnectTimeoutMinutes(int32(autoscale.PeakDisconnectTimeoutMinutes.ValueInt64()))
 		body.SetPeakLogOffAction(getSessionChangeHostingActionValue(autoscale.PeakLogOffAction.ValueString()))
+		body.SetPeakLogOffTimeoutMinutes(int32(autoscale.PeakLogOffTimeoutMinutes.ValueInt64()))
 		body.SetPeakDisconnectAction(getSessionChangeHostingActionValue(autoscale.PeakDisconnectAction.ValueString()))
 		body.SetPeakExtendedDisconnectAction(getSessionChangeHostingActionValue(autoscale.PeakExtendedDisconnectAction.ValueString()))
 		body.SetOffPeakLogOffAction(getSessionChangeHostingActionValue(autoscale.OffPeakLogOffAction.ValueString()))
+		body.SetOffPeakLogOffTimeoutMinutes(int32(autoscale.OffPeakLogOffTimeoutMinutes.ValueInt64()))
 		body.SetOffPeakDisconnectAction(getSessionChangeHostingActionValue(autoscale.OffPeakDisconnectAction.ValueString()))
 		body.SetOffPeakExtendedDisconnectAction(getSessionChangeHostingActionValue(autoscale.OffPeakExtendedDisconnectAction.ValueString()))
 		body.SetPeakExtendedDisconnectTimeoutMinutes(int32(autoscale.PeakExtendedDisconnectTimeoutMinutes.ValueInt64()))
@@ -711,6 +733,8 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 		body.SetPeakBufferSizePercent(int32(autoscale.PeakBufferSizePercent.ValueInt64()))
 		body.SetOffPeakBufferSizePercent(int32(autoscale.OffPeakBufferSizePercent.ValueInt64()))
 		body.SetPowerOffDelayMinutes(int32(autoscale.PowerOffDelayMinutes.ValueInt64()))
+		body.SetPeakAutoscaleAssignedPowerOnIdleAction(getSessionChangeHostingActionValue(autoscale.PeakAutoscaleAssignedPowerOnIdleAction.ValueString()))
+		body.SetPeakAutoscaleAssignedPowerOnIdleTimeoutMinutes(int32(autoscale.PeakAutoscaleAssignedPowerOnIdleTimeoutMinutes.ValueInt64()))
 		body.SetDisconnectPeakIdleSessionAfterSeconds(int32(autoscale.DisconnectPeakIdleSessionAfterSeconds.ValueInt64()))
 		body.SetDisconnectOffPeakIdleSessionAfterSeconds(int32(autoscale.DisconnectOffPeakIdleSessionAfterSeconds.ValueInt64()))
 		body.SetLogoffPeakDisconnectedSessionAfterSeconds(int32(autoscale.LogoffPeakDisconnectedSessionAfterSeconds.ValueInt64()))
@@ -739,6 +763,13 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 		appProtectionModel := util.ObjectValueToTypedObject[DeliveryGroupAppProtection](ctx, diagnostics, plan.AppProtection)
 		body.SetAppProtectionKeyLoggingRequired(appProtectionModel.EnableAntiKeyLogging.ValueBool())
 		body.SetAppProtectionScreenCaptureRequired(appProtectionModel.EnableAntiScreenCapture.ValueBool())
+	}
+
+	body.SetAdminFolder(plan.DeliveryGroupFolderPath.ValueString())
+
+	if !plan.Tenants.IsNull() {
+		associatedTenants := util.StringSetToStringArray(ctx, diagnostics, plan.Tenants)
+		body.SetTenants(associatedTenants)
 	}
 
 	return body, nil
@@ -804,15 +835,71 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 	}
 
 	existingAdvancedAccessPolicies := currentDeliveryGroup.GetAdvancedAccessPolicy()
-	for _, existingAdvancedAccessPolicy := range existingAdvancedAccessPolicies {
-		var advancedAccessPolicyRequest citrixorchestration.AdvancedAccessPolicyRequestModel
-		advancedAccessPolicyRequest.SetId(existingAdvancedAccessPolicy.GetId())
-		advancedAccessPolicyRequest.SetIncludedUserFilterEnabled(includedUsersFilterEnabled)
-		advancedAccessPolicyRequest.SetIncludedUsers(includedUserIds)
-		advancedAccessPolicyRequest.SetExcludedUserFilterEnabled(excludedUsersFilterEnabled)
-		advancedAccessPolicyRequest.SetExcludedUsers(excludedUserIds)
-		advancedAccessPolicyRequest.SetAllowedUsers(allowedUser)
-		advancedAccessPolicies = append(advancedAccessPolicies, advancedAccessPolicyRequest)
+	existingAdvancedAccessPolicies = slices.DeleteFunc(existingAdvancedAccessPolicies, func(policy citrixorchestration.AdvancedAccessPolicyResponseModel) bool {
+		return !policy.GetIsBuiltIn()
+	})
+
+	if !plan.DefaultAccessPolicies.IsNull() {
+		defaultAccessPolicies := util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, diagnostics, plan.DefaultAccessPolicies)
+		for _, defaultAccessPolicy := range defaultAccessPolicies {
+			advancedAccessPolicyRequest, err := getAdvancedAccessPolicyRequestForDefaultPolicy(ctx, diagnostics, defaultAccessPolicy, existingAdvancedAccessPolicies)
+			if err != nil {
+				return citrixorchestration.EditDeliveryGroupRequestModel{}, err
+			}
+			advancedAccessPolicyRequest.SetIncludedUserFilterEnabled(includedUsersFilterEnabled)
+			advancedAccessPolicyRequest.SetIncludedUsers(includedUserIds)
+			advancedAccessPolicyRequest.SetExcludedUserFilterEnabled(excludedUsersFilterEnabled)
+			advancedAccessPolicyRequest.SetExcludedUsers(excludedUserIds)
+			advancedAccessPolicyRequest.SetAllowedUsers(allowedUser)
+			advancedAccessPolicyRequest.SetAppProtectionKeyLoggingRequired(false)
+			advancedAccessPolicyRequest.SetAppProtectionScreenCaptureRequired(false)
+			advancedAccessPolicies = append(advancedAccessPolicies, advancedAccessPolicyRequest)
+		}
+	} else {
+		for _, existingAdvancedAccessPolicy := range existingAdvancedAccessPolicies {
+			var advancedAccessPolicyRequest citrixorchestration.AdvancedAccessPolicyRequestModel
+			advancedAccessPolicyRequest.SetId(existingAdvancedAccessPolicy.GetId())
+			advancedAccessPolicyRequest.SetName(existingAdvancedAccessPolicy.GetName())
+			advancedAccessPolicyRequest.SetIncludedUserFilterEnabled(includedUsersFilterEnabled)
+			advancedAccessPolicyRequest.SetIncludedUsers(includedUserIds)
+			advancedAccessPolicyRequest.SetExcludedUserFilterEnabled(excludedUsersFilterEnabled)
+			advancedAccessPolicyRequest.SetExcludedUsers(excludedUserIds)
+			advancedAccessPolicyRequest.SetAllowedUsers(allowedUser)
+			advancedAccessPolicyRequest.SetAppProtectionKeyLoggingRequired(false)
+			advancedAccessPolicyRequest.SetAppProtectionScreenCaptureRequired(false)
+			advancedAccessPolicies = append(advancedAccessPolicies, advancedAccessPolicyRequest)
+		}
+	}
+
+	if !plan.CustomAccessPolicies.IsNull() {
+		accessPolicies := util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, diagnostics, plan.CustomAccessPolicies)
+		for _, accessPolicy := range accessPolicies {
+			advancedAccessPolicyRequest, err := getAdvancedAccessPolicyRequest(ctx, diagnostics, accessPolicy)
+			if err != nil {
+				return citrixorchestration.EditDeliveryGroupRequestModel{}, err
+			}
+			advancedAccessPolicyRequest.SetIncludedUserFilterEnabled(includedUsersFilterEnabled)
+			advancedAccessPolicyRequest.SetIncludedUsers(includedUserIds)
+			advancedAccessPolicyRequest.SetExcludedUserFilterEnabled(excludedUsersFilterEnabled)
+			advancedAccessPolicyRequest.SetExcludedUsers(excludedUserIds)
+			advancedAccessPolicyRequest.SetAllowedUsers(allowedUser)
+			advancedAccessPolicyRequest.SetAppProtectionKeyLoggingRequired(false)
+			advancedAccessPolicyRequest.SetAppProtectionScreenCaptureRequired(false)
+			advancedAccessPolicies = append(advancedAccessPolicies, advancedAccessPolicyRequest)
+		}
+	}
+
+	if !plan.AppProtection.IsNull() {
+		appProtection := util.ObjectValueToTypedObject[DeliveryGroupAppProtection](ctx, diagnostics, plan.AppProtection)
+		if !appProtection.ApplyContextually.IsNull() {
+			appProtectionApplyContextually := util.ObjectListToTypedArray[DeliveryGroupAppProtectionApplyContextuallyModel](ctx, diagnostics, appProtection.ApplyContextually)
+			for _, applyContextually := range appProtectionApplyContextually {
+				advancedAccessPolicies, err = setAppProtectionOnAdvancedAccessPolicies(diagnostics, applyContextually, advancedAccessPolicies, currentDeliveryGroup.GetName())
+				if err != nil {
+					return citrixorchestration.EditDeliveryGroupRequestModel{}, err
+				}
+			}
+		}
 	}
 
 	// Construct the update model
@@ -846,17 +933,21 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 		editDeliveryGroupRequestBody.SetAutoScaleEnabled(autoscale.AutoscaleEnabled.ValueBool())
 		editDeliveryGroupRequestBody.SetPeakDisconnectTimeoutMinutes(int32(autoscale.PeakDisconnectTimeoutMinutes.ValueInt64()))
 		editDeliveryGroupRequestBody.SetPeakLogOffAction(getSessionChangeHostingActionValue(autoscale.PeakLogOffAction.ValueString()))
+		editDeliveryGroupRequestBody.SetPeakLogOffTimeoutMinutes(int32(autoscale.PeakLogOffTimeoutMinutes.ValueInt64()))
 		editDeliveryGroupRequestBody.SetPeakDisconnectAction(getSessionChangeHostingActionValue(autoscale.PeakDisconnectAction.ValueString()))
 		editDeliveryGroupRequestBody.SetPeakExtendedDisconnectAction(getSessionChangeHostingActionValue(autoscale.PeakExtendedDisconnectAction.ValueString()))
 		editDeliveryGroupRequestBody.SetPeakExtendedDisconnectTimeoutMinutes(int32(autoscale.PeakExtendedDisconnectTimeoutMinutes.ValueInt64()))
 		editDeliveryGroupRequestBody.SetOffPeakDisconnectTimeoutMinutes(int32(autoscale.OffPeakDisconnectTimeoutMinutes.ValueInt64()))
 		editDeliveryGroupRequestBody.SetOffPeakLogOffAction(getSessionChangeHostingActionValue(autoscale.OffPeakLogOffAction.ValueString()))
+		editDeliveryGroupRequestBody.SetOffPeakLogOffTimeoutMinutes(int32(autoscale.OffPeakLogOffTimeoutMinutes.ValueInt64()))
 		editDeliveryGroupRequestBody.SetOffPeakDisconnectAction(getSessionChangeHostingActionValue(autoscale.OffPeakDisconnectAction.ValueString()))
 		editDeliveryGroupRequestBody.SetOffPeakExtendedDisconnectAction(getSessionChangeHostingActionValue(autoscale.OffPeakExtendedDisconnectAction.ValueString()))
 		editDeliveryGroupRequestBody.SetOffPeakExtendedDisconnectTimeoutMinutes(int32(autoscale.OffPeakExtendedDisconnectTimeoutMinutes.ValueInt64()))
 		editDeliveryGroupRequestBody.SetPeakBufferSizePercent(int32(autoscale.PeakBufferSizePercent.ValueInt64()))
 		editDeliveryGroupRequestBody.SetOffPeakBufferSizePercent(int32(autoscale.OffPeakBufferSizePercent.ValueInt64()))
 		editDeliveryGroupRequestBody.SetPowerOffDelayMinutes(int32(autoscale.PowerOffDelayMinutes.ValueInt64()))
+		editDeliveryGroupRequestBody.SetPeakAutoscaleAssignedPowerOnIdleAction(getSessionChangeHostingActionValue(autoscale.PeakAutoscaleAssignedPowerOnIdleAction.ValueString()))
+		editDeliveryGroupRequestBody.SetPeakAutoscaleAssignedPowerOnIdleTimeoutMinutes(int32(autoscale.PeakAutoscaleAssignedPowerOnIdleTimeoutMinutes.ValueInt64()))
 		editDeliveryGroupRequestBody.SetDisconnectPeakIdleSessionAfterSeconds(int32(autoscale.DisconnectPeakIdleSessionAfterSeconds.ValueInt64()))
 		editDeliveryGroupRequestBody.SetDisconnectOffPeakIdleSessionAfterSeconds(int32(autoscale.DisconnectOffPeakIdleSessionAfterSeconds.ValueInt64()))
 		editDeliveryGroupRequestBody.SetLogoffPeakDisconnectedSessionAfterSeconds(int32(autoscale.LogoffPeakDisconnectedSessionAfterSeconds.ValueInt64()))
@@ -894,6 +985,13 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 		appProtectionModel := util.ObjectValueToTypedObject[DeliveryGroupAppProtection](ctx, diagnostics, plan.AppProtection)
 		editDeliveryGroupRequestBody.SetAppProtectionKeyLoggingRequired(appProtectionModel.EnableAntiKeyLogging.ValueBool())
 		editDeliveryGroupRequestBody.SetAppProtectionScreenCaptureRequired(appProtectionModel.EnableAntiScreenCapture.ValueBool())
+	}
+
+	editDeliveryGroupRequestBody.SetAdminFolder(plan.DeliveryGroupFolderPath.ValueString())
+
+	if !plan.Tenants.IsNull() {
+		associatedTenants := util.StringSetToStringArray(ctx, diagnostics, plan.Tenants)
+		editDeliveryGroupRequestBody.SetTenants(associatedTenants)
 	}
 
 	return editDeliveryGroupRequestBody, nil
@@ -1114,6 +1212,71 @@ func (dgDesktop DeliveryGroupDesktop) RefreshListItem(ctx context.Context, diagn
 	return dgDesktop
 }
 
+func (dgAccessPolicy DeliveryGroupAccessPolicyModel) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicy citrixorchestration.AdvancedAccessPolicyResponseModel) util.ModelWithAttributes {
+	dgAccessPolicy.Id = types.StringValue(accessPolicy.GetId())
+
+	if accessPolicy.GetIsBuiltIn() {
+		if accessPolicy.GetAllowedConnection() == citrixorchestration.ALLOWEDCONNECTION_VIA_AG &&
+			!strings.EqualFold(dgAccessPolicy.Name.ValueString(), util.CitrixGatewayConnections) {
+			dgAccessPolicy.Name = types.StringValue(util.CitrixGatewayConnections)
+		}
+
+		if accessPolicy.GetAllowedConnection() == citrixorchestration.ALLOWEDCONNECTION_NOT_VIA_AG &&
+			!strings.EqualFold(dgAccessPolicy.Name.ValueString(), util.NonCitrixGatewayConnections) {
+			dgAccessPolicy.Name = types.StringValue(util.NonCitrixGatewayConnections)
+		}
+	} else if !strings.EqualFold(dgAccessPolicy.Name.ValueString(), accessPolicy.GetName()) {
+		dgAccessPolicy.Name = types.StringValue(accessPolicy.GetName())
+	}
+	dgAccessPolicy.Enabled = types.BoolValue(accessPolicy.GetEnabled())
+	dgAccessPolicy.AllowedConnection = types.StringValue(string(accessPolicy.GetAllowedConnection()))
+	dgAccessPolicy.EnableCriteriaForIncludeConnections = types.BoolValue(accessPolicy.GetIncludedSmartAccessFilterEnabled())
+	dgAccessPolicy.EnableCriteriaForExcludeConnections = types.BoolValue(accessPolicy.GetExcludedSmartAccessFilterEnabled())
+	dgAccessPolicy.IncludeCriteriaFilters = util.RefreshListValueProperties[DeliveryGroupAccessPolicyCriteriaTagsModel, citrixorchestration.SmartAccessTagResponseModel](ctx, diagnostics, dgAccessPolicy.IncludeCriteriaFilters, accessPolicy.GetIncludedSmartAccessTags(), util.GetOrchestrationSmartAccessTagKey)
+	dgAccessPolicy.ExcludeCriteriaFilters = util.RefreshListValueProperties[DeliveryGroupAccessPolicyCriteriaTagsModel, citrixorchestration.SmartAccessTagResponseModel](ctx, diagnostics, dgAccessPolicy.ExcludeCriteriaFilters, accessPolicy.GetExcludedSmartAccessTags(), util.GetOrchestrationSmartAccessTagKey)
+
+	if dgAccessPolicy.EnableCriteriaForIncludeConnections.ValueBool() {
+		dgAccessPolicy.IncludeConnectionsCriteriaType = types.StringValue(string(accessPolicy.GetIncludedSmartAccessFilterType()))
+	} else {
+		dgAccessPolicy.IncludeConnectionsCriteriaType = types.StringNull()
+	}
+
+	return dgAccessPolicy
+}
+
+func (dgAccessPolicyTags DeliveryGroupAccessPolicyCriteriaTagsModel) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicyTag citrixorchestration.SmartAccessTagResponseModel) util.ModelWithAttributes {
+	if !strings.EqualFold(dgAccessPolicyTags.FilterName.ValueString(), accessPolicyTag.GetFarm()) {
+		dgAccessPolicyTags.FilterName = types.StringValue(accessPolicyTag.GetFarm())
+	}
+	if !strings.EqualFold(dgAccessPolicyTags.FilterValue.ValueString(), accessPolicyTag.GetFilter()) {
+		dgAccessPolicyTags.FilterValue = types.StringValue(accessPolicyTag.GetFilter())
+	}
+
+	return dgAccessPolicyTags
+}
+
+func (dgAppProtectionApplyContextually DeliveryGroupAppProtectionApplyContextuallyModel) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicy citrixorchestration.AdvancedAccessPolicyResponseModel) util.ModelWithAttributes {
+	policyName := accessPolicy.GetName()
+	if accessPolicy.GetIsBuiltIn() {
+		policyName = dgAppProtectionApplyContextually.PolicyName.ValueString()
+		if accessPolicy.GetAllowedConnection() == citrixorchestration.ALLOWEDCONNECTION_VIA_AG &&
+			!strings.EqualFold(dgAppProtectionApplyContextually.PolicyName.ValueString(), util.CitrixGatewayConnections) {
+			policyName = util.CitrixGatewayConnections
+		}
+
+		if accessPolicy.GetAllowedConnection() == citrixorchestration.ALLOWEDCONNECTION_NOT_VIA_AG &&
+			!strings.EqualFold(dgAppProtectionApplyContextually.PolicyName.ValueString(), util.NonCitrixGatewayConnections) {
+			policyName = util.NonCitrixGatewayConnections
+		}
+	}
+
+	dgAppProtectionApplyContextually.PolicyName = types.StringValue(policyName)
+	dgAppProtectionApplyContextually.EnableAntiKeyLogging = types.BoolValue(accessPolicy.GetAppProtectionKeyLoggingRequired())
+	dgAppProtectionApplyContextually.EnableAntiScreenCapture = types.BoolValue(accessPolicy.GetAppProtectionScreenCaptureRequired())
+
+	return dgAppProtectionApplyContextually
+}
+
 func getFrequencyActionValue(v string) citrixorchestration.RebootScheduleFrequency {
 	frequency, err := citrixorchestration.NewRebootScheduleFrequencyFromValue(v)
 
@@ -1273,17 +1436,81 @@ func (r DeliveryGroupResourceModel) updatePlanWithDesktops(ctx context.Context, 
 	return r
 }
 
-func updateDeliveryGroupAndDesktopUsers(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, deliveryGroupDesktops *citrixorchestration.DesktopResponseModelCollection) (*citrixorchestration.DeliveryGroupDetailResponseModel, *citrixorchestration.DesktopResponseModelCollection, error) {
-	simpleAccessPolicy := deliveryGroup.GetSimpleAccessPolicy()
-	updatedIncludedUsers, updatedExcludedUsers, err := updateIdentityUserDetails(ctx, client, diagnostics, simpleAccessPolicy.GetIncludedUsers(), simpleAccessPolicy.GetExcludedUsers())
-	if err != nil {
-		return deliveryGroup, deliveryGroupDesktops, err
+func (r DeliveryGroupResourceModel) updatePlanWithAccessPolicies(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicies []citrixorchestration.AdvancedAccessPolicyResponseModel, isBuiltIn bool) DeliveryGroupResourceModel {
+	accessPolicies = slices.DeleteFunc(accessPolicies, func(policy citrixorchestration.AdvancedAccessPolicyResponseModel) bool {
+		return policy.GetIsBuiltIn() != isBuiltIn
+	})
+
+	stateAccessPolciies := r.CustomAccessPolicies
+	if isBuiltIn {
+		stateAccessPolciies = r.DefaultAccessPolicies
 	}
 
-	simpleAccessPolicy.SetIncludedUsers(updatedIncludedUsers)
-	simpleAccessPolicy.SetExcludedUsers(updatedExcludedUsers)
-	deliveryGroup.SetSimpleAccessPolicy(simpleAccessPolicy)
+	var accessPolicyModel basetypes.ListValue
+	if len(accessPolicies) < 1 {
+		accessPolicyModel = util.TypedArrayToObjectList[DeliveryGroupAccessPolicyModel](ctx, diagnostics, nil)
+	} else {
+		accessPolicyModel = util.RefreshListValueProperties[DeliveryGroupAccessPolicyModel, citrixorchestration.AdvancedAccessPolicyResponseModel](ctx, diagnostics, stateAccessPolciies, accessPolicies, util.GetOrchestrationAccessPolicyKey)
+	}
 
+	if isBuiltIn {
+		r.DefaultAccessPolicies = accessPolicyModel
+	} else {
+		r.CustomAccessPolicies = accessPolicyModel
+	}
+	return r
+}
+
+func (r DeliveryGroupResourceModel) updatePlanWithCustomAccessPolicies(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicies []citrixorchestration.AdvancedAccessPolicyResponseModel) DeliveryGroupResourceModel {
+	return r.updatePlanWithAccessPolicies(ctx, diagnostics, accessPolicies, false)
+}
+
+func (r DeliveryGroupResourceModel) updatePlanWithDefaultAccessPolicies(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicies []citrixorchestration.AdvancedAccessPolicyResponseModel) DeliveryGroupResourceModel {
+	if r.DefaultAccessPolicies.IsNull() {
+		return r
+	}
+	return r.updatePlanWithAccessPolicies(ctx, diagnostics, accessPolicies, true)
+}
+
+func (r DeliveryGroupResourceModel) updatePlanWithAppProtection(ctx context.Context, diagnostics *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel) DeliveryGroupResourceModel {
+	antiKeyLoggingEnabled := deliveryGroup.GetAppProtectionKeyLoggingRequired()
+	antiScreenCaptureEnabled := deliveryGroup.GetAppProtectionScreenCaptureRequired()
+	advancedAccessPolicies := slices.Clone(deliveryGroup.GetAdvancedAccessPolicy())
+
+	if antiKeyLoggingEnabled || antiScreenCaptureEnabled {
+		appProtectionModel := DeliveryGroupAppProtection{}
+		appProtectionModel.EnableAntiKeyLogging = types.BoolValue(antiKeyLoggingEnabled)
+		appProtectionModel.EnableAntiScreenCapture = types.BoolValue(antiScreenCaptureEnabled)
+
+		attributesMap, err := util.AttributeMapFromObject(DeliveryGroupAppProtectionApplyContextuallyModel{})
+		if err != nil {
+			diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
+			return r
+		}
+
+		appProtectionModel.ApplyContextually = types.ListNull(types.ObjectType{AttrTypes: attributesMap})
+		r.AppProtection = util.TypedObjectToObjectValue(ctx, diagnostics, appProtectionModel)
+	} else if checkIfAppProtectionAppliedContextually(advancedAccessPolicies) {
+		advancedAccessPolicies = slices.DeleteFunc(advancedAccessPolicies, func(policy citrixorchestration.AdvancedAccessPolicyResponseModel) bool {
+			return !policy.GetAppProtectionKeyLoggingRequired() && !policy.GetAppProtectionScreenCaptureRequired()
+		})
+		appProtection := util.ObjectValueToTypedObject[DeliveryGroupAppProtection](ctx, diagnostics, r.AppProtection)
+		appProtection.ApplyContextually = util.RefreshListValueProperties[DeliveryGroupAppProtectionApplyContextuallyModel, citrixorchestration.AdvancedAccessPolicyResponseModel](ctx, diagnostics, appProtection.ApplyContextually, advancedAccessPolicies, util.GetOrchestrationAccessPolicyKey)
+		appProtection.EnableAntiKeyLogging = types.BoolNull()
+		appProtection.EnableAntiScreenCapture = types.BoolNull()
+		r.AppProtection = util.TypedObjectToObjectValue(ctx, diagnostics, appProtection)
+	} else {
+		if attributes, err := util.AttributeMapFromObject(DeliveryGroupAppProtection{}); err == nil {
+			r.AppProtection = types.ObjectNull(attributes)
+		} else {
+			diagnostics.AddWarning("Error when creating null DeliveryGroupAppProtection", err.Error())
+		}
+	}
+
+	return r
+}
+
+func updateDeliveryGroupAndDesktopUsers(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, deliveryGroupDesktops *citrixorchestration.DesktopResponseModelCollection) (*citrixorchestration.DeliveryGroupDetailResponseModel, *citrixorchestration.DesktopResponseModelCollection, error) {
 	updatedDeliveryGroupDesktops := []citrixorchestration.DesktopResponseModel{}
 	for _, desktop := range deliveryGroupDesktops.GetItems() {
 		updatedIncludedUsers, updatedExcludedUsers, err := updateIdentityUserDetails(ctx, client, diagnostics, desktop.GetIncludedUsers(), desktop.GetExcludedUsers())
@@ -1348,13 +1575,18 @@ func updateIdentityUserDetails(ctx context.Context, client *citrixdaasclient.Cit
 }
 
 func (r DeliveryGroupResourceModel) updatePlanWithRestrictedAccessUsers(ctx context.Context, diagnostics *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel) DeliveryGroupResourceModel {
-	simpleAccessPolicy := deliveryGroup.GetSimpleAccessPolicy()
-
+	advancedAccessPolicies := deliveryGroup.GetAdvancedAccessPolicy()
+	accessPolicy := advancedAccessPolicies[0]
 	if !r.AllowAnonymousAccess.IsNull() {
-		r.AllowAnonymousAccess = types.BoolValue(simpleAccessPolicy.GetAllowAnonymous())
+		allowedUsers := accessPolicy.GetAllowedUsers()
+		if allowedUsers == citrixorchestration.ALLOWEDUSER_ANY ||
+			allowedUsers == citrixorchestration.ALLOWEDUSER_ANONYMOUS_ONLY ||
+			allowedUsers == citrixorchestration.ALLOWEDUSER_FILTERED_OR_ANONYMOUS {
+			r.AllowAnonymousAccess = types.BoolValue(true)
+		}
 	}
 
-	if !simpleAccessPolicy.GetIncludedUserFilterEnabled() || r.RestrictedAccessUsers.IsNull() {
+	if !accessPolicy.GetIncludedUserFilterEnabled() || r.RestrictedAccessUsers.IsNull() {
 		if attributes, err := util.AttributeMapFromObject(RestrictedAccessUsers{}); err == nil {
 			r.RestrictedAccessUsers = types.ObjectNull(attributes)
 		} else {
@@ -1365,18 +1597,18 @@ func (r DeliveryGroupResourceModel) updatePlanWithRestrictedAccessUsers(ctx cont
 
 	users := util.ObjectValueToTypedObject[RestrictedAccessUsers](ctx, diagnostics, r.RestrictedAccessUsers)
 
-	remoteIncludedUsers := simpleAccessPolicy.GetIncludedUsers()
+	remoteIncludedUsers := accessPolicy.GetIncludedUsers()
 	if len(remoteIncludedUsers) == 0 {
 		users.AllowList = types.SetNull(types.StringType)
 	} else {
-		users.AllowList = util.RefreshUsersList(ctx, diagnostics, users.AllowList, simpleAccessPolicy.GetIncludedUsers())
+		users.AllowList = util.RefreshUsersList(ctx, diagnostics, users.AllowList, accessPolicy.GetIncludedUsers())
 	}
 
-	if simpleAccessPolicy.GetExcludedUserFilterEnabled() {
-		if len(simpleAccessPolicy.GetExcludedUsers()) == 0 {
+	if accessPolicy.GetExcludedUserFilterEnabled() {
+		if len(accessPolicy.GetExcludedUsers()) == 0 {
 			users.BlockList = types.SetNull(types.StringType)
 		} else {
-			users.BlockList = util.RefreshUsersList(ctx, diagnostics, users.BlockList, simpleAccessPolicy.GetExcludedUsers())
+			users.BlockList = util.RefreshUsersList(ctx, diagnostics, users.BlockList, accessPolicy.GetExcludedUsers())
 		}
 	}
 
@@ -1399,17 +1631,21 @@ func (r DeliveryGroupResourceModel) updatePlanWithAutoscaleSettings(ctx context.
 
 	autoscale.PeakDisconnectTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetPeakDisconnectTimeoutMinutes()))
 	autoscale.PeakLogOffAction = types.StringValue(string(deliveryGroup.GetPeakLogOffAction()))
+	autoscale.PeakLogOffTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetPeakLogOffTimeoutMinutes()))
 	autoscale.PeakDisconnectAction = types.StringValue(string(deliveryGroup.GetPeakDisconnectAction()))
 	autoscale.PeakExtendedDisconnectAction = types.StringValue(string(deliveryGroup.GetPeakExtendedDisconnectAction()))
 	autoscale.PeakExtendedDisconnectTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetPeakExtendedDisconnectTimeoutMinutes()))
 	autoscale.OffPeakDisconnectTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetOffPeakDisconnectTimeoutMinutes()))
 	autoscale.OffPeakLogOffAction = types.StringValue(string(deliveryGroup.GetOffPeakLogOffAction()))
-	autoscale.OffPeakDisconnectAction = types.StringValue(string(deliveryGroup.GetOffPeakExtendedDisconnectAction()))
+	autoscale.OffPeakLogOffTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetOffPeakLogOffTimeoutMinutes()))
+	autoscale.OffPeakDisconnectAction = types.StringValue(string(deliveryGroup.GetOffPeakDisconnectAction()))
 	autoscale.OffPeakExtendedDisconnectAction = types.StringValue(string(deliveryGroup.GetOffPeakExtendedDisconnectAction()))
 	autoscale.OffPeakExtendedDisconnectTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetOffPeakExtendedDisconnectTimeoutMinutes()))
 	autoscale.PeakBufferSizePercent = types.Int64Value(int64(deliveryGroup.GetPeakBufferSizePercent()))
 	autoscale.OffPeakBufferSizePercent = types.Int64Value(int64(deliveryGroup.GetOffPeakBufferSizePercent()))
 	autoscale.PowerOffDelayMinutes = types.Int64Value(int64(deliveryGroup.GetPowerOffDelayMinutes()))
+	autoscale.PeakAutoscaleAssignedPowerOnIdleAction = types.StringValue(string(deliveryGroup.GetPeakAutoscaleAssignedPowerOnIdleAction()))
+	autoscale.PeakAutoscaleAssignedPowerOnIdleTimeoutMinutes = types.Int64Value(int64(deliveryGroup.GetPeakAutoscaleAssignedPowerOnIdleTimeoutMinutes()))
 	autoscale.DisconnectPeakIdleSessionAfterSeconds = types.Int64Value(int64(deliveryGroup.GetDisconnectPeakIdleSessionAfterSeconds()))
 	autoscale.DisconnectOffPeakIdleSessionAfterSeconds = types.Int64Value(int64(deliveryGroup.GetDisconnectOffPeakIdleSessionAfterSeconds()))
 	autoscale.LogoffPeakDisconnectedSessionAfterSeconds = types.Int64Value(int64(deliveryGroup.GetLogoffPeakDisconnectedSessionAfterSeconds()))
@@ -1480,4 +1716,279 @@ func preserveOrderInPoolSizeSchedule(poolSizeScheduleInPlan, poolSizeScheduleInR
 	}
 
 	return poolSizeSchedules
+}
+
+func getAdvancedAccessPolicyRequest(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicy DeliveryGroupAccessPolicyModel) (citrixorchestration.AdvancedAccessPolicyRequestModel, error) {
+	var advancedAccessPolicyRequest citrixorchestration.AdvancedAccessPolicyRequestModel
+	if !accessPolicy.Id.IsNull() {
+		advancedAccessPolicyRequest.SetId(accessPolicy.Id.ValueString())
+	}
+	advancedAccessPolicyRequest.SetName(accessPolicy.Name.ValueString())
+	advancedAccessPolicyRequest.SetEnabled(accessPolicy.Enabled.ValueBool())
+	allowedConnection, err := citrixorchestration.NewAllowedConnectionFromValue(accessPolicy.AllowedConnection.ValueString())
+	if err != nil {
+		diagnostics.AddError(
+			"Error updating Delivery Group",
+			fmt.Sprintf("Unsupported allowed connection %s.", accessPolicy.AllowedConnection.ValueString()),
+		)
+		return advancedAccessPolicyRequest, err
+	}
+	advancedAccessPolicyRequest.SetAllowedConnection(*allowedConnection)
+
+	advancedAccessPolicyRequest.SetIncludedSmartAccessFilterEnabled(accessPolicy.EnableCriteriaForIncludeConnections.ValueBool())
+
+	if !accessPolicy.IncludeConnectionsCriteriaType.IsNull() {
+		includedSmartAccessFilterType, err := citrixorchestration.NewFilterMatchTypeFromValue(accessPolicy.IncludeConnectionsCriteriaType.ValueString())
+		if err != nil {
+			diagnostics.AddError(
+				"Error updating Delivery Group",
+				fmt.Sprintf("Unsupported criteria type %s.", accessPolicy.IncludeConnectionsCriteriaType.ValueString()),
+			)
+			return advancedAccessPolicyRequest, err
+		}
+		advancedAccessPolicyRequest.SetIncludedSmartAccessFilterType(*includedSmartAccessFilterType)
+	}
+
+	includedSmartAccessTags := getSmartAccessTagsRequest(ctx, diagnostics, util.ObjectListToTypedArray[DeliveryGroupAccessPolicyCriteriaTagsModel](ctx, diagnostics, accessPolicy.IncludeCriteriaFilters))
+	advancedAccessPolicyRequest.SetIncludedSmartAccessTags(includedSmartAccessTags)
+
+	advancedAccessPolicyRequest.SetExcludedSmartAccessFilterEnabled(accessPolicy.EnableCriteriaForExcludeConnections.ValueBool())
+	excludedSmartAccessTags := getSmartAccessTagsRequest(ctx, diagnostics, util.ObjectListToTypedArray[DeliveryGroupAccessPolicyCriteriaTagsModel](ctx, diagnostics, accessPolicy.ExcludeCriteriaFilters))
+	advancedAccessPolicyRequest.SetExcludedSmartAccessTags(excludedSmartAccessTags)
+
+	return advancedAccessPolicyRequest, nil
+}
+
+func getAdvancedAccessPolicyRequestForDefaultPolicy(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicy DeliveryGroupAccessPolicyModel, existingAdvancedAccessPolicies []citrixorchestration.AdvancedAccessPolicyResponseModel) (citrixorchestration.AdvancedAccessPolicyRequestModel, error) {
+	var advancedAccessPolicyRequest citrixorchestration.AdvancedAccessPolicyRequestModel
+
+	// Set static params
+	existingAdvancedAccessPolicyIndex := slices.IndexFunc(existingAdvancedAccessPolicies, func(policy citrixorchestration.AdvancedAccessPolicyResponseModel) bool {
+		return policy.GetIsBuiltIn() && accessPolicy.AllowedConnection.ValueString() == string(policy.GetAllowedConnection())
+	})
+	if existingAdvancedAccessPolicyIndex == -1 {
+		diagnostics.AddError(
+			"Error updating Delivery Group",
+			fmt.Sprintf("Default policy with allowed connection %s not found.", accessPolicy.AllowedConnection.ValueString()),
+		)
+		return advancedAccessPolicyRequest, fmt.Errorf("default policy with allowed connection %s not found", accessPolicy.AllowedConnection.ValueString())
+	}
+	existingAdvancedAccessPolicy := existingAdvancedAccessPolicies[existingAdvancedAccessPolicyIndex]
+
+	advancedAccessPolicyRequest.SetId(existingAdvancedAccessPolicy.GetId())
+	advancedAccessPolicyRequest.SetName(existingAdvancedAccessPolicy.GetName())
+	advancedAccessPolicyRequest.SetAllowedConnection(existingAdvancedAccessPolicy.GetAllowedConnection())
+	advancedAccessPolicyRequest.SetEnabled(accessPolicy.Enabled.ValueBool())
+	advancedAccessPolicyRequest.SetIncludedSmartAccessFilterEnabled(accessPolicy.EnableCriteriaForIncludeConnections.ValueBool())
+
+	if !accessPolicy.IncludeConnectionsCriteriaType.IsNull() {
+		includedSmartAccessFilterType, err := citrixorchestration.NewFilterMatchTypeFromValue(accessPolicy.IncludeConnectionsCriteriaType.ValueString())
+		if err != nil {
+			diagnostics.AddError(
+				"Error updating Delivery Group",
+				fmt.Sprintf("Unsupported criteria type %s.", accessPolicy.IncludeConnectionsCriteriaType.ValueString()),
+			)
+			return advancedAccessPolicyRequest, err
+		}
+		advancedAccessPolicyRequest.SetIncludedSmartAccessFilterType(*includedSmartAccessFilterType)
+	}
+
+	includedSmartAccessTags := getSmartAccessTagsRequest(ctx, diagnostics, util.ObjectListToTypedArray[DeliveryGroupAccessPolicyCriteriaTagsModel](ctx, diagnostics, accessPolicy.IncludeCriteriaFilters))
+	advancedAccessPolicyRequest.SetIncludedSmartAccessTags(includedSmartAccessTags)
+
+	advancedAccessPolicyRequest.SetExcludedSmartAccessFilterEnabled(accessPolicy.EnableCriteriaForExcludeConnections.ValueBool())
+	excludedSmartAccessTags := getSmartAccessTagsRequest(ctx, diagnostics, util.ObjectListToTypedArray[DeliveryGroupAccessPolicyCriteriaTagsModel](ctx, diagnostics, accessPolicy.ExcludeCriteriaFilters))
+	advancedAccessPolicyRequest.SetExcludedSmartAccessTags(excludedSmartAccessTags)
+
+	return advancedAccessPolicyRequest, nil
+}
+
+func getSmartAccessTagsRequest(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicyCriteriaTags []DeliveryGroupAccessPolicyCriteriaTagsModel) []citrixorchestration.SmartAccessTagRequestModel {
+	smartAccessTagRequests := []citrixorchestration.SmartAccessTagRequestModel{}
+	for _, smartAccessTag := range accessPolicyCriteriaTags {
+		var smartAccessTagRequestModel citrixorchestration.SmartAccessTagRequestModel
+		smartAccessTagRequestModel.SetFarm(smartAccessTag.FilterName.ValueString())
+		smartAccessTagRequestModel.SetFilter(smartAccessTag.FilterValue.ValueString())
+		smartAccessTagRequests = append(smartAccessTagRequests, smartAccessTagRequestModel)
+	}
+	return smartAccessTagRequests
+}
+
+func (accessPolicy DeliveryGroupAccessPolicyModel) ValidateConfig(ctx context.Context, diagnostics *diag.Diagnostics, index int) bool {
+	if !accessPolicy.EnableCriteriaForIncludeConnections.ValueBool() {
+		if !accessPolicy.IncludeConnectionsCriteriaType.IsNull() {
+			diagnostics.AddAttributeError(
+				path.Root("access_policies").AtListIndex(index),
+				"Incorrect Attribute Configuration",
+				"include_connections_criteria_type cannot be set if enable_criteria_for_include_connections is set to false.",
+			)
+			return false
+		}
+
+		if len(accessPolicy.IncludeCriteriaFilters.Elements()) > 0 {
+			diagnostics.AddAttributeError(
+				path.Root("access_policies").AtListIndex(index),
+				"Incorrect Attribute Configuration",
+				"include_criteria_filters cannot be set if enable_criteria_for_include_connections is set to false.",
+			)
+			return false
+		}
+	}
+
+	if !accessPolicy.EnableCriteriaForExcludeConnections.ValueBool() && len(accessPolicy.ExcludeCriteriaFilters.Elements()) > 0 {
+		diagnostics.AddAttributeError(
+			path.Root("access_policies").AtListIndex(index),
+			"Incorrect Attribute Configuration",
+			"exclude_criteria_filters cannot be set if enable_criteria_for_exclude_connections is set to false.",
+		)
+
+		return false
+	}
+
+	if !accessPolicy.IncludeCriteriaFilters.IsNull() {
+		includeFilters := util.ObjectListToTypedArray[DeliveryGroupAccessPolicyCriteriaTagsModel](ctx, diagnostics, accessPolicy.IncludeCriteriaFilters)
+		isValid := validateAccessPolicyCriteriaTagsModel(diagnostics, index, includeFilters)
+		if !isValid {
+			return false
+		}
+	}
+
+	if !accessPolicy.ExcludeCriteriaFilters.IsNull() {
+		excludeFilters := util.ObjectListToTypedArray[DeliveryGroupAccessPolicyCriteriaTagsModel](ctx, diagnostics, accessPolicy.ExcludeCriteriaFilters)
+		isValid := validateAccessPolicyCriteriaTagsModel(diagnostics, index, excludeFilters)
+		if !isValid {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (accessPolicy DeliveryGroupAccessPolicyModel) ValidateConfigForDefaultPolicy(ctx context.Context, diagnostics *diag.Diagnostics, index int) bool {
+	if !strings.EqualFold(accessPolicy.Name.ValueString(), util.CitrixGatewayConnections) && !strings.EqualFold(accessPolicy.Name.ValueString(), util.NonCitrixGatewayConnections) {
+		diagnostics.AddAttributeError(
+			path.Root("default_access_policies").AtListIndex(index),
+			"Incorrect Attribute Configuration",
+			"Name must be set to Citrix Gateway connections or Non-Citrix Gateway connections for Default Access Policies.",
+		)
+		return false
+	}
+
+	if strings.EqualFold(accessPolicy.Name.ValueString(), util.CitrixGatewayConnections) &&
+		accessPolicy.AllowedConnection.ValueString() != string(citrixorchestration.ALLOWEDCONNECTION_VIA_AG) {
+		diagnostics.AddAttributeError(
+			path.Root("default_access_policies").AtListIndex(index),
+			"Incorrect Attribute Configuration",
+			"Allowed connection must be set to VIA_AG for Citrix Gateway Connections.",
+		)
+		return false
+	}
+
+	if strings.EqualFold(accessPolicy.Name.ValueString(), util.NonCitrixGatewayConnections) &&
+		accessPolicy.AllowedConnection.ValueString() != string(citrixorchestration.ALLOWEDCONNECTION_NOT_VIA_AG) {
+		diagnostics.AddAttributeError(
+			path.Root("default_access_policies").AtListIndex(index),
+			"Incorrect Attribute Configuration",
+			"Allowed connection must be set to NOT_VIA_AG for Non-Citrix Gateway Connections.",
+		)
+	}
+
+	return true
+}
+
+func (appProtection DeliveryGroupAppProtection) ValidateConfig(ctx context.Context, diagnostics *diag.Diagnostics) bool {
+	if !appProtection.EnableAntiKeyLogging.IsNull() {
+		if !appProtection.EnableAntiKeyLogging.ValueBool() && !appProtection.EnableAntiScreenCapture.ValueBool() {
+			diagnostics.AddAttributeError(
+				path.Root("app_protection"),
+				"Incorrect Attribute Configuration",
+				"When choosing to apply app_protection, either enable_anti_key_logging or enable_anti_screen_capture must be set to true.",
+			)
+			return false
+		}
+	}
+
+	if !appProtection.ApplyContextually.IsNull() {
+		appProtectionApplyContextually := util.ObjectListToTypedArray[DeliveryGroupAppProtectionApplyContextuallyModel](ctx, diagnostics, appProtection.ApplyContextually)
+		for _, applyContextually := range appProtectionApplyContextually {
+			if !applyContextually.EnableAntiKeyLogging.ValueBool() && !applyContextually.EnableAntiScreenCapture.ValueBool() {
+				diagnostics.AddAttributeError(
+					path.Root("app_protection"),
+					"Incorrect Attribute Configuration",
+					"When choosing to apply app_protection conextually, for each policy, either enable_anti_key_logging or enable_anti_screen_capture must be set to true.",
+				)
+
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+func setAppProtectionOnAdvancedAccessPolicies(diagnostics *diag.Diagnostics, applyContextually DeliveryGroupAppProtectionApplyContextuallyModel, advancedAccessPolicies []citrixorchestration.AdvancedAccessPolicyRequestModel, deliveryGroupName string) ([]citrixorchestration.AdvancedAccessPolicyRequestModel, error) {
+	policyName := applyContextually.PolicyName.ValueString()
+	if strings.EqualFold(policyName, util.CitrixGatewayConnections) {
+		policyName = deliveryGroupName + "_AG"
+	} else if strings.EqualFold(policyName, util.NonCitrixGatewayConnections) {
+		policyName = deliveryGroupName + "_Direct"
+	}
+
+	index := slices.IndexFunc(advancedAccessPolicies, func(advancedAccessPolicy citrixorchestration.AdvancedAccessPolicyRequestModel) bool {
+		return advancedAccessPolicy.GetName() == policyName
+	})
+
+	if index == -1 {
+		diagnostics.AddError(
+			"Error updating Delivery Group",
+			fmt.Sprintf("Policy name %s does not exist in Access Policies for Delivery Group %s", policyName, deliveryGroupName),
+		)
+		return advancedAccessPolicies, fmt.Errorf("policy name does not exist in access policies")
+	}
+
+	advancedAccessPolicies[index].SetAppProtectionKeyLoggingRequired(applyContextually.EnableAntiKeyLogging.ValueBool())
+	advancedAccessPolicies[index].SetAppProtectionScreenCaptureRequired(applyContextually.EnableAntiScreenCapture.ValueBool())
+
+	return advancedAccessPolicies, nil
+}
+
+func checkIfAppProtectionAppliedContextually(accessPolicies []citrixorchestration.AdvancedAccessPolicyResponseModel) bool {
+	for _, policy := range accessPolicies {
+		if policy.GetAppProtectionKeyLoggingRequired() || policy.GetAppProtectionScreenCaptureRequired() {
+			return true
+		}
+	}
+
+	return false
+}
+
+func validateAccessPolicyCriteriaTagsModel(diagnostics *diag.Diagnostics, index int, tags []DeliveryGroupAccessPolicyCriteriaTagsModel) bool {
+	tagKV := map[string][]string{}
+	for _, tag := range tags {
+		filterName := tag.FilterName.ValueString()
+		filterValue := tag.FilterValue.ValueString()
+		key := strings.ToLower(filterName)
+		values, exists := tagKV[key]
+		if !exists {
+			tagKV[key] = []string{filterValue}
+			continue
+		}
+
+		if slices.ContainsFunc(values, func(v string) bool {
+			return strings.EqualFold(v, filterValue)
+		}) {
+			diagnostics.AddAttributeError(
+				path.Root("access_policies").AtListIndex(index),
+				"Incorrect Attribute Configuration",
+				fmt.Sprintf("Filter name %s with filter value %s already exists.", filterName, filterValue),
+			)
+
+			return false
+		} else {
+			values = append(values, filterValue)
+			tagKV[key] = values
+		}
+	}
+
+	return true
 }

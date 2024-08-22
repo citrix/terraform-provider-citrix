@@ -28,14 +28,14 @@ This automation script is designed to onboard an existing storefront deployment 
     Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
     ```
 6. Run the script with the following command:
-  - For Citrix on-premises customers
     ```powershell
-    .\terraform-onboarding.ps1 -StorefrontHostname "{SFServerHostName}" -ADAdminUsername "{ADAdminUsername}"-ADAdminPassword "{ADAdminPassword}"
+    .\storefront-terraform-onboarding.ps1 -StorefrontHostname "{SFServerHostName}" -ADAdminUsername "{ADAdminUsername}"-ADAdminPassword "{ADAdminPassword}" 
     ```
     Replace the placeholders `{...}` with your actual values. Here's what each parameter means:
-    - `SFServerHostName`: The Storefront Server Hostname. This can be an IP address or a FQDN/
+    - `SFServerHostName`: The Storefront Server Hostname. This can be an IP address or a FQDN
     - `ADAdminUsername`: The Active Directory Admin Username for authentication with the Storefront Server.
     - `ADAdminPassword`: The Active Directory Admin Password for authentication with the Storefront Server.
+    - `DisableSSLValidation` The switch parameter to disable SSL verification when connecting to the target StoreFront server. 
 
 7. Wait for the script to complete. The execution time will depend on the complexity of the onboarding process and the resources being imported.
 

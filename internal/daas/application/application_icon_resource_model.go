@@ -4,16 +4,20 @@ package application
 
 import (
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // ApplicationIconResourceModel maps the resource schema data.
 type ApplicationIconResourceModel struct {
-	Id      types.String `tfsdk:"id"`
-	RawData types.String `tfsdk:"raw_data"`
+	Id       types.String `tfsdk:"id"`
+	RawData  types.String `tfsdk:"raw_data"`
+	FilePath types.String `tfsdk:"file_path"`
 }
 
 func (ApplicationIconResourceModel) GetSchema() schema.Schema {
@@ -28,8 +32,28 @@ func (ApplicationIconResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"raw_data": schema.StringAttribute{
-				Description: "Prepare an icon in ICO format and convert its binary raw data to base64 encoding. Use the base64 encoded string as the value of this attribute.",
-				Required:    true,
+				Description: "Prepare an icon in ICO format and convert its binary raw data to base64 encoding. Use the base64 encoded string as the value of this attribute. Exactly one of `raw_data` and `file_path` is required.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.ExactlyOneOf(
+						path.MatchRelative().AtParent().AtName("raw_data"),
+						path.MatchRelative().AtParent().AtName("file_path"),
+					),
+					stringvalidator.LengthAtLeast(1),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"file_path": schema.StringAttribute{
+				Description: "Path to the icon file. Exactly one of `raw_data` and `file_path` is required.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 		},
 	}
@@ -42,6 +66,8 @@ func (ApplicationIconResourceModel) GetAttributes() map[string]schema.Attribute 
 func (r ApplicationIconResourceModel) RefreshPropertyValues(application *citrixorchestration.IconResponseModel) ApplicationIconResourceModel {
 	// Overwrite application folder with refreshed state
 	r.Id = types.StringValue(application.GetId())
-	r.RawData = types.StringValue(application.GetRawData())
+	if r.FilePath.IsNull() {
+		r.RawData = types.StringValue(application.GetRawData())
+	}
 	return r
 }

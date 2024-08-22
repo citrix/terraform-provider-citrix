@@ -78,11 +78,11 @@ func (r *awsWorkspacesDeploymentResource) Create(ctx context.Context, req resour
 	initateDeploymentRequest := r.client.QuickCreateClient.DeploymentQCS.InitiateDeploymentAsync(ctx, r.client.ClientConfig.CustomerId)
 	initateDeploymentRequest = initateDeploymentRequest.Body(initiateDeploymentRequestBody)
 
-	// Create new AWS Workspaces Deployment
+	// Create new AWS WorkSpaces Deployment
 	initiateDeploymentResponse, httpResp, err := citrixdaasclient.AddRequestData(initateDeploymentRequest, r.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error initiating AWS Workspaces Deployment: "+plan.Name.ValueString(),
+			"Error initiating AWS WorkSpaces Deployment: "+plan.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadQcsClientError(err),
 		)
@@ -96,11 +96,15 @@ func (r *awsWorkspacesDeploymentResource) Create(ctx context.Context, req resour
 			(deploymentResult.GetDeploymentState() == citrixquickcreate.DEPLOYMENTSTATE_ERROR ||
 				deploymentResult.GetDeploymentState() == citrixquickcreate.DEPLOYMENTSTATE_ERROR_INVALID_ACCOUNT) {
 			resp.Diagnostics.AddError(
-				"Error creating AWS Workspaces Deployment: "+plan.Name.ValueString(),
+				"Error creating AWS WorkSpaces Deployment: "+plan.Name.ValueString(),
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nDeployment is in state "+string(deploymentResult.GetDeploymentState()),
 			)
-			return
+			plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, *deploymentResult)
+
+			// Set state to populated data
+			diags = resp.State.Set(ctx, plan)
+			resp.Diagnostics.Append(diags...)
 		}
 		return
 	}
@@ -109,7 +113,7 @@ func (r *awsWorkspacesDeploymentResource) Create(ctx context.Context, req resour
 	workspaces := util.ObjectListToTypedArray[AwsWorkspacesDeploymentWorkspaceModel](ctx, &resp.Diagnostics, plan.Workspaces)
 	if len(workspaces) != len(deploymentResult.GetWorkspaces()) {
 		resp.Diagnostics.AddError(
-			"Error creating AWS Workspaces Deployment: "+plan.Name.ValueString(),
+			"Error creating AWS WorkSpaces Deployment: "+plan.Name.ValueString(),
 			"Number of workspaces created does not match the number of workspaces in the plan",
 		)
 		return
@@ -131,7 +135,7 @@ func (r *awsWorkspacesDeploymentResource) Create(ctx context.Context, req resour
 	}
 
 	// Map response body to schema and populate computed attribute values
-	// Try getting the AWS Workspaces Deployment
+	// Try getting the AWS WorkSpaces Deployment
 	deployment, _, err := getAwsWorkspacesDeploymentUsingId(ctx, r.client, &resp.Diagnostics, deploymentResult.GetDeploymentId(), true)
 	if err != nil {
 		return
@@ -140,7 +144,7 @@ func (r *awsWorkspacesDeploymentResource) Create(ctx context.Context, req resour
 	if deployment.GetDeploymentState() == citrixquickcreate.DEPLOYMENTSTATE_ERROR ||
 		deployment.GetDeploymentState() == citrixquickcreate.DEPLOYMENTSTATE_ERROR_INVALID_ACCOUNT {
 		resp.Diagnostics.AddError(
-			"Error creating AWS Workspaces Deployment: "+plan.Name.ValueString(),
+			"Error creating AWS WorkSpaces Deployment: "+plan.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nDeployment is in state "+string(deployment.GetDeploymentState()),
 		)
@@ -167,13 +171,13 @@ func (r *awsWorkspacesDeploymentResource) Read(ctx context.Context, req resource
 		return
 	}
 
-	// Try getting the AWS Workspaces Deployment
+	// Try getting the AWS WorkSpaces Deployment
 	deployment, httpResp, err := getAwsWorkspacesDeploymentUsingId(ctx, r.client, &resp.Diagnostics, state.Id.ValueString(), false)
 	if err != nil {
 		if httpResp.StatusCode == http.StatusNotFound {
 			resp.Diagnostics.AddWarning(
-				fmt.Sprintf("AWS Workspaces Deployment with ID: %s not found", state.Id.ValueString()),
-				fmt.Sprintf("AWS Workspaces Deployment with ID: %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", state.Id.ValueString()),
+				fmt.Sprintf("AWS WorkSpaces Deployment with ID: %s not found", state.Id.ValueString()),
+				fmt.Sprintf("AWS WorkSpaces Deployment with ID: %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", state.Id.ValueString()),
 			)
 			resp.State.RemoveResource(ctx)
 			return
@@ -220,7 +224,7 @@ func (r *awsWorkspacesDeploymentResource) Update(ctx context.Context, req resour
 		updateImageTask, httpResp, err := imageUpdateRequest.Execute()
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error updating image for AWS Workspaces Deployment: "+plan.Name.ValueString(),
+				"Error updating image for AWS WorkSpaces Deployment: "+plan.Name.ValueString(),
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadQcsClientError(err),
 			)
@@ -237,7 +241,7 @@ func (r *awsWorkspacesDeploymentResource) Update(ctx context.Context, req resour
 		newRunningMode, err := citrixquickcreate.NewAwsEdcWorkspaceRunningModeFromValue(plan.RunningMode.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error creating AWS Workspaces Deployment: "+plan.Name.ValueString(),
+				"Error creating AWS WorkSpaces Deployment: "+plan.Name.ValueString(),
 				"Error message: "+err.Error(),
 			)
 			return
@@ -255,7 +259,7 @@ func (r *awsWorkspacesDeploymentResource) Update(ctx context.Context, req resour
 		updatePropertiesTask, httpResp, err := deploymentPropertiesUpdateRequest.Execute()
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error updating properties for AWS Workspaces Deployment: "+plan.Name.ValueString(),
+				"Error updating properties for AWS WorkSpaces Deployment: "+plan.Name.ValueString(),
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadQcsClientError(err),
 			)
@@ -267,7 +271,7 @@ func (r *awsWorkspacesDeploymentResource) Update(ctx context.Context, req resour
 		}
 	}
 
-	// 3. Update Workspaces
+	// 3. Update WorkSpaces
 	deployment, _, err := getAwsWorkspacesDeploymentUsingId(ctx, r.client, &resp.Diagnostics, plan.Id.ValueString(), true)
 	if err != nil {
 		return
@@ -311,12 +315,12 @@ func (r *awsWorkspacesDeploymentResource) Delete(ctx context.Context, req resour
 		return
 	}
 
-	// Delete AWS Workspaces Deployment
+	// Delete AWS WorkSpaces Deployment
 	deleteDeploymentRequest := r.client.QuickCreateClient.DeploymentQCS.InitiateDeleteDeploymentAsync(ctx, r.client.ClientConfig.CustomerId, state.Id.ValueString())
 	deleteDeploymentTask, httpResp, err := r.client.QuickCreateClient.DeploymentQCS.InitiateDeleteDeploymentAsyncExecute(deleteDeploymentRequest)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error initiating deletion of AWS Workspaces Deployment: "+state.Name.ValueString(),
+			"Error initiating deletion of AWS WorkSpaces Deployment: "+state.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadQcsClientError(err),
 		)
@@ -349,7 +353,7 @@ func (r *awsWorkspacesDeploymentResource) ValidateConfig(ctx context.Context, re
 
 	if !config.RootVolumeSize.IsUnknown() && !config.UserVolumeSize.IsUnknown() && !validateVolumeSize(config.RootVolumeSize.ValueInt64(), config.UserVolumeSize.ValueInt64()) {
 		resp.Diagnostics.AddError(
-			"Error validating AWS Workspaces Deployment: "+config.Name.ValueString(),
+			"Error validating AWS WorkSpaces Deployment: "+config.Name.ValueString(),
 			"Root volume size and user volume size should be within the allowed range",
 		)
 	}
@@ -358,7 +362,7 @@ func (r *awsWorkspacesDeploymentResource) ValidateConfig(ctx context.Context, re
 		if strings.EqualFold(config.RunningMode.ValueString(), string(citrixquickcreate.AWSEDCWORKSPACERUNNINGMODE_ALWAYS_ON)) &&
 			!config.ScaleSettings.IsNull() {
 			resp.Diagnostics.AddError(
-				"Error validating AWS Workspaces Deployment: "+config.Name.ValueString(),
+				"Error validating AWS WorkSpaces Deployment: "+config.Name.ValueString(),
 				fmt.Sprintf("Scale settings should not be provided when running mode is set to `%s`", string(citrixquickcreate.AWSEDCWORKSPACERUNNINGMODE_ALWAYS_ON)),
 			)
 		}
@@ -371,7 +375,7 @@ func (r *awsWorkspacesDeploymentResource) ValidateConfig(ctx context.Context, re
 				if config.UserDecoupledWorkspaces.ValueBool() {
 					if !workspace.Username.IsUnknown() && !workspace.Username.IsNull() {
 						resp.Diagnostics.AddError(
-							"Error validating AWS Workspaces Deployment: "+config.Name.ValueString(),
+							"Error validating AWS WorkSpaces Deployment: "+config.Name.ValueString(),
 							"When `user_decoupled_workspaces` is set to `true`, `username` should not be provided",
 						)
 						break
@@ -379,7 +383,7 @@ func (r *awsWorkspacesDeploymentResource) ValidateConfig(ctx context.Context, re
 				} else {
 					if !workspace.Username.IsUnknown() && workspace.Username.IsNull() {
 						resp.Diagnostics.AddError(
-							"Error validating AWS Workspaces Deployment: "+config.Name.ValueString(),
+							"Error validating AWS WorkSpaces Deployment: "+config.Name.ValueString(),
 							"When `user_decoupled_workspaces` is set to `false`, `username` should be provided",
 						)
 						break
@@ -388,7 +392,7 @@ func (r *awsWorkspacesDeploymentResource) ValidateConfig(ctx context.Context, re
 			}
 			if !workspace.RootVolumeSize.IsUnknown() && !workspace.UserVolumeSize.IsUnknown() && !validateVolumeSize(workspace.RootVolumeSize.ValueInt64(), workspace.UserVolumeSize.ValueInt64()) {
 				resp.Diagnostics.AddError(
-					"Error validating AWS Workspaces Deployment "+config.Name.ValueString(),
+					"Error validating AWS WorkSpaces Deployment "+config.Name.ValueString(),
 					"Root volume size and user volume size should be within the allowed range for workspace user: "+workspace.Username.ValueString(),
 				)
 				break
@@ -406,7 +410,7 @@ func getAwsWorkspacesDeploymentUsingId(ctx context.Context, client *citrixdaascl
 			return nil, httpResp, err
 		}
 		diagnostics.AddError(
-			"Error getting AWS Workspaces Deployment: "+deploymentId,
+			"Error getting AWS WorkSpaces Deployment: "+deploymentId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadQcsClientError(err),
 		)
@@ -425,7 +429,7 @@ func constructAddAwsWorkspacesDeploymentRequestBody(ctx context.Context, diagnos
 	computeType, err := citrixquickcreate.NewAwsEdcWorkspaceComputeFromValue(config.Performance.ValueString())
 	if err != nil {
 		diagnostics.AddError(
-			"Error creating AWS Workspaces Deployment: "+config.Name.ValueString(),
+			"Error creating AWS WorkSpaces Deployment: "+config.Name.ValueString(),
 			"Error message: "+err.Error(),
 		)
 		return initiateDeploymentBody, err
@@ -440,7 +444,7 @@ func constructAddAwsWorkspacesDeploymentRequestBody(ctx context.Context, diagnos
 	runningMode, err := citrixquickcreate.NewAwsEdcWorkspaceRunningModeFromValue(config.RunningMode.ValueString())
 	if err != nil {
 		diagnostics.AddError(
-			"Error creating AWS Workspaces Deployment: "+config.Name.ValueString(),
+			"Error creating AWS WorkSpaces Deployment: "+config.Name.ValueString(),
 			"Error message: "+err.Error(),
 		)
 		return initiateDeploymentBody, err
@@ -514,7 +518,7 @@ func WaitForQcsDeployment(ctx context.Context, diagnostics *diag.Diagnostics, cl
 	for {
 		if time.Since(startTime) > time.Minute*time.Duration(maxWaitTimeInMinutes) {
 			diagnostics.AddError(
-				"Error waiting for AWS Workspaces Deployment: "+deploymentId,
+				"Error waiting for AWS WorkSpaces Deployment: "+deploymentId,
 				fmt.Sprintf("Error message: wait time exceeded the maximum allowed time of %d minutes", maxWaitTimeInMinutes),
 			)
 			break
@@ -712,7 +716,7 @@ func updateUserCoupledWorkspaces(ctx context.Context, diagnostics *diag.Diagnost
 		deploymentTask, httpResp, err := updateWorkspaceRequest.Execute()
 		if err != nil {
 			diagnostics.AddError(
-				"Error updating existing workspaces in AWS Workspaces Deployment: "+deployment.GetDeploymentName(),
+				"Error updating existing workspaces in AWS WorkSpaces Deployment: "+deployment.GetDeploymentName(),
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadQcsClientError(err),
 			)
@@ -757,7 +761,7 @@ func updateUserCoupledWorkspaces(ctx context.Context, diagnostics *diag.Diagnost
 		deploymentTask, httpResp, err := addMachinesRequest.Execute()
 		if err != nil {
 			diagnostics.AddError(
-				"Error adding new workspaces to AWS Workspaces Deployment: "+deployment.GetDeploymentName(),
+				"Error adding new workspaces to AWS WorkSpaces Deployment: "+deployment.GetDeploymentName(),
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadQcsClientError(err),
 			)
@@ -823,7 +827,7 @@ func updateUserDecoupledWorkspaces(ctx context.Context, diagnostics *diag.Diagno
 		deploymentTask, httpResp, err := addMachinesRequest.Execute()
 		if err != nil {
 			diagnostics.AddError(
-				"Error adding new workspaces to AWS Workspaces Deployment: "+deployment.GetDeploymentName(),
+				"Error adding new workspaces to AWS WorkSpaces Deployment: "+deployment.GetDeploymentName(),
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadQcsClientError(err),
 			)
@@ -843,7 +847,7 @@ func updateUserDecoupledWorkspaces(ctx context.Context, diagnostics *diag.Diagno
 	deploymentWorkspaces := deployment.GetWorkspaces()
 	if len(deploymentWorkspaces) != len(workspaces) {
 		diagnostics.AddError(
-			"Error updating AWS Workspaces Deployment: "+deployment.GetDeploymentName(),
+			"Error updating AWS WorkSpaces Deployment: "+deployment.GetDeploymentName(),
 			"Number of workspaces in updated deployment does not match the number of workspaces in the plan",
 		)
 	}
@@ -867,7 +871,7 @@ func deleteAwsWorkspaceMachines(ctx context.Context, diagnostics *diag.Diagnosti
 	deploymentTask, httpResp, err := removeMachinesRequest.Execute()
 	if err != nil {
 		diagnostics.AddError(
-			"Error updating AWS Workspaces Deployment: "+deployment.GetDeploymentName(),
+			"Error updating AWS WorkSpaces Deployment: "+deployment.GetDeploymentName(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadQcsClientError(err),
 		)

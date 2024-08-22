@@ -1,2 +1,2 @@
-# QuickCreate AWS Workspaces Account can be imported by specifying the Account GUID
+# Quick Deploy AWS WorkSpaces Account can be imported by specifying the Account GUID
 terraform import citrix_quickcreate_aws_workspaces_account.test_aws_workspaces_account 00000000-0000-0000-0000-000000000000

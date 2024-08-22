@@ -31,12 +31,14 @@ resource "citrix_application_group" "example-application-group" {
 
 ### Optional
 
+- `application_group_folder_path` (String) The path of the folder in which the application group is located.
 - `description` (String) Description of the application group.
 - `included_users` (Set of String) Users who can use this application group. 
 
 -> **Note** User must be in `Domain\UserOrGroupName` or `user@domain.com` format
 - `restrict_to_tag` (String) The tag to restrict the application group to.
 - `scopes` (Set of String) The IDs of the scopes for the application group to be a part of.
+- `tenants` (Set of String) A set of identifiers of tenants to associate with the application group.
 
 ### Read-Only
 

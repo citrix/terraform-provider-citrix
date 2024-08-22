@@ -1,7 +1,7 @@
 # citrix.tf variables, uncomment the ones you need for on-premises or cloud
 provider_hostname = "<DDC public IP / hostname>" # on-premises only
 provider_domain_fqdn = "<DomainFqdn>" # on-premises only
-provider_client_id = "<Admin Username>" # or Citrx Cloud secure client ID for cloud
+provider_client_id = "<Admin Username>" # or Citrix Cloud secure client ID for cloud
 provider_client_secret = "<Admin Password>" # or Citrix Cloud secure client secret for cloud
 # provider_customer_id = "<Citrix Cloud CustomerID>" # cloud only
 

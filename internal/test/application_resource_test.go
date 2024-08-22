@@ -18,7 +18,7 @@ func TestApplicationResourcePreCheck(t *testing.T) {
 
 func TestApplicationResource(t *testing.T) {
 	name := os.Getenv("TEST_APP_NAME")
-	updated_folder_name := fmt.Sprintf("%s-2", os.Getenv("TEST_APP_FOLDER_NAME"))
+	updated_folder_name := fmt.Sprintf("%s-2", os.Getenv("TEST_ADMIN_FOLDER_NAME"))
 	zoneInput := os.Getenv("TEST_ZONE_INPUT_AZURE")
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -28,7 +28,7 @@ func TestApplicationResource(t *testing.T) {
 			TestHypervisorResourcePoolPreCheck_Azure(t)
 			TestMachineCatalogPreCheck_Azure(t)
 			TestDeliveryGroupPreCheck(t)
-			TestApplicationFolderPreCheck(t)
+			TestAdminFolderPreCheck(t)
 			TestApplicationResourcePreCheck(t)
 		},
 		Steps: []resource.TestStep{
@@ -36,7 +36,7 @@ func TestApplicationResource(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildApplicationResource(t, testApplicationResource),
-					BuildApplicationFolderResource(t, testApplicationFolderResource_updated),
+					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
 					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
@@ -68,7 +68,7 @@ func TestApplicationResource(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildApplicationResource(t, testApplicationResource_updated),
-					BuildApplicationFolderResource(t, testApplicationFolderResource_updated),
+					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
 					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
@@ -117,7 +117,7 @@ resource "citrix_application" "testApplication" {
 		working_directory       = "test directory"
 	}
 	delivery_groups = [citrix_delivery_group.testDeliveryGroup.id]
-	application_folder_path = citrix_application_folder.testApplicationFolder2.path
+	application_folder_path = citrix_admin_folder.testAdminFolder2.path
 }`
 )
 

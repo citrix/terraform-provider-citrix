@@ -66,7 +66,10 @@ func TestSTFRoamingServiceResource(t *testing.T) {
 
 			// Create and Read testing for STF Roaming Gateway resource
 			{
-				Config: BuildSTFRoamingGatewayResource(t, testSTFRoamingGatewayResource, siteId, name, logonType, gatewayUrl, version),
+				Config: composeTestResourceTf(
+					BuildSTFDeploymentResource(t, testSTFDeploymentResources, siteId),
+					BuildSTFRoamingGatewayResource(t, testSTFRoamingGatewayResource, siteId, name, logonType, gatewayUrl, version),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_stf_roaming_gateway.testSTFRomaingGateway", "site_id", siteId),
 					resource.TestCheckResourceAttr("citrix_stf_roaming_gateway.testSTFRomaingGateway", "name", name),
@@ -83,12 +86,15 @@ func TestSTFRoamingServiceResource(t *testing.T) {
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "name",
 				ImportStateIdFunc:                    generateImportStateId_STFRoamingGatewayResource,
-				ImportStateVerifyIgnore:              []string{"last_updated"},
+				ImportStateVerifyIgnore:              []string{"last_updated", "callback_url"},
 			},
 
 			// Update testing for STF Roaming Gateway resource
 			{
-				Config: BuildSTFRoamingGatewayResource(t, testSTFRoamingGatewayResource_updated, siteId, name, logonTypeUpdated, gatewayUrlUpdated, versionUpdated),
+				Config: composeTestResourceTf(
+					BuildSTFDeploymentResource(t, testSTFDeploymentResources, siteId),
+					BuildSTFRoamingGatewayResource(t, testSTFRoamingGatewayResource_updated, siteId, name, logonTypeUpdated, gatewayUrlUpdated, versionUpdated),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_stf_roaming_gateway.testSTFRomaingGateway", "site_id", siteId),
 					resource.TestCheckResourceAttr("citrix_stf_roaming_gateway.testSTFRomaingGateway", "name", name),
@@ -116,7 +122,7 @@ func generateImportStateId_STFRoamingGatewayResource(state *terraform.State) (st
 }
 
 func BuildSTFRoamingGatewayResource(t *testing.T, gatewayResource string, siteId string, name string, logonType string, gatewayUrl string, version string) string {
-	return BuildSTFDeploymentResource(t, testSTFDeploymentResources, siteId) + fmt.Sprintf(gatewayResource, name, logonType, gatewayUrl, version)
+	return fmt.Sprintf(gatewayResource, name, logonType, gatewayUrl, version)
 }
 
 var (

@@ -66,7 +66,7 @@ func (r *awsWorkspaceAccountDataSource) Read(ctx context.Context, req datasource
 	var account *citrixquickcreate.AwsEdcAccount
 	var err error
 	if data.AccountId.ValueString() != "" {
-		account, _, err = getAwsWorkspacesAccountUsingId(ctx, r.client, &resp.Diagnostics, data.AccountId.ValueString(), false)
+		account, _, err = getAwsWorkspacesAccountUsingId(ctx, r.client, &resp.Diagnostics, data.AccountId.ValueString())
 	} else if data.Name.ValueString() != "" {
 		account, _, err = getAwsWorkspacesAccountUsingName(ctx, r.client, &resp.Diagnostics, data.Name.ValueString())
 	}
@@ -86,7 +86,7 @@ func getAwsWorkspacesAccountUsingName(ctx context.Context, client *citrixdaascli
 	accounts, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickcreate.Accounts](getAccountsRequest, client)
 	if err != nil {
 		diagnostics.AddError(
-			"Error getting AWS Workspaces Account: "+accountName,
+			"Error getting AWS WorkSpaces Account: "+accountName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadQcsClientError(err),
 		)
@@ -99,5 +99,5 @@ func getAwsWorkspacesAccountUsingName(ctx context.Context, client *citrixdaascli
 		}
 	}
 
-	return nil, httpResp, fmt.Errorf("AWS Workspaces Account not found: %s", accountName)
+	return nil, httpResp, fmt.Errorf("AWS WorkSpaces Account not found: %s", accountName)
 }
