@@ -71,29 +71,62 @@ Param (
     [string] $AzureResourceGroupName,
 
     [Parameter(Mandatory = $true)]
-    [string] $AzureDdcVmName,
-
-    [Parameter(Mandatory = $true)]
     [string] $AzureAdVmName,
 
     [Parameter(Mandatory = $false)]
-    [bool] $DisableSSLValidation = $false
+    [string] $AzureDdcVmName,
+
+    [Parameter(Mandatory = $false)]
+    [string] $AzureConnectorVm1Name,
+
+    [Parameter(Mandatory = $false)]
+    [string] $AzureConnectorVm2Name,
+
+    [Parameter(Mandatory = $false)]
+    [bool] $DisableSSLValidation = $false,
+
+    [Parameter(Mandatory = $false)]
+    [bool] $OnPremises = $true
 )
+
+function Start-AzureVm {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string] $ResourceGroupName,
+
+        [Parameter(Mandatory = $true)]
+        [string] $VmName
+    )
+
+    $vm = Get-AzVM -ResourceGroupName $ResourceGroupName -Name $VmName -Status
+    if ($vm.Statuses[1].Code -ne "PowerState/running") {
+        Start-AzVM -ResourceGroupName $ResourceGroupName -Name $VmName
+    }
+}
 
 function Get-Me {
     $base64Auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$DomainFqdn\$ClientId", $ClientSecret)))
     try {
-        $response = Invoke-RestMethod -Uri "https://$Hostname/citrix/orchestration/api/techpreview/tokens" -Method POST -Headers @{ "Authorization" = "Basic $base64Auth" }
+        if ($DisableSSLValidation) {
+            $response = Invoke-RestMethod -Uri "https://$Hostname/citrix/orchestration/api/techpreview/tokens" -Method POST -Headers @{ "Authorization" = "Basic $base64Auth" } -SkipCertificateCheck
+        } else {
+            $response = Invoke-RestMethod -Uri "https://$Hostname/citrix/orchestration/api/techpreview/tokens" -Method POST -Headers @{ "Authorization" = "Basic $base64Auth" }
+        }
     } catch {
         if ($_.Exception.Response.StatusCode.value__ -ne 200) {
-            Write-Host "Failed to get auth token"
+            Write-Host "Failed to get auth token. Status Code: $($_.Exception.Response.StatusCode.value__)"
+            Write-Host "Error: $($_.Exception.Message)"
             return $false
         }
     }
 
     $token = $response.Token
     try {
-        Invoke-RestMethod -Uri "https://$Hostname/citrix/orchestration/api/techpreview/me" -Method GET -Headers @{ "Authorization" = "Bearer $token" }
+        if ($DisableSSLValidation) {
+            Invoke-RestMethod -Uri "https://$Hostname/citrix/orchestration/api/techpreview/me" -Method GET -Headers @{ "Authorization" = "Bearer $token" } -SkipCertificateCheck
+        } else {
+            Invoke-RestMethod -Uri "https://$Hostname/citrix/orchestration/api/techpreview/me" -Method GET -Headers @{ "Authorization" = "Bearer $token" }
+        }
     } catch {
         if ($_.Exception.Response.StatusCode.value__ -ne 200) {
             Write-Host "Failed to get Site"
@@ -110,37 +143,24 @@ $SecureStringPwd = $AzureClientSecret | ConvertTo-SecureString -AsPlainText -For
 $pscredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $AzureClientId, $SecureStringPwd
 Connect-AzAccount -ServicePrincipal -Credential $pscredential -TenantId $AzureTenantId -SubscriptionId $AzureSubscriptionId
 
-## Get the VMs
-$ddcVm = Get-AzVM -ResourceGroupName $AzureResourceGroupName -Name $AzureDdcVmName -Status
-$adVm = Get-AzVM -ResourceGroupName $AzureResourceGroupName -Name $AzureAdVmName -Status
+## Get the VMs and power them up if they are not running
+Start-AzureVm -ResourceGroupName $AzureResourceGroupName -VmName $AzureAdVmName
 
-## Check the power state of the VMs
-if ($ddcVm.Statuses[1].Code -ne "PowerState/running") {
-    Start-AzVM -ResourceGroupName $AzureResourceGroupName -Name $AzureDdcVmName
+if ($OnPremises -eq $true) {
+    Start-AzureVm -ResourceGroupName $AzureResourceGroupName -VmName $AzureDdcVmName
+} else {
+    Start-AzureVm -ResourceGroupName $AzureResourceGroupName -VmName $AzureConnectorVm1Name
+    Start-AzureVm -ResourceGroupName $AzureResourceGroupName -VmName $AzureConnectorVm2Name
 }
 
-if ($adVm.Statuses[1].Code -ne "PowerState/running") {
-    Start-AzVM -ResourceGroupName $AzureResourceGroupName -Name $AzureAdVmName
+# Skip polling for orchestration if the environment is cloud
+if ($OnPremises -eq $false) {
+    exit 0
 }
 
 # Poll for the orchestration service to be available
-## Disable SSL validation for test env
-if ($DisableSSLValidation) {
-    $code = @"
-using System.Net;
-using System.Security.Cryptography.X509Certificates;
-public class TrustAllCertsPolicy : ICertificatePolicy {
-    public bool CheckValidationResult(ServicePoint srvPoint, X509Certificate certificate, WebRequest request, int certificateProblem) {
-        return true;
-    }
-}
-"@
-    Add-Type -TypeDefinition $code -Language CSharp
-    [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
-}
-
 ## Poll for GetMe API to return 200
-$timeout = 300
+$timeout = 600
 $curTime = Get-Date
 $endTime = $curTime.AddSeconds($timeout)
 $success = $false

@@ -24,6 +24,17 @@ func skipForOnPrem(isOnPremises bool) func() (bool, error) {
 	}
 }
 
+// Used to skip a test case if go test is running in GitHub Actions
+func skipForGitHubAction(isGitHubAction bool) func() (bool, error) {
+	return func() (bool, error) {
+		if isGitHubAction {
+			return true, nil
+		}
+
+		return false, nil
+	}
+}
+
 // Used to aggregate arbitrary number of terraform resource blocks
 func composeTestResourceTf(resources ...string) string {
 	var result = ""
