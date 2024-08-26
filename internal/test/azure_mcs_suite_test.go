@@ -49,6 +49,12 @@ func TestAzureMcs(t *testing.T) {
 		// Tests being run in cloud env
 		isOnPremises = false
 	}
+	gotestContext := os.Getenv("GOTEST_CONTEXT")
+	isGitHubAction := false
+	if gotestContext != "" && gotestContext == "github" {
+		// Tests being run in GitHub Action
+		isGitHubAction = true
+	}
 
 	zoneInput := os.Getenv("TEST_ZONE_INPUT_AZURE")
 	zoneDescription := os.Getenv("TEST_ZONE_DESCRIPTION")
@@ -243,6 +249,7 @@ func TestAzureMcs(t *testing.T) {
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
 				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_config.service_account_password"},
+				SkipFunc:                skipForGitHubAction(isGitHubAction),
 			},
 			// ImportState testing - MCS HybridAAD
 			{
@@ -252,6 +259,7 @@ func TestAzureMcs(t *testing.T) {
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
 				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_config.service_account_password"},
+				SkipFunc:                skipForGitHubAction(isGitHubAction),
 			},
 			// ImportState testing - MCS AAD
 			{
@@ -261,7 +269,7 @@ func TestAzureMcs(t *testing.T) {
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
 				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache"},
-				SkipFunc:                skipForOnPrem(isOnPremises),
+				SkipFunc:                func() (bool, error) { return (isOnPremises || isGitHubAction), nil },
 			},
 			// ImportState testing
 			{
@@ -271,7 +279,7 @@ func TestAzureMcs(t *testing.T) {
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
 				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache"},
-				SkipFunc:                skipForOnPrem(isOnPremises),
+				SkipFunc:                func() (bool, error) { return (isOnPremises || isGitHubAction), nil },
 			},
 			// ImportState testing - Manual Power Managed
 			{
@@ -315,6 +323,7 @@ func TestAzureMcs(t *testing.T) {
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
 				ImportStateVerifyIgnore: []string{"last_updated", "autoscale_settings", "associated_machine_catalogs", "reboot_schedules"},
+				SkipFunc:                skipForGitHubAction(isGitHubAction),
 			},
 
 			/****************** Delivery Group Test - MCS AD - Update ******************/

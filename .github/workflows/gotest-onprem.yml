@@ -1,0 +1,140 @@
+# This is a Go Test workflow that is manually triggered
+
+name: GoTest - OnPrem
+
+# Controls when the action will run. Workflow runs when manually triggered using the UI
+# or API.
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'internal/**'
+      - '**.go'
+    types: [opened, reopened, synchronize]
+  workflow_dispatch:
+    # Inputs the workflow accepts.
+    inputs:
+      version:
+        # Friendly description to be shown in the UI
+        description: 'Release version that is tested against.'
+        # Default value if no value is explicitly provided
+        default: 'Latest'
+        # Input has to be provided for the workflow to run
+        required: false
+        # The data type of the input
+        type: string
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a job for preparing test env, and a job for running go tests
+  gotest-prep:
+    # GitHub environment for the job
+    environment: Go Test - OnPrem
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout repo
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+      
+      - name: Run Azure PowerShell inline script
+        uses: azure/powershell@v2
+        with:
+          inlineScript: |
+            ./scripts/test-env-power-management/azure_env.ps1 `
+              -ClientId ${{secrets.CLIENT_ID}} `
+              -ClientSecret ${{secrets.CLIENT_SECRET}} `
+              -DomainFqdn ${{secrets.DOMAIN_FQDN}} `
+              -Hostname ${{secrets.HOSTNAME}} `
+              -AzureClientId ${{secrets.AZURE_CLIENT_ID}} `
+              -AzureClientSecret ${{secrets.AZURE_CLIENT_SECRET}} `
+              -AzureTenantId ${{secrets.AZURE_TENANT_ID}} `
+              -AzureSubscriptionId ${{secrets.AZURE_SUBSCRIPTION_ID}} `
+              -AzureResourceGroupName ${{secrets.AZURE_RESOURCE_GROUP_NAME}} `
+              -AzureDdcVmName ${{secrets.AZURE_DDC_VM_NAME}} `
+              -AzureAdVmName ${{secrets.AZURE_AD_VM_NAME}} `
+              -DisableSSLValidation $true
+          azPSVersion: "latest"
+
+  gotest-onprem:
+    needs: gotest-prep
+    # GitHub environment for the job
+    environment: Go Test - OnPrem
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout repo
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      # Set up Go
+      - name: Setup Go 1.21.x
+        uses: actions/setup-go@v5
+        with:
+          # Semantic version range syntax or exact version of Go
+          go-version: '1.21.x'
+
+      # Install dependencies
+      - name: Install dependencies
+        run: |
+          go get .
+
+      # Set env
+      - name: Set env
+        run: | 
+          echo "TF_ACC=1" >> $GITHUB_ENV
+          echo "GOTEST_CONTEXT=${{vars.GOTEST_CONTEXT}}" >> $GITHUB_ENV
+          echo "CITRIX_CLIENT_ID=${{secrets.CITRIX_CLIENT_ID}}" >> $GITHUB_ENV
+          echo "CITRIX_CLIENT_SECRET=${{secrets.CITRIX_CLIENT_SECRET}}" >> $GITHUB_ENV
+          echo "CITRIX_HOSTNAME=${{secrets.CITRIX_HOSTNAME}}" >> $GITHUB_ENV
+          echo "CITRIX_DISABLE_SSL_VERIFICATION=${{secrets.CITRIX_DISABLE_SSL_VERIFICATION}}" >> $GITHUB_ENV
+          echo "TEST_ZONE_INPUT_AZURE=${{vars.TEST_ZONE_INPUT_AZURE}}" >> $GITHUB_ENV
+          echo "TEST_ZONE_DESCRIPTION=${{vars.TEST_ZONE_DESCRIPTION}}" >> $GITHUB_ENV
+          echo "TEST_HYPERV_NAME_AZURE=${{vars.TEST_HYPERV_NAME_AZURE}}" >> $GITHUB_ENV
+          echo "TEST_HYPERV_AD_ID=${{secrets.TEST_HYPERV_AD_ID}}" >> $GITHUB_ENV
+          echo "TEST_HYPERV_SUBSCRIPTION_ID=${{secrets.TEST_HYPERV_SUBSCRIPTION_ID}}" >> $GITHUB_ENV
+          echo "TEST_HYPERV_APPLICATION_ID=${{secrets.TEST_HYPERV_APPLICATION_ID}}" >> $GITHUB_ENV
+          echo "TEST_HYPERV_APPLICATION_SECRET=${{secrets.TEST_HYPERV_APPLICATION_SECRET}}" >> $GITHUB_ENV
+          echo "TEST_HYPERV_RP_NAME=${{vars.TEST_HYPERV_RP_NAME}}" >> $GITHUB_ENV
+          echo "TEST_HYPERV_RP_REGION=${{secrets.TEST_HYPERV_RP_REGION}}" >> $GITHUB_ENV
+          echo "TEST_HYPERV_RP_VIRTUAL_NETWORK_RESOURCE_GROUP=${{secrets.TEST_HYPERV_RP_VIRTUAL_NETWORK_RESOURCE_GROUP}}" >> $GITHUB_ENV
+          echo "TEST_HYPERV_RP_VIRTUAL_NETWORK=${{secrets.TEST_HYPERV_RP_VIRTUAL_NETWORK}}" >> $GITHUB_ENV
+          echo "Test_HYPERV_RP_SUBNETS=${{secrets.Test_HYPERV_RP_SUBNETS}}" >> $GITHUB_ENV
+          echo "TEST_MC_NAME=${{vars.TEST_MC_NAME}}" >> $GITHUB_ENV
+          echo "TEST_MC_SERVICE_ACCOUNT=${{secrets.TEST_MC_SERVICE_ACCOUNT}}" >> $GITHUB_ENV
+          echo "TEST_MC_SERVICE_ACCOUNT_PASS=${{secrets.TEST_MC_SERVICE_ACCOUNT_PASS}}" >> $GITHUB_ENV
+          echo "TEST_MC_SERVICE_OFFERING=${{secrets.TEST_MC_SERVICE_OFFERING}}" >> $GITHUB_ENV
+          echo "TEST_MC_MASTER_IMAGE=${{secrets.TEST_MC_MASTER_IMAGE}}" >> $GITHUB_ENV
+          echo "TEST_MC_MASTER_IMAGE_UPDATED=${{secrets.TEST_MC_MASTER_IMAGE_UPDATED}}" >> $GITHUB_ENV
+          echo "TEST_MC_IMAGE_RESOURCE_GROUP=${{secrets.TEST_MC_IMAGE_RESOUCE_GROUP}}" >> $GITHUB_ENV
+          echo "TEST_MC_IMAGE_STORAGE_ACCOUNT=${{secrets.TEST_MC_IMAGE_STORAGE_ACCOUNT}}" >> $GITHUB_ENV
+          echo "TEST_MC_IMAGE_CONTAINER=${{secrets.TEST_MC_IMAGE_CONTAINER}}" >> $GITHUB_ENV
+          echo "TEST_MC_SUBNET=${{secrets.TEST_MC_SUBNET}}" >> $GITHUB_ENV
+          echo "TEST_MC_DOMAIN=${{secrets.TEST_MC_DOMAIN}}" >> $GITHUB_ENV
+          echo "TEST_MC_NAME_MANUAL=${{vars.TEST_MC_NAME_MANUAL}}" >> $GITHUB_ENV
+          echo "TEST_MC_ALLOCATION_TYPE_MANUAL_POWER_MANAGED=${{vars.TEST_MC_ALLOCATION_TYPE_MANUAL_POWER_MANAGED}}" >> $GITHUB_ENV
+          echo "TEST_MC_SESSION_SUPPORT_MANUAL_POWER_MANAGED=${{vars.TEST_MC_SESSION_SUPPORT_MANUAL_POWER_MANAGED}}" >> $GITHUB_ENV
+          echo "TEST_MC_REGION_MANUAL_POWER_MANAGED=${{secrets.TEST_MC_REGION_MANUAL_POWER_MANAGED}}" >> $GITHUB_ENV
+          echo "TEST_MC_RESOURCE_GROUP_MANUAL_POWER_MANAGED=${{secrets.TEST_MC_RESOURCE_GROUP_MANUAL_POWER_MANAGED}}" >> $GITHUB_ENV
+          echo "TEST_MC_MACHINE_NAME_MANUAL_AZURE=${{secrets.TEST_MC_MACHINE_NAME_MANUAL_AZURE}}" >> $GITHUB_ENV
+          echo "TEST_MC_MACHINE_ACCOUNT_MANUAL_AZURE=${{secrets.TEST_MC_MACHINE_ACCOUNT_MANUAL_AZURE}}" >> $GITHUB_ENV
+          echo "TEST_DG_NAME=${{vars.TEST_DG_NAME}}" >> $GITHUB_ENV
+          echo "TEST_POLICY_SET_WITHOUT_DG_NAME=${{vars.TEST_POLICY_SET_WITHOUT_DG_NAME}}" >> $GITHUB_ENV
+          echo "TEST_POLICY_SET_NAME=${{vars.TEST_POLICY_SET_NAME}}" >> $GITHUB_ENV
+          echo "TEST_APP_NAME=${{vars.TEST_APP_NAME}}" >> $GITHUB_ENV
+          echo "TEST_ADMIN_FOLDER_NAME=${{vars.TEST_APP_FOLDER_NAME}}" >> $GITHUB_ENV
+          echo "TEST_ROLE_NAME=${{vars.TEST_ROLE_NAME}}" >> $GITHUB_ENV
+          echo "TEST_ADMIN_SCOPE_NAME=${{vars.TEST_ADMIN_SCOPE_NAME}}" >> $GITHUB_ENV
+          echo "TEST_ADMIN_USER_NAME=${{secrets.TEST_ADMIN_USER_NAME}}" >> $GITHUB_ENV
+          echo "TEST_ADMIN_USER_DOMAIN=${{secrets.TEST_ADMIN_USER_DOMAIN}}" >> $GITHUB_ENV
+
+      # Test PreCheck
+      - name: Test
+        run: go test -v ./internal/test -run "^TestAzureMcsSuitePreCheck$"
+
+      # Test
+      - name: Test
+        run: go test -v ./internal/test -run "^TestAzureMcs$" -timeout 1h
