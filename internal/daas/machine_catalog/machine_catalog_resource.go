@@ -846,17 +846,24 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 		return
 	}
 
+	if req.Plan.Raw.IsNull() {
+		// Machine Catalog no longer exist in plan, or executing import / delete operation
+		// No need to modify plan
+		return
+	}
+
+	// Plan is not null. Check if the resource is being created or updated
+	create := req.State.Raw.IsNull()
+	operation := "updating"
+	if create {
+		operation = "creating"
+	}
+
 	var plan MachineCatalogResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
-	}
-
-	create := req.State.Raw.IsNull()
-	operation := "updating"
-	if create {
-		operation = "creating"
 	}
 
 	if !r.client.ClientConfig.IsCspCustomer && !plan.Tenants.IsNull() {
