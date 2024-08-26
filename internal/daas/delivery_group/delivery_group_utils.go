@@ -733,7 +733,10 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 		body.SetPeakBufferSizePercent(int32(autoscale.PeakBufferSizePercent.ValueInt64()))
 		body.SetOffPeakBufferSizePercent(int32(autoscale.OffPeakBufferSizePercent.ValueInt64()))
 		body.SetPowerOffDelayMinutes(int32(autoscale.PowerOffDelayMinutes.ValueInt64()))
-		body.SetPeakAutoscaleAssignedPowerOnIdleAction(getSessionChangeHostingActionValue(autoscale.PeakAutoscaleAssignedPowerOnIdleAction.ValueString()))
+		if peakAutoscaleAssignedPowerOnIdleAction := getSessionChangeHostingActionValue(autoscale.PeakAutoscaleAssignedPowerOnIdleAction.ValueString()); peakAutoscaleAssignedPowerOnIdleAction != citrixorchestration.SESSIONCHANGEHOSTINGACTION_NOTHING {
+			// If we set to Nothing, creation of delivery group fails. This is a workaround until STUD-31795 is fixed.
+			body.SetPeakAutoscaleAssignedPowerOnIdleAction(peakAutoscaleAssignedPowerOnIdleAction)
+		}
 		body.SetPeakAutoscaleAssignedPowerOnIdleTimeoutMinutes(int32(autoscale.PeakAutoscaleAssignedPowerOnIdleTimeoutMinutes.ValueInt64()))
 		body.SetDisconnectPeakIdleSessionAfterSeconds(int32(autoscale.DisconnectPeakIdleSessionAfterSeconds.ValueInt64()))
 		body.SetDisconnectOffPeakIdleSessionAfterSeconds(int32(autoscale.DisconnectOffPeakIdleSessionAfterSeconds.ValueInt64()))

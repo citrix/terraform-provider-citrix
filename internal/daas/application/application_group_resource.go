@@ -102,7 +102,7 @@ func (r *applicationGroupResource) Create(ctx context.Context, req resource.Crea
 	createApplicationGroupRequest.SetDeliveryGroups(deliveryGroups)
 
 	createApplicationGroupRequest.SetAdminFolder(plan.ApplicationGroupFolderPath.ValueString())
-	
+
 	if !plan.Tenants.IsNull() {
 		associatedTenants := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Tenants)
 		createApplicationGroupRequest.SetTenants(associatedTenants)
@@ -355,6 +355,10 @@ func (r *applicationGroupResource) ModifyPlan(ctx context.Context, req resource.
 
 	if r.client != nil && r.client.ApiClient == nil {
 		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
+
+	if req.Plan.Raw.IsNull() {
 		return
 	}
 
