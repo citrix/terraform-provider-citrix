@@ -50,7 +50,7 @@ func (*stfRoamingGatewayResource) ValidateConfig(ctx context.Context, req resour
 
 		for _, staUrl := range staUrlList {
 			if staUrl.StaValidationEnabled.ValueBool() {
-				if staUrl.StaValidationSecret.IsNull() {
+				if !staUrl.StaValidationSecret.IsUnknown() && staUrl.StaValidationSecret.IsNull() {
 					resp.Diagnostics.AddAttributeError(
 						path.Root("sta_validation_secret"),
 						"Incorrect Attribute Configuration",
