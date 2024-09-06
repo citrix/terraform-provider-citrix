@@ -132,7 +132,8 @@ func (r AzureHypervisorResourceModel) RefreshPropertyValues(ctx context.Context,
 	r.ApplicationId = types.StringValue(hypervisor.GetApplicationId())
 	r.SubscriptionId = types.StringValue(hypervisor.GetSubscriptionId())
 	r.ActiveDirectoryId = types.StringValue(hypervisor.GetActiveDirectoryId())
-	scopeIds := util.GetIdsForScopeObjects(hypervisor.GetScopes())
+	scopeIdsInState := util.StringSetToStringArray(ctx, diagnostics, r.Scopes)
+	scopeIds := util.GetIdsForFilteredScopeObjects(scopeIdsInState, hypervisor.GetScopes())
 	r.Scopes = util.StringArrayToStringSet(ctx, diagnostics, scopeIds)
 
 	customPropertiesString := hypervisor.GetCustomProperties()

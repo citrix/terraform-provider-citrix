@@ -104,7 +104,8 @@ func (r AwsHypervisorResourceModel) RefreshPropertyValues(ctx context.Context, d
 	r.Zone = types.StringValue(hypZone.GetId())
 	r.Region = types.StringValue(hypervisor.GetRegion())
 	r.ApiKey = types.StringValue(hypervisor.GetApiKey())
-	scopeIds := util.GetIdsForScopeObjects(hypervisor.GetScopes())
+	scopeIdsInState := util.StringSetToStringArray(ctx, diagnostics, r.Scopes)
+	scopeIds := util.GetIdsForFilteredScopeObjects(scopeIdsInState, hypervisor.GetScopes())
 	r.Scopes = util.StringArrayToStringSet(ctx, diagnostics, scopeIds)
 
 	return r

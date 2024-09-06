@@ -1112,7 +1112,9 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 
 	minimumFunctionalLevel := deliveryGroup.GetMinimumFunctionalLevel()
 	r.MinimumFunctionalLevel = types.StringValue(string(minimumFunctionalLevel))
-	scopeIds := util.GetIdsForScopeObjects(deliveryGroup.GetScopes())
+
+	scopeIdsInState := util.StringSetToStringArray(ctx, diagnostics, r.Scopes)
+	scopeIds := util.GetIdsForFilteredScopeObjects(scopeIdsInState, deliveryGroup.GetScopes())
 	r.Scopes = util.StringArrayToStringSet(ctx, diagnostics, scopeIds)
 
 	if deliveryGroup.GetReuseMachinesWithoutShutdownInOutage() {

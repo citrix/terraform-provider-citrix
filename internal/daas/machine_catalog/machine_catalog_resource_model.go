@@ -634,7 +634,8 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 		return r
 	}
 
-	scopeIds := util.GetIdsForScopeObjects(catalog.GetScopes())
+	scopeIdsInState := util.StringSetToStringArray(ctx, diagnostics, r.Scopes)
+	scopeIds := util.GetIdsForFilteredScopeObjects(scopeIdsInState, catalog.GetScopes())
 	r.Scopes = util.StringArrayToStringSet(ctx, diagnostics, scopeIds)
 
 	// Provisioning Scheme Properties

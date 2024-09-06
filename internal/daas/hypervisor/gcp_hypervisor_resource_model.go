@@ -95,7 +95,8 @@ func (r GcpHypervisorResourceModel) RefreshPropertyValues(ctx context.Context, d
 	hypZone := hypervisor.GetZone()
 	r.Zone = types.StringValue(hypZone.GetId())
 	r.ServiceAccountId = types.StringValue(hypervisor.GetServiceAccountId())
-	scopeIds := util.GetIdsForScopeObjects(hypervisor.GetScopes())
+	scopeIdsInState := util.StringSetToStringArray(ctx, diagnostics, r.Scopes)
+	scopeIds := util.GetIdsForFilteredScopeObjects(scopeIdsInState, hypervisor.GetScopes())
 	r.Scopes = util.StringArrayToStringSet(ctx, diagnostics, scopeIds)
 
 	return r

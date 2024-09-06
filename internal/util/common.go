@@ -344,6 +344,29 @@ func GetIdsForOrchestrationObjects[objType any](slice []objType) []string {
 }
 
 // <summary>
+// Filter and Extract Ids from a list of scope responses
+// </summary>
+// <param name="scopeIdsInState">List of scope Ids in state or config</param>
+// <param name="scopeResponses">List of scope objects from remote</param>
+// <returns>List of Ids extracted from response</returns>
+func GetIdsForFilteredScopeObjects(scopeIdsInState []string, scopeResponses []citrixorchestration.ScopeResponseModel) []string {
+	if scopeIdsInState == nil {
+		scopeIdsInState = []string{}
+	}
+	filteredScopes := []citrixorchestration.ScopeResponseModel{}
+	for _, scope := range scopeResponses {
+		if scope.GetIsTenantScope() && !slices.ContainsFunc(scopeIdsInState, func(scopeId string) bool {
+			return strings.EqualFold(scopeId, scope.GetId())
+		}) {
+			continue
+		}
+		filteredScopes = append(filteredScopes, scope)
+	}
+	scopeIds := GetIdsForScopeObjects(filteredScopes)
+	return scopeIds
+}
+
+// <summary>
 // Extract Ids from a list of scope objects
 // </summary>
 // <param name="slice">Input list of objects</param>

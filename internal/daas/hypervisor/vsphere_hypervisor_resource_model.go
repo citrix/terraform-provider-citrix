@@ -173,7 +173,8 @@ func (r VsphereHypervisorResourceModel) RefreshPropertyValues(ctx context.Contex
 		r.SslThumbprints = types.ListNull(types.StringType)
 	}
 
-	scopeIds := util.GetIdsForScopeObjects(hypervisor.GetScopes())
+	scopeIdsInState := util.StringSetToStringArray(ctx, diagnostics, r.Scopes)
+	scopeIds := util.GetIdsForFilteredScopeObjects(scopeIdsInState, hypervisor.GetScopes())
 	r.Scopes = util.StringArrayToStringSet(ctx, diagnostics, scopeIds)
 
 	hypZone := hypervisor.GetZone()

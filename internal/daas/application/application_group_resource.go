@@ -106,6 +106,8 @@ func (r *applicationGroupResource) Create(ctx context.Context, req resource.Crea
 	if !plan.Tenants.IsNull() {
 		associatedTenants := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Tenants)
 		createApplicationGroupRequest.SetTenants(associatedTenants)
+	} else {
+		createApplicationGroupRequest.SetTenants([]string{})
 	}
 
 	addApplicationsGroupRequest := r.client.ApiClient.ApplicationGroupsAPIsDAAS.ApplicationGroupsCreateApplicationGroup(ctx)
@@ -235,6 +237,8 @@ func (r *applicationGroupResource) Update(ctx context.Context, req resource.Upda
 	if !plan.Tenants.IsNull() {
 		associatedTenants := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Tenants)
 		editApplicationGroupRequestBody.SetTenants(associatedTenants)
+	} else {
+		editApplicationGroupRequestBody.SetTenants([]string{})
 	}
 
 	// Update Application

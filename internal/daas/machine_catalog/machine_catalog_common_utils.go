@@ -87,6 +87,8 @@ func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ct
 	if !plan.Tenants.IsNull() {
 		associatedTenants := util.StringSetToStringArray(ctx, diagnostics, plan.Tenants)
 		body.SetTenants(associatedTenants)
+	} else {
+		body.SetTenants([]string{})
 	}
 
 	if !plan.Scopes.IsNull() {
@@ -161,6 +163,8 @@ func getRequestModelForUpdateMachineCatalog(plan MachineCatalogResourceModel, ct
 	if !plan.Tenants.IsNull() {
 		associatedTenants := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Tenants)
 		body.SetTenants(associatedTenants)
+	} else {
+		body.SetTenants([]string{})
 	}
 
 	if !plan.Scopes.IsNull() {

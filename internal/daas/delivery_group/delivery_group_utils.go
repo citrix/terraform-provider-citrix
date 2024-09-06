@@ -773,6 +773,8 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 	if !plan.Tenants.IsNull() {
 		associatedTenants := util.StringSetToStringArray(ctx, diagnostics, plan.Tenants)
 		body.SetTenants(associatedTenants)
+	} else {
+		body.SetTenants([]string{})
 	}
 
 	return body, nil
@@ -995,6 +997,8 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 	if !plan.Tenants.IsNull() {
 		associatedTenants := util.StringSetToStringArray(ctx, diagnostics, plan.Tenants)
 		editDeliveryGroupRequestBody.SetTenants(associatedTenants)
+	} else {
+		editDeliveryGroupRequestBody.SetTenants([]string{})
 	}
 
 	return editDeliveryGroupRequestBody, nil

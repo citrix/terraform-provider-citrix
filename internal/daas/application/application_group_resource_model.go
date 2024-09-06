@@ -32,7 +32,7 @@ type ApplicationGroupResourceModel struct {
 	DeliveryGroups             types.Set    `tfsdk:"delivery_groups"` // Set[string]
 	Scopes                     types.Set    `tfsdk:"scopes"`          // Set[string]
 	ApplicationGroupFolderPath types.String `tfsdk:"application_group_folder_path"`
-	Tenants                    types.Set    `tfsdk:"tenants"`         // Set[string]
+	Tenants                    types.Set    `tfsdk:"tenants"` // Set[string]
 }
 
 func (ApplicationGroupResourceModel) GetSchema() schema.Schema {
@@ -140,7 +140,8 @@ func (r ApplicationGroupResourceModel) RefreshPropertyValues(ctx context.Context
 	}
 
 	if applicationGroup.GetScopes() != nil {
-		scopeIds := util.GetIdsForScopeObjects(applicationGroup.GetScopes())
+		scopeIdsInState := util.StringSetToStringArray(ctx, diagnostics, r.Scopes)
+		scopeIds := util.GetIdsForFilteredScopeObjects(scopeIdsInState, applicationGroup.GetScopes())
 		r.Scopes = util.StringArrayToStringSet(ctx, diagnostics, scopeIds)
 	}
 
@@ -165,7 +166,7 @@ func (r ApplicationGroupResourceModel) RefreshPropertyValues(ctx context.Context
 	} else {
 		r.ApplicationGroupFolderPath = types.StringNull()
 	}
-	
+
 	if len(applicationGroup.GetTenants()) > 0 || !r.Tenants.IsNull() {
 		var remoteTenants []string
 		for _, tenant := range applicationGroup.GetTenants() {
