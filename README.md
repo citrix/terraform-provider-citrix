@@ -6,6 +6,8 @@ Citrix has developed a custom Terraform provider for automating Citrix product d
 - [Plugin for Terraform Provider for Citrix®](#plugin-for-terraform-provider-for-citrix)
   - [Table of Contents](#table-of-contents)
   - [Contacting the Maintainers](#contacting-the-maintainers)
+  - [Examples](#examples)
+    - [Deployment guides](#deployment-guides)
   - [Plugin for Terraform Provider for Citrix® Documentation](#plugin-for-terraform-provider-for-citrix-documentation)
     - [Navigating the repository](#navigating-the-repository)
     - [Provider Configuration](#provider-configuration)
@@ -25,7 +27,6 @@ Citrix has developed a custom Terraform provider for automating Citrix product d
     - [Create Citrix Cloud Resource Locations](#create-citrix-cloud-resource-locations)
     - [Managing StoreFront resources](#managing-storefront-resources)
     - [Managing DaaS Quick Deploy resources](#managing-daas-quick-deploy-resources)
-  - [Examples and Deployment Guides](#examples-and-deployment-guides)
   - [Frequently Asked Questions](#frequently-asked-questions)
       - [What resource is supported for different connection types?](#what-resource-is-supported-for-different-connection-types)
   - [Attributions](#attributions)
@@ -33,6 +34,19 @@ Citrix has developed a custom Terraform provider for automating Citrix product d
 
 ## Contacting the Maintainers
 This project uses GitHub to track all issues. See [CONTRIBUTING.md](CONTRIBUTING.md) for more information.
+
+## Examples
+Basic example templates for getting started can be found in the repository at [examples/](/examples/README.md)
+
+### Deployment guides
+Complete steps from start to finsh for a variety of senarios from [Citrix Tech Zone](https://community.citrix.com/tech-zone/automation/):
+- [Installing and configuring the provider](https://community.citrix.com/tech-zone/automation/terraform-install-and-config/)
+- [AWS EC2](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-aws/) via MCS
+- [Azure](https://community.citrix.com/tech-zone/build/deployment-guides/citrix-daas-terraform-azure/) via MCS
+- [GCP](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-gcp/) via MCS
+- [vSphere](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-vsphere8/) via MCS
+- [XenServer](https://community.citrix.com/tech-zone/automation/citrix-terraform-xenserver) via MCS
+- [Citrix policies](https://community.citrix.com/tech-zone/automation/cvad-terraform-policies/)
 
 ## Plugin for Terraform Provider for Citrix® Documentation
 
@@ -163,15 +177,6 @@ Please refer to the [StoreFront.md](StoreFront.md) to configure StoreFront resou
 
 ### Managing DaaS Quick Deploy resources
 QuickCreate service allows customers to create and manage Amazon WorkSpaces Core instances in Amazon Web Services (AWS). Please refer to the [QuickCreate documentation](https://docs.citrix.com/en-us/citrix-daas/install-configure/amazon-workspaces-core.html) to learn more. Note that this feature is in Tech Preview.
-
-## Examples and Deployment Guides
-Basic example templates for getting started: [/examples](/examples)
-
-Detailed instructions on setting up deployments on different cloud providers from Citrix Tech Zone:
-- [AWS EC2](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-aws/)
-- [Azure](https://community.citrix.com/tech-zone/build/deployment-guides/citrix-daas-terraform-azure/)
-- [GCP](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-gcp/)
-- [vSphere](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-vsphere8/)
 
 ## Frequently Asked Questions
 

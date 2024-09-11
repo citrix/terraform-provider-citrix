@@ -909,7 +909,8 @@ type DeliveryGroupResourceModel struct {
 	DefaultAccessPolicies       types.List   `tfsdk:"default_access_policies"` //List[DeliveryGroupAccessPolicyModel]
 	CustomAccessPolicies        types.List   `tfsdk:"custom_access_policies"`  //List[DeliveryGroupAccessPolicyModel]
 	DeliveryGroupFolderPath     types.String `tfsdk:"delivery_group_folder_path"`
-	Tenants                     types.Set    `tfsdk:"tenants"` //Set[String]
+	Tenants                     types.Set    `tfsdk:"tenants"`  //Set[String]
+	Metadata                    types.List   `tfsdk:"metadata"` //List[NameValueStringPairmodel]
 }
 
 func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
@@ -1065,7 +1066,6 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 						"Force replacement when discarding changes in default access policies",
 						"Force replacement when discarding changes in default access policies"),
 				},
-				// Default: getDefaultAccessPolicies(ctx, diagnostics),
 			},
 			"custom_access_policies": schema.ListNestedAttribute{
 				Description:  "Custom Access Policies for the delivery group. To manage built-in access policies use the `default_access_policies` instead.",
@@ -1087,6 +1087,7 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 					setvalidator.SizeAtLeast(1),
 				},
 			},
+			"metadata": util.GetMetadataListSchema("Delivery Group"),
 		},
 	}
 }
@@ -1112,7 +1113,9 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 
 	minimumFunctionalLevel := deliveryGroup.GetMinimumFunctionalLevel()
 	r.MinimumFunctionalLevel = types.StringValue(string(minimumFunctionalLevel))
-	scopeIds := util.GetIdsForScopeObjects(deliveryGroup.GetScopes())
+
+	scopeIdsInState := util.StringSetToStringArray(ctx, diagnostics, r.Scopes)
+	scopeIds := util.GetIdsForFilteredScopeObjects(scopeIdsInState, deliveryGroup.GetScopes())
 	r.Scopes = util.StringArrayToStringSet(ctx, diagnostics, scopeIds)
 
 	if deliveryGroup.GetReuseMachinesWithoutShutdownInOutage() {
@@ -1161,6 +1164,14 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 		r.Tenants = util.StringArrayToStringSet(ctx, diagnostics, remoteTenants)
 	} else {
 		r.Tenants = types.SetNull(types.StringType)
+	}
+
+	effectiveMetadata := util.GetEffectiveMetadata(util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, r.Metadata), deliveryGroup.GetMetadata())
+
+	if len(effectiveMetadata) > 0 {
+		r.Metadata = util.RefreshListValueProperties[util.NameValueStringPairModel, citrixorchestration.NameValueStringPairModel](ctx, diagnostics, r.Metadata, effectiveMetadata, util.GetOrchestrationNameValueStringPairKey)
+	} else {
+		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
 	}
 
 	return r

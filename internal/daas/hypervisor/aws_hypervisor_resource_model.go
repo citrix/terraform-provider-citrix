@@ -24,10 +24,11 @@ import (
 // HypervisorResourceModel maps the resource schema data.
 type AwsHypervisorResourceModel struct {
 	/**** Connection Details ****/
-	Id     types.String `tfsdk:"id"`
-	Name   types.String `tfsdk:"name"`
-	Zone   types.String `tfsdk:"zone"`
-	Scopes types.Set    `tfsdk:"scopes"` // Set[string]
+	Id       types.String `tfsdk:"id"`
+	Name     types.String `tfsdk:"name"`
+	Zone     types.String `tfsdk:"zone"`
+	Scopes   types.Set    `tfsdk:"scopes"`   // Set[string]
+	Metadata types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
 	/** AWS EC2 Connection **/
 	Region    types.String `tfsdk:"region"`
 	ApiKey    types.String `tfsdk:"api_key"`
@@ -89,6 +90,7 @@ func (AwsHypervisorResourceModel) GetSchema() schema.Schema {
 					),
 				},
 			},
+			"metadata": util.GetMetadataListSchema("Hypervisor"),
 		},
 	}
 }
@@ -104,8 +106,17 @@ func (r AwsHypervisorResourceModel) RefreshPropertyValues(ctx context.Context, d
 	r.Zone = types.StringValue(hypZone.GetId())
 	r.Region = types.StringValue(hypervisor.GetRegion())
 	r.ApiKey = types.StringValue(hypervisor.GetApiKey())
-	scopeIds := util.GetIdsForScopeObjects(hypervisor.GetScopes())
+	scopeIdsInState := util.StringSetToStringArray(ctx, diagnostics, r.Scopes)
+	scopeIds := util.GetIdsForFilteredScopeObjects(scopeIdsInState, hypervisor.GetScopes())
 	r.Scopes = util.StringArrayToStringSet(ctx, diagnostics, scopeIds)
+
+	effectiveMetadata := util.GetEffectiveMetadata(util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, r.Metadata), hypervisor.GetMetadata())
+
+	if len(effectiveMetadata) > 0 {
+		r.Metadata = util.RefreshListValueProperties[util.NameValueStringPairModel, citrixorchestration.NameValueStringPairModel](ctx, diagnostics, r.Metadata, effectiveMetadata, util.GetOrchestrationNameValueStringPairKey)
+	} else {
+		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
+	}
 
 	return r
 }

@@ -16,6 +16,18 @@ StoreFront Deployment.
 resource "citrix_stf_deployment" "example-stf-deployment" {
 	site_id      = "1"	
 	host_base_url = "https://<storefront machine hostname>"
+	roaming_gateway = [
+		{
+			name = "Example Roaming Gateway Name"
+			logon_type = "None"
+			gateway_url = "https://example.gateway.url/"
+			subnet_ip_address = "10.0.0.1"
+		}
+	]
+	roaming_beacon = {
+		internal_ip = "https://example.internalip.url"
+		external_ips = ["https://example.externalip.url"]
+	}
 }
 ```
 
@@ -28,7 +40,60 @@ resource "citrix_stf_deployment" "example-stf-deployment" {
 
 ### Optional
 
+- `roaming_beacon` (Attributes) Roaming Beacon configuration. (see [below for nested schema](#nestedatt--roaming_beacon))
+- `roaming_gateway` (Attributes List) Roaming Gateway configuration. (see [below for nested schema](#nestedatt--roaming_gateway))
 - `site_id` (String) The IIS site id of the StoreFront deployment. Defaults to 1.
+
+<a id="nestedatt--roaming_beacon"></a>
+### Nested Schema for `roaming_beacon`
+
+Required:
+
+- `internal_ip` (String) Internal IP address of the beacon. It can either be the hostname or the IP address of the beacon.
+
+Optional:
+
+- `external_ips` (List of String) External IP addresses of the beacon. It can either be the gateway url or the IP addresses of the beacon. If the user removes it from terraform, then the previously persisted values will be retained.
+
+
+<a id="nestedatt--roaming_gateway"></a>
+### Nested Schema for `roaming_gateway`
+
+Required:
+
+- `gateway_url` (String) The URL of the StoreFront gateway.
+- `logon_type` (String) The login type required and supported by the Gateway. Possible values are `UsedForHDXOnly`, `Domain`, `RSA`, `DomainAndRSA`, `SMS`, `GatewayKnows`, `SmartCard`, and `None`.
+- `name` (String) The name of the StoreFront roaming gateway.
+- `subnet_ip_address` (String) The subnet IP address of the StoreFront gateway.
+
+Optional:
+
+- `callback_url` (String) The Gateway authentication NetScaler call-back url.
+- `gslb_url` (String) An optional URL which corresponds to the Global Server Load Balancing domain used by multiple gateways. Defaults to an empty string.
+- `is_cloud_gateway` (Boolean) Whether the Gateway is an instance of Citrix Gateway Service in the cloud. Defaults to `false`.
+- `request_ticket_from_two_stas` (Boolean) Request STA tickets from two STA servers (Requires two STA servers). Defaults to `false`.
+- `secure_ticket_authority_urls` (Attributes List) The Secure Ticket Authority (STA) URLs. The STA servers validate the tickets that are issued by the StoreFront server. The STA servers must be reachable from the StoreFront server. (see [below for nested schema](#nestedatt--roaming_gateway--secure_ticket_authority_urls))
+- `session_reliability` (Boolean) Enable session reliability. Session Reliability keeps sessions active and on the user’s screen when network connectivity is interrupted. Users continue to see the application they are using until network connectivity resumes. Defaults to `false`.
+- `smart_card_fallback_logon_type` (String) The login type to use when SmartCard fails. Possible values are `UsedForHDXOnly`, `Domain`, `RSA`, `DomainAndRSA`, `SMS`, `GatewayKnows`, `SmartCard`, and `None`. Defaults to `None`.
+- `stas_bypass_duration` (String) Time before retrying a failed STA server in `dd.hh:mm:ss` format with 0's trimmed. Defaults to `0.1:0:0`
+- `stas_use_load_balancing` (Boolean) Use load balancing for the Secure Ticket Authority (STA) servers. Defaults to `false`.
+- `version` (String) The Citrix NetScaler Gateway version. Possible values are `Version10_0_69_4` and `Version9x`. Defaults to `Version10_0_69_4`.
+
+<a id="nestedatt--roaming_gateway--secure_ticket_authority_urls"></a>
+### Nested Schema for `roaming_gateway.secure_ticket_authority_urls`
+
+Required:
+
+- `sta_url` (String) The URL of the Secure Ticket Authority (STA) server.
+
+Optional:
+
+- `sta_validation_enabled` (Boolean) Whether Secure Ticket Authority (STA) validation is enabled. Defaults to `false`.
+- `sta_validation_secret` (String, Sensitive) The Secure Ticket Authority (STA) validation secret.
+
+Read-Only:
+
+- `authority_id` (String) The ID of the Secure Ticket Authority (STA) server.
 
 ## Import
 

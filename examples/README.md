@@ -5,22 +5,32 @@ This folder contains examples of how to configure Citrix environments in various
 ## Table of Contents
 - [Plugin for Terraform Provider for Citrix® Examples](#plugin-for-terraform-provider-for-citrix-examples)
   - [Table of Contents](#table-of-contents)
-  - [How to use the examples](#how-to-use-the-examples)
+  - [Deployment guides](#deployment-guides)
+  - [How to use the examples in this repository](#how-to-use-the-examples-in-this-repository)
     - [Specifying variables](#specifying-variables)
     - [Provider settings](#provider-settings)
   - [Examples](#examples)
     - [Basic MCS](#basic-mcs)
     - [Non-domain joined MCS](#non-domain-joined-mcs)
     - [Quick Deploy](#quick-deploy)
-    - [Detailed instructions for cloud providers:](#detailed-instructions-for-cloud-providers)
 
-## How to use the examples
+## Deployment guides
+Complete steps from start to finish for a variety of senarios from [Citrix Tech Zone](https://community.citrix.com/tech-zone/automation/):
+- [Installing and configuring the provider](https://community.citrix.com/tech-zone/automation/terraform-install-and-config/)
+- [AWS EC2](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-aws/) via MCS
+- [Azure](https://community.citrix.com/tech-zone/build/deployment-guides/citrix-daas-terraform-azure/) via MCS
+- [GCP](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-gcp/) via MCS
+- [vSphere](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-vsphere8/) via MCS
+- [XenServer](https://community.citrix.com/tech-zone/automation/citrix-terraform-xenserver) via MCS
+- [Citrix policies](https://community.citrix.com/tech-zone/automation/cvad-terraform-policies/)
+
+## How to use the examples in this repository
 Clone this repository and then navigate to the given example directory, [specify the variables](#specifying-variables), and run terraform there:
 ```shell
 > git clone https://github.com/citrix/terraform-provider-citrix.git
 > cd terraform-provider-citrix/examples/basic_azure_mcs_vda
 > cp terraform.template.tfvars terraform.tfvars
-> vscode terraform.tfvars # open the file and specify variables
+> code terraform.tfvars # open the file and specify variables
 > terraform init
 > terraform plan
 > terraform apply
@@ -64,11 +74,3 @@ The difference is in [machine_catalogs.tf](non_domain_joined_azure_mcs_vda/machi
 ### Quick Deploy
 Examples of creating resources using DaaS Quick Deploy. This includes the account, directory or resource connection, image, and finally the deployment which is assigned to a list of usernames provided in the variables.
 * [AWS WorkSpaces Core](basic_aws_workspace_core_deployment)
-
-
-### Detailed instructions for cloud providers:
-Detailed instructions on setting up deployments on different cloud providers from Citrix Tech Zone:
-- [AWS EC2](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-aws/)
-- [Azure](https://community.citrix.com/tech-zone/build/deployment-guides/citrix-daas-terraform-azure/)
-- [GCP](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-gcp/)
-- [vSphere](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-vsphere8/)

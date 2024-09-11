@@ -48,6 +48,14 @@ func (r *scvmmHypervisorResourcePoolResource) ValidateConfig(ctx context.Context
 		return
 	}
 
+	if !data.Metadata.IsNull() {
+		metadata := util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, data.Metadata)
+		isValid := util.ValidateMetadataConfig(ctx, &resp.Diagnostics, metadata)
+		if !isValid {
+			return
+		}
+	}
+
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
 	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }
@@ -173,6 +181,9 @@ func (r *scvmmHypervisorResourcePoolResource) Create(ctx context.Context, req re
 
 	resourcePoolDetails.SetUseLocalStorageCaching(plan.UseLocalStorageCaching.ValueBool())
 
+	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	resourcePoolDetails.SetMetadata(metadata)
+
 	resourcePool, err := CreateHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, *hypervisor, resourcePoolDetails)
 	if err != nil {
 		// Directly return. Error logs have been populated in common function
@@ -276,6 +287,7 @@ func (r *scvmmHypervisorResourcePoolResource) Update(ctx context.Context, req re
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				fmt.Sprintf("\nFailed to resolve resource %s, error: %s", plan.Host.ValueString(), err.Error()),
 		)
+		return
 	}
 
 	storagesToBeIncluded, tempStoragesToBeIncluded := plan.GetStorageList(ctx, r.client, &resp.Diagnostics, hypervisor, host.GetXDPath(), false, false)
@@ -317,6 +329,9 @@ func (r *scvmmHypervisorResourcePoolResource) Update(ctx context.Context, req re
 	editHypervisorResourcePool.SetNetworks(networks)
 
 	editHypervisorResourcePool.SetUseLocalStorageCaching(plan.UseLocalStorageCaching.ValueBool())
+
+	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	editHypervisorResourcePool.SetMetadata(metadata)
 
 	updatedResourcePool, err := UpdateHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, plan.Hypervisor.ValueString(), plan.Id.ValueString(), editHypervisorResourcePool)
 	if err != nil {

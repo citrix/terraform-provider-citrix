@@ -204,6 +204,9 @@ resource "citrix_delivery_group" "example-delivery-group" {
 ~> **Please Note** This setting only impacts Single Session OS Random (pooled) desktops which are power managed. LHC is always enabled for Single Session OS static and Multi Session OS desktops.
 
 -> **Note** When set to `true`, machines will remain available and allow new connections and changes to the machine caused by a user might be present in subsequent sessions. When set to `false`, machines in the delivery group will be unavailable for new connections during a Local Host Cache event.
+- `metadata` (Attributes List) Metadata for the Delivery Group.
+
+~> **Please Note** Metadata once set cannot be removed. Use this field to add new metadata or update the value for an existing metadata. Subsequently, removing any metadata from config will have no effect on the existing metadata of the resource. (see [below for nested schema](#nestedatt--metadata))
 - `minimum_functional_level` (String) Specifies the minimum functional level for the VDA machines in the delivery group. Defaults to `L7_20`.
 - `policy_set_id` (String) GUID identifier of the policy set.
 - `reboot_schedules` (Attributes List) The reboot schedule for the delivery group. (see [below for nested schema](#nestedatt--reboot_schedules))
@@ -436,6 +439,15 @@ Optional:
 
 -> **Note** Users must be in `DOMAIN\UserOrGroupName` or `user@domain.com` format
 
+
+
+<a id="nestedatt--metadata"></a>
+### Nested Schema for `metadata`
+
+Required:
+
+- `name` (String) Metadata name.
+- `value` (String) Metadata value.
 
 
 <a id="nestedatt--reboot_schedules"></a>

@@ -36,8 +36,7 @@ func (ApplicationIconResourceModel) GetSchema() schema.Schema {
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.ExactlyOneOf(
-						path.MatchRelative().AtParent().AtName("raw_data"),
-						path.MatchRelative().AtParent().AtName("file_path"),
+						path.MatchRoot("file_path"),
 					),
 					stringvalidator.LengthAtLeast(1),
 				},

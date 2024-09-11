@@ -105,13 +105,21 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 				"Error creating Zone with Resource Location ID",
 				"Resource Location "+plan.ResourceLocationId.ValueString()+" not found. Ensure the resource location has been created manually or via terraform, then try again.",
 			)
+			return
 		}
 
 		zoneName := resourceLocation.GetName()
 
 		zone, err := pollZone(ctx, r.client, zoneName)
 		if err == nil && zone != nil {
-			// zone exists. Add it to the state file
+			// zone exists. run an update on zone so that the description and metadata are updated
+			zone, err = plan.updateZoneAfterCreate(ctx, r.client, &resp.Diagnostics, zone.GetId(), zoneName)
+
+			if err != nil {
+				return
+			}
+
+			// Add it to the state file
 			plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, zone, false)
 
 			diags = resp.State.Set(ctx, plan)
@@ -130,11 +138,8 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 	var body citrixorchestration.CreateZoneRequestModel
 	body.SetName(plan.Name.ValueString())
 	body.SetDescription(plan.Description.ValueString())
-	if !plan.Metadata.IsNull() {
-		terraformModel := util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata)
-		metadata := util.ParseNameValueStringPairToClientModel(terraformModel)
-		body.SetMetadata(metadata)
-	}
+	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	body.SetMetadata(metadata)
 
 	createZoneRequest := r.client.ApiClient.ZonesAPIsDAAS.ZonesCreateZone(ctx)
 	createZoneRequest = createZoneRequest.CreateZoneRequestModel(body)
@@ -217,14 +222,15 @@ func (r *zoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	// Construct the update model
 	var editZoneRequestBody = &citrixorchestration.EditZoneRequestModel{}
-	editZoneRequestBody.SetName(plan.Name.ValueString())
-	editZoneRequestBody.SetDescription(plan.Description.ValueString())
-
-	if !plan.Metadata.IsNull() {
-		terraformModel := util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata)
-		metadata := util.ParseNameValueStringPairToClientModel(terraformModel)
-		editZoneRequestBody.SetMetadata(metadata)
+	zoneName := plan.Name.ValueString()
+	if !r.client.AuthConfig.OnPremises {
+		// for cloud, there will be no name in plan, use name from state
+		zoneName = state.Name.ValueString()
 	}
+	editZoneRequestBody.SetName(zoneName)
+	editZoneRequestBody.SetDescription(plan.Description.ValueString())
+	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	editZoneRequestBody.SetMetadata(metadata)
 
 	// Update zone
 	editZoneRequest := r.client.ApiClient.ZonesAPIsDAAS.ZonesEditZone(ctx, state.Id.ValueString())
@@ -307,16 +313,6 @@ func (r *zoneResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRe
 		if resp.Diagnostics.HasError() {
 			return
 		}
-
-		if !r.client.AuthConfig.OnPremises && !req.State.Raw.IsNull() {
-			stateAndPlanDiff, _ := req.State.Raw.Diff(req.Plan.Raw)
-			if len(stateAndPlanDiff) > 0 {
-				resp.Diagnostics.AddWarning(
-					"Attempting to modify Zone",
-					"Zones and Cloud Connectors are managed only by Citrix Cloud. You may update the description but any metadata changes will be skipped.",
-				)
-			}
-		}
 	}
 
 	if req.Plan.Raw.IsNull() && !r.client.AuthConfig.OnPremises {
@@ -336,6 +332,14 @@ func (r *zoneResource) ValidateConfig(ctx context.Context, req resource.Validate
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	if !data.Metadata.IsNull() {
+		metadata := util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, data.Metadata)
+		isValid := util.ValidateMetadataConfig(ctx, &resp.Diagnostics, metadata)
+		if !isValid {
+			return
+		}
 	}
 
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
@@ -391,4 +395,33 @@ func pollZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, zo
 	}
 
 	return zone, err
+}
+
+func (r ZoneResourceModel) updateZoneAfterCreate(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, zoneId, zoneName string) (*citrixorchestration.ZoneDetailResponseModel, error) {
+	var editZoneRequestBody citrixorchestration.EditZoneRequestModel
+	editZoneRequestBody.SetName(zoneName)
+	editZoneRequestBody.SetDescription(r.Description.ValueString())
+	metadata := util.GetMetadataRequestModel(ctx, diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, r.Metadata))
+	editZoneRequestBody.SetMetadata(metadata)
+
+	// Update zone
+	editZoneRequest := client.ApiClient.ZonesAPIsDAAS.ZonesEditZone(ctx, zoneId)
+	editZoneRequest = editZoneRequest.EditZoneRequestModel(editZoneRequestBody)
+	httpResp, err := citrixdaasclient.AddRequestData(editZoneRequest, client).Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error updating Zone "+zoneName,
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		return nil, err
+	}
+
+	// Fetch updated zone from GetZone.
+	updatedZone, err := getZone(ctx, client, diagnostics, zoneId)
+	if err != nil {
+		return nil, err
+	}
+
+	return updatedZone, err
 }

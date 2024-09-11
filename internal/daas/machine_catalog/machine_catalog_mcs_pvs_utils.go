@@ -431,6 +431,9 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 		provisioningScheme.SetNetworkMapping(networkMapping)
 	}
 
+	metadata := util.GetMetadataRequestModel(ctx, diag, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diag, provisioningSchemePlan.Metadata))
+	provisioningScheme.SetMetadata(metadata)
+
 	return &provisioningScheme, nil
 }
 
@@ -1351,6 +1354,15 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Con
 	}
 
 	provSchemeModel.MachineDomainIdentity = util.TypedObjectToObjectValue(ctx, diagnostics, machineDomainIdentityModel)
+
+	effectiveMetadata := util.GetEffectiveMetadata(util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, provSchemeModel.Metadata), provScheme.GetMetadata())
+
+	if len(effectiveMetadata) > 0 {
+		provSchemeModel.Metadata = util.RefreshListValueProperties[util.NameValueStringPairModel, citrixorchestration.NameValueStringPairModel](ctx, diagnostics, provSchemeModel.Metadata, effectiveMetadata, util.GetOrchestrationNameValueStringPairKey)
+	} else {
+		provSchemeModel.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
+	}
+
 	r.ProvisioningScheme = util.TypedObjectToObjectValue(ctx, diagnostics, provSchemeModel)
 	return r
 }

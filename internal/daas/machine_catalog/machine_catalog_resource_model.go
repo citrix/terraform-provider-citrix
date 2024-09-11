@@ -21,6 +21,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
@@ -47,7 +48,8 @@ type MachineCatalogResourceModel struct {
 	MinimumFunctionalLevel   types.String `tfsdk:"minimum_functional_level"`
 	Scopes                   types.Set    `tfsdk:"scopes"` //Set[String]
 	MachineCatalogFolderPath types.String `tfsdk:"machine_catalog_folder_path"`
-	Tenants                  types.Set    `tfsdk:"tenants"` // Set[String]
+	Tenants                  types.Set    `tfsdk:"tenants"`  // Set[String]
+	Metadata                 types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
 }
 
 type MachineAccountsModel struct {
@@ -158,6 +160,7 @@ type ProvisioningSchemeModel struct {
 	MachineDomainIdentity       types.Object `tfsdk:"machine_domain_identity"`        // MachineDomainIdentityModel
 	MachineAccountCreationRules types.Object `tfsdk:"machine_account_creation_rules"` // MachineAccountCreationRulesModel
 	CustomProperties            types.List   `tfsdk:"custom_properties"`              // List[CustomPropertyModel]
+	Metadata                    types.List   `tfsdk:"metadata"`                       // List[NameValueStringPairModel]
 }
 
 func (ProvisioningSchemeModel) GetSchema() schema.SingleNestedAttribute {
@@ -253,6 +256,18 @@ func (ProvisioningSchemeModel) GetSchema() schema.SingleNestedAttribute {
 				NestedObject: CustomPropertyModel{}.GetSchema(),
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
+				},
+			},
+			"metadata": schema.ListNestedAttribute{
+				Description: "Metadata for the Provisioning Scheme" +
+					"\n\n~> **Please Note** Metadata for Provisioning Scheme once set cannot be updated or removed.",
+				Optional:     true,
+				NestedObject: util.NameValueStringPairModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.RequiresReplace(),
 				},
 			},
 		},
@@ -570,6 +585,7 @@ func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 					setvalidator.SizeAtLeast(1),
 				},
 			},
+			"metadata": util.GetMetadataListSchema("Machine Catalog"),
 		},
 	}
 }
@@ -634,7 +650,8 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 		return r
 	}
 
-	scopeIds := util.GetIdsForScopeObjects(catalog.GetScopes())
+	scopeIdsInState := util.StringSetToStringArray(ctx, diagnostics, r.Scopes)
+	scopeIds := util.GetIdsForFilteredScopeObjects(scopeIdsInState, catalog.GetScopes())
 	r.Scopes = util.StringArrayToStringSet(ctx, diagnostics, scopeIds)
 
 	// Provisioning Scheme Properties
@@ -656,6 +673,14 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 		r.Tenants = util.StringArrayToStringSet(ctx, diagnostics, remoteTenants)
 	} else {
 		r.Tenants = types.SetNull(types.StringType)
+	}
+
+	effectiveMetadata := util.GetEffectiveMetadata(util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, r.Metadata), catalog.GetMetadata())
+
+	if len(effectiveMetadata) > 0 {
+		r.Metadata = util.RefreshListValueProperties[util.NameValueStringPairModel, citrixorchestration.NameValueStringPairModel](ctx, diagnostics, r.Metadata, effectiveMetadata, util.GetOrchestrationNameValueStringPairKey)
+	} else {
+		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
 	}
 
 	return r

@@ -445,6 +445,9 @@ resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
 - `is_remote_pc` (Boolean) Specify if this catalog is for Remote PC access.
 - `machine_accounts` (Attributes List) Machine accounts to add to the catalog. Only to be used when using `provisioning_type = MANUAL` (see [below for nested schema](#nestedatt--machine_accounts))
 - `machine_catalog_folder_path` (String) The path to the folder in which the machine catalog is located.
+- `metadata` (Attributes List) Metadata for the Machine Catalog.
+
+~> **Please Note** Metadata once set cannot be removed. Use this field to add new metadata or update the value for an existing metadata. Subsequently, removing any metadata from config will have no effect on the existing metadata of the resource. (see [below for nested schema](#nestedatt--metadata))
 - `minimum_functional_level` (String) Specifies the minimum functional level for the VDA machines in the catalog. Defaults to `L7_20`.
 - `provisioning_scheme` (Attributes) Machine catalog provisioning scheme. Required when `provisioning_type = MCS` or `provisioning_type = PVS_STREAMING`. (see [below for nested schema](#nestedatt--provisioning_scheme))
 - `remote_pc_ous` (Attributes List) Organizational Units to be included in the Remote PC machine catalog. Only to be used when `is_remote_pc = true`. For adding machines, use `machine_accounts`. (see [below for nested schema](#nestedatt--remote_pc_ous))
@@ -487,6 +490,15 @@ Optional:
 
 
 
+<a id="nestedatt--metadata"></a>
+### Nested Schema for `metadata`
+
+Required:
+
+- `name` (String) Metadata name.
+- `value` (String) Metadata value.
+
+
 <a id="nestedatt--provisioning_scheme"></a>
 ### Nested Schema for `provisioning_scheme`
 
@@ -506,6 +518,9 @@ Optional:
 - `custom_properties` (Attributes List) **This is an advanced feature. Use with caution.** Custom properties to be set for the machine catalog. For properties that are already supported as a terraform configuration field, please use terraform field instead. (see [below for nested schema](#nestedatt--provisioning_scheme--custom_properties))
 - `gcp_machine_config` (Attributes) Machine Configuration For GCP MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--gcp_machine_config))
 - `machine_domain_identity` (Attributes) The domain identity for machines in the machine catalog.<br />Required when identity_type is set to `ActiveDirectory` (see [below for nested schema](#nestedatt--provisioning_scheme--machine_domain_identity))
+- `metadata` (Attributes List) Metadata for the Provisioning Scheme
+
+~> **Please Note** Metadata for Provisioning Scheme once set cannot be updated or removed. (see [below for nested schema](#nestedatt--provisioning_scheme--metadata))
 - `network_mapping` (Attributes List) Specifies how the attached NICs are mapped to networks. If this parameter is omitted, provisioned VMs are created with a single NIC, which is mapped to the default network in the hypervisor resource pool.  If this parameter is supplied, machines are created with the number of NICs specified in the map, and each NIC is attached to the specified network.<br />Required when `provisioning_scheme.identity_type` is `AzureAD`. (see [below for nested schema](#nestedatt--provisioning_scheme--network_mapping))
 - `nutanix_machine_config` (Attributes) Machine Configuration For Nutanix MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--nutanix_machine_config))
 - `scvmm_machine_config` (Attributes) Machine Configuration for SCVMM MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--scvmm_machine_config))
@@ -738,6 +753,15 @@ Required:
 Optional:
 
 - `domain_ou` (String) The organization unit that computer accounts will be created into.
+
+
+<a id="nestedatt--provisioning_scheme--metadata"></a>
+### Nested Schema for `provisioning_scheme.metadata`
+
+Required:
+
+- `name` (String) Metadata name.
+- `value` (String) Metadata value.
 
 
 <a id="nestedatt--provisioning_scheme--network_mapping"></a>

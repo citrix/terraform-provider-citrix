@@ -640,7 +640,7 @@ func (AzurePvsConfigurationModel) GetSchema() schema.SingleNestedAttribute {
 			},
 		},
 		Validators: []validator.Object{
-			objectvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("azure_pvs_config"), path.MatchRelative().AtParent().AtName("azure_master_image")),
+			objectvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("azure_master_image")),
 		},
 	}
 }

@@ -4,6 +4,7 @@ package hypervisor_resource_pool
 
 import (
 	"context"
+	"fmt"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -117,4 +118,25 @@ func ReadHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.Ci
 	getResourcePoolsRequest := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorResourcePool(ctx, hypervisorId, hypervisorResourcePoolId)
 	resourcePool, _, err := util.ReadResource[*citrixorchestration.HypervisorResourcePoolDetailResponseModel](getResourcePoolsRequest, ctx, client, resp, "Resource Pool", hypervisorResourcePoolId)
 	return resourcePool, err
+}
+
+func getHypervisorResourcePoolSubnets(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId, folderPath string, subnets []string, connectionType citrixorchestration.HypervisorConnectionType) ([]string, error) {
+	remoteSubnets, err := util.GetFilteredResourcePathList(ctx, client, hypervisorId, folderPath, util.NetworkResourceType, subnets, connectionType, "")
+	if err != nil {
+		diagnostics.AddError(
+			"Error creating Hypervisor Resource Pool for "+string(connectionType),
+			"Error message: "+util.ReadClientError(err),
+		)
+		return nil, err
+	}
+
+	if len(remoteSubnets) != len(subnets) {
+		diagnostics.AddError(
+			"Error creating Hypervisor Resource Pool for "+string(connectionType),
+			"Subnet contains invalid value.",
+		)
+		return nil, fmt.Errorf("subnet contains invalid value")
+	}
+
+	return remoteSubnets, nil
 }

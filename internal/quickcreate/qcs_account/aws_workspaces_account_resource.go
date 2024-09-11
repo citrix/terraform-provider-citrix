@@ -17,34 +17,34 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                   = &awsWorkspaceAccountResource{}
-	_ resource.ResourceWithConfigure      = &awsWorkspaceAccountResource{}
-	_ resource.ResourceWithImportState    = &awsWorkspaceAccountResource{}
-	_ resource.ResourceWithValidateConfig = &awsWorkspaceAccountResource{}
-	_ resource.ResourceWithModifyPlan     = &awsWorkspaceAccountResource{}
+	_ resource.Resource                   = &awsWorkspacesAccountResource{}
+	_ resource.ResourceWithConfigure      = &awsWorkspacesAccountResource{}
+	_ resource.ResourceWithImportState    = &awsWorkspacesAccountResource{}
+	_ resource.ResourceWithValidateConfig = &awsWorkspacesAccountResource{}
+	_ resource.ResourceWithModifyPlan     = &awsWorkspacesAccountResource{}
 )
 
 func NewAwsWorkspacesAccountResource() resource.Resource {
-	return &awsWorkspaceAccountResource{}
+	return &awsWorkspacesAccountResource{}
 }
 
 // awsWorkspaceAccountResource is the resource implementation.
-type awsWorkspaceAccountResource struct {
+type awsWorkspacesAccountResource struct {
 	client *citrixdaasclient.CitrixDaasClient
 }
 
 // Metadata returns the resource type name.
-func (r *awsWorkspaceAccountResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+func (r *awsWorkspacesAccountResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_quickcreate_aws_workspaces_account"
 }
 
 // Schema defines the schema for the resource.
-func (r *awsWorkspaceAccountResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *awsWorkspacesAccountResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = AwsWorkspacesAccountResourceModel{}.GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
-func (r *awsWorkspaceAccountResource) Configure(_ context.Context, req resource.ConfigureRequest, _ *resource.ConfigureResponse) {
+func (r *awsWorkspacesAccountResource) Configure(_ context.Context, req resource.ConfigureRequest, _ *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -53,7 +53,7 @@ func (r *awsWorkspaceAccountResource) Configure(_ context.Context, req resource.
 }
 
 // Create creates the resource and sets the initial Terraform state.
-func (r *awsWorkspaceAccountResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *awsWorkspacesAccountResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
@@ -116,7 +116,7 @@ func (r *awsWorkspaceAccountResource) Create(ctx context.Context, req resource.C
 }
 
 // Read refreshes the Terraform state with the latest data.
-func (r *awsWorkspaceAccountResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *awsWorkspacesAccountResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from state
@@ -145,7 +145,7 @@ func (r *awsWorkspaceAccountResource) Read(ctx context.Context, req resource.Rea
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
-func (r *awsWorkspaceAccountResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *awsWorkspacesAccountResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
@@ -255,7 +255,7 @@ func (r *awsWorkspaceAccountResource) Update(ctx context.Context, req resource.U
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
-func (r *awsWorkspaceAccountResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *awsWorkspacesAccountResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from state
@@ -280,12 +280,12 @@ func (r *awsWorkspaceAccountResource) Delete(ctx context.Context, req resource.D
 	}
 }
 
-func (r *awsWorkspaceAccountResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *awsWorkspacesAccountResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Retrieve import ID and save to id attribute
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-func (r *awsWorkspaceAccountResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+func (r *awsWorkspacesAccountResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	var data AwsWorkspacesAccountResourceModel
@@ -299,7 +299,7 @@ func (r *awsWorkspaceAccountResource) ValidateConfig(ctx context.Context, req re
 	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }
 
-func (r *awsWorkspaceAccountResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+func (r *awsWorkspacesAccountResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	if r.client != nil && r.client.QuickCreateClient == nil {

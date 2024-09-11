@@ -24,12 +24,12 @@ var (
 	_ resource.ResourceWithModifyPlan  = &gacSettingsResource{}
 )
 
-// NewAdminUserResource is a helper function to simplify the provider implementation.
-func NewAGacSettingsResource() resource.Resource {
+// NewGacSettingsResource is a helper function to simplify the provider implementation.
+func NewGacSettingsResource() resource.Resource {
 	return &gacSettingsResource{}
 }
 
-// adminUserResource is the resource implementation.
+// gacSettingsResource is the resource implementation.
 type gacSettingsResource struct {
 	client *citrixdaasclient.CitrixDaasClient
 }

@@ -66,6 +66,14 @@ func (r *scvmmHypervisorResource) ValidateConfig(ctx context.Context, req resour
 		return
 	}
 
+	if !data.Metadata.IsNull() {
+		metadata := util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, data.Metadata)
+		isValid := util.ValidateMetadataConfig(ctx, &resp.Diagnostics, metadata)
+		if !isValid {
+			return
+		}
+	}
+
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
 	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }
@@ -106,6 +114,9 @@ func (r *scvmmHypervisorResource) Create(ctx context.Context, req resource.Creat
 	if !plan.Scopes.IsNull() {
 		connectionDetails.SetScopes(util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes))
 	}
+
+	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	connectionDetails.SetMetadata(metadata)
 
 	var body citrixorchestration.CreateHypervisorRequestModel
 	body.SetConnectionDetails(connectionDetails)
@@ -177,14 +188,6 @@ func (r *scvmmHypervisorResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
-	// Retrieve values from state
-	var state SCVMMMHypervisorResourceModel
-	diags = req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
 	// Construct the update model
 	var editHypervisorRequestBody citrixorchestration.EditHypervisorConnectionRequestModel
 	editHypervisorRequestBody.SetName(plan.Name.ValueString())
@@ -210,8 +213,11 @@ func (r *scvmmHypervisorResource) Update(ctx context.Context, req resource.Updat
 		editHypervisorRequestBody.SetScopes(util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes))
 	}
 
+	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	editHypervisorRequestBody.SetMetadata(metadata)
+
 	// Patch hypervisor
-	updatedHypervisor, err := UpdateHypervisor(ctx, r.client, &resp.Diagnostics, editHypervisorRequestBody, state.Id.ValueString(), state.Name.ValueString())
+	updatedHypervisor, err := UpdateHypervisor(ctx, r.client, &resp.Diagnostics, editHypervisorRequestBody, plan.Id.ValueString(), plan.Name.ValueString())
 	if err != nil {
 		return
 	}

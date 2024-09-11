@@ -4,7 +4,7 @@ terraform {
   required_providers {
     citrix = {
       source  = "citrix/citrix"
-      version = ">=0.6.3"
+      version = ">=1.0.2"
     }
   }
 

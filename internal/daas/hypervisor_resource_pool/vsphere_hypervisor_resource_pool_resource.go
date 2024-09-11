@@ -190,6 +190,9 @@ func (r *vsphereHypervisorResourcePoolResource) Create(ctx context.Context, req 
 
 	resourcePoolDetails.SetUseLocalStorageCaching(plan.UseLocalStorageCaching.ValueBool())
 
+	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	resourcePoolDetails.SetMetadata(metadata)
+
 	resourcePool, err := CreateHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, *hypervisor, resourcePoolDetails)
 	if err != nil {
 		// Directly return. Error logs have been populated in common function
@@ -305,6 +308,9 @@ func (r *vsphereHypervisorResourcePoolResource) Update(ctx context.Context, req 
 	editHypervisorResourcePool.SetNetworks(networks)
 
 	editHypervisorResourcePool.SetUseLocalStorageCaching(plan.UseLocalStorageCaching.ValueBool())
+
+	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	editHypervisorResourcePool.SetMetadata(metadata)
 
 	updatedResourcePool, err := UpdateHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, plan.Hypervisor.ValueString(), plan.Id.ValueString(), editHypervisorResourcePool)
 	if err != nil {
@@ -470,6 +476,14 @@ func (r *vsphereHypervisorResourcePoolResource) ValidateConfig(ctx context.Conte
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	if !data.Metadata.IsNull() {
+		metadata := util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, data.Metadata)
+		isValid := util.ValidateMetadataConfig(ctx, &resp.Diagnostics, metadata)
+		if !isValid {
+			return
+		}
 	}
 
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
