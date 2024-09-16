@@ -32,9 +32,23 @@ resource "citrix_nutanix_hypervisor_resource_pool" "example-nutanix-hypervisor-r
 - `name` (String) Name of the resource pool. Name should be unique across all hypervisors.
 - `networks` (List of String) Networks for allocating resources.
 
+### Optional
+
+- `metadata` (Attributes List) Metadata for the Hypervisor Resource Pool.
+
+~> **Please Note** Metadata once set cannot be removed. Use this field to add new metadata or update the value for an existing metadata. Subsequently, removing any metadata from config will have no effect on the existing metadata of the resource. (see [below for nested schema](#nestedatt--metadata))
+
 ### Read-Only
 
 - `id` (String) GUID identifier of the resource pool.
+
+<a id="nestedatt--metadata"></a>
+### Nested Schema for `metadata`
+
+Required:
+
+- `name` (String) Metadata name.
+- `value` (String) Metadata value.
 
 ## Import
 

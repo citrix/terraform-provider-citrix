@@ -22,6 +22,7 @@ import (
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
 	cc_admin_user "github.com/citrix/terraform-provider-citrix/internal/citrixcloud/admin_user"
 	"github.com/citrix/terraform-provider-citrix/internal/citrixcloud/gac_settings"
+	cc_identity_providers "github.com/citrix/terraform-provider-citrix/internal/citrixcloud/identity_providers"
 	"github.com/citrix/terraform-provider-citrix/internal/citrixcloud/resource_locations"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_role"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_user"
@@ -569,6 +570,21 @@ func (p *citrixProvider) validateAndInitializeDaaSClient(ctx context.Context, re
 		}
 	}
 
+	cwsHostName := ""
+	if environment == "Production" {
+		cwsHostName = "cws.citrixworkspacesapi.net"
+	} else if environment == "Staging" {
+		cwsHostName = "cws.ctxwsstgapi.net"
+	} else if environment == "Japan" {
+		cwsHostName = "cws.citrixworkspacesapi.jp"
+	} else if environment == "JapanStaging" {
+		cwsHostName = "cws.citrixstagingapi.jp"
+	} else if environment == "Gov" {
+		cwsHostName = "cws.citrixworkspacesapi.us"
+	} else if environment == "GovStaging" {
+		cwsHostName = "cws.ctxwsstgapi.us"
+	}
+
 	ctx = tflog.SetField(ctx, "citrix_hostname", hostname)
 	if !onPremises {
 		ctx = tflog.SetField(ctx, "citrix_customer_id", customerId)
@@ -678,6 +694,10 @@ func (p *citrixProvider) validateAndInitializeDaaSClient(ctx context.Context, re
 	if quickCreateHostname != "" {
 		client.NewQuickCreateClient(ctx, quickCreateHostname, middlewareAuthFunc)
 	}
+	// Set CWS Client
+	if cwsHostName != "" {
+		client.NewCwsClient(ctx, cwsHostName, middlewareAuthFunc)
+	}
 }
 
 // DataSources defines the data sources implemented in the provider.
@@ -700,8 +720,12 @@ func (p *citrixProvider) DataSources(_ context.Context) []func() datasource.Data
 		// QuickCreate DataSources
 		qcs_image.NewAwsWorkspacesImageDataSource,
 		qcs_account.NewAccountDataSource,
+		qcs_account.NewAwsWorkspacesCloudFormationDataSource,
 		qcs_connection.NewAwsWorkspacesDirectoryConnectionDataSource,
 		qcs_deployment.NewAwsWorkspacesDeploymentDataSource,
+		// CC Identity Provider Resources
+		cc_identity_providers.NewOktaIdentityProviderDataSource,
+		cc_identity_providers.NewSamlIdentityProviderDataSource,
 	}
 }
 
@@ -734,7 +758,7 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		admin_scope.NewAdminScopeResource,
 		policies.NewPolicySetResource,
 		admin_user.NewAdminUserResource,
-		gac_settings.NewAGacSettingsResource,
+		gac_settings.NewGacSettingsResource,
 		resource_locations.NewResourceLocationResource,
 		cc_admin_user.NewCCAdminUserResource,
 		// StoreFront Resources
@@ -744,13 +768,14 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		stf_store.NewXenappDefaultStoreResource,
 		stf_webreceiver.NewSTFWebReceiverResource,
 		stf_multi_site.NewSTFUserFarmMappingResource,
-		stf_roaming.NewSTFRoamingGatewayResource,
-		stf_roaming.NewSTFRoamingBeaconResource,
 		// QuickCreate Resources
 		qcs_account.NewAwsWorkspacesAccountResource,
 		qcs_image.NewAwsEdcImageResource,
 		qcs_connection.NewAwsWorkspacesDirectoryConnectionResource,
 		qcs_deployment.NewAwsWorkspacesDeploymentResource,
+		// CC Identity Provider Resources
+		cc_identity_providers.NewOktaIdentityProviderResource,
+		cc_identity_providers.NewSamlIdentityProviderResource,
 		// Add resource here
 	}
 }

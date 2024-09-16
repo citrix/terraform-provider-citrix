@@ -12,7 +12,6 @@ import (
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework-validators/boolvalidator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -52,7 +51,7 @@ func (PolicySettingModel) GetSchema() schema.NestedAttributeObject {
 				Validators: []validator.String{
 					stringvalidator.ExactlyOneOf(
 						path.MatchRelative().AtParent().AtName("enabled"),
-						path.MatchRelative().AtParent().AtName("value")),
+					),
 				},
 			},
 			"enabled": schema.BoolAttribute{
@@ -61,7 +60,6 @@ func (PolicySettingModel) GetSchema() schema.NestedAttributeObject {
 				Computed:    true,
 				Validators: []validator.Bool{
 					boolvalidator.ExactlyOneOf(
-						path.MatchRelative().AtParent().AtName("enabled"),
 						path.MatchRelative().AtParent().AtName("value")),
 				},
 			},
@@ -374,16 +372,16 @@ type PolicyModel struct {
 	Name                     types.String `tfsdk:"name"`
 	Description              types.String `tfsdk:"description"`
 	Enabled                  types.Bool   `tfsdk:"enabled"`
-	PolicySettings           types.List   `tfsdk:"policy_settings"`             // []PolicySettingModel
-	AccessControlFilters     types.List   `tfsdk:"access_control_filters"`      // []AccessControlFilterModel
+	PolicySettings           types.Set    `tfsdk:"policy_settings"`             // Set[PolicySettingModel]
+	AccessControlFilters     types.Set    `tfsdk:"access_control_filters"`      // Set[AccessControlFilterModel]
 	BranchRepeaterFilter     types.Object `tfsdk:"branch_repeater_filter"`      // BranchRepeaterFilterModel
-	ClientIPFilters          types.List   `tfsdk:"client_ip_filters"`           // []ClientIPFilterModel
-	ClientNameFilters        types.List   `tfsdk:"client_name_filters"`         // []ClientNameFilterModel
-	DeliveryGroupFilters     types.List   `tfsdk:"delivery_group_filters"`      // []DeliveryGroupFilterModel
-	DeliveryGroupTypeFilters types.List   `tfsdk:"delivery_group_type_filters"` // []DeliveryGroupTypeFilterModel
-	OuFilters                types.List   `tfsdk:"ou_filters"`                  // []OuFilterModel
-	UserFilters              types.List   `tfsdk:"user_filters"`                // []UserFilterModel
-	TagFilters               types.List   `tfsdk:"tag_filters"`                 // []TagFilterModel
+	ClientIPFilters          types.Set    `tfsdk:"client_ip_filters"`           // Set[ClientIPFilterModel]
+	ClientNameFilters        types.Set    `tfsdk:"client_name_filters"`         // Set[ClientNameFilterModel]
+	DeliveryGroupFilters     types.Set    `tfsdk:"delivery_group_filters"`      // Set[DeliveryGroupFilterModel]
+	DeliveryGroupTypeFilters types.Set    `tfsdk:"delivery_group_type_filters"` // Set[DeliveryGroupTypeFilterModel]
+	OuFilters                types.Set    `tfsdk:"ou_filters"`                  // Set[OuFilterModel]
+	UserFilters              types.Set    `tfsdk:"user_filters"`                // Set[UserFilterModel]
+	TagFilters               types.Set    `tfsdk:"tag_filters"`                 // Set[TagFilterModel]
 }
 
 func (PolicyModel) GetSchema() schema.NestedAttributeObject {
@@ -403,82 +401,82 @@ func (PolicyModel) GetSchema() schema.NestedAttributeObject {
 				Description: "Indicate whether the policy is being enabled.",
 				Required:    true,
 			},
-			"policy_settings": schema.ListNestedAttribute{
+			"policy_settings": schema.SetNestedAttribute{
 				Description:  "Set of policy settings.",
 				Required:     true,
 				NestedObject: PolicySettingModel{}.GetSchema(),
 			},
-			"access_control_filters": schema.ListNestedAttribute{
-				Description:  "Access control policy filters.",
+			"access_control_filters": schema.SetNestedAttribute{
+				Description:  "Set of Access control policy filters.",
 				Optional:     true,
 				Computed:     true,
 				NestedObject: AccessControlFilterModel{}.GetSchema(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 			},
 			"branch_repeater_filter": BranchRepeaterFilterModel{}.GetSchema(),
-			"client_ip_filters": schema.ListNestedAttribute{
-				Description:  "Client ip policy filters.",
+			"client_ip_filters": schema.SetNestedAttribute{
+				Description:  "Set of Client ip policy filters.",
 				Optional:     true,
 				Computed:     true,
 				NestedObject: ClientIPFilterModel{}.GetSchema(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 			},
-			"client_name_filters": schema.ListNestedAttribute{
-				Description:  "Client name policy filters.",
+			"client_name_filters": schema.SetNestedAttribute{
+				Description:  "Set of Client name policy filters.",
 				Optional:     true,
 				Computed:     true,
 				NestedObject: ClientNameFilterModel{}.GetSchema(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 			},
-			"delivery_group_filters": schema.ListNestedAttribute{
-				Description:  "Delivery group policy filters.",
+			"delivery_group_filters": schema.SetNestedAttribute{
+				Description:  "Set of Delivery group policy filters.",
 				Optional:     true,
 				Computed:     true,
 				NestedObject: DeliveryGroupFilterModel{}.GetSchema(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 			},
-			"delivery_group_type_filters": schema.ListNestedAttribute{
-				Description:  "Delivery group type policy filters.",
+			"delivery_group_type_filters": schema.SetNestedAttribute{
+				Description:  "Set of Delivery group type policy filters.",
 				Optional:     true,
 				Computed:     true,
 				NestedObject: DeliveryGroupTypeFilterModel{}.GetSchema(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 			},
-			"ou_filters": schema.ListNestedAttribute{
-				Description:  "Organizational unit policy filters.",
+			"ou_filters": schema.SetNestedAttribute{
+				Description:  "Set of Organizational unit policy filters.",
 				Optional:     true,
 				Computed:     true,
 				NestedObject: OuFilterModel{}.GetSchema(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 			},
-			"user_filters": schema.ListNestedAttribute{
-				Description:  "User policy filters.",
+			"user_filters": schema.SetNestedAttribute{
+				Description:  "Set of User policy filters.",
 				Optional:     true,
 				Computed:     true,
 				NestedObject: UserFilterModel{}.GetSchema(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 			},
-			"tag_filters": schema.ListNestedAttribute{
-				Description:  "Tag policy filters.",
+			"tag_filters": schema.SetNestedAttribute{
+				Description:  "Set of Tag policy filters.",
 				Optional:     true,
 				Computed:     true,
 				NestedObject: TagFilterModel{}.GetSchema(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 			},
 		},
@@ -494,9 +492,9 @@ type PolicySetResourceModel struct {
 	Name        types.String `tfsdk:"name"`
 	Type        types.String `tfsdk:"type"`
 	Description types.String `tfsdk:"description"`
-	Scopes      types.Set    `tfsdk:"scopes"` // []types.Set
+	Scopes      types.Set    `tfsdk:"scopes"` // Set[String]
 	IsAssigned  types.Bool   `tfsdk:"assigned"`
-	Policies    types.List   `tfsdk:"policies"` // []PolicyModel
+	Policies    types.List   `tfsdk:"policies"` // List[PolicyModel]
 }
 
 func (PolicySetResourceModel) GetSchema() schema.Schema {
@@ -629,7 +627,7 @@ func (r PolicySetResourceModel) RefreshPropertyValues(ctx context.Context, diags
 				return refreshedPolicySettings[i].Name.ValueString() < refreshedPolicySettings[j].Name.ValueString()
 			})
 
-			policyModel.PolicySettings = util.TypedArrayToObjectList[PolicySettingModel](ctx, diags, refreshedPolicySettings)
+			policyModel.PolicySettings = util.TypedArrayToObjectSet(ctx, diags, refreshedPolicySettings)
 
 			var accessControlFilters []AccessControlFilterModel
 
@@ -712,18 +710,18 @@ func (r PolicySetResourceModel) RefreshPropertyValues(ctx context.Context, diags
 					}
 				}
 			}
-			policyModel.AccessControlFilters = util.TypedArrayToObjectList[AccessControlFilterModel](ctx, diags, accessControlFilters)
-			policyModel.ClientIPFilters = util.TypedArrayToObjectList[ClientIPFilterModel](ctx, diags, clientIpFilters)
-			policyModel.ClientNameFilters = util.TypedArrayToObjectList[ClientNameFilterModel](ctx, diags, clientNameFilters)
-			policyModel.DeliveryGroupFilters = util.TypedArrayToObjectList[DeliveryGroupFilterModel](ctx, diags, desktopGroupFilters)
-			policyModel.DeliveryGroupTypeFilters = util.TypedArrayToObjectList[DeliveryGroupTypeFilterModel](ctx, diags, desktopKindFilters)
-			policyModel.TagFilters = util.TypedArrayToObjectList[TagFilterModel](ctx, diags, desktopTagFilters)
-			policyModel.OuFilters = util.TypedArrayToObjectList[OuFilterModel](ctx, diags, ouFilters)
-			policyModel.UserFilters = util.TypedArrayToObjectList[UserFilterModel](ctx, diags, userFilters)
+			policyModel.AccessControlFilters = util.TypedArrayToObjectSet(ctx, diags, accessControlFilters)
+			policyModel.ClientIPFilters = util.TypedArrayToObjectSet(ctx, diags, clientIpFilters)
+			policyModel.ClientNameFilters = util.TypedArrayToObjectSet(ctx, diags, clientNameFilters)
+			policyModel.DeliveryGroupFilters = util.TypedArrayToObjectSet(ctx, diags, desktopGroupFilters)
+			policyModel.DeliveryGroupTypeFilters = util.TypedArrayToObjectSet(ctx, diags, desktopKindFilters)
+			policyModel.TagFilters = util.TypedArrayToObjectSet(ctx, diags, desktopTagFilters)
+			policyModel.OuFilters = util.TypedArrayToObjectSet(ctx, diags, ouFilters)
+			policyModel.UserFilters = util.TypedArrayToObjectSet(ctx, diags, userFilters)
 
 			refreshedPolicies = append(refreshedPolicies, policyModel)
 		}
-		updatedPolicies := util.TypedArrayToObjectList[PolicyModel](ctx, diags, refreshedPolicies)
+		updatedPolicies := util.TypedArrayToObjectList(ctx, diags, refreshedPolicies)
 		r.Policies = updatedPolicies
 	} else {
 		attributesMap, err := util.AttributeMapFromObject(PolicyModel{})

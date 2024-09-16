@@ -107,24 +107,15 @@ func (r *gcpHypervisorResourcePoolResource) Create(ctx context.Context, req reso
 		return
 	}
 	planSubnet := util.StringListToStringArray(ctx, &diags, plan.Subnets)
-	subnets, err := util.GetFilteredResourcePathList(ctx, r.client, hypervisorId, vnetPath, util.NetworkResourceType, planSubnet, hypervisorConnectionType, hypervisor.GetPluginId())
-
+	subnets, err := getHypervisorResourcePoolSubnets(ctx, r.client, &resp.Diagnostics, hypervisorId, vnetPath, planSubnet, hypervisorConnectionType)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating Hypervisor Resource Pool for GCP",
-			"Error message: "+util.ReadClientError(err),
-		)
-		return
-	}
-
-	if len(plan.Subnets.Elements()) != len(subnets) {
-		resp.Diagnostics.AddError(
-			"Error creating Hypervisor Resource Pool for GCP",
-			"Subnet contains invalid value.",
-		)
+		// Directly return. Error logs have been populated in common function
 		return
 	}
 	resourcePoolDetails.SetNetworks(subnets)
+
+	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	resourcePoolDetails.SetMetadata(metadata)
 
 	resourcePool, err := CreateHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, *hypervisor, resourcePoolDetails)
 	if err != nil {
@@ -195,11 +186,14 @@ func (r *gcpHypervisorResourcePoolResource) Update(ctx context.Context, req reso
 		// Support shared VPC if specified as true
 		vnetPath = fmt.Sprintf("%s/%s.sharedvirtualprivatecloud", regionPath, plan.Vpc.ValueString())
 	}
-	subnets, err := util.GetFilteredResourcePathList(ctx, r.client, plan.Hypervisor.ValueString(), vnetPath, util.NetworkResourceType, planSubnet, citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM, "")
+	subnets, err := getHypervisorResourcePoolSubnets(ctx, r.client, &resp.Diagnostics, plan.Hypervisor.ValueString(), vnetPath, planSubnet, citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM)
 	if err != nil {
+		// Directly return. Error logs have been populated in common function
 		return
 	}
 	editHypervisorResourcePool.SetNetworks(subnets)
+	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	editHypervisorResourcePool.SetMetadata(metadata)
 
 	updatedResourcePool, err := UpdateHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, plan.Hypervisor.ValueString(), plan.Id.ValueString(), editHypervisorResourcePool)
 	if err != nil {
@@ -267,6 +261,14 @@ func (r *gcpHypervisorResourcePoolResource) ValidateConfig(ctx context.Context, 
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	if !data.Metadata.IsNull() {
+		metadata := util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, data.Metadata)
+		isValid := util.ValidateMetadataConfig(ctx, &resp.Diagnostics, metadata)
+		if !isValid {
+			return
+		}
 	}
 
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)

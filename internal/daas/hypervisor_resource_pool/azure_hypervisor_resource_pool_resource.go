@@ -90,7 +90,7 @@ func (r *azureHypervisorResourcePoolResource) Create(ctx context.Context, req re
 		)
 		return
 	}
-	region, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, "", plan.Region.ValueString(), "Region", "", hypervisor)
+	region, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, &resp.Diagnostics, hypervisorId, "", plan.Region.ValueString(), "Region", "", hypervisor)
 	regionPath := region.GetXDPath()
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -101,7 +101,7 @@ func (r *azureHypervisorResourcePoolResource) Create(ctx context.Context, req re
 		return
 	}
 	resourcePoolDetails.SetRegion(regionPath)
-	vnet, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, hypervisorId, fmt.Sprintf("%s/virtualprivatecloud.folder", regionPath), plan.VirtualNetwork.ValueString(), util.VirtualPrivateCloudResourceType, plan.VirtualNetworkResourceGroup.ValueString(), hypervisor)
+	vnet, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, &resp.Diagnostics, hypervisorId, fmt.Sprintf("%s/virtualprivatecloud.folder", regionPath), plan.VirtualNetwork.ValueString(), util.VirtualPrivateCloudResourceType, plan.VirtualNetworkResourceGroup.ValueString(), hypervisor)
 	vnetPath := vnet.GetXDPath()
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -121,24 +121,16 @@ func (r *azureHypervisorResourcePoolResource) Create(ctx context.Context, req re
 		return
 	}
 	planSubnet := util.StringListToStringArray(ctx, &diags, plan.Subnets)
-	subnets, err := util.GetFilteredResourcePathList(ctx, r.client, hypervisorId, fmt.Sprintf("%s/virtualprivatecloud.folder/%s", regionPath, vnetPath), util.NetworkResourceType, planSubnet, hypervisorConnectionType, hypervisor.GetPluginId())
-
+	availabilityZonePath := fmt.Sprintf("%s/virtualprivatecloud.folder/%s", regionPath, vnetPath)
+	subnets, err := getHypervisorResourcePoolSubnets(ctx, r.client, &resp.Diagnostics, hypervisorId, availabilityZonePath, planSubnet, hypervisorConnectionType)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating Hypervisor Resource Pool for Azure",
-			"Error message: "+util.ReadClientError(err),
-		)
-		return
-	}
-
-	if len(plan.Subnets.Elements()) != len(subnets) {
-		resp.Diagnostics.AddError(
-			"Error creating Hypervisor Resource Pool for Azure",
-			"Subnet contains invalid value.",
-		)
+		// Directly return. Error logs have been populated in common function
 		return
 	}
 	resourcePoolDetails.SetSubnets(subnets)
+
+	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	resourcePoolDetails.SetMetadata(metadata)
 
 	resourcePool, err := CreateHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, *hypervisor, resourcePoolDetails)
 	if err != nil {
@@ -206,11 +198,16 @@ func (r *azureHypervisorResourcePoolResource) Update(ctx context.Context, req re
 	regionPath := fmt.Sprintf("%s.region", plan.Region.ValueString())
 	resourceGroupPath := fmt.Sprintf("%s.resourcegroup", plan.VirtualNetworkResourceGroup.ValueString())
 	vnetPath := fmt.Sprintf("%s.virtualprivatecloud", plan.VirtualNetwork.ValueString())
-	subnets, err := util.GetFilteredResourcePathList(ctx, r.client, plan.Hypervisor.ValueString(), fmt.Sprintf("%s/virtualprivatecloud.folder/%s/%s", regionPath, resourceGroupPath, vnetPath), util.NetworkResourceType, planSubnet, citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM, "")
+	availabilityZonePath := fmt.Sprintf("%s/virtualprivatecloud.folder/%s/%s", regionPath, resourceGroupPath, vnetPath)
+	subnets, err := getHypervisorResourcePoolSubnets(ctx, r.client, &resp.Diagnostics, plan.Hypervisor.ValueString(), availabilityZonePath, planSubnet, citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM)
 	if err != nil {
+		// Directly return. Error logs have been populated in common function
 		return
 	}
 	editHypervisorResourcePool.SetSubnets(subnets)
+
+	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	editHypervisorResourcePool.SetMetadata(metadata)
 
 	updatedResourcePool, err := UpdateHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, plan.Hypervisor.ValueString(), plan.Id.ValueString(), editHypervisorResourcePool)
 	if err != nil {
@@ -278,6 +275,14 @@ func (r *azureHypervisorResourcePoolResource) ValidateConfig(ctx context.Context
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	if !data.Metadata.IsNull() {
+		metadata := util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, data.Metadata)
+		isValid := util.ValidateMetadataConfig(ctx, &resp.Diagnostics, metadata)
+		if !isValid {
+			return
+		}
 	}
 
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)

@@ -7,8 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"reflect"
 	"regexp"
 	"runtime"
@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	ccadmins "github.com/citrix/citrix-daas-rest-go/ccadmins"
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/citrix-daas-rest-go/citrixquickcreate"
 	citrixstorefrontclient "github.com/citrix/citrix-daas-rest-go/citrixstorefront/apis"
@@ -112,6 +113,18 @@ const AwsAmiAndWsiRegex string = `^ami-[0-9a-f]{8,17}$|^wsi-[0-9a-z]{9,63}$`
 // OU Path
 const OuPathFormat string = `^OU=.+,DC=.+$`
 
+// Email REGEX
+const EmailRegex string = `^[\w-\.]+@([\w-]+\.)+[\w-]+$`
+
+// Okta Domain REGEX
+const OktaDomainRegex string = `\.okta\.com$|\.okta-eu\.com$|\.oktapreview\.com$`
+
+// Application Category Path
+const AppCategoryPathRegex string = `^([a-zA-Z0-9 ]+\\)*[a-zA-Z0-9 ]+\\?$`
+
+// SAML 2.0 Identity Provider Certificate REGEX
+const SamlIdpCertRegex string = `\.[Pp][Ee][Mm]$|\.[Cc][Rr][Tt]$|\.[Cc][Ee][Rr]$`
+
 // NOT_EXIST error code
 const NOT_EXIST string = "NOT_EXIST"
 
@@ -131,6 +144,7 @@ const DefaultQcsAwsWorkspacesOffPeakLogOffTimeoutMinutes int64 = 5
 const DefaultQcsAwsWorkspacesOffPeakBufferSizePercent int64 = 0
 
 // Resource Types
+const SharedSubscriptionResourceType = "sharedsubscription"
 const ImageVersionResourceType string = "ImageVersion"
 const RegionResourceType string = "Region"
 const ServiceOfferingResourceType string = "ServiceOffering"
@@ -166,79 +180,15 @@ const MissingProviderClientIdAndSecretErrorMsg = "client_id and client_secret fi
 const CitrixGatewayConnections = "Citrix Gateway connections"
 const NonCitrixGatewayConnections = "Non-Citrix Gateway Connections"
 
+const MetadataTerraformName = "ManagedBy"
+const MetadataTerrafomValue = "Terraform"
+const MetadataHypervisorSecretExpirationDateName = "Citrix_Orchestration_Hypervisor_Secret_Expiration_Date"
+const MetadataCitrixPrefix = "citrix_"
+const MetadataImageManagementPrepPrefix = "imagemanagementprep_"
+const MetadataTaskDataPrefix = "taskdata_"
+const MetadataTaskStatePrefix = "taskstate_"
+
 var PlatformSettingsAssignedTo = []string{"AllUsersNoAuthentication"}
-
-// Terraform model for name value string pair
-type NameValueStringPairModel struct {
-	Name  types.String `tfsdk:"name"`
-	Value types.String `tfsdk:"value"`
-}
-
-func (r NameValueStringPairModel) GetSchema() schema.NestedAttributeObject {
-	return schema.NestedAttributeObject{
-		Attributes: map[string]schema.Attribute{
-			"name": schema.StringAttribute{
-				Description: "Metadata name.",
-				Required:    true,
-			},
-			"value": schema.StringAttribute{
-				Description: "Metadata value.",
-				Required:    true,
-			},
-		},
-	}
-}
-
-func (NameValueStringPairModel) GetAttributes() map[string]schema.Attribute {
-	return NameValueStringPairModel{}.GetSchema().Attributes
-}
-
-// <summary>
-// Helper function to parse an array of name value pairs in terraform model to an array of name value pairs in client model
-// </summary>
-// <param name="stringPairs">Original string pair array in terraform model</param>
-// <returns>String pair array in client model</returns>
-func ParseNameValueStringPairToClientModel(stringPairs []NameValueStringPairModel) []citrixorchestration.NameValueStringPairModel {
-	var res = []citrixorchestration.NameValueStringPairModel{}
-	for _, stringPair := range stringPairs {
-		name := stringPair.Name.ValueString()
-		value := stringPair.Value.ValueString()
-		res = append(res, citrixorchestration.NameValueStringPairModel{
-			Name:  *citrixorchestration.NewNullableString(&name),
-			Value: *citrixorchestration.NewNullableString(&value),
-		})
-	}
-	return res
-}
-
-// <summary>
-// Helper function to parse an array of name value pairs in client model to an array of name value pairs in terraform model
-// </summary>
-// <param name="stringPairs">Original string pair array in client model</param>
-// <returns>String pair array in terraform model</returns>
-func ParseNameValueStringPairToPluginModel(stringPairs []citrixorchestration.NameValueStringPairModel) []NameValueStringPairModel {
-	var res = []NameValueStringPairModel{}
-	for _, stringPair := range stringPairs {
-		res = append(res, NameValueStringPairModel{
-			Name:  types.StringValue(stringPair.GetName()),
-			Value: types.StringValue(stringPair.GetValue()),
-		})
-	}
-	return res
-}
-
-// <summary>
-// Helper function to append new name value pairs to an array of NameValueStringPairModel in place
-// </summary>
-// <param name="stringPairs">Original string pair array to append to</param>
-// <param name="name">Name of the new string pair to be added</param>
-// <param name="appendValue">Value of the new string pair to be added</param>
-func AppendNameValueStringPair(stringPairs *[]citrixorchestration.NameValueStringPairModel, name string, appendValue string) {
-	*stringPairs = append(*stringPairs, citrixorchestration.NameValueStringPairModel{
-		Name:  *citrixorchestration.NewNullableString(&name),
-		Value: *citrixorchestration.NewNullableString(&appendValue),
-	})
-}
 
 // <summary>
 // Helper function to validate if a string is a valid UUID or null
@@ -341,6 +291,29 @@ func GetIdsForOrchestrationObjects[objType any](slice []objType) []string {
 	}
 
 	return ids
+}
+
+// <summary>
+// Filter and Extract Ids from a list of scope responses
+// </summary>
+// <param name="scopeIdsInState">List of scope Ids in state or config</param>
+// <param name="scopeResponses">List of scope objects from remote</param>
+// <returns>List of Ids extracted from response</returns>
+func GetIdsForFilteredScopeObjects(scopeIdsInState []string, scopeResponses []citrixorchestration.ScopeResponseModel) []string {
+	if scopeIdsInState == nil {
+		scopeIdsInState = []string{}
+	}
+	filteredScopes := []citrixorchestration.ScopeResponseModel{}
+	for _, scope := range scopeResponses {
+		if scope.GetIsTenantScope() && !slices.ContainsFunc(scopeIdsInState, func(scopeId string) bool {
+			return strings.EqualFold(scopeId, scope.GetId())
+		}) {
+			continue
+		}
+		filteredScopes = append(filteredScopes, scope)
+	}
+	scopeIds := GetIdsForScopeObjects(filteredScopes)
+	return scopeIds
 }
 
 // <summary>
@@ -521,6 +494,38 @@ func ProcessAsyncJobResponse(ctx context.Context, client *citrixdaasclient.Citri
 	return nil
 }
 
+// <summary>
+// Helper function to process async job response. Takes async job response and polls for result.
+// </summary>
+// <param name="ctx">Context from caller</param>
+// <param name="client">Citrix DaaS client from provider context</param>
+// <param name="jobResp">Job response from async API call</param>
+// <param name="errContext">Context of the job to be use as Terraform diagnostic error message title</param>
+// <param name="diagnostics">Terraform diagnostics from context</param>
+// <param name="maxTimeout">Maximum timeout threashold for job status polling</param>
+// <returns>Error if job polling failed or job itself ended in failed state</returns>
+func GetAsyncJobResult[ResponseType any](ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int, returnJobError bool) (ResponseType, error) {
+	jobId := citrixdaasclient.GetJobIdFromHttpResponse(*jobResp)
+	err := ProcessAsyncJobResponse(ctx, client, jobResp, errContext, diagnostics, maxTimeout, returnJobError)
+
+	var response ResponseType
+	if err != nil {
+		// Job failed. Return nil and error.
+		return response, err
+	}
+
+	// Job is completed successfully. Get results
+	ss := client.ApiClient.JobsAPIsDAAS.JobsGetJobResults(ctx, jobId)
+	res, _, err := citrixdaasclient.AddRequestData(ss, client).Execute()
+
+	if err == nil {
+		_ = json.Unmarshal([]byte(res), &response)
+		return response, nil
+	}
+
+	return response, err
+}
+
 func WaitForQcsDeploymentTaskWithDiags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, maxWaitTimeInSeconds int, taskId string, taskName, deploymentName string, errorContext string) error {
 	task, httpResp, err := PollQcsTask(ctx, client, diagnostics, taskId, 10, maxWaitTimeInSeconds)
 	if err != nil {
@@ -593,12 +598,24 @@ func GetOrchestrationAccessPolicyKey(remote citrixorchestration.AdvancedAccessPo
 	return remote.GetName()
 }
 
+func GetOrchestrationNameValueStringPairKey(remote citrixorchestration.NameValueStringPairModel) string {
+	return remote.GetName()
+}
+
 func GetSTFGroupMemberKey(remote citrixstorefront.STFGroupMemberResponseModel) string {
 	return *remote.GroupName.Get()
 }
 
 func GetSTFFarmSetKey(remote citrixstorefront.STFFarmSetResponseModel) string {
 	return *remote.Name.Get()
+}
+
+func GetSTFRoamingGatewayKey(remote citrixstorefront.STFRoamingGatewayResponseModel) string {
+	return *remote.Name.Get()
+}
+
+func GetSTFSTAUrlKey(remote citrixstorefront.STFSTAUrlModel) string {
+	return *remote.StaUrl.Get()
 }
 
 func GetQcsAwsWorkspacesWithUsernameKey(remote citrixquickcreate.AwsEdcDeploymentMachine) string {
@@ -731,7 +748,7 @@ func PanicHandler(diagnostics *diag.Diagnostics) {
 
 		// write stack trace to disk so we don't dump on the console
 		fileContents := fmt.Sprintf("%s\n\n%s", f.Name(), debug.Stack())
-		file, err := ioutil.TempFile("", "citrix_provider_crash_stack.*.txt")
+		file, err := os.CreateTemp("", "citrix_provider_crash_stack.*.txt")
 		if err == nil {
 			defer file.Close()
 			_, err := file.WriteString(fileContents)
@@ -1251,4 +1268,8 @@ func PollQcsTask(ctx context.Context, client *citrixdaasclient.CitrixDaasClient,
 	}
 
 	return taskResponse, httpResp, err
+}
+
+func GetCCAdminAccessPolicyNameKey(r ccadmins.AdministratorAccessPolicyModel) string {
+	return r.GetDisplayName()
 }

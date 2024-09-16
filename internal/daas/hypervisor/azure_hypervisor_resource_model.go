@@ -27,10 +27,11 @@ import (
 // HypervisorResourceModel maps the resource schema data.
 type AzureHypervisorResourceModel struct {
 	/**** Connection Details ****/
-	Id     types.String `tfsdk:"id"`
-	Name   types.String `tfsdk:"name"`
-	Zone   types.String `tfsdk:"zone"`
-	Scopes types.Set    `tfsdk:"scopes"` // Set[string]
+	Id       types.String `tfsdk:"id"`
+	Name     types.String `tfsdk:"name"`
+	Zone     types.String `tfsdk:"zone"`
+	Scopes   types.Set    `tfsdk:"scopes"`   // Set[string]
+	Metadata types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
 	/** Azure Connection **/
 	ApplicationId                   types.String `tfsdk:"application_id"`
 	ApplicationSecret               types.String `tfsdk:"application_secret"`
@@ -116,6 +117,7 @@ func (AzureHypervisorResourceModel) GetSchema() schema.Schema {
 					),
 				},
 			},
+			"metadata": util.GetMetadataListSchema("Hypervisor"),
 		},
 	}
 }
@@ -132,13 +134,23 @@ func (r AzureHypervisorResourceModel) RefreshPropertyValues(ctx context.Context,
 	r.ApplicationId = types.StringValue(hypervisor.GetApplicationId())
 	r.SubscriptionId = types.StringValue(hypervisor.GetSubscriptionId())
 	r.ActiveDirectoryId = types.StringValue(hypervisor.GetActiveDirectoryId())
-	scopeIds := util.GetIdsForScopeObjects(hypervisor.GetScopes())
+	scopeIdsInState := util.StringSetToStringArray(ctx, diagnostics, r.Scopes)
+	scopeIds := util.GetIdsForFilteredScopeObjects(scopeIdsInState, hypervisor.GetScopes())
 	r.Scopes = util.StringArrayToStringSet(ctx, diagnostics, scopeIds)
+
+	effectiveMetadata := util.GetEffectiveMetadata(util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, r.Metadata), hypervisor.GetMetadata())
+
+	if len(effectiveMetadata) > 0 {
+		r.Metadata = util.RefreshListValueProperties[util.NameValueStringPairModel, citrixorchestration.NameValueStringPairModel](ctx, diagnostics, r.Metadata, effectiveMetadata, util.GetOrchestrationNameValueStringPairKey)
+	} else {
+		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
+	}
 
 	customPropertiesString := hypervisor.GetCustomProperties()
 	var customProperties []citrixorchestration.NameValueStringPairModel
 	err := json.Unmarshal([]byte(customPropertiesString), &customProperties)
 	if err != nil {
+		diagnostics.AddWarning("Error reading Azure Hypervisor custom properties", err.Error())
 		return r
 	}
 

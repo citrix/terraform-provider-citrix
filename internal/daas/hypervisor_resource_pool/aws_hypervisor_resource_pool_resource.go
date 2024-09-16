@@ -95,24 +95,16 @@ func (r *awsHypervisorResourcePoolResource) Create(ctx context.Context, req reso
 	availabilityZonePath := fmt.Sprintf("%s/%s.availabilityzone", vpcPath, plan.AvailabilityZone.ValueString())
 	resourcePoolDetails.SetAvailabilityZone(availabilityZonePath)
 	planSubnet := util.StringListToStringArray(ctx, &diags, plan.Subnets)
-	subnets, err := util.GetFilteredResourcePathList(ctx, r.client, hypervisorId, availabilityZonePath, util.NetworkResourceType, planSubnet, hypervisorConnectionType, hypervisor.GetPluginId())
+	subnets, err := getHypervisorResourcePoolSubnets(ctx, r.client, &resp.Diagnostics, hypervisorId, availabilityZonePath, planSubnet, hypervisorConnectionType)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating Hypervisor Resource Pool for AWS",
-			"Error message: "+util.ReadClientError(err),
-		)
-		return
-	}
-
-	if len(plan.Subnets.Elements()) != len(subnets) {
-		resp.Diagnostics.AddError(
-			"Error creating Hypervisor Resource Pool for AWS",
-			"Subnet contains invalid value.",
-		)
+		// Directly return. Error logs have been populated in common function
 		return
 	}
 
 	resourcePoolDetails.SetNetworks(subnets)
+
+	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	resourcePoolDetails.SetMetadata(metadata)
 
 	resourcePool, err := CreateHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, *hypervisor, resourcePoolDetails)
 	if err != nil {
@@ -178,11 +170,15 @@ func (r *awsHypervisorResourcePoolResource) Update(ctx context.Context, req reso
 
 	planSubnet := util.StringListToStringArray(ctx, &diags, plan.Subnets)
 	availabilityZonePath := fmt.Sprintf("%s.virtualprivatecloud/%s.availabilityzone", plan.Vpc.ValueString(), plan.AvailabilityZone.ValueString())
-	subnets, err := util.GetFilteredResourcePathList(ctx, r.client, plan.Hypervisor.ValueString(), availabilityZonePath, util.NetworkResourceType, planSubnet, citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS, "")
+	subnets, err := getHypervisorResourcePoolSubnets(ctx, r.client, &resp.Diagnostics, plan.Hypervisor.ValueString(), availabilityZonePath, planSubnet, citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS)
 	if err != nil {
+		// Directly return. Error logs have been populated in common function
 		return
 	}
 	editHypervisorResourcePool.SetNetworks(subnets)
+
+	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	editHypervisorResourcePool.SetMetadata(metadata)
 
 	updatedResourcePool, err := UpdateHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, plan.Hypervisor.ValueString(), plan.Id.ValueString(), editHypervisorResourcePool)
 	if err != nil {
@@ -250,6 +246,14 @@ func (r *awsHypervisorResourcePoolResource) ValidateConfig(ctx context.Context, 
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	if !data.Metadata.IsNull() {
+		metadata := util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, data.Metadata)
+		isValid := util.ValidateMetadataConfig(ctx, &resp.Diagnostics, metadata)
+		if !isValid {
+			return
+		}
 	}
 
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)

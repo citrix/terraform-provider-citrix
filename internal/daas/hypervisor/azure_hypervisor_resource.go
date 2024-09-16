@@ -87,6 +87,8 @@ func (r *azureHypervisorResource) Create(ctx context.Context, req resource.Creat
 	connectionDetails.SetApplicationId(plan.ApplicationId.ValueString())
 	connectionDetails.SetApplicationSecret(plan.ApplicationSecret.ValueString())
 	metadata := getMetadataForAzureRmHypervisor(plan)
+	additionalMetadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	metadata = append(metadata, additionalMetadata...)
 	connectionDetails.SetMetadata(metadata)
 	connectionDetails.SetSubscriptionId(plan.SubscriptionId.ValueString())
 	connectionDetails.SetActiveDirectoryId(plan.ActiveDirectoryId.ValueString())
@@ -173,14 +175,6 @@ func (r *azureHypervisorResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
-	// Retrieve values from state
-	var state AzureHypervisorResourceModel
-	diags = req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
 	// Construct the update model
 	var editHypervisorRequestBody citrixorchestration.EditHypervisorConnectionRequestModel
 	editHypervisorRequestBody.SetName(plan.Name.ValueString())
@@ -188,6 +182,8 @@ func (r *azureHypervisorResource) Update(ctx context.Context, req resource.Updat
 	editHypervisorRequestBody.SetApplicationId(plan.ApplicationId.ValueString())
 	editHypervisorRequestBody.SetApplicationSecret(plan.ApplicationSecret.ValueString())
 	metadata := getMetadataForAzureRmHypervisor(plan)
+	additionalMetadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	metadata = append(metadata, additionalMetadata...)
 	editHypervisorRequestBody.SetMetadata(metadata)
 	if !plan.Scopes.IsNull() {
 		editHypervisorRequestBody.SetScopes(util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes))
@@ -225,7 +221,7 @@ func (r *azureHypervisorResource) Update(ctx context.Context, req resource.Updat
 	editHypervisorRequestBody.SetCustomProperties(string(customPropertiesByte))
 
 	// Fetch updated hypervisor from GetHypervisor
-	updatedHypervisor, err := UpdateHypervisor(ctx, r.client, &resp.Diagnostics, editHypervisorRequestBody, state.Id.ValueString(), state.Name.ValueString())
+	updatedHypervisor, err := UpdateHypervisor(ctx, r.client, &resp.Diagnostics, editHypervisorRequestBody, plan.Id.ValueString(), plan.Name.ValueString())
 	if err != nil {
 		return
 	}
@@ -282,7 +278,7 @@ func getMetadataForAzureRmHypervisor(plan AzureHypervisorResourceModel) []citrix
 	parsedTime, _ := time.Parse(time.DateTime, secretExpirationDate)
 	secretExpirationDateInUnix := parsedTime.UnixMilli()
 	secretExpirationDateMetada := citrixorchestration.NameValueStringPairModel{}
-	secretExpirationDateMetada.SetName("Citrix_Orchestration_Hypervisor_Secret_Expiration_Date")
+	secretExpirationDateMetada.SetName(util.MetadataHypervisorSecretExpirationDateName)
 	secretExpirationDateMetada.SetValue(strconv.Itoa(int(secretExpirationDateInUnix)))
 	metadata := []citrixorchestration.NameValueStringPairModel{
 		secretExpirationDateMetada,
@@ -299,6 +295,14 @@ func (r *azureHypervisorResource) ValidateConfig(ctx context.Context, req resour
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	if !data.Metadata.IsNull() {
+		metadata := util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, data.Metadata)
+		isValid := util.ValidateMetadataConfig(ctx, &resp.Diagnostics, metadata)
+		if !isValid {
+			return
+		}
 	}
 
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)

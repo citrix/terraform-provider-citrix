@@ -135,20 +135,20 @@ Required:
 
 - `enabled` (Boolean) Indicate whether the policy is being enabled.
 - `name` (String) Name of the policy.
-- `policy_settings` (Attributes List) Set of policy settings. (see [below for nested schema](#nestedatt--policies--policy_settings))
+- `policy_settings` (Attributes Set) Set of policy settings. (see [below for nested schema](#nestedatt--policies--policy_settings))
 
 Optional:
 
-- `access_control_filters` (Attributes List) Access control policy filters. (see [below for nested schema](#nestedatt--policies--access_control_filters))
+- `access_control_filters` (Attributes Set) Set of Access control policy filters. (see [below for nested schema](#nestedatt--policies--access_control_filters))
 - `branch_repeater_filter` (Attributes) Set of policy filters. (see [below for nested schema](#nestedatt--policies--branch_repeater_filter))
-- `client_ip_filters` (Attributes List) Client ip policy filters. (see [below for nested schema](#nestedatt--policies--client_ip_filters))
-- `client_name_filters` (Attributes List) Client name policy filters. (see [below for nested schema](#nestedatt--policies--client_name_filters))
-- `delivery_group_filters` (Attributes List) Delivery group policy filters. (see [below for nested schema](#nestedatt--policies--delivery_group_filters))
-- `delivery_group_type_filters` (Attributes List) Delivery group type policy filters. (see [below for nested schema](#nestedatt--policies--delivery_group_type_filters))
+- `client_ip_filters` (Attributes Set) Set of Client ip policy filters. (see [below for nested schema](#nestedatt--policies--client_ip_filters))
+- `client_name_filters` (Attributes Set) Set of Client name policy filters. (see [below for nested schema](#nestedatt--policies--client_name_filters))
+- `delivery_group_filters` (Attributes Set) Set of Delivery group policy filters. (see [below for nested schema](#nestedatt--policies--delivery_group_filters))
+- `delivery_group_type_filters` (Attributes Set) Set of Delivery group type policy filters. (see [below for nested schema](#nestedatt--policies--delivery_group_type_filters))
 - `description` (String) Description of the policy.
-- `ou_filters` (Attributes List) Organizational unit policy filters. (see [below for nested schema](#nestedatt--policies--ou_filters))
-- `tag_filters` (Attributes List) Tag policy filters. (see [below for nested schema](#nestedatt--policies--tag_filters))
-- `user_filters` (Attributes List) User policy filters. (see [below for nested schema](#nestedatt--policies--user_filters))
+- `ou_filters` (Attributes Set) Set of Organizational unit policy filters. (see [below for nested schema](#nestedatt--policies--ou_filters))
+- `tag_filters` (Attributes Set) Set of Tag policy filters. (see [below for nested schema](#nestedatt--policies--tag_filters))
+- `user_filters` (Attributes Set) Set of User policy filters. (see [below for nested schema](#nestedatt--policies--user_filters))
 
 <a id="nestedatt--policies--policy_settings"></a>
 ### Nested Schema for `policies.policy_settings`

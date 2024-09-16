@@ -121,7 +121,13 @@ function Invoke-WebRequestWithRetry {
         try {
             $attempt++
             Write-Verbose "Attempting $Method $Uri..."
-            $response = Invoke-WebRequest -Uri $Uri -Method $Method -Headers $Headers -ContentType $ContentType -Body $Body
+            if ($DisableSSLValidation -and $PSVersionTable.PSVersion.Major -ge 7) {
+                $response = Invoke-WebRequest -Uri $Uri -Method $Method -Headers $Headers -ContentType $ContentType -Body $Body -SkipCertificateCheck
+            }
+            else {
+                $response = Invoke-WebRequest -Uri $Uri -Method $Method -Headers $Headers -ContentType $ContentType -Body $Body
+            }
+            
             return $response
         }
         catch {
@@ -611,7 +617,7 @@ function ExtractAndSaveApplicationIcons {
     $iconCounter = 0
 
     # Create the icons folder
-    $iconsFolder = "icons"
+    $iconsFolder = Join-Path -Path $PSScriptRoot -ChildPath "icons"
     if (-not (Test-Path -Path $iconsFolder)) {
         New-Item -ItemType Directory -Path $iconsFolder | Out-Null
     }
@@ -620,7 +626,7 @@ function ExtractAndSaveApplicationIcons {
         if ($line -match 'raw_data\s*=\s*"([^"]+)"') {
             $rawDataValue = $matches[1]
             $iconBytes = [System.Convert]::FromBase64String($rawDataValue)
-            $iconFileName = "$iconsFolder\\app_icon_$iconCounter.ico"
+            $iconFileName = "$iconsFolder\app_icon_$iconCounter.ico"
 
             try {
                 [System.IO.File]::WriteAllBytes($iconFileName, $iconBytes)
@@ -630,10 +636,12 @@ function ExtractAndSaveApplicationIcons {
                 continue
             }
 
-            $iconCounter++
+            # Replace backslashes with double backslashes for terraform
+            $iconFileName = $iconFileName -replace '\\', '\\'
 
+            $iconCounter++
             # Replace raw_data value with icon file path using filebase64 to encode a file's content in base64 format
-            $line =  'raw_data = filebase64("' + $iconFileName + '")'
+            $line = 'raw_data = filebase64("' + $iconFileName + '")'
         }
         $filteredOutput += $line
     }
@@ -676,7 +684,7 @@ function PostProcessProviderConfig {
     Set-Content -Path ".\citrix.tf" -Value $content
 }
 
-if ($DisableSSLValidation) {
+if ($DisableSSLValidation -and $PSVersionTable.PSVersion.Major -lt 7) {
     $code = @"
 using System.Net;
 using System.Security.Cryptography.X509Certificates;

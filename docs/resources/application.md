@@ -13,6 +13,7 @@ Resource for creating and managing applications.
 ## Example Usage
 
 ```terraform
+# Application resource with priorities of delivery groups specified with the `delivery_groups` list attribute.
 resource "citrix_application" "example-application" {
   name                    = "example-name"
   description             = "example-description"
@@ -26,6 +27,33 @@ resource "citrix_application" "example-application" {
   delivery_groups = [citrix_delivery_group.example-delivery-group.id]
   icon            = citrix_application_icon.example-application-icon.id
   limit_visibility_to_users = ["example\\user1"]
+  application_category_path = "ApplicationCategory\\SubCategory"
+}
+
+# Application resource with priorities of delivery groups specified with the `delivery_groups_priority` set attribute.
+resource "citrix_application" "example-application" {
+  name                    = "example-name"
+  description             = "example-description"
+  published_name          = "example-published-name"
+  application_folder_path = citrix_admin_folder.example-admin-folder-for-application.path
+  installed_app_properties = {
+    command_line_arguments  = "<Command line arguments for the executable>"
+    command_line_executable = "<Command line executable path>"
+    working_directory       = "<Working directory path for the executable>"
+  }
+  delivery_groups_priority = [
+    {
+      id = citrix_delivery_group.example-delivery-group-1.id
+      priority = 3
+    },
+    {
+      id = citrix_delivery_group.example-delivery-group-2.id
+      priority = 0
+    }
+  ]
+  icon            = citrix_application_icon.example-application-icon.id
+  limit_visibility_to_users = ["example\\user1"]
+  application_category_path = "ApplicationCategory\\SubCategory"
 }
 ```
 
@@ -34,19 +62,26 @@ resource "citrix_application" "example-application" {
 
 ### Required
 
-- `delivery_groups` (Set of String) The delivery group IDs to which the application should be added.
 - `installed_app_properties` (Attributes) The install application properties. (see [below for nested schema](#nestedatt--installed_app_properties))
 - `name` (String) Name of the application.
 - `published_name` (String) A display name for the application that is shown to users.
 
 ### Optional
 
+- `application_category_path` (String) The application category path allows users to organize and view applications under specific categories in Citrix Workspace App.
 - `application_folder_path` (String) The application folder path in which the application should be created.
+- `delivery_groups` (List of String) The delivery group IDs to which the application should be added.
+
+-> **Note** The order of delivery group in the `delivery_groups` list determines the priority of the delivery group. Alternatively, you can use the `delivery_groups_priority` attribute to selectively set the priority of delivery groups.
+- `delivery_groups_priority` (Attributes Set) Set of delivery groups with their corresponding priority. (see [below for nested schema](#nestedatt--delivery_groups_priority))
 - `description` (String) Description of the application.
 - `icon` (String) The Id of the icon to be associated with the application.
-- `limit_visibility_to_users` (Set of String) By default, the application is visible to all users within a delivery group. However, you can restrict its visibility to only certain users by specifying them in the `limit_visibility_to_users` list. 
+- `limit_visibility_to_users` (Set of String) By default, the application is visible to all users within a delivery group. However, you can restrict its visibility to only certain users by specifying them in the `limit_visibility_to_users` list.
 
 -> **Note** Users must be in `DOMAIN\UserOrGroupName` or `user@domain.com` format
+- `metadata` (Attributes List) Metadata for the Application.
+
+~> **Please Note** Metadata once set cannot be removed. Use this field to add new metadata or update the value for an existing metadata. Subsequently, removing any metadata from config will have no effect on the existing metadata of the resource. (see [below for nested schema](#nestedatt--metadata))
 
 ### Read-Only
 
@@ -63,6 +98,24 @@ Optional:
 
 - `command_line_arguments` (String) The command-line arguments to use when launching the executable.
 - `working_directory` (String) The working directory which the executable is launched from.
+
+
+<a id="nestedatt--delivery_groups_priority"></a>
+### Nested Schema for `delivery_groups_priority`
+
+Required:
+
+- `id` (String) The Id of the delivery group.
+- `priority` (Number) The priority of the delivery group. `0` means the highest priority.
+
+
+<a id="nestedatt--metadata"></a>
+### Nested Schema for `metadata`
+
+Required:
+
+- `name` (String) Metadata name.
+- `value` (String) Metadata value.
 
 ## Import
 

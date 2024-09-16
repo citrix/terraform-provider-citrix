@@ -68,8 +68,7 @@ func (AwsWorkspacesDirectoryConnectionResourceModel) GetSchema() schema.Schema {
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
 					stringvalidator.ExactlyOneOf(
-						path.MatchRelative().AtParent().AtName("zone"),
-						path.MatchRelative().AtParent().AtName("resource_location"),
+						path.MatchRoot("resource_location"),
 					),
 				},
 				PlanModifiers: []planmodifier.String{

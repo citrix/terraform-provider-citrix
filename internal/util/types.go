@@ -74,8 +74,12 @@ func attributeToTerraformType(attribute schema.Attribute) (attr.Type, error) {
 		return types.NumberType, nil
 	case schema.Int64Attribute:
 		return types.Int64Type, nil
+	case schema.Int32Attribute:
+		return types.Int32Type, nil
 	case schema.Float64Attribute:
 		return types.Float64Type, nil
+	case schema.Float32Attribute:
+		return types.Float32Type, nil
 	case schema.ListAttribute:
 		return types.ListType{ElemType: attrib.ElementType}, nil
 	case schema.ListNestedAttribute:

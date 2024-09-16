@@ -104,7 +104,7 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
 		serviceOffering := azureMachineConfigModel.ServiceOffering.ValueString()
 		queryPath := "serviceoffering.folder"
-		serviceOfferingPath, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, serviceOffering, util.ServiceOfferingResourceType, "")
+		serviceOfferingPath, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, serviceOffering, util.ServiceOfferingResourceType, "")
 		if err != nil {
 			diag.AddError(
 				"Error creating Machine Catalog",
@@ -151,7 +151,7 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 			diskEncryptionSetModel := util.ObjectValueToTypedObject[AzureDiskEncryptionSetModel](ctx, diag, azureMachineConfigModel.DiskEncryptionSet)
 			diskEncryptionSet := diskEncryptionSetModel.DiskEncryptionSetName.ValueString()
 			diskEncryptionSetRg := diskEncryptionSetModel.DiskEncryptionSetResourceGroup.ValueString()
-			des, httpResp, err := util.GetSingleResourceFromHypervisor(ctx, client, hypervisor.GetId(), hypervisorResourcePool.GetId(), fmt.Sprintf("%s\\diskencryptionset.folder", hypervisorResourcePool.GetXDPath()), diskEncryptionSet, "", diskEncryptionSetRg)
+			des, httpResp, err := util.GetSingleResourceFromHypervisor(ctx, client, diag, hypervisor.GetId(), hypervisorResourcePool.GetId(), fmt.Sprintf("%s\\diskencryptionset.folder", hypervisorResourcePool.GetXDPath()), diskEncryptionSet, "", diskEncryptionSetRg)
 			if err != nil {
 				diag.AddError(
 					"Error creating Machine Catalog",
@@ -167,7 +167,7 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
 		awsMachineConfig := util.ObjectValueToTypedObject[AwsMachineConfigModel](ctx, diag, provisioningSchemePlan.AwsMachineConfig)
 		inputServiceOffering := awsMachineConfig.ServiceOffering.ValueString()
-		serviceOffering, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetId(), hypervisorResourcePool.GetId(), "", inputServiceOffering, util.ServiceOfferingResourceType, "")
+		serviceOffering, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, diag, hypervisor.GetId(), hypervisorResourcePool.GetId(), "", inputServiceOffering, util.ServiceOfferingResourceType, "")
 
 		if err != nil {
 			diag.AddError(
@@ -181,7 +181,7 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 
 		masterImage := awsMachineConfig.MasterImage.ValueString()
 		imageId := fmt.Sprintf("%s (%s)", masterImage, awsMachineConfig.ImageAmi.ValueString())
-		imagePath, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", imageId, util.TemplateResourceType, "")
+		imagePath, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", imageId, util.TemplateResourceType, "")
 		if err != nil {
 			diag.AddError(
 				"Error creating Machine Catalog",
@@ -197,7 +197,7 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 
 		securityGroupPaths := []string{}
 		for _, securityGroup := range util.StringListToStringArray(ctx, diag, awsMachineConfig.SecurityGroups) {
-			securityGroupPath, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", securityGroup, util.SecurityGroupResourceType, "")
+			securityGroupPath, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", securityGroup, util.SecurityGroupResourceType, "")
 			if err != nil {
 				diag.AddError(
 					"Error creating Machine Catalog",
@@ -229,7 +229,7 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 		imageVm := gcpMachineConfig.MasterImage.ValueString()
 		if snapshot != "" {
 			queryPath := fmt.Sprintf("%s.vm", imageVm)
-			imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, snapshot, util.SnapshotResourceType, "")
+			imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, snapshot, util.SnapshotResourceType, "")
 			if err != nil {
 				diag.AddError(
 					"Error creating Machine Catalog",
@@ -239,7 +239,7 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 				return nil, err
 			}
 		} else {
-			imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", imageVm, util.VirtualMachineResourceType, "")
+			imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", imageVm, util.VirtualMachineResourceType, "")
 			if err != nil {
 				diag.AddError(
 					"Error creating Machine Catalog",
@@ -257,7 +257,7 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 
 		machineProfile := gcpMachineConfig.MachineProfile.ValueString()
 		if machineProfile != "" {
-			machineProfilePath, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", machineProfile, util.VirtualMachineResourceType, "")
+			machineProfilePath, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", machineProfile, util.VirtualMachineResourceType, "")
 			if err != nil {
 				diag.AddError(
 					"Error creating Machine Catalog",
@@ -306,7 +306,7 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 		}
 
 		if !vSphereMachineConfig.MachineProfile.IsNull() {
-			machineProfile, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", vSphereMachineConfig.MachineProfile.ValueString(), util.TemplateResourceType, "")
+			machineProfile, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", vSphereMachineConfig.MachineProfile.ValueString(), util.TemplateResourceType, "")
 			if err != nil {
 				diag.AddError(
 					"Error creating Machine Catalog",
@@ -387,7 +387,7 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 		provisioningScheme.SetCpuCount(int32(nutanixMachineConfig.CpuCount.ValueInt64()))
 		provisioningScheme.SetCoresPerCpuCount(int32(nutanixMachineConfig.CoresPerCpuCount.ValueInt64()))
 
-		imagePath, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", nutanixMachineConfig.MasterImage.ValueString(), util.TemplateResourceType, "")
+		imagePath, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", nutanixMachineConfig.MasterImage.ValueString(), util.TemplateResourceType, "")
 		if err != nil {
 			diag.AddError(
 				"Error creating Machine Catalog",
@@ -397,7 +397,7 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 			return nil, err
 		}
 
-		containerId, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", nutanixMachineConfig.Container.ValueString(), util.StorageResourceType, "")
+		containerId, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", nutanixMachineConfig.Container.ValueString(), util.StorageResourceType, "")
 
 		if err != nil {
 			diag.AddError(
@@ -431,6 +431,9 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 		provisioningScheme.SetNetworkMapping(networkMapping)
 	}
 
+	metadata := util.GetMetadataRequestModel(ctx, diag, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diag, provisioningSchemePlan.Metadata))
+	provisioningScheme.SetMetadata(metadata)
+
 	return &provisioningScheme, nil
 }
 
@@ -457,7 +460,7 @@ func setProvisioningSchemeForMcsCatalog(ctx context.Context, client *citrixdaasc
 				resourceGroup,
 				storageAccount,
 				container)
-			imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, masterImage, "", "")
+			imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, masterImage, "", "")
 			if err != nil {
 				diagnostics.AddError(
 					"Error creating Machine Catalog",
@@ -471,7 +474,7 @@ func setProvisioningSchemeForMcsCatalog(ctx context.Context, client *citrixdaasc
 				"%s\\%s.resourcegroup",
 				imageBasePath,
 				resourceGroup)
-			imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, masterImage, "", "")
+			imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, masterImage, "", "")
 			if err != nil {
 				diagnostics.AddError(
 					"Error creating Machine Catalog",
@@ -493,7 +496,7 @@ func setProvisioningSchemeForMcsCatalog(ctx context.Context, client *citrixdaasc
 				resourceGroup,
 				gallery,
 				definition)
-			imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, version, "", "")
+			imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, version, "", "")
 			if err != nil {
 				diagnostics.AddError(
 					"Error creating Machine Catalog",
@@ -538,7 +541,7 @@ func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan Provisioning
 		azureMachineConfigModel := util.ObjectValueToTypedObject[AzureMachineConfigModel](ctx, diagnostics, provisioningSchemePlan.AzureMachineConfig)
 		serviceOffering := azureMachineConfigModel.ServiceOffering.ValueString()
 		queryPath := "serviceoffering.folder"
-		serviceOfferingPath, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, serviceOffering, util.ServiceOfferingResourceType, "")
+		serviceOfferingPath, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, serviceOffering, util.ServiceOfferingResourceType, "")
 		if err != nil {
 			diagnostics.AddError(
 				"Error updating Machine Catalog",
@@ -551,7 +554,7 @@ func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan Provisioning
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
 		awsMachineConfig := util.ObjectValueToTypedObject[AwsMachineConfigModel](ctx, nil, provisioningSchemePlan.AwsMachineConfig)
 		inputServiceOffering := awsMachineConfig.ServiceOffering.ValueString()
-		serviceOffering, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetId(), hypervisorResourcePool.GetId(), "", inputServiceOffering, util.ServiceOfferingResourceType, "")
+		serviceOffering, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, diagnostics, hypervisor.GetId(), hypervisorResourcePool.GetId(), "", inputServiceOffering, util.ServiceOfferingResourceType, "")
 
 		if err != nil {
 			diagnostics.AddError(
@@ -565,7 +568,7 @@ func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan Provisioning
 
 		securityGroupPaths := []string{}
 		for _, securityGroup := range util.StringListToStringArray(ctx, diagnostics, awsMachineConfig.SecurityGroups) {
-			securityGroupPath, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", securityGroup, util.SecurityGroupResourceType, "")
+			securityGroupPath, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", securityGroup, util.SecurityGroupResourceType, "")
 			if err != nil {
 				diagnostics.AddError(
 					"Error updating Machine Catalog",
@@ -589,7 +592,7 @@ func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan Provisioning
 		body.SetMemoryMB(int32(vSphereMachineConfig.MemoryMB.ValueInt64()))
 
 		if !vSphereMachineConfig.MachineProfile.IsNull() {
-			machineProfile, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", vSphereMachineConfig.MachineProfile.ValueString(), util.TemplateResourceType, "")
+			machineProfile, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, client, diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", vSphereMachineConfig.MachineProfile.ValueString(), util.TemplateResourceType, "")
 			if err != nil {
 				diagnostics.AddError(
 					"Error updating Machine Catalog",
@@ -857,7 +860,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 						resourceGroup,
 						storageAccount,
 						container)
-					imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, newImage, "", "")
+					imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, newImage, "", "")
 					if err != nil {
 						resp.Diagnostics.AddError(
 							"Error updating Machine Catalog",
@@ -870,7 +873,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 					queryPath := fmt.Sprintf(
 						"image.folder\\%s.resourcegroup",
 						resourceGroup)
-					imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, newImage, "", "")
+					imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, newImage, "", "")
 					if err != nil {
 						resp.Diagnostics.AddError(
 							"Error updating Machine Catalog",
@@ -891,7 +894,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 						resourceGroup,
 						gallery,
 						definition)
-					imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, version, "", "")
+					imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, version, "", "")
 					if err != nil {
 						resp.Diagnostics.AddError(
 							"Error updating Machine Catalog",
@@ -942,7 +945,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
 		awsMachineConfig := util.ObjectValueToTypedObject[AwsMachineConfigModel](ctx, &resp.Diagnostics, provisioningSchemePlan.AwsMachineConfig)
 		imageId := fmt.Sprintf("%s (%s)", awsMachineConfig.MasterImage.ValueString(), awsMachineConfig.ImageAmi.ValueString())
-		imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", imageId, util.TemplateResourceType, "")
+		imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", imageId, util.TemplateResourceType, "")
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating Machine Catalog",
@@ -976,7 +979,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 
 		if snapshot != "" {
 			queryPath := fmt.Sprintf("%s.vm", newImage)
-			imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, snapshot, util.SnapshotResourceType, "")
+			imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, snapshot, util.SnapshotResourceType, "")
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating Machine Catalog",
@@ -986,7 +989,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 				return err
 			}
 		} else {
-			imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", newImage, util.VirtualMachineResourceType, "")
+			imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", newImage, util.VirtualMachineResourceType, "")
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating Machine Catalog",
@@ -1015,7 +1018,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 		}
 
 		if gcpMachineProfile != "" {
-			machineProfilePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", gcpMachineConfig.MachineProfile.ValueString(), util.VirtualMachineResourceType, "")
+			machineProfilePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", gcpMachineConfig.MachineProfile.ValueString(), util.VirtualMachineResourceType, "")
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating Machine Catalog",
@@ -1103,7 +1106,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM:
 		nutanixMachineConfig := util.ObjectValueToTypedObject[NutanixMachineConfigModel](ctx, &resp.Diagnostics, provisioningSchemePlan.NutanixMachineConfig)
 		if hypervisor.GetPluginId() == util.NUTANIX_PLUGIN_ID {
-			imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", nutanixMachineConfig.MasterImage.ValueString(), util.TemplateResourceType, "")
+			imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", nutanixMachineConfig.MasterImage.ValueString(), util.TemplateResourceType, "")
 
 			if err != nil {
 				resp.Diagnostics.AddError(
@@ -1220,7 +1223,7 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Con
 			awsMachineConfig = AwsMachineConfigModel{}
 		} else {
 
-			if serviceOfferingObject, httpResp, err := util.GetSingleResourceFromHypervisor(ctx, client, hypervisor.GetId(), resourcePool.GetId(), "", provScheme.GetServiceOffering(), util.ServiceOfferingResourceType, ""); err == nil {
+			if serviceOfferingObject, httpResp, err := util.GetSingleResourceFromHypervisor(ctx, client, diagnostics, hypervisor.GetId(), resourcePool.GetId(), "", provScheme.GetServiceOffering(), util.ServiceOfferingResourceType, ""); err == nil {
 				provScheme.SetServiceOffering(serviceOfferingObject.GetId())
 				catalog.SetProvisioningScheme(provScheme)
 			} else {
@@ -1351,6 +1354,15 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Con
 	}
 
 	provSchemeModel.MachineDomainIdentity = util.TypedObjectToObjectValue(ctx, diagnostics, machineDomainIdentityModel)
+
+	effectiveMetadata := util.GetEffectiveMetadata(util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, provSchemeModel.Metadata), provScheme.GetMetadata())
+
+	if len(effectiveMetadata) > 0 {
+		provSchemeModel.Metadata = util.RefreshListValueProperties[util.NameValueStringPairModel, citrixorchestration.NameValueStringPairModel](ctx, diagnostics, provSchemeModel.Metadata, effectiveMetadata, util.GetOrchestrationNameValueStringPairKey)
+	} else {
+		provSchemeModel.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
+	}
+
 	r.ProvisioningScheme = util.TypedObjectToObjectValue(ctx, diagnostics, provSchemeModel)
 	return r
 }
@@ -1522,7 +1534,7 @@ func getOnPremImage(ctx context.Context, client *citrixdaasclient.CitrixDaasClie
 		errTemplate = fmt.Sprintf("Failed to locate snapshot %s of master image VM %s", snapshotName, image)
 	}
 
-	imageResource, httpResp, err := util.GetSingleResourceFromHypervisor(ctx, client, hypervisorName, resourcePoolName, queryPath, resourceName, resourceType, "")
+	imageResource, httpResp, err := util.GetSingleResourceFromHypervisor(ctx, client, diags, hypervisorName, resourcePoolName, queryPath, resourceName, resourceType, "")
 	if err != nil {
 		diags.AddError(
 			fmt.Sprintf("Error %s Machine Catalog", action),
@@ -1558,7 +1570,7 @@ func handleMachineProfileForAzureMcsPvsCatalog(ctx context.Context, client *citr
 		resourceType = ""
 		errorMessage = fmt.Sprintf("Failed to locate machine profile template spec %s with version %s on Azure", machineProfile.MachineProfileTemplateSpecName.ValueString(), machineProfile.MachineProfileTemplateSpecVersion.ValueString())
 	}
-	machineProfileResource, httpResp, err := util.GetSingleResourceFromHypervisor(ctx, client, hypervisorName, resourcePoolName, queryPath, machineProfileVmOrTemplateSpecVersion, resourceType, "")
+	machineProfileResource, httpResp, err := util.GetSingleResourceFromHypervisor(ctx, client, diag, hypervisorName, resourcePoolName, queryPath, machineProfileVmOrTemplateSpecVersion, resourceType, "")
 	if err != nil {
 		diag.AddError(
 			fmt.Sprintf("Error %s Machine Catalog", action),

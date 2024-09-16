@@ -472,6 +472,14 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 		return
 	}
 
+	if !data.Metadata.IsNull() {
+		metadata := util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, data.Metadata)
+		isValid := util.ValidateMetadataConfig(ctx, &resp.Diagnostics, metadata)
+		if !isValid {
+			return
+		}
+	}
+
 	if !data.DefaultAccessPolicies.IsNull() {
 		accesPolicies := util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, &resp.Diagnostics, data.DefaultAccessPolicies)
 
@@ -529,7 +537,8 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 		}
 	}
 
-	if data.AssociatedMachineCatalogs.IsNull() || len(data.AssociatedMachineCatalogs.Elements()) < 1 {
+	if !data.AssociatedMachineCatalogs.IsUnknown() &&
+		(data.AssociatedMachineCatalogs.IsNull() || len(data.AssociatedMachineCatalogs.Elements()) < 1) {
 		// if no machine catalogs are associated, sharing_kind and session_support must be specified
 
 		errorSummary := "Incorrect Attribute Configuration"

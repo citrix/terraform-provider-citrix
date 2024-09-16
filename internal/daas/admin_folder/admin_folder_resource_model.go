@@ -37,7 +37,7 @@ func (AdminFolderResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "Name of the admin folder.",
+				Description: "Name of the admin folder. Admin Folder name should be unique within the same parent folder.",
 				Required:    true,
 			},
 			"parent_path": schema.StringAttribute{

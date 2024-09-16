@@ -408,7 +408,48 @@
         "TEST_AWS_WORKSPACES_DEPLOYMENT_DATA_SOURCE_CONNECTION_GUID": "{QCS aws directory connection guid}",
 
         // Site Data Source Go Tests Env Variables
-        "TEST_SITE_DATA_SOURCE_EXPECTED_SITE_ID": "{Expected Site ID}"
+        "TEST_SITE_DATA_SOURCE_EXPECTED_SITE_ID": "{Expected Site ID}",
+
+        // Citrix Cloud Identity Provider Go Tests Env Variables
+        // Okta Identity Provider Resource Go Tests Env Variables
+        "TEST_CC_OKTA_IDP_NAME": "{Name of the Okta Identity Provider}",
+        
+        "TEST_CC_OKTA_IDP_DOMAIN": "{Domain of the Okta Identity Provider}",
+        "TEST_CC_OKTA_IDP_CLIENT_ID": "{Client ID of the Okta Identity Provider}",
+        "TEST_CC_OKTA_IDP_CLIENT_SECRET": "{Client Secret of the Okta Identity Provider}",
+        "TEST_CC_OKTA_IDP_API_TOKEN": "{API Token of the Okta Identity Provider}",
+
+        "TEST_CC_OKTA_IDP_DOMAIN_UPDATED": "{Updated Domain of the Okta Identity Provider}",
+        "TEST_CC_OKTA_IDP_CLIENT_ID_UPDATED": "{Updated Client ID of the Okta Identity Provider}",
+        "TEST_CC_OKTA_IDP_CLIENT_SECRET_UPDATED": "{Updated Client Secret of the Okta Identity Provider}",
+        "TEST_CC_OKTA_IDP_API_TOKEN_UPDATED": "{Updated API Token of the Okta Identity Provider}",
+        // Okta Identity Provider Data Source Go Tests Env Variables
+        "TEST_CC_OKTA_IDP_DATA_SOURCE_ID": "{ID of the Okta Identity Provider Data Source}",
+        "TEST_CC_OKTA_IDP_DATA_SOURCE_NAME": "{Name of the Okta Identity Provider Data Source}",
+        "TEST_CC_OKTA_IDP_DATA_SOURCE_DOMAIN": "{Domain of the Okta Identity Provider Data Source}",
+
+        // Saml Identity Provider Resource Go Tests Env Variables
+        "TEST_CC_SAML_IDP_NAME": "{Name of the SAML 2.0 Identity Provider}",
+        "TEST_CC_SAML_IDP_AUTH_DOMAIN_NAME": "{Auth Domain Name of the SAML 2.0 Identity Provider}",
+
+        "TEST_CC_SAML_IDP_ENTITY_ID": "{Entity ID of the SAML 2.0 Identity Provider}",
+        "TEST_CC_SAML_IDP_USE_SCOPED_ENTITY_ID": "false",
+        "TEST_CC_SAML_IDP_SSO_URL": "{SSO URL of the SAML 2.0 Identity Provider}",
+        "TEST_CC_SAML_IDP_CERT_FILE_PATH": "{Certificate File Path of the SAML 2.0 Identity Provider}",
+        "TEST_CC_SAML_IDP_LOGOUT_URL": "{Logout URL of the SAML 2.0 Identity Provider}",
+
+        "TEST_CC_SAML_IDP_ENTITY_ID_UPDATED": "{Updated Entity ID of the SAML 2.0 Identity Provider}",
+        "TEST_CC_SAML_IDP_USE_SCOPED_ENTITY_ID_UPDATED": "true",
+        "TEST_CC_SAML_IDP_SSO_URL_UPDATED": "{Updated SSO URL of the SAML 2.0 Identity Provider}",
+        "TEST_CC_SAML_IDP_CERT_FILE_PATH_UPDATED": "{Updated Certificate File Path of the SAML 2.0 Identity Provider}",
+        "TEST_CC_SAML_IDP_LOGOUT_URL_UPDATED": "{Updated Logout URL of the SAML 2.0 Identity Provider}",
+
+        // Saml Identity Provider Data Source Go Tests Env Variables
+        "TEST_CC_SAML_IDP_DATA_SOURCE_ID" : "{ID of the SAML 2.0 Identity Provider Data Source}",
+        "TEST_CC_SAML_IDP_DATA_SOURCE_NAME" : "{Name of the SAML 2.0 Identity Provider Data Source}",
+        "TEST_CC_SAML_IDP_DATA_SOURCE_AUTH_DOMAIN" : "{Auth Domain Name of the SAML 2.0 Identity Provider Data Source}",
+        "TEST_CC_SAML_IDP_DATA_SOURCE_ENTITY_ID" : "{Entity ID of the SAML 2.0 Identity Provider Data Source}"
+
     },
     "go.testTimeout": "120m"
 }

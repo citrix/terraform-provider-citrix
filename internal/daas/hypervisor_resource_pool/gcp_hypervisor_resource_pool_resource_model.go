@@ -25,6 +25,7 @@ type GcpHypervisorResourcePoolResourceModel struct {
 	Id         types.String `tfsdk:"id"`
 	Name       types.String `tfsdk:"name"`
 	Hypervisor types.String `tfsdk:"hypervisor"`
+	Metadata   types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
 	/**** Resource Pool Details ****/
 	Region  types.String `tfsdk:"region"`
 	Vpc     types.String `tfsdk:"vpc"`
@@ -102,6 +103,7 @@ func (GcpHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 					boolplanmodifier.RequiresReplaceIfConfigured(),
 				},
 			},
+			"metadata": util.GetMetadataListSchema("Hypervisor Resource Pool"),
 		},
 	}
 }
@@ -135,6 +137,13 @@ func (r GcpHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx contex
 	vpcType := vpc.GetObjectTypeName()
 	if vpcType == "sharedvirtualprivatecloud" {
 		r.SharedVpc = types.BoolValue(true)
+	}
+
+	effectiveMetadata := util.GetEffectiveMetadata(util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, r.Metadata), resourcePool.GetMetadata())
+	if len(effectiveMetadata) > 0 {
+		r.Metadata = util.RefreshListValueProperties[util.NameValueStringPairModel, citrixorchestration.NameValueStringPairModel](ctx, diagnostics, r.Metadata, effectiveMetadata, util.GetOrchestrationNameValueStringPairKey)
+	} else {
+		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
 	}
 
 	return r

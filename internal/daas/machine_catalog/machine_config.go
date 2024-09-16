@@ -640,7 +640,7 @@ func (AzurePvsConfigurationModel) GetSchema() schema.SingleNestedAttribute {
 			},
 		},
 		Validators: []validator.Object{
-			objectvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("azure_pvs_config"), path.MatchRelative().AtParent().AtName("azure_master_image")),
+			objectvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("azure_master_image")),
 		},
 	}
 }
@@ -1088,36 +1088,51 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 		if masterImageXdPath != "" {
 			segments := strings.Split(masterImage.GetXDPath(), "\\")
 			lastIndex := len(segments)
-			if lastIndex == 8 {
-				resourceTag := strings.Split(segments[lastIndex-1], ".")
-				resourceType := resourceTag[len(resourceTag)-1]
+			resourceTag := strings.Split(segments[lastIndex-1], ".")
+			resourceType := resourceTag[len(resourceTag)-1]
 
-				if strings.EqualFold(resourceType, util.VhdResourceType) {
-					// VHD image
-					azureMasterImage.MasterImage = types.StringValue(masterImage.GetName())
-					azureMasterImage.Container = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".container"))
-					azureMasterImage.StorageAccount = types.StringValue(strings.TrimSuffix(segments[lastIndex-3], ".storageaccount"))
-				} else if strings.EqualFold(resourceType, util.ImageVersionResourceType) {
-					/* For Azure Image Gallery image, the XDPath looks like:
-					* XDHyp:\\HostingUnits\\{resource pool}\\image.folder\\{resource group}.resourcegroup\\{gallery name}.gallery\\{image name}.imagedefinition\\{image version}.imageversion
-					* The Name property in MasterImage will be image version instead of image definition (name of the image)
-					 */
-					azureGalleryImageModel := util.ObjectValueToTypedObject[GalleryImageModel](ctx, diagnostics, azureMasterImage.GalleryImage)
-					azureGalleryImageModel.Version = types.StringValue(masterImage.GetName())
-					// Extract {image name} from {image name}.imagedefinition
-					azureGalleryImageModel.Definition = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".imagedefinition"))
-					// Extract {gallery name} from {gallery name}.gallery
-					azureGalleryImageModel.Gallery = types.StringValue(strings.TrimSuffix(segments[lastIndex-3], ".gallery"))
-
-					azureMasterImage.GalleryImage = util.TypedObjectToObjectValue(ctx, diagnostics, azureGalleryImageModel)
-
-				}
-				// Extract {resource group} from {resource group}.resourcegroup
+			if strings.EqualFold(resourceType, util.VhdResourceType) {
+				// VHD image
+				azureMasterImage.MasterImage = types.StringValue(masterImage.GetName())
+				azureMasterImage.Container = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".container"))
+				azureMasterImage.StorageAccount = types.StringValue(strings.TrimSuffix(segments[lastIndex-3], ".storageaccount"))
 				azureMasterImage.ResourceGroup = types.StringValue(strings.TrimSuffix(segments[lastIndex-4], ".resourcegroup"))
+
+				segment := strings.Split(segments[lastIndex-5], ".")
+				resourceType := segment[len(segment)-1]
+				if strings.EqualFold(resourceType, util.SharedSubscriptionResourceType) {
+					azureMasterImage.SharedSubscription = types.StringValue(segment[0])
+				}
+			} else if strings.EqualFold(resourceType, util.ImageVersionResourceType) {
+				/* For Azure Image Gallery image, the XDPath looks like:
+				* XDHyp:\\HostingUnits\\{resource pool}\\image.folder\\{resource group}.resourcegroup\\{gallery name}.gallery\\{image name}.imagedefinition\\{image version}.imageversion
+				* The Name property in MasterImage will be image version instead of image definition (name of the image)
+				 */
+				azureGalleryImageModel := util.ObjectValueToTypedObject[GalleryImageModel](ctx, diagnostics, azureMasterImage.GalleryImage)
+				azureGalleryImageModel.Version = types.StringValue(masterImage.GetName())
+				// Extract {image name} from {image name}.imagedefinition
+				azureGalleryImageModel.Definition = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".imagedefinition"))
+				// Extract {gallery name} from {gallery name}.gallery
+				azureGalleryImageModel.Gallery = types.StringValue(strings.TrimSuffix(segments[lastIndex-3], ".gallery"))
+
+				azureMasterImage.GalleryImage = util.TypedObjectToObjectValue(ctx, diagnostics, azureGalleryImageModel)
+				azureMasterImage.ResourceGroup = types.StringValue(strings.TrimSuffix(segments[lastIndex-4], ".resourcegroup"))
+				segment := strings.Split(segments[lastIndex-5], ".")
+				resourceType := segment[len(segment)-1]
+				if strings.EqualFold(resourceType, util.SharedSubscriptionResourceType) {
+					azureMasterImage.SharedSubscription = types.StringValue(segment[0])
+				} else {
+					azureMasterImage.SharedSubscription = types.StringValue("")
+				}
 			} else {
 				// Snapshot or Managed Disk
 				azureMasterImage.MasterImage = types.StringValue(masterImage.GetName())
 				azureMasterImage.ResourceGroup = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".resourcegroup"))
+				segment := strings.Split(segments[lastIndex-3], ".")
+				resourceType := segment[len(segment)-1]
+				if strings.EqualFold(resourceType, util.SharedSubscriptionResourceType) {
+					azureMasterImage.SharedSubscription = types.StringValue(segment[0])
+				}
 			}
 		}
 

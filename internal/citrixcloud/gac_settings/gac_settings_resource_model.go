@@ -314,7 +314,7 @@ func (WindowsSettings) GetSchema() schema.NestedAttributeObject {
 				Description: "String value (if any) associated with the setting.",
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_string"), path.MatchRelative().AtParent().AtName("value_list")),
+					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_list")),
 					stringvalidator.LengthAtLeast(1),
 				},
 			},
@@ -378,7 +378,7 @@ func (AndroidSettings) GetSchema() schema.NestedAttributeObject {
 				Description: "String value (if any) associated with the setting.",
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_string"), path.MatchRelative().AtParent().AtName("value_list")),
+					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_list")),
 					stringvalidator.LengthAtLeast(1),
 				},
 			},
@@ -415,7 +415,7 @@ func (ChromeosSettings) GetSchema() schema.NestedAttributeObject {
 				Description: "String value (if any) associated with the setting.",
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_string"), path.MatchRelative().AtParent().AtName("value_list")),
+					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_list")),
 					stringvalidator.LengthAtLeast(1),
 				},
 			},
@@ -452,7 +452,7 @@ func (Html5Settings) GetSchema() schema.NestedAttributeObject {
 				Description: "String value (if any) associated with the setting.",
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_string"), path.MatchRelative().AtParent().AtName("value_list")),
+					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_list")),
 					stringvalidator.LengthAtLeast(1),
 				},
 			},
@@ -489,7 +489,7 @@ func (MacosSettings) GetSchema() schema.NestedAttributeObject {
 				Description: "String value (if any) associated with the setting.",
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_string"), path.MatchRelative().AtParent().AtName("value_list")),
+					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_list")),
 					stringvalidator.LengthAtLeast(1),
 				},
 			},

@@ -53,6 +53,8 @@ func TestApplicationResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_application.testApplication", "delivery_groups.#", "1"),
 					// Verify the command line executable
 					resource.TestCheckResourceAttr("citrix_application.testApplication", "installed_app_properties.command_line_executable", "test.exe"),
+					// Verify the application category path
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_category_path", "Main Apps\\Test App"),
 				),
 			},
 			// ImportState testing
@@ -87,6 +89,66 @@ func TestApplicationResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_application.testApplication", "installed_app_properties.command_line_executable", "updated_test.exe"),
 					// Verify the application folder path
 					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_folder_path", fmt.Sprintf("%s\\", updated_folder_name)),
+					// Verify the application category path
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_category_path", ""),
+				),
+			},
+			// Update and Read testing
+			{
+				Config: composeTestResourceTf(
+					BuildApplicationResource(t, testApplicationResource_withPriorityModel),
+					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildPolicySetResourceWithoutDeliveryGroup(t),
+					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zoneInput, false),
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify name of application
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "name", fmt.Sprintf("%s-updated", name)),
+					// Verify description of application
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "description", "Application for testing updated"),
+					// Verify the command line arguments
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "installed_app_properties.command_line_arguments", "update test arguments"),
+					// Verify the command line executable
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "installed_app_properties.command_line_executable", "updated_test.exe"),
+					// Verify the application folder path
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_folder_path", fmt.Sprintf("%s\\", updated_folder_name)),
+					// Verify the application category path
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_category_path", ""),
+					// Verify the number of delivery groups
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "delivery_groups_priority.#", "1"),
+				),
+			},
+			// Update and Read testing
+			{
+				Config: composeTestResourceTf(
+					BuildApplicationResource(t, testApplicationResource_withPriorityModel_updated),
+					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildPolicySetResourceWithoutDeliveryGroup(t),
+					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources),
+					BuildZoneResource(t, zoneInput, false),
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify name of application
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "name", fmt.Sprintf("%s-updated", name)),
+					// Verify description of application
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "description", "Application for testing updated"),
+					// Verify the command line arguments
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "installed_app_properties.command_line_arguments", "update test arguments"),
+					// Verify the command line executable
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "installed_app_properties.command_line_executable", "updated_test.exe"),
+					// Verify the application folder path
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_folder_path", fmt.Sprintf("%s\\", updated_folder_name)),
+					// Verify the application category path
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_category_path", ""),
+					// Verify the number of delivery groups
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "delivery_groups_priority.#", "1"),
 				),
 			},
 			// Delete testing
@@ -105,6 +167,7 @@ resource "citrix_application" "testApplication" {
 		working_directory       = "test directory"
 	}
 	delivery_groups = [citrix_delivery_group.testDeliveryGroup.id]
+	application_category_path = "Main Apps\\Test App"
 }`
 	testApplicationResource_updated = `
 resource "citrix_application" "testApplication" {
@@ -117,6 +180,43 @@ resource "citrix_application" "testApplication" {
 		working_directory       = "test directory"
 	}
 	delivery_groups = [citrix_delivery_group.testDeliveryGroup.id]
+	application_folder_path = citrix_admin_folder.testAdminFolder2.path
+}`
+
+	testApplicationResource_withPriorityModel = `
+resource "citrix_application" "testApplication" {
+	name                = "%s-updated"
+	description         = "Application for testing updated"
+	published_name = "TestApplication"
+	installed_app_properties = {
+		command_line_arguments  = "update test arguments"
+		command_line_executable = "updated_test.exe"
+		working_directory       = "test directory"
+	}
+	delivery_groups_priority = [
+		{
+			id = citrix_delivery_group.testDeliveryGroup.id
+			priority = 0
+		}
+	]
+	application_folder_path = citrix_admin_folder.testAdminFolder2.path
+}`
+	testApplicationResource_withPriorityModel_updated = `
+resource "citrix_application" "testApplication" {
+	name                = "%s-updated"
+	description         = "Application for testing updated"
+	published_name = "TestApplication"
+	installed_app_properties = {
+		command_line_arguments  = "update test arguments"
+		command_line_executable = "updated_test.exe"
+		working_directory       = "test directory"
+	}
+	delivery_groups_priority = [
+		{
+			id = citrix_delivery_group.testDeliveryGroup.id
+			priority = 5
+		}
+	]
 	application_folder_path = citrix_admin_folder.testAdminFolder2.path
 }`
 )

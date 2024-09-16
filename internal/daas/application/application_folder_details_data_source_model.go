@@ -45,6 +45,6 @@ func (r ApplicationFolderDetailsDataSourceModel) getInstalledAppProperties(ctx c
 	return util.TypedObjectToObjectValue(ctx, diagnostics, installedAppResponse)
 }
 
-func (r ApplicationFolderDetailsDataSourceModel) getDeliveryGroups(ctx context.Context, diagnostics *diag.Diagnostics, app citrixorchestration.ApplicationResponseModel) types.Set {
-	return util.StringArrayToStringSet(ctx, diagnostics, app.AssociatedDeliveryGroupUuids)
+func (r ApplicationFolderDetailsDataSourceModel) getDeliveryGroups(ctx context.Context, diagnostics *diag.Diagnostics, app citrixorchestration.ApplicationResponseModel) types.List {
+	return util.StringArrayToStringList(ctx, diagnostics, app.AssociatedDeliveryGroupUuids)
 }

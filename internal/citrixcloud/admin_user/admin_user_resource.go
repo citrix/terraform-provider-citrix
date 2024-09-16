@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	ccadmins "github.com/citrix/citrix-daas-rest-go/ccadmins"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -67,19 +69,41 @@ func (r *ccAdminUserResource) Create(ctx context.Context, req resource.CreateReq
 	}
 
 	// Generate API request body from plan
-	var body ccadmins.CitrixCloudServicesAdministratorsApiModelsCreateAdministratorInputModel
+	var body ccadmins.CreateAdministratorInputModel
 	body.SetType(plan.Type.ValueString())
 	body.SetAccessType(plan.AccessType.ValueString())
-	body.SetProviderType(plan.ProviderType.ValueString())
 	body.SetEmail(plan.Email.ValueString())
-	body.SetFirstName(plan.FirstName.ValueString())
-	body.SetLastName(plan.LastName.ValueString())
-	body.SetDisplayName(plan.DisplayName.ValueString())
+	adminProviderType, err := getAdminProviderType(plan.ProviderType.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error getting the provider type",
+			"Error message: "+err.Error())
+		return
+	}
+	body.SetProviderType(adminProviderType)
 
-	createAdminUserRequest := r.client.CCAdminsClient.AdministratorsAPI.CustomerAdministratorsCreatePost(ctx, r.client.ClientConfig.CustomerId)
-	createAdminUserRequest = createAdminUserRequest.CitrixCloudServicesAdministratorsApiModelsCreateAdministratorInputModel(body)
+	if !plan.FirstName.IsNull() {
+		body.SetFirstName(plan.FirstName.ValueString())
+	}
+	if !plan.LastName.IsNull() {
+		body.SetLastName(plan.LastName.ValueString())
+	}
+	if !plan.DisplayName.IsNull() {
+		body.SetDisplayName(plan.DisplayName.ValueString())
+	}
 
-	// Send invitation to the admin user
+	// Add policies to the admin user
+	accessPolicy, err := getAdminUserPolicies(ctx, &resp.Diagnostics, r.client, plan)
+	if err != nil {
+		resp.Diagnostics.AddError("Error adding policies to the user", "Error message: "+err.Error())
+		return
+	}
+	body.SetPolicies(accessPolicy)
+
+	createAdminUserRequest := r.client.CCAdminsClient.AdministratorsAPI.CreateAdministrator(ctx)
+	createAdminUserRequest = createAdminUserRequest.CitrixCustomerId(r.client.ClientConfig.CustomerId).CreateAdministratorInputModel(body)
+
+	// Create a new admin user
 	_, httpResp, err := citrixdaasclient.AddRequestData(createAdminUserRequest, r.client).Execute()
 
 	//In case of error, add it to diagnostics and return
@@ -93,17 +117,28 @@ func (r *ccAdminUserResource) Create(ctx context.Context, req resource.CreateReq
 	}
 
 	// Try getting the new admin user from remote
-	adminUser, err := getAdminUser(ctx, r.client, plan.Email.ValueString())
-
+	adminUser, err := getAdminUser(ctx, r.client, plan)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error fetching admin user",
 			util.ReadClientError(err),
 		)
+		return
 	}
 
-	// Map response body to schema and populate computed attribute values
+	// Update the plan with the fetched admin user details
 	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, adminUser)
+
+	if !plan.Policies.IsNull() {
+		var filteredPolicies []CCAdminPolicyResourceModel
+		policies := util.ObjectListToTypedArray[CCAdminPolicyResourceModel](ctx, &resp.Diagnostics, plan.Policies)
+		for _, policy := range policies {
+			// Set the service name to empty string as it is not returned by the API
+			policy.ServiceName = types.StringValue("")
+			filteredPolicies = append(filteredPolicies, policy)
+		}
+		plan.Policies = util.TypedArrayToObjectList[CCAdminPolicyResourceModel](ctx, &resp.Diagnostics, filteredPolicies)
+	}
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -126,10 +161,10 @@ func (r *ccAdminUserResource) Read(ctx context.Context, req resource.ReadRequest
 	}
 
 	// Try getting the admin user from remote
-	var adminUser *ccadmins.CitrixCloudServicesAdministratorsApiModelsAdministratorResult
+	var adminUser ccadmins.AdministratorResult
 	var err error
 
-	adminUser, err = getAdminUser(ctx, r.client, state.Email.ValueString())
+	adminUser, err = getAdminUser(ctx, r.client, state)
 	if err != nil {
 		resp.Diagnostics.AddWarning(
 			fmt.Sprintf("Admin user with email: %s not found", state.Email.ValueString()),
@@ -138,12 +173,21 @@ func (r *ccAdminUserResource) Read(ctx context.Context, req resource.ReadRequest
 		// Remove from state
 		resp.State.RemoveResource(ctx)
 	}
-
 	if err != nil {
 		return
 	}
-
 	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, adminUser)
+
+	if isInvitationAccepted(state) && state.AccessType.ValueString() == string(ccadmins.ADMINISTRATORACCESSTYPE_CUSTOM) {
+		adminId := state.AdminId.ValueString()
+		accessPolicies, err := getAccessPolicies(ctx, r.client, adminId)
+		if err != nil {
+			resp.Diagnostics.AddError("Error getting access policies for user "+state.Email.ValueString(),
+				"\nError message: "+util.ReadClientError(err))
+			return
+		}
+		state = state.RefreshPropertyValuesForPolicies(ctx, &resp.Diagnostics, accessPolicies)
+	}
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -157,10 +201,95 @@ func (r *ccAdminUserResource) Read(ctx context.Context, req resource.ReadRequest
 func (r *ccAdminUserResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
-	resp.Diagnostics.AddError(
-		"Error updating admin user",
-		"Admin Users with access_type set to Full cannot be updated.",
-	)
+	// Retrieve values from state
+	var state CCAdminUserResourceModel
+	diags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if !isInvitationAccepted(state) {
+		resp.Diagnostics.AddError(
+			"Error updating admin user with email: "+state.Email.ValueString(),
+			"User should first accept the invitation before updating the user.",
+		)
+		return
+	}
+	adminId := state.AdminId.ValueString()
+
+	var plan CCAdminUserResourceModel
+	diags = req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if !plan.FirstName.IsNull() && state.FirstName.ValueString() != plan.FirstName.ValueString() {
+		resp.Diagnostics.AddError(
+			"Error updating first name",
+			"First name cannot be updated",
+		)
+		return
+	}
+
+	if !plan.LastName.IsNull() && state.LastName.ValueString() != plan.LastName.ValueString() {
+		resp.Diagnostics.AddError(
+			"Error updating last name",
+			"Last name cannot be updated",
+		)
+		return
+	}
+
+	if !plan.DisplayName.IsNull() && state.DisplayName.ValueString() != plan.DisplayName.ValueString() {
+		resp.Diagnostics.AddError(
+			"Error updating display name",
+			"Display name cannot be updated",
+		)
+		return
+	}
+
+	accessPolicy, err := getAdminUserPolicies(ctx, &resp.Diagnostics, r.client, plan)
+	if err != nil {
+		resp.Diagnostics.AddError("Error updating policies for the user",
+			"Error message: "+err.Error())
+		return
+	}
+
+	updateAdministratorAccessModel := ccadmins.AdministratorAccessModel{}
+	adminAccessType, err := getAdminAccessType(plan.AccessType.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid access type",
+			"Error message: "+err.Error())
+		return
+	}
+	updateAdministratorAccessModel.SetAccessType(adminAccessType)
+	updateAdministratorAccessModel.SetPolicies(accessPolicy)
+	updateAdminUserRequest := r.client.CCAdminsClient.AdministratorsAPI.UpdateAdministratorAccess(ctx)
+	updateAdminUserRequest = updateAdminUserRequest.CitrixCustomerId(r.client.ClientConfig.CustomerId)
+	updateAdminUserRequest = updateAdminUserRequest.Id(adminId)
+	updateAdminUserRequest = updateAdminUserRequest.AdministratorAccessModel(updateAdministratorAccessModel)
+	httpResp, err := citrixdaasclient.AddRequestData(updateAdminUserRequest, r.client).Execute()
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating policies for "+plan.Email.ValueString(),
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		return
+	}
+
+	plan, err = fetchAndUpdateAdminUser(ctx, r.client, plan, &resp.Diagnostics)
+	if err != nil {
+		return // Error already added to diagnostics
+	}
+
+	// Set state to fully populated data
+	diags = resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
@@ -175,67 +304,38 @@ func (r *ccAdminUserResource) Delete(ctx context.Context, req resource.DeleteReq
 		return
 	}
 
-	if state.UserId.IsNull() || state.UserId.ValueString() == "" {
-		resp.Diagnostics.AddError(
-			"Error deleting admin user",
-			"Admin User needs to accept the invitation before they can be deleted.",
-		)
-		return
-	}
-
-	deleteAdminUserRequest := r.client.CCAdminsClient.AdministratorsAPI.CustomerAdministratorsAdminIdDelete(ctx, state.UserId.ValueString(), r.client.ClientConfig.CustomerId)
-	httpResp, err := citrixdaasclient.AddRequestData(deleteAdminUserRequest, r.client).Execute()
-	if err != nil && httpResp.StatusCode != http.StatusNotFound {
-		resp.Diagnostics.AddError(
-			"Error deleting admin user with email: "+state.Email.ValueString(),
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-		return
+	// Check if the user has accepted the invitation if not delete the invitation
+	if !isInvitationAccepted(state) {
+		deleteAdminInvitationRequest := r.client.CCAdminsClient.AdministratorsAPI.DeleteInvitation(ctx)
+		deleteAdminInvitationRequest = deleteAdminInvitationRequest.CitrixCustomerId(r.client.ClientConfig.CustomerId)
+		deleteAdminInvitationRequest = deleteAdminInvitationRequest.Email(state.Email.ValueString())
+		_, httpResp, err := citrixdaasclient.AddRequestData(deleteAdminInvitationRequest, r.client).Execute()
+		if err != nil && httpResp.StatusCode != http.StatusNotFound {
+			resp.Diagnostics.AddError(
+				"Error deleting admin user invitation with email: "+state.Email.ValueString(),
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return
+		}
+	} else {
+		deleteAdminUserRequest := r.client.CCAdminsClient.AdministratorsAPI.DeleteAdministrator(ctx, state.AdminId.ValueString())
+		deleteAdminUserRequest = deleteAdminUserRequest.CitrixCustomerId(r.client.ClientConfig.CustomerId)
+		httpResp, err := citrixdaasclient.AddRequestData(deleteAdminUserRequest, r.client).Execute()
+		if err != nil && httpResp.StatusCode != http.StatusNotFound {
+			resp.Diagnostics.AddError(
+				"Error deleting admin user with email: "+state.Email.ValueString(),
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return
+		}
 	}
 }
 
 func (r *ccAdminUserResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Retrieve import ID and save to id attribute
-	resource.ImportStatePassthroughID(ctx, path.Root("email"), req, resp)
-}
-
-func getAdminUser(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, adminUserEmail string) (*ccadmins.CitrixCloudServicesAdministratorsApiModelsAdministratorResult, error) {
-
-	// Get admin user
-	getAdminUsersRequest := client.CCAdminsClient.AdministratorsAPI.CustomerAdministratorsGet(ctx, client.ClientConfig.CustomerId)
-	var adminUser *ccadmins.CitrixCloudServicesAdministratorsApiModelsAdministratorResult
-	adminUsersResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*ccadmins.CitrixCloudServicesAdministratorsApiModelsAdministratorsResult](getAdminUsersRequest, client)
-
-	if err != nil {
-		err = fmt.Errorf("TransactionId: " + citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp) + "\nError message: " + util.ReadClientError(err))
-		return adminUser, err
-	}
-
-	for _, adminUser := range adminUsersResponse.GetItems() {
-		if adminUser.GetEmail() == adminUserEmail {
-			return &adminUser, nil
-		}
-	}
-
-	for adminUsersResponse.GetContinuationToken() != "" {
-		getAdminUsersRequest = getAdminUsersRequest.RequestContinuation(adminUsersResponse.GetContinuationToken())
-		adminUsersResponse, httpResp, err = citrixdaasclient.ExecuteWithRetry[*ccadmins.CitrixCloudServicesAdministratorsApiModelsAdministratorsResult](getAdminUsersRequest, client)
-		if err != nil {
-			err = fmt.Errorf("TransactionId: " + citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp) + "\nError message: " + util.ReadClientError(err))
-			return adminUser, err
-		}
-
-		for _, adminUser := range adminUsersResponse.GetItems() {
-			if adminUser.GetEmail() == adminUserEmail {
-				return &adminUser, nil
-			}
-		}
-	}
-
-	err = fmt.Errorf("could not find admin user with email: %s", adminUserEmail)
-
-	return adminUser, err
+	resource.ImportStatePassthroughID(ctx, path.Root("admin_id"), req, resp)
 }
 
 func (r *ccAdminUserResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
@@ -245,6 +345,21 @@ func (r *ccAdminUserResource) ValidateConfig(ctx context.Context, req resource.V
 	diags := req.Config.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if strings.EqualFold(data.AccessType.ValueString(), string(ccadmins.ADMINISTRATORACCESSTYPE_FULL)) && !data.Policies.IsNull() {
+		resp.Diagnostics.AddError(
+			"Error validating policies",
+			"Full access type does not require policies",
+		)
+	}
+
+	if strings.EqualFold(data.AccessType.ValueString(), string(ccadmins.ADMINISTRATORACCESSTYPE_CUSTOM)) && !data.Policies.IsUnknown() && data.Policies.IsNull() {
+		resp.Diagnostics.AddError(
+			"Error validating policies",
+			"Policies are required to be set for access type Custom",
+		)
 		return
 	}
 

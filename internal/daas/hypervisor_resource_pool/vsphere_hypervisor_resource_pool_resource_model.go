@@ -62,6 +62,7 @@ type VsphereHypervisorResourcePoolResourceModel struct {
 	Id         types.String `tfsdk:"id"`
 	Name       types.String `tfsdk:"name"`
 	Hypervisor types.String `tfsdk:"hypervisor"`
+	Metadata   types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
 	/**** Resource Pool Details ****/
 	Cluster                types.Object `tfsdk:"cluster"`           //VsphereHypervisorClusterModel
 	Networks               types.List   `tfsdk:"networks"`          // List[string]
@@ -129,6 +130,7 @@ func (VsphereHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 					boolplanmodifier.RequiresReplace(),
 				},
 			},
+			"metadata": util.GetMetadataListSchema("Hypervisor Resource Pool"),
 		},
 	}
 }
@@ -155,6 +157,14 @@ func (r VsphereHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx co
 	r.Storage = util.RefreshListValueProperties[HypervisorStorageModel, citrixorchestration.HypervisorStorageResourceResponseModel](ctx, diagnostics, r.Storage, resourcePool.GetStorage(), util.GetOrchestrationHypervisorStorageKey)
 	r.TemporaryStorage = util.RefreshListValueProperties[HypervisorStorageModel, citrixorchestration.HypervisorStorageResourceResponseModel](ctx, diagnostics, r.TemporaryStorage, resourcePool.GetTemporaryStorage(), util.GetOrchestrationHypervisorStorageKey)
 	r = r.updatePlanWithCluster(ctx, diagnostics, resourcePool)
+
+	effectiveMetadata := util.GetEffectiveMetadata(util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, r.Metadata), resourcePool.GetMetadata())
+	if len(effectiveMetadata) > 0 {
+		r.Metadata = util.RefreshListValueProperties[util.NameValueStringPairModel, citrixorchestration.NameValueStringPairModel](ctx, diagnostics, r.Metadata, effectiveMetadata, util.GetOrchestrationNameValueStringPairKey)
+	} else {
+		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
+	}
+
 	return r
 }
 

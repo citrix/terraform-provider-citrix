@@ -26,10 +26,11 @@ import (
 // HypervisorResourceModel maps the resource schema data.
 type NutanixHypervisorResourceModel struct {
 	/**** Connection Details ****/
-	Id     types.String `tfsdk:"id"`
-	Name   types.String `tfsdk:"name"`
-	Zone   types.String `tfsdk:"zone"`
-	Scopes types.Set    `tfsdk:"scopes"` // Set[string]
+	Id       types.String `tfsdk:"id"`
+	Name     types.String `tfsdk:"name"`
+	Zone     types.String `tfsdk:"zone"`
+	Scopes   types.Set    `tfsdk:"scopes"`   // Set[string]
+	Metadata types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
 	/** Nutanix Connection **/
 	Username                            types.String `tfsdk:"username"`
 	Password                            types.String `tfsdk:"password"`
@@ -133,6 +134,7 @@ func (NutanixHypervisorResourceModel) GetSchema() schema.Schema {
 					),
 				},
 			},
+			"metadata": util.GetMetadataListSchema("Hypervisor"),
 		},
 	}
 }
@@ -149,8 +151,17 @@ func (r NutanixHypervisorResourceModel) RefreshPropertyValues(ctx context.Contex
 	r.MaxAbsoluteActiveActions = types.Int64Value(int64(hypervisor.GetMaxAbsoluteActiveActions()))
 	r.MaxAbsoluteNewActionsPerMinute = types.Int64Value(int64(hypervisor.GetMaxAbsoluteNewActionsPerMinute()))
 	r.MaxPowerActionsPercentageOfMachines = types.Int64Value(int64(hypervisor.GetMaxPowerActionsPercentageOfMachines()))
-	scopeIds := util.GetIdsForScopeObjects(hypervisor.GetScopes())
+	scopeIdsInState := util.StringSetToStringArray(ctx, diagnostics, r.Scopes)
+	scopeIds := util.GetIdsForFilteredScopeObjects(scopeIdsInState, hypervisor.GetScopes())
 	r.Scopes = util.StringArrayToStringSet(ctx, diagnostics, scopeIds)
+
+	effectiveMetadata := util.GetEffectiveMetadata(util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, r.Metadata), hypervisor.GetMetadata())
+
+	if len(effectiveMetadata) > 0 {
+		r.Metadata = util.RefreshListValueProperties[util.NameValueStringPairModel, citrixorchestration.NameValueStringPairModel](ctx, diagnostics, r.Metadata, effectiveMetadata, util.GetOrchestrationNameValueStringPairKey)
+	} else {
+		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
+	}
 
 	hypZone := hypervisor.GetZone()
 	r.Zone = types.StringValue(hypZone.GetId())

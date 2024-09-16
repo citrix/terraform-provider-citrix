@@ -17,29 +17,29 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ datasource.DataSource              = &awsWorkspaceAccountDataSource{}
-	_ datasource.DataSourceWithConfigure = &awsWorkspaceAccountDataSource{}
+	_ datasource.DataSource              = &awsWorkspacesAccountDataSource{}
+	_ datasource.DataSourceWithConfigure = &awsWorkspacesAccountDataSource{}
 )
 
 func NewAccountDataSource() datasource.DataSource {
-	return &awsWorkspaceAccountDataSource{}
+	return &awsWorkspacesAccountDataSource{}
 }
 
-type awsWorkspaceAccountDataSource struct {
+type awsWorkspacesAccountDataSource struct {
 	client *citrixdaasclient.CitrixDaasClient
 }
 
 // Metadata returns the datasource type name.
-func (r *awsWorkspaceAccountDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+func (r *awsWorkspacesAccountDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_quickcreate_aws_workspaces_account"
 }
 
 // Schema defines the schema for the datasource.
-func (r *awsWorkspaceAccountDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (r *awsWorkspacesAccountDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = AwsWorkspacesAccountDataSourceModel{}.GetSchema()
 }
 
-func (r *awsWorkspaceAccountDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, _ *datasource.ConfigureResponse) {
+func (r *awsWorkspacesAccountDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, _ *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -48,7 +48,7 @@ func (r *awsWorkspaceAccountDataSource) Configure(_ context.Context, req datasou
 }
 
 // Read refreshes the Terraform state with the latest data.
-func (r *awsWorkspaceAccountDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+func (r *awsWorkspacesAccountDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	if r.client != nil && r.client.QuickCreateClient == nil {

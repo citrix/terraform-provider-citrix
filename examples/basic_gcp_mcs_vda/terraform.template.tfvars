@@ -23,7 +23,7 @@ domain_service_account = "<Admin Username>"
 domain_service_account_password = "<Admin Password>"
 gcp_storage_type = "pd-standard"
 gcp_master_image = "<Image template VM name>"
-gcp_availability_zones = "<project name>:<region>:<availability zone1>,<project name>:<region>:<availability zone2>,..."
+gcp_availability_zones = ["<project name>:<region>:<availability zone1>", "<project name>:<region>:<availability zone2>"]
 machine_catalog_naming_scheme = "ctx-gcp-##"
 
 # resource_pools.tf variables
