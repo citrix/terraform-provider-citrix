@@ -5,7 +5,7 @@ go 1.21
 toolchain go1.21.4
 
 require (
-	github.com/citrix/citrix-daas-rest-go v1.0.1
+	github.com/citrix/citrix-daas-rest-go v1.0.4
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-azure-helpers v0.70.1
 	github.com/hashicorp/terraform-plugin-docs v0.14.1

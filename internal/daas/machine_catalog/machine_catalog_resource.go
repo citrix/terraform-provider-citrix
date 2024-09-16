@@ -417,6 +417,14 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 		)
 	}
 
+	if !data.Metadata.IsNull() {
+		metadata := util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, data.Metadata)
+		isValid := util.ValidateMetadataConfig(ctx, &resp.Diagnostics, metadata)
+		if !isValid {
+			return
+		}
+	}
+
 	provisioningTypeMcs := string(citrixorchestration.PROVISIONINGTYPE_MCS)
 	provisioningTypeManual := string(citrixorchestration.PROVISIONINGTYPE_MANUAL)
 	provisioningTypePvsStreaming := string(citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING)
@@ -424,7 +432,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 	azureAD := string(citrixorchestration.IDENTITYTYPE_AZURE_AD)
 
 	if data.ProvisioningType.ValueString() == provisioningTypeMcs {
-		if data.ProvisioningScheme.IsNull() {
+		if !data.ProvisioningScheme.IsUnknown() && data.ProvisioningScheme.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("provisioning_scheme"),
 				"Missing Attribute Configuration",
@@ -433,6 +441,15 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 		} else {
 			// Validate Provisioning Scheme
 			provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, data.ProvisioningScheme)
+
+			if !provSchemeModel.Metadata.IsNull() {
+				metadata := util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, provSchemeModel.Metadata)
+				isValid := util.ValidateMetadataConfig(ctx, &resp.Diagnostics, metadata)
+				if !isValid {
+					return
+				}
+			}
+
 			if !provSchemeModel.AzureMachineConfig.IsNull() {
 				azureMachineConfigModel := util.ObjectValueToTypedObject[AzureMachineConfigModel](ctx, &resp.Diagnostics, provSchemeModel.AzureMachineConfig)
 				// Validate Azure Machine Config
@@ -440,7 +457,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 					// Validate Writeback Cache
 					azureWbcModel := util.ObjectValueToTypedObject[AzureWritebackCacheModel](ctx, &resp.Diagnostics, azureMachineConfigModel.WritebackCache)
 
-					if azureWbcModel.PersistWBC.IsNull() {
+					if !azureWbcModel.PersistWBC.IsUnknown() && azureWbcModel.PersistWBC.IsNull() {
 						resp.Diagnostics.AddAttributeError(
 							path.Root("persist_wbc"),
 							"Missing Attribute Configuration",
@@ -448,7 +465,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 						)
 					}
 
-					if azureWbcModel.StorageCostSaving.IsNull() {
+					if !azureWbcModel.StorageCostSaving.IsUnknown() && azureWbcModel.StorageCostSaving.IsNull() {
 						resp.Diagnostics.AddAttributeError(
 							path.Root("storage_cost_saving"),
 							"Incorrect Attribute Configuration",
@@ -456,7 +473,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 						)
 					}
 
-					if azureWbcModel.WriteBackCacheMemorySizeMB.IsNull() {
+					if !azureWbcModel.WriteBackCacheMemorySizeMB.IsUnknown() && azureWbcModel.WriteBackCacheMemorySizeMB.IsNull() {
 						resp.Diagnostics.AddAttributeError(
 							path.Root("writeback_cache_memory_size_mb"),
 							"Incorrect Attribute Configuration",
@@ -517,7 +534,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 						)
 					}
 
-					if azureMachineConfigModel.UseAzureComputeGallery.IsNull() {
+					if !azureMachineConfigModel.UseAzureComputeGallery.IsUnknown() && azureMachineConfigModel.UseAzureComputeGallery.IsNull() {
 						resp.Diagnostics.AddAttributeError(
 							path.Root("use_azure_compute_gallery"),
 							"Missing Attribute Configuration",
@@ -615,7 +632,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 		data.IsPowerManaged = types.BoolValue(true) // set power managed to true for MCS catalog
 	} else if data.ProvisioningType.ValueString() == provisioningTypePvsStreaming {
 		// Add checks for PVSStreaming catalogs
-		if data.ProvisioningScheme.IsNull() {
+		if !data.ProvisioningScheme.IsUnknown() && data.ProvisioningScheme.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("provisioning_scheme"),
 				"Missing Attribute Configuration",
@@ -624,7 +641,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 		} else {
 			// Validate Provisioning Scheme
 			provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, data.ProvisioningScheme)
-			if provSchemeModel.AzureMachineConfig.IsNull() {
+			if !provSchemeModel.AzureMachineConfig.IsUnknown() && provSchemeModel.AzureMachineConfig.IsNull() {
 				resp.Diagnostics.AddAttributeError(
 					path.Root("azure_machine_config"),
 					"Missing Attribute Configuration",
@@ -634,7 +651,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 
 			azureMachineConfigModel := util.ObjectValueToTypedObject[AzureMachineConfigModel](ctx, &resp.Diagnostics, provSchemeModel.AzureMachineConfig)
 
-			if azureMachineConfigModel.AzurePvsConfiguration.IsNull() {
+			if !azureMachineConfigModel.AzurePvsConfiguration.IsUnknown() && azureMachineConfigModel.AzurePvsConfiguration.IsNull() {
 				resp.Diagnostics.AddAttributeError(
 					path.Root("azure_pvs_config"),
 					"Missing Attribute Configuration",
@@ -690,7 +707,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 				)
 			}
 
-			if azureMachineConfigModel.MachineProfile.IsNull() {
+			if !azureMachineConfigModel.MachineProfile.IsUnknown() && azureMachineConfigModel.MachineProfile.IsNull() {
 				resp.Diagnostics.AddAttributeError(
 					path.Root("machine_profile"),
 					"Missing Attribute Configuration",
@@ -698,7 +715,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 				)
 			}
 
-			if azureMachineConfigModel.WritebackCache.IsNull() {
+			if !azureMachineConfigModel.WritebackCache.IsUnknown() && azureMachineConfigModel.WritebackCache.IsNull() {
 				resp.Diagnostics.AddAttributeError(
 					path.Root("writeback_cache"),
 					"Missing Attribute Configuration",
@@ -707,7 +724,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 			} else {
 
 				azureWbcModel := util.ObjectValueToTypedObject[AzureWritebackCacheModel](ctx, &resp.Diagnostics, azureMachineConfigModel.WritebackCache)
-				if azureWbcModel.PersistWBC.IsNull() || !azureWbcModel.PersistWBC.ValueBool() {
+				if !azureWbcModel.PersistWBC.IsUnknown() && (azureWbcModel.PersistWBC.IsNull() || !azureWbcModel.PersistWBC.ValueBool()) {
 					resp.Diagnostics.AddAttributeError(
 						path.Root("persist_wbc"),
 						"Incorrect Attribute Configuration",
@@ -744,7 +761,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 
 	} else if data.ProvisioningType.ValueString() == provisioningTypeManual {
 		// Manual provisioning type
-		if data.IsPowerManaged.IsNull() {
+		if !data.IsPowerManaged.IsUnknown() && data.IsPowerManaged.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("is_power_managed"),
 				"Missing Attribute Configuration",
@@ -752,7 +769,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 			)
 		}
 
-		if data.IsRemotePc.IsNull() {
+		if !data.IsRemotePc.IsUnknown() && data.IsRemotePc.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("is_remote_pc"),
 				"Missing Attribute Configuration",
@@ -772,7 +789,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 			if !data.MachineAccounts.IsNull() {
 				machineAccounts := util.ObjectListToTypedArray[MachineAccountsModel](ctx, &resp.Diagnostics, data.MachineAccounts)
 				for _, machineAccount := range machineAccounts {
-					if machineAccount.Hypervisor.IsNull() {
+					if !machineAccount.Hypervisor.IsUnknown() && machineAccount.Hypervisor.IsNull() {
 						resp.Diagnostics.AddAttributeError(
 							path.Root("machine_accounts"),
 							"Missing Attribute Configuration",
@@ -782,7 +799,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 
 					machines := util.ObjectListToTypedArray[MachineCatalogMachineModel](ctx, &resp.Diagnostics, machineAccount.Machines)
 					for _, machine := range machines {
-						if machine.MachineName.IsNull() {
+						if !machine.MachineName.IsUnknown() && machine.MachineName.IsNull() {
 							resp.Diagnostics.AddAttributeError(
 								path.Root("machine_accounts"),
 								"Missing Attribute Configuration",

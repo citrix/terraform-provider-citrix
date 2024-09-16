@@ -22,6 +22,7 @@ type NutanixHypervisorResourcePoolResourceModel struct {
 	Id         types.String `tfsdk:"id"`
 	Name       types.String `tfsdk:"name"`
 	Hypervisor types.String `tfsdk:"hypervisor"`
+	Metadata   types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
 	/**** Resource Pool Details ****/
 	Networks types.List `tfsdk:"networks"` // List[string]
 }
@@ -59,6 +60,7 @@ func (NutanixHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 					listvalidator.SizeAtLeast(1),
 				},
 			},
+			"metadata": util.GetMetadataListSchema("Hypervisor Resource Pool"),
 		},
 	}
 }
@@ -80,6 +82,13 @@ func (r NutanixHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx co
 		remoteNetwork = append(remoteNetwork, network.GetName())
 	}
 	r.Networks = util.RefreshListValues(ctx, diagnostics, r.Networks, remoteNetwork)
+
+	effectiveMetadata := util.GetEffectiveMetadata(util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, r.Metadata), resourcePool.GetMetadata())
+	if len(effectiveMetadata) > 0 {
+		r.Metadata = util.RefreshListValueProperties[util.NameValueStringPairModel, citrixorchestration.NameValueStringPairModel](ctx, diagnostics, r.Metadata, effectiveMetadata, util.GetOrchestrationNameValueStringPairKey)
+	} else {
+		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
+	}
 
 	return r
 }

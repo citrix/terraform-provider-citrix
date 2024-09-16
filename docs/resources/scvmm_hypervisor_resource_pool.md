@@ -51,6 +51,9 @@ resource "citrix_scvmm_hypervisor_resource_pool" "example-scvmm-hypervisor-resou
 
 ### Optional
 
+- `metadata` (Attributes List) Metadata for the Hypervisor Resource Pool.
+
+~> **Please Note** Metadata once set cannot be removed. Use this field to add new metadata or update the value for an existing metadata. Subsequently, removing any metadata from config will have no effect on the existing metadata of the resource. (see [below for nested schema](#nestedatt--metadata))
 - `use_local_storage_caching` (Boolean) Indicates whether intellicache is enabled to reduce load on the shared storage device. Will only be effective when shared storage is used. Default value is `false`.
 
 ### Read-Only
@@ -79,6 +82,15 @@ Required:
 Optional:
 
 - `superseded` (Boolean) Indicates whether the storage has been superseded. Superseded storage may be used for existing virtual machines, but is not used when provisioning new virtual machines. Use only when updating the resource pool.
+
+
+<a id="nestedatt--metadata"></a>
+### Nested Schema for `metadata`
+
+Required:
+
+- `name` (String) Metadata name.
+- `value` (String) Metadata value.
 
 ## Import
 

@@ -120,8 +120,8 @@ variable "gcp_master_image" {
 }
 
 variable "gcp_availability_zones" {
-  description = "Comma seperate list of GCP availability zones in the format of \"<project name>:<region>:<availability zone1>,<project name>:<region>:<availability zone2>,...\""
-  type        = string
+  description = "A list of GCP availability zones in the format of \"<project name>:<region>:<availability zone1>\""
+  type        = list(string)
 }
 
 variable "machine_catalog_naming_scheme" {

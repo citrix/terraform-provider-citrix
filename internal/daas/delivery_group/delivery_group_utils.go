@@ -125,7 +125,7 @@ func validatePowerManagementSettings(ctx context.Context, diags *diag.Diagnostic
 	}
 	autoscale := util.ObjectValueToTypedObject[DeliveryGroupPowerManagementSettings](ctx, diags, plan.AutoscaleSettings)
 
-	errStringSuffix := "cannot be set for a Multisession catalog"
+	errStringSuffix := "cannot be set for a catalog with Random allocation type"
 
 	if autoscale.PeakLogOffAction.ValueString() != "Nothing" {
 		return false, "PeakLogOffAction " + errStringSuffix
@@ -152,6 +152,8 @@ func validatePowerManagementSettings(ctx context.Context, diags *diag.Diagnostic
 	}
 
 	if sessionSupport == citrixorchestration.SESSIONSUPPORT_MULTI_SESSION {
+		errStringSuffix = "cannot be set for a Multisession catalog"
+
 		if autoscale.PeakDisconnectAction.ValueString() != "Nothing" {
 			return false, "PeakDisconnectAction " + errStringSuffix
 		}
@@ -773,7 +775,12 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 	if !plan.Tenants.IsNull() {
 		associatedTenants := util.StringSetToStringArray(ctx, diagnostics, plan.Tenants)
 		body.SetTenants(associatedTenants)
+	} else {
+		body.SetTenants([]string{})
 	}
+
+	metadata := util.GetMetadataRequestModel(ctx, diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, plan.Metadata))
+	body.SetMetadata(metadata)
 
 	return body, nil
 }
@@ -995,7 +1002,12 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 	if !plan.Tenants.IsNull() {
 		associatedTenants := util.StringSetToStringArray(ctx, diagnostics, plan.Tenants)
 		editDeliveryGroupRequestBody.SetTenants(associatedTenants)
+	} else {
+		editDeliveryGroupRequestBody.SetTenants([]string{})
 	}
+
+	metadata := util.GetMetadataRequestModel(ctx, diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, plan.Metadata))
+	editDeliveryGroupRequestBody.SetMetadata(metadata)
 
 	return editDeliveryGroupRequestBody, nil
 }
@@ -1589,7 +1601,7 @@ func (r DeliveryGroupResourceModel) updatePlanWithRestrictedAccessUsers(ctx cont
 		}
 	}
 
-	if !accessPolicy.GetIncludedUserFilterEnabled() || r.RestrictedAccessUsers.IsNull() {
+	if !accessPolicy.GetIncludedUserFilterEnabled() {
 		if attributes, err := util.AttributeMapFromObject(RestrictedAccessUsers{}); err == nil {
 			r.RestrictedAccessUsers = types.ObjectNull(attributes)
 		} else {
@@ -1615,7 +1627,13 @@ func (r DeliveryGroupResourceModel) updatePlanWithRestrictedAccessUsers(ctx cont
 		}
 	}
 
-	r.RestrictedAccessUsers = util.TypedObjectToObjectValue(ctx, diagnostics, users)
+	if users.AllowList.IsNull() && users.BlockList.IsNull() {
+		if attributes, err := util.AttributeMapFromObject(users); err == nil {
+			r.RestrictedAccessUsers = types.ObjectNull(attributes)
+		}
+	} else {
+		r.RestrictedAccessUsers = util.TypedObjectToObjectValue(ctx, diagnostics, users)
+	}
 
 	return r
 }

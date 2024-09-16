@@ -91,7 +91,7 @@ func (r *policySetResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 	plannedPolicies := util.ObjectListToTypedArray[PolicyModel](ctx, &resp.Diagnostics, plan.Policies)
 
 	for _, policy := range plannedPolicies {
-		policySettings := util.ObjectListToTypedArray[PolicySettingModel](ctx, &resp.Diagnostics, policy.PolicySettings)
+		policySettings := util.ObjectSetToTypedArray[PolicySettingModel](ctx, &resp.Diagnostics, policy.PolicySettings)
 
 		for _, setting := range policySettings {
 			if strings.EqualFold(setting.Value.ValueString(), "true") ||
@@ -104,14 +104,6 @@ func (r *policySetResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 				)
 			}
 		}
-	}
-	plan.Policies = util.TypedArrayToObjectList[PolicyModel](ctx, &resp.Diagnostics, plannedPolicies)
-
-	// Set state to fully populated data
-	diags = resp.Plan.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
 	}
 }
 
@@ -309,16 +301,9 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	var state PolicySetResourceModel
-	diags = req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
 	// Get refreshed policy set properties from Orchestration
-	policySetId := state.Id.ValueString()
-	policySetName := state.Name.ValueString()
+	policySetId := plan.Id.ValueString()
+	policySetName := plan.Name.ValueString()
 
 	policySets, err := getPolicySets(ctx, r.client, &resp.Diagnostics)
 	if err != nil {
@@ -703,7 +688,7 @@ func constructCreatePolicyBatchRequestModel(ctx context.Context, diags *diag.Dia
 		createPolicyRequest.SetIsEnabled(policyToCreate.Enabled.ValueBool())
 		// Add Policy Settings
 		policySettings := []citrixorchestration.SettingRequest{}
-		policySettingsToCreate := util.ObjectListToTypedArray[PolicySettingModel](ctx, diags, policyToCreate.PolicySettings)
+		policySettingsToCreate := util.ObjectSetToTypedArray[PolicySettingModel](ctx, diags, policyToCreate.PolicySettings)
 		for _, policySetting := range policySettingsToCreate {
 			settingRequest := citrixorchestration.SettingRequest{}
 			settingRequest.SetSettingName(policySetting.Name.ValueString())
@@ -773,7 +758,7 @@ func constructPolicyFilterRequests(ctx context.Context, diags *diag.Diagnostics,
 	}
 
 	if !policy.AccessControlFilters.IsNull() && len(policy.AccessControlFilters.Elements()) > 0 {
-		accessControlFilters := util.ObjectListToTypedArray[AccessControlFilterModel](ctx, diags, policy.AccessControlFilters)
+		accessControlFilters := util.ObjectSetToTypedArray[AccessControlFilterModel](ctx, diags, policy.AccessControlFilters)
 		for _, accessControlFilter := range accessControlFilters {
 			filterRequest := citrixorchestration.FilterRequest{}
 			filterRequest.SetFilterType("AccessControl")
@@ -809,7 +794,7 @@ func constructPolicyFilterRequests(ctx context.Context, diags *diag.Diagnostics,
 	}
 
 	if !policy.ClientIPFilters.IsNull() && len(policy.ClientIPFilters.Elements()) > 0 {
-		clientIpFilters := util.ObjectListToTypedArray[ClientIPFilterModel](ctx, diags, policy.ClientIPFilters)
+		clientIpFilters := util.ObjectSetToTypedArray[ClientIPFilterModel](ctx, diags, policy.ClientIPFilters)
 		for _, clientIpFilter := range clientIpFilters {
 			filterRequest := citrixorchestration.FilterRequest{}
 			filterRequest.SetFilterType("ClientIP")
@@ -822,7 +807,7 @@ func constructPolicyFilterRequests(ctx context.Context, diags *diag.Diagnostics,
 	}
 
 	if !policy.ClientNameFilters.IsNull() && len(policy.ClientNameFilters.Elements()) > 0 {
-		clientNameFilters := util.ObjectListToTypedArray[ClientNameFilterModel](ctx, diags, policy.ClientNameFilters)
+		clientNameFilters := util.ObjectSetToTypedArray[ClientNameFilterModel](ctx, diags, policy.ClientNameFilters)
 		for _, clientName := range clientNameFilters {
 			filterRequest := citrixorchestration.FilterRequest{}
 			filterRequest.SetFilterType("ClientName")
@@ -835,7 +820,7 @@ func constructPolicyFilterRequests(ctx context.Context, diags *diag.Diagnostics,
 	}
 
 	if !policy.DeliveryGroupFilters.IsNull() && len(policy.DeliveryGroupFilters.Elements()) > 0 {
-		deliveryGroupFilters := util.ObjectListToTypedArray[DeliveryGroupFilterModel](ctx, diags, policy.DeliveryGroupFilters)
+		deliveryGroupFilters := util.ObjectSetToTypedArray[DeliveryGroupFilterModel](ctx, diags, policy.DeliveryGroupFilters)
 		for _, deliveryGroupFilter := range deliveryGroupFilters {
 			filterRequest := citrixorchestration.FilterRequest{}
 			filterRequest.SetFilterType("DesktopGroup")
@@ -862,7 +847,7 @@ func constructPolicyFilterRequests(ctx context.Context, diags *diag.Diagnostics,
 	}
 
 	if !policy.DeliveryGroupTypeFilters.IsNull() && len(policy.DeliveryGroupTypeFilters.Elements()) > 0 {
-		deliveryGroupTypeFilters := util.ObjectListToTypedArray[DeliveryGroupTypeFilterModel](ctx, diags, policy.DeliveryGroupTypeFilters)
+		deliveryGroupTypeFilters := util.ObjectSetToTypedArray[DeliveryGroupTypeFilterModel](ctx, diags, policy.DeliveryGroupTypeFilters)
 		for _, deliveryGroupTypeFilter := range deliveryGroupTypeFilters {
 			filterRequest := citrixorchestration.FilterRequest{}
 			filterRequest.SetFilterType("DesktopKind")
@@ -875,7 +860,7 @@ func constructPolicyFilterRequests(ctx context.Context, diags *diag.Diagnostics,
 	}
 
 	if !policy.TagFilters.IsNull() && len(policy.TagFilters.Elements()) > 0 {
-		tagFilters := util.ObjectListToTypedArray[TagFilterModel](ctx, diags, policy.TagFilters)
+		tagFilters := util.ObjectSetToTypedArray[TagFilterModel](ctx, diags, policy.TagFilters)
 		for _, tagFilter := range tagFilters {
 			filterRequest := citrixorchestration.FilterRequest{}
 			filterRequest.SetFilterType("DesktopTag")
@@ -902,7 +887,7 @@ func constructPolicyFilterRequests(ctx context.Context, diags *diag.Diagnostics,
 	}
 
 	if !policy.OuFilters.IsNull() && len(policy.OuFilters.Elements()) > 0 {
-		ouFilters := util.ObjectListToTypedArray[OuFilterModel](ctx, diags, policy.OuFilters)
+		ouFilters := util.ObjectSetToTypedArray[OuFilterModel](ctx, diags, policy.OuFilters)
 		for _, ouFilter := range ouFilters {
 			filterRequest := citrixorchestration.FilterRequest{}
 			filterRequest.SetFilterType("OU")
@@ -915,7 +900,7 @@ func constructPolicyFilterRequests(ctx context.Context, diags *diag.Diagnostics,
 	}
 
 	if !policy.UserFilters.IsNull() && len(policy.UserFilters.Elements()) > 0 {
-		userFilters := util.ObjectListToTypedArray[UserFilterModel](ctx, diags, policy.UserFilters)
+		userFilters := util.ObjectSetToTypedArray[UserFilterModel](ctx, diags, policy.UserFilters)
 		for _, userFilter := range userFilters {
 			filterRequest := citrixorchestration.FilterRequest{}
 			filterRequest.SetFilterType("User")

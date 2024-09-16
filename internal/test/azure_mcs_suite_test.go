@@ -137,6 +137,7 @@ func TestAzureMcs(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
 					resource.TestCheckResourceAttr("citrix_azure_hypervisor.testHypervisor", "name", hypervName),
+					resource.TestCheckResourceAttr("citrix_azure_hypervisor.testHypervisor", "metadata.#", "3"),
 				),
 			},
 			// ImportState testing
@@ -146,7 +147,7 @@ func TestAzureMcs(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"last_updated", "application_secret"},
+				ImportStateVerifyIgnore: []string{"application_secret", "metadata"},
 			},
 			// Update and Read testing
 			{
@@ -157,6 +158,7 @@ func TestAzureMcs(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
 					resource.TestCheckResourceAttr("citrix_azure_hypervisor.testHypervisor", "name", fmt.Sprintf("%s-updated", hypervName)),
+					resource.TestCheckResourceAttr("citrix_azure_hypervisor.testHypervisor", "metadata.#", "4"),
 				),
 			},
 

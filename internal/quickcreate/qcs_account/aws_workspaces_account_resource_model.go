@@ -59,7 +59,7 @@ func (AwsWorkspacesAccountResourceModel) GetSchema() schema.Schema {
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(util.AwsAccessKeyIdRegex), "AWS AccessKeyId can only contain letters, numbers and underscore"),
-					stringvalidator.AlsoRequires(path.MatchRelative().AtParent().AtName("aws_secret_access_key")),
+					stringvalidator.AlsoRequires(path.MatchRoot("aws_secret_access_key")),
 				},
 			},
 			"aws_secret_access_key": schema.StringAttribute{
@@ -76,8 +76,7 @@ func (AwsWorkspacesAccountResourceModel) GetSchema() schema.Schema {
 					stringvalidator.LengthAtMost(2048),
 					stringvalidator.RegexMatches(regexp.MustCompile(util.AwsRoleArnRegex), "The Role ARN provided contains invalid characters or is in an incorrect format"),
 					stringvalidator.ExactlyOneOf(
-						path.MatchRelative().AtParent().AtName("aws_access_key_id"),
-						path.MatchRelative().AtParent().AtName("aws_role_arn"),
+						path.MatchRoot("aws_access_key_id"),
 					),
 				},
 			},

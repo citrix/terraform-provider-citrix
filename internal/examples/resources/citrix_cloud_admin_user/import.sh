@@ -1,2 +1,2 @@
-# Admin User can be imported by specifying their email
-terraform import citrix_cloud_admin_user.example-admin-user example-admin@citrix.com
+# Admin User can be imported by specifying their adminId which can be userId or ucOid. Note: Admin users must accept the invitation before they can be imported.
+terraform import citrix_cloud_admin_user.example-admin-user f6197063-a7b3-49fc-a1df-42a042449bff

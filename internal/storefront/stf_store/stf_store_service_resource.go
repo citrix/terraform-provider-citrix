@@ -990,7 +990,7 @@ func (plan STFStoreServiceResourceModel) createStoreFarms(ctx context.Context, c
 	siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
 	if err != nil {
 		diagnostics.AddError(
-			"Error Getting StoreFront StoreService SiteId",
+			"Error getting StoreFront StoreService SiteId",
 			"Error message: "+err.Error(),
 		)
 		return err
@@ -1022,7 +1022,7 @@ func (plan STFStoreServiceResourceModel) updateStoreFarms(ctx context.Context, c
 	siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
 	if err != nil {
 		diagnostics.AddError(
-			"Error Getting StoreFront StoreService SiteId",
+			"Error getting StoreFront StoreService SiteId",
 			"Error message: "+err.Error(),
 		)
 		return err
@@ -1167,7 +1167,7 @@ func (plan STFStoreServiceResourceModel) getStoreFarms(ctx context.Context, clie
 	siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
 	if err != nil {
 		diagnostics.AddError(
-			"Error Getting StoreFront StoreService SiteId",
+			"Error getting StoreFront StoreService SiteId",
 			"Error message: "+err.Error(),
 		)
 		return nil, err

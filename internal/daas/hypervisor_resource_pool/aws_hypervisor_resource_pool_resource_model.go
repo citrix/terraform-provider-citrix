@@ -23,6 +23,7 @@ type AwsHypervisorResourcePoolResourceModel struct {
 	Id         types.String `tfsdk:"id"`
 	Name       types.String `tfsdk:"name"`
 	Hypervisor types.String `tfsdk:"hypervisor"`
+	Metadata   types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
 	/**** Resource Pool Details ****/
 	Vpc     types.String `tfsdk:"vpc"`
 	Subnets types.List   `tfsdk:"subnets"` // List[string]
@@ -77,6 +78,7 @@ func (AwsHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 					stringplanmodifier.RequiresReplaceIfConfigured(),
 				},
 			},
+			"metadata": util.GetMetadataListSchema("Hypervosor Resource Pool"),
 		},
 	}
 }
@@ -103,6 +105,14 @@ func (r AwsHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx contex
 		res = append(res, strings.Split(name, " ")[0])
 	}
 	r.Subnets = util.RefreshListValues(ctx, diagnostics, r.Subnets, res)
+
+	effectiveMetadata := util.GetEffectiveMetadata(util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, r.Metadata), resourcePool.GetMetadata())
+
+	if len(effectiveMetadata) > 0 {
+		r.Metadata = util.RefreshListValueProperties[util.NameValueStringPairModel, citrixorchestration.NameValueStringPairModel](ctx, diagnostics, r.Metadata, effectiveMetadata, util.GetOrchestrationNameValueStringPairKey)
+	} else {
+		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
+	}
 
 	return r
 }

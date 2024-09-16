@@ -8,7 +8,6 @@ import (
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -63,14 +62,7 @@ func (ZoneResourceModel) GetSchema() schema.Schema {
 				Optional: true,
 				Computed: true,
 			},
-			"metadata": schema.ListNestedAttribute{
-				Description:  "Metadata of the zone. Cannot be modified for Citrix Cloud customer.",
-				Optional:     true,
-				NestedObject: util.NameValueStringPairModel{}.GetSchema(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
-				},
-			},
+			"metadata": util.GetMetadataListSchema("Zone"),
 		},
 	}
 }
@@ -92,12 +84,12 @@ func (r ZoneResourceModel) RefreshPropertyValues(ctx context.Context, diags *dia
 		r.ResourceLocationId = types.StringNull()
 	}
 
-	// Set optional values
-	metadata := zone.GetMetadata()
-	if onpremises && (!r.Metadata.IsNull() || len(metadata) > 0) {
-		// Cloud customers cannot modify Zone metadata because of CC zone syncing
-		// On-Premises customers can have either nil value for metadata, or provide an empty array
-		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diags, util.ParseNameValueStringPairToPluginModel(metadata))
+	effectiveMetadata := util.GetEffectiveMetadata(util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diags, r.Metadata), zone.GetMetadata())
+
+	if len(effectiveMetadata) > 0 {
+		r.Metadata = util.RefreshListValueProperties[util.NameValueStringPairModel, citrixorchestration.NameValueStringPairModel](ctx, diags, r.Metadata, effectiveMetadata, util.GetOrchestrationNameValueStringPairKey)
+	} else {
+		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diags, nil)
 	}
 
 	return r

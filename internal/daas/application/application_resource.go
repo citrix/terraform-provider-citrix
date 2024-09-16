@@ -81,6 +81,7 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 	createApplicationRequest.SetInstalledAppProperties(createInstalledAppRequest)
 	createApplicationRequest.SetApplicationFolder(plan.ApplicationFolderPath.ValueString())
 	createApplicationRequest.SetIcon(plan.Icon.ValueString())
+	createApplicationRequest.SetClientFolder(plan.ApplicationCategoryPath.ValueString())
 
 	if plan.LimitVisibilityToUsers.IsNull() {
 		createApplicationRequest.SetIncludedUserFilterEnabled(false)
@@ -100,15 +101,13 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 		createApplicationRequest.SetIncludedUserFilterEnabled(true)
 	}
 
+	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	createApplicationRequest.SetMetadata(metadata)
+
 	var newApplicationRequest []citrixorchestration.CreateApplicationRequestModel
 	newApplicationRequest = append(newApplicationRequest, createApplicationRequest)
 
-	var deliveryGroups []citrixorchestration.PriorityRefRequestModel
-	for _, value := range util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.DeliveryGroups) {
-		var deliveryGroupRequestModel citrixorchestration.PriorityRefRequestModel
-		deliveryGroupRequestModel.SetItem(value)
-		deliveryGroups = append(deliveryGroups, deliveryGroupRequestModel)
-	}
+	deliveryGroups := buildDeliveryGroupsPriorityRequestModel(ctx, &resp.Diagnostics, plan)
 
 	var body citrixorchestration.AddApplicationsRequestModel
 	body.SetNewApplications(newApplicationRequest)
@@ -147,8 +146,13 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
+	applicationDeliveryGroups, err := getApplicationDeliveryGroups(ctx, r.client, &resp.Diagnostics, applicationName)
+	if err != nil {
+		return
+	}
+
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, application)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, application, applicationDeliveryGroups)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -176,7 +180,12 @@ func (r *applicationResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, application)
+	applicationDeliveryGroups, err := getApplicationDeliveryGroups(ctx, r.client, &resp.Diagnostics, state.Id.ValueString())
+	if err != nil {
+		return
+	}
+
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, application, applicationDeliveryGroups)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -198,16 +207,8 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	// Retrieve values from state
-	var state ApplicationResourceModel
-	diags = req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	applicationId := state.Id.ValueString()
-	applicationName := state.Name.ValueString()
+	applicationId := plan.Id.ValueString()
+	applicationName := plan.Name.ValueString()
 
 	// Construct the update model
 	var editApplicationRequestBody = &citrixorchestration.EditApplicationRequestModel{}
@@ -216,6 +217,7 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 	editApplicationRequestBody.SetPublishedName(plan.PublishedName.ValueString())
 	editApplicationRequestBody.SetApplicationFolder(plan.ApplicationFolderPath.ValueString())
 	editApplicationRequestBody.SetIcon(plan.Icon.ValueString())
+	editApplicationRequestBody.SetClientFolder(plan.ApplicationCategoryPath.ValueString())
 
 	if plan.LimitVisibilityToUsers.IsNull() {
 		editApplicationRequestBody.SetIncludedUserFilterEnabled(false)
@@ -242,19 +244,16 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 
 	editApplicationRequestBody.SetInstalledAppProperties(editInstalledAppRequest)
 
-	var deliveryGroups []citrixorchestration.PriorityRefRequestModel
-	for _, value := range util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.DeliveryGroups) {
-		var deliveryGroupRequestModel citrixorchestration.PriorityRefRequestModel
-		deliveryGroupRequestModel.SetItem(value)
-		deliveryGroups = append(deliveryGroups, deliveryGroupRequestModel)
-	}
-
+	deliveryGroups := buildDeliveryGroupsPriorityRequestModel(ctx, &resp.Diagnostics, plan)
 	editApplicationRequestBody.SetDeliveryGroups(deliveryGroups)
 
 	folderPathExists := checkIfApplicationFolderPathExist(ctx, r.client, &resp.Diagnostics, plan.ApplicationFolderPath.ValueString())
 	if !folderPathExists {
 		return
 	}
+
+	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	editApplicationRequestBody.SetMetadata(metadata)
 
 	// Update Application
 	editApplicationRequest := r.client.ApiClient.ApplicationsAPIsDAAS.ApplicationsPatchApplication(ctx, applicationId)
@@ -274,8 +273,13 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
+	applicationDeliveryGroups, err := getApplicationDeliveryGroups(ctx, r.client, &resp.Diagnostics, applicationId)
+	if err != nil {
+		return
+	}
+
 	// Update resource state with updated property values
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, application)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, application, applicationDeliveryGroups)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -316,6 +320,39 @@ func (r *applicationResource) ImportState(ctx context.Context, req resource.Impo
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
+func (r *applicationResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data ApplicationResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if !data.Metadata.IsNull() {
+		metadata := util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, data.Metadata)
+		isValid := util.ValidateMetadataConfig(ctx, &resp.Diagnostics, metadata)
+		if !isValid {
+			return
+		}
+	}
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
+
+	validateDeliveryGroupsPriority(ctx, &resp.Diagnostics, data)
+}
+
+func (r *applicationResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	if r.client != nil && r.client.ApiClient == nil {
+		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
+}
+
 func readApplication(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, applicationId string) (*citrixorchestration.ApplicationDetailResponseModel, error) {
 	getApplicationRequest := client.ApiClient.ApplicationsAPIsDAAS.ApplicationsGetApplication(ctx, applicationId)
 	applicationResource, _, err := util.ReadResource[*citrixorchestration.ApplicationDetailResponseModel](getApplicationRequest, ctx, client, resp, "Application", applicationId)
@@ -334,6 +371,20 @@ func getApplication(ctx context.Context, client *citrixdaasclient.CitrixDaasClie
 	}
 
 	return application, err
+}
+
+func getApplicationDeliveryGroups(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, applicationNameOrId string) (*citrixorchestration.ApplicationDeliveryGroupResponseModelCollection, error) {
+	getApplicationDeliveryGroupsRequest := client.ApiClient.ApplicationsAPIsDAAS.ApplicationsGetApplicationDeliveryGroups(ctx, applicationNameOrId)
+	applicationDeliveryGroups, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ApplicationDeliveryGroupResponseModelCollection](getApplicationDeliveryGroupsRequest, client)
+	if err != nil {
+		diagnostics.AddError(
+			"Error Reading Delivery Groups associated with Application "+applicationNameOrId,
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+	}
+
+	return applicationDeliveryGroups, err
 }
 
 // checkIfApplicationFolderPathExist checks if the application folder path exists.
@@ -360,25 +411,57 @@ func checkIfApplicationFolderPathExist(ctx context.Context, client *citrixdaascl
 	return true
 }
 
-func (r *applicationResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	defer util.PanicHandler(&resp.Diagnostics)
-
-	var data ApplicationResourceModel
-	diags := req.Config.Get(ctx, &data)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
+func buildDeliveryGroupsPriorityRequestModel(ctx context.Context, diagnostics *diag.Diagnostics, plan ApplicationResourceModel) []citrixorchestration.PriorityRefRequestModel {
+	var deliveryGroups []citrixorchestration.PriorityRefRequestModel
+	if !plan.DeliveryGroups.IsNull() {
+		for index, deliveryGroup := range util.StringListToStringArray(ctx, diagnostics, plan.DeliveryGroups) {
+			var deliveryGroupRequestModel citrixorchestration.PriorityRefRequestModel
+			deliveryGroupRequestModel.SetItem(deliveryGroup)
+			deliveryGroupRequestModel.SetPriority(int32(index))
+			deliveryGroups = append(deliveryGroups, deliveryGroupRequestModel)
+		}
+	} else if !plan.DeliveryGroupsPriority.IsNull() {
+		for _, deliveryGroup := range util.ObjectSetToTypedArray[DeliveryGroupPriorityModel](ctx, diagnostics, plan.DeliveryGroupsPriority) {
+			var deliveryGroupRequestModel citrixorchestration.PriorityRefRequestModel
+			deliveryGroupRequestModel.SetItem(deliveryGroup.Id.ValueString())
+			deliveryGroupRequestModel.SetPriority(deliveryGroup.Priority.ValueInt32())
+			deliveryGroups = append(deliveryGroups, deliveryGroupRequestModel)
+		}
 	}
-
-	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
-	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
+	return deliveryGroups
 }
 
-func (r *applicationResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
-	defer util.PanicHandler(&resp.Diagnostics)
+func validateDeliveryGroupsPriority(ctx context.Context, diagnostics *diag.Diagnostics, data ApplicationResourceModel) {
+	// Make sure the delivery_groups_priority does not have duplicated priority values
+	if !data.DeliveryGroupsPriority.IsNull() && !data.DeliveryGroupsPriority.IsUnknown() {
+		dgPriority := util.ObjectSetToTypedArray[DeliveryGroupPriorityModel](ctx, diagnostics, data.DeliveryGroupsPriority)
+		priorityMap := map[int32]bool{}
+		deliveryGroupMap := map[string]bool{}
+		isValid := true
+		for _, dg := range dgPriority {
+			if !dg.Priority.IsNull() {
+				if priorityMap[dg.Priority.ValueInt32()] {
+					isValid = false
+				} else {
+					priorityMap[dg.Priority.ValueInt32()] = true
+				}
+			}
 
-	if r.client != nil && r.client.ApiClient == nil {
-		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
-		return
+			if !dg.Id.IsNull() {
+				if deliveryGroupMap[dg.Id.ValueString()] {
+					isValid = false
+				} else {
+					deliveryGroupMap[dg.Id.ValueString()] = true
+				}
+			}
+
+			if !isValid {
+				diagnostics.AddError(
+					"Invalid configuration in delivery_groups_priority",
+					"The value of priority and delivery group id should be unique in delivery_groups_priority",
+				)
+				return
+			}
+		}
 	}
 }

@@ -52,6 +52,7 @@ func TestHypervisorResourceAzureRM(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
 					resource.TestCheckResourceAttr("citrix_azure_hypervisor.testHypervisor", "name", name),
+					resource.TestCheckResourceAttr("citrix_azure_hypervisor.testHypervisor", "metadata.#", "3"),
 				),
 			},
 
@@ -62,7 +63,7 @@ func TestHypervisorResourceAzureRM(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"last_updated", "application_secret"},
+				ImportStateVerifyIgnore: []string{"application_secret", "metadata"},
 			},
 			// Update and Read testing
 			{
@@ -70,6 +71,7 @@ func TestHypervisorResourceAzureRM(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
 					resource.TestCheckResourceAttr("citrix_azure_hypervisor.testHypervisor", "name", fmt.Sprintf("%s-updated", name)),
+					resource.TestCheckResourceAttr("citrix_azure_hypervisor.testHypervisor", "metadata.#", "4"),
 				),
 			},
 		},
@@ -462,6 +464,20 @@ resource "citrix_azure_hypervisor" "testHypervisor" {
     subscription_id     = "%s"
     application_secret  = "%s"
     application_id      = "%s"
+	metadata    = [
+		{
+			name = "key1",
+			value = "value1"
+		},
+		{
+			name = "key2",
+			value = "value2"
+		},
+		{
+			name = "key3",
+			value = "value3"
+		}
+	]
 }
 `
 
@@ -473,6 +489,24 @@ resource "citrix_azure_hypervisor" "testHypervisor" {
     subscription_id     = "%s"
     application_secret  = "%s"
     application_id      = "%s"
+	metadata    = [
+		{
+			name = "key1",
+			value = "value1"
+		},
+		{
+			name = "key2",
+			value = "value2"
+		},
+		{
+			name = "key3",
+			value = "value3"
+		},
+		{
+			name = "key4",
+			value = "value4"
+		}
+	]
 }
 `
 )

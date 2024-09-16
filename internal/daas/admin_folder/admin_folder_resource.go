@@ -143,14 +143,7 @@ func (r *adminFolderResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	var state AdminFolderResourceModel
-	diags = req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	adminFolderId := state.Id.ValueString()
+	adminFolderId := plan.Id.ValueString()
 
 	adminFolderResource, err := getAdminFolder(ctx, r.client, &resp.Diagnostics, adminFolderId)
 	if err != nil {

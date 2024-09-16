@@ -87,6 +87,8 @@ func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ct
 	if !plan.Tenants.IsNull() {
 		associatedTenants := util.StringSetToStringArray(ctx, diagnostics, plan.Tenants)
 		body.SetTenants(associatedTenants)
+	} else {
+		body.SetTenants([]string{})
 	}
 
 	if !plan.Scopes.IsNull() {
@@ -131,6 +133,9 @@ func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ct
 		body.SetMachines(machinesRequest)
 	}
 
+	metadata := util.GetMetadataRequestModel(ctx, diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, plan.Metadata))
+	body.SetMetadata(metadata)
+
 	return &body, nil
 }
 
@@ -161,6 +166,8 @@ func getRequestModelForUpdateMachineCatalog(plan MachineCatalogResourceModel, ct
 	if !plan.Tenants.IsNull() {
 		associatedTenants := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Tenants)
 		body.SetTenants(associatedTenants)
+	} else {
+		body.SetTenants([]string{})
 	}
 
 	if !plan.Scopes.IsNull() {
@@ -200,6 +207,9 @@ func getRequestModelForUpdateMachineCatalog(plan MachineCatalogResourceModel, ct
 	if err != nil {
 		return nil, err
 	}
+
+	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	body.SetMetadata(metadata)
 
 	return &body, nil
 }
@@ -249,7 +259,7 @@ func generateBatchApiHeaders(ctx context.Context, diagnostics *diag.Diagnostics,
 }
 
 func readMachineCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, machineCatalogId string) (*citrixorchestration.MachineCatalogDetailResponseModel, *http.Response, error) {
-	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId).Fields("Id,Name,Description,ProvisioningType,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC")
+	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId).Fields("Id,Name,Description,ProvisioningType,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC,Metadata")
 	catalog, httpResp, err := util.ReadResource[*citrixorchestration.MachineCatalogDetailResponseModel](getMachineCatalogRequest, ctx, client, resp, "Machine Catalog", machineCatalogId)
 
 	return catalog, httpResp, err

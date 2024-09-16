@@ -106,7 +106,12 @@ func (r *applicationGroupResource) Create(ctx context.Context, req resource.Crea
 	if !plan.Tenants.IsNull() {
 		associatedTenants := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Tenants)
 		createApplicationGroupRequest.SetTenants(associatedTenants)
+	} else {
+		createApplicationGroupRequest.SetTenants([]string{})
 	}
+
+	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	createApplicationGroupRequest.SetMetadata(metadata)
 
 	addApplicationsGroupRequest := r.client.ApiClient.ApplicationGroupsAPIsDAAS.ApplicationGroupsCreateApplicationGroup(ctx)
 	addApplicationsGroupRequest = addApplicationsGroupRequest.CreateApplicationGroupRequestModel(createApplicationGroupRequest)
@@ -182,16 +187,8 @@ func (r *applicationGroupResource) Update(ctx context.Context, req resource.Upda
 		return
 	}
 
-	// Retrieve values from plan
-	var state ApplicationGroupResourceModel
-	diags = req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	applicationGroupId := state.Id.ValueString()
-	applicationGroupName := state.Name.ValueString()
+	applicationGroupId := plan.Id.ValueString()
+	applicationGroupName := plan.Name.ValueString()
 
 	// Construct the update model
 	var editApplicationGroupRequestBody = &citrixorchestration.EditApplicationGroupRequestModel{}
@@ -235,7 +232,12 @@ func (r *applicationGroupResource) Update(ctx context.Context, req resource.Upda
 	if !plan.Tenants.IsNull() {
 		associatedTenants := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Tenants)
 		editApplicationGroupRequestBody.SetTenants(associatedTenants)
+	} else {
+		editApplicationGroupRequestBody.SetTenants([]string{})
 	}
+
+	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	editApplicationGroupRequestBody.SetMetadata(metadata)
 
 	// Update Application
 	editApplicationRequest := r.client.ApiClient.ApplicationGroupsAPIsDAAS.ApplicationGroupsUpdateApplicationGroup(ctx, applicationGroupId)
@@ -344,6 +346,14 @@ func (r *applicationGroupResource) ValidateConfig(ctx context.Context, req resou
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	if !data.Metadata.IsNull() {
+		metadata := util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, data.Metadata)
+		isValid := util.ValidateMetadataConfig(ctx, &resp.Diagnostics, metadata)
+		if !isValid {
+			return
+		}
 	}
 
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
