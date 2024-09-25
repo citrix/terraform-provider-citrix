@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/citrix/terraform-provider-citrix/internal/validators"
 	"github.com/hashicorp/terraform-plugin-framework-validators/boolvalidator"
@@ -541,7 +542,7 @@ func (DeliveryGroupPowerManagementSettings) GetSchema() schema.SingleNestedAttri
 			"power_time_schemes": schema.ListNestedAttribute{
 				Description: "Power management time schemes." +
 					"\n\n~> **Please Note** It is not allowed to have more than one power time scheme that cover the same day of the week for the same delivery group.",
-				Required:     true,
+				Optional:     true,
 				NestedObject: DeliveryGroupPowerTimeScheme{}.GetSchema(),
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
@@ -898,22 +899,25 @@ type DeliveryGroupResourceModel struct {
 	SharingKind                 types.String `tfsdk:"sharing_kind"`
 	RestrictedAccessUsers       types.Object `tfsdk:"restricted_access_users"`
 	AllowAnonymousAccess        types.Bool   `tfsdk:"allow_anonymous_access"`
-	Desktops                    types.List   `tfsdk:"desktops"`                    //List[DeliveryGroupDesktop]
-	AssociatedMachineCatalogs   types.List   `tfsdk:"associated_machine_catalogs"` //List[DeliveryGroupMachineCatalogModel]
-	AutoscaleSettings           types.Object `tfsdk:"autoscale_settings"`          //DeliveryGroupPowerManagementSettings
-	RebootSchedules             types.List   `tfsdk:"reboot_schedules"`            //List[DeliveryGroupRebootSchedule]
+	Desktops                    types.List   `tfsdk:"desktops"`                    // List[DeliveryGroupDesktop]
+	AssociatedMachineCatalogs   types.List   `tfsdk:"associated_machine_catalogs"` // List[DeliveryGroupMachineCatalogModel]
+	AutoscaleSettings           types.Object `tfsdk:"autoscale_settings"`          // DeliveryGroupPowerManagementSettings
+	RebootSchedules             types.List   `tfsdk:"reboot_schedules"`            // List[DeliveryGroupRebootSchedule]
 	TotalMachines               types.Int64  `tfsdk:"total_machines"`
 	PolicySetId                 types.String `tfsdk:"policy_set_id"`
 	MinimumFunctionalLevel      types.String `tfsdk:"minimum_functional_level"`
 	StoreFrontServers           types.Set    `tfsdk:"storefront_servers"` //Set[string]
 	Scopes                      types.Set    `tfsdk:"scopes"`             //Set[String]
+	BuiltInScopes               types.Set    `tfsdk:"built_in_scopes"`    //Set[String]
+	InheritedScopes             types.Set    `tfsdk:"inherited_scopes"`   //Set[String]
 	MakeResourcesAvailableInLHC types.Bool   `tfsdk:"make_resources_available_in_lhc"`
-	AppProtection               types.Object `tfsdk:"app_protection"`          //DeliveryGroupAppProtection
-	DefaultAccessPolicies       types.List   `tfsdk:"default_access_policies"` //List[DeliveryGroupAccessPolicyModel]
-	CustomAccessPolicies        types.List   `tfsdk:"custom_access_policies"`  //List[DeliveryGroupAccessPolicyModel]
+	AppProtection               types.Object `tfsdk:"app_protection"`          // DeliveryGroupAppProtection
+	DefaultAccessPolicies       types.List   `tfsdk:"default_access_policies"` // List[DeliveryGroupAccessPolicyModel]
+	CustomAccessPolicies        types.List   `tfsdk:"custom_access_policies"`  // List[DeliveryGroupAccessPolicyModel]
 	DeliveryGroupFolderPath     types.String `tfsdk:"delivery_group_folder_path"`
-	Tenants                     types.Set    `tfsdk:"tenants"`  //Set[String]
-	Metadata                    types.List   `tfsdk:"metadata"` //List[NameValueStringPairmodel]
+	Tenants                     types.Set    `tfsdk:"tenants"`  // Set[String]
+	Metadata                    types.List   `tfsdk:"metadata"` // List[NameValueStringPairmodel]
+	Tags                        types.Set    `tfsdk:"tags"`     // Set[string]
 }
 
 func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
@@ -1035,6 +1039,16 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 					),
 				},
 			},
+			"built_in_scopes": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "The IDs of the built-in scopes of the delivery group.",
+				Computed:    true,
+			},
+			"inherited_scopes": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "The IDs of the inherited scopes of the delivery group.",
+				Computed:    true,
+			},
 			"storefront_servers": schema.SetAttribute{
 				ElementType: types.StringType,
 				Description: "A list of GUID identifiers of StoreFront Servers to associate with the delivery group.",
@@ -1085,12 +1099,22 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 			"tenants": schema.SetAttribute{
 				ElementType: types.StringType,
 				Description: "A set of identifiers of tenants to associate with the delivery group.",
+				Computed:    true,
+			},
+			"metadata": util.GetMetadataListSchema("Delivery Group"),
+			"tags": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "A set of identifiers of tags to associate with the delivery group.",
 				Optional:    true,
 				Validators: []validator.Set{
 					setvalidator.SizeAtLeast(1),
+					setvalidator.ValueStringsAre(
+						validator.String(
+							stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
+						),
+					),
 				},
 			},
-			"metadata": util.GetMetadataListSchema("Delivery Group"),
 		},
 	}
 }
@@ -1099,7 +1123,7 @@ func (DeliveryGroupResourceModel) GetAttributes() map[string]schema.Attribute {
 	return DeliveryGroupResourceModel{}.GetSchema().Attributes
 }
 
-func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, dgDesktops *citrixorchestration.DesktopResponseModelCollection, dgPowerTimeSchemes *citrixorchestration.PowerTimeSchemeResponseModelCollection, dgMachines *citrixorchestration.MachineResponseModelCollection, dgRebootSchedule *citrixorchestration.RebootScheduleResponseModelCollection) DeliveryGroupResourceModel {
+func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixclient.CitrixDaasClient, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, dgDesktops *citrixorchestration.DesktopResponseModelCollection, dgPowerTimeSchemes *citrixorchestration.PowerTimeSchemeResponseModelCollection, dgMachines *citrixorchestration.MachineResponseModelCollection, dgRebootSchedule *citrixorchestration.RebootScheduleResponseModelCollection, tags []string) DeliveryGroupResourceModel {
 
 	// Set required values
 	r.Id = types.StringValue(deliveryGroup.GetId())
@@ -1117,9 +1141,19 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 	minimumFunctionalLevel := deliveryGroup.GetMinimumFunctionalLevel()
 	r.MinimumFunctionalLevel = types.StringValue(string(minimumFunctionalLevel))
 
-	scopeIdsInState := util.StringSetToStringArray(ctx, diagnostics, r.Scopes)
-	scopeIds := util.GetIdsForFilteredScopeObjects(scopeIdsInState, deliveryGroup.GetScopes())
+	parentList := []string{}
+	associatedCatalogs := util.ObjectListToTypedArray[DeliveryGroupMachineCatalogModel](ctx, diagnostics, r.AssociatedMachineCatalogs)
+	for _, machineCatalog := range associatedCatalogs {
+		parentList = append(parentList, machineCatalog.MachineCatalog.ValueString())
+	}
+	scopeIdsInPlan := util.StringSetToStringArray(ctx, diagnostics, r.Scopes)
+	scopeIds, builtInScopes, inheritedScopeIds, err := util.CategorizeScopes(ctx, client, diagnostics, deliveryGroup.GetScopes(), citrixorchestration.SCOPEDOBJECTTYPE_MACHINE_CATALOG, parentList, scopeIdsInPlan)
+	if err != nil {
+		return r
+	}
 	r.Scopes = util.StringArrayToStringSet(ctx, diagnostics, scopeIds)
+	r.BuiltInScopes = util.StringArrayToStringSet(ctx, diagnostics, builtInScopes)
+	r.InheritedScopes = util.StringArrayToStringSet(ctx, diagnostics, inheritedScopeIds)
 
 	if deliveryGroup.GetReuseMachinesWithoutShutdownInOutage() {
 		r.MakeResourcesAvailableInLHC = types.BoolValue(true)
@@ -1159,15 +1193,7 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 		r.DeliveryGroupFolderPath = types.StringNull()
 	}
 
-	if len(deliveryGroup.GetTenants()) > 0 || !r.Tenants.IsNull() {
-		var remoteTenants []string
-		for _, tenant := range deliveryGroup.GetTenants() {
-			remoteTenants = append(remoteTenants, tenant.GetId())
-		}
-		r.Tenants = util.StringArrayToStringSet(ctx, diagnostics, remoteTenants)
-	} else {
-		r.Tenants = types.SetNull(types.StringType)
-	}
+	r.Tenants = util.RefreshTenantSet(ctx, diagnostics, deliveryGroup.GetTenants())
 
 	effectiveMetadata := util.GetEffectiveMetadata(util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, r.Metadata), deliveryGroup.GetMetadata())
 
@@ -1176,6 +1202,8 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 	} else {
 		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
 	}
+
+	r.Tags = util.RefreshTagSet(ctx, diagnostics, tags)
 
 	return r
 }

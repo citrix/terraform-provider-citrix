@@ -30,7 +30,9 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/daas/bearer_token"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/cvad_site"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/storefront_server"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/tags"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/vda"
+	"github.com/citrix/terraform-provider-citrix/internal/middleware"
 	"github.com/citrix/terraform-provider-citrix/internal/quickcreate/qcs_account"
 	"github.com/citrix/terraform-provider-citrix/internal/quickcreate/qcs_connection"
 	"github.com/citrix/terraform-provider-citrix/internal/quickcreate/qcs_deployment"
@@ -52,7 +54,6 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/daas/zone"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
-	"github.com/google/uuid"
 	"golang.org/x/mod/semver"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -126,15 +127,17 @@ func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"hostname": schema.StringAttribute{
-						Description: "Host name / base URL of Citrix DaaS service. " + "<br />" +
-							"For Citrix on-premises customers (Required): Use this to specify Delivery Controller hostname. " + "<br />" +
-							"For Citrix Cloud customers (Optional): Use this to force override the Citrix DaaS service hostname." + "<br />" +
-							"Can be set via Environment Variable **CITRIX_HOSTNAME**.",
+						Description: "Host name / base URL of Citrix DaaS service. " +
+							"\nFor Citrix on-premises customers: Use this to specify Delivery Controller hostname. " +
+							"\nFor Citrix Cloud customers: Use this to force override the Citrix DaaS service hostname." +
+							"\n\n-> **Note** Can be set via Environment Variable **CITRIX_HOSTNAME**." +
+							"\n\n~> **Please Note** This parameter is required for on-premises customers to be specified in the provider configuration or via environment variable.",
 						Optional: true,
 					},
 					"environment": schema.StringAttribute{
-						Description: "Citrix Cloud environment of the customer. Only applicable for Citrix Cloud customers. Available options: `Production`, `Staging`, `Japan`, `JapanStaging`, `Gov`, `GovStaging`. " + "<br />" +
-							"Can be set via Environment Variable **CITRIX_ENVIRONMENT**.",
+						Description: "Citrix Cloud environment of the customer. Available options: `Production`, `Staging`, `Japan`, `JapanStaging`, `Gov`, `GovStaging`. " +
+							"\n\n-> **Note** Can be set via Environment Variable **CITRIX_ENVIRONMENT**." +
+							"\n\n~> **Please Note** Only applicable for Citrix Cloud customers.",
 						Optional: true,
 						Validators: []validator.String{
 							stringvalidator.OneOf(
@@ -148,31 +151,34 @@ func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 						},
 					},
 					"customer_id": schema.StringAttribute{
-						Description: "Citrix Cloud customer ID. Only applicable for Citrix Cloud customers." + "<br />" +
-							"Can be set via Environment Variable **CITRIX_CUSTOMER_ID**.",
+						Description: "The Citrix Cloud customer ID." +
+							"\n\n-> **Note** Can be set via Environment Variable **CITRIX_CUSTOMER_ID**." +
+							"\n\n~> **Please Note** This parameter is required for Citrix Cloud customers to be specified in the provider configuration or via environment variable.",
 						Optional: true,
 					},
 					"client_id": schema.StringAttribute{
-						Description: "Client Id for Citrix DaaS service authentication. " + "<br />" +
-							"For Citrix On-Premises customers: Use this to specify a DDC administrator username. " + "<br />" +
-							"For Citrix Cloud customers: Use this to specify Cloud API Key Client Id." + "<br />" +
-							"Can be set via Environment Variable **CITRIX_CLIENT_ID**.",
+						Description: "Client Id for Citrix DaaS service authentication. " +
+							"\nFor Citrix On-Premises customers: Use this to specify a DDC administrator username. " +
+							"\nFor Citrix Cloud customers: Use this to specify Cloud API Key Client Id." +
+							"\n\n-> **Note** Can be set via Environment Variable **CITRIX_CLIENT_ID**." +
+							"\n\n~> **Please Note** This parameter is required to be specified in the provider configuration or via environment variable.",
 						Optional: true,
 					},
 					"client_secret": schema.StringAttribute{
-						Description: "Client Secret for Citrix DaaS service authentication. " + "<br />" +
-							"For Citrix on-premises customers: Use this to specify a DDC administrator password. " + "<br />" +
-							"For Citrix Cloud customers: Use this to specify Cloud API Key Client Secret." + "<br />" +
-							"Can be set via Environment Variable **CITRIX_CLIENT_SECRET**.",
+						Description: "Client Secret for Citrix DaaS service authentication. " +
+							"\nFor Citrix on-premises customers: Use this to specify a DDC administrator password. " +
+							"\nFor Citrix Cloud customers: Use this to specify Cloud API Key Client Secret." +
+							"\n\n-> **Note** Can be set via Environment Variable **CITRIX_CLIENT_SECRET**." +
+							"\n\n~> **Please Note** This parameter is required to be specified in the provider configuration or via environment variable.",
 						Optional:  true,
 						Sensitive: true,
 					},
 					"disable_ssl_verification": schema.BoolAttribute{
-						Description: "Disable SSL verification against the target DDC. " + "<br />" +
-							"Only applicable to on-premises customers. Citrix Cloud customers should omit this option. Set to true to skip SSL verification only when the target DDC does not have a valid SSL certificate issued by a trusted CA. " + "<br />" +
-							"When set to true, please make sure that your provider config is set for a known DDC hostname. " + "<br />" +
-							"[It is recommended to configure a valid certificate for the target DDC](https://docs.citrix.com/en-us/citrix-virtual-apps-desktops/install-configure/install-core/secure-web-studio-deployment) " + "<br />" +
-							"Can be set via Environment Variable **CITRIX_DISABLE_SSL_VERIFICATION**.",
+						Description: "Disable SSL verification against the target DDC. " +
+							"\nSet to true to skip SSL verification only when the target DDC does not have a valid SSL certificate issued by a trusted CA. " +
+							"\nWhen set to true, please make sure that your provider config is set for a known DDC hostname. " +
+							"\n\n-> **Note** Can be set via Environment Variable **CITRIX_DISABLE_SSL_VERIFICATION**." +
+							"\n\n~> **Please Note** [It is recommended to configure a valid certificate for the target DDC](https://docs.citrix.com/en-us/citrix-virtual-apps-desktops/install-configure/install-core/secure-web-studio-deployment) ",
 						Optional: true,
 					},
 				},
@@ -183,22 +189,25 @@ func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 				Optional: true,
 				Attributes: map[string]schema.Attribute{
 					"computer_name": schema.StringAttribute{
-						Required: true,
 						Description: "StoreFront server computer Name " + "<br />" +
-							"Only applicable for Citrix on-premises customers. Use this to specify StoreFront server computer name " + "<br />" +
-							"Can be set via Environment Variable **SF_COMPUTER_NAME**.",
+							"Use this to specify StoreFront server computer name " + "<br />" +
+							"Can be set via Environment Variable **SF_COMPUTER_NAME**." + "<br />" +
+							"This parameter is **required** to be specified in the provider configuration or via environment variable.",
+						Optional: true,
 					},
 					"ad_admin_username": schema.StringAttribute{
 						Description: "Active Directory Admin Username to connect to storefront server " + "<br />" +
-							"Only applicable for Citrix on-premises customers. Use this to specify AD admin username " + "<br />" +
-							"Can be set via Environment Variable **SF_AD_ADMIN_USERNAME**.",
-						Required: true,
+							"Use this to specify AD admin username " + "<br />" +
+							"Can be set via Environment Variable **SF_AD_ADMIN_USERNAME**." + "<br />" +
+							"This parameter is **required** to be specified in the provider configuration or via environment variable.",
+						Optional: true,
 					},
 					"ad_admin_password": schema.StringAttribute{
 						Description: "Active Directory Admin Password to connect to storefront server " + "<br />" +
-							"Only applicable for Citrix on-premises customers. Use this to specify AD admin password" + "<br />" +
-							"Can be set via Environment Variable **SF_AD_ADMIN_PASSWORD**.",
-						Required: true,
+							"Use this to specify AD admin password" + "<br />" +
+							"Can be set via Environment Variable **SF_AD_ADMIN_PASSWORD**." + "<br />" +
+							"This parameter is **required** to be specified in the provider configuration or via environment variable.",
+						Optional: true,
 					},
 					"disable_ssl_verification": schema.BoolAttribute{
 						Description: "Disable SSL verification against the target storefront server. " + "<br />" +
@@ -211,60 +220,6 @@ func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 			},
 		},
 	}
-}
-
-func middlewareAuthWithCustomerIdHeaderFunc(authClient *citrixclient.CitrixDaasClient, r *http.Request) {
-	// Auth
-	if authClient != nil && r.Header.Get("Authorization") == "" {
-		token, _, err := authClient.SignIn()
-		if err != nil {
-			tflog.Error(r.Context(), "Could not sign into Citrix DaaS, error: "+err.Error())
-		}
-		r.Header["Authorization"] = []string{token}
-	}
-
-	r.Header["Citrix-CustomerId"] = []string{authClient.ClientConfig.CustomerId}
-	r.Header["Accept"] = []string{"application/json"}
-	r.URL.Path = strings.Replace(r.URL.Path, "/"+authClient.ClientConfig.CustomerId+"/administrators", "", 1)
-
-	// TransactionId
-	transactionId := r.Header.Get("Citrix-TransactionId")
-	if transactionId == "" {
-		transactionId = uuid.NewString()
-		r.Header.Add("Citrix-TransactionId", transactionId)
-	}
-
-	// Log the request
-	tflog.Info(r.Context(), "Orchestration API request", map[string]interface{}{
-		"url":           r.URL.String(),
-		"method":        r.Method,
-		"transactionId": transactionId,
-	})
-}
-
-func middlewareAuthFunc(authClient *citrixclient.CitrixDaasClient, r *http.Request) {
-	// Auth
-	if authClient != nil && r.Header.Get("Authorization") == "" {
-		token, _, err := authClient.SignIn()
-		if err != nil {
-			tflog.Error(r.Context(), "Could not sign into Citrix DaaS, error: "+err.Error())
-		}
-		r.Header["Authorization"] = []string{token}
-	}
-
-	// TransactionId
-	transactionId := r.Header.Get("Citrix-TransactionId")
-	if transactionId == "" {
-		transactionId = uuid.NewString()
-		r.Header.Add("Citrix-TransactionId", transactionId)
-	}
-
-	// Log the request
-	tflog.Info(r.Context(), "Orchestration API request", map[string]interface{}{
-		"url":           r.URL.String(),
-		"method":        r.Method,
-		"transactionId": transactionId,
-	})
 }
 
 type registryResponse struct {
@@ -346,6 +301,8 @@ func (p *citrixProvider) versionCheck(resp *provider.ConfigureResponse) {
 }
 
 // Configure prepares a Citrixdaas API client for data sources and resources.
+// **Important Note**: Provider client initialization logic is also implemented for sweeper in sweeper_test.go
+// Please make sure to update the sweeper client initialization in sweeper_test.go if any changes are made here.
 func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 	tflog.Info(ctx, "Configuring Citrix Cloud client")
 	defer util.PanicHandler(&resp.Diagnostics)
@@ -360,31 +317,38 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		return
 	}
 
-	// Set StoreFront Client
 	client := &citrixclient.CitrixDaasClient{}
 
+	storeFrontClientInitialized := false
+	daasClientInitialized := false
+
+	// Initialize storefront client
 	storefront_computer_name := os.Getenv("SF_COMPUTER_NAME")
 	storefront_ad_admin_username := os.Getenv("SF_AD_ADMIN_USERNAME")
 	storefront_ad_admin_password := os.Getenv("SF_AD_ADMIN_PASSWORD")
 	storefront_disable_ssl_verification := strings.EqualFold(os.Getenv("SF_DISABLE_SSL_VERIFICATION"), "true")
 
-	// If practitioner provide a storefront configuration
-	if storefront_computer_name != "" || storefront_ad_admin_username != "" || storefront_ad_admin_password != "" || config.StoreFrontRemoteHost != nil {
-		if config.StoreFrontRemoteHost != nil {
-			if !config.StoreFrontRemoteHost.ComputerName.IsNull() {
-				storefront_computer_name = config.StoreFrontRemoteHost.ComputerName.ValueString()
+	if storefrontConfig := config.StoreFrontRemoteHost; storefrontConfig != nil || (storefront_computer_name != "" && storefront_ad_admin_username != "" && storefront_ad_admin_password != "") {
+		if storefrontConfig != nil {
+			if !storefrontConfig.ComputerName.IsNull() {
+				storefront_computer_name = storefrontConfig.ComputerName.ValueString()
 			}
-			if !config.StoreFrontRemoteHost.ADadminUserName.IsNull() {
-				storefront_ad_admin_username = config.StoreFrontRemoteHost.ADadminUserName.ValueString()
+			if !storefrontConfig.ADadminUserName.IsNull() {
+				storefront_ad_admin_username = storefrontConfig.ADadminUserName.ValueString()
 			}
-			if !config.StoreFrontRemoteHost.AdAdminPassword.IsNull() {
-				storefront_ad_admin_password = config.StoreFrontRemoteHost.AdAdminPassword.ValueString()
+			if !storefrontConfig.AdAdminPassword.IsNull() {
+				storefront_ad_admin_password = storefrontConfig.AdAdminPassword.ValueString()
 			}
-			if !config.StoreFrontRemoteHost.DisableSslVerification.IsNull() {
-				storefront_disable_ssl_verification = config.StoreFrontRemoteHost.DisableSslVerification.ValueBool()
+			if !storefrontConfig.DisableSslVerification.IsNull() {
+				storefront_disable_ssl_verification = storefrontConfig.DisableSslVerification.ValueBool()
 			}
 		}
-		client.NewStoreFrontClient(ctx, storefront_computer_name, storefront_ad_admin_username, storefront_ad_admin_password, storefront_disable_ssl_verification)
+
+		validateAndInitializeStorefrontClient(ctx, resp, client, storefront_computer_name, storefront_ad_admin_username, storefront_ad_admin_password, storefront_disable_ssl_verification)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		storeFrontClientInitialized = true
 	}
 
 	// Initialize cvad client
@@ -396,37 +360,46 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	disableSslVerification := strings.EqualFold(os.Getenv("CITRIX_DISABLE_SSL_VERIFICATION"), "true")
 	quick_create_host_name := os.Getenv("CITRIX_QUICK_CREATE_HOST_NAME")
 
-	if cvadConfig := config.CvadConfig; cvadConfig != nil {
-		if !cvadConfig.ClientId.IsNull() {
-			clientId = cvadConfig.ClientId.ValueString()
+	if cvadConfig := config.CvadConfig; cvadConfig != nil || (clientId != "" && clientSecret != "") {
+		if cvadConfig != nil {
+			if !cvadConfig.ClientId.IsNull() {
+				clientId = cvadConfig.ClientId.ValueString()
+			}
+
+			if !cvadConfig.ClientSecret.IsNull() {
+				clientSecret = cvadConfig.ClientSecret.ValueString()
+			}
+
+			if !cvadConfig.Hostname.IsNull() {
+				hostname = cvadConfig.Hostname.ValueString()
+			}
+
+			if !cvadConfig.Environment.IsNull() {
+				environment = cvadConfig.Environment.ValueString()
+			}
+
+			if !cvadConfig.CustomerId.IsNull() {
+				customerId = cvadConfig.CustomerId.ValueString()
+			}
+
+			if !cvadConfig.DisableSslVerification.IsNull() {
+				disableSslVerification = cvadConfig.DisableSslVerification.ValueBool()
+			}
 		}
 
-		if !cvadConfig.ClientSecret.IsNull() {
-			clientSecret = cvadConfig.ClientSecret.ValueString()
-		}
-
-		if !cvadConfig.Hostname.IsNull() {
-			hostname = cvadConfig.Hostname.ValueString()
-		}
-
-		if !cvadConfig.Environment.IsNull() {
-			environment = cvadConfig.Environment.ValueString()
-		}
-
-		if !cvadConfig.CustomerId.IsNull() {
-			customerId = cvadConfig.CustomerId.ValueString()
-		}
-
-		if !cvadConfig.DisableSslVerification.IsNull() {
-			disableSslVerification = cvadConfig.DisableSslVerification.ValueBool()
-		}
-	}
-
-	if clientId != "" || clientSecret != "" || config.CvadConfig != nil {
-		p.validateAndInitializeDaaSClient(ctx, resp, client, clientId, clientSecret, hostname, environment, customerId, quick_create_host_name, disableSslVerification)
+		validateAndInitializeDaaSClient(ctx, resp, client, clientId, clientSecret, hostname, environment, customerId, quick_create_host_name, p.version, disableSslVerification)
 		if resp.Diagnostics.HasError() {
 			return
 		}
+		daasClientInitialized = true
+	}
+
+	if !storeFrontClientInitialized && !daasClientInitialized {
+		resp.Diagnostics.AddError(
+			"Invalid Provider Configuration",
+			"At least one of `cvad_config` and `storefront_remote_host` attributes must be specified.",
+		)
+		return
 	}
 
 	// Make the Citrix API client available during DataSource and Resource
@@ -437,23 +410,64 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	tflog.Info(ctx, "Configured Citrix API client", map[string]any{"success": true})
 }
 
-func (p *citrixProvider) validateAndInitializeDaaSClient(ctx context.Context, resp *provider.ConfigureResponse, client *citrixclient.CitrixDaasClient, clientId, clientSecret, hostname, environment, customerId, quick_create_host_name string, disableSslVerification bool) {
+func validateAndInitializeStorefrontClient(ctx context.Context, resp *provider.ConfigureResponse, client *citrixclient.CitrixDaasClient, storefront_computer_name, storefront_ad_admin_username, storefront_ad_admin_password string, storefront_disable_ssl_verification bool) {
+	if storefront_computer_name == "" {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("storefront_remote_host").AtName("computer_name"),
+			"Unknown StoreFront Computer Name",
+			"The provider cannot create the Citrix StoreFront client as there is an unknown configuration value for the StoreFront Computer Name. "+
+				"Either set the value in the provider configuration, or use the SF_COMPUTER_NAME environment variable.",
+		)
+		return
+	}
+	if storefront_ad_admin_username == "" {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("storefront_remote_host").AtName("ad_admin_username"),
+			"Unknown StoreFront AD Admin Username",
+			"The provider cannot create the Citrix StoreFront client as there is an unknown configuration value for the StoreFront AD Admin Username. "+
+				"Either set the value in the provider configuration, or use the SF_AD_ADMIN_USERNAME environment variable.",
+		)
+		return
+	}
+	if storefront_ad_admin_password == "" {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("storefront_remote_host").AtName("ad_admin_password"),
+			"Unknown StoreFront AD Admin Password",
+			"The provider cannot create the Citrix StoreFront client as there is an unknown configuration value for the StoreFront AD Admin Password. "+
+				"Either set the value in the provider configuration, or use the SF_AD_ADMIN_PASSWORD environment variable.",
+		)
+		return
+	}
+	client.InitializeStoreFrontClient(ctx, storefront_computer_name, storefront_ad_admin_username, storefront_ad_admin_password, storefront_disable_ssl_verification)
+}
+
+func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.ConfigureResponse, client *citrixclient.CitrixDaasClient, clientId, clientSecret, hostname, environment, customerId, quick_create_host_name, version string, disableSslVerification bool) {
 	if clientId == "" {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("client_id"),
+			path.Root("cvad_config").AtName("client_id"),
 			"Unknown Citrix API Client Id",
 			"The provider cannot create the Citrix API client as there is an unknown configuration value for the Citrix API ClientId. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the CITRIX_CLIENT_ID environment variable.",
+				"Either set the value in the provider configuration, or use the CITRIX_CLIENT_ID environment variable.",
 		)
 		return
 	}
 
 	if clientSecret == "" {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("client_secret"),
+			path.Root("cvad_config").AtName("client_secret"),
 			"Unknown Citrix API Client Secret",
 			"The provider cannot create the Citrix API client as there is an unknown configuration value for the Citrix API ClientSecret. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the CITRIX_CLIENT_SECRET environment variable.",
+				"Either set the value in the provider configuration, or use the CITRIX_CLIENT_SECRET environment variable.",
+		)
+		return
+	}
+
+	if customerId == "" && hostname == "" {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("cvad_config").AtName("customer_id"),
+			"Citrix API Customer Id or Hostname is Required",
+			"The provider cannot create the Citrix API client as there is an unknown configuration value for the Citrix API CustomerId and Hostname. "+
+				"Either set the value in the provider configuration, or using the CITRIX_CUSTOMER_ID or CITRIX_HOSTNAME environment variables.",
 		)
 		return
 	}
@@ -462,12 +476,9 @@ func (p *citrixProvider) validateAndInitializeDaaSClient(ctx context.Context, re
 		environment = "Production" // default to production
 	}
 
+	onPremises := false
 	if customerId == "" {
 		customerId = "CitrixOnPremises"
-	}
-
-	onPremises := false
-	if customerId == "CitrixOnPremises" {
 		onPremises = true
 	}
 
@@ -477,8 +488,8 @@ func (p *citrixProvider) validateAndInitializeDaaSClient(ctx context.Context, re
 	// On-Premises customer must specify hostname with DDC hostname / IP address
 	if onPremises && hostname == "" {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("hostname"),
-			"Missing Citrix DaaS API Host",
+			path.Root("cvad_config").AtName("hostname"),
+			"Missing Citrix DaaS API Hostname",
 			"The provider cannot create the Citrix API client as there is a missing or empty value for the Citrix DaaS API hostname for on-premises customers. "+
 				"Set the host value in the configuration. Ensure the value is not empty. ",
 		)
@@ -486,7 +497,7 @@ func (p *citrixProvider) validateAndInitializeDaaSClient(ctx context.Context, re
 
 	if !onPremises && disableSslVerification {
 		resp.Diagnostics.AddAttributeError(
-			path.Root("disable_ssl_verification"),
+			path.Root("cvad_config").AtName("disable_ssl_verification"),
 			"Cannot disable SSL verification for Citrix Cloud customer",
 			"The provider cannot disable SSL verification in the Citrix API client against a Citrix Cloud customer as all Citrix Cloud requests has to go through secured TLS / SSL connection. "+
 				"Omit disable_ssl_verification or set to false for Citrix Cloud customer. ",
@@ -614,9 +625,9 @@ func (p *citrixProvider) validateAndInitializeDaaSClient(ctx context.Context, re
 
 	tflog.Debug(ctx, "Creating Citrix API client")
 
-	userAgent := "citrix-terraform-provider/" + p.version + " (https://github.com/citrix/terraform-provider-citrix)"
+	userAgent := "citrix-terraform-provider/" + version + " (https://github.com/citrix/terraform-provider-citrix)"
 	// Create a new Citrix API client using the configuration values
-	httpResp, err := client.NewCitrixDaasClient(ctx, authUrl, ccUrl, hostname, customerId, clientId, clientSecret, onPremises, apiGateway, isGov, disableSslVerification, &userAgent, middlewareAuthFunc, middlewareAuthWithCustomerIdHeaderFunc)
+	httpResp, err := client.InitializeCitrixDaasClient(ctx, authUrl, ccUrl, hostname, customerId, clientId, clientSecret, onPremises, apiGateway, isGov, disableSslVerification, &userAgent, middleware.MiddlewareAuthFunc, middleware.MiddlewareAuthWithCustomerIdHeaderFunc)
 	if err != nil {
 		if httpResp != nil {
 			if httpResp.StatusCode == 401 {
@@ -692,11 +703,11 @@ func (p *citrixProvider) validateAndInitializeDaaSClient(ctx context.Context, re
 	}
 	// Set Quick Create Client
 	if quickCreateHostname != "" {
-		client.NewQuickCreateClient(ctx, quickCreateHostname, middlewareAuthFunc)
+		client.InitializeQuickCreateClient(ctx, quickCreateHostname, middleware.MiddlewareAuthFunc)
 	}
 	// Set CWS Client
 	if cwsHostName != "" {
-		client.NewCwsClient(ctx, cwsHostName, middlewareAuthFunc)
+		client.InitializeCwsClient(ctx, cwsHostName, middleware.MiddlewareAuthFunc)
 	}
 }
 
@@ -715,6 +726,7 @@ func (p *citrixProvider) DataSources(_ context.Context) []func() datasource.Data
 		machine_catalog.NewPvsDataSource,
 		bearer_token.NewBearerTokenDataSource,
 		cvad_site.NewSiteDataSource,
+		tags.NewTagDataSource,
 		// StoreFront DataSources
 		stf_roaming.NewSTFRoamingServiceDataSource,
 		// QuickCreate DataSources
@@ -725,6 +737,7 @@ func (p *citrixProvider) DataSources(_ context.Context) []func() datasource.Data
 		qcs_deployment.NewAwsWorkspacesDeploymentDataSource,
 		// CC Identity Provider Resources
 		cc_identity_providers.NewOktaIdentityProviderDataSource,
+		cc_identity_providers.NewGoogleIdentityProviderDataSource,
 		cc_identity_providers.NewSamlIdentityProviderDataSource,
 	}
 }
@@ -761,6 +774,7 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		gac_settings.NewGacSettingsResource,
 		resource_locations.NewResourceLocationResource,
 		cc_admin_user.NewCCAdminUserResource,
+		tags.NewTagResource,
 		// StoreFront Resources
 		stf_deployment.NewSTFDeploymentResource,
 		stf_authentication.NewSTFAuthenticationServiceResource,
@@ -774,6 +788,7 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		qcs_connection.NewAwsWorkspacesDirectoryConnectionResource,
 		qcs_deployment.NewAwsWorkspacesDeploymentResource,
 		// CC Identity Provider Resources
+		cc_identity_providers.NewGoogleIdentityProviderResource,
 		cc_identity_providers.NewOktaIdentityProviderResource,
 		cc_identity_providers.NewSamlIdentityProviderResource,
 		// Add resource here

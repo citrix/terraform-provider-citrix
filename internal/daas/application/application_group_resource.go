@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -103,13 +104,6 @@ func (r *applicationGroupResource) Create(ctx context.Context, req resource.Crea
 
 	createApplicationGroupRequest.SetAdminFolder(plan.ApplicationGroupFolderPath.ValueString())
 
-	if !plan.Tenants.IsNull() {
-		associatedTenants := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Tenants)
-		createApplicationGroupRequest.SetTenants(associatedTenants)
-	} else {
-		createApplicationGroupRequest.SetTenants([]string{})
-	}
-
 	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
 	createApplicationGroupRequest.SetMetadata(metadata)
 
@@ -126,14 +120,27 @@ func (r *applicationGroupResource) Create(ctx context.Context, req resource.Crea
 		)
 		return
 	}
-	// Map response body to schema and populate Computed attribute values
 
-	//Create AppGroup response does not return delivery groups so we are making another call to fetch delivery groups
-	dgs, err := getDeliveryGroups(ctx, r.client, &resp.Diagnostics, addAppGroupResp.GetId())
+	applicationGroupId := addAppGroupResp.GetId()
+	// Update application group tags
+	setApplicationGroupTags(ctx, &resp.Diagnostics, r.client, applicationGroupId, plan.Tags)
+
+	// Map response body to schema and populate Computed attribute values
+	// Get updated applicationGroup with getApplicationGroup
+	applicationGroup, err := getApplicationGroup(ctx, r.client, &resp.Diagnostics, applicationGroupId)
 	if err != nil {
 		return
 	}
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, addAppGroupResp, dgs)
+
+	// Create AppGroup response does not return delivery groups so we are making another call to fetch delivery groups
+	dgs, err := getDeliveryGroups(ctx, r.client, &resp.Diagnostics, applicationGroupId)
+	if err != nil {
+		return
+	}
+
+	tags := getApplicationGroupTags(ctx, &resp.Diagnostics, r.client, applicationGroupId)
+
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, applicationGroup, dgs, tags)
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -165,7 +172,10 @@ func (r *applicationGroupResource) Read(ctx context.Context, req resource.ReadRe
 	if err != nil {
 		return
 	}
-	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, applicationGroup, dgs)
+
+	tags := getApplicationGroupTags(ctx, &resp.Diagnostics, r.client, applicationGroup.GetId())
+
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, applicationGroup, dgs, tags)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -229,13 +239,6 @@ func (r *applicationGroupResource) Update(ctx context.Context, req resource.Upda
 
 	editApplicationGroupRequestBody.SetAdminFolder(plan.ApplicationGroupFolderPath.ValueString())
 
-	if !plan.Tenants.IsNull() {
-		associatedTenants := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Tenants)
-		editApplicationGroupRequestBody.SetTenants(associatedTenants)
-	} else {
-		editApplicationGroupRequestBody.SetTenants([]string{})
-	}
-
 	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
 	editApplicationGroupRequestBody.SetMetadata(metadata)
 
@@ -251,6 +254,9 @@ func (r *applicationGroupResource) Update(ctx context.Context, req resource.Upda
 		)
 	}
 
+	// Update application group tags
+	setApplicationGroupTags(ctx, &resp.Diagnostics, r.client, applicationGroupId, plan.Tags)
+
 	// Get updated applicationGroup from getApplicationGroup
 	applicationGroup, err := getApplicationGroup(ctx, r.client, &resp.Diagnostics, applicationGroupId)
 	if err != nil {
@@ -262,8 +268,11 @@ func (r *applicationGroupResource) Update(ctx context.Context, req resource.Upda
 	if err != nil {
 		return
 	}
+
+	tags := getApplicationGroupTags(ctx, &resp.Diagnostics, r.client, applicationGroupId)
+
 	// Update resource state with updated property values
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, applicationGroup, dgs)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, applicationGroup, dgs, tags)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -367,29 +376,27 @@ func (r *applicationGroupResource) ModifyPlan(ctx context.Context, req resource.
 		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
 		return
 	}
+}
 
-	if req.Plan.Raw.IsNull() {
-		return
-	}
+func setApplicationGroupTags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, appGroupId string, tagSet types.Set) {
+	setTagsRequestBody := util.ConstructTagsRequestModel(ctx, diagnostics, tagSet)
 
-	var plan ApplicationGroupResourceModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	setTagsRequest := client.ApiClient.ApplicationGroupsAPIsDAAS.ApplicationGroupsSetApplicationGroupTags(ctx, appGroupId)
+	setTagsRequest = setTagsRequest.TagsRequestModel(setTagsRequestBody)
 
-	create := req.State.Raw.IsNull()
-	operation := "updating"
-	if create {
-		operation = "creating"
-	}
-
-	if !r.client.ClientConfig.IsCspCustomer && !plan.Tenants.IsNull() {
-		resp.Diagnostics.AddError(
-			"Error "+operation+" Application Group "+plan.Name.ValueString(),
-			"`tenants` attribute can only be set for Citrix Service Provider customer.",
+	httpResp, err := citrixdaasclient.AddRequestData(setTagsRequest, client).Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error set tags for Application Group "+appGroupId,
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
 		)
-		return
+		// Continue without return in order to get other attributes refreshed in state
 	}
+}
+
+func getApplicationGroupTags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, applicationGroupId string) []string {
+	getTagsRequest := client.ApiClient.ApplicationGroupsAPIsDAAS.ApplicationGroupsGetApplicationGroupTags(ctx, applicationGroupId)
+	tagsResp, httpResp, err := citrixdaasclient.AddRequestData(getTagsRequest, client).Execute()
+	return util.ProcessTagsResponseCollection(diagnostics, tagsResp, httpResp, err, "Application Group", applicationGroupId)
 }

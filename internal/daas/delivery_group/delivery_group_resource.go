@@ -218,6 +218,8 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 		)
 	}
 
+	setDeliveryGroupTags(ctx, &resp.Diagnostics, r.client, deliveryGroupId, plan.Tags)
+
 	deliveryGroup, err = getDeliveryGroup(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
 	if err != nil {
 		return
@@ -261,7 +263,9 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 		// Do not return if there is an error. We need to set the resource in the state so that tf knows about the resource and marks it tainted (diagnostics already has the error)
 	}
 
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, deliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule)
+	tags := getDeliveryGroupTags(ctx, &resp.Diagnostics, r.client, deliveryGroupId)
+
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, deliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule, tags)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -323,7 +327,9 @@ func (r *deliveryGroupResource) Read(ctx context.Context, req resource.ReadReque
 		}
 	}
 
-	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, deliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule)
+	tags := getDeliveryGroupTags(ctx, &resp.Diagnostics, r.client, deliveryGroupId)
+
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, deliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule, tags)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -375,6 +381,8 @@ func (r *deliveryGroupResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
+	setDeliveryGroupTags(ctx, &resp.Diagnostics, r.client, deliveryGroupId, plan.Tags)
+
 	// Get desktops
 	deliveryGroupDesktops, err := getDeliveryGroupDesktops(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
 
@@ -421,7 +429,9 @@ func (r *deliveryGroupResource) Update(ctx context.Context, req resource.UpdateR
 		// Do not return if there is an error. We need to set the resource in the state so that tf knows about the resource and marks it tainted (diagnostics already has the error)
 	}
 
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, updatedDeliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule)
+	tags := getDeliveryGroupTags(ctx, &resp.Diagnostics, r.client, deliveryGroupId)
+
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, updatedDeliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule, tags)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -686,13 +696,5 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 			"Incorrect Attribute Configuration",
 			"make_resources_available_in_lhc can only be set for power managed Single Session OS Random (pooled) VDAs.",
 		)
-	}
-
-	if !r.client.ClientConfig.IsCspCustomer && !plan.Tenants.IsNull() {
-		resp.Diagnostics.AddError(
-			"Error "+operation+" Delivery Group "+plan.Name.ValueString(),
-			"`tenants` attribute can only be set for Citrix Service Provider customer.",
-		)
-		return
 	}
 }

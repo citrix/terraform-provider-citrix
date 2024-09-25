@@ -3,12 +3,36 @@
 package test
 
 import (
+	"context"
 	"fmt"
+	"log"
+	"net/http"
 	"os"
 	"testing"
 
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
+
+func init() {
+	resource.AddTestSweepers("citrix_zone", &resource.Sweeper{
+		Name: "citrix_zone",
+		F: func(hypervisor string) error {
+			ctx := context.Background()
+			client := sharedClientForSweepers(ctx)
+
+			if v := os.Getenv("CITRIX_CUSTOMER_ID"); v != "" && v != "CitrixOnPremises" {
+				// For Cloud Customers, there is no need to remove remote zones
+				return nil
+			}
+			zoneName := os.Getenv("TEST_ZONE_INPUT")
+			err := zoneSweeper(ctx, zoneName, client)
+			return err
+		},
+		Dependencies: []string{"citrix_hypervisor"},
+	})
+}
 
 func TestZonePreCheck(t *testing.T) {
 	zoneInput := os.Getenv("TEST_ZONE_INPUT")
@@ -208,4 +232,22 @@ func getAggregateTestFunc(isOnPremises bool, zoneInput string, zoneDescription s
 		resource.TestCheckResourceAttr("citrix_zone.test", "resource_location_id", zoneInput),
 		resource.TestCheckResourceAttr("citrix_zone.test", "description", zoneDescription),
 	)
+}
+
+func zoneSweeper(ctx context.Context, zoneName string, client *citrixclient.CitrixDaasClient) error {
+	getZoneRequest := client.ApiClient.ZonesAPIsDAAS.ZonesGetZone(ctx, zoneName)
+	zone, httpResp, err := citrixclient.ExecuteWithRetry[*citrixorchestration.ZoneDetailResponseModel](getZoneRequest, client)
+	if err != nil {
+		if httpResp.StatusCode == http.StatusNotFound {
+			// Resource does not exist in remote, no need to delete
+			return nil
+		}
+		return fmt.Errorf("error getting zone: %s", err)
+	}
+	deleteZoneRequest := client.ApiClient.ZonesAPIsDAAS.ZonesDeleteZone(ctx, zone.GetId())
+	httpResp, err = citrixclient.AddRequestData(deleteZoneRequest, client).Execute()
+	if err != nil && httpResp.StatusCode != http.StatusNotFound {
+		log.Printf("Error destroying %s during sweep: %s", zoneName, err)
+	}
+	return nil
 }

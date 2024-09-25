@@ -47,7 +47,7 @@ func GetHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.Cit
 }
 
 func GetMachineCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, machineCatalogId string, addErrorToDiagnostics bool) (*citrixorchestration.MachineCatalogDetailResponseModel, error) {
-	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId).Fields("Id,Name,Description,ProvisioningType,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC,Metadata")
+	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId).Fields("Id,Name,Description,ProvisioningType,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC,Metadata,Scopes")
 	catalog, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.MachineCatalogDetailResponseModel](getMachineCatalogRequest, client)
 	if err != nil && addErrorToDiagnostics {
 		diagnostics.AddError(
@@ -58,6 +58,48 @@ func GetMachineCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasC
 	}
 
 	return catalog, err
+}
+
+func GetMachineCatalogIdWithPath(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, machineCatalogPath string) (string, error) {
+	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogPath).Fields("Id")
+	catalog, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.MachineCatalogDetailResponseModel](getMachineCatalogRequest, client)
+	if err != nil {
+		diagnostics.AddError(
+			"Error reading Machine Catalog "+machineCatalogPath,
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+ReadClientError(err),
+		)
+	}
+
+	return catalog.GetId(), err
+}
+
+func GetDeliveryGroupIdWithPath(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupPath string) (string, error) {
+	getDeliveryGroupRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroup(ctx, deliveryGroupPath).Fields("Id")
+	deliveryGroup, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.DeliveryGroupDetailResponseModel](getDeliveryGroupRequest, client)
+	if err != nil {
+		diagnostics.AddError(
+			"Error reading Delivery Group "+deliveryGroupPath,
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+ReadClientError(err),
+		)
+	}
+
+	return deliveryGroup.GetId(), err
+}
+
+func GetApplicationGroupIdWithPath(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, appGroupPath string) (string, error) {
+	getAppGroupRequest := client.ApiClient.ApplicationGroupsAPIsDAAS.ApplicationGroupsGetApplicationGroup(ctx, appGroupPath).Fields("Id")
+	appGroup, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ApplicationGroupDetailResponseModel](getAppGroupRequest, client)
+	if err != nil {
+		diagnostics.AddError(
+			"Error reading Application Group "+appGroupPath,
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+ReadClientError(err),
+		)
+	}
+
+	return appGroup.GetId(), err
 }
 
 func GetMachineCatalogMachines(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, machineCatalogId string) (*citrixorchestration.MachineResponseModelCollection, error) {
@@ -309,7 +351,7 @@ func GetFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.C
 	return result, nil
 }
 
-func ValidateHypervisorResource(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorName, hypervisorPoolName, resourcePath string) (bool, string) {
+func ValidateHypervisorResource(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, hypervisorName string, hypervisorPoolName string, resourcePath string) (bool, string) {
 	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsValidateHypervisorResourcePoolResource(ctx, hypervisorName, hypervisorPoolName)
 	var validationRequestModel citrixorchestration.HypervisorResourceValidationRequestModel
 	validationRequestModel.SetPath(resourcePath)
@@ -336,4 +378,87 @@ func ValidateHypervisorResource(ctx context.Context, client *citrixdaasclient.Ci
 	}
 
 	return true, ""
+}
+
+func CategorizeScopes(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, scopeResponses []citrixorchestration.ScopeResponseModel, parentObjectType citrixorchestration.ScopedObjectType, parentObjectIds []string, scopeIdsInPlan []string) ([]string, []string, []string, error) {
+	regularScopeIds := []string{}
+	builtInScopeIds := []string{}
+	inheritedScopeIds := []string{}
+	for _, scope := range scopeResponses {
+		scopeId := scope.GetId()
+
+		if slices.Contains(scopeIdsInPlan, scopeId) {
+			regularScopeIds = append(regularScopeIds, scopeId)
+			continue
+		} else if scope.GetIsBuiltIn() {
+			builtInScopeIds = append(builtInScopeIds, scopeId)
+			continue
+		}
+		isInheritedScope, err := IsScopeInherited(ctx, client, diagnostics, scopeId, parentObjectType, parentObjectIds)
+		if err != nil {
+			return regularScopeIds, builtInScopeIds, inheritedScopeIds, err
+		}
+		if !isInheritedScope {
+			regularScopeIds = append(regularScopeIds, scopeId)
+		} else {
+			inheritedScopeIds = append(inheritedScopeIds, scopeId)
+		}
+	}
+	return regularScopeIds, builtInScopeIds, inheritedScopeIds, nil
+}
+
+func IsScopeInherited(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, scopeNameOrId string, parentObjectType citrixorchestration.ScopedObjectType, parentObjectIds []string) (bool, error) {
+	responseModels, err := GetAllScopedObjects(ctx, client, diagnostics, scopeNameOrId, "")
+	if err != nil {
+		return false, err
+	}
+	for _, scopedObject := range responseModels {
+		if parentObjectType == scopedObject.GetObjectType() {
+			object := scopedObject.GetObject()
+			objectId := object.GetId()
+			// For the ScopedObjects API, the id attribute of Machine Catalog, Delivery Group, and Application Group responses use UID instead of GUID
+			if parentObjectType == citrixorchestration.SCOPEDOBJECTTYPE_MACHINE_CATALOG {
+				objectId, err = GetMachineCatalogIdWithPath(ctx, client, diagnostics, strings.ReplaceAll(object.GetName(), "\\", "|"))
+				if err != nil {
+					return false, err
+				}
+			} else if parentObjectType == citrixorchestration.SCOPEDOBJECTTYPE_DELIVERY_GROUP {
+				objectId, err = GetDeliveryGroupIdWithPath(ctx, client, diagnostics, strings.ReplaceAll(object.GetName(), "\\", "|"))
+				if err != nil {
+					return false, err
+				}
+			} else if parentObjectType == citrixorchestration.SCOPEDOBJECTTYPE_APPLICATION_GROUP {
+				objectId, err = GetApplicationGroupIdWithPath(ctx, client, diagnostics, strings.ReplaceAll(object.GetName(), "\\", "|"))
+				if err != nil {
+					return false, err
+				}
+			}
+			if slices.Contains(parentObjectIds, objectId) {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}
+
+func GetAllScopedObjects(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, scopeNameOrId string, continuationToken string) ([]citrixorchestration.ScopedObjectResponseModel, error) {
+	req := client.ApiClient.AdminAPIsDAAS.AdminGetAdminScopedObjects(ctx, scopeNameOrId)
+	req = req.Limit(250)
+	req = req.ContinuationToken(continuationToken)
+	responseModel, httpResp, err := citrixdaasclient.AddRequestData(req, client).Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error fetching associated objects for admin scope "+scopeNameOrId,
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+ReadClientError(err),
+		)
+		return []citrixorchestration.ScopedObjectResponseModel{}, err
+	}
+	if responseModel.GetContinuationToken() != "" {
+		childResponse, err := GetAllScopedObjects(ctx, client, diagnostics, scopeNameOrId, responseModel.GetContinuationToken())
+		return append(responseModel.GetItems(), childResponse...), err
+	} else {
+		return responseModel.GetItems(), nil
+	}
 }

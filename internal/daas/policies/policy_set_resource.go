@@ -73,7 +73,7 @@ func (r *policySetResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 	// Validate DDC Version
 	errorSummary := fmt.Sprintf("Error %s Policy Set", operation)
 	feature := "Policy Set resource"
-	isDdcVersionSupported := util.CheckProductVersion(r.client, &resp.Diagnostics, 118, 7, 41, errorSummary, feature)
+	isDdcVersionSupported := util.CheckProductVersion(r.client, &resp.Diagnostics, 120, 7, 41, errorSummary, feature)
 
 	if !isDdcVersionSupported {
 		return

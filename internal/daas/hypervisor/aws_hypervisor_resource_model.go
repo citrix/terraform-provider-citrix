@@ -29,6 +29,7 @@ type AwsHypervisorResourceModel struct {
 	Zone     types.String `tfsdk:"zone"`
 	Scopes   types.Set    `tfsdk:"scopes"`   // Set[string]
 	Metadata types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
+	Tenants  types.Set    `tfsdk:"tenants"`  // Set[string]
 	/** AWS EC2 Connection **/
 	Region    types.String `tfsdk:"region"`
 	ApiKey    types.String `tfsdk:"api_key"`
@@ -91,6 +92,11 @@ func (AwsHypervisorResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"metadata": util.GetMetadataListSchema("Hypervisor"),
+			"tenants": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "A set of identifiers of tenants to associate with the hypervisor connection.",
+				Computed:    true,
+			},
 		},
 	}
 }
@@ -117,6 +123,8 @@ func (r AwsHypervisorResourceModel) RefreshPropertyValues(ctx context.Context, d
 	} else {
 		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
 	}
+
+	r.Tenants = util.RefreshTenantSet(ctx, diagnostics, hypervisor.GetTenants())
 
 	return r
 }

@@ -31,6 +31,7 @@ type NutanixHypervisorResourceModel struct {
 	Zone     types.String `tfsdk:"zone"`
 	Scopes   types.Set    `tfsdk:"scopes"`   // Set[string]
 	Metadata types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
+	Tenants  types.Set    `tfsdk:"tenants"`  // Set[string]
 	/** Nutanix Connection **/
 	Username                            types.String `tfsdk:"username"`
 	Password                            types.String `tfsdk:"password"`
@@ -135,6 +136,11 @@ func (NutanixHypervisorResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"metadata": util.GetMetadataListSchema("Hypervisor"),
+			"tenants": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "A set of identifiers of tenants to associate with the hypervisor connection.",
+				Computed:    true,
+			},
 		},
 	}
 }
@@ -162,6 +168,8 @@ func (r NutanixHypervisorResourceModel) RefreshPropertyValues(ctx context.Contex
 	} else {
 		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
 	}
+
+	r.Tenants = util.RefreshTenantSet(ctx, diagnostics, hypervisor.GetTenants())
 
 	hypZone := hypervisor.GetZone()
 	r.Zone = types.StringValue(hypZone.GetId())

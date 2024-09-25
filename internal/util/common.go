@@ -24,6 +24,7 @@ import (
 	citrixstorefrontclient "github.com/citrix/citrix-daas-rest-go/citrixstorefront/apis"
 	citrixstorefront "github.com/citrix/citrix-daas-rest-go/citrixstorefront/models"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/citrix/citrix-daas-rest-go/globalappconfiguration"
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -92,6 +93,9 @@ const TimeSpanRegex string = `^(\d+)\.((\d)|(1\d)|(2[0-3])):((\d)|[1-5][0-9]):((
 
 // ID of the Default Site Policy Set
 const DefaultSitePolicySetId string = "00000000-0000-0000-0000-000000000000"
+
+// Url Ending Forward Slash Regex
+const UrlValidator string = `^https?://.*\/$`
 
 // SSL Thumbprint
 const SslThumbprintRegex string = `^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$`
@@ -230,6 +234,24 @@ func ReadClientError(err error) string {
 			return err.Error()
 		}
 		return msgObj.GetErrorMessage()
+	}
+
+	return err.Error()
+}
+
+func ReadGacError(err error) string {
+	genericOpenApiError, ok := err.(*globalappconfiguration.GenericOpenAPIError)
+	if !ok {
+		return err.Error()
+	}
+	msg := genericOpenApiError.Body()
+	if msg != nil {
+		var msgObj globalappconfiguration.CitrixErrorModel
+		unmarshalError := json.Unmarshal(msg, &msgObj)
+		if unmarshalError != nil {
+			return err.Error()
+		}
+		return msgObj.GetDetail()
 	}
 
 	return err.Error()
@@ -1113,8 +1135,12 @@ func GetAttributeValues(ctx context.Context, diags *diag.Diagnostics, attribute 
 		return refVal.Interface().(types.Bool).ValueBool()
 	case types.Int64:
 		return refVal.Interface().(types.Int64).ValueInt64()
+	case types.Int32:
+		return refVal.Interface().(types.Int32).ValueInt32()
 	case types.Float64:
 		return refVal.Interface().(types.Float64).ValueFloat64()
+	case types.Float32:
+		return refVal.Interface().(types.Float32).ValueFloat32()
 	case types.List:
 		reflectedList := refVal.Interface().(types.List)
 		reflectedElementType := reflect.TypeOf(reflectedList.ElementType(ctx))
@@ -1196,7 +1222,7 @@ func CheckIfFieldIsSensitive(ctx context.Context, diags *diag.Diagnostics, attri
 	}
 
 	switch attr := attribute.(type) {
-	case schema.StringAttribute, schema.BoolAttribute, schema.Int64Attribute, schema.Float64Attribute, schema.ListAttribute, schema.SetAttribute, schema.MapAttribute:
+	case schema.StringAttribute, schema.BoolAttribute, schema.Int64Attribute, schema.Int32Attribute, schema.Float64Attribute, schema.Float32Attribute, schema.ListAttribute, schema.SetAttribute, schema.MapAttribute:
 		return nil, false
 	case schema.SingleNestedAttribute:
 		sensitiveFields := GetSensitiveFieldsForAttribute(ctx, diags, attr.Attributes)
@@ -1272,4 +1298,50 @@ func PollQcsTask(ctx context.Context, client *citrixdaasclient.CitrixDaasClient,
 
 func GetCCAdminAccessPolicyNameKey(r ccadmins.AdministratorAccessPolicyModel) string {
 	return r.GetDisplayName()
+}
+
+func RefreshTenantSet(ctx context.Context, diagnostics *diag.Diagnostics, tenants []citrixorchestration.RefResponseModel) types.Set {
+	var remoteTenants []string
+	for _, tenant := range tenants {
+		remoteTenants = append(remoteTenants, tenant.GetId())
+	}
+	return StringArrayToStringSet(ctx, diagnostics, remoteTenants)
+}
+
+func ConstructTagsRequestModel(ctx context.Context, diagnostics *diag.Diagnostics, tagSet types.Set) citrixorchestration.TagsRequestModel {
+	tags := []string{}
+	if !tagSet.IsNull() {
+		tags = StringSetToStringArray(ctx, diagnostics, tagSet)
+	}
+	var setTagsRequestBody citrixorchestration.TagsRequestModel
+	setTagsRequestBody.SetItems(tags)
+	return setTagsRequestBody
+}
+
+func RefreshTagSet(ctx context.Context, diagnostics *diag.Diagnostics, tags []string) types.Set {
+	if len(tags) > 0 {
+		return StringArrayToStringSet(ctx, diagnostics, tags)
+	} else {
+		return types.SetNull(types.StringType)
+	}
+}
+
+func ProcessTagsResponseCollection(diagnostics *diag.Diagnostics, tagsResp *citrixorchestration.TagResponseModelCollection, httpResp *http.Response, err error, resourceType string, resourceId string) []string {
+	tags := []string{}
+	if err != nil {
+		diagnostics.AddError(
+			fmt.Sprintf("Error get tags for %s %s", resourceType, resourceId),
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+ReadClientError(err),
+		)
+		// Continue without return in order to get other attributes refreshed in state
+		return tags
+	}
+	if tagsResp == nil || len(tagsResp.GetItems()) == 0 {
+		return tags
+	}
+	for _, tag := range tagsResp.GetItems() {
+		tags = append(tags, tag.GetId())
+	}
+	return tags
 }

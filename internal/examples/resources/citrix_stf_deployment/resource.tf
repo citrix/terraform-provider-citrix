@@ -10,7 +10,7 @@ resource "citrix_stf_deployment" "example-stf-deployment" {
 		}
 	]
 	roaming_beacon = {
-		internal_ip = "https://example.internalip.url"
-		external_ips = ["https://example.externalip.url"]
+		internal_address = "https://example.internalip.url/"
+		external_addresses = ["https://example.externalip.url/"]
 	}
 }

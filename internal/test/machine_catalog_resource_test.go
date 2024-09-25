@@ -3,13 +3,76 @@
 package test
 
 import (
+	"context"
 	"fmt"
+	"log"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
 
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
+
+func init() {
+	resource.AddTestSweepers("citrix_machine_catalog", &resource.Sweeper{
+		Name: "citrix_machine_catalog",
+		F: func(hypervisor string) error {
+			ctx := context.Background()
+			client := sharedClientForSweepers(ctx)
+
+			isOnPremises := (client.ClientConfig.CustomerId == "CitrixOnPremises")
+
+			var errs *multierror.Error
+			// MCS AD machine catalog sweep
+			machineCatalogName := os.Getenv("TEST_MC_NAME")
+			err := machineCatalogSweeper(ctx, machineCatalogName, client)
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			}
+
+			// MCS Hybrid Azure AD machine catalog sweep
+			err = machineCatalogSweeper(ctx, machineCatalogName+"-HybAAD", client)
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			}
+
+			if !isOnPremises {
+				// MCS Azure AD machine catalog sweep
+				err = machineCatalogSweeper(ctx, machineCatalogName+"-AAD", client)
+				if err != nil {
+					errs = multierror.Append(errs, err)
+				}
+
+				// MCS Workgroup machine catalog sweep
+				err = machineCatalogSweeper(ctx, machineCatalogName+"-WRKGRP", client)
+				if err != nil {
+					errs = multierror.Append(errs, err)
+				}
+			}
+
+			// Manual machine catalog sweep
+			machineCatalogName = os.Getenv("TEST_MC_NAME_MANUAL")
+			err = machineCatalogSweeper(ctx, machineCatalogName, client)
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			}
+
+			// Remote PC machine catalog sweep
+			machineCatalogName = os.Getenv("TEST_MC_NAME_REMOTE_PC")
+			err = machineCatalogSweeper(ctx, machineCatalogName, client)
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			}
+
+			return errs.ErrorOrNil()
+		},
+		Dependencies: []string{"citrix_delivery_group"},
+	})
+}
 
 func TestMachineCatalogPreCheck_Azure(t *testing.T) {
 	if v := os.Getenv("TEST_MC_NAME"); v == "" {
@@ -2705,4 +2768,22 @@ func BuildMachineCatalogResourceRemotePC(t *testing.T, machineResource string) s
 	include_subfolders := os.Getenv("TEST_MC_INCLUDE_SUBFOLDERS_REMOTE_PC")
 
 	return fmt.Sprintf(machineResource, name, allocation_type, machine_account, include_subfolders, ou)
+}
+
+func machineCatalogSweeper(ctx context.Context, machineCatalogName string, client *citrixclient.CitrixDaasClient) error {
+	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogName)
+	machineCatalog, httpResp, err := citrixclient.ExecuteWithRetry[*citrixorchestration.MachineCatalogDetailResponseModel](getMachineCatalogRequest, client)
+	if err != nil {
+		if httpResp.StatusCode == http.StatusNotFound {
+			// Resource does not exist in remote, no need to delete
+			return nil
+		}
+		return fmt.Errorf("Error getting machine catalog: %s", err)
+	}
+	deleteMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsDeleteMachineCatalog(ctx, machineCatalog.GetId())
+	httpResp, err = citrixclient.AddRequestData(deleteMachineCatalogRequest, client).Execute()
+	if err != nil && httpResp.StatusCode != http.StatusNotFound {
+		log.Printf("Error destroying %s during sweep: %s", machineCatalogName, err)
+	}
+	return nil
 }

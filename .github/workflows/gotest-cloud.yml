@@ -138,9 +138,13 @@ jobs:
           echo "TEST_ADMIN_USER_DOMAIN=${{secrets.TEST_ADMIN_USER_DOMAIN}}" >> $GITHUB_ENV
 
       # Test PreCheck
-      - name: Test
+      - name: Test Precheck
         run: go test -v ./internal/test -run "^TestAzureMcsSuitePreCheck$"
 
       # Test
       - name: Test
         run: go test -v ./internal/test -run "^TestAzureMcs$" -timeout 1h
+
+      # Sweep
+      - name: Sweep
+        run: go test -v ./internal/test -run "^TestAzureMcs$" -timeout 1h -sweep-run "citrix_zone,citrix_zone,citrix_admin_folder,citrix_admin_role,citrix_admin_scope" -sweep="azure"

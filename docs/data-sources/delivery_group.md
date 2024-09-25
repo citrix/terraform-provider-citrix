@@ -32,6 +32,8 @@ data "citrix_delivery_group" "example_delivery_group" {
 ### Read-Only
 
 - `id` (String) GUID identifier of the delivery group.
+- `tags` (Set of String) A set of identifiers of tags to associate with the delivery group.
+- `tenants` (Set of String) A set of identifiers of tenants to associate with the delivery group.
 - `vdas` (Attributes List) The VDAs associated with the delivery group. (see [below for nested schema](#nestedatt--vdas))
 
 <a id="nestedatt--vdas"></a>

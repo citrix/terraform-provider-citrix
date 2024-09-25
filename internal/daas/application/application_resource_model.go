@@ -107,13 +107,14 @@ type ApplicationResourceModel struct {
 	PublishedName           types.String `tfsdk:"published_name"`
 	Description             types.String `tfsdk:"description"`
 	InstalledAppProperties  types.Object `tfsdk:"installed_app_properties"` // InstalledAppResponseModel
-	DeliveryGroups          types.List   `tfsdk:"delivery_groups"`          //List[string]
-	DeliveryGroupsPriority  types.Set    `tfsdk:"delivery_groups_priority"` //List[DeliveryGroupPriorityModel]
+	DeliveryGroups          types.List   `tfsdk:"delivery_groups"`          // List[string]
+	DeliveryGroupsPriority  types.Set    `tfsdk:"delivery_groups_priority"` // List[DeliveryGroupPriorityModel]
 	ApplicationFolderPath   types.String `tfsdk:"application_folder_path"`
 	Icon                    types.String `tfsdk:"icon"`
-	LimitVisibilityToUsers  types.Set    `tfsdk:"limit_visibility_to_users"` //Set[string]
+	LimitVisibilityToUsers  types.Set    `tfsdk:"limit_visibility_to_users"` // Set[string]
 	ApplicationCategoryPath types.String `tfsdk:"application_category_path"`
 	Metadata                types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
+	Tags                    types.Set    `tfsdk:"tags"`     // Set[string]
 }
 
 // Schema defines the schema for the data source.
@@ -197,6 +198,19 @@ func (ApplicationResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"metadata": util.GetMetadataListSchema("Application"),
+			"tags": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "A set of identifiers of tags to associate with the application.",
+				Optional:    true,
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
+					setvalidator.ValueStringsAre(
+						validator.String(
+							stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
+						),
+					),
+				},
+			},
 		},
 	}
 }
@@ -205,7 +219,7 @@ func (ApplicationResourceModel) GetAttributes() map[string]schema.Attribute {
 	return ApplicationResourceModel{}.GetSchema().Attributes
 }
 
-func (r ApplicationResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, application *citrixorchestration.ApplicationDetailResponseModel, applicationDeliveryGroup *citrixorchestration.ApplicationDeliveryGroupResponseModelCollection) ApplicationResourceModel {
+func (r ApplicationResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, application *citrixorchestration.ApplicationDetailResponseModel, applicationDeliveryGroup *citrixorchestration.ApplicationDeliveryGroupResponseModelCollection, tags []string) ApplicationResourceModel {
 	// Overwrite application with refreshed state
 	r.Id = types.StringValue(application.GetId())
 	r.Name = types.StringValue(application.GetName())
@@ -266,6 +280,8 @@ func (r ApplicationResourceModel) RefreshPropertyValues(ctx context.Context, dia
 	} else {
 		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
 	}
+
+	r.Tags = util.RefreshTagSet(ctx, diagnostics, tags)
 
 	return r
 }

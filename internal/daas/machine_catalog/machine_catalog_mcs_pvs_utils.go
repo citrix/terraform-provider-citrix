@@ -839,8 +839,8 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 
 	// Set default reboot options
 	var rebootOption citrixorchestration.RebootMachinesRequestModel
-	rebootOption.SetRebootDuration(-1)
-	rebootOption.SetWarningDuration(-1)
+	rebootOption.SetRebootDuration(-1) // Default to update on next shutdown
+	rebootOption.SetWarningDuration(0) // Default to no warning
 
 	switch hypervisor.GetConnectionType() {
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
@@ -848,15 +848,21 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 		azureMachineProfile := azureMachineConfigModel.MachineProfile
 		if !(*provisioningType == citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING) {
 			azureMasterImageModel := util.ObjectValueToTypedObject[AzureMasterImageModel](ctx, &resp.Diagnostics, azureMachineConfigModel.AzureMasterImage)
+			sharedSubscription := azureMasterImageModel.SharedSubscription.ValueString()
 			newImage := azureMasterImageModel.MasterImage.ValueString()
 			resourceGroup := azureMasterImageModel.ResourceGroup.ValueString()
+			imageBasePath := "image.folder"
+			if sharedSubscription != "" {
+				imageBasePath = fmt.Sprintf("image.folder\\%s.sharedsubscription", sharedSubscription)
+			}
 
 			if newImage != "" {
 				storageAccount := azureMasterImageModel.StorageAccount.ValueString()
 				container := azureMasterImageModel.Container.ValueString()
 				if storageAccount != "" && container != "" {
 					queryPath := fmt.Sprintf(
-						"image.folder\\%s.resourcegroup\\%s.storageaccount\\%s.container",
+						"%s\\%s.resourcegroup\\%s.storageaccount\\%s.container",
+						imageBasePath,
 						resourceGroup,
 						storageAccount,
 						container)
@@ -871,7 +877,8 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 					}
 				} else {
 					queryPath := fmt.Sprintf(
-						"image.folder\\%s.resourcegroup",
+						"%s\\%s.resourcegroup",
+						imageBasePath,
 						resourceGroup)
 					imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisor(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, newImage, "", "")
 					if err != nil {
@@ -890,7 +897,8 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 				version := azureGalleryImage.Version.ValueString()
 				if gallery != "" && definition != "" {
 					queryPath := fmt.Sprintf(
-						"image.folder\\%s.resourcegroup\\%s.gallery\\%s.imagedefinition",
+						"%s\\%s.resourcegroup\\%s.gallery\\%s.imagedefinition",
+						imageBasePath,
 						resourceGroup,
 						gallery,
 						definition)
@@ -914,7 +922,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 				rebootOption.SetRebootDuration(int32(rebootOptionsPlan.RebootDuration.ValueInt64()))
 				warningDuration := int32(rebootOptionsPlan.WarningDuration.ValueInt64())
 				rebootOption.SetWarningDuration(warningDuration)
-				if warningDuration > 0 {
+				if warningDuration > 0 || warningDuration == -1 {
 					// if warning duration is not 0, it's set in plan and requires warning message body
 					rebootOption.SetWarningMessage(rebootOptionsPlan.WarningMessage.ValueString())
 					if !rebootOptionsPlan.WarningRepeatInterval.IsNull() {
@@ -963,7 +971,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 			rebootOption.SetRebootDuration(int32(rebootOptionsPlan.RebootDuration.ValueInt64()))
 			warningDuration := int32(rebootOptionsPlan.WarningDuration.ValueInt64())
 			rebootOption.SetWarningDuration(warningDuration)
-			if warningDuration > 0 {
+			if warningDuration > 0 || warningDuration == -1 {
 				// if warning duration is not 0, it's set in plan and requires warning message body
 				rebootOption.SetWarningMessage(rebootOptionsPlan.WarningMessage.ValueString())
 				if !rebootOptionsPlan.WarningRepeatInterval.IsNull() {
@@ -1008,7 +1016,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 			rebootOption.SetRebootDuration(int32(rebootOptionsPlan.RebootDuration.ValueInt64()))
 			warningDuration := int32(rebootOptionsPlan.WarningDuration.ValueInt64())
 			rebootOption.SetWarningDuration(warningDuration)
-			if warningDuration > 0 {
+			if warningDuration > 0 || warningDuration == -1 {
 				// if warning duration is not 0, it's set in plan and requires warning message body
 				rebootOption.SetWarningMessage(rebootOptionsPlan.WarningMessage.ValueString())
 				if !rebootOptionsPlan.WarningRepeatInterval.IsNull() {
@@ -1045,7 +1053,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 			rebootOption.SetRebootDuration(int32(rebootOptionsPlan.RebootDuration.ValueInt64()))
 			warningDuration := int32(rebootOptionsPlan.WarningDuration.ValueInt64())
 			rebootOption.SetWarningDuration(warningDuration)
-			if warningDuration > 0 {
+			if warningDuration > 0 || warningDuration == -1 {
 				// if warning duration is not 0, it's set in plan and requires warning message body
 				rebootOption.SetWarningMessage(rebootOptionsPlan.WarningMessage.ValueString())
 				if !rebootOptionsPlan.WarningRepeatInterval.IsNull() {
@@ -1070,7 +1078,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 			rebootOption.SetRebootDuration(int32(rebootOptionsPlan.RebootDuration.ValueInt64()))
 			warningDuration := int32(rebootOptionsPlan.WarningDuration.ValueInt64())
 			rebootOption.SetWarningDuration(warningDuration)
-			if warningDuration > 0 {
+			if warningDuration > 0 || warningDuration == -1 {
 				// if warning duration is not 0, it's set in plan and requires warning message body
 				rebootOption.SetWarningMessage(rebootOptionsPlan.WarningMessage.ValueString())
 				if !rebootOptionsPlan.WarningRepeatInterval.IsNull() {
@@ -1095,7 +1103,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 			rebootOption.SetRebootDuration(int32(rebootOptionsPlan.RebootDuration.ValueInt64()))
 			warningDuration := int32(rebootOptionsPlan.WarningDuration.ValueInt64())
 			rebootOption.SetWarningDuration(warningDuration)
-			if warningDuration > 0 {
+			if warningDuration > 0 || warningDuration == -1 {
 				// if warning duration is not 0, it's set in plan and requires warning message body
 				rebootOption.SetWarningMessage(rebootOptionsPlan.WarningMessage.ValueString())
 				if !rebootOptionsPlan.WarningRepeatInterval.IsNull() {
@@ -1125,7 +1133,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 				rebootOption.SetRebootDuration(int32(rebootOptionsPlan.RebootDuration.ValueInt64()))
 				warningDuration := int32(rebootOptionsPlan.WarningDuration.ValueInt64())
 				rebootOption.SetWarningDuration(warningDuration)
-				if warningDuration > 0 {
+				if warningDuration > 0 || warningDuration == -1 {
 					// if warning duration is not 0, it's set in plan and requires warning message body
 					rebootOption.SetWarningMessage(rebootOptionsPlan.WarningMessage.ValueString())
 					if !rebootOptionsPlan.WarningRepeatInterval.IsNull() {
@@ -1219,10 +1227,7 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Con
 		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
 		awsMachineConfig := util.ObjectValueToTypedObject[AwsMachineConfigModel](ctx, diagnostics, provSchemeModel.AwsMachineConfig)
-		if provSchemeModel.AwsMachineConfig.IsNull() {
-			awsMachineConfig = AwsMachineConfigModel{}
-		} else {
-
+		if !provSchemeModel.AwsMachineConfig.IsNull() {
 			if serviceOfferingObject, httpResp, err := util.GetSingleResourceFromHypervisor(ctx, client, diagnostics, hypervisor.GetId(), resourcePool.GetId(), "", provScheme.GetServiceOffering(), util.ServiceOfferingResourceType, ""); err == nil {
 				provScheme.SetServiceOffering(serviceOfferingObject.GetId())
 				catalog.SetProvisioningScheme(provScheme)
@@ -1244,10 +1249,6 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Con
 		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
 		gcpMachineConfig := util.ObjectValueToTypedObject[GcpMachineConfigModel](ctx, diagnostics, provSchemeModel.GcpMachineConfig)
-		if provSchemeModel.GcpMachineConfig.IsNull() {
-			gcpMachineConfig = GcpMachineConfigModel{}
-		}
-
 		gcpMachineConfig.RefreshProperties(ctx, diagnostics, *catalog)
 		provSchemeModel.GcpMachineConfig = util.TypedObjectToObjectValue(ctx, diagnostics, gcpMachineConfig)
 		for _, stringPair := range customProperties {
@@ -1258,33 +1259,19 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Con
 		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER:
 		vSphereMachineConfig := util.ObjectValueToTypedObject[VsphereMachineConfigModel](ctx, diagnostics, provSchemeModel.VsphereMachineConfig)
-		if provSchemeModel.VsphereMachineConfig.IsNull() {
-			vSphereMachineConfig = VsphereMachineConfigModel{}
-		}
 		vSphereMachineConfig.RefreshProperties(ctx, diagnostics, *catalog)
 		provSchemeModel.VsphereMachineConfig = util.TypedObjectToObjectValue(ctx, diagnostics, vSphereMachineConfig)
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER:
 		xenserverMachineConfig := util.ObjectValueToTypedObject[XenserverMachineConfigModel](ctx, diagnostics, provSchemeModel.XenserverMachineConfig)
-		if provSchemeModel.XenserverMachineConfig.IsNull() {
-			xenserverMachineConfig = XenserverMachineConfigModel{}
-		}
-
 		xenserverMachineConfig.RefreshProperties(ctx, diagnostics, *catalog)
 		provSchemeModel.XenserverMachineConfig = util.TypedObjectToObjectValue(ctx, diagnostics, xenserverMachineConfig)
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM:
 		scvmmMachineConfig := util.ObjectValueToTypedObject[SCVMMMachineConfigModel](ctx, diagnostics, provSchemeModel.SCVMMMachineConfigModel)
-		if provSchemeModel.SCVMMMachineConfigModel.IsNull() {
-			scvmmMachineConfig = SCVMMMachineConfigModel{}
-		}
 		scvmmMachineConfig.RefreshProperties(ctx, diagnostics, *catalog)
 		provSchemeModel.SCVMMMachineConfigModel = util.TypedObjectToObjectValue(ctx, diagnostics, scvmmMachineConfig)
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM:
 		if pluginId == util.NUTANIX_PLUGIN_ID {
 			nutanixMachineConfig := util.ObjectValueToTypedObject[NutanixMachineConfigModel](ctx, diagnostics, provSchemeModel.NutanixMachineConfig)
-			if provSchemeModel.NutanixMachineConfig.IsNull() {
-				nutanixMachineConfig = NutanixMachineConfigModel{}
-			}
-
 			nutanixMachineConfig.RefreshProperties(*catalog)
 			provSchemeModel.NutanixMachineConfig = util.TypedObjectToObjectValue(ctx, diagnostics, nutanixMachineConfig)
 		}
@@ -1346,7 +1333,7 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Con
 
 	machineDomainIdentityModel := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, diagnostics, provSchemeModel.MachineDomainIdentity)
 
-	if domain.GetName() != "" {
+	if domain.GetName() != "" && !strings.EqualFold(domain.GetName(), machineDomainIdentityModel.Domain.ValueString()) {
 		machineDomainIdentityModel.Domain = types.StringValue(domain.GetName())
 	}
 	if machineAccountCreateRules.GetOU() != "" {

@@ -3,12 +3,33 @@
 package test
 
 import (
+	"context"
 	"fmt"
+	"log"
+	"net/http"
 	"os"
 	"testing"
 
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
+
+func init() {
+	resource.AddTestSweepers("citrix_admin_role", &resource.Sweeper{
+		Name: "citrix_admin_role",
+		F: func(hypervisor string) error {
+			ctx := context.Background()
+			client := sharedClientForSweepers(ctx)
+
+			// adminRoleName := os.Getenv("TEST_ROLE_NAME")
+			adminRoleName := "sweeper-role"
+			err := adminRoleSweeper(ctx, adminRoleName, client)
+			return err
+		},
+		Dependencies: []string{"citrix_admin_user"},
+	})
+}
 
 func TestAdminRolePreCheck(t *testing.T) {
 	if name := os.Getenv("TEST_ROLE_NAME"); name == "" {
@@ -98,4 +119,22 @@ var (
 
 func BuildAdminRoleResource(t *testing.T, adminRole string) string {
 	return fmt.Sprintf(adminRole, os.Getenv("TEST_ROLE_NAME"))
+}
+
+func adminRoleSweeper(ctx context.Context, adminRoleName string, client *citrixclient.CitrixDaasClient) error {
+	getAdminRoleRequest := client.ApiClient.AdminAPIsDAAS.AdminGetAdminRole(ctx, adminRoleName)
+	adminRole, httpResp, err := citrixclient.ExecuteWithRetry[*citrixorchestration.RoleResponseModel](getAdminRoleRequest, client)
+	if err != nil {
+		if httpResp.StatusCode == http.StatusNotFound {
+			// Resource does not exist in remote, no need to delete
+			return nil
+		}
+		return fmt.Errorf("Error getting admin role: %s", err)
+	}
+	deleteAdminRoleRequest := client.ApiClient.AdminAPIsDAAS.AdminDeleteAdminRole(ctx, adminRole.GetId())
+	httpResp, err = citrixclient.AddRequestData(deleteAdminRoleRequest, client).Execute()
+	if err != nil && httpResp.StatusCode != http.StatusNotFound {
+		log.Printf("Error destroying %s during sweep: %s", adminRoleName, err)
+	}
+	return nil
 }

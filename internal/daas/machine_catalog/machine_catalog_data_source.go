@@ -84,7 +84,9 @@ func (d *MachineCatalogDataSource) Read(ctx context.Context, req datasource.Read
 		)
 	}
 
-	data = data.RefreshPropertyValues(machineCatalog, machineCatalogVdas)
+	tags := getMachineCatalogTags(ctx, &resp.Diagnostics, d.client, machineCatalogPath)
+
+	data = data.RefreshPropertyValues(ctx, &resp.Diagnostics, machineCatalog, machineCatalogVdas, tags)
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

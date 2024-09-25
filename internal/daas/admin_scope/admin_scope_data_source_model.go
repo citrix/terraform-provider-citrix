@@ -49,7 +49,7 @@ func GetAdminScopeDataSourceSchema() schema.Schema {
 				Description: "ID of the Admin Scope.",
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.ExactlyOneOf(path.MatchRoot("id"), path.MatchRoot("name")), // Ensures that only one of either Id or Name is provided. It will also cause a validation error if none are specified.
+					stringvalidator.ExactlyOneOf(path.MatchRoot("name")), // Ensures that only one of either Id or Name is provided. It will also cause a validation error if none are specified.
 				},
 			},
 			"name": schema.StringAttribute{

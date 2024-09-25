@@ -448,8 +448,32 @@
         "TEST_CC_SAML_IDP_DATA_SOURCE_ID" : "{ID of the SAML 2.0 Identity Provider Data Source}",
         "TEST_CC_SAML_IDP_DATA_SOURCE_NAME" : "{Name of the SAML 2.0 Identity Provider Data Source}",
         "TEST_CC_SAML_IDP_DATA_SOURCE_AUTH_DOMAIN" : "{Auth Domain Name of the SAML 2.0 Identity Provider Data Source}",
-        "TEST_CC_SAML_IDP_DATA_SOURCE_ENTITY_ID" : "{Entity ID of the SAML 2.0 Identity Provider Data Source}"
+        "TEST_CC_SAML_IDP_DATA_SOURCE_ENTITY_ID" : "{Entity ID of the SAML 2.0 Identity Provider Data Source}",
 
+        // Google Identity Provider Resource Go Tests Env Variables
+        "TEST_CC_GOOGLE_IDP_NAME": "{Name of the Google Identity Provider}",
+        "TEST_CC_GOOGLE_IDP_AUTH_DOMAIN_NAME": "{Auth Domain Name of the Google Identity Provider}",
+
+        "TEST_CC_GOOGLE_IDP_CLIENT_EMAIL": "{Client Email of the Google Identity Provider}",
+        "TEST_CC_GOOGLE_IDP_PRIVATE_KEY": "{Private Key of the Google Identity Provider}",
+        "TEST_CC_GOOGLE_IDP_IMPERSONATED_USER": "{Impersonated User of the Google Identity Provider}",
+
+        "TEST_CC_GOOGLE_IDP_CLIENT_EMAIL_UPDATED": "{Updated Client Email of the Google Identity Provider}",
+        "TEST_CC_GOOGLE_IDP_PRIVATE_KEY_UPDATED": "{Updated Private Key of the Google Identity Provider}",
+        "TEST_CC_GOOGLE_IDP_IMPERSONATED_USER_UPDATED": "{Updated Impersonated User of the Google Identity Provider}",
+        // Google Identity Provider Data Source Go Tests Env Variables
+        "TEST_CC_GOOGLE_IDP_DATA_SOURCE_ID": "{ID of the Google Identity Provider Data Source}",
+        "TEST_CC_GOOGLE_IDP_DATA_SOURCE_NAME": "{Name of the Google Identity Provider Data Source}",
+        "TEST_CC_GOOGLE_IDP_DATA_SOURCE_AUTH_DOMAIN_NAME": "{Auth Domain Name of the Google Identity Provider Data Source}",
+        
+        // Tag Go Tests Env Variables
+        // Tag Data Source Go Tests Env Variables
+        "TEST_TAG_DATA_SOURCE_ID": "{ID of the tag}",
+        "TEST_TAG_DATA_SOURCE_NAME": "{Name of the tag}",
+        "TEST_TAG_DATA_SOURCE_DESCRIPTION": "{Description of the tag}",
+        // Tag Resource Go Tests Env Variables
+        "TEST_TAG_RESOURCE_NAME": "{Name of the tag resource}",
+        "TEST_TAG_RESOURCE_DESCRIPTION": "{Description of the tag resource}"
     },
     "go.testTimeout": "120m"
 }

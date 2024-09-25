@@ -14,14 +14,16 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                = &gacSettingsResource{}
-	_ resource.ResourceWithConfigure   = &gacSettingsResource{}
-	_ resource.ResourceWithImportState = &gacSettingsResource{}
-	_ resource.ResourceWithModifyPlan  = &gacSettingsResource{}
+	_ resource.Resource                   = &gacSettingsResource{}
+	_ resource.ResourceWithConfigure      = &gacSettingsResource{}
+	_ resource.ResourceWithImportState    = &gacSettingsResource{}
+	_ resource.ResourceWithModifyPlan     = &gacSettingsResource{}
+	_ resource.ResourceWithValidateConfig = &gacSettingsResource{}
 )
 
 // NewGacSettingsResource is a helper function to simplify the provider implementation.
@@ -41,7 +43,7 @@ func (r *gacSettingsResource) Metadata(_ context.Context, req resource.MetadataR
 
 // Schema defines the schema for the resource.
 func (r *gacSettingsResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = GetSchema()
+	resp.Schema = GACSettingsResourceModel{}.GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -98,7 +100,7 @@ func (r *gacSettingsResource) Create(ctx context.Context, req resource.CreateReq
 		resp.Diagnostics.AddError(
 			"Error creating Settings configuration for ServiceUrl: "+plan.ServiceUrl.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
+				"\nError message: "+util.ReadGacError(err),
 		)
 		return
 	}
@@ -192,7 +194,7 @@ func (r *gacSettingsResource) Update(ctx context.Context, req resource.UpdateReq
 		resp.Diagnostics.AddError(
 			"Error updating settings configuration for service url: "+plan.ServiceUrl.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
+				"\nError message: "+util.ReadGacError(err),
 		)
 	}
 
@@ -233,7 +235,7 @@ func (r *gacSettingsResource) Delete(ctx context.Context, req resource.DeleteReq
 		resp.Diagnostics.AddError(
 			"Error deleting settings configuration for service url: "+state.ServiceUrl.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
+				"\nError message: "+util.ReadGacError(err),
 		)
 		return
 	}
@@ -253,7 +255,7 @@ func getSettingsConfiguration(ctx context.Context, client *citrixdaasclient.Citr
 		diagnostics.AddError(
 			"Error fetching settings configuration for service url: "+serviceUrl,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
+				"\nError message: "+util.ReadGacError(err),
 		)
 	}
 
@@ -375,6 +377,53 @@ func CreateCategorySettingsForWindows(ctx context.Context, diagnostics *diag.Dia
 			categorySetting.SetValue(windowsSetting.ValueString.ValueString())
 		} else if len(windowsSetting.ValueList.Elements()) > 0 {
 			categorySetting.SetValue(util.StringListToStringArray(ctx, diagnostics, windowsSetting.ValueList))
+		} else if len(windowsSetting.LocalAppAllowList.Elements()) > 0 {
+			var localAppAllowListGo []LocalAppAllowListModel_Go
+			localAppAllowList := util.ObjectListToTypedArray[LocalAppAllowListModel](ctx, diagnostics, windowsSetting.LocalAppAllowList)
+			for _, localApp := range localAppAllowList {
+				var localAppAllowListGoItem LocalAppAllowListModel_Go
+				ConvertStruct(localApp, &localAppAllowListGoItem)
+				localAppAllowListGo = append(localAppAllowListGo, localAppAllowListGoItem)
+			}
+			categorySetting.SetValue(localAppAllowListGo)
+		} else if !windowsSetting.EnterpriseBroswerSSO.IsNull() {
+			var enterpriseBrowserSSO CitrixEnterpriseBrowserModel_Go
+			browserModel := util.ObjectValueToTypedObject[CitrixEnterpriseBrowserModel](ctx, diagnostics, windowsSetting.EnterpriseBroswerSSO)
+			domains := util.StringListToStringArray(ctx, diagnostics, browserModel.CitrixEnterpriseBrowserSSODomains)
+			enterpriseBrowserSSO.CitrixEnterpriseBrowserSSOEnabled = browserModel.CitrixEnterpriseBrowserSSOEnabled.ValueBool()
+			enterpriseBrowserSSO.CitrixEnterpriseBrowserSSODomains = domains
+			categorySetting.SetValue(enterpriseBrowserSSO)
+		} else if !windowsSetting.ExtensionInstallAllowList.IsNull() {
+			var extensionInstallAllowListGo []ExtensionInstallAllowListModel_Go
+			extensionInstallAllowList := util.ObjectListToTypedArray[ExtensionInstallAllowListModel](ctx, diagnostics, windowsSetting.ExtensionInstallAllowList)
+			for _, extensionInstall := range extensionInstallAllowList {
+				var extensionInstallAllowListGoItem ExtensionInstallAllowListModel_Go
+				ConvertStruct(extensionInstall, &extensionInstallAllowListGoItem)
+				extensionInstallAllowListGo = append(extensionInstallAllowListGo, extensionInstallAllowListGoItem)
+			}
+			categorySetting.SetValue(extensionInstallAllowListGo)
+		} else if !windowsSetting.AutoLaunchProtocolsFromOrigins.IsNull() {
+			var autoLaunchProtocolsFromOriginsGo []AutoLaunchProtocolsFromOriginsModel_Go
+			autoLaunchProtocolsFromOriginsList := util.ObjectListToTypedArray[AutoLaunchProtocolsFromOriginsModel](ctx, diagnostics, windowsSetting.AutoLaunchProtocolsFromOrigins)
+			for _, autoLaunchProtocolsFromOrigins := range autoLaunchProtocolsFromOriginsList {
+				var autoLaunchProtocolItem AutoLaunchProtocolsFromOriginsModel_Go
+				autoLaunchProtocolItem.Protocol = autoLaunchProtocolsFromOrigins.Protocol.ValueString()
+				if !autoLaunchProtocolsFromOrigins.AllowedOrigins.IsNull() {
+					autoLaunchProtocolItem.AllowedOrigins = util.StringListToStringArray(ctx, diagnostics, autoLaunchProtocolsFromOrigins.AllowedOrigins)
+				}
+				autoLaunchProtocolsFromOriginsGo = append(autoLaunchProtocolsFromOriginsGo, autoLaunchProtocolItem)
+			}
+			categorySetting.SetValue(autoLaunchProtocolsFromOriginsGo)
+		} else if !windowsSetting.ManagedBookmarks.IsNull() {
+			var managedBookmarksGo []BookMarkValueModel_Go
+			managedBookmarksList := util.ObjectListToTypedArray[BookMarkValueModel](ctx, diagnostics, windowsSetting.ManagedBookmarks)
+			for _, managedBookmark := range managedBookmarksList {
+				var managedBookmarkItem BookMarkValueModel_Go
+				managedBookmarkItem.Name = managedBookmark.Name.ValueString()
+				managedBookmarkItem.Url = managedBookmark.Url.ValueString()
+				managedBookmarksGo = append(managedBookmarksGo, managedBookmarkItem)
+			}
+			categorySetting.SetValue(managedBookmarksGo)
 		}
 		categorySettings = append(categorySettings, categorySetting)
 	}
@@ -463,7 +512,46 @@ func CreateCategorySettingsForMacos(ctx context.Context, diagnostics *diag.Diagn
 			categorySetting.SetValue(macosSetting.ValueString.ValueString())
 		} else if len(macosSetting.ValueList.Elements()) > 0 {
 			categorySetting.SetValue(util.StringListToStringArray(ctx, diagnostics, macosSetting.ValueList))
+		} else if !macosSetting.AutoLaunchProtocolsFromOrigins.IsNull() {
+			var autoLaunchProtocolsFromOriginsGo []AutoLaunchProtocolsFromOriginsModel_Go
+			autoLaunchProtocolsFromOriginsList := util.ObjectListToTypedArray[AutoLaunchProtocolsFromOriginsModel](ctx, diagnostics, macosSetting.AutoLaunchProtocolsFromOrigins)
+			for _, autoLaunchProtocolsFromOrigins := range autoLaunchProtocolsFromOriginsList {
+				var autoLaunchProtocolItem AutoLaunchProtocolsFromOriginsModel_Go
+				autoLaunchProtocolItem.Protocol = autoLaunchProtocolsFromOrigins.Protocol.ValueString()
+				if !autoLaunchProtocolsFromOrigins.AllowedOrigins.IsNull() {
+					autoLaunchProtocolItem.AllowedOrigins = util.StringListToStringArray(ctx, diagnostics, autoLaunchProtocolsFromOrigins.AllowedOrigins)
+				}
+				autoLaunchProtocolsFromOriginsGo = append(autoLaunchProtocolsFromOriginsGo, autoLaunchProtocolItem)
+			}
+			categorySetting.SetValue(autoLaunchProtocolsFromOriginsGo)
+		} else if !macosSetting.EnterpriseBroswerSSO.IsNull() {
+			var enterpriseBrowserSSO CitrixEnterpriseBrowserModel_Go
+			browserModel := util.ObjectValueToTypedObject[CitrixEnterpriseBrowserModel](ctx, diagnostics, macosSetting.EnterpriseBroswerSSO)
+			domains := util.StringListToStringArray(ctx, diagnostics, browserModel.CitrixEnterpriseBrowserSSODomains)
+			enterpriseBrowserSSO.CitrixEnterpriseBrowserSSOEnabled = browserModel.CitrixEnterpriseBrowserSSOEnabled.ValueBool()
+			enterpriseBrowserSSO.CitrixEnterpriseBrowserSSODomains = domains
+			categorySetting.SetValue(enterpriseBrowserSSO)
+		} else if !macosSetting.ExtensionInstallAllowList.IsNull() {
+			var extensionInstallAllowListGo []ExtensionInstallAllowListModel_Go
+			extensionInstallAllowList := util.ObjectListToTypedArray[ExtensionInstallAllowListModel](ctx, diagnostics, macosSetting.ExtensionInstallAllowList)
+			for _, extensionInstall := range extensionInstallAllowList {
+				var extensionInstallAllowListGoItem ExtensionInstallAllowListModel_Go
+				ConvertStruct(extensionInstall, &extensionInstallAllowListGoItem)
+				extensionInstallAllowListGo = append(extensionInstallAllowListGo, extensionInstallAllowListGoItem)
+			}
+			categorySetting.SetValue(extensionInstallAllowListGo)
+		} else if !macosSetting.ManagedBookmarks.IsNull() {
+			var managedBookmarksGo []BookMarkValueModel_Go
+			managedBookmarksList := util.ObjectListToTypedArray[BookMarkValueModel](ctx, diagnostics, macosSetting.ManagedBookmarks)
+			for _, managedBookmark := range managedBookmarksList {
+				var managedBookmarkItem BookMarkValueModel_Go
+				managedBookmarkItem.Name = managedBookmark.Name.ValueString()
+				managedBookmarkItem.Url = managedBookmark.Url.ValueString()
+				managedBookmarksGo = append(managedBookmarksGo, managedBookmarkItem)
+			}
+			categorySetting.SetValue(managedBookmarksGo)
 		}
+
 		categorySettings = append(categorySettings, categorySetting)
 	}
 	return categorySettings
@@ -475,5 +563,45 @@ func (r *gacSettingsResource) ModifyPlan(ctx context.Context, req resource.Modif
 	if r.client != nil && r.client.GacClient == nil {
 		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
 		return
+	}
+}
+
+func (r *gacSettingsResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
+	var data GACSettingsResourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	appSettings := util.ObjectValueToTypedObject[AppSettings](ctx, &resp.Diagnostics, data.AppSettings)
+	if !appSettings.Windows.IsNull() && !appSettings.Windows.IsUnknown() {
+		windowsList := util.ObjectListToTypedArray[Windows](ctx, &resp.Diagnostics, appSettings.Windows)
+		for _, windowsInstance := range windowsList {
+			appSettings := util.ObjectListToTypedArray[WindowsSettings](ctx, &resp.Diagnostics, windowsInstance.Settings)
+			for _, appSetting := range appSettings {
+				if appSetting.LocalAppAllowList.IsNull() && appSetting.EnterpriseBroswerSSO.IsNull() && appSetting.ExtensionInstallAllowList.IsNull() && appSetting.ValueList.IsNull() && appSetting.ValueString.IsNull() && appSetting.AutoLaunchProtocolsFromOrigins.IsNull() && appSetting.ManagedBookmarks.IsNull() {
+					resp.Diagnostics.AddError("Error in Windows Settings", "At least one value should be specified for Windows Settings")
+				}
+			}
+		}
+
+		if !appSettings.Macos.IsNull() && !appSettings.Macos.IsUnknown() {
+			macosList := util.ObjectListToTypedArray[Macos](ctx, &resp.Diagnostics, appSettings.Macos)
+			for _, macosInstance := range macosList {
+				appSettings := util.ObjectListToTypedArray[MacosSettings](ctx, &resp.Diagnostics, macosInstance.Settings)
+				for _, appSetting := range appSettings {
+					if appSetting.EnterpriseBroswerSSO.IsNull() && appSetting.ExtensionInstallAllowList.IsNull() && appSetting.ValueList.IsNull() && appSetting.ValueString.IsNull() && appSetting.AutoLaunchProtocolsFromOrigins.IsNull() && appSetting.ManagedBookmarks.IsNull() {
+						resp.Diagnostics.AddError("Error in MacOs Settings", "At least one value should be specified for Windows Settings")
+					}
+				}
+			}
+
+			schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+			tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
+		}
+
 	}
 }

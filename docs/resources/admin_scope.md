@@ -29,6 +29,7 @@ resource "citrix_admin_scope" "example-admin-scope" {
 ### Optional
 
 - `description` (String) Description of the admin scope.
+- `is_tenant_scope` (Boolean) Indicates whether the admin scope is a tenant scope. Defaults to `false`.
 
 ### Read-Only
 

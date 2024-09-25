@@ -104,9 +104,11 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 	if err != nil {
 		return
 	}
+	machineCatalogPath := strings.ReplaceAll(plan.MachineCatalogFolderPath.ValueString(), "\\", "|") + plan.Name.ValueString()
+
+	setMachineCatalogTags(ctx, &resp.Diagnostics, r.client, machineCatalogPath, plan.Tags)
 
 	// Get the new catalog
-	machineCatalogPath := strings.ReplaceAll(plan.MachineCatalogFolderPath.ValueString(), "\\", "|") + plan.Name.ValueString()
 	catalog, err := util.GetMachineCatalog(ctx, r.client, &resp.Diagnostics, machineCatalogPath, true)
 
 	if err != nil {
@@ -133,8 +135,10 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 		pluginId = hypervisor.GetPluginId()
 	}
 
+	tags := getMachineCatalogTags(ctx, &resp.Diagnostics, r.client, catalog.GetId())
+
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, catalog, &connectionType, machines, pluginId)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, catalog, &connectionType, machines, pluginId, tags)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -185,8 +189,11 @@ func (r *machineCatalogResource) Read(ctx context.Context, req resource.ReadRequ
 		connectionType = hypervisor.GetConnectionType().Ptr()
 		pluginId = hypervisor.GetPluginId()
 	}
+
+	tags := getMachineCatalogTags(ctx, &resp.Diagnostics, r.client, catalog.GetId())
+
 	// Overwrite items with refreshed state
-	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, catalog, connectionType, machineCatalogMachines, pluginId)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, catalog, connectionType, machineCatalogMachines, pluginId, tags)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -282,6 +289,8 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		}
 	}
 
+	setMachineCatalogTags(ctx, &resp.Diagnostics, r.client, catalogId, plan.Tags)
+
 	// Fetch updated machine catalog from GetMachineCatalog.
 	catalog, err = util.GetMachineCatalog(ctx, r.client, &resp.Diagnostics, catalogId, true)
 	if err != nil {
@@ -307,8 +316,10 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		pluginId = hypervisor.GetPluginId()
 	}
 
+	tags := getMachineCatalogTags(ctx, &resp.Diagnostics, r.client, catalogId)
+
 	// Update resource state with updated items and timestamp
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, catalog, &connectionType, machines, pluginId)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, catalog, &connectionType, machines, pluginId, tags)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -453,6 +464,24 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 			if !provSchemeModel.AzureMachineConfig.IsNull() {
 				azureMachineConfigModel := util.ObjectValueToTypedObject[AzureMachineConfigModel](ctx, &resp.Diagnostics, provSchemeModel.AzureMachineConfig)
 				// Validate Azure Machine Config
+				// Validate Azure Master Image
+				if !azureMachineConfigModel.AzureMasterImage.IsUnknown() && azureMachineConfigModel.AzureMasterImage.IsNull() {
+					resp.Diagnostics.AddAttributeError(
+						path.Root("azure_master_image"),
+						"Missing Attribute Configuration",
+						fmt.Sprintf("Expected azure_master_image to be configured when provisioning_type is %s.", provisioningTypeMcs),
+					)
+				}
+
+				// Validate Azure PVS Configuration
+				if !azureMachineConfigModel.AzurePvsConfiguration.IsNull() {
+					resp.Diagnostics.AddAttributeError(
+						path.Root("azure_pvs_config"),
+						"Incorrect Attribute Configuration",
+						fmt.Sprintf("azure_pvs_config is not supported when provisioning_type is %s.", provisioningTypeMcs),
+					)
+				}
+
 				if !azureMachineConfigModel.WritebackCache.IsNull() {
 					// Validate Writeback Cache
 					azureWbcModel := util.ObjectValueToTypedObject[AzureWritebackCacheModel](ctx, &resp.Diagnostics, azureMachineConfigModel.WritebackCache)
@@ -860,34 +889,6 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 
 	if r.client != nil && r.client.ApiClient == nil {
 		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
-		return
-	}
-
-	if req.Plan.Raw.IsNull() {
-		// Machine Catalog no longer exist in plan, or executing import / delete operation
-		// No need to modify plan
-		return
-	}
-
-	// Plan is not null. Check if the resource is being created or updated
-	create := req.State.Raw.IsNull()
-	operation := "updating"
-	if create {
-		operation = "creating"
-	}
-
-	var plan MachineCatalogResourceModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	if !r.client.ClientConfig.IsCspCustomer && !plan.Tenants.IsNull() {
-		resp.Diagnostics.AddError(
-			"Error "+operation+" Machine Catalog "+plan.Name.ValueString(),
-			"`tenants` attribute can only be set for Citrix Service Provider customer.",
-		)
 		return
 	}
 }

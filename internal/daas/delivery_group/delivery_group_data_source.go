@@ -83,7 +83,9 @@ func (d *DeliveryGroupDataSource) Read(ctx context.Context, req datasource.ReadR
 		)
 	}
 
-	data = data.RefreshPropertyValues(deliveryGroup, deliveryGroupVdas)
+	tags := getDeliveryGroupTags(ctx, &resp.Diagnostics, d.client, deliveryGroupName)
+
+	data = data.RefreshPropertyValues(ctx, &resp.Diagnostics, deliveryGroup, deliveryGroupVdas, tags)
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

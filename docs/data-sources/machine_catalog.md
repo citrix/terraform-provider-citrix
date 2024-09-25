@@ -32,6 +32,8 @@ data "citrix_machine_catalog" "example_machine_catalog" {
 ### Read-Only
 
 - `id` (String) GUID identifier of the machine catalog.
+- `tags` (Set of String) A set of identifiers of tags to associate with the machine catalog.
+- `tenants` (Set of String) A set of identifiers of tenants to associate with the machine catalog.
 - `vdas` (Attributes List) The VDAs associated with the machine catalog. (see [below for nested schema](#nestedatt--vdas))
 
 <a id="nestedatt--vdas"></a>

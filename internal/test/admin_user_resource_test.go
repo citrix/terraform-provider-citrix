@@ -3,12 +3,35 @@
 package test
 
 import (
+	"context"
 	"fmt"
+	"log"
+	"net/http"
 	"os"
 	"testing"
 
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
+
+func init() {
+	resource.AddTestSweepers("citrix_admin_user", &resource.Sweeper{
+		Name: "citrix_admin_user",
+		F: func(hypervisor string) error {
+			ctx := context.Background()
+			client := sharedClientForSweepers(ctx)
+			if client.ClientConfig.CustomerId != "CitrixOnPremises" {
+				// Admin user is not supported for cloud customers
+				return nil
+			}
+
+			adminUserName := os.Getenv("TEST_ADMIN_USER_NAME")
+			err := adminUserSweeper(ctx, adminUserName, client)
+			return err
+		},
+	})
+}
 
 func TestAdminUserPreCheck(t *testing.T) {
 	if name := os.Getenv("TEST_ADMIN_USER_NAME"); name == "" {
@@ -151,4 +174,23 @@ func BuildAdminUserResource(t *testing.T, adminUser string) string {
 	adminName := os.Getenv("TEST_ADMIN_USER_NAME")
 	adminDomain := os.Getenv("TEST_ADMIN_USER_DOMAIN")
 	return fmt.Sprintf(adminUser, adminName, adminDomain)
+}
+
+func adminUserSweeper(ctx context.Context, adminUserName string, client *citrixclient.CitrixDaasClient) error {
+	getAdminUserRequest := client.ApiClient.AdminAPIsDAAS.AdminGetAdminAdministrator(ctx, adminUserName)
+	adminUser, httpResp, err := citrixclient.ExecuteWithRetry[*citrixorchestration.AdministratorResponseModel](getAdminUserRequest, client)
+	if err != nil {
+		if httpResp.StatusCode == http.StatusNotFound {
+			// Resource does not exist in remote, no need to delete
+			return nil
+		}
+		return fmt.Errorf("Error getting admin user: %s", err)
+	}
+	userDetails := adminUser.GetUser()
+	deleteAdminUserRequest := client.ApiClient.AdminAPIsDAAS.AdminDeleteAdminAdministrator(ctx, userDetails.GetSid())
+	httpResp, err = citrixclient.AddRequestData(deleteAdminUserRequest, client).Execute()
+	if err != nil && httpResp.StatusCode != http.StatusNotFound {
+		log.Printf("Error destroying %s during sweep: %s", adminUserName, err)
+	}
+	return nil
 }

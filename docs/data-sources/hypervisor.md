@@ -29,3 +29,4 @@ data "citrix_hypervisor" "azure-hypervisor" {
 ### Read-Only
 
 - `id` (String) GUID identifier of the hypervisor.
+- `tenants` (Set of String) A set of identifiers of tenants to associate with the hypervisor connection.

@@ -3,12 +3,32 @@
 package test
 
 import (
+	"context"
 	"fmt"
+	"log"
+	"net/http"
 	"os"
 	"testing"
 
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
+
+func init() {
+	resource.AddTestSweepers("citrix_admin_scope", &resource.Sweeper{
+		Name: "citrix_admin_scope",
+		F: func(hypervisor string) error {
+			ctx := context.Background()
+			client := sharedClientForSweepers(ctx)
+
+			adminScopeName := os.Getenv("TEST_ADMIN_SCOPE_NAME")
+			err := adminScopeSweeper(ctx, adminScopeName, client)
+			return err
+		},
+		Dependencies: []string{"citrix_admin_user"},
+	})
+}
 
 // TestAdminScopeResourcePreCheck validates the necessary env variable exist
 // in the testing environment
@@ -78,4 +98,22 @@ var (
 
 func BuildAdminScopeResource(t *testing.T, adminScope string) string {
 	return fmt.Sprintf(adminScope, os.Getenv("TEST_ADMIN_SCOPE_NAME"))
+}
+
+func adminScopeSweeper(ctx context.Context, adminScopeName string, client *citrixclient.CitrixDaasClient) error {
+	getAdminScopeRequest := client.ApiClient.AdminAPIsDAAS.AdminGetAdminScope(ctx, adminScopeName)
+	adminScope, httpResp, err := citrixclient.ExecuteWithRetry[*citrixorchestration.ScopeResponseModel](getAdminScopeRequest, client)
+	if err != nil {
+		if httpResp.StatusCode == http.StatusNotFound {
+			// Resource does not exist in remote, no need to delete
+			return nil
+		}
+		return fmt.Errorf("Error getting admin scope: %s", err)
+	}
+	deleteAdminScopeRequest := client.ApiClient.AdminAPIsDAAS.AdminDeleteAdminScope(ctx, adminScope.GetId())
+	httpResp, err = citrixclient.AddRequestData(deleteAdminScopeRequest, client).Execute()
+	if err != nil && httpResp.StatusCode != http.StatusNotFound {
+		log.Printf("Error destroying %s during sweep: %s", adminScopeName, err)
+	}
+	return nil
 }

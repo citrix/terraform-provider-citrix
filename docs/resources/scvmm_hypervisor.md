@@ -50,6 +50,7 @@ resource "citrix_scvmm_hypervisor" "example-scvmm-hypervisor" {
 ### Read-Only
 
 - `id` (String) GUID identifier of the hypervisor.
+- `tenants` (Set of String) A set of identifiers of tenants to associate with the hypervisor connection.
 
 <a id="nestedatt--metadata"></a>
 ### Nested Schema for `metadata`

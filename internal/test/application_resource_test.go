@@ -1,12 +1,31 @@
 package test
 
 import (
+	"context"
 	"fmt"
+	"log"
+	"net/http"
 	"os"
 	"testing"
 
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
+
+func init() {
+	resource.AddTestSweepers("citrix_application", &resource.Sweeper{
+		Name: "citrix_application",
+		F: func(hypervisor string) error {
+			ctx := context.Background()
+			client := sharedClientForSweepers(ctx)
+
+			appName := os.Getenv("TEST_APP_NAME")
+			err := applicationSweeper(ctx, appName, client)
+			return err
+		},
+	})
+}
 
 // TestApplicationResourcePreCheck validates the necessary env variable exist
 // in the testing environment
@@ -224,4 +243,22 @@ resource "citrix_application" "testApplication" {
 func BuildApplicationResource(t *testing.T, applicationResource string) string {
 	name := os.Getenv("TEST_APP_NAME")
 	return fmt.Sprintf(applicationResource, name)
+}
+
+func applicationSweeper(ctx context.Context, appName string, client *citrixclient.CitrixDaasClient) error {
+	getApplicationRequest := client.ApiClient.ApplicationsAPIsDAAS.ApplicationsGetApplication(ctx, appName)
+	application, httpResp, err := citrixclient.ExecuteWithRetry[*citrixorchestration.ApplicationDetailResponseModel](getApplicationRequest, client)
+	if err != nil {
+		if httpResp.StatusCode == http.StatusNotFound {
+			// Resource does not exist in remote, no need to delete
+			return nil
+		}
+		return fmt.Errorf("Error getting application: %s", err)
+	}
+	deleteApplicationRequest := client.ApiClient.ApplicationsAPIsDAAS.ApplicationsDeleteApplication(ctx, application.GetId())
+	httpResp, err = citrixclient.AddRequestData(deleteApplicationRequest, client).Execute()
+	if err != nil && httpResp.StatusCode != http.StatusNotFound {
+		log.Printf("Error destroying %s during sweep: %s", appName, err)
+	}
+	return nil
 }

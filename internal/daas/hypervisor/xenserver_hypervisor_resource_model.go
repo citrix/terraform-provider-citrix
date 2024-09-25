@@ -32,6 +32,7 @@ type XenserverHypervisorResourceModel struct {
 	Zone     types.String `tfsdk:"zone"`
 	Scopes   types.Set    `tfsdk:"scopes"`   // Set[string]
 	Metadata types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
+	Tenants  types.Set    `tfsdk:"tenants"`  // Set[string]
 	/** Xenserver Connection **/
 	Username                            types.String `tfsdk:"username"`
 	Password                            types.String `tfsdk:"password"`
@@ -100,7 +101,7 @@ func (XenserverHypervisorResourceModel) GetSchema() schema.Schema {
 			},
 			"ssl_thumbprints": schema.ListAttribute{
 				ElementType: types.StringType,
-				Description: "SSL certificate thumbprints to consider acceptable for this connection.  If not specified, and the hypervisor uses SSL for its connection, the SSL certificate's root certification authority and any intermediate certificates must be trusted.",
+				Description: "SSL certificate thumbprints to consider acceptable for this connection. If not specified, and the hypervisor uses SSL for its connection, the SSL certificate's root certification authority and any intermediate certificates must be trusted.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.RequiresReplace(),
@@ -154,6 +155,11 @@ func (XenserverHypervisorResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"metadata": util.GetMetadataListSchema("Hypervisor"),
+			"tenants": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "A set of identifiers of tenants to associate with the hypervisor connection.",
+				Computed:    true,
+			},
 		},
 	}
 }
@@ -188,6 +194,8 @@ func (r XenserverHypervisorResourceModel) RefreshPropertyValues(ctx context.Cont
 	} else {
 		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
 	}
+
+	r.Tenants = util.RefreshTenantSet(ctx, diagnostics, hypervisor.GetTenants())
 
 	hypZone := hypervisor.GetZone()
 	r.Zone = types.StringValue(hypZone.GetId())
