@@ -72,7 +72,7 @@ func (d *HypervisorDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		)
 	}
 
-	data = data.RefreshPropertyValues(hypervisor)
+	data = data.RefreshPropertyValues(ctx, &resp.Diagnostics, hypervisor)
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

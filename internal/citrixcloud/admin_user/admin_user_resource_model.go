@@ -4,6 +4,7 @@ package cc_admin_user
 
 import (
 	"context"
+	"regexp"
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/ccadmins"
@@ -22,15 +23,17 @@ import (
 
 // CCAdminUserResourceModel maps the resource schema data.
 type CCAdminUserResourceModel struct {
-	AdminId      types.String `tfsdk:"admin_id"`
-	AccessType   types.String `tfsdk:"access_type"`
-	DisplayName  types.String `tfsdk:"display_name"`
-	Email        types.String `tfsdk:"email"`
-	FirstName    types.String `tfsdk:"first_name"`
-	LastName     types.String `tfsdk:"last_name"`
-	ProviderType types.String `tfsdk:"provider_type"`
-	Type         types.String `tfsdk:"type"`
-	Policies     types.List   `tfsdk:"policies"` // List[CCAdminPolicyResourceModel]
+	AdminId            types.String `tfsdk:"admin_id"`
+	AccessType         types.String `tfsdk:"access_type"`
+	DisplayName        types.String `tfsdk:"display_name"`
+	Email              types.String `tfsdk:"email"`
+	FirstName          types.String `tfsdk:"first_name"`
+	LastName           types.String `tfsdk:"last_name"`
+	ProviderType       types.String `tfsdk:"provider_type"`
+	Type               types.String `tfsdk:"type"`
+	Policies           types.List   `tfsdk:"policies"` // List[CCAdminPolicyResourceModel]
+	ExternalProviderId types.String `tfsdk:"external_provider_id"`
+	ExternalUserId     types.String `tfsdk:"external_user_id"`
 }
 
 var _ util.RefreshableListItemWithAttributes[ccadmins.AdministratorAccessPolicyModel] = CCAdminPolicyResourceModel{}
@@ -106,10 +109,13 @@ func (CCAdminUserResourceModel) GetSchema() schema.Schema {
 			"display_name": schema.StringAttribute{
 				Description: "Display name for the user.",
 				Optional:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"email": schema.StringAttribute{
 				Description: "Email of the user where the invitation link will be sent.",
-				Required:    true,
+				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -117,27 +123,42 @@ func (CCAdminUserResourceModel) GetSchema() schema.Schema {
 			"first_name": schema.StringAttribute{
 				Description: "First name of the user.",
 				Optional:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"last_name": schema.StringAttribute{
 				Description: "Last name of the user.",
 				Optional:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"provider_type": schema.StringAttribute{
-				Description: "Identity provider for the administrator or group you want to add. Currently, this attribute can be set to `CitrixSTS`",
+				Description: "Identity provider for the administrator or group you want to add. Currently, this attribute can be set to `CitrixSTS`,`AzureAd` or `Ad`.",
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.OneOf(
 						string(ccadmins.ADMINISTRATORPROVIDERTYPE_CITRIX_STS),
+						string(ccadmins.ADMINISTRATORPROVIDERTYPE_AZURE_AD),
+						string(ccadmins.ADMINISTRATOREXTERNALPROVIDERTYPE_AD),
 					),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"type": schema.StringAttribute{
-				Description: "Type of administrator being added. Currently, this attribute can only be set to `AdministratorUser`.",
+				Description: "Type of administrator being added. Currently, this attribute can be set to `AdministratorUser` or `AdministratorGroup`. Note: `AdministratorGroup` is only supported for `AzureAd` and `Ad` provider type.",
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.OneOf(
 						string(ccadmins.ADMINISTRATORTYPE_ADMINISTRATOR_USER),
+						string(ccadmins.ADMINISTRATORTYPE_ADMINISTRATOR_GROUP),
 					),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"policies": schema.ListNestedAttribute{
@@ -146,6 +167,25 @@ func (CCAdminUserResourceModel) GetSchema() schema.Schema {
 				NestedObject: CCAdminPolicyResourceModel{}.GetSchema(),
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
+				},
+			},
+			"external_provider_id": schema.StringAttribute{
+				Description: " External provider Id for directory. For `AzureAd`, specify the external tenant ID. For `Ad`, specify the AD domain name in FQDN format (e.g., MyDomain.com)",
+				Optional:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"external_user_id": schema.StringAttribute{
+				Description: "External objectId for user or group from the directory",
+				Optional:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+				Validators: []validator.String{
+					validator.String(
+						stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
+					),
 				},
 			},
 		},
@@ -157,10 +197,19 @@ func (CCAdminUserResourceModel) GetAttributes() map[string]schema.Attribute {
 }
 
 func (r CCAdminUserResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, adminUser ccadmins.AdministratorResult) CCAdminUserResourceModel {
-	r.AdminId = types.StringValue(adminUser.GetUserId())
 	r.AccessType = types.StringValue(string(adminUser.GetAccessType()))
 	r.Type = types.StringValue(string(adminUser.GetType()))
-	r.ProviderType = types.StringValue(string(adminUser.GetProviderType()))
+
+	// Set the admin id based on the type of the admin user
+	if r.Type.ValueString() == string(ccadmins.ADMINISTRATORTYPE_ADMINISTRATOR_GROUP) {
+		r.AdminId = types.StringValue(adminUser.GetUcOid())
+	} else {
+		r.AdminId = types.StringValue(adminUser.GetUserId())
+	}
+
+	if !providerTypeExists(adminUser.GetLegacyProviders(), r.ProviderType.ValueString()) {
+		r.ProviderType = types.StringValue(string(adminUser.GetProviderType()))
+	}
 
 	if !strings.EqualFold(r.Email.ValueString(), adminUser.GetEmail()) {
 		r.Email = types.StringValue(adminUser.GetEmail())
@@ -174,6 +223,14 @@ func (r CCAdminUserResourceModel) RefreshPropertyValues(ctx context.Context, dia
 	}
 	if !r.LastName.IsNull() {
 		r.LastName = types.StringValue(adminUser.GetLastName())
+	}
+
+	if !r.ExternalProviderId.IsNull() {
+		r.ExternalProviderId = types.StringValue(adminUser.GetProviderId())
+	}
+
+	if !r.ExternalUserId.IsNull() {
+		r.ExternalUserId = types.StringValue(getExternalUserId(adminUser.GetExternalOid()))
 	}
 	return r
 }

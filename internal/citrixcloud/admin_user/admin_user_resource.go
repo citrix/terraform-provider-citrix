@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 
 	ccadmins "github.com/citrix/citrix-daas-rest-go/ccadmins"
@@ -71,8 +72,18 @@ func (r *ccAdminUserResource) Create(ctx context.Context, req resource.CreateReq
 	// Generate API request body from plan
 	var body ccadmins.CreateAdministratorInputModel
 	body.SetType(plan.Type.ValueString())
-	body.SetAccessType(plan.AccessType.ValueString())
-	body.SetEmail(plan.Email.ValueString())
+	adminAccessType, err := getAdminAccessType(plan.AccessType.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid access type",
+			"Error message: "+err.Error())
+		return
+	}
+	body.SetAccessType(adminAccessType)
+
+	if !plan.Email.IsNull() {
+		body.SetEmail(plan.Email.ValueString())
+	}
+
 	adminProviderType, err := getAdminProviderType(plan.ProviderType.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -90,6 +101,12 @@ func (r *ccAdminUserResource) Create(ctx context.Context, req resource.CreateReq
 	}
 	if !plan.DisplayName.IsNull() {
 		body.SetDisplayName(plan.DisplayName.ValueString())
+	}
+	if !plan.ExternalProviderId.IsNull() {
+		body.SetExternalProviderId(plan.ExternalProviderId.ValueString())
+	}
+	if !plan.ExternalUserId.IsNull() {
+		body.SetExternalUserId(plan.ExternalUserId.ValueString())
 	}
 
 	// Add policies to the admin user
@@ -109,7 +126,7 @@ func (r *ccAdminUserResource) Create(ctx context.Context, req resource.CreateReq
 	//In case of error, add it to diagnostics and return
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error creating admin with email: "+plan.Email.ValueString(),
+			"Error creating admin "+plan.Email.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
@@ -167,8 +184,8 @@ func (r *ccAdminUserResource) Read(ctx context.Context, req resource.ReadRequest
 	adminUser, err = getAdminUser(ctx, r.client, state)
 	if err != nil {
 		resp.Diagnostics.AddWarning(
-			fmt.Sprintf("Admin user with email: %s not found", state.Email.ValueString()),
-			fmt.Sprintf("Admin user: %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", state.Email.ValueString()),
+			fmt.Sprintf("Admin user with id: %s not found", state.AdminId.ValueString()),
+			fmt.Sprintf("Admin user: %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", state.AdminId.ValueString()),
 		)
 		// Remove from state
 		resp.State.RemoveResource(ctx)
@@ -182,7 +199,7 @@ func (r *ccAdminUserResource) Read(ctx context.Context, req resource.ReadRequest
 		adminId := state.AdminId.ValueString()
 		accessPolicies, err := getAccessPolicies(ctx, r.client, adminId)
 		if err != nil {
-			resp.Diagnostics.AddError("Error getting access policies for user "+state.Email.ValueString(),
+			resp.Diagnostics.AddError("Error getting access policies for user "+state.AdminId.ValueString(),
 				"\nError message: "+util.ReadClientError(err))
 			return
 		}
@@ -272,7 +289,7 @@ func (r *ccAdminUserResource) Update(ctx context.Context, req resource.UpdateReq
 	httpResp, err := citrixdaasclient.AddRequestData(updateAdminUserRequest, r.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error updating policies for "+plan.Email.ValueString(),
+			"Error updating policies for "+plan.AdminId.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
@@ -305,7 +322,7 @@ func (r *ccAdminUserResource) Delete(ctx context.Context, req resource.DeleteReq
 	}
 
 	// Check if the user has accepted the invitation if not delete the invitation
-	if !isInvitationAccepted(state) {
+	if !isInvitationAccepted(state) && state.Email.ValueString() != "" {
 		deleteAdminInvitationRequest := r.client.CCAdminsClient.AdministratorsAPI.DeleteInvitation(ctx)
 		deleteAdminInvitationRequest = deleteAdminInvitationRequest.CitrixCustomerId(r.client.ClientConfig.CustomerId)
 		deleteAdminInvitationRequest = deleteAdminInvitationRequest.Email(state.Email.ValueString())
@@ -324,7 +341,7 @@ func (r *ccAdminUserResource) Delete(ctx context.Context, req resource.DeleteReq
 		httpResp, err := citrixdaasclient.AddRequestData(deleteAdminUserRequest, r.client).Execute()
 		if err != nil && httpResp.StatusCode != http.StatusNotFound {
 			resp.Diagnostics.AddError(
-				"Error deleting admin user with email: "+state.Email.ValueString(),
+				"Error deleting admin user with id: "+state.AdminId.ValueString(),
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadClientError(err),
 			)
@@ -359,6 +376,78 @@ func (r *ccAdminUserResource) ValidateConfig(ctx context.Context, req resource.V
 		resp.Diagnostics.AddError(
 			"Error validating policies",
 			"Policies are required to be set for access type Custom",
+		)
+		return
+	}
+
+	if data.Type.ValueString() == string(ccadmins.ADMINISTRATORTYPE_ADMINISTRATOR_USER) {
+
+		if !data.Email.IsUnknown() && data.Email.IsNull() {
+			resp.Diagnostics.AddError(
+				"Error validating email",
+				"Email is required for Administrator type User",
+			)
+			return
+		}
+
+		// TODO: Implement validation for the provider type field when set to 'AzureAd' for users, pending API support.
+		if data.ProviderType.ValueString() != string(ccadmins.ADMINISTRATORPROVIDERTYPE_CITRIX_STS) {
+			resp.Diagnostics.AddError(
+				"Error validating provider type",
+				"Provider type should be CitrixSts for Administrator type User",
+			)
+			return
+		}
+
+		if !data.ExternalProviderId.IsNull() || !data.ExternalUserId.IsNull() {
+			resp.Diagnostics.AddError(
+				"Error validating external provider id and external user id",
+				"Administrator type User does not require external provider id and external user id",
+			)
+			return
+		}
+	}
+
+	if data.Type.ValueString() == string(ccadmins.ADMINISTRATORTYPE_ADMINISTRATOR_GROUP) {
+
+		if !data.Email.IsNull() {
+			resp.Diagnostics.AddError(
+				"Error validating email",
+				"Email is not supported for Administrator Groups",
+			)
+			return
+		}
+
+		// TODO: Remove this once https://updates.cloud.com/details/cc50882/ is completed
+		if data.AccessType.ValueString() != string(ccadmins.ADMINISTRATORACCESSTYPE_CUSTOM) {
+			resp.Diagnostics.AddError(
+				"Error validating access type",
+				"Access type should be Custom for Administrator type Group",
+			)
+			return
+		}
+	}
+
+	if (data.ProviderType.ValueString() == string(ccadmins.ADMINISTRATORPROVIDERTYPE_AZURE_AD) || data.ProviderType.ValueString() == string(ccadmins.ADMINISTRATOREXTERNALPROVIDERTYPE_AD)) && !data.ExternalProviderId.IsUnknown() && !data.ExternalUserId.IsUnknown() && (data.ExternalProviderId.IsNull() || data.ExternalUserId.IsNull()) {
+		resp.Diagnostics.AddError(
+			"Error validating provider type",
+			"External provider id and external user id are required for provider type Azure AD and AD",
+		)
+		return
+	}
+
+	if data.ProviderType.ValueString() == string(ccadmins.ADMINISTRATORPROVIDERTYPE_AZURE_AD) && !regexp.MustCompile(util.GuidRegex).MatchString(data.ExternalProviderId.ValueString()) {
+		resp.Diagnostics.AddError(
+			"Error validating external provider id",
+			"The external provider ID for AzureAd must be a valid GUID",
+		)
+		return
+	}
+
+	if data.ProviderType.ValueString() == string(ccadmins.ADMINISTRATORPROVIDERTYPE_AD) && !regexp.MustCompile(util.DomainFqdnRegex).MatchString(data.ExternalProviderId.ValueString()) {
+		resp.Diagnostics.AddError(
+			"Error validating external provider id",
+			"The external provider ID for AD must be in FQDN format",
 		)
 		return
 	}

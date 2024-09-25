@@ -238,8 +238,52 @@ Required:
 
 Optional:
 
+- `auto_launch_protocols_from_origins` (Attributes List) Specify a list of protocols that can launch an external application from the listed origins without prompting the user. (see [below for nested schema](#nestedatt--app_settings--macos--settings--auto_launch_protocols_from_origins))
+- `enterprise_browser_sso` (Attributes) Enables Single Sign-on (SSO) for all the web and SaaS apps for the selected Operating System for the IdP domains added as long as the same IdP is used to sign in to the Citrix Workspace app and the relevant web or SaaS app. (see [below for nested schema](#nestedatt--app_settings--macos--settings--enterprise_browser_sso))
+- `extension_install_allow_list` (Attributes List) Array of objects of type ExtensionInstallAllowlist. For example: {id:"extension_id1",name:"extension_name1",install link:"chrome store url for the extension"} (see [below for nested schema](#nestedatt--app_settings--macos--settings--extension_install_allow_list))
+- `managed_bookmarks` (Attributes List) Array of objects of type ManagedBookmarks. For example: {name:"bookmark_name1",url:"bookmark_url1"} (see [below for nested schema](#nestedatt--app_settings--macos--settings--managed_bookmarks))
 - `value_list` (List of String) List value (if any) associated with the setting.
 - `value_string` (String) String value (if any) associated with the setting.
+
+<a id="nestedatt--app_settings--macos--settings--auto_launch_protocols_from_origins"></a>
+### Nested Schema for `app_settings.macos.settings.value_string`
+
+Required:
+
+- `protocol` (String) Auto launch protocol
+
+Optional:
+
+- `allowed_origins` (List of String) List of origins urls
+
+
+<a id="nestedatt--app_settings--macos--settings--enterprise_browser_sso"></a>
+### Nested Schema for `app_settings.macos.settings.value_string`
+
+Required:
+
+- `citrix_enterprise_browser_sso_domains` (List of String) List of IdP domains for which SSO is enabled.
+- `citrix_enterprise_browser_sso_enabled` (Boolean) Enables Single Sign-on (SSO) for all the web and SaaS apps.
+
+
+<a id="nestedatt--app_settings--macos--settings--extension_install_allow_list"></a>
+### Nested Schema for `app_settings.macos.settings.value_string`
+
+Required:
+
+- `id` (String) Id of the allowed extensions.
+- `install_link` (String) Install link for the allowed extensions.
+- `name` (String) Name of the allowed extensions.
+
+
+<a id="nestedatt--app_settings--macos--settings--managed_bookmarks"></a>
+### Nested Schema for `app_settings.macos.settings.value_string`
+
+Required:
+
+- `name` (String) Name for the bookmark
+- `url` (String) URL for the bookmark
+
 
 
 
@@ -261,8 +305,62 @@ Required:
 
 Optional:
 
+- `auto_launch_protocols_from_origins` (Attributes List) A list of protocols that can launch an external application from the listed origins without prompting the user. (see [below for nested schema](#nestedatt--app_settings--windows--settings--auto_launch_protocols_from_origins))
+- `enterprise_browser_sso` (Attributes) Enables Single Sign-on (SSO) for all the web and SaaS apps for the selected Operating System for the IdP domains added as long as the same IdP is used to sign in to the Citrix Workspace app and the relevant web or SaaS app. (see [below for nested schema](#nestedatt--app_settings--windows--settings--enterprise_browser_sso))
+- `extension_install_allow_list` (Attributes List) An allowed list of extensions that users can add to the Citrix Enterprise Browser. This list uses the Chrome Web Store. (see [below for nested schema](#nestedatt--app_settings--windows--settings--extension_install_allow_list))
+- `local_app_allow_list` (Attributes List) List of App Object to allow list for Local App Discovery. (see [below for nested schema](#nestedatt--app_settings--windows--settings--local_app_allow_list))
+- `managed_bookmarks` (Attributes List) A list of bookmarks to push to the Citrix Enterprise Browser. (see [below for nested schema](#nestedatt--app_settings--windows--settings--managed_bookmarks))
 - `value_list` (List of String) List value (if any) associated with the setting.
 - `value_string` (String) String value (if any) associated with the setting.
+
+<a id="nestedatt--app_settings--windows--settings--auto_launch_protocols_from_origins"></a>
+### Nested Schema for `app_settings.windows.settings.value_string`
+
+Required:
+
+- `protocol` (String) Auto launch protocol
+
+Optional:
+
+- `allowed_origins` (List of String) List of origins urls
+
+
+<a id="nestedatt--app_settings--windows--settings--enterprise_browser_sso"></a>
+### Nested Schema for `app_settings.windows.settings.value_string`
+
+Required:
+
+- `citrix_enterprise_browser_sso_domains` (List of String) List of IdP domains for which SSO is enabled.
+- `citrix_enterprise_browser_sso_enabled` (Boolean) Enables Single Sign-on (SSO) for all the web and SaaS apps.
+
+
+<a id="nestedatt--app_settings--windows--settings--extension_install_allow_list"></a>
+### Nested Schema for `app_settings.windows.settings.value_string`
+
+Required:
+
+- `id` (String) Id of the allowed extensions.
+- `install_link` (String) Install link for the allowed extensions.
+- `name` (String) Name of the allowed extensions.
+
+
+<a id="nestedatt--app_settings--windows--settings--local_app_allow_list"></a>
+### Nested Schema for `app_settings.windows.settings.value_string`
+
+Required:
+
+- `arguments` (String) Arguments for Local App Discovery.
+- `name` (String) Name for Local App Discovery.
+- `path` (String) Path for Local App Discovery.
+
+
+<a id="nestedatt--app_settings--windows--settings--managed_bookmarks"></a>
+### Nested Schema for `app_settings.windows.settings.value_string`
+
+Required:
+
+- `name` (String) Name for the bookmark
+- `url` (String) URL for the bookmark
 
 ## Import
 

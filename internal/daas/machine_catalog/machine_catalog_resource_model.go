@@ -46,10 +46,13 @@ type MachineCatalogResourceModel struct {
 	MachineAccounts          types.List   `tfsdk:"machine_accounts"`    // List[MachineAccountsModel]
 	RemotePcOus              types.List   `tfsdk:"remote_pc_ous"`       // List[RemotePcOuModel]
 	MinimumFunctionalLevel   types.String `tfsdk:"minimum_functional_level"`
-	Scopes                   types.Set    `tfsdk:"scopes"` //Set[String]
+	Scopes                   types.Set    `tfsdk:"scopes"`           //Set[String]
+	BuiltInScopes            types.Set    `tfsdk:"built_in_scopes"`  //Set[String]
+	InheritedScopes          types.Set    `tfsdk:"inherited_scopes"` //Set[String]
 	MachineCatalogFolderPath types.String `tfsdk:"machine_catalog_folder_path"`
 	Tenants                  types.Set    `tfsdk:"tenants"`  // Set[String]
 	Metadata                 types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
+	Tags                     types.Set    `tfsdk:"tags"`     // Set[String]
 }
 
 type MachineAccountsModel struct {
@@ -198,7 +201,7 @@ func (ProvisioningSchemeModel) GetSchema() schema.SingleNestedAttribute {
 				},
 			},
 			"network_mapping": schema.ListNestedAttribute{
-				Description: "Specifies how the attached NICs are mapped to networks. If this parameter is omitted, provisioned VMs are created with a single NIC, which is mapped to the default network in the hypervisor resource pool.  If this parameter is supplied, machines are created with the number of NICs specified in the map, and each NIC is attached to the specified network." + "<br />" +
+				Description: "Specifies how the attached NICs are mapped to networks. If this parameter is omitted, provisioned VMs are created with a single NIC, which is mapped to the default network in the hypervisor resource pool. If this parameter is supplied, machines are created with the number of NICs specified in the map, and each NIC is attached to the specified network." + "<br />" +
 					"Required when `provisioning_scheme.identity_type` is `AzureAD`.",
 				Optional:     true,
 				NestedObject: NetworkMappingModel{}.GetSchema(),
@@ -572,6 +575,16 @@ func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 					),
 				},
 			},
+			"built_in_scopes": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "The IDs of the built_in scopes of the machine catalog.",
+				Computed:    true,
+			},
+			"inherited_scopes": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "The IDs of the inherited scopes of the machine catalog.",
+				Computed:    true,
+			},
 			"provisioning_scheme": ProvisioningSchemeModel{}.GetSchema(),
 			"machine_catalog_folder_path": schema.StringAttribute{
 				Description: "The path to the folder in which the machine catalog is located.",
@@ -580,12 +593,22 @@ func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 			"tenants": schema.SetAttribute{
 				ElementType: types.StringType,
 				Description: "A set of identifiers of tenants to associate with the machine catalog.",
+				Computed:    true,
+			},
+			"metadata": util.GetMetadataListSchema("Machine Catalog"),
+			"tags": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "A set of identifiers of tags to associate with the machine catalog.",
 				Optional:    true,
 				Validators: []validator.Set{
 					setvalidator.SizeAtLeast(1),
+					setvalidator.ValueStringsAre(
+						validator.String(
+							stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
+						),
+					),
 				},
 			},
-			"metadata": util.GetMetadataListSchema("Machine Catalog"),
 		},
 	}
 }
@@ -594,7 +617,7 @@ func (MachineCatalogResourceModel) GetAttributes() map[string]schema.Attribute {
 	return MachineCatalogResourceModel{}.GetSchema().Attributes
 }
 
-func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixclient.CitrixDaasClient, catalog *citrixorchestration.MachineCatalogDetailResponseModel, connectionType *citrixorchestration.HypervisorConnectionType, machines *citrixorchestration.MachineResponseModelCollection, pluginId string) MachineCatalogResourceModel {
+func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixclient.CitrixDaasClient, catalog *citrixorchestration.MachineCatalogDetailResponseModel, connectionType *citrixorchestration.HypervisorConnectionType, machines *citrixorchestration.MachineResponseModelCollection, pluginId string, tags []string) MachineCatalogResourceModel {
 	// Machine Catalog Properties
 	r.Id = types.StringValue(catalog.GetId())
 	r.Name = types.StringValue(catalog.GetName())
@@ -641,6 +664,21 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 
 	r = r.updateCatalogWithRemotePcConfig(ctx, diagnostics, catalog)
 
+	hypervisorConnection := catalog.GetHypervisorConnection()
+	parentList := []string{
+		hypervisorConnection.GetId(),
+	}
+	scopeIdsInPlan := util.StringSetToStringArray(ctx, diagnostics, r.Scopes)
+	scopeIds, builtInScopes, inheritedScopeIds, err := util.CategorizeScopes(ctx, client, diagnostics, catalog.GetScopes(), citrixorchestration.SCOPEDOBJECTTYPE_HYPERVISOR_CONNECTION, parentList, scopeIdsInPlan)
+	if err != nil {
+		return r
+	}
+	r.Scopes = util.StringArrayToStringSet(ctx, diagnostics, scopeIds)
+	r.BuiltInScopes = util.StringArrayToStringSet(ctx, diagnostics, builtInScopes)
+	r.InheritedScopes = util.StringArrayToStringSet(ctx, diagnostics, inheritedScopeIds)
+
+	r.Tenants = util.RefreshTenantSet(ctx, diagnostics, catalog.GetTenants())
+
 	if catalog.ProvisioningScheme == nil {
 		if attributesMap, err := util.AttributeMapFromObject(ProvisioningSchemeModel{}); err == nil {
 			r.ProvisioningScheme = types.ObjectNull(attributesMap)
@@ -649,10 +687,6 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 		}
 		return r
 	}
-
-	scopeIdsInState := util.StringSetToStringArray(ctx, diagnostics, r.Scopes)
-	scopeIds := util.GetIdsForFilteredScopeObjects(scopeIdsInState, catalog.GetScopes())
-	r.Scopes = util.StringArrayToStringSet(ctx, diagnostics, scopeIds)
 
 	// Provisioning Scheme Properties
 	r = r.updateCatalogWithProvScheme(ctx, diagnostics, client, catalog, connectionType, pluginId, provScheme)
@@ -665,16 +699,6 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 		r.MachineCatalogFolderPath = types.StringNull()
 	}
 
-	if len(catalog.GetTenants()) > 0 || !r.Tenants.IsNull() {
-		var remoteTenants []string
-		for _, tenant := range catalog.GetTenants() {
-			remoteTenants = append(remoteTenants, tenant.GetId())
-		}
-		r.Tenants = util.StringArrayToStringSet(ctx, diagnostics, remoteTenants)
-	} else {
-		r.Tenants = types.SetNull(types.StringType)
-	}
-
 	effectiveMetadata := util.GetEffectiveMetadata(util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, r.Metadata), catalog.GetMetadata())
 
 	if len(effectiveMetadata) > 0 {
@@ -682,6 +706,8 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 	} else {
 		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
 	}
+
+	r.Tags = util.RefreshTagSet(ctx, diagnostics, tags)
 
 	return r
 }
@@ -692,14 +718,14 @@ func (networkMapping NetworkMappingModel) RefreshListItem(_ context.Context, _ *
 	segments := strings.Split(network.GetXDPath(), "\\")
 	lastIndex := len(segments)
 
-	networkName := (strings.Split(segments[lastIndex-1], "."))[0]
+	networkName := (strings.TrimSuffix(segments[lastIndex-1], ".network"))
 	matchAws := regexp.MustCompile(util.AwsNetworkNameRegex)
 	if matchAws.MatchString(networkName) {
 		/* For AWS Network, the XDPath looks like:
 		* XDHyp:\\HostingUnits\\{resource pool}\\{availability zone}.availabilityzone\\{network ip}`/{prefix length} (vpc-{vpc-id}).network
 		* The Network property should be set to {network ip}/{prefix length}
 		 */
-		networkName = strings.ReplaceAll(strings.Split((strings.TrimSuffix(segments[lastIndex-1], ".network")), " ")[0], "`/", "/")
+		networkName = strings.ReplaceAll(strings.Split((networkName), " ")[0], "`/", "/")
 	}
 	networkMapping.Network = types.StringValue(networkName)
 	return networkMapping

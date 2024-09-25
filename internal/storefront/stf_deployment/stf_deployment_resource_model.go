@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	citrixstorefront "github.com/citrix/citrix-daas-rest-go/citrixstorefront/models"
-	models "github.com/citrix/citrix-daas-rest-go/citrixstorefront/models" // Add this line to import the package that contains the 'models' identifier
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -24,8 +23,8 @@ import (
 )
 
 type RoamingBeacon struct {
-	Internal types.String `tfsdk:"internal_ip"`
-	External types.List   `tfsdk:"external_ips"`
+	Internal types.String `tfsdk:"internal_address"`
+	External types.List   `tfsdk:"external_addresses"`
 }
 
 func (RoamingBeacon) GetSchema() schema.SingleNestedAttribute {
@@ -33,17 +32,23 @@ func (RoamingBeacon) GetSchema() schema.SingleNestedAttribute {
 		Description: "Roaming Beacon configuration.",
 		Optional:    true,
 		Attributes: map[string]schema.Attribute{
-			"internal_ip": schema.StringAttribute{
-				Description: "Internal IP address of the beacon. It can either be the hostname or the IP address of the beacon.",
+			"internal_address": schema.StringAttribute{
+				Description: "Internal IP address of the beacon. It can either be the hostname or the IP address of the beacon. The Internal IP must be either in `http(s)://<ip_address>/` OR `http(s)://<hostname>/`.",
 				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.UrlValidator), "must be a valid URI format starting with http:// or https:// and ending with /."),
+				},
 			},
-			"external_ips": schema.ListAttribute{
+			"external_addresses": schema.ListAttribute{
 				ElementType: types.StringType,
-				Description: "External IP addresses of the beacon. It can either be the gateway url or the IP addresses of the beacon. If the user removes it from terraform, then the previously persisted values will be retained.",
+				Description: "External IP addresses of the beacon. It can either be the gateway url or the IP addresses of the beacon. If the user removes it from terraform, then the previously persisted values will be retained. Each External IP must be either in `http(s)://<ip_address>/` OR `http(s)://<hostname>/`.",
 				Optional:    true,
 				Computed:    true,
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
+					listvalidator.ValueStringsAre(
+						stringvalidator.RegexMatches(regexp.MustCompile(util.UrlValidator), "must be a valid URI format starting with http:// or https:// and ending with /."),
+					),
 				},
 			},
 		},
@@ -68,9 +73,7 @@ func (r STFSecureTicketAuthority) GetKey() string {
 func (r STFSecureTicketAuthority) RefreshListItem(_ context.Context, _ *diag.Diagnostics, sta citrixstorefront.STFSTAUrlModel) util.ModelWithAttributes {
 	r.AuthorityId = types.StringValue(*sta.AuthorityId.Get())
 	r.StaUrl = types.StringValue(*sta.StaUrl.Get())
-	if sta.StaValidationEnabled.IsSet() {
-		r.StaValidationEnabled = types.BoolValue(*sta.StaValidationEnabled.Get())
-	}
+	r.StaValidationEnabled = types.BoolValue(*sta.StaValidationEnabled.Get())
 	if !sta.StaValidationEnabled.IsSet() || !*sta.StaValidationEnabled.Get() {
 		r.StaValidationSecret = types.StringNull()
 	} else if sta.StaValidationSecret.IsSet() && *sta.StaValidationSecret.Get() != "" {
@@ -194,17 +197,16 @@ func (RoamingGateway) GetSchema() schema.NestedAttributeObject {
 			"logon_type": schema.StringAttribute{
 				Description: "The login type required and supported by the Gateway. Possible values are `UsedForHDXOnly`, `Domain`, `RSA`, `DomainAndRSA`, `SMS`, `GatewayKnows`, `SmartCard`, and `None`.",
 				Required:    true,
-				// Default:     listdefault.StaticValue(types.ListValueMust(types.StringType, []attr.Value{})),
 				Validators: []validator.String{
 					stringvalidator.OneOf(
-						string(models.LOGONTYPE_USED_FOR_HDX_ONLY),
-						string(models.LOGONTYPE_DOMAIN),
-						string(models.LOGONTYPE_RSA),
-						string(models.LOGONTYPE_DOMAIN_AND_RSA),
-						string(models.LOGONTYPE_SMS),
-						string(models.LOGONTYPE_GATEWAY_KNOWS),
-						string(models.LOGONTYPE_SMART_CARD),
-						string(models.LOGONTYPE_NONE),
+						string(citrixstorefront.LOGONTYPE_USED_FOR_HDX_ONLY),
+						string(citrixstorefront.LOGONTYPE_DOMAIN),
+						string(citrixstorefront.LOGONTYPE_RSA),
+						string(citrixstorefront.LOGONTYPE_DOMAIN_AND_RSA),
+						string(citrixstorefront.LOGONTYPE_SMS),
+						string(citrixstorefront.LOGONTYPE_GATEWAY_KNOWS),
+						string(citrixstorefront.LOGONTYPE_SMART_CARD),
+						string(citrixstorefront.LOGONTYPE_NONE),
 					),
 				},
 			},
@@ -212,14 +214,17 @@ func (RoamingGateway) GetSchema() schema.NestedAttributeObject {
 				Description: "The URL of the StoreFront gateway.",
 				Required:    true,
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.UrlValidator), "must be a valid URI format starting with http:// or https:// and ending with /."),
 				},
 			},
 			"callback_url": schema.StringAttribute{
-				Description: "The Gateway authentication NetScaler call-back url.",
+				Description: "The Gateway authentication NetScaler call-back url. Must end with `/CitrixAuthService/AuthService.asmx`",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(""),
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(`^.*\/CitrixAuthService\/AuthService.asmx$`), "must be a valid URL end with `/CitrixAuthService/AuthService.asmx`."),
+				},
 			},
 			"smart_card_fallback_logon_type": schema.StringAttribute{
 				Description: "The login type to use when SmartCard fails. Possible values are `UsedForHDXOnly`, `Domain`, `RSA`, `DomainAndRSA`, `SMS`, `GatewayKnows`, `SmartCard`, and `None`. Defaults to `None`.",
@@ -228,14 +233,14 @@ func (RoamingGateway) GetSchema() schema.NestedAttributeObject {
 				Default:     stringdefault.StaticString("None"),
 				Validators: []validator.String{
 					stringvalidator.OneOf(
-						string(models.LOGONTYPE_USED_FOR_HDX_ONLY),
-						string(models.LOGONTYPE_DOMAIN),
-						string(models.LOGONTYPE_RSA),
-						string(models.LOGONTYPE_DOMAIN_AND_RSA),
-						string(models.LOGONTYPE_SMS),
-						string(models.LOGONTYPE_GATEWAY_KNOWS),
-						string(models.LOGONTYPE_SMART_CARD),
-						string(models.LOGONTYPE_NONE),
+						string(citrixstorefront.LOGONTYPE_USED_FOR_HDX_ONLY),
+						string(citrixstorefront.LOGONTYPE_DOMAIN),
+						string(citrixstorefront.LOGONTYPE_RSA),
+						string(citrixstorefront.LOGONTYPE_DOMAIN_AND_RSA),
+						string(citrixstorefront.LOGONTYPE_SMS),
+						string(citrixstorefront.LOGONTYPE_GATEWAY_KNOWS),
+						string(citrixstorefront.LOGONTYPE_SMART_CARD),
+						string(citrixstorefront.LOGONTYPE_NONE),
 					),
 				},
 			},
@@ -298,6 +303,9 @@ func (RoamingGateway) GetSchema() schema.NestedAttributeObject {
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(""),
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.UrlValidator), "must be a valid URI format starting with http:// or https://, and ending with /."),
+				},
 			},
 			"is_cloud_gateway": schema.BoolAttribute{
 				Description: "Whether the Gateway is an instance of Citrix Gateway Service in the cloud. Defaults to `false`.",

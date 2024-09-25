@@ -41,11 +41,14 @@ resource "citrix_application_group" "example-application-group" {
 ~> **Please Note** Metadata once set cannot be removed. Use this field to add new metadata or update the value for an existing metadata. Subsequently, removing any metadata from config will have no effect on the existing metadata of the resource. (see [below for nested schema](#nestedatt--metadata))
 - `restrict_to_tag` (String) The tag to restrict the application group to.
 - `scopes` (Set of String) The IDs of the scopes for the application group to be a part of.
-- `tenants` (Set of String) A set of identifiers of tenants to associate with the application group.
+- `tags` (Set of String) A set of identifiers of tags to associate with the application group.
 
 ### Read-Only
 
+- `built_in_scopes` (Set of String) The IDs of the built-in scopes of the application group.
 - `id` (String) GUID identifier of the application group.
+- `inherited_scopes` (Set of String) The IDs of the inherited scopes of the application group.
+- `tenants` (Set of String) A set of identifiers of tenants to associate with the application group.
 
 <a id="nestedatt--metadata"></a>
 ### Nested Schema for `metadata`

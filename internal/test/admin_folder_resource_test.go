@@ -1,12 +1,32 @@
 package test
 
 import (
+	"context"
 	"fmt"
+	"log"
+	"net/http"
 	"os"
 	"testing"
 
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
+
+func init() {
+	resource.AddTestSweepers("citrix_admin_folder", &resource.Sweeper{
+		Name: "citrix_admin_folder",
+		F: func(hypervisor string) error {
+			ctx := context.Background()
+			client := sharedClientForSweepers(ctx)
+
+			adminFolderName := os.Getenv("TEST_ADMIN_FOLDER_NAME")
+			err := adminFolderSweeper(ctx, adminFolderName, client)
+			return err
+		},
+		Dependencies: []string{"citrix_application"},
+	})
+}
 
 // TestAdminFolderPreCheck validates the necessary env variable exist
 // in the testing environment
@@ -197,4 +217,22 @@ func BuildAdminFolderResourceWithTwoTypes(t *testing.T, adminFolder string, admi
 	folder_name_2 := fmt.Sprintf("%s-2", name)
 
 	return fmt.Sprintf(adminFolder, folder_name_1, adminFolderType1, adminFolderType2, folder_name_2, adminFolderType1, adminFolderType2)
+}
+
+func adminFolderSweeper(ctx context.Context, adminFolderName string, client *citrixclient.CitrixDaasClient) error {
+	getAdminFolderRequest := client.ApiClient.AdminFoldersAPIsDAAS.AdminFoldersGetAdminFolder(ctx, adminFolderName)
+	adminFolder, httpResp, err := citrixclient.ExecuteWithRetry[*citrixorchestration.AdminFolderResponseModel](getAdminFolderRequest, client)
+	if err != nil {
+		if httpResp.StatusCode == http.StatusNotFound {
+			// Resource does not exist in remote, no need to delete
+			return nil
+		}
+		return fmt.Errorf("Error getting admin folder: %s", err)
+	}
+	deleteAdminFolderRequest := client.ApiClient.AdminFoldersAPIsDAAS.AdminFoldersDeleteAdminFolder(ctx, adminFolder.GetId())
+	httpResp, err = citrixclient.AddRequestData(deleteAdminFolderRequest, client).Execute()
+	if err != nil && httpResp.StatusCode != http.StatusNotFound {
+		log.Printf("Error destroying %s during sweep: %s", adminFolderName, err)
+	}
+	return nil
 }

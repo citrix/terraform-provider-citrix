@@ -45,10 +45,10 @@ func TestSTFDeploymentResourceWithProperties(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_gateway.0.logon_type", "Domain"),
 					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_gateway.0.gateway_url", "https://example1.gateway.url/"),
 					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_gateway.0.subnet_ip_address", "10.0.0.10"),
-					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_beacon.internal_ip", "https://example.internal.url/"),
-					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_beacon.external_ips.#", "2"),
-					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_beacon.external_ips.0", "https://example.external.url/"),
-					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_beacon.external_ips.1", "https://example1.external.url/"),
+					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_beacon.internal_address", "https://example.internal.url/"),
+					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_beacon.external_addresses.#", "2"),
+					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_beacon.external_addresses.0", "https://example.external.url/"),
+					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_beacon.external_addresses.1", "https://example1.external.url/"),
 				),
 			},
 
@@ -65,9 +65,9 @@ func TestSTFDeploymentResourceWithProperties(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_gateway.0.logon_type", "None"),
 					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_gateway.0.gateway_url", "https://example.gateway.url/"),
 					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_gateway.0.subnet_ip_address", "10.0.0.1"),
-					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_beacon.internal_ip", "https://example1.internal.url/"),
-					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_beacon.external_ips.#", "1"),
-					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_beacon.external_ips.0", "https://example.external.url/"),
+					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_beacon.internal_address", "https://example1.internal.url/"),
+					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_beacon.external_addresses.#", "1"),
+					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_beacon.external_addresses.0", "https://example.external.url/"),
 				),
 			},
 			// ImportState testing
@@ -77,7 +77,7 @@ func TestSTFDeploymentResourceWithProperties(t *testing.T) {
 				ImportStateId:                        siteId_updated,
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "site_id",
-				ImportStateVerifyIgnore:              []string{"last_updated", "roaming_beacon.external_ips", "roaming_gateway"},
+				ImportStateVerifyIgnore:              []string{"last_updated", "roaming_beacon.external_addresses", "roaming_gateway"},
 			},
 			{
 				Config: BuildSTFDeploymentResource(t, testSTFDeploymentResources_OnlyInt, siteId_updated),
@@ -91,9 +91,9 @@ func TestSTFDeploymentResourceWithProperties(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_gateway.0.logon_type", "None"),
 					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_gateway.0.gateway_url", "https://example.gateway.url/"),
 					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_gateway.0.subnet_ip_address", "10.0.0.1"),
-					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_beacon.internal_ip", "https://example1.internal.url/"),
-					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_beacon.external_ips.#", "1"),
-					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_beacon.external_ips.0", "https://example.external.url/"),
+					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_beacon.internal_address", "https://example1.internal.url/"),
+					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_beacon.external_addresses.#", "1"),
+					resource.TestCheckResourceAttr("citrix_stf_deployment.testSTFDeployment", "roaming_beacon.external_addresses.0", "https://example.external.url/"),
 				),
 			},
 		},
@@ -117,8 +117,8 @@ var (
 			subnet_ip_address = "10.0.0.10"
 		}]
 		roaming_beacon = {
-			internal_ip = "https://example.internal.url/"
-			external_ips = ["https://example.external.url/", "https://example1.external.url/"]
+			internal_address = "https://example.internal.url/"
+			external_addresses = ["https://example.external.url/", "https://example1.external.url/"]
 		}
 	}
 	`
@@ -133,8 +133,8 @@ var (
 			subnet_ip_address = "10.0.0.1"
 		}]
 		roaming_beacon = {
-			internal_ip = "https://example1.internal.url/"
-			external_ips = ["https://example.external.url/"]
+			internal_address = "https://example1.internal.url/"
+			external_addresses = ["https://example.external.url/"]
 		}
 	}
 	`
@@ -149,7 +149,7 @@ var (
 			subnet_ip_address = "10.0.0.1"
 		}]
 		roaming_beacon = {
-			internal_ip = "https://example1.internal.url/"
+			internal_address = "https://example1.internal.url/"
 		}
 	}
 	`

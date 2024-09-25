@@ -3,15 +3,45 @@
 package test
 
 import (
+	"context"
 	"fmt"
+	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
+
+func init() {
+	resource.AddTestSweepers("citrix_hypervisor_resource_pool", &resource.Sweeper{
+		Name: "citrix_hypervisor_resource_pool",
+		F: func(hypervisor string) error {
+			ctx := context.Background()
+			client := sharedClientForSweepers(ctx)
+
+			// Default hypervisor to Azure
+			hypervisorName := os.Getenv("TEST_HYPERV_NAME_AZURE")
+			resourcePoolName := os.Getenv("TEST_HYPERV_RP_NAME")
+			if hypervisor == "aws" {
+				hypervisorName = os.Getenv("TEST_HYPERV_NAME_AWS_EC2")
+				resourcePoolName = os.Getenv("TEST_HYPERV_RP_NAME_AWS_EC2")
+			}
+			if hypervisor == "gcp" {
+				hypervisorName = os.Getenv("TEST_HYPERV_NAME_GCP")
+				resourcePoolName = os.Getenv("TEST_HYPERV_RP_NAME_GCP")
+			}
+			err := hypervisorResourcePoolSweeper(ctx, hypervisorName, resourcePoolName, client)
+			return err
+		},
+		Dependencies: []string{"citrix_machine_catalog"},
+	})
+}
 
 func TestHypervisorResourcePoolPreCheck_Azure(t *testing.T) {
 	if v := os.Getenv("TEST_HYPERV_RP_NAME"); v == "" {
@@ -888,4 +918,22 @@ func BuildHypervisorResourcePoolResourceAwsEc2(t *testing.T, hypervisorRP string
 	subnets := os.Getenv("Test_HYPERV_RP_SUBNETS_AWS_EC2")
 
 	return fmt.Sprintf(hypervisorRP, name, vpc, availability_zone, subnets)
+}
+
+func hypervisorResourcePoolSweeper(ctx context.Context, hypervisorName string, resourcePoolName string, client *citrixclient.CitrixDaasClient) error {
+	getHypervisorRequest := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorResourcePool(ctx, hypervisorName, resourcePoolName)
+	resourcePool, httpResp, err := citrixclient.ExecuteWithRetry[*citrixorchestration.HypervisorResourcePoolDetailResponseModel](getHypervisorRequest, client)
+	if err != nil {
+		if httpResp.StatusCode == http.StatusNotFound {
+			// Resource does not exist in remote, no need to delete
+			return nil
+		}
+		return fmt.Errorf("Error getting resource pool: %s", err)
+	}
+	deleteResourcePoolRequest := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsDeleteHypervisorResourcePool(ctx, hypervisorName, resourcePool.GetId())
+	httpResp, err = citrixclient.AddRequestData(deleteResourcePoolRequest, client).Execute()
+	if err != nil && httpResp.StatusCode != http.StatusNotFound {
+		log.Printf("Error destroying %s during sweep: %s", hypervisorName, err)
+	}
+	return nil
 }

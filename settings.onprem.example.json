@@ -352,7 +352,16 @@
          ],
 
          // Site Data Source Go Tests Env Variables
-        "TEST_SITE_DATA_SOURCE_EXPECTED_SITE_ID": "{Expected Site ID}"
+        "TEST_SITE_DATA_SOURCE_EXPECTED_SITE_ID": "{Expected Site ID}",
+
+        // Tag Go Tests Env Variables
+        // Tag Data Source Go Tests Env Variables
+        "TEST_TAG_DATA_SOURCE_ID": "{ID of the tag}",
+        "TEST_TAG_DATA_SOURCE_NAME": "{Name of the tag}",
+        "TEST_TAG_DATA_SOURCE_DESCRIPTION": "{Description of the tag}",
+        // Tag Resource Go Tests Env Variables
+        "TEST_TAG_RESOURCE_NAME": "{Name of the tag resource}",
+        "TEST_TAG_RESOURCE_DESCRIPTION": "{Description of the tag resource}"
     },
     "go.testTimeout": "30m"
 }

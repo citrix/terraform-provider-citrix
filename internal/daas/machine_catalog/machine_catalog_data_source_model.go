@@ -3,9 +3,13 @@
 package machine_catalog
 
 import (
+	"context"
+
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/vda"
+	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -14,7 +18,9 @@ type MachineCatalogDataSourceModel struct {
 	Id                       types.String   `tfsdk:"id"`
 	Name                     types.String   `tfsdk:"name"`
 	MachineCatalogFolderPath types.String   `tfsdk:"machine_catalog_folder_path"`
-	Vdas                     []vda.VdaModel `tfsdk:"vdas"` // List[VdaModel]
+	Vdas                     []vda.VdaModel `tfsdk:"vdas"`    // List[VdaModel]
+	Tenants                  types.Set      `tfsdk:"tenants"` // Set[String]
+	Tags                     types.Set      `tfsdk:"tags"`    // Set[string]
 }
 
 func (MachineCatalogDataSourceModel) GetSchema() schema.Schema {
@@ -38,11 +44,21 @@ func (MachineCatalogDataSourceModel) GetSchema() schema.Schema {
 				Computed:     true,
 				NestedObject: vda.VdaModel{}.GetSchema(),
 			},
+			"tenants": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "A set of identifiers of tenants to associate with the machine catalog.",
+				Computed:    true,
+			},
+			"tags": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "A set of identifiers of tags to associate with the machine catalog.",
+				Computed:    true,
+			},
 		},
 	}
 }
 
-func (r MachineCatalogDataSourceModel) RefreshPropertyValues(catalog *citrixorchestration.MachineCatalogDetailResponseModel, vdas *citrixorchestration.MachineResponseModelCollection) MachineCatalogDataSourceModel {
+func (r MachineCatalogDataSourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, catalog *citrixorchestration.MachineCatalogDetailResponseModel, vdas *citrixorchestration.MachineResponseModelCollection, tags []string) MachineCatalogDataSourceModel {
 	r.Id = types.StringValue(catalog.GetId())
 	r.Name = types.StringValue(catalog.GetName())
 
@@ -73,6 +89,9 @@ func (r MachineCatalogDataSourceModel) RefreshPropertyValues(catalog *citrixorch
 	}
 
 	r.Vdas = res
+
+	r.Tenants = util.RefreshTenantSet(ctx, diagnostics, catalog.GetTenants())
+	r.Tags = util.StringArrayToStringSet(ctx, diagnostics, tags)
 
 	return r
 }

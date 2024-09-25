@@ -9,6 +9,8 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -17,9 +19,10 @@ import (
 
 // AdminScopeResourceModel maps the resource schema data.
 type AdminScopeResourceModel struct {
-	Id          types.String `tfsdk:"id"`
-	Name        types.String `tfsdk:"name"`
-	Description types.String `tfsdk:"description"`
+	Id            types.String `tfsdk:"id"`
+	Name          types.String `tfsdk:"name"`
+	Description   types.String `tfsdk:"description"`
+	IsTenantScope types.Bool   `tfsdk:"is_tenant_scope"`
 }
 
 func (r AdminScopeResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, adminScope *citrixorchestration.ScopeResponseModel) AdminScopeResourceModel {
@@ -28,6 +31,7 @@ func (r AdminScopeResourceModel) RefreshPropertyValues(ctx context.Context, diag
 	r.Id = types.StringValue(adminScope.GetId())
 	r.Name = types.StringValue(adminScope.GetName())
 	r.Description = types.StringValue(adminScope.GetDescription())
+	r.IsTenantScope = types.BoolValue(adminScope.GetIsTenantScope())
 
 	return r
 }
@@ -53,6 +57,15 @@ func (AdminScopeResourceModel) GetSchema() schema.Schema {
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(""),
+			},
+			"is_tenant_scope": schema.BoolAttribute{
+				Description: "Indicates whether the admin scope is a tenant scope. Defaults to `false`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.RequiresReplace(),
+				},
 			},
 		},
 	}

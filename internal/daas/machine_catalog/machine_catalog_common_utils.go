@@ -84,13 +84,6 @@ func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ct
 
 	body.SetAdminFolder(plan.MachineCatalogFolderPath.ValueString())
 
-	if !plan.Tenants.IsNull() {
-		associatedTenants := util.StringSetToStringArray(ctx, diagnostics, plan.Tenants)
-		body.SetTenants(associatedTenants)
-	} else {
-		body.SetTenants([]string{})
-	}
-
 	if !plan.Scopes.IsNull() {
 		plannedScopes := util.StringSetToStringArray(ctx, diagnostics, plan.Scopes)
 		body.SetScopes(plannedScopes)
@@ -162,13 +155,6 @@ func getRequestModelForUpdateMachineCatalog(plan MachineCatalogResourceModel, ct
 	body.SetMinimumFunctionalLevel(*functionalLevel)
 
 	body.SetAdminFolder(plan.MachineCatalogFolderPath.ValueString())
-
-	if !plan.Tenants.IsNull() {
-		associatedTenants := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Tenants)
-		body.SetTenants(associatedTenants)
-	} else {
-		body.SetTenants([]string{})
-	}
 
 	if !plan.Scopes.IsNull() {
 		plannedScopes := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes)
@@ -259,7 +245,7 @@ func generateBatchApiHeaders(ctx context.Context, diagnostics *diag.Diagnostics,
 }
 
 func readMachineCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, machineCatalogId string) (*citrixorchestration.MachineCatalogDetailResponseModel, *http.Response, error) {
-	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId).Fields("Id,Name,Description,ProvisioningType,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC,Metadata")
+	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId).Fields("Id,Name,Description,ProvisioningType,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC,Metadata,Scopes")
 	catalog, httpResp, err := util.ReadResource[*citrixorchestration.MachineCatalogDetailResponseModel](getMachineCatalogRequest, ctx, client, resp, "Machine Catalog", machineCatalogId)
 
 	return catalog, httpResp, err
@@ -471,4 +457,27 @@ func checkIfCatalogAttributeCanBeUpdated(ctx context.Context, state tfsdk.State)
 	}
 
 	return true
+}
+
+func setMachineCatalogTags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, catalogIdOrPath string, tagSet types.Set) {
+	setTagsRequestBody := util.ConstructTagsRequestModel(ctx, diagnostics, tagSet)
+
+	setTagsRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsSetMachineCatalogTags(ctx, catalogIdOrPath)
+	setTagsRequest = setTagsRequest.TagsRequestModel(setTagsRequestBody)
+
+	httpResp, err := citrixdaasclient.AddRequestData(setTagsRequest, client).Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error set tags for Machine Catalog "+catalogIdOrPath,
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		// Continue without return in order to get other attributes refreshed in state
+	}
+}
+
+func getMachineCatalogTags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, machineCatalogId string) []string {
+	getTagsRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogTags(ctx, machineCatalogId)
+	tagsResp, httpResp, err := citrixdaasclient.AddRequestData(getTagsRequest, client).Execute()
+	return util.ProcessTagsResponseCollection(diagnostics, tagsResp, httpResp, err, "Machine Catalog", machineCatalogId)
 }

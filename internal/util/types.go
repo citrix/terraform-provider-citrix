@@ -146,35 +146,19 @@ func defaultObjectFromObjectValue[objTyp any](ctx context.Context, v types.Objec
 			// If this isn't done the framework will return errors like "Value Conversion Error, Expected framework type from provider logic ... Received framework type from provider logic: types._____[]"
 			if attributeVal, ok := attributeVal.(types.ObjectType); ok {
 				attributeMap := attributeVal.AttributeTypes()
-				if v.IsNull() {
-					reflectAttribute.Set(reflect.ValueOf(types.ObjectNull(attributeMap)))
-				} else {
-					reflectAttribute.Set(reflect.ValueOf(types.ObjectUnknown(attributeMap)))
-				}
+				reflectAttribute.Set(reflect.ValueOf(types.ObjectNull(attributeMap)))
 			}
 			if attributeVal, ok := attributeVal.(types.ListType); ok {
 				elemType := attributeVal.ElementType()
-				if v.IsNull() {
-					reflectAttribute.Set(reflect.ValueOf(types.ListNull(elemType)))
-				} else {
-					reflectAttribute.Set(reflect.ValueOf(types.ListUnknown(elemType)))
-				}
+				reflectAttribute.Set(reflect.ValueOf(types.ListNull(elemType)))
 			}
 			if attributeVal, ok := attributeVal.(types.SetType); ok {
 				elemType := attributeVal.ElementType()
-				if v.IsNull() {
-					reflectAttribute.Set(reflect.ValueOf(types.SetNull(elemType)))
-				} else {
-					reflectAttribute.Set(reflect.ValueOf(types.SetUnknown(elemType)))
-				}
+				reflectAttribute.Set(reflect.ValueOf(types.SetNull(elemType)))
 			}
 			if attributeVal, ok := attributeVal.(types.MapType); ok {
 				elemType := attributeVal.ElementType()
-				if v.IsNull() {
-					reflectAttribute.Set(reflect.ValueOf(types.MapNull(elemType)))
-				} else {
-					reflectAttribute.Set(reflect.ValueOf(types.MapUnknown(elemType)))
-				}
+				reflectAttribute.Set(reflect.ValueOf(types.MapNull(elemType)))
 			}
 		}
 	}

@@ -4,6 +4,7 @@ package gac_settings
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 
@@ -27,6 +28,10 @@ type GACSettingsResourceModel struct {
 	Description     types.String `tfsdk:"description"`
 	UseForAppConfig types.Bool   `tfsdk:"use_for_app_config"`
 	AppSettings     types.Object `tfsdk:"app_settings"` // AppSettings
+}
+
+func (GACSettingsResourceModel) GetAttributes() map[string]schema.Attribute {
+	return GACSettingsResourceModel{}.GetSchema().Attributes
 }
 
 type AppSettings struct {
@@ -298,9 +303,14 @@ func (Macos) GetAttributes() map[string]schema.Attribute {
 }
 
 type WindowsSettings struct {
-	Name        types.String `tfsdk:"name"`
-	ValueString types.String `tfsdk:"value_string"`
-	ValueList   types.List   `tfsdk:"value_list"`
+	Name                           types.String `tfsdk:"name"`
+	ValueString                    types.String `tfsdk:"value_string"`
+	ValueList                      types.List   `tfsdk:"value_list"`
+	LocalAppAllowList              types.List   `tfsdk:"local_app_allow_list"`               //list[LocalAppAllowListModel]
+	ExtensionInstallAllowList      types.List   `tfsdk:"extension_install_allow_list"`       //list[ExtensionInstallAllowListModel]
+	AutoLaunchProtocolsFromOrigins types.List   `tfsdk:"auto_launch_protocols_from_origins"` //List[AutoLaunchProtocolsFromOriginsModel]
+	ManagedBookmarks               types.List   `tfsdk:"managed_bookmarks"`                  //List[BookMarkValueModel]
+	EnterpriseBroswerSSO           types.Object `tfsdk:"enterprise_browser_sso"`             //CitrixEnterpriseBrowserModel
 }
 
 func (WindowsSettings) GetSchema() schema.NestedAttributeObject {
@@ -314,7 +324,6 @@ func (WindowsSettings) GetSchema() schema.NestedAttributeObject {
 				Description: "String value (if any) associated with the setting.",
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_list")),
 					stringvalidator.LengthAtLeast(1),
 				},
 			},
@@ -326,6 +335,39 @@ func (WindowsSettings) GetSchema() schema.NestedAttributeObject {
 					listvalidator.SizeAtLeast(1),
 				},
 			},
+			"local_app_allow_list": schema.ListNestedAttribute{
+				Optional:     true,
+				Description:  "List of App Object to allow list for Local App Discovery.",
+				NestedObject: LocalAppAllowListModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+			"extension_install_allow_list": schema.ListNestedAttribute{
+				Optional:     true,
+				Description:  "An allowed list of extensions that users can add to the Citrix Enterprise Browser. This list uses the Chrome Web Store.",
+				NestedObject: ExtensionInstallAllowListModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+			"auto_launch_protocols_from_origins": schema.ListNestedAttribute{
+				Optional:     true,
+				Description:  "A list of protocols that can launch an external application from the listed origins without prompting the user.",
+				NestedObject: AutoLaunchProtocolsFromOriginsModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+			"managed_bookmarks": schema.ListNestedAttribute{
+				Optional:     true,
+				Description:  "A list of bookmarks to push to the Citrix Enterprise Browser.",
+				NestedObject: BookMarkValueModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+			"enterprise_browser_sso": CitrixEnterpriseBrowserModel{}.GetSchema(),
 		},
 	}
 }
@@ -473,9 +515,13 @@ func (Html5Settings) GetAttributes() map[string]schema.Attribute {
 }
 
 type MacosSettings struct {
-	Name        types.String `tfsdk:"name"`
-	ValueString types.String `tfsdk:"value_string"`
-	ValueList   types.List   `tfsdk:"value_list"`
+	Name                           types.String `tfsdk:"name"`
+	ValueString                    types.String `tfsdk:"value_string"`
+	ValueList                      types.List   `tfsdk:"value_list"`
+	AutoLaunchProtocolsFromOrigins types.List   `tfsdk:"auto_launch_protocols_from_origins"` //[]AutoLaunchProtocolsFromOrigins
+	ManagedBookmarks               types.List   `tfsdk:"managed_bookmarks"`                  //[]BookMarkValue
+	ExtensionInstallAllowList      types.List   `tfsdk:"extension_install_allow_list"`       //[]ExtensionInstallAllowList
+	EnterpriseBroswerSSO           types.Object `tfsdk:"enterprise_browser_sso"`             //CitrixEnterpriseBrowserModel
 }
 
 func (MacosSettings) GetSchema() schema.NestedAttributeObject {
@@ -489,7 +535,6 @@ func (MacosSettings) GetSchema() schema.NestedAttributeObject {
 				Description: "String value (if any) associated with the setting.",
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_list")),
 					stringvalidator.LengthAtLeast(1),
 				},
 			},
@@ -501,6 +546,31 @@ func (MacosSettings) GetSchema() schema.NestedAttributeObject {
 					listvalidator.SizeAtLeast(1),
 				},
 			},
+			"auto_launch_protocols_from_origins": schema.ListNestedAttribute{
+				Optional:     true,
+				Description:  "Specify a list of protocols that can launch an external application from the listed origins without prompting the user.",
+				NestedObject: AutoLaunchProtocolsFromOriginsModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+			"managed_bookmarks": schema.ListNestedAttribute{
+				Optional:     true,
+				Description:  "Array of objects of type ManagedBookmarks. For example: {name:\"bookmark_name1\",url:\"bookmark_url1\"}",
+				NestedObject: BookMarkValueModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+			"extension_install_allow_list": schema.ListNestedAttribute{
+				Optional:     true,
+				Description:  "Array of objects of type ExtensionInstallAllowlist. For example: {id:\"extension_id1\",name:\"extension_name1\",install link:\"chrome store url for the extension\"}",
+				NestedObject: ExtensionInstallAllowListModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+			"enterprise_browser_sso": CitrixEnterpriseBrowserModel{}.GetSchema(),
 		},
 	}
 }
@@ -883,14 +953,54 @@ func parseWindowsSettings(ctx context.Context, diagnostics *diag.Diagnostics, re
 
 	for _, remoteWindowsSetting := range remoteWindowsSettings {
 		var windowsSetting WindowsSettings
+		WindowsSettingsDefaultValues(ctx, diagnostics, &windowsSetting)
 		windowsSetting.Name = types.StringValue(remoteWindowsSetting.GetName())
-		windowsSetting.ValueList = types.ListNull(types.StringType)
 		valueType := reflect.TypeOf(remoteWindowsSetting.GetValue())
 		switch valueType.Kind() {
 		case reflect.String:
 			windowsSetting.ValueString = types.StringValue(remoteWindowsSetting.GetValue().(string))
 		case reflect.Slice:
+			localAppAllowList := GACSettingsUpdate[LocalAppAllowListModel, LocalAppAllowListModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
+			if localAppAllowList != nil {
+				windowsSetting.LocalAppAllowList = util.TypedArrayToObjectList(ctx, diagnostics, localAppAllowList)
+				break
+			}
+
+			extentionInstallAllowList := GACSettingsUpdate[ExtensionInstallAllowListModel, ExtensionInstallAllowListModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
+			if extentionInstallAllowList != nil {
+				windowsSetting.ExtensionInstallAllowList = util.TypedArrayToObjectList(ctx, diagnostics, extentionInstallAllowList)
+				break
+			}
+
+			autoLaunchProtocolsList := GACSettingsUpdate[AutoLaunchProtocolsFromOriginsModel, AutoLaunchProtocolsFromOriginsModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
+			if autoLaunchProtocolsList != nil {
+				windowsSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectList(ctx, diagnostics, autoLaunchProtocolsList)
+				break
+			}
+
+			managedBookmarkList := GACSettingsUpdate[BookMarkValueModel, BookMarkValueModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
+			if managedBookmarkList != nil {
+				windowsSetting.ManagedBookmarks = util.TypedArrayToObjectList(ctx, diagnostics, managedBookmarkList)
+				break
+			}
+
 			windowsSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteWindowsSetting.Value.([]interface{}))
+		case reflect.Map:
+			v := remoteWindowsSetting.Value.(map[string]interface{})
+			elementJSON, err := json.Marshal(v)
+			if err != nil {
+				errMsg = fmt.Sprintf("Error marshaling element to CitrixEnterpriseBrowserModel: %v", err)
+				break
+			}
+			var app CitrixEnterpriseBrowserModel_Go
+			if err := json.Unmarshal(elementJSON, &app); err != nil { // marshal and unmarshal for the conversion
+				errMsg = fmt.Sprintf("Error unmarshaling element to CitrixEnterpriseBrowserModel: %v", err)
+				break
+			}
+			var browserModel CitrixEnterpriseBrowserModel
+			browserModel.CitrixEnterpriseBrowserSSOEnabled = types.BoolValue(app.CitrixEnterpriseBrowserSSOEnabled)
+			browserModel.CitrixEnterpriseBrowserSSODomains, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, v["CitrixEnterpriseBrowserSSODomains"].([]interface{}))
+			windowsSetting.EnterpriseBroswerSSO = util.TypedObjectToObjectValue(ctx, diagnostics, browserModel)
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for windows setting value: %v", valueType.Kind())
 		}
@@ -1000,14 +1110,52 @@ func parseMacosSettings(ctx context.Context, diagnostics *diag.Diagnostics, remo
 
 	for _, remoteMacosSetting := range remoteMacosSettings {
 		var macosSetting MacosSettings
+		MacosSettingsDefaultValues(ctx, diagnostics, &macosSetting) // Set the default list null for macos settings
 		macosSetting.Name = types.StringValue(remoteMacosSetting.GetName())
-		macosSetting.ValueList = types.ListNull(types.StringType)
 		valueType := reflect.TypeOf(remoteMacosSetting.GetValue())
 		switch valueType.Kind() {
 		case reflect.String:
 			macosSetting.ValueString = types.StringValue(remoteMacosSetting.GetValue().(string))
 		case reflect.Slice:
+			// Check if the value is of type LocalAppAllowList
+			autoLaunchProtocolsList := GACSettingsUpdate[AutoLaunchProtocolsFromOriginsModel, AutoLaunchProtocolsFromOriginsModel_Go](ctx, diagnostics, remoteMacosSetting.Value)
+			if autoLaunchProtocolsList != nil {
+				macosSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectList(ctx, diagnostics, autoLaunchProtocolsList)
+				break
+			}
+
+			// Check if the value is of type BookMarkValue
+			managedBookmarkList := GACSettingsUpdate[BookMarkValueModel, BookMarkValueModel_Go](ctx, diagnostics, remoteMacosSetting.Value)
+			if managedBookmarkList != nil {
+				macosSetting.ManagedBookmarks = util.TypedArrayToObjectList(ctx, diagnostics, managedBookmarkList)
+				break
+			}
+			// Check if the value is of type ExtensionInstallAllowList
+			extensionInstallAllowList := GACSettingsUpdate[ExtensionInstallAllowListModel, ExtensionInstallAllowListModel_Go](ctx, diagnostics, remoteMacosSetting.Value)
+			if extensionInstallAllowList != nil {
+				macosSetting.ExtensionInstallAllowList = util.TypedArrayToObjectList(ctx, diagnostics, extensionInstallAllowList)
+				break
+			}
+
 			macosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteMacosSetting.Value.([]interface{}))
+
+		case reflect.Map:
+			v := remoteMacosSetting.Value.(map[string]interface{})
+			elementJSON, err := json.Marshal(v)
+			if err != nil {
+				errMsg = fmt.Sprintf("Error marshaling element to CitrixEnterpriseBrowserModel: %v", err)
+				break
+			}
+			var app CitrixEnterpriseBrowserModel_Go
+			if err := json.Unmarshal(elementJSON, &app); err != nil { // marshal and unmarshal for the conversion
+				errMsg = fmt.Sprintf("Error unmarshaling element to CitrixEnterpriseBrowserModel: %v", err)
+				break
+			}
+			var browserModel CitrixEnterpriseBrowserModel
+			browserModel.CitrixEnterpriseBrowserSSOEnabled = types.BoolValue(app.CitrixEnterpriseBrowserSSOEnabled)
+			browserModel.CitrixEnterpriseBrowserSSODomains, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, v["CitrixEnterpriseBrowserSSODomains"].([]interface{}))
+			macosSetting.EnterpriseBroswerSSO = util.TypedObjectToObjectValue(ctx, diagnostics, browserModel)
+
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for macos setting value: %v", valueType.Kind())
 		}
@@ -1085,15 +1233,56 @@ func getWindowsCategorySettings(ctx context.Context, diagnostics *diag.Diagnosti
 
 		var windowsSetting WindowsSettings
 		errMsg = ""
-
-		windowsSetting.Name = stateWindowsSetting.Name // Since this value is present as the map key, it is same as remote
-		windowsSetting.ValueList = types.ListNull(types.StringType)
+		windowsSetting.Name = stateWindowsSetting.Name
+		WindowsSettingsDefaultValues(ctx, diagnostics, &windowsSetting)
 		valueType := reflect.TypeOf(remoteWindowsSetting.Value)
 		switch valueType.Kind() {
 		case reflect.String:
 			windowsSetting.ValueString = types.StringValue(remoteWindowsSetting.Value.(string))
 		case reflect.Slice:
+			localAppAllowList := GACSettingsUpdate[LocalAppAllowListModel, LocalAppAllowListModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
+			if localAppAllowList != nil {
+				windowsSetting.LocalAppAllowList = util.TypedArrayToObjectList(ctx, diagnostics, localAppAllowList)
+				break
+			}
+
+			extentionInstallAllowList := GACSettingsUpdate[ExtensionInstallAllowListModel, ExtensionInstallAllowListModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
+			if extentionInstallAllowList != nil {
+				windowsSetting.ExtensionInstallAllowList = util.TypedArrayToObjectList(ctx, diagnostics, extentionInstallAllowList)
+				break
+			}
+
+			autoLaunchProtocolsList := GACSettingsUpdate[AutoLaunchProtocolsFromOriginsModel, AutoLaunchProtocolsFromOriginsModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
+			if autoLaunchProtocolsList != nil {
+				windowsSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectList(ctx, diagnostics, autoLaunchProtocolsList)
+				break
+			}
+
+			managedBookmarkList := GACSettingsUpdate[BookMarkValueModel, BookMarkValueModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
+			if managedBookmarkList != nil {
+				windowsSetting.ManagedBookmarks = util.TypedArrayToObjectList(ctx, diagnostics, managedBookmarkList)
+				break
+			}
+
 			windowsSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteWindowsSetting.Value.([]interface{}))
+
+		case reflect.Map:
+			v := remoteWindowsSetting.Value.(map[string]interface{})
+			elementJSON, err := json.Marshal(v)
+			if err != nil {
+				errMsg = fmt.Sprintf("Error marshaling element to CitrixEnterpriseBrowserModel: %v", err)
+				break
+			}
+			var app CitrixEnterpriseBrowserModel_Go
+			if err := json.Unmarshal(elementJSON, &app); err != nil { // marshal and unmarshal for the conversion
+				errMsg = fmt.Sprintf("Error unmarshaling element to CitrixEnterpriseBrowserModel: %v", err)
+				break
+			}
+			var browserModel CitrixEnterpriseBrowserModel
+			browserModel.CitrixEnterpriseBrowserSSOEnabled = types.BoolValue(app.CitrixEnterpriseBrowserSSOEnabled)
+			browserModel.CitrixEnterpriseBrowserSSODomains, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, v["CitrixEnterpriseBrowserSSODomains"].([]interface{}))
+			windowsSetting.EnterpriseBroswerSSO = util.TypedObjectToObjectValue(ctx, diagnostics, browserModel)
+
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for windows setting value: %v", valueType.Kind())
 		}
@@ -1107,7 +1296,6 @@ func getWindowsCategorySettings(ctx context.Context, diagnostics *diag.Diagnosti
 		windowsSettingsForState = append(windowsSettingsForState, windowsSetting)
 		remoteWindowsSetting.IsVisited = true
 	}
-
 	// Add the windows settings from remote which are not present in the state
 	for settingName, remoteWindowsSetting := range remoteWindowsCategorySettingsMap {
 		if !remoteWindowsSetting.IsVisited {
@@ -1115,13 +1303,54 @@ func getWindowsCategorySettings(ctx context.Context, diagnostics *diag.Diagnosti
 			errMsg = ""
 
 			windowsSetting.Name = types.StringValue(settingName)
-			windowsSetting.ValueList = types.ListNull(types.StringType)
+			WindowsSettingsDefaultValues(ctx, diagnostics, &windowsSetting)
 			valueType := reflect.TypeOf(remoteWindowsSetting.Value)
 			switch valueType.Kind() {
 			case reflect.String:
 				windowsSetting.ValueString = types.StringValue(remoteWindowsSetting.Value.(string))
 			case reflect.Slice:
+				localAppAllowList := GACSettingsUpdate[LocalAppAllowListModel, LocalAppAllowListModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
+				if localAppAllowList != nil {
+					windowsSetting.LocalAppAllowList = util.TypedArrayToObjectList(ctx, diagnostics, localAppAllowList)
+					break
+				}
+
+				extentionInstallAllowList := GACSettingsUpdate[ExtensionInstallAllowListModel, ExtensionInstallAllowListModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
+				if extentionInstallAllowList != nil {
+					windowsSetting.ExtensionInstallAllowList = util.TypedArrayToObjectList(ctx, diagnostics, extentionInstallAllowList)
+					break
+				}
+
+				autoLaunchProtocolsList := GACSettingsUpdate[AutoLaunchProtocolsFromOriginsModel, AutoLaunchProtocolsFromOriginsModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
+				if autoLaunchProtocolsList != nil {
+					windowsSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectList(ctx, diagnostics, autoLaunchProtocolsList)
+					break
+				}
+
+				managedBookmarkList := GACSettingsUpdate[BookMarkValueModel, BookMarkValueModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
+				if managedBookmarkList != nil {
+					windowsSetting.ManagedBookmarks = util.TypedArrayToObjectList(ctx, diagnostics, managedBookmarkList)
+					break
+				}
+
 				windowsSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteWindowsSetting.Value.([]interface{}))
+			case reflect.Map:
+				v := remoteWindowsSetting.Value.(map[string]interface{})
+				elementJSON, err := json.Marshal(v)
+				if err != nil {
+					errMsg = fmt.Sprintf("Error marshaling element to CitrixEnterpriseBrowserModel: %v", err)
+					break
+				}
+				var app CitrixEnterpriseBrowserModel_Go
+				if err := json.Unmarshal(elementJSON, &app); err != nil { // marshal and unmarshal for the conversion
+					errMsg = fmt.Sprintf("Error unmarshaling element to CitrixEnterpriseBrowserModel: %v", err)
+					break
+				}
+				var browserModel CitrixEnterpriseBrowserModel
+				browserModel.CitrixEnterpriseBrowserSSOEnabled = types.BoolValue(app.CitrixEnterpriseBrowserSSOEnabled)
+				browserModel.CitrixEnterpriseBrowserSSODomains, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, v["CitrixEnterpriseBrowserSSODomains"].([]interface{}))
+				windowsSetting.EnterpriseBroswerSSO = util.TypedObjectToObjectValue(ctx, diagnostics, browserModel)
+
 			default:
 				errMsg = fmt.Sprintf("Unsupported type for windows setting value: %v", valueType.Kind())
 			}
@@ -1500,15 +1729,52 @@ func getMacosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 
 		var macosSetting MacosSettings
 		errMsg = ""
-
-		macosSetting.Name = stateMacosSetting.Name // Since this value is present as the map key, it is same as remote
-		macosSetting.ValueList = types.ListNull(types.StringType)
+		MacosSettingsDefaultValues(ctx, diagnostics, &macosSetting) // Set the default list null for macos settings
+		macosSetting.Name = stateMacosSetting.Name                  // Since this value is present as the map key, it is same as remote
 		valueType := reflect.TypeOf(remoteMacosSetting.Value)
 		switch valueType.Kind() {
 		case reflect.String:
 			macosSetting.ValueString = types.StringValue(remoteMacosSetting.Value.(string))
 		case reflect.Slice:
+			// Check if the value is of type LocalAppAllowList
+			autoLaunchProtocolsList := GACSettingsUpdate[AutoLaunchProtocolsFromOriginsModel, AutoLaunchProtocolsFromOriginsModel_Go](ctx, diagnostics, remoteMacosSetting.Value)
+			if autoLaunchProtocolsList != nil {
+				macosSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectList(ctx, diagnostics, autoLaunchProtocolsList)
+				break
+			}
+
+			// Check if the value is of type BookMarkValue
+			managedBookmarkList := GACSettingsUpdate[BookMarkValueModel, BookMarkValueModel_Go](ctx, diagnostics, remoteMacosSetting.Value)
+			if managedBookmarkList != nil {
+				macosSetting.ManagedBookmarks = util.TypedArrayToObjectList(ctx, diagnostics, managedBookmarkList)
+				break
+			}
+			// Check if the value is of type ExtensionInstallAllowList
+			extensionInstallAllowList := GACSettingsUpdate[ExtensionInstallAllowListModel, ExtensionInstallAllowListModel_Go](ctx, diagnostics, remoteMacosSetting.Value)
+			if extensionInstallAllowList != nil {
+				macosSetting.ExtensionInstallAllowList = util.TypedArrayToObjectList(ctx, diagnostics, extensionInstallAllowList)
+				break
+			}
+
 			macosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteMacosSetting.Value.([]interface{}))
+
+		case reflect.Map:
+			v := remoteMacosSetting.Value.(map[string]interface{})
+			elementJSON, err := json.Marshal(v)
+			if err != nil {
+				errMsg = fmt.Sprintf("Error marshaling element to CitrixEnterpriseBrowserModel: %v", err)
+				break
+			}
+			var app CitrixEnterpriseBrowserModel_Go
+			if err := json.Unmarshal(elementJSON, &app); err != nil { // marshal and unmarshal for the conversion
+				errMsg = fmt.Sprintf("Error unmarshaling element to CitrixEnterpriseBrowserModel: %v", err)
+				break
+			}
+			var browserModel CitrixEnterpriseBrowserModel
+			browserModel.CitrixEnterpriseBrowserSSOEnabled = types.BoolValue(app.CitrixEnterpriseBrowserSSOEnabled)
+			browserModel.CitrixEnterpriseBrowserSSODomains, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, v["CitrixEnterpriseBrowserSSODomains"].([]interface{}))
+			macosSetting.EnterpriseBroswerSSO = util.TypedObjectToObjectValue(ctx, diagnostics, browserModel)
+
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for macos setting value: %v", valueType.Kind())
 		}
@@ -1530,13 +1796,48 @@ func getMacosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 			errMsg = ""
 
 			macosSetting.Name = types.StringValue(settingName)
-			macosSetting.ValueList = types.ListNull(types.StringType)
+			MacosSettingsDefaultValues(ctx, diagnostics, &macosSetting) // Set the default list null for macos settings
 			valueType := reflect.TypeOf(remoteMacosSetting.Value)
 			switch valueType.Kind() {
 			case reflect.String:
 				macosSetting.ValueString = types.StringValue(remoteMacosSetting.Value.(string))
 			case reflect.Slice:
+				// Check if the value is of type LocalAppAllowList
+				autoLaunchProtocolsList := GACSettingsUpdate[AutoLaunchProtocolsFromOriginsModel, AutoLaunchProtocolsFromOriginsModel_Go](ctx, diagnostics, remoteMacosSetting.Value)
+				if autoLaunchProtocolsList != nil {
+					macosSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectList(ctx, diagnostics, autoLaunchProtocolsList)
+					break
+				}
+				// Check if the value is of type BookMarkValue
+				managedBookmarkList := GACSettingsUpdate[BookMarkValueModel, BookMarkValueModel_Go](ctx, diagnostics, remoteMacosSetting.Value)
+				if managedBookmarkList != nil {
+					macosSetting.ManagedBookmarks = util.TypedArrayToObjectList(ctx, diagnostics, managedBookmarkList)
+					break
+				}
+				// Check if the value is of type ExtensionInstallAllowList
+				extensionInstallAllowList := GACSettingsUpdate[ExtensionInstallAllowListModel, ExtensionInstallAllowListModel_Go](ctx, diagnostics, remoteMacosSetting.Value)
+				if extensionInstallAllowList != nil {
+					macosSetting.ExtensionInstallAllowList = util.TypedArrayToObjectList(ctx, diagnostics, extensionInstallAllowList)
+					break
+				}
 				macosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteMacosSetting.Value.([]interface{}))
+
+			case reflect.Map:
+				v := remoteMacosSetting.Value.(map[string]interface{})
+				elementJSON, err := json.Marshal(v)
+				if err != nil {
+					errMsg = fmt.Sprintf("Error marshaling element to CitrixEnterpriseBrowserModel: %v", err)
+					break
+				}
+				var app CitrixEnterpriseBrowserModel_Go
+				if err := json.Unmarshal(elementJSON, &app); err != nil { // marshal and unmarshal for conversion
+					errMsg = fmt.Sprintf("Error unmarshaling element to CitrixEnterpriseBrowserModel: %v", err)
+					break
+				}
+				var browserModel CitrixEnterpriseBrowserModel
+				browserModel.CitrixEnterpriseBrowserSSOEnabled = types.BoolValue(app.CitrixEnterpriseBrowserSSOEnabled)
+				browserModel.CitrixEnterpriseBrowserSSODomains, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, v["CitrixEnterpriseBrowserSSODomains"].([]interface{}))
+				macosSetting.EnterpriseBroswerSSO = util.TypedObjectToObjectValue(ctx, diagnostics, browserModel)
 			default:
 				errMsg = fmt.Sprintf("Unsupported type for macos setting value: %v", valueType.Kind())
 			}
@@ -1554,7 +1855,7 @@ func getMacosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 	return util.TypedArrayToObjectList[MacosSettings](ctx, diagnostics, macosSettingsForState)
 }
 
-func GetSchema() schema.Schema {
+func (GACSettingsResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "Citrix Cloud --- Manages the Global App Configuration settings for a service url.",
 		Attributes: map[string]schema.Attribute{

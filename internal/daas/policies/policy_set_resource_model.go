@@ -499,7 +499,7 @@ type PolicySetResourceModel struct {
 
 func (PolicySetResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "CVAD --- Manages a policy set and the policies within it. The order of the policies specified in this resource reflect the policy priority.", // TODO: Update this comment when policy set is available for cloud
+		Description: "CVAD --- Manages a policy set and the policies within it. The order of the policies specified in this resource reflect the policy priority.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the policy set.",

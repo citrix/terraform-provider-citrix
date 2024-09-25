@@ -50,11 +50,12 @@ resource "citrix_xenserver_hypervisor" "example-xenserver-hypervisor" {
 
 ~> **Please Note** Metadata once set cannot be removed. Use this field to add new metadata or update the value for an existing metadata. Subsequently, removing any metadata from config will have no effect on the existing metadata of the resource. (see [below for nested schema](#nestedatt--metadata))
 - `scopes` (Set of String) The IDs of the scopes for the hypervisor to be a part of.
-- `ssl_thumbprints` (List of String) SSL certificate thumbprints to consider acceptable for this connection.  If not specified, and the hypervisor uses SSL for its connection, the SSL certificate's root certification authority and any intermediate certificates must be trusted.
+- `ssl_thumbprints` (List of String) SSL certificate thumbprints to consider acceptable for this connection. If not specified, and the hypervisor uses SSL for its connection, the SSL certificate's root certification authority and any intermediate certificates must be trusted.
 
 ### Read-Only
 
 - `id` (String) GUID identifier of the hypervisor.
+- `tenants` (Set of String) A set of identifiers of tenants to associate with the hypervisor connection.
 
 <a id="nestedatt--metadata"></a>
 ### Nested Schema for `metadata`

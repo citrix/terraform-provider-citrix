@@ -215,11 +215,14 @@ resource "citrix_delivery_group" "example-delivery-group" {
 - `session_support` (String) The session support for the delivery group. Can only be set to `SingleSession` or `MultiSession`. Specify only if you want to create a Delivery Group wthout any `associated_machine_catalogs`. Ensure session support is same as that of the prospective Machine Catalogs you will associate this Delivery Group with.
 - `sharing_kind` (String) The sharing kind for the delivery group. Can only be set to `Shared` or `Private`. Specify only if you want to create a Delivery Group wthout any `associated_machine_catalogs`.
 - `storefront_servers` (Set of String) A list of GUID identifiers of StoreFront Servers to associate with the delivery group.
-- `tenants` (Set of String) A set of identifiers of tenants to associate with the delivery group.
+- `tags` (Set of String) A set of identifiers of tags to associate with the delivery group.
 
 ### Read-Only
 
+- `built_in_scopes` (Set of String) The IDs of the built-in scopes of the delivery group.
 - `id` (String) GUID identifier of the delivery group.
+- `inherited_scopes` (Set of String) The IDs of the inherited scopes of the delivery group.
+- `tenants` (Set of String) A set of identifiers of tenants to associate with the delivery group.
 - `total_machines` (Number) The total number of machines in the delivery group.
 
 <a id="nestedatt--app_protection"></a>
@@ -263,9 +266,6 @@ Required:
 Required:
 
 - `autoscale_enabled` (Boolean) Whether auto-scale is enabled for the delivery group.
-- `power_time_schemes` (Attributes List) Power management time schemes.
-
-~> **Please Note** It is not allowed to have more than one power time scheme that cover the same day of the week for the same delivery group. (see [below for nested schema](#nestedatt--autoscale_settings--power_time_schemes))
 
 Optional:
 
@@ -294,6 +294,9 @@ Optional:
 ~> **Please Note** Applies only to multi-session machines. 
 
 -> **Note** By default, the power-off delay is 30 minutes. You can set it in a range of 0 to 60 minutes.
+- `power_time_schemes` (Attributes List) Power management time schemes.
+
+~> **Please Note** It is not allowed to have more than one power time scheme that cover the same day of the week for the same delivery group. (see [below for nested schema](#nestedatt--autoscale_settings--power_time_schemes))
 - `timezone` (String) The time zone in which this delivery group's machines reside.
 
 <a id="nestedatt--autoscale_settings--power_time_schemes"></a>

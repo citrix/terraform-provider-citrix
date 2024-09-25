@@ -3,9 +3,13 @@
 package delivery_group
 
 import (
+	"context"
+
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/vda"
+	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -14,7 +18,9 @@ type DeliveryGroupDataSourceModel struct {
 	Id                      types.String   `tfsdk:"id"`
 	Name                    types.String   `tfsdk:"name"`
 	DeliveryGroupFolderPath types.String   `tfsdk:"delivery_group_folder_path"`
-	Vdas                    []vda.VdaModel `tfsdk:"vdas"` // List[VdaModel]
+	Vdas                    []vda.VdaModel `tfsdk:"vdas"`    // List[VdaModel]
+	Tenants                 types.Set      `tfsdk:"tenants"` // Set[string]
+	Tags                    types.Set      `tfsdk:"tags"`    // Set[string]
 }
 
 func (DeliveryGroupDataSourceModel) GetSchema() schema.Schema {
@@ -38,11 +44,21 @@ func (DeliveryGroupDataSourceModel) GetSchema() schema.Schema {
 				Computed:     true,
 				NestedObject: vda.VdaModel{}.GetSchema(),
 			},
+			"tenants": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "A set of identifiers of tenants to associate with the delivery group.",
+				Computed:    true,
+			},
+			"tags": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "A set of identifiers of tags to associate with the delivery group.",
+				Computed:    true,
+			},
 		},
 	}
 }
 
-func (r DeliveryGroupDataSourceModel) RefreshPropertyValues(deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, vdas *citrixorchestration.MachineResponseModelCollection) DeliveryGroupDataSourceModel {
+func (r DeliveryGroupDataSourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, vdas *citrixorchestration.MachineResponseModelCollection, tags []string) DeliveryGroupDataSourceModel {
 	r.Id = types.StringValue(deliveryGroup.GetId())
 	r.Name = types.StringValue(deliveryGroup.GetName())
 
@@ -73,6 +89,9 @@ func (r DeliveryGroupDataSourceModel) RefreshPropertyValues(deliveryGroup *citri
 	}
 
 	r.Vdas = res
+
+	r.Tenants = util.RefreshTenantSet(ctx, diagnostics, deliveryGroup.GetTenants())
+	r.Tags = util.RefreshTagSet(ctx, diagnostics, tags)
 
 	return r
 }

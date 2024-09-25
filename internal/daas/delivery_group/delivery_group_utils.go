@@ -772,13 +772,6 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 
 	body.SetAdminFolder(plan.DeliveryGroupFolderPath.ValueString())
 
-	if !plan.Tenants.IsNull() {
-		associatedTenants := util.StringSetToStringArray(ctx, diagnostics, plan.Tenants)
-		body.SetTenants(associatedTenants)
-	} else {
-		body.SetTenants([]string{})
-	}
-
 	metadata := util.GetMetadataRequestModel(ctx, diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, plan.Metadata))
 	body.SetMetadata(metadata)
 
@@ -998,13 +991,6 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 	}
 
 	editDeliveryGroupRequestBody.SetAdminFolder(plan.DeliveryGroupFolderPath.ValueString())
-
-	if !plan.Tenants.IsNull() {
-		associatedTenants := util.StringSetToStringArray(ctx, diagnostics, plan.Tenants)
-		editDeliveryGroupRequestBody.SetTenants(associatedTenants)
-	} else {
-		editDeliveryGroupRequestBody.SetTenants([]string{})
-	}
 
 	metadata := util.GetMetadataRequestModel(ctx, diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, plan.Metadata))
 	editDeliveryGroupRequestBody.SetMetadata(metadata)
@@ -1673,9 +1659,17 @@ func (r DeliveryGroupResourceModel) updatePlanWithAutoscaleSettings(ctx context.
 	autoscale.LogoffOffPeakDisconnectedSessionAfterSeconds = types.Int64Value(int64(deliveryGroup.GetLogoffOffPeakDisconnectedSessionAfterSeconds()))
 
 	parsedPowerTimeSchemes := parsePowerTimeSchemesClientToPluginModel(ctx, diags, dgPowerTimeSchemes.GetItems())
-	autoscalePowerTimeSchemes := util.ObjectListToTypedArray[DeliveryGroupPowerTimeScheme](ctx, diags, autoscale.PowerTimeSchemes)
-	parsedPowerTimeSchemes = preserveOrderInPowerTimeSchemes(ctx, diags, autoscalePowerTimeSchemes, parsedPowerTimeSchemes)
-	autoscale.PowerTimeSchemes = util.TypedArrayToObjectList[DeliveryGroupPowerTimeScheme](ctx, diags, parsedPowerTimeSchemes)
+	if parsedPowerTimeSchemes != nil {
+		autoscalePowerTimeSchemes := util.ObjectListToTypedArray[DeliveryGroupPowerTimeScheme](ctx, diags, autoscale.PowerTimeSchemes)
+		parsedPowerTimeSchemes = preserveOrderInPowerTimeSchemes(ctx, diags, autoscalePowerTimeSchemes, parsedPowerTimeSchemes)
+		autoscale.PowerTimeSchemes = util.TypedArrayToObjectList(ctx, diags, parsedPowerTimeSchemes)
+	} else {
+		if attributeMap, err := util.AttributeMapFromObject(DeliveryGroupPowerTimeScheme{}); err == nil {
+			autoscale.PowerTimeSchemes = types.ListNull(types.ObjectType{AttrTypes: attributeMap})
+		} else {
+			diags.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
+		}
+	}
 
 	r.AutoscaleSettings = util.TypedObjectToObjectValue(ctx, diags, autoscale)
 	return r
@@ -1770,11 +1764,11 @@ func getAdvancedAccessPolicyRequest(ctx context.Context, diagnostics *diag.Diagn
 		advancedAccessPolicyRequest.SetIncludedSmartAccessFilterType(*includedSmartAccessFilterType)
 	}
 
-	includedSmartAccessTags := getSmartAccessTagsRequest(ctx, diagnostics, util.ObjectListToTypedArray[DeliveryGroupAccessPolicyCriteriaTagsModel](ctx, diagnostics, accessPolicy.IncludeCriteriaFilters))
+	includedSmartAccessTags := getSmartAccessTagsRequest(util.ObjectListToTypedArray[DeliveryGroupAccessPolicyCriteriaTagsModel](ctx, diagnostics, accessPolicy.IncludeCriteriaFilters))
 	advancedAccessPolicyRequest.SetIncludedSmartAccessTags(includedSmartAccessTags)
 
 	advancedAccessPolicyRequest.SetExcludedSmartAccessFilterEnabled(accessPolicy.EnableCriteriaForExcludeConnections.ValueBool())
-	excludedSmartAccessTags := getSmartAccessTagsRequest(ctx, diagnostics, util.ObjectListToTypedArray[DeliveryGroupAccessPolicyCriteriaTagsModel](ctx, diagnostics, accessPolicy.ExcludeCriteriaFilters))
+	excludedSmartAccessTags := getSmartAccessTagsRequest(util.ObjectListToTypedArray[DeliveryGroupAccessPolicyCriteriaTagsModel](ctx, diagnostics, accessPolicy.ExcludeCriteriaFilters))
 	advancedAccessPolicyRequest.SetExcludedSmartAccessTags(excludedSmartAccessTags)
 
 	return advancedAccessPolicyRequest, nil
@@ -1814,17 +1808,17 @@ func getAdvancedAccessPolicyRequestForDefaultPolicy(ctx context.Context, diagnos
 		advancedAccessPolicyRequest.SetIncludedSmartAccessFilterType(*includedSmartAccessFilterType)
 	}
 
-	includedSmartAccessTags := getSmartAccessTagsRequest(ctx, diagnostics, util.ObjectListToTypedArray[DeliveryGroupAccessPolicyCriteriaTagsModel](ctx, diagnostics, accessPolicy.IncludeCriteriaFilters))
+	includedSmartAccessTags := getSmartAccessTagsRequest(util.ObjectListToTypedArray[DeliveryGroupAccessPolicyCriteriaTagsModel](ctx, diagnostics, accessPolicy.IncludeCriteriaFilters))
 	advancedAccessPolicyRequest.SetIncludedSmartAccessTags(includedSmartAccessTags)
 
 	advancedAccessPolicyRequest.SetExcludedSmartAccessFilterEnabled(accessPolicy.EnableCriteriaForExcludeConnections.ValueBool())
-	excludedSmartAccessTags := getSmartAccessTagsRequest(ctx, diagnostics, util.ObjectListToTypedArray[DeliveryGroupAccessPolicyCriteriaTagsModel](ctx, diagnostics, accessPolicy.ExcludeCriteriaFilters))
+	excludedSmartAccessTags := getSmartAccessTagsRequest(util.ObjectListToTypedArray[DeliveryGroupAccessPolicyCriteriaTagsModel](ctx, diagnostics, accessPolicy.ExcludeCriteriaFilters))
 	advancedAccessPolicyRequest.SetExcludedSmartAccessTags(excludedSmartAccessTags)
 
 	return advancedAccessPolicyRequest, nil
 }
 
-func getSmartAccessTagsRequest(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicyCriteriaTags []DeliveryGroupAccessPolicyCriteriaTagsModel) []citrixorchestration.SmartAccessTagRequestModel {
+func getSmartAccessTagsRequest(accessPolicyCriteriaTags []DeliveryGroupAccessPolicyCriteriaTagsModel) []citrixorchestration.SmartAccessTagRequestModel {
 	smartAccessTagRequests := []citrixorchestration.SmartAccessTagRequestModel{}
 	for _, smartAccessTag := range accessPolicyCriteriaTags {
 		var smartAccessTagRequestModel citrixorchestration.SmartAccessTagRequestModel
@@ -2012,4 +2006,27 @@ func validateAccessPolicyCriteriaTagsModel(diagnostics *diag.Diagnostics, index 
 	}
 
 	return true
+}
+
+func setDeliveryGroupTags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, dgIdOrPath string, tagSet types.Set) {
+	setTagsRequestBody := util.ConstructTagsRequestModel(ctx, diagnostics, tagSet)
+
+	setTagsRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsSetDeliveryGroupTags(ctx, dgIdOrPath)
+	setTagsRequest = setTagsRequest.TagsRequestModel(setTagsRequestBody)
+
+	httpResp, err := citrixdaasclient.AddRequestData(setTagsRequest, client).Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error set tags for Delivery Group "+dgIdOrPath,
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		// Continue without return in order to get other attributes refreshed in state
+	}
+}
+
+func getDeliveryGroupTags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, deliveryGroupId string) []string {
+	getTagsRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroupTags(ctx, deliveryGroupId)
+	tagsResp, httpResp, err := citrixdaasclient.AddRequestData(getTagsRequest, client).Execute()
+	return util.ProcessTagsResponseCollection(diagnostics, tagsResp, httpResp, err, "Delivery Group", deliveryGroupId)
 }

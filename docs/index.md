@@ -55,23 +55,52 @@ provider "citrix" {
 
 Optional:
 
-- `client_id` (String) Client Id for Citrix DaaS service authentication. <br />For Citrix On-Premises customers: Use this to specify a DDC administrator username. <br />For Citrix Cloud customers: Use this to specify Cloud API Key Client Id.<br />Can be set via Environment Variable **CITRIX_CLIENT_ID**.
-- `client_secret` (String, Sensitive) Client Secret for Citrix DaaS service authentication. <br />For Citrix on-premises customers: Use this to specify a DDC administrator password. <br />For Citrix Cloud customers: Use this to specify Cloud API Key Client Secret.<br />Can be set via Environment Variable **CITRIX_CLIENT_SECRET**.
-- `customer_id` (String) Citrix Cloud customer ID. Only applicable for Citrix Cloud customers.<br />Can be set via Environment Variable **CITRIX_CUSTOMER_ID**.
-- `disable_ssl_verification` (Boolean) Disable SSL verification against the target DDC. <br />Only applicable to on-premises customers. Citrix Cloud customers should omit this option. Set to true to skip SSL verification only when the target DDC does not have a valid SSL certificate issued by a trusted CA. <br />When set to true, please make sure that your provider config is set for a known DDC hostname. <br />[It is recommended to configure a valid certificate for the target DDC](https://docs.citrix.com/en-us/citrix-virtual-apps-desktops/install-configure/install-core/secure-web-studio-deployment) <br />Can be set via Environment Variable **CITRIX_DISABLE_SSL_VERIFICATION**.
-- `environment` (String) Citrix Cloud environment of the customer. Only applicable for Citrix Cloud customers. Available options: `Production`, `Staging`, `Japan`, `JapanStaging`, `Gov`, `GovStaging`. <br />Can be set via Environment Variable **CITRIX_ENVIRONMENT**.
-- `hostname` (String) Host name / base URL of Citrix DaaS service. <br />For Citrix on-premises customers (Required): Use this to specify Delivery Controller hostname. <br />For Citrix Cloud customers (Optional): Use this to force override the Citrix DaaS service hostname.<br />Can be set via Environment Variable **CITRIX_HOSTNAME**.
+- `client_id` (String) Client Id for Citrix DaaS service authentication. 
+For Citrix On-Premises customers: Use this to specify a DDC administrator username. 
+For Citrix Cloud customers: Use this to specify Cloud API Key Client Id.
+
+-> **Note** Can be set via Environment Variable **CITRIX_CLIENT_ID**.
+
+~> **Please Note** This parameter is required to be specified in the provider configuration or via environment variable.
+- `client_secret` (String, Sensitive) Client Secret for Citrix DaaS service authentication. 
+For Citrix on-premises customers: Use this to specify a DDC administrator password. 
+For Citrix Cloud customers: Use this to specify Cloud API Key Client Secret.
+
+-> **Note** Can be set via Environment Variable **CITRIX_CLIENT_SECRET**.
+
+~> **Please Note** This parameter is required to be specified in the provider configuration or via environment variable.
+- `customer_id` (String) The Citrix Cloud customer ID.
+
+-> **Note** Can be set via Environment Variable **CITRIX_CUSTOMER_ID**.
+
+~> **Please Note** This parameter is required for Citrix Cloud customers to be specified in the provider configuration or via environment variable.
+- `disable_ssl_verification` (Boolean) Disable SSL verification against the target DDC. 
+Set to true to skip SSL verification only when the target DDC does not have a valid SSL certificate issued by a trusted CA. 
+When set to true, please make sure that your provider config is set for a known DDC hostname. 
+
+-> **Note** Can be set via Environment Variable **CITRIX_DISABLE_SSL_VERIFICATION**.
+
+~> **Please Note** [It is recommended to configure a valid certificate for the target DDC](https://docs.citrix.com/en-us/citrix-virtual-apps-desktops/install-configure/install-core/secure-web-studio-deployment)
+- `environment` (String) Citrix Cloud environment of the customer. Available options: `Production`, `Staging`, `Japan`, `JapanStaging`, `Gov`, `GovStaging`. 
+
+-> **Note** Can be set via Environment Variable **CITRIX_ENVIRONMENT**.
+
+~> **Please Note** Only applicable for Citrix Cloud customers.
+- `hostname` (String) Host name / base URL of Citrix DaaS service. 
+For Citrix on-premises customers: Use this to specify Delivery Controller hostname. 
+For Citrix Cloud customers: Use this to force override the Citrix DaaS service hostname.
+
+-> **Note** Can be set via Environment Variable **CITRIX_HOSTNAME**.
+
+~> **Please Note** This parameter is required for on-premises customers to be specified in the provider configuration or via environment variable.
 
 
 <a id="nestedatt--storefront_remote_host"></a>
 ### Nested Schema for `storefront_remote_host`
 
-Required:
-
-- `ad_admin_password` (String) Active Directory Admin Password to connect to storefront server <br />Only applicable for Citrix on-premises customers. Use this to specify AD admin password<br />Can be set via Environment Variable **SF_AD_ADMIN_PASSWORD**.
-- `ad_admin_username` (String) Active Directory Admin Username to connect to storefront server <br />Only applicable for Citrix on-premises customers. Use this to specify AD admin username <br />Can be set via Environment Variable **SF_AD_ADMIN_USERNAME**.
-- `computer_name` (String) StoreFront server computer Name <br />Only applicable for Citrix on-premises customers. Use this to specify StoreFront server computer name <br />Can be set via Environment Variable **SF_COMPUTER_NAME**.
-
 Optional:
 
+- `ad_admin_password` (String) Active Directory Admin Password to connect to storefront server <br />Use this to specify AD admin password<br />Can be set via Environment Variable **SF_AD_ADMIN_PASSWORD**.<br />This parameter is **required** to be specified in the provider configuration or via environment variable.
+- `ad_admin_username` (String) Active Directory Admin Username to connect to storefront server <br />Use this to specify AD admin username <br />Can be set via Environment Variable **SF_AD_ADMIN_USERNAME**.<br />This parameter is **required** to be specified in the provider configuration or via environment variable.
+- `computer_name` (String) StoreFront server computer Name <br />Use this to specify StoreFront server computer name <br />Can be set via Environment Variable **SF_COMPUTER_NAME**.<br />This parameter is **required** to be specified in the provider configuration or via environment variable.
 - `disable_ssl_verification` (Boolean) Disable SSL verification against the target storefront server. <br />Only applicable to customers connecting to storefront server remotely. Customers should omit this option when running storefront provider locally. Set to true to skip SSL verification only when the target DDC does not have a valid SSL certificate issued by a trusted CA. <br />When set to true, please make sure that your provider storefront_remote_host is set for a known storefront hostname. <br />Can be set via Environment Variable **SF_DISABLE_SSL_VERIFICATION**.

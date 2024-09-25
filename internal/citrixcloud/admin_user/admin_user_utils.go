@@ -60,6 +60,7 @@ func isCustomAccessTypeWithPolicies(adminUserResource CCAdminUserResourceModel) 
 func getAdminUser(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, adminUserResource CCAdminUserResourceModel) (ccadmins.AdministratorResult, error) {
 	adminUserEmail := adminUserResource.Email.ValueString()
 	adminId := adminUserResource.AdminId.ValueString()
+	externalUserId := adminUserResource.ExternalUserId.ValueString()
 
 	// Initialize the request to fetch admin users
 	fetchAdminUsersRequest := client.CCAdminsClient.AdministratorsAPI.FetchAdministrators(ctx)
@@ -76,7 +77,9 @@ func getAdminUser(ctx context.Context, client *citrixdaasclient.CitrixDaasClient
 
 		// Check if the user is already present
 		for _, adminUser := range adminUsersResponse.GetItems() {
-			if adminId != "" && (adminUser.GetUserId() == adminId || adminUser.GetUcOid() == adminId) || (strings.EqualFold(adminUser.GetEmail(), adminUserEmail)) {
+			if (adminId != "" && (adminUser.GetUserId() == adminId || adminUser.GetUcOid() == adminId)) ||
+				(externalUserId != "" && strings.EqualFold(getExternalUserId(adminUser.GetExternalOid()), externalUserId)) ||
+				(adminUserEmail != "" && strings.EqualFold(adminUser.GetEmail(), adminUserEmail)) {
 				return adminUser, nil
 			}
 		}
@@ -88,7 +91,15 @@ func getAdminUser(ctx context.Context, client *citrixdaasclient.CitrixDaasClient
 		fetchAdminUsersRequest = fetchAdminUsersRequest.RequestContinuation(adminUsersResponse.GetContinuationToken())
 	}
 
-	return adminUser, fmt.Errorf("could not find admin user with email: %s", adminUserEmail)
+	var identifier string
+	if adminUserEmail != "" {
+		identifier = fmt.Sprintf("email: %s", adminUserEmail)
+	} else if adminId != "" {
+		identifier = fmt.Sprintf("id: %s", adminId)
+	} else if externalUserId != "" {
+		identifier = fmt.Sprintf("external user id: %s", externalUserId)
+	}
+	return adminUser, fmt.Errorf("could not find admin user %s", identifier)
 }
 
 func getAdminUserPolicies(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, adminUserResourceModel CCAdminUserResourceModel) ([]ccadmins.AdministratorAccessPolicyModel, error) {
@@ -282,4 +293,21 @@ func fetchAndUpdateAdminUser(ctx context.Context, client *citrixdaasclient.Citri
 		plan = plan.RefreshPropertyValuesForPolicies(ctx, diagnostics, accessPolicies)
 	}
 	return plan, nil
+}
+
+// Checks if the provider type exists in the list of legacy providers
+func providerTypeExists(remoteProviderTypes []string, providerType string) bool {
+	if providerType != "" {
+		for _, pt := range remoteProviderTypes {
+			if strings.EqualFold(pt, providerType) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func getExternalUserId(externalOid string) string {
+	externalOidParts := strings.Split(externalOid, "/")
+	return externalOidParts[len(externalOidParts)-1]
 }

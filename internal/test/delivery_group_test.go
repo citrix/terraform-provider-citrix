@@ -3,12 +3,31 @@
 package test
 
 import (
+	"context"
 	"fmt"
+	"log"
+	"net/http"
 	"os"
 	"testing"
 
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
+
+func init() {
+	resource.AddTestSweepers("citrix_delivery_group", &resource.Sweeper{
+		Name: "citrix_delivery_group",
+		F: func(hypervisor string) error {
+			ctx := context.Background()
+			client := sharedClientForSweepers(ctx)
+
+			deliveryGroupName := os.Getenv("TEST_DG_NAME")
+			err := deliveryGroupSweeper(ctx, deliveryGroupName, client)
+			return err
+		},
+	})
+}
 
 // testHypervisorPreCheck validates the necessary env variable exist
 // in the testing environment
@@ -396,4 +415,22 @@ func BuildPolicySetResourceWithoutDeliveryGroup(t *testing.T) string {
 	policySetName := os.Getenv("TEST_POLICY_SET_WITHOUT_DG_NAME")
 
 	return fmt.Sprintf(policy_set_no_delivery_group_testResource, policySetName)
+}
+
+func deliveryGroupSweeper(ctx context.Context, deliveryGroupName string, client *citrixclient.CitrixDaasClient) error {
+	getDeliveryGroupRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroup(ctx, deliveryGroupName)
+	deliveryGroup, httpResp, err := citrixclient.ExecuteWithRetry[*citrixorchestration.DeliveryGroupDetailResponseModel](getDeliveryGroupRequest, client)
+	if err != nil {
+		if httpResp.StatusCode == http.StatusNotFound {
+			// Resource does not exist in remote, no need to delete
+			return nil
+		}
+		return fmt.Errorf("Error getting delivery group: %s", err)
+	}
+	deleteDeliveryGroupRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsDeleteDeliveryGroup(ctx, deliveryGroup.GetId())
+	httpResp, err = citrixclient.AddRequestData(deleteDeliveryGroupRequest, client).Execute()
+	if err != nil && httpResp.StatusCode != http.StatusNotFound {
+		log.Printf("Error destroying %s during sweep: %s", deliveryGroupName, err)
+	}
+	return nil
 }

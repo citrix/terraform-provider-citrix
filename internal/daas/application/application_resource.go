@@ -151,8 +151,10 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
+	tags := getApplicationTags(ctx, &resp.Diagnostics, r.client, applicationName)
+
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, application, applicationDeliveryGroups)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, application, applicationDeliveryGroups, tags)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -185,7 +187,9 @@ func (r *applicationResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, application, applicationDeliveryGroups)
+	tags := getApplicationTags(ctx, &resp.Diagnostics, r.client, state.Id.ValueString())
+
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, application, applicationDeliveryGroups, tags)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -278,8 +282,10 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
+	tags := getApplicationTags(ctx, &resp.Diagnostics, r.client, applicationId)
+
 	// Update resource state with updated property values
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, application, applicationDeliveryGroups)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, application, applicationDeliveryGroups, tags)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -464,4 +470,10 @@ func validateDeliveryGroupsPriority(ctx context.Context, diagnostics *diag.Diagn
 			}
 		}
 	}
+}
+
+func getApplicationTags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, applicationId string) []string {
+	getTagsRequest := client.ApiClient.ApplicationsAPIsDAAS.ApplicationsGetApplicationTags(ctx, applicationId)
+	tagsResp, httpResp, err := citrixdaasclient.AddRequestData(getTagsRequest, client).Execute()
+	return util.ProcessTagsResponseCollection(diagnostics, tagsResp, httpResp, err, "Application", applicationId)
 }

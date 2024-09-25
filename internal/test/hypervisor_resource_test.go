@@ -3,12 +3,39 @@
 package test
 
 import (
+	"context"
 	"fmt"
+	"log"
+	"net/http"
 	"os"
 	"testing"
 
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
+
+func init() {
+	resource.AddTestSweepers("citrix_hypervisor", &resource.Sweeper{
+		Name: "citrix_hypervisor",
+		F: func(hypervisor string) error {
+			ctx := context.Background()
+			client := sharedClientForSweepers(ctx)
+
+			// Default hypervisor to Azure
+			hypervisorName := os.Getenv("TEST_HYPERV_NAME_AZURE")
+			if hypervisor == "aws" {
+				hypervisorName = os.Getenv("TEST_HYPERV_NAME_AWS_EC2")
+			}
+			if hypervisor == "gcp" {
+				hypervisorName = os.Getenv("TEST_HYPERV_NAME_GCP")
+			}
+			err := hypervisorSweeper(ctx, hypervisorName, client)
+			return err
+		},
+		Dependencies: []string{"citrix_hypervisor_resource_pool"},
+	})
+}
 
 // testHypervisorPreCheck validates the necessary env variable exist
 // in the testing environment
@@ -752,4 +779,22 @@ func BuildHypervisorResourceAwsEc2(t *testing.T, hypervisor string) string {
 	region := os.Getenv("TEST_HYPERV_REGION_AWS_EC2")
 	zoneValueForHypervisor := "citrix_zone.test.id"
 	return fmt.Sprintf(hypervisor, name, zoneValueForHypervisor, api_key, secret_key, region)
+}
+
+func hypervisorSweeper(ctx context.Context, hypervisorName string, client *citrixclient.CitrixDaasClient) error {
+	getHypervisorRequest := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisor(ctx, hypervisorName)
+	hypervisor, httpResp, err := citrixclient.ExecuteWithRetry[*citrixorchestration.HypervisorDetailResponseModel](getHypervisorRequest, client)
+	if err != nil {
+		if httpResp.StatusCode == http.StatusNotFound {
+			// Resource does not exist in remote, no need to delete
+			return nil
+		}
+		return fmt.Errorf("Error getting hypervisor: %s", err)
+	}
+	deleteHypervisorRequest := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsDeleteHypervisor(ctx, hypervisor.GetId())
+	httpResp, err = citrixclient.AddRequestData(deleteHypervisorRequest, client).Execute()
+	if err != nil && httpResp.StatusCode != http.StatusNotFound {
+		log.Printf("Error destroying %s during sweep: %s", hypervisorName, err)
+	}
+	return nil
 }

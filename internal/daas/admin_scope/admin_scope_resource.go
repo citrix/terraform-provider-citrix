@@ -70,6 +70,7 @@ func (r *adminScopeResource) Create(ctx context.Context, req resource.CreateRequ
 	var body citrixorchestration.CreateAdminScopeRequestModel
 	body.SetName(plan.Name.ValueString())
 	body.SetDescription(plan.Description.ValueString())
+	body.SetIsTenantScope(plan.IsTenantScope.ValueBool())
 
 	createAdminScopeRequest := r.client.ApiClient.AdminAPIsDAAS.AdminCreateAdminScope(ctx)
 	createAdminScopeRequest = createAdminScopeRequest.CreateAdminScopeRequestModel(body)
@@ -250,6 +251,34 @@ func (r *adminScopeResource) ModifyPlan(ctx context.Context, req resource.Modify
 
 	if r.client != nil && r.client.ApiClient == nil {
 		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
+		return
+	}
+
+	if req.Plan.Raw.IsNull() {
+		// No plan to modify. Return
+		return
+	}
+
+	create := req.State.Raw.IsNull()
+
+	var plan AdminScopeResourceModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	operation := "updating"
+	if create {
+		operation = "creating"
+	}
+
+	if plan.IsTenantScope.ValueBool() && r.client.ClientConfig.IsCspCustomer {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("is_tenant_scope"),
+			"Error "+operation+" Admin Scope "+plan.Name.ValueString(),
+			"Tenant scopes are created automatically when the tenants are onboarded to the Citrix Service Provider customer. Add a tenant to this customer to create the tenant scope.",
+		)
 		return
 	}
 }

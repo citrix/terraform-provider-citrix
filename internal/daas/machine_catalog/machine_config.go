@@ -1013,7 +1013,7 @@ func (ImageUpdateRebootOptionsModel) GetSchema() schema.SingleNestedAttribute {
 		Attributes: map[string]schema.Attribute{
 			"reboot_duration": schema.Int64Attribute{
 				Description: "Approximate maximum duration over which the reboot cycle runs, in minutes. " +
-					"Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. " +
+					"-> **Note** Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. " +
 					"Set to `0` to reboot all machines immediately.",
 				Required: true,
 				Validators: []validator.Int64{
@@ -1021,17 +1021,20 @@ func (ImageUpdateRebootOptionsModel) GetSchema() schema.SingleNestedAttribute {
 				},
 			},
 			"warning_duration": schema.Int64Attribute{
-				Description: "Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.",
-				Optional:    true,
+				Description: "Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session." +
+					"-> **Note** When `reboot_duration` is set to `-1`, if a warning message should be displayed, `warning_duration` has to be set to `-1` to show the warning message immediately." +
+					"-> **Note** When `reboot_duration` is not set to `-1`, `warning_duration` cannot be set to `-1`.",
+				Optional: true,
 				Validators: []validator.Int64{
-					int64validator.AtLeast(1),
+					int64validator.AtLeast(-1),
+					int64validator.NoneOf(0),
 					int64validator.AlsoRequires(path.Expressions{
 						path.MatchRelative().AtParent().AtName("warning_message"),
 					}...),
 				},
 			},
 			"warning_message": schema.StringAttribute{
-				Description: "Warning message displayed in user sessions on a machine scheduled for a reboot.  The optional pattern '%m%' is replaced by the number of minutes until the reboot.",
+				Description: "Warning message displayed in user sessions on a machine scheduled for a reboot. The optional pattern '%m%' is replaced by the number of minutes until the reboot.",
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
@@ -1057,11 +1060,19 @@ func (ImageUpdateRebootOptionsModel) GetAttributes() map[string]schema.Attribute
 
 func (rebootOptions ImageUpdateRebootOptionsModel) ValidateConfig(diagnostics *diag.Diagnostics) {
 	rebootDuration := int32(rebootOptions.RebootDuration.ValueInt64())
-	if rebootDuration == -1 && !rebootOptions.WarningDuration.IsNull() {
+	warningDuration := int32(rebootOptions.WarningDuration.ValueInt64())
+	if rebootDuration == -1 && warningDuration > 0 {
 		diagnostics.AddAttributeError(
 			path.Root("warning_duration"),
 			"Invalid Reboot Warning Duration",
-			"warning_duration cannot be set when reboot_duration is set to -1.",
+			"warning_duration can only be set to -1 or 0 when reboot_duration is set to -1.",
+		)
+	}
+	if rebootDuration != -1 && warningDuration == -1 {
+		diagnostics.AddAttributeError(
+			path.Root("warning_duration"),
+			"Invalid Reboot Warning Duration",
+			"warning_duration cannot be set to -1 when reboot_duration is not set to -1.",
 		)
 	}
 	if !rebootOptions.WarningRepeatInterval.IsNull() && rebootOptions.WarningRepeatInterval.ValueInt64() >= rebootOptions.WarningDuration.ValueInt64() {
@@ -1091,19 +1102,7 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 			resourceTag := strings.Split(segments[lastIndex-1], ".")
 			resourceType := resourceTag[len(resourceTag)-1]
 
-			if strings.EqualFold(resourceType, util.VhdResourceType) {
-				// VHD image
-				azureMasterImage.MasterImage = types.StringValue(masterImage.GetName())
-				azureMasterImage.Container = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".container"))
-				azureMasterImage.StorageAccount = types.StringValue(strings.TrimSuffix(segments[lastIndex-3], ".storageaccount"))
-				azureMasterImage.ResourceGroup = types.StringValue(strings.TrimSuffix(segments[lastIndex-4], ".resourcegroup"))
-
-				segment := strings.Split(segments[lastIndex-5], ".")
-				resourceType := segment[len(segment)-1]
-				if strings.EqualFold(resourceType, util.SharedSubscriptionResourceType) {
-					azureMasterImage.SharedSubscription = types.StringValue(segment[0])
-				}
-			} else if strings.EqualFold(resourceType, util.ImageVersionResourceType) {
+			if strings.EqualFold(resourceType, util.ImageVersionResourceType) {
 				/* For Azure Image Gallery image, the XDPath looks like:
 				* XDHyp:\\HostingUnits\\{resource pool}\\image.folder\\{resource group}.resourcegroup\\{gallery name}.gallery\\{image name}.imagedefinition\\{image version}.imageversion
 				* The Name property in MasterImage will be image version instead of image definition (name of the image)
@@ -1122,16 +1121,51 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 				if strings.EqualFold(resourceType, util.SharedSubscriptionResourceType) {
 					azureMasterImage.SharedSubscription = types.StringValue(segment[0])
 				} else {
-					azureMasterImage.SharedSubscription = types.StringValue("")
+					azureMasterImage.SharedSubscription = types.StringNull()
 				}
+
+				// Clear other master image details
+				azureMasterImage.MasterImage = types.StringNull()
+				azureMasterImage.StorageAccount = types.StringNull()
+				azureMasterImage.Container = types.StringNull()
 			} else {
-				// Snapshot or Managed Disk
-				azureMasterImage.MasterImage = types.StringValue(masterImage.GetName())
-				azureMasterImage.ResourceGroup = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".resourcegroup"))
-				segment := strings.Split(segments[lastIndex-3], ".")
-				resourceType := segment[len(segment)-1]
-				if strings.EqualFold(resourceType, util.SharedSubscriptionResourceType) {
-					azureMasterImage.SharedSubscription = types.StringValue(segment[0])
+				if strings.EqualFold(resourceType, util.VhdResourceType) {
+					// VHD image
+					azureMasterImage.MasterImage = types.StringValue(masterImage.GetName())
+					azureMasterImage.Container = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".container"))
+					azureMasterImage.StorageAccount = types.StringValue(strings.TrimSuffix(segments[lastIndex-3], ".storageaccount"))
+					azureMasterImage.ResourceGroup = types.StringValue(strings.TrimSuffix(segments[lastIndex-4], ".resourcegroup"))
+
+					segment := strings.Split(segments[lastIndex-5], ".")
+					resourceType := segment[len(segment)-1]
+					if strings.EqualFold(resourceType, util.SharedSubscriptionResourceType) {
+						azureMasterImage.SharedSubscription = types.StringValue(segment[0])
+					} else {
+						azureMasterImage.SharedSubscription = types.StringNull()
+					}
+				} else {
+					// Snapshot or Managed Disk
+					azureMasterImage.MasterImage = types.StringValue(masterImage.GetName())
+					azureMasterImage.ResourceGroup = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".resourcegroup"))
+					segment := strings.Split(segments[lastIndex-3], ".")
+					resourceType := segment[len(segment)-1]
+					if strings.EqualFold(resourceType, util.SharedSubscriptionResourceType) {
+						azureMasterImage.SharedSubscription = types.StringValue(segment[0])
+					} else {
+						azureMasterImage.SharedSubscription = types.StringNull()
+					}
+
+					// Clear VHD image details
+					azureMasterImage.StorageAccount = types.StringNull()
+					azureMasterImage.Container = types.StringNull()
+				}
+
+				// Clear gallery image details
+				attributeMap, err := util.AttributeMapFromObject(GalleryImageModel{})
+				if err != nil {
+					diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
+				} else {
+					azureMasterImage.GalleryImage = types.ObjectNull(attributeMap)
 				}
 			}
 		}
@@ -1170,16 +1204,19 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 	}
 
 	// Refresh Writeback Cache
+	azureWbcModel := util.ObjectValueToTypedObject[AzureWritebackCacheModel](ctx, diagnostics, mc.WritebackCache)
 	wbcDiskSize := provScheme.GetWriteBackCacheDiskSizeGB()
 	wbcMemorySize := provScheme.GetWriteBackCacheMemorySizeMB()
 	if wbcDiskSize != 0 {
-		azureWbcModel := AzureWritebackCacheModel{}
 		azureWbcModel.WriteBackCacheDiskSizeGB = types.Int64Value(int64(provScheme.GetWriteBackCacheDiskSizeGB()))
 		if wbcMemorySize != 0 {
 			azureWbcModel.WriteBackCacheMemorySizeMB = types.Int64Value(int64(provScheme.GetWriteBackCacheMemorySizeMB()))
 		}
-
-		mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, azureWbcModel)
+		// default bool values to false because Orchestration won't return them in the custom properties
+		azureWbcModel.PersistOsDisk = types.BoolValue(false)
+		azureWbcModel.PersistVm = types.BoolValue(false)
+		azureWbcModel.PersistWBC = types.BoolValue(false)
+		azureWbcModel.StorageCostSaving = types.BoolValue(false)
 	}
 
 	if provScheme.GetDeviceManagementType() == citrixorchestration.DEVICEMANAGEMENTTYPE_INTUNE {
@@ -1205,35 +1242,15 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 		case "ResourceGroups":
 			mc.VdaResourceGroup = types.StringValue(stringPair.GetValue())
 		case "WBCDiskStorageType":
-			if !mc.WritebackCache.IsNull() {
-				azureWbcModel := util.ObjectValueToTypedObject[AzureWritebackCacheModel](ctx, diagnostics, mc.WritebackCache)
-				azureWbcModel.WBCDiskStorageType = types.StringValue(stringPair.GetValue())
-				mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, azureWbcModel)
-			}
+			azureWbcModel.WBCDiskStorageType = types.StringValue(stringPair.GetValue())
 		case "PersistWBC":
-			if !mc.WritebackCache.IsNull() {
-				azureWbcModel := util.ObjectValueToTypedObject[AzureWritebackCacheModel](ctx, diagnostics, mc.WritebackCache)
-				azureWbcModel.PersistWBC = util.StringToTypeBool(stringPair.GetValue())
-				mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, azureWbcModel)
-			}
+			azureWbcModel.PersistWBC = util.StringToTypeBool(stringPair.GetValue())
 		case "PersistOsDisk":
-			if !mc.WritebackCache.IsNull() {
-				azureWbcModel := util.ObjectValueToTypedObject[AzureWritebackCacheModel](ctx, diagnostics, mc.WritebackCache)
-				azureWbcModel.PersistOsDisk = util.StringToTypeBool(stringPair.GetValue())
-				mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, azureWbcModel)
-			}
+			azureWbcModel.PersistOsDisk = util.StringToTypeBool(stringPair.GetValue())
 		case "PersistVm":
-			if !mc.WritebackCache.IsNull() {
-				azureWbcModel := util.ObjectValueToTypedObject[AzureWritebackCacheModel](ctx, diagnostics, mc.WritebackCache)
-				azureWbcModel.PersistVm = util.StringToTypeBool(stringPair.GetValue())
-				mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, azureWbcModel)
-			}
+			azureWbcModel.PersistVm = util.StringToTypeBool(stringPair.GetValue())
 		case "StorageTypeAtShutdown":
-			if !mc.WritebackCache.IsNull() {
-				azureWbcModel := util.ObjectValueToTypedObject[AzureWritebackCacheModel](ctx, diagnostics, mc.WritebackCache)
-				azureWbcModel.StorageCostSaving = types.BoolValue(true)
-				mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, azureWbcModel)
-			}
+			azureWbcModel.StorageCostSaving = types.BoolValue(true)
 		case "LicenseType":
 			licenseType := stringPair.GetValue()
 			if licenseType == "" {
@@ -1285,6 +1302,11 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 		}
 	}
 
+	if wbcDiskSize != 0 {
+		// Finish refresh Writeback Cache
+		mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, azureWbcModel)
+	}
+
 	if !isLicenseTypeSet && !mc.LicenseType.IsNull() {
 		mc.LicenseType = types.StringNull()
 	}
@@ -1320,6 +1342,7 @@ func (mc *AwsMachineConfigModel) RefreshProperties(ctx context.Context, diagnost
 	 * The Name property in MasterImage will be image name without ami id appended
 	 */
 	mc.MasterImage = types.StringValue(strings.Split(masterImage.GetName(), " (ami-")[0])
+	mc.ImageAmi = types.StringValue(strings.TrimSuffix((strings.Split(masterImage.GetName(), " (")[1]), ")"))
 
 	// Refresh Master Image Note
 	currentDiskImage := provScheme.GetCurrentDiskImage()
@@ -1374,13 +1397,13 @@ func (mc *GcpMachineConfigModel) RefreshProperties(ctx context.Context, diagnost
 	writebackCache := util.ObjectValueToTypedObject[GcpWritebackCacheModel](ctx, diagnostics, mc.WritebackCache)
 
 	if wbcDiskSize != 0 {
-		if mc.WritebackCache.IsNull() {
-			writebackCache = GcpWritebackCacheModel{}
-		}
 		writebackCache.WriteBackCacheDiskSizeGB = types.Int64Value(int64(provScheme.GetWriteBackCacheDiskSizeGB()))
 		if wbcMemorySize != 0 {
 			writebackCache.WriteBackCacheMemorySizeMB = types.Int64Value(int64(provScheme.GetWriteBackCacheMemorySizeMB()))
 		}
+		// default bool values to false because Orchestration won't return them in the custom properties
+		writebackCache.PersistOsDisk = types.BoolValue(false)
+		writebackCache.PersistWBC = types.BoolValue(false)
 	}
 
 	mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, writebackCache)
@@ -1392,17 +1415,11 @@ func (mc *GcpMachineConfigModel) RefreshProperties(ctx context.Context, diagnost
 		case "StorageType":
 			mc.StorageType = types.StringValue(stringPair.GetValue())
 		case "WBCDiskStorageType":
-			if !mc.WritebackCache.IsNull() {
-				writebackCache.WBCDiskStorageType = types.StringValue(stringPair.GetValue())
-			}
+			writebackCache.WBCDiskStorageType = types.StringValue(stringPair.GetValue())
 		case "PersistWBC":
-			if !mc.WritebackCache.IsNull() {
-				writebackCache.PersistWBC = util.StringToTypeBool(stringPair.GetValue())
-			}
+			writebackCache.PersistWBC = util.StringToTypeBool(stringPair.GetValue())
 		case "PersistOsDisk":
-			if !mc.WritebackCache.IsNull() {
-				writebackCache.PersistOsDisk = util.StringToTypeBool(stringPair.GetValue())
-			}
+			writebackCache.PersistOsDisk = util.StringToTypeBool(stringPair.GetValue())
 		default:
 		}
 	}
@@ -1469,9 +1486,6 @@ func (mc *XenserverMachineConfigModel) RefreshProperties(ctx context.Context, di
 	wbcMemorySize := provScheme.GetWriteBackCacheMemorySizeMB()
 	writebackCache := util.ObjectValueToTypedObject[XenserverWritebackCacheModel](ctx, diagnostics, mc.WritebackCache)
 	if wbcDiskSize != 0 {
-		if mc.WritebackCache.IsNull() {
-			writebackCache = XenserverWritebackCacheModel{}
-		}
 		writebackCache.WriteBackCacheDiskSizeGB = types.Int64Value(int64(provScheme.GetWriteBackCacheDiskSizeGB()))
 		if wbcMemorySize != 0 {
 			writebackCache.WriteBackCacheMemorySizeMB = types.Int64Value(int64(provScheme.GetWriteBackCacheMemorySizeMB()))

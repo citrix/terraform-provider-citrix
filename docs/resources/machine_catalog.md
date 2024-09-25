@@ -452,12 +452,15 @@ resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
 - `provisioning_scheme` (Attributes) Machine catalog provisioning scheme. Required when `provisioning_type = MCS` or `provisioning_type = PVS_STREAMING`. (see [below for nested schema](#nestedatt--provisioning_scheme))
 - `remote_pc_ous` (Attributes List) Organizational Units to be included in the Remote PC machine catalog. Only to be used when `is_remote_pc = true`. For adding machines, use `machine_accounts`. (see [below for nested schema](#nestedatt--remote_pc_ous))
 - `scopes` (Set of String) The IDs of the scopes for the machine catalog to be a part of.
-- `tenants` (Set of String) A set of identifiers of tenants to associate with the machine catalog.
+- `tags` (Set of String) A set of identifiers of tags to associate with the machine catalog.
 - `vda_upgrade_type` (String) Type of Vda Upgrade. Choose between LTSR and CR. When omitted, Vda Upgrade is disabled.
 
 ### Read-Only
 
+- `built_in_scopes` (Set of String) The IDs of the built_in scopes of the machine catalog.
 - `id` (String) GUID identifier of the machine catalog.
+- `inherited_scopes` (Set of String) The IDs of the inherited scopes of the machine catalog.
+- `tenants` (Set of String) A set of identifiers of tenants to associate with the machine catalog.
 
 <a id="nestedatt--machine_accounts"></a>
 ### Nested Schema for `machine_accounts`
@@ -521,7 +524,7 @@ Optional:
 - `metadata` (Attributes List) Metadata for the Provisioning Scheme
 
 ~> **Please Note** Metadata for Provisioning Scheme once set cannot be updated or removed. (see [below for nested schema](#nestedatt--provisioning_scheme--metadata))
-- `network_mapping` (Attributes List) Specifies how the attached NICs are mapped to networks. If this parameter is omitted, provisioned VMs are created with a single NIC, which is mapped to the default network in the hypervisor resource pool.  If this parameter is supplied, machines are created with the number of NICs specified in the map, and each NIC is attached to the specified network.<br />Required when `provisioning_scheme.identity_type` is `AzureAD`. (see [below for nested schema](#nestedatt--provisioning_scheme--network_mapping))
+- `network_mapping` (Attributes List) Specifies how the attached NICs are mapped to networks. If this parameter is omitted, provisioned VMs are created with a single NIC, which is mapped to the default network in the hypervisor resource pool. If this parameter is supplied, machines are created with the number of NICs specified in the map, and each NIC is attached to the specified network.<br />Required when `provisioning_scheme.identity_type` is `AzureAD`. (see [below for nested schema](#nestedatt--provisioning_scheme--network_mapping))
 - `nutanix_machine_config` (Attributes) Machine Configuration For Nutanix MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--nutanix_machine_config))
 - `scvmm_machine_config` (Attributes) Machine Configuration for SCVMM MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--scvmm_machine_config))
 - `vsphere_machine_config` (Attributes) Machine Configuration for vSphere MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--vsphere_machine_config))
@@ -557,12 +560,12 @@ Optional:
 
 Required:
 
-- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
+- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. -> **Note** Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
 
 Optional:
 
-- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.
-- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot.  The optional pattern '%m%' is replaced by the number of minutes until the reboot.
+- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.-> **Note** When `reboot_duration` is set to `-1`, if a warning message should be displayed, `warning_duration` has to be set to `-1` to show the warning message immediately.-> **Note** When `reboot_duration` is not set to `-1`, `warning_duration` cannot be set to `-1`.
+- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot. The optional pattern '%m%' is replaced by the number of minutes until the reboot.
 - `warning_repeat_interval` (Number) Number of minutes to wait before showing the reboot warning message again.
 
 
@@ -639,12 +642,12 @@ Required:
 
 Required:
 
-- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
+- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. -> **Note** Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
 
 Optional:
 
-- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.
-- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot.  The optional pattern '%m%' is replaced by the number of minutes until the reboot.
+- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.-> **Note** When `reboot_duration` is set to `-1`, if a warning message should be displayed, `warning_duration` has to be set to `-1` to show the warning message immediately.-> **Note** When `reboot_duration` is not set to `-1`, `warning_duration` cannot be set to `-1`.
+- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot. The optional pattern '%m%' is replaced by the number of minutes until the reboot.
 - `warning_repeat_interval` (Number) Number of minutes to wait before showing the reboot warning message again.
 
 
@@ -719,12 +722,12 @@ Optional:
 
 Required:
 
-- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
+- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. -> **Note** Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
 
 Optional:
 
-- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.
-- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot.  The optional pattern '%m%' is replaced by the number of minutes until the reboot.
+- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.-> **Note** When `reboot_duration` is set to `-1`, if a warning message should be displayed, `warning_duration` has to be set to `-1` to show the warning message immediately.-> **Note** When `reboot_duration` is not set to `-1`, `warning_duration` cannot be set to `-1`.
+- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot. The optional pattern '%m%' is replaced by the number of minutes until the reboot.
 - `warning_repeat_interval` (Number) Number of minutes to wait before showing the reboot warning message again.
 
 
@@ -794,12 +797,12 @@ Optional:
 
 Required:
 
-- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
+- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. -> **Note** Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
 
 Optional:
 
-- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.
-- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot.  The optional pattern '%m%' is replaced by the number of minutes until the reboot.
+- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.-> **Note** When `reboot_duration` is set to `-1`, if a warning message should be displayed, `warning_duration` has to be set to `-1` to show the warning message immediately.-> **Note** When `reboot_duration` is not set to `-1`, `warning_duration` cannot be set to `-1`.
+- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot. The optional pattern '%m%' is replaced by the number of minutes until the reboot.
 - `warning_repeat_interval` (Number) Number of minutes to wait before showing the reboot warning message again.
 
 
@@ -826,12 +829,12 @@ Optional:
 
 Required:
 
-- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
+- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. -> **Note** Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
 
 Optional:
 
-- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.
-- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot.  The optional pattern '%m%' is replaced by the number of minutes until the reboot.
+- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.-> **Note** When `reboot_duration` is set to `-1`, if a warning message should be displayed, `warning_duration` has to be set to `-1` to show the warning message immediately.-> **Note** When `reboot_duration` is not set to `-1`, `warning_duration` cannot be set to `-1`.
+- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot. The optional pattern '%m%' is replaced by the number of minutes until the reboot.
 - `warning_repeat_interval` (Number) Number of minutes to wait before showing the reboot warning message again.
 
 
@@ -871,12 +874,12 @@ Optional:
 
 Required:
 
-- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
+- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. -> **Note** Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
 
 Optional:
 
-- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.
-- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot.  The optional pattern '%m%' is replaced by the number of minutes until the reboot.
+- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.-> **Note** When `reboot_duration` is set to `-1`, if a warning message should be displayed, `warning_duration` has to be set to `-1` to show the warning message immediately.-> **Note** When `reboot_duration` is not set to `-1`, `warning_duration` cannot be set to `-1`.
+- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot. The optional pattern '%m%' is replaced by the number of minutes until the reboot.
 - `warning_repeat_interval` (Number) Number of minutes to wait before showing the reboot warning message again.
 
 
@@ -915,12 +918,12 @@ Optional:
 
 Required:
 
-- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
+- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. -> **Note** Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
 
 Optional:
 
-- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.
-- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot.  The optional pattern '%m%' is replaced by the number of minutes until the reboot.
+- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.-> **Note** When `reboot_duration` is set to `-1`, if a warning message should be displayed, `warning_duration` has to be set to `-1` to show the warning message immediately.-> **Note** When `reboot_duration` is not set to `-1`, `warning_duration` cannot be set to `-1`.
+- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot. The optional pattern '%m%' is replaced by the number of minutes until the reboot.
 - `warning_repeat_interval` (Number) Number of minutes to wait before showing the reboot warning message again.
 
 
