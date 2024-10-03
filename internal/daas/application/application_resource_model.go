@@ -6,6 +6,7 @@ import (
 	"context"
 	"regexp"
 	"sort"
+	"strings"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
@@ -166,6 +167,10 @@ func (ApplicationResourceModel) GetSchema() schema.Schema {
 			"application_folder_path": schema.StringAttribute{
 				Description: "The application folder path in which the application should be created.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathWithBackslashRegex), "Admin Folder Path must not start or end with a backslash"),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathSpecialCharactersRegex), "Admin Folder Path must not contain any of the following special characters: / ; : # . * ? = < > | [ ] ( ) { } \" ' ` ~ "),
+				},
 			},
 			"icon": schema.StringAttribute{
 				Description: "The Id of the icon to be associated with the application.",
@@ -229,8 +234,10 @@ func (r ApplicationResourceModel) RefreshPropertyValues(ctx context.Context, dia
 	r.ApplicationCategoryPath = types.StringValue(application.GetClientFolder())
 
 	// Set optional values
-	if *application.GetApplicationFolder().Name.Get() != "" {
-		r.ApplicationFolderPath = types.StringValue(*application.GetApplicationFolder().Name.Get())
+	adminFolder := application.GetApplicationFolder()
+	adminFolderPath := strings.TrimSuffix(adminFolder.GetName(), "\\")
+	if adminFolderPath != "" {
+		r.ApplicationFolderPath = types.StringValue(adminFolderPath)
 	} else {
 		r.ApplicationFolderPath = types.StringNull()
 	}

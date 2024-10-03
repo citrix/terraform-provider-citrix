@@ -4,12 +4,16 @@ package delivery_group
 
 import (
 	"context"
+	"regexp"
+	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/vda"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -38,6 +42,10 @@ func (DeliveryGroupDataSourceModel) GetSchema() schema.Schema {
 			"delivery_group_folder_path": schema.StringAttribute{
 				Description: "The path to the folder in which the delivery group is located.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathWithBackslashRegex), "Admin Folder Path must not start or end with a backslash"),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathSpecialCharactersRegex), "Admin Folder Path must not contain any of the following special characters: / ; : # . * ? = < > | [ ] ( ) { } \" ' ` ~ "),
+				},
 			},
 			"vdas": schema.ListNestedAttribute{
 				Description:  "The VDAs associated with the delivery group.",
@@ -63,7 +71,7 @@ func (r DeliveryGroupDataSourceModel) RefreshPropertyValues(ctx context.Context,
 	r.Name = types.StringValue(deliveryGroup.GetName())
 
 	adminFolder := deliveryGroup.GetAdminFolder()
-	adminFolderPath := adminFolder.GetName()
+	adminFolderPath := strings.TrimSuffix(adminFolder.GetName(), "\\")
 	if adminFolderPath != "" {
 		r.DeliveryGroupFolderPath = types.StringValue(adminFolderPath)
 	} else {

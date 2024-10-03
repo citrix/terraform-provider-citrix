@@ -474,6 +474,10 @@
         // Tag Resource Go Tests Env Variables
         "TEST_TAG_RESOURCE_NAME": "{Name of the tag resource}",
         "TEST_TAG_RESOURCE_DESCRIPTION": "{Description of the tag resource}"
+
+        // Wem Resource Go Tests Env Variables
+        "TEST_WEM_SITE_RESOURCE_NAME": "{Name of the WEM Site Resource}",
+        "TEST_WEM_SITE_RESOURCE_DESCRIPTION": "{Description of the WEM Site Resource}",
     },
     "go.testTimeout": "120m"
 }

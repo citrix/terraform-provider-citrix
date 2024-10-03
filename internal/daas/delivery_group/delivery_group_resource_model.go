@@ -1095,6 +1095,10 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 			"delivery_group_folder_path": schema.StringAttribute{
 				Description: "The path of the folder in which the delivery group is located.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathWithBackslashRegex), "Admin Folder Path must not start or end with a backslash"),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathSpecialCharactersRegex), "Admin Folder Path must not contain any of the following special characters: / ; : # . * ? = < > | [ ] ( ) { } \" ' ` ~ "),
+				},
 			},
 			"tenants": schema.SetAttribute{
 				ElementType: types.StringType,
@@ -1186,7 +1190,7 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 	}
 
 	adminFolder := deliveryGroup.GetAdminFolder()
-	adminFolderPath := adminFolder.GetName()
+	adminFolderPath := strings.TrimSuffix(adminFolder.GetName(), "\\")
 	if adminFolderPath != "" {
 		r.DeliveryGroupFolderPath = types.StringValue(adminFolderPath)
 	} else {

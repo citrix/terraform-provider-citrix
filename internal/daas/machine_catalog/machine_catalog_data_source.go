@@ -61,12 +61,18 @@ func (d *MachineCatalogDataSource) Read(ctx context.Context, req datasource.Read
 	}
 
 	// Get refreshed machine catalog state from Orchestration
-	machineCatalogPath := strings.ReplaceAll(data.MachineCatalogFolderPath.ValueString(), "\\", "|") + data.Name.ValueString()
+	machineCatalogName := data.Name.ValueString()
+	machineCatalogPath := strings.ReplaceAll(data.MachineCatalogFolderPath.ValueString(), "\\", "|")
+	if machineCatalogPath != "" {
+		machineCatalogPath = machineCatalogPath + "|" + machineCatalogName
+	} else {
+		machineCatalogPath += machineCatalogName
+	}
 	getMachineCatalogRequest := d.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogPath).Fields("Id,Name,Description,ProvisioningType,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC")
 	machineCatalog, httpResp, err := citrixdaasclient.AddRequestData(getMachineCatalogRequest, d.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error reading Machine Catalog "+data.Name.ValueString(),
+			"Error reading Machine Catalog "+machineCatalogName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
@@ -78,7 +84,7 @@ func (d *MachineCatalogDataSource) Read(ctx context.Context, req datasource.Read
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error listing VDAs in Machine Catalog "+data.Name.ValueString(),
+			"Error listing VDAs in Machine Catalog "+machineCatalogName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)

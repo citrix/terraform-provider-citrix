@@ -63,7 +63,7 @@ func (d *AdminFolderDataSource) Read(ctx context.Context, req datasource.ReadReq
 		adminFolderIdOrPath = data.Id.ValueString()
 	}
 	if data.Path.ValueString() != "" {
-		adminFolderIdOrPath = data.Path.ValueString()
+		adminFolderIdOrPath = data.Path.ValueString() + "\\"
 		adminFolderIdOrPath = strings.ReplaceAll(adminFolderIdOrPath, "\\", "|")
 	}
 

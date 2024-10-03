@@ -589,6 +589,10 @@ func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 			"machine_catalog_folder_path": schema.StringAttribute{
 				Description: "The path to the folder in which the machine catalog is located.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathWithBackslashRegex), "Admin Folder Path must not start or end with a backslash"),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathSpecialCharactersRegex), "Admin Folder Path must not contain any of the following special characters: / ; : # . * ? = < > | [ ] ( ) { } \" ' ` ~ "),
+				},
 			},
 			"tenants": schema.SetAttribute{
 				ElementType: types.StringType,
@@ -679,20 +683,8 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 
 	r.Tenants = util.RefreshTenantSet(ctx, diagnostics, catalog.GetTenants())
 
-	if catalog.ProvisioningScheme == nil {
-		if attributesMap, err := util.AttributeMapFromObject(ProvisioningSchemeModel{}); err == nil {
-			r.ProvisioningScheme = types.ObjectNull(attributesMap)
-		} else {
-			diagnostics.AddWarning("Error when creating null ProvisioningSchemeModel", err.Error())
-		}
-		return r
-	}
-
-	// Provisioning Scheme Properties
-	r = r.updateCatalogWithProvScheme(ctx, diagnostics, client, catalog, connectionType, pluginId, provScheme)
-
 	adminFolder := catalog.GetAdminFolder()
-	adminFolderPath := adminFolder.GetName()
+	adminFolderPath := strings.TrimSuffix(adminFolder.GetName(), "\\")
 	if adminFolderPath != "" {
 		r.MachineCatalogFolderPath = types.StringValue(adminFolderPath)
 	} else {
@@ -708,6 +700,18 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 	}
 
 	r.Tags = util.RefreshTagSet(ctx, diagnostics, tags)
+
+	if catalog.ProvisioningScheme == nil {
+		if attributesMap, err := util.AttributeMapFromObject(ProvisioningSchemeModel{}); err == nil {
+			r.ProvisioningScheme = types.ObjectNull(attributesMap)
+		} else {
+			diagnostics.AddWarning("Error when creating null ProvisioningSchemeModel", err.Error())
+		}
+		return r
+	}
+
+	// Provisioning Scheme Properties
+	r = r.updateCatalogWithProvScheme(ctx, diagnostics, client, catalog, connectionType, pluginId, provScheme)
 
 	return r
 }

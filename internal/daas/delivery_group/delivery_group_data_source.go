@@ -4,6 +4,7 @@ package delivery_group
 
 import (
 	"context"
+	"strings"
 
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
@@ -61,7 +62,13 @@ func (d *DeliveryGroupDataSource) Read(ctx context.Context, req datasource.ReadR
 
 	// Get refreshed delivery group state from Orchestration
 	deliveryGroupName := data.Name.ValueString()
-	getDeliveryGroupRequest := d.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroup(ctx, deliveryGroupName)
+	deliveryGroupPath := strings.ReplaceAll(data.DeliveryGroupFolderPath.ValueString(), "\\", "|")
+	if deliveryGroupPath != "" {
+		deliveryGroupPath = deliveryGroupPath + "|" + deliveryGroupName
+	} else {
+		deliveryGroupPath = deliveryGroupName
+	}
+	getDeliveryGroupRequest := d.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroup(ctx, deliveryGroupPath)
 	deliveryGroup, httpResp, err := citrixdaasclient.AddRequestData(getDeliveryGroupRequest, d.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(

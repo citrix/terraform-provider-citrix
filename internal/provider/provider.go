@@ -44,6 +44,9 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_store"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_webreceiver"
 
+	"github.com/citrix/terraform-provider-citrix/internal/wem/wem_machine_ad_object"
+	"github.com/citrix/terraform-provider-citrix/internal/wem/wem_site"
+
 	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_folder"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_scope"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/delivery_group"
@@ -596,6 +599,21 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 		cwsHostName = "cws.ctxwsstgapi.us"
 	}
 
+	wemHostName := ""
+	if environment == "Production" {
+		wemHostName = "api.wem.cloud.com"
+	} else if environment == "Staging" {
+		wemHostName = "api.wem.cloudburrito.com"
+	} else if environment == "Japan" {
+		wemHostName = "api.wem.citrixcloud.jp"
+	} else if environment == "JapanStaging" {
+		wemHostName = "api.wem.citrixcloudstaging.jp"
+	} else if environment == "Gov" {
+		wemHostName = "api.wem.citrixworkspacesapi.us"
+	} else if environment == "GovStaging" {
+		wemHostName = "api.wem.ctxwsstgapi.us"
+	}
+
 	ctx = tflog.SetField(ctx, "citrix_hostname", hostname)
 	if !onPremises {
 		ctx = tflog.SetField(ctx, "citrix_customer_id", customerId)
@@ -709,6 +727,10 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 	if cwsHostName != "" {
 		client.InitializeCwsClient(ctx, cwsHostName, middleware.MiddlewareAuthFunc)
 	}
+	// Set WEM Client
+	if wemHostName != "" {
+		client.InitializeWemClient(ctx, wemHostName, middleware.MiddlewareAuthFunc)
+	}
 }
 
 // DataSources defines the data sources implemented in the provider.
@@ -791,6 +813,9 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		cc_identity_providers.NewGoogleIdentityProviderResource,
 		cc_identity_providers.NewOktaIdentityProviderResource,
 		cc_identity_providers.NewSamlIdentityProviderResource,
+		// Wem Resources
+		wem_site.NewWemSiteServiceResource,
+		wem_machine_ad_object.NewWemDirectoryResource,
 		// Add resource here
 	}
 }

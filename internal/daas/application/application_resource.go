@@ -138,7 +138,7 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 
 	// If the application is present in an application folder, we specify the name in this format: {application folder path plus application name}.For example, FolderName1|FolderName2|ApplicationName.
 	if plan.ApplicationFolderPath.ValueString() != "" {
-		applicationName = strings.ReplaceAll(plan.ApplicationFolderPath.ValueString(), "\\", "|") + applicationName
+		applicationName = strings.ReplaceAll(plan.ApplicationFolderPath.ValueString(), "\\", "|") + "|" + applicationName
 	}
 
 	application, err := getApplication(ctx, r.client, &resp.Diagnostics, applicationName)
@@ -399,7 +399,7 @@ func checkIfApplicationFolderPathExist(ctx context.Context, client *citrixdaascl
 		return true
 	}
 
-	tempFolderPath := strings.ReplaceAll(applicationFolderPath, "\\", "|")
+	tempFolderPath := strings.ReplaceAll(applicationFolderPath, "\\", "|") + "|"
 	appFolderExistRequest := client.ApiClient.ApplicationFoldersAPIsDAAS.ApplicationFoldersCheckApplicationFolderPathExists(ctx, tempFolderPath)
 	httpResp, err := citrixdaasclient.AddRequestData(appFolderExistRequest, client).Execute()
 	if err != nil {

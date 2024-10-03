@@ -129,6 +129,10 @@ const AppCategoryPathRegex string = `^([a-zA-Z0-9 ]+\\)*[a-zA-Z0-9 ]+\\?$`
 // SAML 2.0 Identity Provider Certificate REGEX
 const SamlIdpCertRegex string = `\.[Pp][Ee][Mm]$|\.[Cc][Rr][Tt]$|\.[Cc][Ee][Rr]$`
 
+// Admin Folder Path
+const AdminFolderPathWithBackslashRegex string = `^[^\\].*[^\\]$`
+const AdminFolderPathSpecialCharactersRegex string = `^[^/;:#.*?=<>|[\](){}"'\` + "`~]+$"
+
 // NOT_EXIST error code
 const NOT_EXIST string = "NOT_EXIST"
 

@@ -5,6 +5,7 @@ package application
 import (
 	"context"
 	"regexp"
+	"strings"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -117,6 +118,10 @@ func (ApplicationGroupResourceModel) GetSchema() schema.Schema {
 			"application_group_folder_path": schema.StringAttribute{
 				Description: "The path of the folder in which the application group is located.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathWithBackslashRegex), "Admin Folder Path must not start or end with a backslash"),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathSpecialCharactersRegex), "Admin Folder Path must not contain any of the following special characters: / ; : # . * ? = < > | [ ] ( ) { } \" ' ` ~ "),
+				},
 			},
 			"tenants": schema.SetAttribute{
 				ElementType: types.StringType,
@@ -185,7 +190,7 @@ func (r ApplicationGroupResourceModel) RefreshPropertyValues(ctx context.Context
 	r.InheritedScopes = util.StringArrayToStringSet(ctx, diagnostics, inheritedScopeIds)
 
 	adminFolder := applicationGroup.GetAdminFolder()
-	adminFolderPath := adminFolder.GetName()
+	adminFolderPath := strings.TrimSuffix(adminFolder.GetName(), "\\")
 	if adminFolderPath != "" {
 		r.ApplicationGroupFolderPath = types.StringValue(adminFolderPath)
 	} else {
