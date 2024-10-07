@@ -13,12 +13,21 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 )
 
+func readConfigurationSet(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, wemResource WemSiteResourceModel) (*citrixwemservice.SiteModel, error) {
+	idInt64, err := strconv.ParseInt(wemResource.Id.ValueString(), 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid id: %v", err)
+	}
+	siteGetRequest := client.WemClient.SiteDAAS.SiteQueryById(ctx, idInt64)
+	siteGetResponse, _, err := util.ReadResource[*citrixwemservice.SiteModel](siteGetRequest, ctx, client, resp, "Configuration Set", wemResource.Name.ValueString())
+	return siteGetResponse, err
+}
+
 func getSiteByName(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, wemResource WemSiteResourceModel) (citrixwemservice.SiteModel, error) {
-	var resp *resource.ReadResponse
 	siteName := wemResource.Name.ValueString()
 	siteGetRequest := client.WemClient.SiteDAAS.SiteQuery(ctx)
 	siteGetRequest = siteGetRequest.Name(siteName)
-	siteGetResponse, httpResp, err := util.ReadResource[*citrixwemservice.SiteQuery200Response](siteGetRequest, ctx, client, resp, "Name", siteName)
+	siteGetResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixwemservice.SiteQuery200Response](siteGetRequest, client)
 
 	siteConfigList := siteGetResponse.GetItems()
 	var siteConfig citrixwemservice.SiteModel
@@ -38,14 +47,12 @@ func getSiteByName(ctx context.Context, client *citrixdaasclient.CitrixDaasClien
 }
 
 func getSiteById(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, wemResource WemSiteResourceModel) (*citrixwemservice.SiteModel, error) {
-	var resp *resource.ReadResponse
-	siteId := wemResource.Id.ValueString()
 	idInt64, err := strconv.ParseInt(wemResource.Id.ValueString(), 10, 64)
 	if err != nil {
 		return &citrixwemservice.SiteModel{}, fmt.Errorf("invalid id: %v", err)
 	}
 	siteGetRequest := client.WemClient.SiteDAAS.SiteQueryById(ctx, idInt64)
-	siteGetResponse, httpResp, err := util.ReadResource[*citrixwemservice.SiteModel](siteGetRequest, ctx, client, resp, "Id", siteId)
+	siteGetResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixwemservice.SiteModel](siteGetRequest, client)
 
 	if err != nil {
 		err = fmt.Errorf("TransactionId: " + citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp) + "\nError message: " + util.ReadClientError(err))

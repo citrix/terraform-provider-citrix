@@ -168,7 +168,7 @@ func (w *wemSiteServiceResource) Read(ctx context.Context, req resource.ReadRequ
 	}
 
 	// Get site from remote using site Id
-	siteConfig, err := getSiteById(ctx, w.client, state)
+	siteConfig, err := readConfigurationSet(ctx, w.client, resp, state)
 	if err != nil {
 		return
 	}

@@ -11,11 +11,20 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 )
 
+func readDirectoryObject(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, machineADObjectId string) (*citrixwemservice.MachineModel, error) {
+	idInt64, err := strconv.ParseInt(machineADObjectId, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid WEM Directory object ID: %v", err)
+	}
+	machineADObjectQueryRequest := client.WemClient.MachineADObjectDAAS.AdObjectQueryById(ctx, idInt64)
+	machineADObjectQueryResponse, _, err := util.ReadResource[*citrixwemservice.MachineModel](machineADObjectQueryRequest, ctx, client, resp, "Catalog Directory Object", machineADObjectId)
+	return machineADObjectQueryResponse, err
+}
+
 func getMachineADObjectBySid(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, machineCatalogId string) (citrixwemservice.MachineModel, error) {
-	var resp *resource.ReadResponse
 	machineADObjectQueryRequest := client.WemClient.MachineADObjectDAAS.AdObjectQuery(ctx)
 	machineADObjectQueryRequest = machineADObjectQueryRequest.Sid(machineCatalogId)
-	machineADObjectQueryResponse, httpResp, err := util.ReadResource[*citrixwemservice.AdObjectQuery200Response](machineADObjectQueryRequest, ctx, client, resp, "Sid", machineCatalogId)
+	machineADObjectQueryResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixwemservice.AdObjectQuery200Response](machineADObjectQueryRequest, client)
 
 	var machineADObject citrixwemservice.MachineModel
 	machineADObjectList := machineADObjectQueryResponse.GetItems()
@@ -36,13 +45,12 @@ func getMachineADObjectBySid(ctx context.Context, client *citrixdaasclient.Citri
 }
 
 func getMachineADObjectById(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, machineADObjectId string) (*citrixwemservice.MachineModel, error) {
-	var resp *resource.ReadResponse
 	idInt64, err := strconv.ParseInt(machineADObjectId, 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("invalid WEM Directory object ID: %v", err)
 	}
 	machineADObjectQueryRequest := client.WemClient.MachineADObjectDAAS.AdObjectQueryById(ctx, idInt64)
-	machineADObjectQueryResponse, httpResp, err := util.ReadResource[*citrixwemservice.MachineModel](machineADObjectQueryRequest, ctx, client, resp, "Id", machineADObjectId)
+	machineADObjectQueryResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixwemservice.MachineModel](machineADObjectQueryRequest, client)
 
 	if err != nil {
 		err = fmt.Errorf("TransactionId: " + citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp) + "\nError message: " + util.ReadClientError(err))

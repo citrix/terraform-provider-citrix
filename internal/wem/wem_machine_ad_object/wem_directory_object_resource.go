@@ -169,7 +169,7 @@ func (w *wemDirectoryResource) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	// Get WEM Directory object by ID
-	machineADObject, err := getMachineADObjectById(ctx, w.client, state.Id.ValueString())
+	machineADObject, err := readDirectoryObject(ctx, w.client, resp, state.Id.ValueString())
 	if err != nil {
 		return
 	}
