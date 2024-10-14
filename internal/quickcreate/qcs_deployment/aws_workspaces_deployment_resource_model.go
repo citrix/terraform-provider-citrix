@@ -133,18 +133,30 @@ func (AwsWorkspacesDeploymentWorkspaceModel) GetSchema() schema.NestedAttributeO
 			"workspace_id": schema.StringAttribute{
 				Description: "Id of the AWS WorkSpaces machine.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"machine_id": schema.StringAttribute{
 				Description: "Id of the machine.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"machine_name": schema.StringAttribute{
 				Description: "Name of the machine.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"broker_machine_id": schema.StringAttribute{
 				Description: "GUID identifier of the machine.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}

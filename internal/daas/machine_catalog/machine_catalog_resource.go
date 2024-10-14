@@ -104,7 +104,13 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 	if err != nil {
 		return
 	}
-	machineCatalogPath := strings.ReplaceAll(plan.MachineCatalogFolderPath.ValueString(), "\\", "|") + plan.Name.ValueString()
+	machineCatalogName := plan.Name.ValueString()
+	machineCatalogPath := strings.ReplaceAll(plan.MachineCatalogFolderPath.ValueString(), "\\", "|")
+	if machineCatalogPath != "" {
+		machineCatalogPath = machineCatalogPath + "|" + machineCatalogName
+	} else {
+		machineCatalogPath += machineCatalogName
+	}
 
 	setMachineCatalogTags(ctx, &resp.Diagnostics, r.client, machineCatalogPath, plan.Tags)
 
@@ -231,7 +237,7 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	body, err := getRequestModelForUpdateMachineCatalog(plan, ctx, r.client, resp, r.client.AuthConfig.OnPremises)
+	body, err := getRequestModelForUpdateMachineCatalog(plan, state, ctx, r.client, resp, r.client.AuthConfig.OnPremises)
 	if err != nil {
 		return
 	}

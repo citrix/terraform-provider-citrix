@@ -300,14 +300,23 @@ func (SamlIdentityProviderResourceModel) GetSchema() schema.Schema {
 			"cert_common_name": schema.StringAttribute{
 				Description: "The common name of the SAML certificate.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"cert_expiration": schema.StringAttribute{
 				Description: "The expiration date time of the SAML certificate.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"scoped_entity_id_suffix": schema.StringAttribute{
 				Description: "The Scoped Entity Id Suffix for the SAML 2.0 Identity Provider.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}

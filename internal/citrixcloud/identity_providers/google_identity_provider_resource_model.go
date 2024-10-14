@@ -75,10 +75,16 @@ func (GoogleIdentityProviderResourceModel) GetSchema() schema.Schema {
 			"google_customer_id": schema.StringAttribute{
 				Description: "Customer ID of the configured  Google Cloud Identity Provider.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"google_domain": schema.StringAttribute{
 				Description: "Domain of the configured Google Cloud Identity Provider.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}

@@ -484,6 +484,9 @@ func (ReceiverConfiguration) GetSchema() schema.SingleNestedAttribute {
 			"download_url": schema.StringAttribute{
 				Description: "The URL to download the Receiver Configuration .cr file.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
@@ -584,14 +587,23 @@ func (AuthenticationManager) GetSchema() schema.SingleNestedAttribute {
 			"get_user_name_url": schema.StringAttribute{
 				Description: "The URL to obtain the full username. Defaults to `Authentication/GetUserName`.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"logoff_url": schema.StringAttribute{
 				Description: "The URL to log off the Citrix Receiver for Web session. Defaults to `Authentication/Logoff`.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"change_credentials_url": schema.StringAttribute{
 				Description: "The URL to initiate a change password operation. Defaults to `ExplicitAuth/GetChangeCredentialForm`.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}

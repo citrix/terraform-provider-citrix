@@ -197,6 +197,14 @@ func (r *applicationGroupResource) Update(ctx context.Context, req resource.Upda
 		return
 	}
 
+	// Get current state
+	var state ApplicationGroupResourceModel
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	applicationGroupId := plan.Id.ValueString()
 	applicationGroupName := plan.Name.ValueString()
 
@@ -239,7 +247,7 @@ func (r *applicationGroupResource) Update(ctx context.Context, req resource.Upda
 
 	editApplicationGroupRequestBody.SetAdminFolder(plan.ApplicationGroupFolderPath.ValueString())
 
-	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	metadata := util.GetUpdatedMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, state.Metadata), util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
 	editApplicationGroupRequestBody.SetMetadata(metadata)
 
 	// Update Application
@@ -397,6 +405,7 @@ func setApplicationGroupTags(ctx context.Context, diagnostics *diag.Diagnostics,
 
 func getApplicationGroupTags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, applicationGroupId string) []string {
 	getTagsRequest := client.ApiClient.ApplicationGroupsAPIsDAAS.ApplicationGroupsGetApplicationGroupTags(ctx, applicationGroupId)
+	getTagsRequest = getTagsRequest.Fields("Id,Name,Description")
 	tagsResp, httpResp, err := citrixdaasclient.AddRequestData(getTagsRequest, client).Execute()
 	return util.ProcessTagsResponseCollection(diagnostics, tagsResp, httpResp, err, "Application Group", applicationGroupId)
 }

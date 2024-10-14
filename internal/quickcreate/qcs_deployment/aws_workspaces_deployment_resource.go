@@ -608,7 +608,7 @@ func updateMachinesMaintenceMode(ctx context.Context, diagnostics *diag.Diagnost
 			)
 			return err
 		}
-		relativeUrl := fmt.Sprintf("/Machines/%s?async=true", brokerMachineId)
+		relativeUrl := fmt.Sprintf("/Machines/%s", brokerMachineId)
 
 		var batchRequestItem citrixorchestration.BatchRequestItemModel
 		batchRequestItem.SetReference(fmt.Sprintf("maintenanceMode%s", strconv.Itoa(index)))

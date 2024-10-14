@@ -32,6 +32,7 @@ type AzureHypervisorResourceModel struct {
 	Zone     types.String `tfsdk:"zone"`
 	Scopes   types.Set    `tfsdk:"scopes"`   // Set[string]
 	Metadata types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
+	Tenants  types.Set    `tfsdk:"tenants"`  // Set[string]
 	/** Azure Connection **/
 	ApplicationId                   types.String `tfsdk:"application_id"`
 	ApplicationSecret               types.String `tfsdk:"application_secret"`
@@ -118,6 +119,11 @@ func (AzureHypervisorResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"metadata": util.GetMetadataListSchema("Hypervisor"),
+			"tenants": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "A set of identifiers of tenants to associate with the hypervisor connection.",
+				Computed:    true,
+			},
 		},
 	}
 }
@@ -145,6 +151,8 @@ func (r AzureHypervisorResourceModel) RefreshPropertyValues(ctx context.Context,
 	} else {
 		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
 	}
+
+	r.Tenants = util.RefreshTenantSet(ctx, diagnostics, hypervisor.GetTenants())
 
 	customPropertiesString := hypervisor.GetCustomProperties()
 	var customProperties []citrixorchestration.NameValueStringPairModel

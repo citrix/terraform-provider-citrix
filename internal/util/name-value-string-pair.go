@@ -107,8 +107,7 @@ func ValidateMetadataConfig(ctx context.Context, diagnostics *diag.Diagnostics, 
 
 func GetMetadataListSchema(resource string) schema.ListNestedAttribute {
 	return schema.ListNestedAttribute{
-		Description: fmt.Sprintf("Metadata for the %s.", resource) +
-			"\n\n~> **Please Note** Metadata once set cannot be removed. Use this field to add new metadata or update the value for an existing metadata. Subsequently, removing any metadata from config will have no effect on the existing metadata of the resource.",
+		Description:  fmt.Sprintf("Metadata for the %s.", resource),
 		Optional:     true,
 		NestedObject: NameValueStringPairModel{}.GetSchema(),
 		Validators: []validator.List{
@@ -177,6 +176,25 @@ func GetMetadataRequestModel(ctx context.Context, diagnostics *diag.Diagnostics,
 		metadata = append(metadata, additionalMetadata...)
 	}
 
+	return metadata
+}
+
+// <summary>
+// Helper function to delete metadata that is not a part of the plan. The value of the metadata is set to empty string to delete the KVP from the remote. (STUD-31858)
+// </summary>
+func GetUpdatedMetadataRequestModel(ctx context.Context, diagnostics *diag.Diagnostics, stateMetadata []NameValueStringPairModel, planMetadata []NameValueStringPairModel) []citrixorchestration.NameValueStringPairModel {
+	metadata := GetMetadataRequestModel(ctx, diagnostics, planMetadata)
+	metadataMap := make(map[string]bool)
+	for _, item := range metadata {
+		metadataMap[item.GetName()] = true
+	}
+
+	// Add metadata Name from state with empty value to delete them from the remote
+	for _, pair := range stateMetadata {
+		if _, exists := metadataMap[pair.Name.ValueString()]; !exists {
+			AppendNameValueStringPair(&metadata, pair.Name.ValueString(), "")
+		}
+	}
 	return metadata
 }
 

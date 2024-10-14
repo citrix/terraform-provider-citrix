@@ -102,6 +102,7 @@ type cvadConfig struct {
 	ClientId               types.String `tfsdk:"client_id"`
 	ClientSecret           types.String `tfsdk:"client_secret"`
 	DisableSslVerification types.Bool   `tfsdk:"disable_ssl_verification"`
+	DisableDaaSClient      types.Bool   `tfsdk:"disable_daas_client"`
 }
 
 type storefrontConfig struct {
@@ -179,6 +180,12 @@ func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 							"\nWhen set to true, please make sure that your provider config is set for a known DDC hostname. " +
 							"\n\n-> **Note** Can be set via Environment Variable **CITRIX_DISABLE_SSL_VERIFICATION**." +
 							"\n\n~> **Please Note** [It is recommended to configure a valid certificate for the target DDC](https://docs.citrix.com/en-us/citrix-virtual-apps-desktops/install-configure/install-core/secure-web-studio-deployment) ",
+						Optional: true,
+					},
+					"disable_daas_client": schema.BoolAttribute{
+						Description: "Disable Citrix DaaS client setup. " +
+							"\nSet to true to skip Citrix DaaS client setup. " +
+							"\n\n-> **Note** Can be set via Environment Variable **CITRIX_DISABLE_DAAS_CLIENT**.",
 						Optional: true,
 					},
 				},
@@ -358,6 +365,7 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	environment := os.Getenv("CITRIX_ENVIRONMENT")
 	customerId := os.Getenv("CITRIX_CUSTOMER_ID")
 	disableSslVerification := strings.EqualFold(os.Getenv("CITRIX_DISABLE_SSL_VERIFICATION"), "true")
+	disableDaasClient := strings.EqualFold(os.Getenv("CITRIX_DISABLE_DAAS_CLIENT"), "true")
 	quick_create_host_name := os.Getenv("CITRIX_QUICK_CREATE_HOST_NAME")
 
 	if cvadConfig := config.CvadConfig; cvadConfig != nil || (clientId != "" && clientSecret != "") {
@@ -385,9 +393,14 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 			if !cvadConfig.DisableSslVerification.IsNull() {
 				disableSslVerification = cvadConfig.DisableSslVerification.ValueBool()
 			}
+
+			if !cvadConfig.DisableDaaSClient.IsNull() {
+				disableDaasClient = cvadConfig.DisableDaaSClient.ValueBool()
+			}
+
 		}
 
-		validateAndInitializeDaaSClient(ctx, resp, client, clientId, clientSecret, hostname, environment, customerId, quick_create_host_name, p.version, disableSslVerification)
+		validateAndInitializeDaaSClient(ctx, resp, client, clientId, clientSecret, hostname, environment, customerId, quick_create_host_name, p.version, disableSslVerification, disableDaasClient)
 		if resp.Diagnostics.HasError() {
 			return
 		}
@@ -441,7 +454,7 @@ func validateAndInitializeStorefrontClient(ctx context.Context, resp *provider.C
 	client.InitializeStoreFrontClient(ctx, storefront_computer_name, storefront_ad_admin_username, storefront_ad_admin_password, storefront_disable_ssl_verification)
 }
 
-func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.ConfigureResponse, client *citrixclient.CitrixDaasClient, clientId, clientSecret, hostname, environment, customerId, quick_create_host_name, version string, disableSslVerification bool) {
+func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.ConfigureResponse, client *citrixclient.CitrixDaasClient, clientId, clientSecret, hostname, environment, customerId, quick_create_host_name, version string, disableSslVerification bool, disableDaasClient bool) {
 	if clientId == "" {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("cvad_config").AtName("client_id"),
@@ -626,81 +639,63 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 	tflog.Debug(ctx, "Creating Citrix API client")
 
 	userAgent := "citrix-terraform-provider/" + version + " (https://github.com/citrix/terraform-provider-citrix)"
-	// Create a new Citrix API client using the configuration values
-	httpResp, err := client.InitializeCitrixDaasClient(ctx, authUrl, ccUrl, hostname, customerId, clientId, clientSecret, onPremises, apiGateway, isGov, disableSslVerification, &userAgent, middleware.MiddlewareAuthFunc, middleware.MiddlewareAuthWithCustomerIdHeaderFunc)
+
+	// Setup the Citrix API Client
+	token, httpResp, err := client.SetupCitrixClientsContext(ctx, authUrl, ccUrl, hostname, customerId, clientId, clientSecret, onPremises, apiGateway, isGov, disableSslVerification, &userAgent, middleware.MiddlewareAuthFunc, middleware.MiddlewareAuthWithCustomerIdHeaderFunc)
 	if err != nil {
-		if httpResp != nil {
-			if httpResp.StatusCode == 401 {
-				resp.Diagnostics.AddError(
-					"Invalid credential in provider config",
-					"Make sure client_id and client_secret is correct in provider config. ",
-				)
-			} else if httpResp.StatusCode >= 500 {
-				if onPremises {
-					resp.Diagnostics.AddError(
-						"Citrix DaaS service unavailable",
-						"Please check if you can access Web Studio. \n\n"+
-							"Please ensure that Citrix Orchestration Service on the target DDC(s) are running reachable from this Machine.",
-					)
-				} else {
-					resp.Diagnostics.AddError(
-						"Citrix DaaS service unavailable",
-						"The DDC(s) for the customer cannot be reached. Please check if you can access DaaS UI.",
-					)
-				}
-			} else {
-				resp.Diagnostics.AddError(
-					"Unable to Create Citrix API Client",
-					"An unexpected error occurred when creating the Citrix API client. \n\n"+
-						"Error: "+err.Error(),
-				)
-			}
+		if httpResp != nil && httpResp.StatusCode == 401 {
+			resp.Diagnostics.AddError(
+				"Invalid credential in provider config",
+				"Make sure client_id and client_secret are correct in provider config.",
+			)
 		} else {
-			// Case 1: DDC off
-			urlErr := new(url.Error)
-			opErr := new(net.OpError)
-			syscallErr := new(os.SyscallError)
-			if errors.As(err, &urlErr) && errors.As(urlErr.Err, &opErr) && errors.As(opErr.Err, &syscallErr) && syscallErr.Err == syscall.Errno(10060) {
-				resp.Diagnostics.AddError(
-					"DDC(s) cannot be reached",
-					"Ensure that the DDC(s) are running. Make sure this machine has proper network routing to reach the DDC(s) and is not blocked by any firewall rules.",
-				)
-
-				return
-			}
-
-			// Case 2: Invalid certificate
-			cryptoErr := new(tls.CertificateVerificationError)
-			errors.As(urlErr.Err, &cryptoErr)
-			if len(cryptoErr.UnverifiedCertificates) > 0 {
-				resp.Diagnostics.AddError(
-					"DDC(s) does not have a valid SSL certificate issued by a trusted Certificate Authority",
-					"If you are running against on-premises DDC(s) that does not have an SSL certificate issue by a trusted CA, consider setting \"disable_ssl_verification\" to \"true\" in provider config.",
-				)
-
-				return
-			}
-
-			// Case 3: Malformed hostname
-			if urlErr != nil && opErr.Err == nil {
-				resp.Diagnostics.AddError(
-					"Invalid DDC(s) hostname",
-					"Please revise the hostname in provider config and make sure it is a valid hostname or IP address.",
-				)
-
-				return
-			}
-
-			// Case 4: Catch all other errors
 			resp.Diagnostics.AddError(
 				"Unable to Create Citrix API Client",
-				"An unexpected error occurred when creating the Citrix API client. \n\n"+
+				"An unexpected error occurred when creating the Citrix API client.\n\n"+
 					"Error: "+err.Error(),
 			)
 		}
-
 		return
 	}
+
+	// Initialize the Cloud Clients if not on-premises
+	if !onPremises {
+		client.InitializeCitrixCloudClients(ctx, ccUrl, hostname, middleware.MiddlewareAuthFunc, middleware.MiddlewareAuthWithCustomerIdHeaderFunc)
+	}
+
+	if !disableDaasClient {
+		// Setup the DAAS Client
+		httpResp, err = client.InitializeCitrixDaasClient(ctx, customerId, token, onPremises, apiGateway, disableSslVerification, &userAgent)
+		if err != nil {
+			if httpResp != nil {
+				if httpResp.StatusCode >= 500 {
+					if onPremises {
+						resp.Diagnostics.AddError(
+							"Citrix DaaS service unavailable",
+							"Please check if you can access Web Studio. \n\n"+
+								"Please ensure that Citrix Orchestration Service on the target DDC(s) are running reachable from this Machine.",
+						)
+					} else {
+						resp.Diagnostics.AddError(
+							"Citrix DaaS service unavailable",
+							"The DDC(s) for the customer cannot be reached. Please check if you can access DaaS UI.\n\n"+
+								"Note: If you are running resources that do not require DaaS/CVAD entitlement, you can set `disable_daas_client` to `true` in the provider configuration to skip the DaaS client setup.",
+						)
+					}
+				} else {
+					resp.Diagnostics.AddError(
+						"Unable to Create Citrix API Client",
+						"An unexpected error occurred when creating the Citrix API client.\n\n"+
+							"Error: "+err.Error(),
+					)
+				}
+
+			} else {
+				handleNetworkError(err, resp)
+			}
+		}
+	}
+
 	// Set Quick Create Client
 	if quickCreateHostname != "" {
 		client.InitializeQuickCreateClient(ctx, quickCreateHostname, middleware.MiddlewareAuthFunc)
@@ -709,6 +704,49 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 	if cwsHostName != "" {
 		client.InitializeCwsClient(ctx, cwsHostName, middleware.MiddlewareAuthFunc)
 	}
+}
+
+func handleNetworkError(err error, resp *provider.ConfigureResponse) {
+	urlErr := new(url.Error)
+	opErr := new(net.OpError)
+	syscallErr := new(os.SyscallError)
+
+	// Case 1: DDC off
+	if errors.As(err, &urlErr) && errors.As(urlErr.Err, &opErr) && errors.As(opErr.Err, &syscallErr) && syscallErr.Err == syscall.Errno(10060) {
+		resp.Diagnostics.AddError(
+			"DDC(s) cannot be reached",
+			"Ensure that the DDC(s) are running. Make sure this machine has proper network routing to reach the DDC(s) and is not blocked by any firewall rules.",
+		)
+		return
+	}
+
+	// Case 2: Invalid certificate
+	cryptoErr := new(tls.CertificateVerificationError)
+	errors.As(urlErr.Err, &cryptoErr)
+	if len(cryptoErr.UnverifiedCertificates) > 0 {
+		resp.Diagnostics.AddError(
+			"DDC(s) does not have a valid SSL certificate issued by a trusted Certificate Authority",
+			"If you are running against on-premises DDC(s) that does not have an SSL certificate issue by a trusted CA, consider setting \"disable_ssl_verification\" to \"true\" in provider config.",
+		)
+		return
+	}
+
+	// Case 3: Malformed hostname
+	if urlErr != nil && opErr.Err == nil {
+		resp.Diagnostics.AddError(
+			"Invalid DDC(s) hostname",
+			"Please revise the hostname in provider config and make sure it is a valid hostname or IP address.",
+		)
+		return
+	}
+
+	// Case 4: Catch all other errors
+	resp.Diagnostics.AddError(
+		"Unable to Create Citrix API Client",
+		"An unexpected error occurred when creating the Citrix API client. \n\n"+
+			"Error: "+err.Error(),
+	)
+	return
 }
 
 // DataSources defines the data sources implemented in the provider.
@@ -739,6 +777,8 @@ func (p *citrixProvider) DataSources(_ context.Context) []func() datasource.Data
 		cc_identity_providers.NewOktaIdentityProviderDataSource,
 		cc_identity_providers.NewGoogleIdentityProviderDataSource,
 		cc_identity_providers.NewSamlIdentityProviderDataSource,
+		// CC Resource Locations
+		resource_locations.NewResourceLocationsDataSource,
 	}
 }
 

@@ -135,8 +135,10 @@ func (r *stfStoreServiceResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	//Create Store Farms
-	plan.createStoreFarms(ctx, r.client, &resp.Diagnostics)
-	farms, err := plan.getStoreFarms(ctx, r.client, &resp.Diagnostics)
+	var farms []citrixstorefront.StoreFarmModel
+	storeFarm := util.ObjectListToTypedArray[StoreFarm](ctx, &resp.Diagnostics, plan.StoreFarm)
+	createAndUpdateStoreFarms(ctx, r.client, &resp.Diagnostics, farms, siteIdInt, plan.VirtualPath.ValueString(), storeFarm)
+	farms, err = plan.getStoreFarms(ctx, r.client, &resp.Diagnostics)
 	if err != nil {
 		return
 	}
@@ -145,15 +147,15 @@ func (r *stfStoreServiceResource) Create(ctx context.Context, req resource.Creat
 	plan.RefreshPropertyValues(ctx, &resp.Diagnostics, &StoreServiceDetail, farms)
 	// Create StoreFarmConfiguration
 	if !plan.FarmSettings.IsNull() {
-
-		err := plan.setFarmSettingsSetRequest(ctx, r.client, &resp.Diagnostics)
+		plannedFarmSettings := util.ObjectValueToTypedObject[FarmSettings](ctx, &resp.Diagnostics, plan.FarmSettings)
+		err := setFarmSettingsSetRequest(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), plannedFarmSettings)
 
 		if err != nil {
 			return
 		}
 
 		// Get updated STFStoreFarmConfiguration Settings
-		getResponse, err := plan.getFarmSettingsGetRequest(ctx, r.client, &resp.Diagnostics)
+		getResponse, err := getFarmSettingsGetRequest(ctx, r.client, siteIdInt, plan.VirtualPath.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching STF StoreFarmConfigurations in Create",
@@ -166,12 +168,12 @@ func (r *stfStoreServiceResource) Create(ctx context.Context, req resource.Creat
 
 	// Create StoreFront Store Enumeration Options
 	if !plan.EnumerationOptions.IsNull() {
-
+		enumerationOptions := util.ObjectValueToTypedObject[EnumerationOptions](ctx, &resp.Diagnostics, plan.EnumerationOptions)
 		// Update Storefront Store Enumeration Options
-		plan.setSTFStoreEnumerationOptions(ctx, r.client, &resp.Diagnostics)
+		setSTFStoreEnumerationOptions(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), enumerationOptions)
 
 		// Get updated STFStoreService Enumeration Options
-		getResponse, err := plan.getSTFStoreEnumerationOptions(ctx, r.client, &resp.Diagnostics)
+		getResponse, err := getSTFStoreEnumerationOptions(ctx, r.client, siteIdInt, plan.VirtualPath.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching StoreFront Store Enumeration Options",
@@ -186,9 +188,10 @@ func (r *stfStoreServiceResource) Create(ctx context.Context, req resource.Creat
 
 	// Set PNA properties
 	if !plan.PNA.IsNull() {
-		plan.setSTFStorePNA(ctx, r.client, &resp.Diagnostics)
+		pna := util.ObjectValueToTypedObject[PNA](ctx, &resp.Diagnostics, plan.PNA)
+		setSTFStorePNA(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), pna)
 
-		updatedPna, err := plan.getSTFStorePNA(ctx, r.client, &resp.Diagnostics)
+		updatedPna, err := getSTFStorePNA(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching updated PNA for StoreFront StoreService",
@@ -200,12 +203,13 @@ func (r *stfStoreServiceResource) Create(ctx context.Context, req resource.Creat
 
 	// Create StoreFront Store Launch Options
 	if !plan.LaunchOptions.IsNull() {
+		launchOptions := util.ObjectValueToTypedObject[LaunchOptions](ctx, &resp.Diagnostics, plan.LaunchOptions)
 
 		// Update Storefront Store Launch Options
-		plan.setSTFStoreLaunchOptions(ctx, r.client, &resp.Diagnostics)
+		setSTFStoreLaunchOptions(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), launchOptions)
 
 		// Get updated STFStoreService Launch Options
-		getResponse, err := plan.getSTFStoreLaunchOptions(ctx, r.client)
+		getResponse, err := getSTFStoreLaunchOptions(ctx, r.client, siteIdInt, plan.VirtualPath.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching StoreFront Store Launch Options",
@@ -221,13 +225,14 @@ func (r *stfStoreServiceResource) Create(ctx context.Context, req resource.Creat
 	// Create StoreFront Roaming Account
 
 	if !plan.RoamingAccount.IsNull() {
+		roamingAccount := util.ObjectValueToTypedObject[RoamingAccount](ctx, &resp.Diagnostics, plan.RoamingAccount)
 		// Update Storefront Roaming Account
-		err := plan.setSTFRoamingAccount(ctx, r.client, &resp.Diagnostics)
+		err := setSTFRoamingAccount(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), roamingAccount)
 		if err != nil {
 			return
 		}
 		// Get updated Roaming Account
-		getResponse, err := plan.getSTFRoamingAccount(ctx, r.client, &resp.Diagnostics)
+		getResponse, err := getSTFRoamingAccount(ctx, r.client, siteIdInt, plan.VirtualPath.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching STF StoreFront Roaming Account",
@@ -261,7 +266,16 @@ func (r *stfStoreServiceResource) Read(ctx context.Context, req resource.ReadReq
 		return
 	}
 
-	STFStoreService, err := state.getSTFStoreService(ctx, r.client, &resp.Diagnostics)
+	siteIdInt, err := strconv.ParseInt(state.SiteId.ValueString(), 10, 64)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error deleting StoreFront Store Service ",
+			"Error message: "+err.Error(),
+		)
+		return
+	}
+
+	STFStoreService, err := getSTFStoreService(ctx, r.client, siteIdInt, state.VirtualPath.ValueString())
 	if err != nil {
 		return
 	}
@@ -282,7 +296,7 @@ func (r *stfStoreServiceResource) Read(ctx context.Context, req resource.ReadReq
 	// Refresh StoreFarmConfiguration
 	if !state.FarmSettings.IsNull() {
 		// Get updated STFStoreFarmConfiguration Settings
-		getResponse, err := state.getFarmSettingsGetRequest(ctx, r.client, &resp.Diagnostics)
+		getResponse, err := getFarmSettingsGetRequest(ctx, r.client, siteIdInt, state.VirtualPath.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching STF StoreFarmConfigurations in Read",
@@ -295,7 +309,7 @@ func (r *stfStoreServiceResource) Read(ctx context.Context, req resource.ReadReq
 	//Refresh Storefront StoreService Enumerations
 	if !state.EnumerationOptions.IsNull() {
 		// Get STFStoreService Enumeration Options
-		getResponse, err := state.getSTFStoreEnumerationOptions(ctx, r.client, &resp.Diagnostics)
+		getResponse, err := getSTFStoreEnumerationOptions(ctx, r.client, siteIdInt, state.VirtualPath.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching StoreFront Store Enumeration Options",
@@ -309,7 +323,7 @@ func (r *stfStoreServiceResource) Read(ctx context.Context, req resource.ReadReq
 	//Refresh Storefront StoreService Launch Options
 	if !state.LaunchOptions.IsNull() {
 		// Get STFStoreService Launch Options
-		getResponse, err := state.getSTFStoreLaunchOptions(ctx, r.client)
+		getResponse, err := getSTFStoreLaunchOptions(ctx, r.client, siteIdInt, state.VirtualPath.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching StoreFront Store Launch Options",
@@ -322,7 +336,7 @@ func (r *stfStoreServiceResource) Read(ctx context.Context, req resource.ReadReq
 
 	// Fetch Pna
 	if !state.PNA.IsNull() {
-		updatedPna, err := state.getSTFStorePNA(ctx, r.client, &resp.Diagnostics)
+		updatedPna, err := getSTFStorePNA(ctx, r.client, &resp.Diagnostics, siteIdInt, state.VirtualPath.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching PNA for StoreFront StoreService",
@@ -335,7 +349,7 @@ func (r *stfStoreServiceResource) Read(ctx context.Context, req resource.ReadReq
 	// Fetch Roaming Account
 	if !state.RoamingAccount.IsNull() {
 		// Get updated STFStoreFarmConfiguration Settings
-		getResponse, err := state.getSTFRoamingAccount(ctx, r.client, &resp.Diagnostics)
+		getResponse, err := getSTFRoamingAccount(ctx, r.client, siteIdInt, state.VirtualPath.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching STF Roaming Account",
@@ -376,7 +390,7 @@ func (r *stfStoreServiceResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 	// Get refreshed STFStoreService
-	_, err = plan.getSTFStoreService(ctx, r.client, &resp.Diagnostics)
+	_, err = getSTFStoreService(ctx, r.client, siteIdInt, plan.VirtualPath.ValueString())
 	if err != nil {
 		return
 	}
@@ -397,19 +411,21 @@ func (r *stfStoreServiceResource) Update(ctx context.Context, req resource.Updat
 	}
 
 	// Fetch updated STFStoreService
-	updatedSTFStoreService, err := plan.getSTFStoreService(ctx, r.client, &resp.Diagnostics)
+	updatedSTFStoreService, err := getSTFStoreService(ctx, r.client, siteIdInt, plan.VirtualPath.ValueString())
 	if err != nil {
 		return
 	}
 
 	var state STFStoreServiceResourceModel
 	req.State.Get(ctx, &state)
+
 	existingFarms, err := state.getStoreFarms(ctx, r.client, &resp.Diagnostics)
 	if err != nil {
 		return
 	}
 	//Update farms
-	plan.updateStoreFarms(ctx, r.client, &resp.Diagnostics, existingFarms)
+	storeFarms := util.ObjectListToTypedArray[StoreFarm](ctx, &resp.Diagnostics, plan.StoreFarm)
+	createAndUpdateStoreFarms(ctx, r.client, &resp.Diagnostics, existingFarms, siteIdInt, plan.VirtualPath.ValueString(), storeFarms)
 	farms, err := plan.getStoreFarms(ctx, r.client, &resp.Diagnostics)
 	if err != nil {
 		return
@@ -420,15 +436,15 @@ func (r *stfStoreServiceResource) Update(ctx context.Context, req resource.Updat
 
 	// Update StoreFarmConfiguration
 	if !plan.FarmSettings.IsNull() {
-
-		err := plan.setFarmSettingsSetRequest(ctx, r.client, &resp.Diagnostics)
+		plannedFarmSettings := util.ObjectValueToTypedObject[FarmSettings](ctx, &resp.Diagnostics, plan.FarmSettings)
+		err := setFarmSettingsSetRequest(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), plannedFarmSettings)
 
 		if err != nil {
 			return
 		}
 
 		// Get updated STFStoreFarmConfiguration Settings
-		getResponse, err := plan.getFarmSettingsGetRequest(ctx, r.client, &resp.Diagnostics)
+		getResponse, err := getFarmSettingsGetRequest(ctx, r.client, siteIdInt, plan.VirtualPath.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching STF StoreFarmConfigurations in Update",
@@ -441,12 +457,12 @@ func (r *stfStoreServiceResource) Update(ctx context.Context, req resource.Updat
 
 	//  updated STFStoreService Enumeration Options
 	if !plan.EnumerationOptions.IsNull() {
-
+		enumerationOptions := util.ObjectValueToTypedObject[EnumerationOptions](ctx, &resp.Diagnostics, plan.EnumerationOptions)
 		// Update Storefront Store Enumeration Options
-		plan.setSTFStoreEnumerationOptions(ctx, r.client, &resp.Diagnostics)
+		setSTFStoreEnumerationOptions(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), enumerationOptions)
 
 		// Get updated STFStoreService Enumeration Options
-		getResponse, err := plan.getSTFStoreEnumerationOptions(ctx, r.client, &resp.Diagnostics)
+		getResponse, err := getSTFStoreEnumerationOptions(ctx, r.client, siteIdInt, plan.VirtualPath.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching StoreFront Store Enumeration Options",
@@ -459,9 +475,10 @@ func (r *stfStoreServiceResource) Update(ctx context.Context, req resource.Updat
 
 	// Set PNA properties
 	if !plan.PNA.IsNull() {
-		plan.setSTFStorePNA(ctx, r.client, &resp.Diagnostics)
+		pna := util.ObjectValueToTypedObject[PNA](ctx, &resp.Diagnostics, plan.PNA)
+		setSTFStorePNA(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), pna)
 
-		updatedPna, err := plan.getSTFStorePNA(ctx, r.client, &resp.Diagnostics)
+		updatedPna, err := getSTFStorePNA(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching updated PNA for StoreFront StoreService",
@@ -473,12 +490,12 @@ func (r *stfStoreServiceResource) Update(ctx context.Context, req resource.Updat
 
 	// Update StoreFront Store Launch Options
 	if !plan.LaunchOptions.IsNull() {
-
+		launchOptions := util.ObjectValueToTypedObject[LaunchOptions](ctx, &resp.Diagnostics, plan.LaunchOptions)
 		// Update Storefront Store Launch Options
-		plan.setSTFStoreLaunchOptions(ctx, r.client, &resp.Diagnostics)
+		setSTFStoreLaunchOptions(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), launchOptions)
 
 		// Get updated STFStoreService Launch Options
-		getResponse, err := plan.getSTFStoreLaunchOptions(ctx, r.client)
+		getResponse, err := getSTFStoreLaunchOptions(ctx, r.client, siteIdInt, plan.VirtualPath.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching StoreFront Store Launch Options",
@@ -494,15 +511,16 @@ func (r *stfStoreServiceResource) Update(ctx context.Context, req resource.Updat
 	// Update StoreFront Roaming Account
 
 	if !plan.RoamingAccount.IsNull() {
+		roamingAccount := util.ObjectValueToTypedObject[RoamingAccount](ctx, &resp.Diagnostics, plan.RoamingAccount)
 		// Update Storefront Roaming Account
-		update_err := plan.setSTFRoamingAccount(ctx, r.client, &resp.Diagnostics)
+		update_err := setSTFRoamingAccount(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), roamingAccount)
 
 		if update_err != nil {
 			return
 		}
 
 		// Get updated Roaming Account
-		getResponse, err := plan.getSTFRoamingAccount(ctx, r.client, &resp.Diagnostics)
+		getResponse, err := getSTFRoamingAccount(ctx, r.client, siteIdInt, plan.VirtualPath.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching STF StoreFront Roaming Account",
@@ -594,20 +612,12 @@ func (r *stfStoreServiceResource) ImportState(ctx context.Context, req resource.
 }
 
 // Gets the STFStoreService and logs any errors
-func (plan STFStoreServiceResourceModel) getSTFStoreService(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) (*citrixstorefront.STFStoreDetailModel, error) {
+func getSTFStoreService(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, siteIdInt int64, VirtualPath string) (*citrixstorefront.STFStoreDetailModel, error) {
 	var body citrixstorefront.GetSTFStoreRequestModel
-	if !plan.SiteId.IsNull() {
-		siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
-		if err != nil {
-			diagnostics.AddError(
-				"Error fetching state of StoreFront StoreService ",
-				"Error message: "+err.Error(),
-			)
-			return nil, err
-		}
-		body.SetSiteId(siteIdInt)
-	}
-	body.SetVirtualPath(plan.VirtualPath.ValueString())
+
+	body.SetSiteId(siteIdInt)
+
+	body.SetVirtualPath(VirtualPath)
 	getSTFStoreServiceRequest := client.StorefrontClient.StoreSF.STFStoreGetSTFStore(ctx, body)
 
 	// Get refreshed STFStoreService properties from Orchestration
@@ -621,18 +631,9 @@ func (plan STFStoreServiceResourceModel) getSTFStoreService(ctx context.Context,
 	return &STFStoreService, nil
 }
 
-func (plan STFStoreServiceResourceModel) setFarmSettingsSetRequest(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) error {
+func setFarmSettingsSetRequest(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, siteId int64, VirtualPath string, plannedFarmSettings FarmSettings) error {
 	var farmSettingBody citrixstorefront.SetStoreFarmConfigurationRequestModel
-	siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
-	if err != nil {
-		diagnostics.AddError(
-			"Error setting farm_settings for StoreFront StoreService ",
-			"Error message: "+err.Error(),
-		)
-		return err
-	}
 
-	plannedFarmSettings := util.ObjectValueToTypedObject[FarmSettings](ctx, diagnostics, plan.FarmSettings)
 	farmSettingBody.SetEnableFileTypeAssociation(plannedFarmSettings.EnableFileTypeAssociation.ValueBool())
 	farmSettingBody.SetCommunicationTimeout(plannedFarmSettings.CommunicationTimeout.ValueString())
 	farmSettingBody.SetConnectionTimeout(plannedFarmSettings.ConnectionTimeout.ValueString())
@@ -647,14 +648,14 @@ func (plan STFStoreServiceResourceModel) setFarmSettingsSetRequest(ctx context.C
 
 	// Generate STFStoreFarmConfig body
 	getSTFStoreServiceBody := citrixstorefront.GetSTFStoreRequestModel{}
-	getSTFStoreServiceBody.SetSiteId(siteIdInt)
-	getSTFStoreServiceBody.SetVirtualPath(plan.VirtualPath.ValueString())
+	getSTFStoreServiceBody.SetSiteId(siteId)
+	getSTFStoreServiceBody.SetVirtualPath(VirtualPath)
 
 	// Create the client request to Set StoreFront Enumeration Options
 	farmSettingsRequest := client.StorefrontClient.StoreSF.STFStoreFarmSetSTFStoreConfiguration(ctx, farmSettingBody, getSTFStoreServiceBody)
 
 	// Execute the request
-	_, err = farmSettingsRequest.Execute()
+	_, err := farmSettingsRequest.Execute()
 	if err != nil {
 		diagnostics.AddError(
 			"Error creating StoreFront Store Farm Configurations",
@@ -667,19 +668,12 @@ func (plan STFStoreServiceResourceModel) setFarmSettingsSetRequest(ctx context.C
 }
 
 // Get STF-StoreFarm Config
-func (plan STFStoreServiceResourceModel) getFarmSettingsGetRequest(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) (*citrixstorefront.StoreFarmConfigurationResponseModel, error) {
+func getFarmSettingsGetRequest(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, siteId int64, VirtualPath string) (*citrixstorefront.StoreFarmConfigurationResponseModel, error) {
 	// Generate farmSetting body
-	siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
-	if err != nil {
-		diagnostics.AddError(
-			"Error setting farm_settings for StoreFront StoreService ",
-			"Error message: "+err.Error(),
-		)
-		return nil, err
-	}
+
 	getFarmSettingsBody := citrixstorefront.GetSTFStoreRequestModel{}
-	getFarmSettingsBody.SetSiteId(siteIdInt)
-	getFarmSettingsBody.SetVirtualPath(plan.VirtualPath.ValueString())
+	getFarmSettingsBody.SetSiteId(siteId)
+	getFarmSettingsBody.SetVirtualPath(VirtualPath)
 
 	// Get Request for STF StoreFarm Configurations
 	farmSettingsRequest := client.StorefrontClient.StoreSF.STFStoreFarmGetStoreConfiguration(ctx, getFarmSettingsBody)
@@ -689,20 +683,11 @@ func (plan STFStoreServiceResourceModel) getFarmSettingsGetRequest(ctx context.C
 	return &getResponse, err
 }
 
-func (plan STFStoreServiceResourceModel) getSTFStorePNA(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) (*citrixstorefront.STFPna, error) {
+func getSTFStorePNA(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, siteIdInt int64, VirtualPath string) (*citrixstorefront.STFPna, error) {
 	var storeBody citrixstorefront.GetSTFStoreRequestModel
 
-	siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
-	if err != nil {
-		diagnostics.AddError(
-			"Error fetching PNA for Store Service ",
-			"Error message: "+err.Error(),
-		)
-		return nil, err
-	}
-
 	storeBody.SetSiteId(siteIdInt)
-	storeBody.SetVirtualPath(plan.VirtualPath.ValueString())
+	storeBody.SetVirtualPath(VirtualPath)
 	// Fetch updated PNA
 	updatedPna, err := client.StorefrontClient.StoreSF.STFStoreGetStorePna(ctx, storeBody).Execute()
 	if err != nil {
@@ -715,20 +700,12 @@ func (plan STFStoreServiceResourceModel) getSTFStorePNA(ctx context.Context, cli
 }
 
 // Set STF Store PNA
-func (plan STFStoreServiceResourceModel) setSTFStorePNA(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) error {
-	siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
-	if err != nil {
-		diagnostics.AddError(
-			"Error setting PNA for Store Service ",
-			"Error message: "+err.Error(),
-		)
-		return err
-	}
+func setSTFStorePNA(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, siteIdInt int64, VirtualPath string, pna PNA) error {
+
 	var storeBody citrixstorefront.GetSTFStoreRequestModel
 	storeBody.SetSiteId(siteIdInt)
-	storeBody.SetVirtualPath(plan.VirtualPath.ValueString())
+	storeBody.SetVirtualPath(VirtualPath)
 
-	pna := util.ObjectValueToTypedObject[PNA](ctx, diagnostics, plan.PNA)
 	if pna.Enable.ValueBool() {
 		// Disable PNA first because of the existing problem from PNA cmdlet
 		disablePnaRequest := client.StorefrontClient.StoreSF.STFStoreDisableStorePna(ctx, storeBody)
@@ -765,18 +742,11 @@ func (plan STFStoreServiceResourceModel) setSTFStorePNA(ctx context.Context, cli
 }
 
 // Set Storefront Store Enumeration Options
-func (plan STFStoreServiceResourceModel) setSTFStoreEnumerationOptions(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) error {
-	siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
-	if err != nil {
-		diagnostics.AddError(
-			"Error setting StoreFront Store Enumeration Options",
-			"Error message: "+err.Error(),
-		)
-		return err
-	}
+func setSTFStoreEnumerationOptions(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, siteId int64, VirtualPath string, enumerationOptions EnumerationOptions) error {
+
 	// Generate API request body
 	var enumerationOptionsBody citrixstorefront.SetSTFStoreEnumerationOptionsRequestModel
-	enumerationOptions := util.ObjectValueToTypedObject[EnumerationOptions](ctx, diagnostics, plan.EnumerationOptions)
+
 	if !enumerationOptions.EnhancedEnumeration.IsNull() {
 		enumerationOptionsBody.SetEnhancedEnumeration(enumerationOptions.EnhancedEnumeration.ValueBool())
 	}
@@ -795,14 +765,14 @@ func (plan STFStoreServiceResourceModel) setSTFStoreEnumerationOptions(ctx conte
 
 	// Generate getSTFStoreService body
 	getSTFStoreServiceBody := citrixstorefront.GetSTFStoreRequestModel{}
-	getSTFStoreServiceBody.SetSiteId(siteIdInt)
-	getSTFStoreServiceBody.SetVirtualPath(plan.VirtualPath.ValueString())
+	getSTFStoreServiceBody.SetSiteId(siteId)
+	getSTFStoreServiceBody.SetVirtualPath(VirtualPath)
 
 	// Create the client request to Set StoreFront Enumeration Options
 	enumerationOptionsRequest := client.StorefrontClient.StoreSF.STFStoreSetSTFStoreEnumerationOptions(ctx, enumerationOptionsBody, getSTFStoreServiceBody)
 
 	// Execute the request
-	_, err = enumerationOptionsRequest.Execute()
+	_, err := enumerationOptionsRequest.Execute()
 	if err != nil {
 		diagnostics.AddError(
 			"Error setting StoreFront Store Enumeration Options",
@@ -814,19 +784,12 @@ func (plan STFStoreServiceResourceModel) setSTFStoreEnumerationOptions(ctx conte
 }
 
 // Get Storefront store Enumeration Options
-func (plan STFStoreServiceResourceModel) getSTFStoreEnumerationOptions(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) (*citrixstorefront.GetSTFStoreEnumerationOptionsResponseModel, error) {
-	siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
-	if err != nil {
-		diagnostics.AddError(
-			"Error setting StoreFront Store Enumeration Options",
-			"Error message: "+err.Error(),
-		)
-		return nil, err
-	}
+func getSTFStoreEnumerationOptions(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, siteId int64, VirtualPath string) (*citrixstorefront.GetSTFStoreEnumerationOptionsResponseModel, error) {
+
 	// Generate getSTFStoreService body
 	getSTFStoreServiceBody := citrixstorefront.GetSTFStoreRequestModel{}
-	getSTFStoreServiceBody.SetSiteId(siteIdInt)
-	getSTFStoreServiceBody.SetVirtualPath(plan.VirtualPath.ValueString())
+	getSTFStoreServiceBody.SetSiteId(siteId)
+	getSTFStoreServiceBody.SetVirtualPath(VirtualPath)
 
 	// Create the client request to Get StoreFront Enumeration Options
 	enumerationOptionsRequest := client.StorefrontClient.StoreSF.STFStoreGetSTFStoreEnumerationOptions(ctx, getSTFStoreServiceBody)
@@ -837,18 +800,10 @@ func (plan STFStoreServiceResourceModel) getSTFStoreEnumerationOptions(ctx conte
 }
 
 // Set Storefront Store Launch Options
-func (plan STFStoreServiceResourceModel) setSTFStoreLaunchOptions(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) error {
-	siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
-	if err != nil {
-		diagnostics.AddError(
-			"Error setting StoreFront Store Launch Options",
-			"Error message: "+err.Error(),
-		)
-		return err
-	}
+func setSTFStoreLaunchOptions(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, siteId int64, VirtualPath string, launchOptions LaunchOptions) error {
+
 	// Generate API request body
 	var launchOptionsBody citrixstorefront.SetSTFStoreLaunchOptionsRequestModel
-	launchOptions := util.ObjectValueToTypedObject[LaunchOptions](ctx, diagnostics, plan.LaunchOptions)
 
 	if !launchOptions.AddressResolutionType.IsNull() {
 		launchOptionsBody.SetAddressResolutionType(launchOptions.AddressResolutionType.ValueString())
@@ -892,14 +847,14 @@ func (plan STFStoreServiceResourceModel) setSTFStoreLaunchOptions(ctx context.Co
 
 	// Generate getSTFStoreService body
 	getSTFStoreServiceBody := citrixstorefront.GetSTFStoreRequestModel{}
-	getSTFStoreServiceBody.SetSiteId(siteIdInt)
-	getSTFStoreServiceBody.SetVirtualPath(plan.VirtualPath.ValueString())
+	getSTFStoreServiceBody.SetSiteId(siteId)
+	getSTFStoreServiceBody.SetVirtualPath(VirtualPath)
 
 	// Create the client request to Set StoreFront Enumeration Options
 	launchOptionsRequest := client.StorefrontClient.StoreSF.STFStoreSetSTFStoreLaunchOptions(ctx, launchOptionsBody, getSTFStoreServiceBody)
 
 	// Execute the request
-	err = launchOptionsRequest.Execute()
+	err := launchOptionsRequest.Execute()
 	if err != nil {
 		diagnostics.AddError(
 			"Error setting StoreFront Store Launch Options",
@@ -911,11 +866,11 @@ func (plan STFStoreServiceResourceModel) setSTFStoreLaunchOptions(ctx context.Co
 }
 
 // Get Storefront store Launch Options
-func (plan *STFStoreServiceResourceModel) getSTFStoreLaunchOptions(ctx context.Context, client *citrixdaasclient.CitrixDaasClient) (*citrixstorefront.GetSTFStoreLaunchOptionsResponseModel, error) {
+func getSTFStoreLaunchOptions(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, siteId int64, VirtualPath string) (*citrixstorefront.GetSTFStoreLaunchOptionsResponseModel, error) {
 	// Generate getSTFStoreService body
 	getSTFStoreServiceBody := citrixstorefront.GetSTFStoreRequestModel{}
-
-	getSTFStoreServiceBody.SetVirtualPath(plan.VirtualPath.ValueString())
+	getSTFStoreServiceBody.SetSiteId(siteId)
+	getSTFStoreServiceBody.SetVirtualPath(VirtualPath)
 
 	// Create the client request to Get StoreFront Launch Options
 	launchOptionsRequest := client.StorefrontClient.StoreSF.STFStoreGetSTFStoreLaunchOptions(ctx, getSTFStoreServiceBody)
@@ -926,17 +881,9 @@ func (plan *STFStoreServiceResourceModel) getSTFStoreLaunchOptions(ctx context.C
 	return &getResponse, err
 }
 
-func (plan STFStoreServiceResourceModel) setSTFRoamingAccount(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) error {
-	siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
-	if err != nil {
-		diagnostics.AddError(
-			"Error creating StoreFront StoreService ",
-			"Error message: "+err.Error(),
-		)
-		return err
-	}
+func setSTFRoamingAccount(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, siteId int64, VirtualPath string, roamingAccountSettings RoamingAccount) error {
+
 	var roamingAccountSettingsBody citrixstorefront.SetSTFRoamingAccountRequestModel
-	roamingAccountSettings := util.ObjectValueToTypedObject[RoamingAccount](ctx, diagnostics, plan.RoamingAccount)
 
 	if !roamingAccountSettings.Published.IsNull() {
 		roamingAccountSettingsBody.SetPublished(roamingAccountSettings.Published.ValueBool())
@@ -944,14 +891,14 @@ func (plan STFStoreServiceResourceModel) setSTFRoamingAccount(ctx context.Contex
 
 	// Generate getSTFStoreService body
 	getSTFStoreServiceBody := citrixstorefront.GetSTFStoreRequestModel{}
-	getSTFStoreServiceBody.SetSiteId(siteIdInt)
-	getSTFStoreServiceBody.SetVirtualPath(plan.VirtualPath.ValueString())
+	getSTFStoreServiceBody.SetSiteId(siteId)
+	getSTFStoreServiceBody.SetVirtualPath(VirtualPath)
 
 	// Create the client request to Set Storefront Gateway Settings
 	gatewaySerivceRequest := client.StorefrontClient.StoreSF.STFRoamingAccountSet(ctx, roamingAccountSettingsBody, getSTFStoreServiceBody)
 
 	// Execute the request
-	err = gatewaySerivceRequest.Execute()
+	err := gatewaySerivceRequest.Execute()
 	if err != nil {
 		diagnostics.AddError(
 			"Error setting StoreFront Store Gateway Settings",
@@ -963,19 +910,12 @@ func (plan STFStoreServiceResourceModel) setSTFRoamingAccount(ctx context.Contex
 
 }
 
-func (plan STFStoreServiceResourceModel) getSTFRoamingAccount(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) (*citrixstorefront.GetSTFRoamingAccountResponseModel, error) {
-	siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
-	if err != nil {
-		diagnostics.AddError(
-			"Error creating StoreFront StoreService ",
-			"Error message: "+err.Error(),
-		)
-		return nil, err
-	}
+func getSTFRoamingAccount(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, siteId int64, VirtualPath string) (*citrixstorefront.GetSTFRoamingAccountResponseModel, error) {
+
 	// Generate getSTFStoreService body
 	getSTFStoreServiceBody := citrixstorefront.GetSTFStoreRequestModel{}
-	getSTFStoreServiceBody.SetSiteId(siteIdInt)
-	getSTFStoreServiceBody.SetVirtualPath(plan.VirtualPath.ValueString())
+	getSTFStoreServiceBody.SetSiteId(siteId)
+	getSTFStoreServiceBody.SetVirtualPath(VirtualPath)
 
 	// Create the client request to Get StoreFront Gateway Settings
 	roamingAccRequest := client.StorefrontClient.StoreSF.STFRoamingAccountGet(ctx, getSTFStoreServiceBody)
@@ -986,62 +926,32 @@ func (plan STFStoreServiceResourceModel) getSTFRoamingAccount(ctx context.Contex
 	return &getResponse, err
 }
 
-func (plan STFStoreServiceResourceModel) createStoreFarms(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) error {
-	siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
-	if err != nil {
-		diagnostics.AddError(
-			"Error getting StoreFront StoreService SiteId",
-			"Error message: "+err.Error(),
-		)
-		return err
-	}
+func createAndUpdateStoreFarms(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, existingFarms []citrixstorefront.StoreFarmModel, siteId int64, VirtualPath string, farms []StoreFarm) error {
 
-	farms := util.ObjectListToTypedArray[StoreFarm](ctx, diagnostics, plan.StoreFarm)
-
-	for _, farm := range farms {
-		var storeFarmSetBody = farm.buildStoreFarmBody(ctx, client, diagnostics)
-		//set Store for StoreFarm Create Request
-		getStoreBody := citrixstorefront.GetSTFStoreRequestModel{}
-		getStoreBody.SetSiteId(siteIdInt)
-		getStoreBody.SetVirtualPath(plan.VirtualPath.ValueString())
-
-		createStoreFarmRequest := client.StorefrontClient.StoreSF.STFStoreNewStoreFarm(ctx, storeFarmSetBody, getStoreBody)
-		_, err := createStoreFarmRequest.Execute()
-		if err != nil {
-			diagnostics.AddError(
-				"Error creating Store Farm",
-				"Error message: "+err.Error(),
-			)
-			return err
-		}
-	}
-	return nil
-}
-
-func (plan STFStoreServiceResourceModel) updateStoreFarms(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, existingFarms []citrixstorefront.StoreFarmModel) error {
-	siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
-	if err != nil {
-		diagnostics.AddError(
-			"Error getting StoreFront StoreService SiteId",
-			"Error message: "+err.Error(),
-		)
-		return err
-	}
 	//set Store for StoreFarm Set Request
 	getStoreBody := citrixstorefront.GetSTFStoreRequestModel{}
-	getStoreBody.SetSiteId(siteIdInt)
-	getStoreBody.SetVirtualPath(plan.VirtualPath.ValueString())
-	farms := util.ObjectListToTypedArray[StoreFarm](ctx, diagnostics, plan.StoreFarm)
-	//remove farms that are not in the plan
+	getStoreBody.SetSiteId(siteId)
+	getStoreBody.SetVirtualPath(VirtualPath)
+
+	planFarmArray := []string{}
+	existingFarmArray := []string{}
+
+	for _, farm := range farms {
+		planFarmArray = append(planFarmArray, farm.FarmName.ValueString())
+	}
+
+	// Delete Roaming Farms that are in not in the plan but are in the existing farms
 	for _, existingFarm := range existingFarms {
+		var existingFarmName string
 		found := false
 		if existingFarm.FarmName.Get() == nil || *existingFarm.FarmName.Get() == "" {
 			continue
 		}
-		existingFarmName := *existingFarm.FarmName.Get()
+		existingFarmArray = append(existingFarmArray, *existingFarm.FarmName.Get())
+		existingFarmName = *existingFarm.FarmName.Get()
 
-		for _, farm := range farms {
-			if existingFarmName == farm.FarmName.ValueString() {
+		for _, planFarm := range planFarmArray {
+			if existingFarmName == planFarm {
 				found = true
 				break
 			}
@@ -1061,15 +971,22 @@ func (plan STFStoreServiceResourceModel) updateStoreFarms(ctx context.Context, c
 			}
 		}
 	}
+
 	//update or create farms
 	for _, farm := range farms {
-		var storeFarmSetBody = farm.buildStoreFarmBody(ctx, client, diagnostics)
+		found := false
+		var storeFarmSetBody = farm.buildStoreFarmBody(ctx, diagnostics)
 		//fetch existing StoreFarm to see if a new farm need to be created
-		var storeFarmGetBody citrixstorefront.GetSTFStoreFarmRequestModel
-		storeFarmGetBody.SetFarmName(farm.FarmName.ValueString())
-		getStoreFarmRequest := client.StorefrontClient.StoreSF.STFStoreGetStoreFarm(ctx, storeFarmGetBody, getStoreBody)
-		_, err := getStoreFarmRequest.Execute()
-		if err != nil && strings.EqualFold(err.Error(), util.NOT_EXIST) { //if farm does not exist, create a new farm
+
+		// Check if the farm is already present in the existing farms
+		for _, existingFarm := range existingFarmArray {
+			if existingFarm == farm.FarmName.ValueString() {
+				found = true
+				break
+			}
+		}
+
+		if !found { //create new farm
 			createStoreFarmRequest := client.StorefrontClient.StoreSF.STFStoreNewStoreFarm(ctx, storeFarmSetBody, getStoreBody)
 			_, err := createStoreFarmRequest.Execute()
 			if err != nil {
@@ -1081,7 +998,7 @@ func (plan STFStoreServiceResourceModel) updateStoreFarms(ctx context.Context, c
 			}
 		} else { //otherwise update the existing farm
 			setStoreFarmRequest := client.StorefrontClient.StoreSF.STFStoreSetStoreFarm(ctx, storeFarmSetBody, getStoreBody)
-			_, err = setStoreFarmRequest.Execute()
+			_, err := setStoreFarmRequest.Execute()
 			if err != nil {
 				diagnostics.AddError(
 					"Error updating Store Farm during Update",
@@ -1094,7 +1011,7 @@ func (plan STFStoreServiceResourceModel) updateStoreFarms(ctx context.Context, c
 	return nil
 }
 
-func (farm StoreFarm) buildStoreFarmBody(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) citrixstorefront.AddSTFStoreFarmRequestModel {
+func (farm StoreFarm) buildStoreFarmBody(ctx context.Context, diagnostics *diag.Diagnostics) citrixstorefront.AddSTFStoreFarmRequestModel {
 	var storeFarmSetBody citrixstorefront.AddSTFStoreFarmRequestModel
 	if !farm.AllFailedBypassDuration.IsNull() {
 		storeFarmSetBody.SetAllFailedBypassDuration(farm.AllFailedBypassDuration.ValueInt64())
@@ -1164,7 +1081,7 @@ func (farm StoreFarm) buildStoreFarmBody(ctx context.Context, client *citrixdaas
 }
 
 func (plan STFStoreServiceResourceModel) getStoreFarms(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) ([]citrixstorefront.StoreFarmModel, error) {
-	siteIdInt, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
+	siteId, err := strconv.ParseInt(plan.SiteId.ValueString(), 10, 64)
 	if err != nil {
 		diagnostics.AddError(
 			"Error getting StoreFront StoreService SiteId",
@@ -1173,9 +1090,8 @@ func (plan STFStoreServiceResourceModel) getStoreFarms(ctx context.Context, clie
 		return nil, err
 	}
 	farms := util.ObjectListToTypedArray[StoreFarm](ctx, diagnostics, plan.StoreFarm)
-
 	getStoreBody := citrixstorefront.GetSTFStoreRequestModel{}
-	getStoreBody.SetSiteId(siteIdInt)
+	getStoreBody.SetSiteId(siteId)
 	getStoreBody.SetVirtualPath(plan.VirtualPath.ValueString())
 
 	var storeFarms []citrixstorefront.StoreFarmModel

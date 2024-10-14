@@ -427,10 +427,10 @@ func TestAzureMcs(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "name", folder_name_1),
 					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "name", folder_name_2),
 					// Verify parent path of admin folder
-					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "parent_path", fmt.Sprintf("%s\\", folder_name_1)),
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "parent_path", folder_name_1),
 					// Verify path of admin folder
-					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "path", fmt.Sprintf("%s\\", folder_name_1)),
-					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "path", fmt.Sprintf("%s\\%s\\", folder_name_1, folder_name_2)),
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "path", folder_name_1),
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "path", fmt.Sprintf("%s\\%s", folder_name_1, folder_name_2)),
 					// Verify type of admin folder
 					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "type.#", "1"),
 					resource.TestCheckTypeSetElemAttr("citrix_admin_folder.testAdminFolder1", "type.*", "ContainsApplications"),
@@ -459,10 +459,10 @@ func TestAzureMcs(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "name", folder_name_1),
 					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "name", folder_name_2),
 					// Verify parent path of admin folder
-					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "parent_path", fmt.Sprintf("%s\\", folder_name_1)),
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "parent_path", folder_name_1),
 					// Verify path of admin folder
-					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "path", fmt.Sprintf("%s\\", folder_name_1)),
-					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "path", fmt.Sprintf("%s\\%s\\", folder_name_1, folder_name_2)),
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "path", folder_name_1),
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "path", fmt.Sprintf("%s\\%s", folder_name_1, folder_name_2)),
 					// Verify type of admin folder
 					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "type.#", "1"),
 					resource.TestCheckTypeSetElemAttr("citrix_admin_folder.testAdminFolder1", "type.*", "ContainsApplicationGroups"),
@@ -485,10 +485,10 @@ func TestAzureMcs(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "name", folder_name_1_updated),
 					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "name", folder_name_2),
 					// Verify parent path of admin folder
-					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "parent_path", fmt.Sprintf("%s\\", folder_name_1_updated)),
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "parent_path", folder_name_1_updated),
 					// Verify path of admin folder
-					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "path", fmt.Sprintf("%s\\", folder_name_1_updated)),
-					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "path", fmt.Sprintf("%s\\%s\\", folder_name_1_updated, folder_name_2)),
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "path", folder_name_1_updated),
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "path", fmt.Sprintf("%s\\%s", folder_name_1_updated, folder_name_2)),
 					// Verify type of admin folder
 					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "type.#", "1"),
 					resource.TestCheckTypeSetElemAttr("citrix_admin_folder.testAdminFolder1", "type.*", "ContainsApplications"),
@@ -511,8 +511,8 @@ func TestAzureMcs(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "name", folder_name_1_updated),
 					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "name", folder_name_2),
 					// Verify path of admin folder
-					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "path", fmt.Sprintf("%s\\", folder_name_1_updated)),
-					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "path", fmt.Sprintf("%s\\", folder_name_2)),
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "path", folder_name_1_updated),
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "path", folder_name_2),
 					// Verify type of admin folder
 					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "type.#", "1"),
 					resource.TestCheckTypeSetElemAttr("citrix_admin_folder.testAdminFolder1", "type.*", "ContainsApplications"),
@@ -535,8 +535,8 @@ func TestAzureMcs(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "name", folder_name_1_updated),
 					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "name", folder_name_2),
 					// Verify path of admin folder
-					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "path", fmt.Sprintf("%s\\", folder_name_1_updated)),
-					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "path", fmt.Sprintf("%s\\", folder_name_2)),
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "path", folder_name_1_updated),
+					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder2", "path", folder_name_2),
 					// Verify type of admin folder
 					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "type.#", "2"),
 					resource.TestCheckTypeSetElemAttr("citrix_admin_folder.testAdminFolder1", "type.*", "ContainsMachineCatalogs"),
@@ -679,7 +679,7 @@ func TestAzureMcs(t *testing.T) {
 					// Verify the command line executable
 					resource.TestCheckResourceAttr("citrix_application.testApplication", "installed_app_properties.command_line_executable", "updated_test.exe"),
 					// Verify the application folder path
-					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_folder_path", fmt.Sprintf("%s\\", folder_name_2)),
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_folder_path", folder_name_2),
 
 					// /*** Verify Policy Set ***/
 					// // Verify name of the policy set

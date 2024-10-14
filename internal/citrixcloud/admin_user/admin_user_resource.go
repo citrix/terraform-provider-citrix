@@ -15,7 +15,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -133,28 +132,9 @@ func (r *ccAdminUserResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	// Try getting the new admin user from remote
-	adminUser, err := getAdminUser(ctx, r.client, plan)
+	plan, err = fetchAndUpdateAdminUser(ctx, r.client, plan, &resp.Diagnostics)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error fetching admin user",
-			util.ReadClientError(err),
-		)
-		return
-	}
-
-	// Update the plan with the fetched admin user details
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, adminUser)
-
-	if !plan.Policies.IsNull() {
-		var filteredPolicies []CCAdminPolicyResourceModel
-		policies := util.ObjectListToTypedArray[CCAdminPolicyResourceModel](ctx, &resp.Diagnostics, plan.Policies)
-		for _, policy := range policies {
-			// Set the service name to empty string as it is not returned by the API
-			policy.ServiceName = types.StringValue("")
-			filteredPolicies = append(filteredPolicies, policy)
-		}
-		plan.Policies = util.TypedArrayToObjectList[CCAdminPolicyResourceModel](ctx, &resp.Diagnostics, filteredPolicies)
+		return // Error already added to diagnostics
 	}
 
 	// Set state to fully populated data

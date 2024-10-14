@@ -284,7 +284,8 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 
 		image := vSphereMachineConfig.MasterImageVm.ValueString()
 		snapshot := vSphereMachineConfig.ImageSnapshot.ValueString()
-		imagePath, err := getOnPremImagePath(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), image, snapshot, "creating")
+		resourcePoolPath := vSphereMachineConfig.ResourcePoolPath.ValueString()
+		imagePath, err := getOnPremImagePath(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), image, snapshot, resourcePoolPath, "creating")
 		if err != nil {
 			return nil, err
 		}
@@ -325,7 +326,7 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 
 		image := xenserverMachineConfig.MasterImageVm.ValueString()
 		snapshot := xenserverMachineConfig.ImageSnapshot.ValueString()
-		imagePath, err := getOnPremImagePath(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), image, snapshot, "creating")
+		imagePath, err := getOnPremImagePath(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), image, snapshot, "", "creating")
 		if err != nil {
 			return nil, err
 		}
@@ -349,7 +350,7 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 
 		image := scvmmMachineConfig.MasterImage.ValueString()
 		snapshot := scvmmMachineConfig.ImageSnapshot.ValueString()
-		imageResource, err := getOnPremImage(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), image, snapshot, "creating")
+		imageResource, err := getOnPremImage(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), image, snapshot, "", "creating")
 		if err != nil {
 			return nil, err
 		}
@@ -611,7 +612,7 @@ func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan Provisioning
 
 		image := scvmmMachineConfig.MasterImage.ValueString()
 		snapshot := scvmmMachineConfig.ImageSnapshot.ValueString()
-		imageResource, err := getOnPremImage(ctx, client, diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), image, snapshot, "updating")
+		imageResource, err := getOnPremImage(ctx, client, diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), image, snapshot, "", "updating")
 		if err != nil {
 			return body, err
 		}
@@ -744,7 +745,7 @@ func addMachinesToMcsPvsCatalog(ctx context.Context, client *citrixdaasclient.Ci
 	}
 
 	batchRequestItems := []citrixorchestration.BatchRequestItemModel{}
-	relativeUrl := fmt.Sprintf("/MachineCatalogs/%s/Machines?async=true", catalogId)
+	relativeUrl := fmt.Sprintf("/MachineCatalogs/%s/Machines", catalogId)
 	for i := 0; i < int(addMachinesCount); i++ {
 		var batchRequestItem citrixorchestration.BatchRequestItemModel
 		batchRequestItem.SetMethod(http.MethodPost)
@@ -1040,7 +1041,8 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 		vSphereMachineConfig := util.ObjectValueToTypedObject[VsphereMachineConfigModel](ctx, &resp.Diagnostics, provisioningSchemePlan.VsphereMachineConfig)
 		newImage := vSphereMachineConfig.MasterImageVm.ValueString()
 		snapshot := vSphereMachineConfig.ImageSnapshot.ValueString()
-		imagePath, err = getOnPremImagePath(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), newImage, snapshot, "updating")
+		resourcePoolPath := vSphereMachineConfig.ResourcePoolPath.ValueString()
+		imagePath, err = getOnPremImagePath(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), newImage, snapshot, resourcePoolPath, "updating")
 		if err != nil {
 			return err
 		}
@@ -1065,7 +1067,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 		xenserverMachineConfig := util.ObjectValueToTypedObject[XenserverMachineConfigModel](ctx, &resp.Diagnostics, provisioningSchemePlan.XenserverMachineConfig)
 		newImage := xenserverMachineConfig.MasterImageVm.ValueString()
 		snapshot := xenserverMachineConfig.ImageSnapshot.ValueString()
-		imagePath, err = getOnPremImagePath(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), newImage, snapshot, "updating")
+		imagePath, err = getOnPremImagePath(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), newImage, snapshot, "", "updating")
 		if err != nil {
 			return err
 		}
@@ -1090,7 +1092,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 		scvmmMachineConfig := util.ObjectValueToTypedObject[SCVMMMachineConfigModel](ctx, &resp.Diagnostics, provisioningSchemePlan.SCVMMMachineConfigModel)
 		newImage := scvmmMachineConfig.MasterImage.ValueString()
 		snapshot := scvmmMachineConfig.ImageSnapshot.ValueString()
-		imagePath, err = getOnPremImagePath(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), newImage, snapshot, "updating")
+		imagePath, err = getOnPremImagePath(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), newImage, snapshot, "", "updating")
 		if err != nil {
 			return err
 		}
@@ -1503,13 +1505,19 @@ func parseNetworkMappingToClientModel(networkMappings []NetworkMappingModel, res
 	return res, nil
 }
 
-func getOnPremImage(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diags *diag.Diagnostics, hypervisorName, resourcePoolName, image, snapshot, action string) (*citrixorchestration.HypervisorResourceResponseModel, error) {
+func getOnPremImage(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diags *diag.Diagnostics, hypervisorName, resourcePoolName, image, snapshot, resourcePoolPath, action string) (*citrixorchestration.HypervisorResourceResponseModel, error) {
 	queryPath := ""
+	if resourcePoolPath != "" {
+		resourcePoolSegments := strings.Split(resourcePoolPath, "/")
+		for _, resourcePool := range resourcePoolSegments {
+			queryPath = queryPath + resourcePool + ".resourcepool" + "\\"
+		}
+	}
 	resourceType := util.VirtualMachineResourceType
 	resourceName := image
 	errTemplate := fmt.Sprintf("Failed to locate master image machine %s", image)
 	if snapshot != "" {
-		queryPath = fmt.Sprintf("%s.vm", image)
+		queryPath = queryPath + fmt.Sprintf("%s.vm", image)
 		snapshotSegments := strings.Split(snapshot, "/")
 		snapshotName := snapshotSegments[len(snapshotSegments)-1]
 		for i := 0; i < len(snapshotSegments)-1; i++ {
@@ -1534,8 +1542,8 @@ func getOnPremImage(ctx context.Context, client *citrixdaasclient.CitrixDaasClie
 	return imageResource, nil
 }
 
-func getOnPremImagePath(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diags *diag.Diagnostics, hypervisorName, resourcePoolName, image, snapshot, action string) (string, error) {
-	imageResource, err := getOnPremImage(ctx, client, diags, hypervisorName, resourcePoolName, image, snapshot, action)
+func getOnPremImagePath(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diags *diag.Diagnostics, hypervisorName, resourcePoolName, image, snapshot, resourcePoolPath, action string) (string, error) {
+	imageResource, err := getOnPremImage(ctx, client, diags, hypervisorName, resourcePoolName, image, snapshot, resourcePoolPath, action)
 	if err != nil {
 		return "", err
 	}

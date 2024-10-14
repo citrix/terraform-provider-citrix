@@ -172,6 +172,14 @@ func (r *vsphereHypervisorResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
+	// Get current state
+	var state VsphereHypervisorResourceModel
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	// Construct the update model
 	var editHypervisorRequestBody citrixorchestration.EditHypervisorConnectionRequestModel
 	editHypervisorRequestBody.SetName(plan.Name.ValueString())
@@ -199,7 +207,7 @@ func (r *vsphereHypervisorResource) Update(ctx context.Context, req resource.Upd
 	if !plan.Scopes.IsNull() {
 		editHypervisorRequestBody.SetScopes(util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes))
 	}
-	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	metadata := util.GetUpdatedMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, state.Metadata), util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
 	editHypervisorRequestBody.SetMetadata(metadata)
 
 	// Patch hypervisor

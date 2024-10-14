@@ -46,6 +46,9 @@ func (AwsWorkspacesAccountResourceModel) GetSchema() schema.Schema {
 			"aws_account": schema.StringAttribute{
 				Description: "AWS account number associated with the account.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"aws_region": schema.StringAttribute{
 				Description: "AWS region the account is associated with.",

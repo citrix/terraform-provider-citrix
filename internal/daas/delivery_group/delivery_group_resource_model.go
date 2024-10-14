@@ -26,6 +26,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setdefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -239,8 +240,11 @@ func (DeliveryGroupRebootSchedule) GetSchema() schema.NestedAttributeObject {
 				Required:    true,
 			},
 			"restrict_to_tag": schema.StringAttribute{
-				Description: "The tag to which the reboot schedule is restricted.",
+				Description: "Restrict reboot schedule to machines with tag specified in Guid.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
+				},
 			},
 			"ignore_maintenance_mode": schema.BoolAttribute{
 				Description: "Whether the reboot schedule ignores machines in the maintenance mode.",
@@ -624,6 +628,7 @@ var _ util.RefreshableListItemWithAttributes[citrixorchestration.DesktopResponse
 type DeliveryGroupDesktop struct {
 	PublishedName         types.String `tfsdk:"published_name"`
 	DesktopDescription    types.String `tfsdk:"description"`
+	RestrictToTag         types.String `tfsdk:"restrict_to_tag"`
 	Enabled               types.Bool   `tfsdk:"enabled"`
 	EnableSessionRoaming  types.Bool   `tfsdk:"enable_session_roaming"`
 	RestrictedAccessUsers types.Object `tfsdk:"restricted_access_users"` //RestrictedAccessUsers
@@ -646,6 +651,13 @@ func (DeliveryGroupDesktop) GetSchema() schema.NestedAttributeObject {
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(""),
+			},
+			"restrict_to_tag": schema.StringAttribute{
+				Description: "Restrict session launch to machines with tag specified in GUID.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
+				},
 			},
 			"enabled": schema.BoolAttribute{
 				Description: "Specify whether to enable the delivery of this desktop. Default is `true`.",
@@ -1043,6 +1055,9 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 				ElementType: types.StringType,
 				Description: "The IDs of the built-in scopes of the delivery group.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Set{
+					setplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"inherited_scopes": schema.SetAttribute{
 				ElementType: types.StringType,
@@ -1095,6 +1110,10 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 			"delivery_group_folder_path": schema.StringAttribute{
 				Description: "The path of the folder in which the delivery group is located.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathWithBackslashRegex), "Admin Folder Path must not start or end with a backslash"),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathSpecialCharactersRegex), "Admin Folder Path must not contain any of the following special characters: / ; : # . * ? = < > | [ ] ( ) { } \" ' ` ~ "),
+				},
 			},
 			"tenants": schema.SetAttribute{
 				ElementType: types.StringType,
@@ -1186,7 +1205,7 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 	}
 
 	adminFolder := deliveryGroup.GetAdminFolder()
-	adminFolderPath := adminFolder.GetName()
+	adminFolderPath := strings.TrimSuffix(adminFolder.GetName(), "\\")
 	if adminFolderPath != "" {
 		r.DeliveryGroupFolderPath = types.StringValue(adminFolderPath)
 	} else {

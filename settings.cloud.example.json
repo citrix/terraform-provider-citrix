@@ -261,7 +261,7 @@
 
         // Resource Location Go Tests
         "TEST_RESOURCE_LOCATION_NAME": "ctx-test-resource-location",
-
+        
         // StoreFront env variable
         "SF_COMPUTER_NAME"              : "{storefront_computer_name}",
         "SF_AD_ADMIN_USERNAME"         : "{storefront_admin_username}",
@@ -301,6 +301,10 @@
         "TEST_HYPERVISOR_DATASOURCE_NAME"     :"azure",
         "TEST_HYPERVISOR_DATASOURCE_ID": "{Existing hypervisor ID for verification}",
 
+        // Resource Location Data Source Go Tests
+        "TEST_RESOURCE_LOCATION_DATASOURCE_NAME": "ctx-test-resource-location",
+        "TEST_RESOURCE_LOCATION_ID": "{Existing resource location ID for verification}",
+        
         // Hypervisor Resource Pool Data Source Go Tests
         "TEST_HYPERVISOR_RP_DATASOURCE_NAME"     :"zl-rp",
         "TEST_HYPERVISOR_RP_DATASOURCE_ID": "{Existing hypervisor resource pool ID for verification}",

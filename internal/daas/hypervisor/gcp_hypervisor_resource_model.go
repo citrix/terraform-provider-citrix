@@ -29,6 +29,7 @@ type GcpHypervisorResourceModel struct {
 	Zone     types.String `tfsdk:"zone"`
 	Scopes   types.Set    `tfsdk:"scopes"`   // Set[string]
 	Metadata types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
+	Tenants  types.Set    `tfsdk:"tenants"`  // Set[string]
 	/** GCP Connection **/
 	ServiceAccountId          types.String `tfsdk:"service_account_id"`
 	ServiceAccountCredentials types.String `tfsdk:"service_account_credentials"`
@@ -83,6 +84,11 @@ func (GcpHypervisorResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"metadata": util.GetMetadataListSchema("Hypervisor"),
+			"tenants": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "A set of identifiers of tenants to associate with the hypervisor connection.",
+				Computed:    true,
+			},
 		},
 	}
 }
@@ -108,6 +114,8 @@ func (r GcpHypervisorResourceModel) RefreshPropertyValues(ctx context.Context, d
 	} else {
 		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
 	}
+
+	r.Tenants = util.RefreshTenantSet(ctx, diagnostics, hypervisor.GetTenants())
 
 	return r
 }

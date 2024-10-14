@@ -47,7 +47,7 @@ func GetHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.Cit
 }
 
 func GetMachineCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, machineCatalogId string, addErrorToDiagnostics bool) (*citrixorchestration.MachineCatalogDetailResponseModel, error) {
-	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId).Fields("Id,Name,Description,ProvisioningType,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC,Metadata,Scopes")
+	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId).Fields("Id,Name,Description,ProvisioningType,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC,Metadata,Scopes,UpgradeInfo,AdminFolder")
 	catalog, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.MachineCatalogDetailResponseModel](getMachineCatalogRequest, client)
 	if err != nil && addErrorToDiagnostics {
 		diagnostics.AddError(
@@ -315,7 +315,7 @@ func GetFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.C
 					name = strings.Split(name, " ")[0]
 				}
 				if _, exists := filterMap[strings.ToLower(name)]; exists {
-					if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER && strings.EqualFold(resourceType, NetworkResourceType) {
+					if (connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM || connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER) && strings.EqualFold(resourceType, NetworkResourceType) {
 						result = append(result, child.GetRelativePath())
 					} else if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && strings.EqualFold(pluginId, NUTANIX_PLUGIN_ID) && strings.EqualFold(resourceType, NetworkResourceType) {
 						result = append(result, child.GetFullName())

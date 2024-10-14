@@ -141,4 +141,5 @@ jobs:
 
       # Sweep
       - name: Sweep
+        if: always()
         run: go test -v ./internal/test -run "^TestAzureMcs$" -timeout 1h -sweep-run "citrix_zone,citrix_zone,citrix_admin_folder,citrix_admin_role,citrix_admin_scope" -sweep="azure"
