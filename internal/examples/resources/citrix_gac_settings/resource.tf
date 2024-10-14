@@ -30,7 +30,28 @@ resource "citrix_gac_settings" "test_settings_configuration" {
                         value_string = "3600000"
                     }
                 ]
-            }
+            },
+            {
+                user_override = false,
+                category = "dazzle",
+                settings = [
+                    {
+                        name = "Local App Whitelist",
+                        local_app_allow_list = [
+                            {
+                                arguments = "www.citrix.com",
+                                name = "Google Chrome",
+                                path = "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
+                            },
+                            {
+                                arguments = "www.citrix2.com",
+                                name = "Google Chrome2",
+                                path = "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
+                            },
+                        ]
+                    }
+                ]
+            },
         ],
         html5 = [
             {
@@ -67,6 +88,37 @@ resource "citrix_gac_settings" "test_settings_configuration" {
                             "startWorkspace",
                             "refreshApps"
                         ]
+                    }
+                ]
+            },
+             {
+                user_override = false,
+                category = "Browser",
+                settings = [
+                    {
+                        name = "managed bookmarks",
+                        managed_bookmarks = [
+                            {
+                                name = "Citrix",
+                                url = "https://www.citrix.com/"
+                            },
+                            {
+                                name = "Citrix Workspace app",
+                                url = "https://www.citrix.com/products/receiver.html"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        linux = [
+            {
+                category = "root",
+                user_override = false,
+                settings = [
+                    {
+                        name = "enable fido2",
+                        value_string = "true"
                     }
                 ]
             }

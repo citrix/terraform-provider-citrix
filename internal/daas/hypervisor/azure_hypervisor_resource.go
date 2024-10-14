@@ -175,6 +175,14 @@ func (r *azureHypervisorResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
+	// Get current state
+	var state AzureHypervisorResourceModel
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	// Construct the update model
 	var editHypervisorRequestBody citrixorchestration.EditHypervisorConnectionRequestModel
 	editHypervisorRequestBody.SetName(plan.Name.ValueString())
@@ -182,7 +190,7 @@ func (r *azureHypervisorResource) Update(ctx context.Context, req resource.Updat
 	editHypervisorRequestBody.SetApplicationId(plan.ApplicationId.ValueString())
 	editHypervisorRequestBody.SetApplicationSecret(plan.ApplicationSecret.ValueString())
 	metadata := getMetadataForAzureRmHypervisor(plan)
-	additionalMetadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	additionalMetadata := util.GetUpdatedMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, state.Metadata), util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
 	metadata = append(metadata, additionalMetadata...)
 	editHypervisorRequestBody.SetMetadata(metadata)
 	if !plan.Scopes.IsNull() {

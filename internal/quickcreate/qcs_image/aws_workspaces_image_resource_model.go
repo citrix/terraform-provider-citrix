@@ -113,10 +113,16 @@ func (AwsWorkspacesImageResourceModel) GetSchema() schema.Schema {
 			"tenancy": schema.StringAttribute{
 				Description: "The type of tenancy of the image.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"state": schema.StringAttribute{
 				Description: "The state of ingestion process of the image.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}

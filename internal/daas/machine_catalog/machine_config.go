@@ -278,6 +278,7 @@ func (GcpMachineConfigModel) GetAttributes() map[string]schema.Attribute {
 type VsphereMachineConfigModel struct {
 	/** vSphere Hypervisor **/
 	MasterImageVm            types.String `tfsdk:"master_image_vm"`
+	ResourcePoolPath         types.String `tfsdk:"resource_pool_path"`
 	ImageSnapshot            types.String `tfsdk:"image_snapshot"`
 	MasterImageNote          types.String `tfsdk:"master_image_note"`
 	ImageUpdateRebootOptions types.Object `tfsdk:"image_update_reboot_options"`
@@ -295,6 +296,18 @@ func (VsphereMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 			"master_image_vm": schema.StringAttribute{
 				Description: "The name of the virtual machine that will be used as master image. This property is case sensitive.",
 				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(util.NoPathRegex),
+						"must not contain any path.",
+					),
+				},
+			},
+			"resource_pool_path": schema.StringAttribute{
+				Description: "The Resource Pool path under which the `master_image_vm` is located. This property is case sensitive.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(""),
 			},
 			"image_snapshot": schema.StringAttribute{
 				Description: "The Snapshot of the virtual machine specified in `master_image_vm`. Specify the relative path of the snapshot. Eg: snaphost-1/snapshot-2/snapshot-3. This property is case sensitive.",
@@ -360,6 +373,12 @@ func (XenserverMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 			"master_image_vm": schema.StringAttribute{
 				Description: "The name of the virtual machine that will be used as master image. This property is case sensitive.",
 				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(util.NoPathRegex),
+						"must not contain any path.",
+					),
+				},
 			},
 			"image_snapshot": schema.StringAttribute{
 				Description: "The Snapshot of the virtual machine specified in `master_image_vm`. Specify the relative path of the snapshot. Eg: snaphost-1/snapshot-2/snapshot-3. This property is case sensitive.",
@@ -576,6 +595,9 @@ func (AzureMasterImageModel) GetSchema() schema.SingleNestedAttribute {
 			"shared_subscription": schema.StringAttribute{
 				Description: "The Azure Subscription ID where the image VHD / managed disk / snapshot for creating machines is located. Only required if the image is not in the same subscription of the hypervisor.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
 			},
 			"master_image": schema.StringAttribute{
 				Description: "The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors. Omit this field if you want to use gallery_image.",
@@ -1430,9 +1452,10 @@ func (mc *VsphereMachineConfigModel) RefreshProperties(ctx context.Context, diag
 	provScheme := catalog.GetProvisioningScheme()
 
 	// Refresh Master Image
-	masterImage, imageSnapshot := parseOnPremImagePath(catalog)
+	masterImage, imageSnapshot, resourcePoolPath := parseOnPremImagePath(catalog)
 	mc.MasterImageVm = types.StringValue(masterImage)
 	mc.ImageSnapshot = types.StringValue(imageSnapshot)
+	mc.ResourcePoolPath = types.StringValue(resourcePoolPath)
 
 	// Refresh Master Image Note
 	currentDiskImage := provScheme.GetCurrentDiskImage()
@@ -1473,7 +1496,7 @@ func (mc *XenserverMachineConfigModel) RefreshProperties(ctx context.Context, di
 	mc.CpuCount = types.Int64Value(int64(provScheme.GetCpuCount()))
 	mc.MemoryMB = types.Int64Value(int64(provScheme.GetMemoryMB()))
 
-	masterImage, imageSnapshot := parseOnPremImagePath(catalog)
+	masterImage, imageSnapshot, _ := parseOnPremImagePath(catalog)
 	mc.MasterImageVm = types.StringValue(masterImage)
 	mc.ImageSnapshot = types.StringValue(imageSnapshot)
 
@@ -1516,7 +1539,7 @@ func (mc *SCVMMMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 	provScheme := catalog.GetProvisioningScheme()
 
 	// Refresh Master Image
-	masterImage, imageSnapshot := parseOnPremImagePath(catalog)
+	masterImage, imageSnapshot, _ := parseOnPremImagePath(catalog)
 	mc.MasterImage = types.StringValue(masterImage)
 	mc.ImageSnapshot = types.StringValue(imageSnapshot)
 
@@ -1581,7 +1604,7 @@ func parseAzureMachineProfileResponseToModel(machineProfileResponse citrixorches
 	return &machineProfileModel
 }
 
-func parseOnPremImagePath(catalog citrixorchestration.MachineCatalogDetailResponseModel) (masterImage, imageSnapshot string) {
+func parseOnPremImagePath(catalog citrixorchestration.MachineCatalogDetailResponseModel) (masterImage, imageSnapshot string, resourcePoolPath string) {
 	provScheme := catalog.GetProvisioningScheme()
 	currentDiskImage := provScheme.GetCurrentDiskImage()
 	currentImage := currentDiskImage.GetImage()
@@ -1589,17 +1612,36 @@ func parseOnPremImagePath(catalog citrixorchestration.MachineCatalogDetailRespon
 
 	// Refresh Master Image
 	/*
-	 * For On-Premise snapshot image, the RelativePath looks like:
-	 * {VM name}.vm/{VM snapshot name}.snapshot(/{VM snapshot name}.snapshot)*
-	 * A new snapshot will be created if it was not specified. There will always be at least one snapshot in the path.
-	 */
-	imageSegments := strings.Split(relativePath, "/")
-	masterImage = strings.TrimSuffix(imageSegments[0], ".vm")
+			* For On-Premise snapshot image, the RelativePath looks like:
+			* {VM name}.vm/{VM snapshot name}.snapshot(/{VM snapshot name}.snapshot)*
+			* A new snapshot will be created if it was not specified. There will always be at least one snapshot in the path.
 
-	snapshot := strings.TrimSuffix(imageSegments[1], ".snapshot")
-	for i := 2; i < len(imageSegments); i++ {
-		snapshot = snapshot + "/" + strings.TrimSuffix(imageSegments[i], ".snapshot")
+			* For Vsphere image, the RelativePath can also include resource pool and look like:
+		    * {Resource Pool Name}.resourcepool/{Resource Pool Name}.resourcepool/{VM name}.vm/{VM snapshot name}.snapshot(/{VM snapshot name}.snapshot)*
+	*/
+
+	// Find the last index of ".resourcepool"
+	lastResourcePoolIndex := strings.LastIndex(relativePath, ".resourcepool")
+	if lastResourcePoolIndex != -1 {
+		// Extract the resource pool path
+		resourcePoolVal := relativePath[:lastResourcePoolIndex+len(".resourcepool")]
+		// Remove all occurrences of ".resourcepool" from the extracted path
+		resourcePoolPath = strings.ReplaceAll(resourcePoolVal, ".resourcepool", "")
+		// Trim the resource pool path from the relative path
+		relativePath = relativePath[lastResourcePoolIndex+len(".resourcepool/"):]
 	}
 
-	return masterImage, snapshot
+	// Find the index of ".vm"
+	vmIndex := strings.Index(relativePath, ".vm")
+	if vmIndex == -1 {
+		return "", "", ""
+	}
+	// Extract the master image name and trim the ".vm"
+	masterImage = relativePath[:vmIndex]
+
+	// Extract the snapshot part of the path
+	snapshotPath := relativePath[vmIndex+len(".vm/"):]
+	imageSnapshot = strings.ReplaceAll(snapshotPath, ".snapshot", "")
+
+	return masterImage, imageSnapshot, resourcePoolPath
 }

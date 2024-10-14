@@ -13,6 +13,7 @@ import (
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // List of AdministratorServiceNames
@@ -142,8 +143,8 @@ func getAdminAccessPolicy(ctx context.Context, diagnostics *diag.Diagnostics, ad
 	createAdminPolicyModel := ccadmins.AdministratorAccessPolicyModel{}
 	var serviceNameList []string
 	for _, remotePolicy := range remoteAdminPolicies {
-
-		if strings.EqualFold(remotePolicy.GetDisplayName(), policyDisplayName) {
+		trimmedRemotePolicyDisplayName := strings.TrimSuffix(remotePolicy.GetDisplayName(), util.AdminUserMonitorAccessPolicySuffix)
+		if strings.EqualFold(remotePolicy.GetDisplayName(), policyDisplayName) || strings.EqualFold(trimmedRemotePolicyDisplayName, policyDisplayName) {
 			// If service name is specified, check if the policy is associated with the service
 			if serviceName != "" && !strings.EqualFold(remotePolicy.GetServiceName(), serviceName) {
 				continue
@@ -275,22 +276,34 @@ func fetchAndUpdateAdminUser(ctx context.Context, client *citrixdaasclient.Citri
 	// Update the plan with the fetched admin user details
 	plan = plan.RefreshPropertyValues(ctx, diagnostics, adminUser)
 
-	// Check if the invitation is accepted and if custom access type with policies is required
-	if isInvitationAccepted(plan) && isCustomAccessTypeWithPolicies(plan) {
-		adminId := plan.AdminId.ValueString()
-
-		// Fetch access policies for the admin user
-		accessPolicies, err := getAccessPolicies(ctx, client, adminId)
-		if err != nil {
-			diagnostics.AddError(
-				"Error getting access policies for user "+plan.Email.ValueString(),
-				"Error message: "+util.ReadClientError(err),
-			)
-			return plan, err
+	// Check if custom access type with policies is required
+	if isCustomAccessTypeWithPolicies(plan) {
+		if isInvitationAccepted(plan) {
+			adminId := plan.AdminId.ValueString()
+			// Fetch access policies for the admin user
+			accessPolicies, err := getAccessPolicies(ctx, client, adminId)
+			if err != nil {
+				diagnostics.AddError(
+					"Error getting access policies for user "+plan.Email.ValueString(),
+					"Error message: "+util.ReadClientError(err),
+				)
+				return plan, err
+			}
+			// Update the plan with the fetched access policies
+			plan = plan.RefreshPropertyValuesForPolicies(ctx, diagnostics, accessPolicies)
+		} else {
+			// If the invitation is not accepted
+			var filteredPolicies []CCAdminPolicyResourceModel
+			policies := util.ObjectListToTypedArray[CCAdminPolicyResourceModel](ctx, diagnostics, plan.Policies)
+			for _, policy := range policies {
+				// Set the service name to empty string if it is not set as its a computed field
+				if policy.ServiceName.IsNull() || policy.ServiceName.ValueString() == "" {
+					policy.ServiceName = types.StringValue("")
+				}
+				filteredPolicies = append(filteredPolicies, policy)
+			}
+			plan.Policies = util.TypedArrayToObjectList[CCAdminPolicyResourceModel](ctx, diagnostics, filteredPolicies)
 		}
-
-		// Update the plan with the fetched access policies
-		plan = plan.RefreshPropertyValuesForPolicies(ctx, diagnostics, accessPolicies)
 	}
 	return plan, nil
 }

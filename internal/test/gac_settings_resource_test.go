@@ -127,6 +127,12 @@ func TestGacSettingsResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.macos.0.settings.0.value_list.#", "2"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.macos.0.settings.0.value_list.0", "startWorkspace"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.macos.0.settings.0.value_list.1", "refreshApps"),
+					// Check permissions for Linux
+					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.linux.#", "1"),
+					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.linux.0.category", "root"),
+					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.linux.0.user_override", "false"),
+					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.linux.0.settings.#", "1"),
+					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.linux.0.settings.0.name", "enable fido2"),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
@@ -262,6 +268,18 @@ var (
 								"startWorkspace",
 								"refreshApps"
 							]
+						}
+					]
+				}
+			],
+			linux = [
+				{
+					category = "root",
+					user_override = false,
+					settings = [
+						{
+							name = "enable fido2",
+							value_string = "true"
 						}
 					]
 				}

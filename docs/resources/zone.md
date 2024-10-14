@@ -51,9 +51,7 @@ resource "citrix_zone" "example-cloud-zone" {
 - `description` (String) Description of the zone. 
 
 -> **Note** For Citrix Cloud customer, ensure this matches the description of the existing zone behind the `resource_location_id` that needs to be used.
-- `metadata` (Attributes List) Metadata for the Zone.
-
-~> **Please Note** Metadata once set cannot be removed. Use this field to add new metadata or update the value for an existing metadata. Subsequently, removing any metadata from config will have no effect on the existing metadata of the resource. (see [below for nested schema](#nestedatt--metadata))
+- `metadata` (Attributes List) Metadata for the Zone. (see [below for nested schema](#nestedatt--metadata))
 - `name` (String) Name of the zone. 
 
 -> **Note** For Citrix Cloud Customer, `name` is not allowed to be used for creating zone and is computed only. Use `resource_location_id` to create zone Instead.

@@ -349,6 +349,14 @@ func (r *deliveryGroupResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
+	// Get State to check the diff for metadata
+	var state DeliveryGroupResourceModel
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	// Get refreshed delivery group properties from Orchestration
 	deliveryGroupId := plan.Id.ValueString()
 	deliveryGroupName := plan.Name.ValueString()
@@ -357,7 +365,7 @@ func (r *deliveryGroupResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
-	editDeliveryGroupRequestBody, err := getRequestModelForDeliveryGroupUpdate(ctx, &resp.Diagnostics, r.client, plan, currentDeliveryGroup)
+	editDeliveryGroupRequestBody, err := getRequestModelForDeliveryGroupUpdate(ctx, &resp.Diagnostics, r.client, plan, state, currentDeliveryGroup)
 	if err != nil {
 		return
 	}

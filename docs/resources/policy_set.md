@@ -12,7 +12,7 @@ Manages a policy set and the policies within it. The order of the policies speci
 
 -> **Note** For detailed information about policy settings and filters, please refer to [this document](https://github.com/citrix/terraform-provider-citrix/blob/main/internal/daas/policies/policy_set_resource.md).
 
-~> **Disclaimer** This feature is supported for On-Premises with DDC version `2402` and above and will be made available for Cloud soon.
+~> **Disclaimer** This feature is supported for Citrix Cloud customers, and for Citrix On-Premises customers with DDC version `2402` and above.
 
 ## Example Usage
 

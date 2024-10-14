@@ -70,7 +70,11 @@ func (r *adminFolderResource) Create(ctx context.Context, req resource.CreateReq
 	// Generate API request body from plan
 	var createAdminFolderRequest citrixorchestration.CreateAdminFolderRequestModel
 	createAdminFolderRequest.SetName(plan.Name.ValueString())
-	createAdminFolderRequest.SetPath(plan.ParentPath.ValueString())
+	parentPath := plan.ParentPath.ValueString()
+	if parentPath != "" {
+		parentPath = parentPath + "\\"
+	}
+	createAdminFolderRequest.SetPath(parentPath)
 
 	adminFolderTypesArray, err := getAdminFolderObjectIdentifierArrayFromTypeSet(ctx, &resp.Diagnostics, plan.Name.ValueString(), plan.Type)
 	if err != nil {
@@ -155,7 +159,7 @@ func (r *adminFolderResource) Update(ctx context.Context, req resource.UpdateReq
 	editAdminFolderRequestBody.SetName(plan.Name.ValueString())
 
 	var parentPath = strings.TrimSuffix(adminFolderResource.GetPath(), adminFolderResource.GetName()+"\\")
-	if plan.ParentPath.ValueString() != parentPath {
+	if plan.ParentPath.ValueString() != strings.TrimSuffix(parentPath, "\\") {
 		editAdminFolderRequestBody.SetParent(plan.ParentPath.ValueString())
 	}
 

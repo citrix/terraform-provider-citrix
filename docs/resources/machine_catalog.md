@@ -445,9 +445,7 @@ resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
 - `is_remote_pc` (Boolean) Specify if this catalog is for Remote PC access.
 - `machine_accounts` (Attributes List) Machine accounts to add to the catalog. Only to be used when using `provisioning_type = MANUAL` (see [below for nested schema](#nestedatt--machine_accounts))
 - `machine_catalog_folder_path` (String) The path to the folder in which the machine catalog is located.
-- `metadata` (Attributes List) Metadata for the Machine Catalog.
-
-~> **Please Note** Metadata once set cannot be removed. Use this field to add new metadata or update the value for an existing metadata. Subsequently, removing any metadata from config will have no effect on the existing metadata of the resource. (see [below for nested schema](#nestedatt--metadata))
+- `metadata` (Attributes List) Metadata for the Machine Catalog. (see [below for nested schema](#nestedatt--metadata))
 - `minimum_functional_level` (String) Specifies the minimum functional level for the VDA machines in the catalog. Defaults to `L7_20`.
 - `provisioning_scheme` (Attributes) Machine catalog provisioning scheme. Required when `provisioning_type = MCS` or `provisioning_type = PVS_STREAMING`. (see [below for nested schema](#nestedatt--provisioning_scheme))
 - `remote_pc_ous` (Attributes List) Organizational Units to be included in the Remote PC machine catalog. Only to be used when `is_remote_pc = true`. For adding machines, use `machine_accounts`. (see [below for nested schema](#nestedatt--remote_pc_ous))
@@ -867,6 +865,7 @@ Optional:
 - `image_update_reboot_options` (Attributes) The options for how rebooting is performed for image update. When omitted, image update on the VDAs will be performed on next shutdown. (see [below for nested schema](#nestedatt--provisioning_scheme--vsphere_machine_config--image_update_reboot_options))
 - `machine_profile` (String) The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics and host cache property of OS disk.
 - `master_image_note` (String) The note for the master image.
+- `resource_pool_path` (String) The Resource Pool path under which the `master_image_vm` is located. This property is case sensitive.
 - `writeback_cache` (Attributes) Write-back Cache config. Leave this empty to disable Write-back Cache. (see [below for nested schema](#nestedatt--provisioning_scheme--vsphere_machine_config--writeback_cache))
 
 <a id="nestedatt--provisioning_scheme--vsphere_machine_config--image_update_reboot_options"></a>

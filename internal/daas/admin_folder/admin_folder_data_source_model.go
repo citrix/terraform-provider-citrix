@@ -3,6 +3,7 @@ package admin_folder
 
 import (
 	"context"
+	"regexp"
 	"strings"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
@@ -43,6 +44,10 @@ func (AdminFolderDataSourceModel) GetSchema() schema.Schema {
 			"path": schema.StringAttribute{
 				Description: "Path to the admin folder.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathWithBackslashRegex), "Admin Folder Path must not start or end with a backslash"),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathSpecialCharactersRegex), "Admin Folder Path must not contain any of the following special characters: / ; : # . * ? = < > | [ ] ( ) { } \" ' ` ~ "),
+				},
 			},
 			"name": schema.StringAttribute{
 				Description: "Name of the admin folder.",
@@ -82,7 +87,7 @@ func (r AdminFolderDataSourceModel) RefreshPropertyValues(ctx context.Context, d
 	r.Id = types.StringValue(adminFolder.GetId())
 	r.Name = types.StringValue(adminFolder.GetName())
 
-	r.Path = types.StringValue(adminFolder.GetPath())
+	r.Path = types.StringValue(strings.TrimSuffix(adminFolder.GetPath(), "\\"))
 
 	adminFolderTypes := []string{}
 	adminFolderMetadata := adminFolder.GetMetadata()
@@ -94,6 +99,7 @@ func (r AdminFolderDataSourceModel) RefreshPropertyValues(ctx context.Context, d
 	r.Type = adminFolderTypeSet
 
 	var parentPath = strings.TrimSuffix(adminFolder.GetPath(), adminFolder.GetName()+"\\")
+	parentPath = strings.TrimSuffix(parentPath, "\\")
 	if parentPath != "" {
 		r.ParentPath = types.StringValue(parentPath)
 	} else {

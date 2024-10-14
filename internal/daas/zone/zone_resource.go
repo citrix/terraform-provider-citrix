@@ -229,7 +229,7 @@ func (r *zoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 	editZoneRequestBody.SetName(zoneName)
 	editZoneRequestBody.SetDescription(plan.Description.ValueString())
-	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	metadata := util.GetUpdatedMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, state.Metadata), util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
 	editZoneRequestBody.SetMetadata(metadata)
 
 	// Update zone

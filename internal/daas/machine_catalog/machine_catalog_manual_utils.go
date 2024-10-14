@@ -219,7 +219,7 @@ func addMachinesToManualCatalog(ctx context.Context, diagnostics *diag.Diagnosti
 	}
 
 	batchRequestItems := []citrixorchestration.BatchRequestItemModel{}
-	relativeUrl := fmt.Sprintf("/MachineCatalogs/%s/Machines?async=true", catalogIdOrName)
+	relativeUrl := fmt.Sprintf("/MachineCatalogs/%s/Machines", catalogIdOrName)
 	for i := 0; i < len(addMachinesRequest); i++ {
 		addMachineRequestStringBody, err := util.ConvertToString(addMachinesRequest[i])
 		if err != nil {

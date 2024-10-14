@@ -419,3 +419,31 @@ func MacosSettingsDefaultValues(ctx context.Context, diagnostics *diag.Diagnosti
 	}
 	macosSetting.EnterpriseBroswerSSO = types.ObjectNull(enterpriseBrowserAttributesMap)
 }
+
+func LinuxSettingsDefaultValues(ctx context.Context, diagnostics *diag.Diagnostics, linuxSetting *LinuxSettings) {
+	linuxSetting.ValueList = types.ListNull(types.StringType)
+	//setting null for AutoLaunchProtocolsFromOrigins
+	autoLaunchProtocolAttributesMap, err := util.AttributeMapFromObject(AutoLaunchProtocolsFromOriginsModel{AllowedOrigins: types.ListNull(types.StringType)})
+	if err != nil {
+		diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
+		return
+	}
+	linuxSetting.AutoLaunchProtocolsFromOrigins = types.ListNull(types.ObjectType{AttrTypes: autoLaunchProtocolAttributesMap})
+
+	//setting null for ManagedBookmarks
+	bookMarkAttributesMap, err := util.AttributeMapFromObject(BookMarkValueModel{})
+	if err != nil {
+		diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
+		return
+	}
+	linuxSetting.ManagedBookmarks = types.ListNull(types.ObjectType{AttrTypes: bookMarkAttributesMap})
+
+	//setting null for ExtensionInstallAllowList
+	installAllowListAttributesMap, err := util.AttributeMapFromObject(ExtensionInstallAllowListModel{})
+	if err != nil {
+		diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
+		return
+	}
+	linuxSetting.ExtensionInstallAllowList = types.ListNull(types.ObjectType{AttrTypes: installAllowListAttributesMap})
+
+}

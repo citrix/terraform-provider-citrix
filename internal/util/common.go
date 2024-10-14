@@ -104,7 +104,7 @@ const SslThumbprintRegex string = `^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$`
 const AwsEc2InstanceTypeRegex string = `^[a-z0-9]{1,15}\.[a-z0-9]{1,15}$`
 
 // Active Directory Sid
-const ActiveDirectorySidRegex string = `^S-1-[0-59]-\d{2}-\d{8,10}-\d{8,10}-\d{8,10}-[1-9]\d{3}$`
+const ActiveDirectorySidRegex string = `^S-1-[0-59]-\d{2}-\d{8,10}-\d{8,10}-\d{8,10}-[1-9]\d{2,}$`
 
 // AWS Machine Image ID REGEX
 const AwsAmiRegex string = `^ami-[0-9a-f]{8,17}$`
@@ -128,6 +128,16 @@ const AppCategoryPathRegex string = `^([a-zA-Z0-9 ]+\\)*[a-zA-Z0-9 ]+\\?$`
 
 // SAML 2.0 Identity Provider Certificate REGEX
 const SamlIdpCertRegex string = `\.[Pp][Ee][Mm]$|\.[Cc][Rr][Tt]$|\.[Cc][Ee][Rr]$`
+
+// Admin Folder Path
+const AdminFolderPathWithBackslashRegex string = `^[^\\].*[^\\]$`
+const AdminFolderPathSpecialCharactersRegex string = `^[^/;:#.*?=<>|[\](){}"'\` + "`~]+$"
+
+// Check if it does not contain path separator
+const NoPathRegex = `^[^\\/]*$`
+
+// GAC Category Name
+const GacCategoryNameRegex string = `^(root|[A-Z][a-z ]*)$`
 
 // NOT_EXIST error code
 const NOT_EXIST string = "NOT_EXIST"
@@ -191,6 +201,9 @@ const MetadataCitrixPrefix = "citrix_"
 const MetadataImageManagementPrepPrefix = "imagemanagementprep_"
 const MetadataTaskDataPrefix = "taskdata_"
 const MetadataTaskStatePrefix = "taskstate_"
+
+// CC Admin User
+const AdminUserMonitorAccessPolicySuffix = " - Access to 'Monitor' tab only"
 
 var PlatformSettingsAssignedTo = []string{"AllUsersNoAuthentication"}
 

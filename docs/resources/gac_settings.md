@@ -58,7 +58,28 @@ resource "citrix_gac_settings" "test_settings_configuration" {
                         value_string = "3600000"
                     }
                 ]
-            }
+            },
+            {
+                user_override = false,
+                category = "dazzle",
+                settings = [
+                    {
+                        name = "Local App Whitelist",
+                        local_app_allow_list = [
+                            {
+                                arguments = "www.citrix.com",
+                                name = "Google Chrome",
+                                path = "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
+                            },
+                            {
+                                arguments = "www.citrix2.com",
+                                name = "Google Chrome2",
+                                path = "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
+                            },
+                        ]
+                    }
+                ]
+            },
         ],
         html5 = [
             {
@@ -97,6 +118,37 @@ resource "citrix_gac_settings" "test_settings_configuration" {
                         ]
                     }
                 ]
+            },
+             {
+                user_override = false,
+                category = "Browser",
+                settings = [
+                    {
+                        name = "managed bookmarks",
+                        managed_bookmarks = [
+                            {
+                                name = "Citrix",
+                                url = "https://www.citrix.com/"
+                            },
+                            {
+                                name = "Citrix Workspace app",
+                                url = "https://www.citrix.com/products/receiver.html"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        linux = [
+            {
+                category = "root",
+                user_override = false,
+                settings = [
+                    {
+                        name = "enable fido2",
+                        value_string = "true"
+                    }
+                ]
             }
         ]
     }
@@ -122,12 +174,13 @@ resource "citrix_gac_settings" "test_settings_configuration" {
 
 Optional:
 
-- `android` (Attributes List) Settings to be applied for users using android platform. (see [below for nested schema](#nestedatt--app_settings--android))
-- `chromeos` (Attributes List) Settings to be applied for users using chrome os platform. (see [below for nested schema](#nestedatt--app_settings--chromeos))
-- `html5` (Attributes List) Settings to be applied for users using html5. (see [below for nested schema](#nestedatt--app_settings--html5))
-- `ios` (Attributes List) Settings to be applied for users using ios platform. (see [below for nested schema](#nestedatt--app_settings--ios))
-- `macos` (Attributes List) Settings to be applied for users using mac os platform. (see [below for nested schema](#nestedatt--app_settings--macos))
-- `windows` (Attributes List) Settings to be applied for users using windows platform. (see [below for nested schema](#nestedatt--app_settings--windows))
+- `android` (Attributes Set) Settings to be applied for users using android platform. (see [below for nested schema](#nestedatt--app_settings--android))
+- `chromeos` (Attributes Set) Settings to be applied for users using chrome os platform. (see [below for nested schema](#nestedatt--app_settings--chromeos))
+- `html5` (Attributes Set) Settings to be applied for users using html5. (see [below for nested schema](#nestedatt--app_settings--html5))
+- `ios` (Attributes Set) Settings to be applied for users using ios platform. (see [below for nested schema](#nestedatt--app_settings--ios))
+- `linux` (Attributes Set) Settings to be applied for users using linux platform. (see [below for nested schema](#nestedatt--app_settings--linux))
+- `macos` (Attributes Set) Settings to be applied for users using mac os platform. (see [below for nested schema](#nestedatt--app_settings--macos))
+- `windows` (Attributes Set) Settings to be applied for users using windows platform. (see [below for nested schema](#nestedatt--app_settings--windows))
 
 <a id="nestedatt--app_settings--android"></a>
 ### Nested Schema for `app_settings.android`
@@ -217,6 +270,63 @@ Required:
 Optional:
 
 - `value_string` (String) String value (if any) associated with the setting.
+
+
+
+<a id="nestedatt--app_settings--linux"></a>
+### Nested Schema for `app_settings.linux`
+
+Required:
+
+- `category` (String) Defines the category of the setting.
+- `settings` (Attributes List) A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform. (see [below for nested schema](#nestedatt--app_settings--linux--settings))
+- `user_override` (Boolean) Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.
+
+<a id="nestedatt--app_settings--linux--settings"></a>
+### Nested Schema for `app_settings.linux.settings`
+
+Required:
+
+- `name` (String) Name of the setting.
+
+Optional:
+
+- `auto_launch_protocols_from_origins` (Attributes List) A list of protocols that can launch an external application from the listed origins without prompting the user. (see [below for nested schema](#nestedatt--app_settings--linux--settings--auto_launch_protocols_from_origins))
+- `extension_install_allow_list` (Attributes List) An allowed list of extensions that users can add to the Citrix Enterprise Browser. This list uses the Chrome Web Store. (see [below for nested schema](#nestedatt--app_settings--linux--settings--extension_install_allow_list))
+- `managed_bookmarks` (Attributes List) A list of bookmarks to push to the Citrix Enterprise Browser. (see [below for nested schema](#nestedatt--app_settings--linux--settings--managed_bookmarks))
+- `value_list` (List of String) List value (if any) associated with the setting.
+- `value_string` (String) String value (if any) associated with the setting.
+
+<a id="nestedatt--app_settings--linux--settings--auto_launch_protocols_from_origins"></a>
+### Nested Schema for `app_settings.linux.settings.value_string`
+
+Required:
+
+- `protocol` (String) Auto launch protocol
+
+Optional:
+
+- `allowed_origins` (List of String) List of origins urls
+
+
+<a id="nestedatt--app_settings--linux--settings--extension_install_allow_list"></a>
+### Nested Schema for `app_settings.linux.settings.value_string`
+
+Required:
+
+- `id` (String) Id of the allowed extensions.
+- `install_link` (String) Install link for the allowed extensions.
+- `name` (String) Name of the allowed extensions.
+
+
+<a id="nestedatt--app_settings--linux--settings--managed_bookmarks"></a>
+### Nested Schema for `app_settings.linux.settings.value_string`
+
+Required:
+
+- `name` (String) Name for the bookmark
+- `url` (String) URL for the bookmark
+
 
 
 

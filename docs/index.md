@@ -10,6 +10,43 @@ description: |-
 
 Manage and deploy Citrix resources easily using the Citrix Terraform provider. The provider currently supports both Citrix Virtual Apps & Desktops(CVAD) and Citrix Desktop as a Service (DaaS) solutions. You can automate creation of site setup including host connections, machine catalogs and delivery groups etc for both CVAD and Citrix DaaS. You can deploy resources in Citrix supported hypervisors and public clouds. Currently, we support deployments in Nutanix, VMware vSphere, XenServer, Microsoft Azure, AWS EC2 and Google Cloud Compute. Additionally, you can also use Manual provisioning or RemotePC to add workloads. The provider is developed and maintained by Citrix.
 
+Documentation regarding the [Data Sources](https://developer.hashicorp.com/terraform/language/data-sources) and [Resources](https://developer.hashicorp.com/terraform/language/resources) supported by the Citrix Provider can be found in the navigation to the left.
+
+Check out the [release notes](https://github.com/citrix/terraform-provider-citrix/releases) to find out more about the provider's latest features and version information.
+
+## Getting Started
+
+New to Terraform? Click [here](https://developer.hashicorp.com/terraform) to learn more.
+
+### Importing existing Citrix resources into Terraform
+
+Experience the immediate benefits of Terraform by importing your Citrix resources (CVAD or DaaS) using our [Onboarding Script](https://github.com/citrix/terraform-provider-citrix/blob/main/scripts/onboarding-helper/terraform-onboarding.ps1). This allows you to quickly adopt infrastructure as code and streamline your infrastructure management. A comprehensive [ReadMe](https://github.com/citrix/terraform-provider-citrix/blob/main/scripts/onboarding-helper/README.md) is available to guide you through the process.
+
+### Creating Citrix resources via Terraform
+
+Please refer to [Citrix Tech Zone](https://community.citrix.com/tech-zone/automation/) to find detailed guides on how to deploy and manage resources using the Citrix provider:
+- [Installing and configuring the Citrix provider](https://community.citrix.com/tech-zone/automation/terraform-install-and-config/)
+- [AWS EC2](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-aws/) via MCS
+- [Azure](https://community.citrix.com/tech-zone/build/deployment-guides/citrix-daas-terraform-azure/) via MCS
+- [GCP](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-gcp/) via MCS
+- [vSphere](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-vsphere8/) via MCS
+- [XenServer](https://community.citrix.com/tech-zone/automation/citrix-terraform-xenserver) via MCS
+- [Citrix policies](https://community.citrix.com/tech-zone/automation/cvad-terraform-policies/)
+
+## Frequently Asked Questions
+
+### What resource is supported for different connection types?
+
+| Connection Type  |   Hypervisor       |   Resource Pool    |  MCS Power Managed   | MCS Provisioning     |          PVS             | Manual/Remote PC     |
+|------------------|--------------------|--------------------|----------------------|----------------------|--------------------------|----------------------|
+| AzureRM          |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_check_mark:        | :heavy_check_mark:   |
+| AWS EC2          |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
+| GCP              |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
+| vSphere          |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
+| XenServer        |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
+| Nutanix          |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
+| SCVMM            |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
+
 ## Example Usage
 
 ```terraform
@@ -74,6 +111,10 @@ For Citrix Cloud customers: Use this to specify Cloud API Key Client Secret.
 -> **Note** Can be set via Environment Variable **CITRIX_CUSTOMER_ID**.
 
 ~> **Please Note** This parameter is required for Citrix Cloud customers to be specified in the provider configuration or via environment variable.
+- `disable_daas_client` (Boolean) Disable Citrix DaaS client setup. 
+Set to true to skip Citrix DaaS client setup. 
+
+-> **Note** Can be set via Environment Variable **CITRIX_DISABLE_DAAS_CLIENT**.
 - `disable_ssl_verification` (Boolean) Disable SSL verification against the target DDC. 
 Set to true to skip SSL verification only when the target DDC does not have a valid SSL certificate issued by a trusted CA. 
 When set to true, please make sure that your provider config is set for a known DDC hostname. 

@@ -778,7 +778,7 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 	return body, nil
 }
 
-func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, plan DeliveryGroupResourceModel, currentDeliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel) (citrixorchestration.EditDeliveryGroupRequestModel, error) {
+func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, plan DeliveryGroupResourceModel, state DeliveryGroupResourceModel, currentDeliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel) (citrixorchestration.EditDeliveryGroupRequestModel, error) {
 	desktops := util.ObjectListToTypedArray[DeliveryGroupDesktop](ctx, diagnostics, plan.Desktops)
 	deliveryGroupDesktopsArray, err := verifyUsersAndParseDeliveryGroupDesktopsToClientModel(ctx, diagnostics, client, desktops)
 	if err != nil {
@@ -992,7 +992,7 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 
 	editDeliveryGroupRequestBody.SetAdminFolder(plan.DeliveryGroupFolderPath.ValueString())
 
-	metadata := util.GetMetadataRequestModel(ctx, diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, plan.Metadata))
+	metadata := util.GetUpdatedMetadataRequestModel(ctx, diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, state.Metadata), util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, plan.Metadata))
 	editDeliveryGroupRequestBody.SetMetadata(metadata)
 
 	return editDeliveryGroupRequestBody, nil
@@ -1172,6 +1172,13 @@ func (schedule DeliveryGroupRebootSchedule) RefreshListItem(ctx context.Context,
 func (dgDesktop DeliveryGroupDesktop) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, desktop citrixorchestration.DesktopResponseModel) util.ModelWithAttributes {
 	dgDesktop.PublishedName = types.StringValue(desktop.GetPublishedName())
 	dgDesktop.DesktopDescription = types.StringValue(desktop.GetDescription())
+
+	if desktop.RestrictToTag != nil {
+		restrictToTag := desktop.GetRestrictToTag()
+		dgDesktop.RestrictToTag = types.StringValue(restrictToTag.GetId())
+	} else {
+		dgDesktop.RestrictToTag = types.StringNull()
+	}
 
 	dgDesktop.Enabled = types.BoolValue(desktop.GetEnabled())
 	sessionReconnection := desktop.GetSessionReconnection()
@@ -1380,6 +1387,21 @@ func verifyUsersAndParseDeliveryGroupDesktopsToClientModel(ctx context.Context, 
 			}
 		}
 
+		if !deliveryGroupDesktop.RestrictToTag.IsNull() {
+			tagId := deliveryGroupDesktop.RestrictToTag.ValueString()
+			getTagRequest := client.ApiClient.TagsAPIsDAAS.TagsGetTag(ctx, tagId)
+			tag, httpResp, err := citrixdaasclient.AddRequestData(getTagRequest, client).Execute()
+			if err != nil {
+				diagnostics.AddError(
+					"Error fetching tag for delivery group desktop",
+					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+						"\nError message: "+util.ReadClientError(err),
+				)
+				return desktopRequests, err
+			}
+
+			desktopRequest.SetRestrictToTag(tag.GetName())
+		}
 		desktopRequest.SetIncludedUserFilterEnabled(includedUsersFilterEnabled)
 		desktopRequest.SetExcludedUserFilterEnabled(excludedUsersFilterEnabled)
 		desktopRequest.SetIncludedUsers(includedUserIds)
@@ -2027,6 +2049,7 @@ func setDeliveryGroupTags(ctx context.Context, diagnostics *diag.Diagnostics, cl
 
 func getDeliveryGroupTags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, deliveryGroupId string) []string {
 	getTagsRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroupTags(ctx, deliveryGroupId)
+	getTagsRequest = getTagsRequest.Fields("Id,Name,Description")
 	tagsResp, httpResp, err := citrixdaasclient.AddRequestData(getTagsRequest, client).Execute()
 	return util.ProcessTagsResponseCollection(diagnostics, tagsResp, httpResp, err, "Delivery Group", deliveryGroupId)
 }

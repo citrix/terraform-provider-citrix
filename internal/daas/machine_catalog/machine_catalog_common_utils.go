@@ -132,7 +132,7 @@ func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ct
 	return &body, nil
 }
 
-func getRequestModelForUpdateMachineCatalog(plan MachineCatalogResourceModel, ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, isOnPremises bool) (*citrixorchestration.UpdateMachineCatalogRequestModel, error) {
+func getRequestModelForUpdateMachineCatalog(plan MachineCatalogResourceModel, state MachineCatalogResourceModel, ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, isOnPremises bool) (*citrixorchestration.UpdateMachineCatalogRequestModel, error) {
 	// Generate API request body from plan
 	var body citrixorchestration.UpdateMachineCatalogRequestModel
 	body.SetName(plan.Name.ValueString())
@@ -194,7 +194,7 @@ func getRequestModelForUpdateMachineCatalog(plan MachineCatalogResourceModel, ct
 		return nil, err
 	}
 
-	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	metadata := util.GetUpdatedMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, state.Metadata), util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
 	body.SetMetadata(metadata)
 
 	return &body, nil
@@ -245,7 +245,7 @@ func generateBatchApiHeaders(ctx context.Context, diagnostics *diag.Diagnostics,
 }
 
 func readMachineCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, machineCatalogId string) (*citrixorchestration.MachineCatalogDetailResponseModel, *http.Response, error) {
-	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId).Fields("Id,Name,Description,ProvisioningType,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC,Metadata,Scopes")
+	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId).Fields("Id,Name,Description,ProvisioningType,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC,Metadata,Scopes,UpgradeInfo,AdminFolder")
 	catalog, httpResp, err := util.ReadResource[*citrixorchestration.MachineCatalogDetailResponseModel](getMachineCatalogRequest, ctx, client, resp, "Machine Catalog", machineCatalogId)
 
 	return catalog, httpResp, err
@@ -284,7 +284,7 @@ func deleteMachinesFromCatalog(ctx context.Context, client *citrixdaasclient.Cit
 				)
 				return err
 			}
-			relativeUrl := fmt.Sprintf("/Machines/%s?async=true", machineToDelete.GetId())
+			relativeUrl := fmt.Sprintf("/Machines/%s", machineToDelete.GetId())
 
 			var batchRequestItem citrixorchestration.BatchRequestItemModel
 			batchRequestItem.SetReference(strconv.Itoa(index))
@@ -341,7 +341,7 @@ func deleteMachinesFromCatalog(ctx context.Context, client *citrixdaasclient.Cit
 	batchRequestItems = []citrixorchestration.BatchRequestItemModel{}
 	for index, machineToDelete := range machinesToDelete {
 		var batchRequestItem citrixorchestration.BatchRequestItemModel
-		relativeUrl := fmt.Sprintf("/Machines/%s?deleteVm=%t&purgeDBOnly=false&deleteAccount=%s&async=true", machineToDelete.GetId(), isMcsOrPvsCatalog, deleteAccountOpion)
+		relativeUrl := fmt.Sprintf("/Machines/%s?deleteVm=%t&purgeDBOnly=false&deleteAccount=%s", machineToDelete.GetId(), isMcsOrPvsCatalog, deleteAccountOpion)
 		batchRequestItem.SetReference(strconv.Itoa(index))
 		batchRequestItem.SetMethod(http.MethodDelete)
 		batchRequestItem.SetHeaders(batchApiHeaders)
@@ -478,6 +478,7 @@ func setMachineCatalogTags(ctx context.Context, diagnostics *diag.Diagnostics, c
 
 func getMachineCatalogTags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, machineCatalogId string) []string {
 	getTagsRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogTags(ctx, machineCatalogId)
+	getTagsRequest = getTagsRequest.Fields("Id,Name,Description")
 	tagsResp, httpResp, err := citrixdaasclient.AddRequestData(getTagsRequest, client).Execute()
 	return util.ProcessTagsResponseCollection(diagnostics, tagsResp, httpResp, err, "Machine Catalog", machineCatalogId)
 }

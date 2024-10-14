@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -256,11 +257,17 @@ func (r *TagResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 		operation = "creating"
 	}
 
-	isTagNameAvailable, err := checkTagNameAvailability(ctx, r.client, &resp.Diagnostics, plan.Name.ValueString())
+	// Only validate tag name availability against tag ID during update operation.
+	tagId := ""
+	if !create {
+		tagId = plan.Id.ValueString()
+	}
+
+	isTagNameAvailable, err := checkTagNameAvailability(ctx, r.client, &resp.Diagnostics, tagId, plan.Name.ValueString())
 	if err != nil {
 		return
 	}
-	if !isTagNameAvailable {
+	if !isTagNameAvailable && create {
 		resp.Diagnostics.AddError(
 			fmt.Sprintf("Error %s Tag: %s", operation, plan.Name.ValueString()),
 			fmt.Sprintf("Tag with name %s already exist", plan.Name.ValueString()),
@@ -269,9 +276,9 @@ func (r *TagResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 	}
 }
 
-func checkTagNameAvailability(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, tagName string) (bool, error) {
-	checkTagNameAvailabilityRequest := client.ApiClient.TagsAPIsDAAS.TagsCheckTagExists(ctx, tagName)
-	httpResp, err := citrixdaasclient.AddRequestData(checkTagNameAvailabilityRequest, client).Execute()
+func checkTagNameAvailability(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, tagId string, tagName string) (bool, error) {
+	getTagRequest := client.ApiClient.TagsAPIsDAAS.TagsGetTag(ctx, tagName)
+	tag, httpResp, err := citrixdaasclient.AddRequestData(getTagRequest, client).Execute()
 	if err != nil {
 		if httpResp.StatusCode == http.StatusNotFound {
 			return true, nil
@@ -283,7 +290,13 @@ func checkTagNameAvailability(ctx context.Context, client *citrixdaasclient.Citr
 		)
 		return false, err
 	}
-	return false, nil
+
+	// Only fail availability check if the tag name is already in used by another tag
+	if !strings.EqualFold(tagId, tag.GetId()) {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func getTag(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, tagNameOrId string) (*citrixorchestration.TagDetailResponseModel, error) {

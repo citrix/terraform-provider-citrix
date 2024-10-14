@@ -36,9 +36,7 @@ resource "citrix_application_group" "example-application-group" {
 - `included_users` (Set of String) Users who can use this application group. 
 
 -> **Note** User must be in `Domain\UserOrGroupName` or `user@domain.com` format
-- `metadata` (Attributes List) Metadata for the Application Group.
-
-~> **Please Note** Metadata once set cannot be removed. Use this field to add new metadata or update the value for an existing metadata. Subsequently, removing any metadata from config will have no effect on the existing metadata of the resource. (see [below for nested schema](#nestedatt--metadata))
+- `metadata` (Attributes List) Metadata for the Application Group. (see [below for nested schema](#nestedatt--metadata))
 - `restrict_to_tag` (String) The tag to restrict the application group to.
 - `scopes` (Set of String) The IDs of the scopes for the application group to be a part of.
 - `tags` (Set of String) A set of identifiers of tags to associate with the application group.

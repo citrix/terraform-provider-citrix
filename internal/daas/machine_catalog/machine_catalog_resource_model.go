@@ -24,6 +24,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setdefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -579,6 +580,9 @@ func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 				ElementType: types.StringType,
 				Description: "The IDs of the built_in scopes of the machine catalog.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Set{
+					setplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"inherited_scopes": schema.SetAttribute{
 				ElementType: types.StringType,
@@ -589,6 +593,10 @@ func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 			"machine_catalog_folder_path": schema.StringAttribute{
 				Description: "The path to the folder in which the machine catalog is located.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathWithBackslashRegex), "Admin Folder Path must not start or end with a backslash"),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathSpecialCharactersRegex), "Admin Folder Path must not contain any of the following special characters: / ; : # . * ? = < > | [ ] ( ) { } \" ' ` ~ "),
+				},
 			},
 			"tenants": schema.SetAttribute{
 				ElementType: types.StringType,
@@ -633,12 +641,12 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 	catalogZone := catalog.GetZone()
 	r.Zone = types.StringValue(catalogZone.GetId())
 
-	if catalog.UpgradeInfo != nil {
-		if *catalog.UpgradeInfo.UpgradeType != citrixorchestration.VDAUPGRADETYPE_NOT_SET || !r.VdaUpgradeType.IsNull() {
-			r.VdaUpgradeType = types.StringValue(string(*catalog.UpgradeInfo.UpgradeType))
-		}
-	} else {
+	upgradeInfo := catalog.GetUpgradeInfo()
+	upgradeType := upgradeInfo.GetUpgradeType()
+	if upgradeType == "" || upgradeType == citrixorchestration.VDAUPGRADETYPE_NOT_SET {
 		r.VdaUpgradeType = types.StringNull()
+	} else {
+		r.VdaUpgradeType = types.StringValue(string(upgradeType))
 	}
 
 	provtype := catalog.GetProvisioningType()
@@ -679,20 +687,8 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 
 	r.Tenants = util.RefreshTenantSet(ctx, diagnostics, catalog.GetTenants())
 
-	if catalog.ProvisioningScheme == nil {
-		if attributesMap, err := util.AttributeMapFromObject(ProvisioningSchemeModel{}); err == nil {
-			r.ProvisioningScheme = types.ObjectNull(attributesMap)
-		} else {
-			diagnostics.AddWarning("Error when creating null ProvisioningSchemeModel", err.Error())
-		}
-		return r
-	}
-
-	// Provisioning Scheme Properties
-	r = r.updateCatalogWithProvScheme(ctx, diagnostics, client, catalog, connectionType, pluginId, provScheme)
-
 	adminFolder := catalog.GetAdminFolder()
-	adminFolderPath := adminFolder.GetName()
+	adminFolderPath := strings.TrimSuffix(adminFolder.GetName(), "\\")
 	if adminFolderPath != "" {
 		r.MachineCatalogFolderPath = types.StringValue(adminFolderPath)
 	} else {
@@ -708,6 +704,18 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 	}
 
 	r.Tags = util.RefreshTagSet(ctx, diagnostics, tags)
+
+	if catalog.ProvisioningScheme == nil {
+		if attributesMap, err := util.AttributeMapFromObject(ProvisioningSchemeModel{}); err == nil {
+			r.ProvisioningScheme = types.ObjectNull(attributesMap)
+		} else {
+			diagnostics.AddWarning("Error when creating null ProvisioningSchemeModel", err.Error())
+		}
+		return r
+	}
+
+	// Provisioning Scheme Properties
+	r = r.updateCatalogWithProvScheme(ctx, diagnostics, client, catalog, connectionType, pluginId, provScheme)
 
 	return r
 }

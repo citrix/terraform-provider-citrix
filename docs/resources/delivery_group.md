@@ -204,9 +204,7 @@ resource "citrix_delivery_group" "example-delivery-group" {
 ~> **Please Note** This setting only impacts Single Session OS Random (pooled) desktops which are power managed. LHC is always enabled for Single Session OS static and Multi Session OS desktops.
 
 -> **Note** When set to `true`, machines will remain available and allow new connections and changes to the machine caused by a user might be present in subsequent sessions. When set to `false`, machines in the delivery group will be unavailable for new connections during a Local Host Cache event.
-- `metadata` (Attributes List) Metadata for the Delivery Group.
-
-~> **Please Note** Metadata once set cannot be removed. Use this field to add new metadata or update the value for an existing metadata. Subsequently, removing any metadata from config will have no effect on the existing metadata of the resource. (see [below for nested schema](#nestedatt--metadata))
+- `metadata` (Attributes List) Metadata for the Delivery Group. (see [below for nested schema](#nestedatt--metadata))
 - `minimum_functional_level` (String) Specifies the minimum functional level for the VDA machines in the delivery group. Defaults to `L7_20`.
 - `policy_set_id` (String) GUID identifier of the policy set.
 - `reboot_schedules` (Attributes List) The reboot schedule for the delivery group. (see [below for nested schema](#nestedatt--reboot_schedules))
@@ -426,6 +424,7 @@ Optional:
 
 - `description` (String) A description for the published desktop. The name and description are shown in Citrix Workspace app.
 - `enabled` (Boolean) Specify whether to enable the delivery of this desktop. Default is `true`.
+- `restrict_to_tag` (String) Restrict session launch to machines with tag specified in GUID.
 - `restricted_access_users` (Attributes) Restrict access to this Desktop by specifying users and groups in the allow and block list. If no value is specified, all users that have access to this Delivery Group will have access to the Desktop. 
 
 ~> **Please Note** For Remote PC Delivery Groups desktops, `restricted_access_users` has to be set. (see [below for nested schema](#nestedatt--desktops--restricted_access_users))
@@ -480,7 +479,7 @@ Optional:
 - `reboot_notification_to_users` (Attributes) The reboot notification for the reboot schedule. 
 
 ~> **Please Note** Not available for natural reboot. (see [below for nested schema](#nestedatt--reboot_schedules--reboot_notification_to_users))
-- `restrict_to_tag` (String) The tag to which the reboot schedule is restricted.
+- `restrict_to_tag` (String) Restrict reboot schedule to machines with tag specified in Guid.
 - `week_in_month` (String) The week in the month on which the reboot schedule runs monthly. Can only be set to `First`, `Second`, `Third`, `Fourth`, or `Last`.
 
 <a id="nestedatt--reboot_schedules--reboot_notification_to_users"></a>

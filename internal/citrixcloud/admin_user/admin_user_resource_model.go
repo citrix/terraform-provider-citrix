@@ -286,7 +286,10 @@ func filterPolicies(remotePolicies []ccadmins.AdministratorAccessPolicyModel, po
 		checkable := remotePolicy.GetCheckable()
 		if checkable.GetValue() {
 			// Check if the remote policy name exists in the policies
+			trimmedRemotePolicyDisplayName := strings.TrimSuffix(remotePolicy.GetDisplayName(), util.AdminUserMonitorAccessPolicySuffix)
 			if configPolicyName, exists := policyNameMap[strings.ToLower(remotePolicy.GetDisplayName())]; exists {
+				remotePolicy.SetDisplayName(configPolicyName)
+			} else if configPolicyName, exists := policyNameMap[strings.ToLower(trimmedRemotePolicyDisplayName)]; exists {
 				remotePolicy.SetDisplayName(configPolicyName)
 			}
 			filteredPolicies = append(filteredPolicies, remotePolicy)

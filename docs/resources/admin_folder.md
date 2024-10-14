@@ -41,7 +41,7 @@ resource "citrix_admin_folder" "example-admin-folder-3" {
 
 ### Optional
 
-- `parent_path` (String) Path of the parent admin folder.
+- `parent_path` (String) Path of the parent admin folder. Please note that the parent path should not end with a `\`.
 
 ### Read-Only
 

@@ -138,7 +138,7 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 
 	// If the application is present in an application folder, we specify the name in this format: {application folder path plus application name}.For example, FolderName1|FolderName2|ApplicationName.
 	if plan.ApplicationFolderPath.ValueString() != "" {
-		applicationName = strings.ReplaceAll(plan.ApplicationFolderPath.ValueString(), "\\", "|") + applicationName
+		applicationName = strings.ReplaceAll(plan.ApplicationFolderPath.ValueString(), "\\", "|") + "|" + applicationName
 	}
 
 	application, err := getApplication(ctx, r.client, &resp.Diagnostics, applicationName)
@@ -211,6 +211,14 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
+	// Get current state
+	var state ApplicationResourceModel
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	applicationId := plan.Id.ValueString()
 	applicationName := plan.Name.ValueString()
 
@@ -256,7 +264,7 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	metadata := util.GetUpdatedMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, state.Metadata), util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
 	editApplicationRequestBody.SetMetadata(metadata)
 
 	// Update Application
@@ -399,7 +407,7 @@ func checkIfApplicationFolderPathExist(ctx context.Context, client *citrixdaascl
 		return true
 	}
 
-	tempFolderPath := strings.ReplaceAll(applicationFolderPath, "\\", "|")
+	tempFolderPath := strings.ReplaceAll(applicationFolderPath, "\\", "|") + "|"
 	appFolderExistRequest := client.ApiClient.ApplicationFoldersAPIsDAAS.ApplicationFoldersCheckApplicationFolderPathExists(ctx, tempFolderPath)
 	httpResp, err := citrixdaasclient.AddRequestData(appFolderExistRequest, client).Execute()
 	if err != nil {
@@ -474,6 +482,7 @@ func validateDeliveryGroupsPriority(ctx context.Context, diagnostics *diag.Diagn
 
 func getApplicationTags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, applicationId string) []string {
 	getTagsRequest := client.ApiClient.ApplicationsAPIsDAAS.ApplicationsGetApplicationTags(ctx, applicationId)
+	getTagsRequest = getTagsRequest.Fields("Id,Name,Description")
 	tagsResp, httpResp, err := citrixdaasclient.AddRequestData(getTagsRequest, client).Execute()
 	return util.ProcessTagsResponseCollection(diagnostics, tagsResp, httpResp, err, "Application", applicationId)
 }

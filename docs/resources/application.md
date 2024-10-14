@@ -79,9 +79,7 @@ resource "citrix_application" "example-application" {
 - `limit_visibility_to_users` (Set of String) By default, the application is visible to all users within a delivery group. However, you can restrict its visibility to only certain users by specifying them in the `limit_visibility_to_users` list.
 
 -> **Note** Users must be in `DOMAIN\UserOrGroupName` or `user@domain.com` format
-- `metadata` (Attributes List) Metadata for the Application.
-
-~> **Please Note** Metadata once set cannot be removed. Use this field to add new metadata or update the value for an existing metadata. Subsequently, removing any metadata from config will have no effect on the existing metadata of the resource. (see [below for nested schema](#nestedatt--metadata))
+- `metadata` (Attributes List) Metadata for the Application. (see [below for nested schema](#nestedatt--metadata))
 - `tags` (Set of String) A set of identifiers of tags to associate with the application.
 
 ### Read-Only

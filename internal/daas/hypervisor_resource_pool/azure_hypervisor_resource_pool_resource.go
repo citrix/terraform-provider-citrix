@@ -91,7 +91,7 @@ func (r *azureHypervisorResourcePoolResource) Create(ctx context.Context, req re
 		return
 	}
 	region, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, &resp.Diagnostics, hypervisorId, "", plan.Region.ValueString(), "Region", "", hypervisor)
-	regionPath := region.GetXDPath()
+	regionPath := region.GetRelativePath()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor Resource Pool for Azure",
@@ -102,7 +102,7 @@ func (r *azureHypervisorResourcePoolResource) Create(ctx context.Context, req re
 	}
 	resourcePoolDetails.SetRegion(regionPath)
 	vnet, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, &resp.Diagnostics, hypervisorId, fmt.Sprintf("%s/virtualprivatecloud.folder", regionPath), plan.VirtualNetwork.ValueString(), util.VirtualPrivateCloudResourceType, plan.VirtualNetworkResourceGroup.ValueString(), hypervisor)
-	vnetPath := vnet.GetXDPath()
+	vnetPath := vnet.GetRelativePath()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor Resource Pool for Azure",
@@ -190,6 +190,13 @@ func (r *azureHypervisorResourcePoolResource) Update(ctx context.Context, req re
 		return
 	}
 
+	var state AzureHypervisorResourcePoolResourceModel
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	var editHypervisorResourcePool citrixorchestration.EditHypervisorResourcePoolRequestModel
 	editHypervisorResourcePool.SetName(plan.Name.ValueString())
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM)
@@ -206,7 +213,7 @@ func (r *azureHypervisorResourcePoolResource) Update(ctx context.Context, req re
 	}
 	editHypervisorResourcePool.SetSubnets(subnets)
 
-	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
+	metadata := util.GetUpdatedMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, state.Metadata), util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
 	editHypervisorResourcePool.SetMetadata(metadata)
 
 	updatedResourcePool, err := UpdateHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, plan.Hypervisor.ValueString(), plan.Id.ValueString(), editHypervisorResourcePool)

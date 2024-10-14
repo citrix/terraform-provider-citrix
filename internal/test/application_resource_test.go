@@ -107,7 +107,7 @@ func TestApplicationResource(t *testing.T) {
 					// Verify the command line executable
 					resource.TestCheckResourceAttr("citrix_application.testApplication", "installed_app_properties.command_line_executable", "updated_test.exe"),
 					// Verify the application folder path
-					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_folder_path", fmt.Sprintf("%s\\", updated_folder_name)),
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_folder_path", updated_folder_name),
 					// Verify the application category path
 					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_category_path", ""),
 				),
@@ -134,7 +134,7 @@ func TestApplicationResource(t *testing.T) {
 					// Verify the command line executable
 					resource.TestCheckResourceAttr("citrix_application.testApplication", "installed_app_properties.command_line_executable", "updated_test.exe"),
 					// Verify the application folder path
-					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_folder_path", fmt.Sprintf("%s\\", updated_folder_name)),
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_folder_path", updated_folder_name),
 					// Verify the application category path
 					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_category_path", ""),
 					// Verify the number of delivery groups
@@ -163,7 +163,7 @@ func TestApplicationResource(t *testing.T) {
 					// Verify the command line executable
 					resource.TestCheckResourceAttr("citrix_application.testApplication", "installed_app_properties.command_line_executable", "updated_test.exe"),
 					// Verify the application folder path
-					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_folder_path", fmt.Sprintf("%s\\", updated_folder_name)),
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_folder_path", updated_folder_name),
 					// Verify the application category path
 					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_category_path", ""),
 					// Verify the number of delivery groups
