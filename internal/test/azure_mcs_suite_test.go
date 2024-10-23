@@ -92,6 +92,7 @@ func TestAzureMcs(t *testing.T) {
 			TestDeliveryGroupPreCheck(t)
 			TestAdminFolderPreCheck(t)
 			TestApplicationResourcePreCheck(t)
+			TestPolicySetResourcePreCheck(t)
 		},
 		Steps: []resource.TestStep{
 			/****************** Zone Test ******************/
@@ -553,7 +554,7 @@ func TestAzureMcs(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildAdminRoleResource(t, adminRoleTestResource),
 					BuildAdminScopeResource(t, adminScopeTestResource),
-					// BuildPolicySetResource(t, policy_set_testResource),
+					BuildPolicySetResource(t, policy_set_testResource),
 					BuildApplicationResource(t, testApplicationResource),
 					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
@@ -574,26 +575,37 @@ func TestAzureMcs(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_application.testApplication", "installed_app_properties.command_line_executable", "test.exe"),
 
 					// /*** Verify Policy Set ***/
-					// // Verify name of the policy set
-					// resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "name", os.Getenv("TEST_POLICY_SET_NAME")+"-1"),
-					// // Verify description of the policy set
-					// resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "description", "Test policy set description"),
-					// // Verify type of the policy set
-					// resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "type", "DeliveryGroupPolicies"),
-					// // Verify the number of scopes of the policy set
-					// resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.#", "0"),
-					// // Verify the number of policies in the policy set
-					// resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.#", "2"),
-					// // Verify name of the first policy in the policy set
-					// resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.name", "first-test-policy"),
-					// // Verify policy settings of the first policy in the policy set
-					// resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.policy_settings.#", "2"),
-					// resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.policy_settings.0.name", "AdvanceWarningPeriod"),
-					// resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.policy_settings.0.value", "13:00:00"),
-					// resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.policy_settings.1.name", "AllowFileDownload"),
-					// resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.policy_settings.1.enabled", "true"),
-					// // Verify name of the second policy in the policy set
-					// resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.1.name", "second-test-policy"),
+					// Verify name of the policy set
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "name", os.Getenv("TEST_POLICY_SET_NAME")+"-1"),
+					// Verify description of the policy set
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "description", "Test policy set description"),
+					// Verify type of the policy set
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "type", "DeliveryGroupPolicies"),
+					// Verify the number of scopes of the policy set
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.#", "0"),
+					// Verify the number of policies in the policy set
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.#", "2"),
+					// Verify name of the first policy in the policy set
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.name", "first-test-policy"),
+					// Verify policy settings of the first policy in the policy set
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.policy_settings.#", "3"),
+					resource.TestCheckTypeSetElemNestedAttrs("citrix_policy_set.testPolicySet", "policies.0.policy_settings.*", map[string]string{
+						"name":        "AdvanceWarningPeriod",
+						"use_default": "false",
+						"value":       "13:00:00",
+					}),
+					resource.TestCheckTypeSetElemNestedAttrs("citrix_policy_set.testPolicySet", "policies.0.policy_settings.*", map[string]string{
+						"name":        "AllowFileDownload",
+						"enabled":     "true",
+						"use_default": "false",
+					}),
+					// Verify name of the second policy in the policy set
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.1.name", "second-test-policy"),
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.1.policy_settings.#", "1"),
+					resource.TestCheckTypeSetElemNestedAttrs("citrix_policy_set.testPolicySet", "policies.1.policy_settings.*", map[string]string{
+						"name":        "AdvanceWarningPeriod",
+						"use_default": "true",
+					}),
 
 					/*** Verify Admin Scope ***/
 					// Verify the name of the admin scope
@@ -626,15 +638,15 @@ func TestAzureMcs(t *testing.T) {
 				// API, therefore there is no value for it during import.
 				ImportStateVerifyIgnore: []string{"delivery_groups", "installed_app_properties"},
 			},
-			// // ImportState testing - Policy Set
-			// {
-			// 	ResourceName:      "citrix_policy_set.testPolicySet",
-			// 	ImportState:       true,
-			// 	ImportStateVerify: true,
-			// 	// The last_updated attribute does not exist in the Orchestration
-			// 	// API, therefore there is no value for it during import.
-			// 	ImportStateVerifyIgnore: []string{"last_updated"},
-			// },
+			// ImportState testing
+			{
+				ResourceName:      "citrix_policy_set.testPolicySet",
+				ImportState:       true,
+				ImportStateVerify: true,
+				// The last_updated attribute does not exist in the Orchestration
+				// API, therefore there is no value for it during import.
+				ImportStateVerifyIgnore: []string{"last_updated"},
+			},
 			// ImportState testing - Admin Scope
 			{
 				ResourceName:      "citrix_admin_scope.test_scope",
@@ -659,7 +671,7 @@ func TestAzureMcs(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildAdminRoleResource(t, adminRoleTestResource_updated),
 					BuildAdminScopeResource(t, adminScopeTestResource_updated),
-					// BuildPolicySetResource(t, policy_set_updated_testResource),
+					BuildPolicySetResource(t, policy_set_updated_testResource),
 					BuildApplicationResource(t, testApplicationResource_updated),
 					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
@@ -681,19 +693,18 @@ func TestAzureMcs(t *testing.T) {
 					// Verify the application folder path
 					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_folder_path", folder_name_2),
 
-					// /*** Verify Policy Set ***/
-					// // Verify name of the policy set
-					// resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "name", os.Getenv("TEST_POLICY_SET_NAME")+"-3"),
-					// // Verify description of the policy set
-					// resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "description", "Test policy set description updated"),
-					// // Verify type of the policy set
-					// resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "type", "DeliveryGroupPolicies"),
-					// // Verify the number of scopes of the policy set
-					// resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.#", "0"),
-					// // Verify the number of policies in the policy set
-					// resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.#", "1"),
-					// // Verify name of the second policy in the policy set
-					// resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.name", "first-test-policy"),
+					// Verify name of the policy set
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "name", os.Getenv("TEST_POLICY_SET_NAME")+"-3"),
+					// Verify description of the policy set
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "description", "Test policy set description updated"),
+					// Verify type of the policy set
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "type", "DeliveryGroupPolicies"),
+					// Verify the number of scopes of the policy set
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.#", "0"),
+					// Verify the number of policies in the policy set
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.#", "1"),
+					// Verify name of the second policy in the policy set
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.name", "first-test-policy"),
 
 					/*** Verify Admin Scope ***/
 					// Verify the name of the admin scope

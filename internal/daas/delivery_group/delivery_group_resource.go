@@ -67,7 +67,7 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 	}
 
 	// Get machine catalogs and verify all of them have the same session support
-	associatedMachineCatalogs := util.ObjectListToTypedArray[DeliveryGroupMachineCatalogModel](ctx, &resp.Diagnostics, plan.AssociatedMachineCatalogs)
+	associatedMachineCatalogs := util.ObjectSetToTypedArray[DeliveryGroupMachineCatalogModel](ctx, &resp.Diagnostics, plan.AssociatedMachineCatalogs)
 	associatedMachineCatalogProperties, err := validateAndReturnMachineCatalogSessionSupport(ctx, *r.client, &resp.Diagnostics, associatedMachineCatalogs, true)
 
 	if err != nil {
@@ -642,7 +642,7 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 		return
 	}
 
-	associatedMachineCatalogs := util.ObjectListToTypedArray[DeliveryGroupMachineCatalogModel](ctx, &resp.Diagnostics, plan.AssociatedMachineCatalogs)
+	associatedMachineCatalogs := util.ObjectSetToTypedArray[DeliveryGroupMachineCatalogModel](ctx, &resp.Diagnostics, plan.AssociatedMachineCatalogs)
 	associatedMachineCatalogProperties, err := validateAndReturnMachineCatalogSessionSupport(ctx, *r.client, &resp.Diagnostics, associatedMachineCatalogs, !create)
 	if err != nil || associatedMachineCatalogProperties.SessionSupport == "" {
 		return
@@ -655,7 +655,6 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 			"Error "+operation+" Delivery Group "+plan.Name.ValueString(),
 			"Error message: "+errMsg,
 		)
-
 		return
 	}
 
@@ -664,7 +663,6 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 			"Error "+operation+" Delivery Group "+plan.Name.ValueString(),
 			"Autoscale settings can only be configured if associated machine catalogs are power managed.",
 		)
-
 		return
 	}
 

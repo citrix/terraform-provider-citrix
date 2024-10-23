@@ -206,6 +206,7 @@ function Start-GetRequest {
 
 function New-RequiredFiles {
 
+    Write-Verbose "Creating required files for terraform."
     # Create temporary import.tf for terraform import
     if (!(Test-Path ".\citrix.tf")) {
         New-Item -path ".\" -name "citrix.tf" -type "file" -Force
@@ -258,6 +259,8 @@ provider "citrix" {
         Clear-Content -path ".\resource.tf"
         Write-Verbose "Cleared content in terraform resource file."
     }
+
+    Write-Verbose "Required files created successfully."
 
 }
 
@@ -357,6 +360,7 @@ function Get-ImportMap {
 # List all CVAD objects from existing site
 function Get-ExistingCVADResources {
    
+    Write-Verbose "Get list of all existing CVAD resources from the site."
     $resources = @{
         "zone"                 = @{
             "resourceApi"          = "zones"
@@ -410,7 +414,7 @@ function Get-ExistingCVADResources {
             "resourceApi"          = "/gpo/policySets"
             "resourceProviderName" = "policy_set"
         }
-        "application"      = @{
+        "application"          = @{
             "resourceApi"          = "Applications"
             "resourceProviderName" = "application"
         }
@@ -422,7 +426,7 @@ function Get-ExistingCVADResources {
             "resourceApi"          = "ApplicationGroups"
             "resourceProviderName" = "application_group"
         }
-        "application_icon" = @{
+        "application_icon"     = @{
             "resourceApi"          = "Icons"
             "resourceProviderName" = "application_icon"
         }
@@ -445,10 +449,12 @@ function Get-ExistingCVADResources {
             }
         }
     }
+    Write-Verbose "Successfully retrieved all CVAD resources from the site."
 }
 
 # Function to import terraform resources into state
 function Import-ResourcesToState {
+    Write-Verbose "Importing terraform resources into state."
     foreach ($resource in  $script:cvadResourcesMap.Keys) {
         foreach ($id in  $script:cvadResourcesMap[$resource].Keys) {
             terraform import "citrix_$($resource).$($script:cvadResourcesMap[$resource][$id])" "$id" 
@@ -487,6 +493,19 @@ function InjectSecretValues {
     return $content
 }
 
+function PostProcessProviderConfig {
+
+    Write-Verbose "Post-processing provider config."
+    # Post-process the provider config output in citrix.tf
+    $content = Get-Content -Path ".\citrix.tf" -Raw
+
+    # Uncomment field for client secret in provider config
+    $content = $content -replace "# ", ""
+
+    # Overwrite provider config with processed value
+    Set-Content -Path ".\citrix.tf" -Value $content
+}
+
 function RemoveComputedPropertiesForZone {
     param(
         [parameter(Mandatory = $true)]
@@ -494,11 +513,13 @@ function RemoveComputedPropertiesForZone {
     )
 
     if ($script:onPremise) {
+        Write-Verbose "Removing computed properties for zone resource in on-premises."
         # Remove resource_location_id property from each zone resource for on-premises 
         $resourceLocationIdRegex = "(\s+)resource_location_id(\s+)= (\S+)"
         $content = $content -replace $resourceLocationIdRegex, ""
     }
     else {
+        Write-Verbose "Removing computed properties for zone resource in cloud."
         # Remove name property from each zone resource in cloud
         $filteredOutput = @()
         $lines = $content -split "`r?`n"
@@ -527,29 +548,42 @@ function RemoveComputedProperties {
         [string] $content
     )
 
-    # Remove Id property from each resource since they are computed
-    $idRegex = "(\s+)id(\s+)= (\S+)"
-    $content = $content -replace $idRegex, ""
+    Write-Verbose "Removing computed properties from terraform output."
+    # Define an array of regex patterns to remove computed properties
+    $regexPatterns = @(
+        "(\s+)id(\s+)= (\S+)",
+        "(\s+)total_machines(\s+)= (\S+)",
+        '(\s+)path\s*=\s*"(.*?)"',
+        "(\s+)assigned(\s+)= (\S+)",
+        "(\s+)is_built_in(\s+)= (\S+)",
+        "(\s+)built_in_scopes\s*=\s*\[[\s\S]*?\]",
+        "(\s+)inherited_scopes\s*=\s*\[[\s\S]*?\]"
+    )
 
-    # Remove total_machines property from machine_catalog since it is computed
-    $totalMachineRegex = "(\s+)total_machines(\s+)= (\S+)"
-    $content = $content -replace $totalMachineRegex, ""
+    # Identify the delivery_groups_priority block
+    $deliveryGroupsPriorityPattern = "(\s*)delivery_groups_priority\s*=\s*\[[\s\S]*?\]"
+    $deliveryGroupsPriorityMatches = [regex]::Matches($content, $deliveryGroupsPriorityPattern, [System.Text.RegularExpressions.RegexOptions]::Singleline)
 
-    # Remove path property from application_folder since it is computed
-    $pathRegex = '(\s+)path\s*=\s*".*\\\\.*"'
-    $content = $content -replace $pathRegex, ""
+    # Extract the delivery_groups_priority block and replace it with a placeholder
+    foreach ($match in $deliveryGroupsPriorityMatches) {
+        $deliveryGroupsPriorityBlock = $match.Value
+        $content = $content -replace [regex]::Escape($deliveryGroupsPriorityBlock), "PLACEHOLDER_DELIVERY_GROUPS_PRIORITY"
+    }
 
-    # Remove assigned property from application since it is computed
-    $isAssignedRegex = "(\s+)assigned(\s+)= (\S+)"
-    $content = $content -replace $isAssignedRegex, ""
+    # Loop through each regex pattern and replace matches in the content
+    foreach ($pattern in $regexPatterns) {
+        $content = $content -replace $pattern, ""
+    }
 
-    # Remove is_built_in property from admin_role since it is computed
-    $isBuiltInRegex = "(\s+)is_built_in(\s+)= (\S+)"
-    $content = $content -replace $isBuiltInRegex, ""
+    # Restore the delivery_groups_priority block
+    foreach ($match in $deliveryGroupsPriorityMatches) {
+        $content = $content -replace "PLACEHOLDER_DELIVERY_GROUPS_PRIORITY", $match.Value
+    }
 
-    # Remove contents for zone respource
+    # Remove contents for zone resource
     $content = RemoveComputedPropertiesForZone -content $content
     
+    Write-Verbose "Computed properties removed successfully."
     return $content
 }
 
@@ -563,6 +597,7 @@ function ReplaceDependencyRelationships {
         return $content
     }
 
+    Write-Verbose "Creating dependency relationships between resources."
     # Create dependency relationships between resources with id references
     foreach ($resource in $script:cvadResourcesMap.Keys) {
         foreach ($id in $script:cvadResourcesMap[$resource].Keys) {
@@ -585,6 +620,7 @@ function InjectPlaceHolderSensitiveValues {
         [string] $content
     )
 
+    Write-Verbose "Injecting placeholder for sensitive values in terraform output."
     ### hypervisor secrets ###
     ######   Azure   ######
     $content = InjectSecretValues -targetProperty "application_id" -newProperty "application_secret" -content $content
@@ -601,6 +637,7 @@ function InjectPlaceHolderSensitiveValues {
 
     return $content
 }
+
 function ExtractAndSaveApplicationIcons {
     param(
         [parameter(Mandatory = $true)]
@@ -611,6 +648,8 @@ function ExtractAndSaveApplicationIcons {
     if ($content -notmatch 'citrix_application_icon') {
         return
     }
+
+    Write-Verbose "Extracting and saving application icons into icons folder."
 
     $filteredOutput = @()
     $lines = $content -split "`r?`n"
@@ -647,7 +686,38 @@ function ExtractAndSaveApplicationIcons {
     }
 
     $content = $filteredOutput -join "`n"
+    Write-Verbose "Extracted and saved $iconCounter application icons."
     return $content
+}
+
+function OrganizeTerraformResources {
+    param(
+        [parameter(Mandatory = $true)]
+        [string] $content
+    )
+
+    Write-Verbose "Organizing terraform resources into separate files."
+    # Post-process the terraform output
+    $content = Get-Content -Path ".\resource.tf" -Raw
+
+    # Regular expression to match resource blocks starting with # and ending with an empty line
+    $resourcePattern = '(#\s*(\w+)\.\w+:\s*.*?)(\n\s*\n|\s*$)'
+
+    # Find all resource blocks
+    $resources = [regex]::Matches($content, $resourcePattern, [System.Text.RegularExpressions.RegexOptions]::Singleline)
+
+    # Create a new .tf file for each resource type in its respective folder
+    foreach ($resource in $resources) {
+        $resourceBlock = $resource.Groups[1].Value
+        $resourceType = $resource.Groups[2].Value
+        $filename = "$resourceType.tf"
+    
+        # Append the resource block to the file
+        Add-Content -Path $filename -Value $resourceBlock
+        Add-Content -Path $filename -Value "`n"  # Add a newline for separation
+    }
+
+    Write-Verbose "Resource files created successfully."
 }
 
 function PostProcessTerraformOutput {
@@ -670,18 +740,8 @@ function PostProcessTerraformOutput {
     # Overwrite extracted terraform with processed value
     Set-Content -Path ".\resource.tf" -Value $content
 
-}
-
-function PostProcessProviderConfig {
-
-    # Post-process the provider config output in citrix.tf
-    $content = Get-Content -Path ".\citrix.tf" -Raw
-
-    # Uncomment field for client secret in provider config
-    $content = $content -replace "# ", ""
-
-    # Overwrite provider config with processed value
-    Set-Content -Path ".\citrix.tf" -Value $content
+    # Organize terraform resources into separate files
+    OrganizeTerraformResources -content $content
 }
 
 if ($DisableSSLValidation -and $PSVersionTable.PSVersion.Major -lt 7) {
@@ -745,8 +805,9 @@ try {
     # Post-process terraform output
     PostProcessTerraformOutput
 
-    # Remove temporary TF file
+    # Remove temporary files
     Remove-Item ".\import.tf"
+    Remove-Item ".\resource.tf"
 
     # Format terraform files
     terraform fmt

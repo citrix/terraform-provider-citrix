@@ -22,6 +22,13 @@ resource "citrix_policy_set" "testPolicySet" {
             description = "First test policy with priority 0"
             enabled = true
             policy_settings = [
+				{
+                    name = "VirtualChannelWhiteList"
+                    value = jsonencode([
+                        "=disabled="
+                    ])
+                    use_default = false
+                },
                 {
                     name = "AdvanceWarningPeriod"
                     value = "13:00:00"
@@ -48,8 +55,7 @@ resource "citrix_policy_set" "testPolicySet" {
             policy_settings = [
                 {
                     name = "AdvanceWarningPeriod"
-                    value = "17:00:00"
-                    use_default = false
+                    use_default = true
                 },
             ]
         }
@@ -70,8 +76,7 @@ resource "citrix_policy_set" "testPolicySet" {
             policy_settings = [
                 {
                     name = "AdvanceWarningPeriod"
-                    value = "17:00:00"
-                    use_default = false
+                    use_default = true
                 },
             ]
         },
@@ -179,21 +184,23 @@ func TestPolicySetResource(t *testing.T) {
 					// Verify name of the first policy in the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.name", "first-test-policy"),
 					// Verify policy settings of the first policy in the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.policy_settings.#", "2"),
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.policy_settings.#", "3"),
 					resource.TestCheckTypeSetElemNestedAttrs("citrix_policy_set.testPolicySet", "policies.0.policy_settings.*", map[string]string{
-						"name":  "AdvanceWarningPeriod",
-						"value": "13:00:00",
+						"name":        "AdvanceWarningPeriod",
+						"use_default": "false",
+						"value":       "13:00:00",
 					}),
 					resource.TestCheckTypeSetElemNestedAttrs("citrix_policy_set.testPolicySet", "policies.0.policy_settings.*", map[string]string{
-						"name":    "AllowFileDownload",
-						"enabled": "true",
+						"name":        "AllowFileDownload",
+						"enabled":     "true",
+						"use_default": "false",
 					}),
 					// Verify name of the second policy in the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.1.name", "second-test-policy"),
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.1.policy_settings.#", "1"),
 					resource.TestCheckTypeSetElemNestedAttrs("citrix_policy_set.testPolicySet", "policies.1.policy_settings.*", map[string]string{
-						"name":  "AdvanceWarningPeriod",
-						"value": "17:00:00",
+						"name":        "AdvanceWarningPeriod",
+						"use_default": "true",
 					}),
 				),
 			},

@@ -124,7 +124,7 @@ const EmailRegex string = `^[\w-\.]+@([\w-]+\.)+[\w-]+$`
 const OktaDomainRegex string = `\.okta\.com$|\.okta-eu\.com$|\.oktapreview\.com$`
 
 // Application Category Path
-const AppCategoryPathRegex string = `^([a-zA-Z0-9 ]+\\)*[a-zA-Z0-9 ]+\\?$`
+const AppCategoryPathRegex string = `^([a-zA-Z0-9 ]+\\)*[a-zA-Z0-9 ]+\\?$|^$`
 
 // SAML 2.0 Identity Provider Certificate REGEX
 const SamlIdpCertRegex string = `\.[Pp][Ee][Mm]$|\.[Cc][Rr][Tt]$|\.[Cc][Ee][Rr]$`
@@ -132,6 +132,9 @@ const SamlIdpCertRegex string = `\.[Pp][Ee][Mm]$|\.[Cc][Rr][Tt]$|\.[Cc][Ee][Rr]$
 // Admin Folder Path
 const AdminFolderPathWithBackslashRegex string = `^[^\\].*[^\\]$`
 const AdminFolderPathSpecialCharactersRegex string = `^[^/;:#.*?=<>|[\](){}"'\` + "`~]+$"
+
+// String REGEX without trailing and leading whitespace
+const StringWithoutTrailingLeadingWhitespaceRegex string = `^\S(.*\S)?$`
 
 // Check if it does not contain path separator
 const NoPathRegex = `^[^\\/]*$`
@@ -769,7 +772,7 @@ func RefreshList(state []string, remote []string) []string {
 
 // <summary>
 // Global panic handler to catch all unexpected errors to prevent provider from crashing.
-// Writes crash stack into local txt file for troubleshooting, and displays error message in Terrafor Diagnostics.
+// Writes crash stack into local txt file for troubleshooting, and displays error message in Terraform Diagnostics.
 // </summary>
 // <param name="diagnostics">Terraform Diagnostics from context</param>
 func PanicHandler(diagnostics *diag.Diagnostics) {

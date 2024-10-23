@@ -112,6 +112,8 @@ func TestDeliveryGroupResourceAzureRM(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "desktops.#", "1"),
 					// Verify number of reboot schedules
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "reboot_schedules.#", "1"),
+					// Verify number of reboot schedules
+					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "reboot_schedules.ignore_maintenance_mode", "false"),
 					// Verify total number of machines in delivery group
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "total_machines", "2"),
 					// Verify the policy set id assigned to the delivery group
@@ -308,7 +310,7 @@ resource "citrix_delivery_group" "testDeliveryGroup" {
 			start_time = "12:12"
 			start_date = "2024-05-25"
 			reboot_duration_minutes = 0
-			ignore_maintenance_mode = true
+			ignore_maintenance_mode = false
 			natural_reboot_schedule = false
 		}
 	]

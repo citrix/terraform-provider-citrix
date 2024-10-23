@@ -912,7 +912,7 @@ type DeliveryGroupResourceModel struct {
 	RestrictedAccessUsers       types.Object `tfsdk:"restricted_access_users"`
 	AllowAnonymousAccess        types.Bool   `tfsdk:"allow_anonymous_access"`
 	Desktops                    types.List   `tfsdk:"desktops"`                    // List[DeliveryGroupDesktop]
-	AssociatedMachineCatalogs   types.List   `tfsdk:"associated_machine_catalogs"` // List[DeliveryGroupMachineCatalogModel]
+	AssociatedMachineCatalogs   types.Set    `tfsdk:"associated_machine_catalogs"` // List[DeliveryGroupMachineCatalogModel]
 	AutoscaleSettings           types.Object `tfsdk:"autoscale_settings"`          // DeliveryGroupPowerManagementSettings
 	RebootSchedules             types.List   `tfsdk:"reboot_schedules"`            // List[DeliveryGroupRebootSchedule]
 	TotalMachines               types.Int64  `tfsdk:"total_machines"`
@@ -930,6 +930,7 @@ type DeliveryGroupResourceModel struct {
 	Tenants                     types.Set    `tfsdk:"tenants"`  // Set[String]
 	Metadata                    types.List   `tfsdk:"metadata"` // List[NameValueStringPairmodel]
 	Tags                        types.Set    `tfsdk:"tags"`     // Set[string]
+	DefaultDesktopIcon          types.String `tfsdk:"default_desktop_icon"`
 }
 
 func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
@@ -1003,7 +1004,7 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 					listvalidator.SizeAtLeast(1),
 				},
 			},
-			"associated_machine_catalogs": schema.ListNestedAttribute{
+			"associated_machine_catalogs": schema.SetNestedAttribute{
 				Description:  "Machine catalogs from which to assign machines to the newly created delivery group.",
 				Optional:     true,
 				NestedObject: DeliveryGroupMachineCatalogModel{}.GetSchema(),
@@ -1134,6 +1135,12 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 					),
 				},
 			},
+			"default_desktop_icon": schema.StringAttribute{
+				Description: "The id of the icon to be used as the default icon for the desktops in the delivery group.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("1"),
+			},
 		},
 	}
 }
@@ -1161,7 +1168,7 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 	r.MinimumFunctionalLevel = types.StringValue(string(minimumFunctionalLevel))
 
 	parentList := []string{}
-	associatedCatalogs := util.ObjectListToTypedArray[DeliveryGroupMachineCatalogModel](ctx, diagnostics, r.AssociatedMachineCatalogs)
+	associatedCatalogs := util.ObjectSetToTypedArray[DeliveryGroupMachineCatalogModel](ctx, diagnostics, r.AssociatedMachineCatalogs)
 	for _, machineCatalog := range associatedCatalogs {
 		parentList = append(parentList, machineCatalog.MachineCatalog.ValueString())
 	}
@@ -1211,6 +1218,8 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 	} else {
 		r.DeliveryGroupFolderPath = types.StringNull()
 	}
+
+	r.DefaultDesktopIcon = types.StringValue(deliveryGroup.GetDefaultDesktopIconId())
 
 	r.Tenants = util.RefreshTenantSet(ctx, diagnostics, deliveryGroup.GetTenants())
 

@@ -353,7 +353,7 @@ func addRemoveMachinesFromDeliveryGroup(ctx context.Context, client *citrixdaasc
 	existingAssociatedMachineCatalogsMap := createExistingCatalogsAndMachinesMap(deliveryGroupMachines)
 
 	requestedAssociatedMachineCatalogsMap := map[string]bool{}
-	for _, associatedMachineCatalog := range util.ObjectListToTypedArray[DeliveryGroupMachineCatalogModel](ctx, diagnostics, plan.AssociatedMachineCatalogs) {
+	for _, associatedMachineCatalog := range util.ObjectSetToTypedArray[DeliveryGroupMachineCatalogModel](ctx, diagnostics, plan.AssociatedMachineCatalogs) {
 
 		requestedAssociatedMachineCatalogsMap[associatedMachineCatalog.MachineCatalog.ValueString()] = true
 
@@ -653,9 +653,10 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 	body.SetName(plan.Name.ValueString())
 	body.SetDescription(plan.Description.ValueString())
 	body.SetRebootSchedules(deliveryGroupRebootScheduleArray)
+	body.SetDefaultDesktopIcon(plan.DefaultDesktopIcon.ValueString())
 
 	if !plan.AssociatedMachineCatalogs.IsNull() && len(plan.AssociatedMachineCatalogs.Elements()) > 0 {
-		deliveryGroupMachineCatalogsArray := getDeliveryGroupAddMachinesRequest(util.ObjectListToTypedArray[DeliveryGroupMachineCatalogModel](ctx, diagnostics, plan.AssociatedMachineCatalogs))
+		deliveryGroupMachineCatalogsArray := getDeliveryGroupAddMachinesRequest(util.ObjectSetToTypedArray[DeliveryGroupMachineCatalogModel](ctx, diagnostics, plan.AssociatedMachineCatalogs))
 		body.SetMachineCatalogs(deliveryGroupMachineCatalogsArray)
 	}
 
@@ -715,6 +716,9 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 	if !plan.MakeResourcesAvailableInLHC.IsNull() {
 		body.SetReuseMachinesWithoutShutdownInOutage(plan.MakeResourcesAvailableInLHC.ValueBool())
 	}
+
+	// Set the default value to false to handle cases where the API incorrectly returns auto scale enabled as true, even when auto scale settings are not provided.
+	body.SetAutoScaleEnabled(false)
 
 	if !plan.AutoscaleSettings.IsNull() {
 		autoscale := util.ObjectValueToTypedObject[DeliveryGroupPowerManagementSettings](ctx, diagnostics, plan.AutoscaleSettings)
@@ -912,6 +916,7 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 	editDeliveryGroupRequestBody.SetDesktops(deliveryGroupDesktopsArray)
 	editDeliveryGroupRequestBody.SetRebootSchedules(deliveryGroupRebootScheduleArray)
 	editDeliveryGroupRequestBody.SetAdvancedAccessPolicy(advancedAccessPolicies)
+	editDeliveryGroupRequestBody.SetDefaultDesktopIcon(plan.DefaultDesktopIcon.ValueString())
 
 	if !plan.Scopes.IsNull() {
 		plannedScopes := util.StringSetToStringArray(ctx, diagnostics, plan.Scopes)
@@ -1081,7 +1086,7 @@ func parseDeliveryGroupRebootScheduleToClientModel(ctx context.Context, diags *d
 			rebootScheduleRequest.SetRestrictToTag(rebootSchedule.RestrictToTag.ValueString())
 		}
 
-		rebootScheduleRequest.SetIgnoreMaintenanceMode(true)
+		rebootScheduleRequest.SetIgnoreMaintenanceMode(rebootSchedule.IgnoreMaintenanceMode.ValueBool())
 		rebootScheduleRequest.SetEnabled(rebootSchedule.RebootScheduleEnabled.ValueBool())
 		rebootScheduleRequest.SetFrequency(getFrequencyActionValue(rebootSchedule.Frequency.ValueString()))
 		rebootScheduleRequest.SetFrequencyFactor(int32(rebootSchedule.FrequencyFactor.ValueInt64()))
@@ -1448,7 +1453,7 @@ func (r DeliveryGroupResourceModel) updatePlanWithAssociatedCatalogs(ctx context
 		associatedMachineCatalogs = append(associatedMachineCatalogs, deliveryGroupMachineCatalogModel)
 	}
 
-	r.AssociatedMachineCatalogs = util.TypedArrayToObjectList[DeliveryGroupMachineCatalogModel](ctx, diags, associatedMachineCatalogs)
+	r.AssociatedMachineCatalogs = util.TypedArrayToObjectSet[DeliveryGroupMachineCatalogModel](ctx, diags, associatedMachineCatalogs)
 
 	return r
 }
@@ -1647,7 +1652,7 @@ func (r DeliveryGroupResourceModel) updatePlanWithRestrictedAccessUsers(ctx cont
 }
 
 func (r DeliveryGroupResourceModel) updatePlanWithAutoscaleSettings(ctx context.Context, diags *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, dgPowerTimeSchemes *citrixorchestration.PowerTimeSchemeResponseModelCollection) DeliveryGroupResourceModel {
-	if r.AutoscaleSettings.IsNull() {
+	if !deliveryGroup.GetAutoScaleEnabled() && r.AutoscaleSettings.IsNull() {
 		return r
 	}
 

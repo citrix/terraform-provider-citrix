@@ -85,8 +85,13 @@ When `allowed` is set to `true`, this means policy is applied to `Connections wi
 Example: 
 ```
 branch_repeater_filter = {
-    enabled    = true
     allowed    = true
+}
+```
+
+```
+branch_repeater_filter = {
+    allowed    = false
 }
 ```
 
@@ -8035,6 +8040,13 @@ jsonencode([
     "{Virtual Channel Name 1},{App Path 1}",
     "{Virtual Channel Name 2},{App Path 2}",
     ...
+])
+```
+
+Setting Value for disable:
+```
+jsonencode([
+    "=disabled="
 ])
 ```
 
