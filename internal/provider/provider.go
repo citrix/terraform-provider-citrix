@@ -29,6 +29,7 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/daas/application"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/bearer_token"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/cvad_site"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/desktop_icon"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/storefront_server"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/tags"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/vda"
@@ -43,6 +44,9 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_roaming"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_store"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_webreceiver"
+
+	"github.com/citrix/terraform-provider-citrix/internal/wem/wem_machine_ad_object"
+	"github.com/citrix/terraform-provider-citrix/internal/wem/wem_site"
 
 	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_folder"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_scope"
@@ -609,6 +613,21 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 		cwsHostName = "cws.ctxwsstgapi.us"
 	}
 
+	wemHostName := ""
+	if environment == "Production" {
+		wemHostName = "api.wem.cloud.com"
+	} else if environment == "Staging" {
+		wemHostName = "api.wem.cloudburrito.com"
+	} else if environment == "Japan" {
+		wemHostName = "api.wem.citrixcloud.jp"
+	} else if environment == "JapanStaging" {
+		wemHostName = "api.wem.citrixcloudstaging.jp"
+	} else if environment == "Gov" {
+		wemHostName = "api.wem.citrixworkspacesapi.us"
+	} else if environment == "GovStaging" {
+		wemHostName = "api.wem.ctxwsstgapi.us"
+	}
+
 	ctx = tflog.SetField(ctx, "citrix_hostname", hostname)
 	if !onPremises {
 		ctx = tflog.SetField(ctx, "citrix_customer_id", customerId)
@@ -704,6 +723,10 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 	if cwsHostName != "" {
 		client.InitializeCwsClient(ctx, cwsHostName, middleware.MiddlewareAuthFunc)
 	}
+	// Set WEM Client
+	if wemHostName != "" {
+		client.InitializeWemClient(ctx, wemHostName, middleware.MiddlewareAuthFunc)
+	}
 }
 
 func handleNetworkError(err error, resp *provider.ConfigureResponse) {
@@ -779,6 +802,8 @@ func (p *citrixProvider) DataSources(_ context.Context) []func() datasource.Data
 		cc_identity_providers.NewSamlIdentityProviderDataSource,
 		// CC Resource Locations
 		resource_locations.NewResourceLocationsDataSource,
+		// WEM
+		wem_site.NewWemSiteDataSource,
 	}
 }
 
@@ -806,6 +831,7 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		application.NewApplicationResource,
 		application.NewApplicationGroupResource,
 		application.NewApplicationIconResource,
+		desktop_icon.NewDesktopIconResource,
 		admin_folder.NewAdminFolderResource,
 		admin_role.NewAdminRoleResource,
 		admin_scope.NewAdminScopeResource,
@@ -831,6 +857,9 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		cc_identity_providers.NewGoogleIdentityProviderResource,
 		cc_identity_providers.NewOktaIdentityProviderResource,
 		cc_identity_providers.NewSamlIdentityProviderResource,
+		// Wem Resources
+		wem_site.NewWemSiteServiceResource,
+		wem_machine_ad_object.NewWemDirectoryResource,
 		// Add resource here
 	}
 }

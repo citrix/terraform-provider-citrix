@@ -477,7 +477,16 @@
         "TEST_TAG_DATA_SOURCE_DESCRIPTION": "{Description of the tag}",
         // Tag Resource Go Tests Env Variables
         "TEST_TAG_RESOURCE_NAME": "{Name of the tag resource}",
-        "TEST_TAG_RESOURCE_DESCRIPTION": "{Description of the tag resource}"
+        "TEST_TAG_RESOURCE_DESCRIPTION": "{Description of the tag resource}",
+
+        // Wem Resource Go Tests Env Variables
+        "TEST_WEM_SITE_RESOURCE_NAME": "{Name of the WEM Site Resource}",
+        "TEST_WEM_SITE_RESOURCE_DESCRIPTION": "{Description of the WEM Site Resource}",
+
+        // WEM Datasource go tests
+        "TEST_WEM_SITE_DATA_SOURCE_ID": "{Id of the WEM Configuration Set}",
+        "TEST_WEM_SITE_DATA_SOURCE_NAME": "{Name of the WEM Configuration Set}",
+        "TEST_WEM_SITE_DATA_SOURCE_DESCRIPTION": "{Description of the WEM Configuration Set}"
     },
     "go.testTimeout": "120m"
 }

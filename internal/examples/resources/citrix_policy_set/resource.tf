@@ -25,7 +25,6 @@ resource "citrix_policy_set" "example-policy-set" {
                 },
             ]
             branch_repeater_filter = {
-                enabled = true
                 allowed = true
             },
             client_ip_filters = [

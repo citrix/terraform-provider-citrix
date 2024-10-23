@@ -1259,6 +1259,10 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 			if !isUseEphemeralOsDiskSet {
 				mc.StorageType = types.StringValue(stringPair.GetValue())
 			}
+		case "StorageAccountType":
+			if !isUseEphemeralOsDiskSet {
+				mc.StorageType = types.StringValue(stringPair.GetValue())
+			}
 		case "UseManagedDisks":
 			mc.UseManagedDisks = util.StringToTypeBool(stringPair.GetValue())
 		case "ResourceGroups":

@@ -4,7 +4,6 @@ package policies
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"slices"
@@ -15,11 +14,8 @@ import (
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -88,12 +84,38 @@ func (r *policySetResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 		}
 	}
 
+	userSettings := []string{}
+	getSettingDefinitionsRequest := r.client.ApiClient.GpoDAAS.GpoGetSettingDefinitions(ctx)
+	getSettingDefinitionsRequest = getSettingDefinitionsRequest.IsLean(true)
+	getSettingDefinitionsRequest = getSettingDefinitionsRequest.Limit(-1)
+	getSettingDefinitionsRequest = getSettingDefinitionsRequest.IsUserSetting(true)
+	getSettingDefinitionsRequest.Execute()
+	userSettingsResp, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.SettingDefinitionEnvelope](getSettingDefinitionsRequest, r.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Unable to fetch user setting definitions",
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		return
+	}
+
+	for _, setting := range userSettingsResp.GetItems() {
+		userSettings = append(userSettings, setting.GetSettingName())
+	}
+
 	plannedPolicies := util.ObjectListToTypedArray[PolicyModel](ctx, &resp.Diagnostics, plan.Policies)
 
 	for _, policy := range plannedPolicies {
+		policyContainsUserSetting := false
 		policySettings := util.ObjectSetToTypedArray[PolicySettingModel](ctx, &resp.Diagnostics, policy.PolicySettings)
-
 		for _, setting := range policySettings {
+			if slices.ContainsFunc(userSettings, func(userSetting string) bool {
+				return strings.EqualFold(userSetting, setting.Name.ValueString())
+			}) {
+				policyContainsUserSetting = true
+			}
+
 			if strings.EqualFold(setting.Value.ValueString(), "true") ||
 				strings.EqualFold(setting.Value.ValueString(), "1") ||
 				strings.EqualFold(setting.Value.ValueString(), "false") ||
@@ -102,6 +124,55 @@ func (r *policySetResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 					"Error "+operation+" Policy Set",
 					"Please specify boolean policy setting value with the 'enabled' attribute.",
 				)
+				return
+			}
+		}
+
+		if !policyContainsUserSetting {
+			if (!policy.AccessControlFilters.IsNull() && !policy.AccessControlFilters.IsUnknown()) ||
+				(!policy.BranchRepeaterFilter.IsNull() && !policy.BranchRepeaterFilter.IsUnknown()) ||
+				(!policy.ClientIPFilters.IsNull() && !policy.ClientIPFilters.IsUnknown()) ||
+				(!policy.ClientNameFilters.IsNull() && !policy.ClientNameFilters.IsUnknown()) ||
+				(!policy.UserFilters.IsNull() && !policy.UserFilters.IsUnknown()) {
+				resp.Diagnostics.AddError(
+					fmt.Sprintf("Error configuring Policy %s in Policy Set %s", policy.Name.ValueString(), plan.Name.ValueString()),
+					"None of `access_control_filters`, `branch_repeater_filter`, `client_ip_filters`, `client_name_filters`, and `user_filters` can be specified when policy does not contain any user setting.",
+				)
+				return
+			}
+		}
+
+		if !policy.DeliveryGroupFilters.IsNull() {
+			deliveryGroupFilters := util.ObjectSetToTypedArray[DeliveryGroupFilterModel](ctx, &resp.Diagnostics, policy.DeliveryGroupFilters)
+			for _, deliveryGroupFilter := range deliveryGroupFilters {
+				deliveryGroupId := deliveryGroupFilter.DeliveryGroupId.ValueString()
+				getDeliveryGroupRequest := r.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroup(ctx, deliveryGroupId)
+				_, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.DeliveryGroupDetailResponseModel](getDeliveryGroupRequest, r.client)
+				if err != nil {
+					resp.Diagnostics.AddError(
+						fmt.Sprintf("Delivery group %s specified in the delivery group filter does not exist.", deliveryGroupId),
+						"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+							"\nError message: "+util.ReadClientError(err),
+					)
+					return
+				}
+			}
+		}
+
+		if !policy.TagFilters.IsNull() {
+			tagFilters := util.ObjectSetToTypedArray[TagFilterModel](ctx, &resp.Diagnostics, policy.TagFilters)
+			for _, tagFilter := range tagFilters {
+				tagId := tagFilter.Tag.ValueString()
+				getTagRequest := r.client.ApiClient.TagsAPIsDAAS.TagsGetTag(ctx, tagId)
+				_, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.TagDetailResponseModel](getTagRequest, r.client)
+				if err != nil {
+					resp.Diagnostics.AddError(
+						fmt.Sprintf("Tag %s specified in the tag filter does not exist.", tagId),
+						"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+							"\nError message: "+util.ReadClientError(err),
+					)
+					return
+				}
 			}
 		}
 	}
@@ -193,6 +264,7 @@ func (r *policySetResource) Create(ctx context.Context, req resource.CreateReque
 			"TransactionId: "+txId+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return
 	}
 
 	if successfulJobs < len(plan.Policies.Elements()) {
@@ -202,6 +274,7 @@ func (r *policySetResource) Create(ctx context.Context, req resource.CreateReque
 			"TransactionId: "+txId+
 				"\n"+errMsg,
 		)
+		return
 	}
 
 	// Try getting the new policy set with policy set GUID
@@ -222,6 +295,7 @@ func (r *policySetResource) Create(ctx context.Context, req resource.CreateReque
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadClientError(err),
 			)
+			return
 		}
 	}
 
@@ -301,6 +375,13 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
+	var state PolicySetResourceModel
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	// Get refreshed policy set properties from Orchestration
 	policySetId := plan.Id.ValueString()
 	policySetName := plan.Name.ValueString()
@@ -317,119 +398,6 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 				"Policy Set with name "+policySetName+" already exists",
 			)
 			return
-		}
-	}
-
-	stateAndPlanDiff, _ := req.State.Raw.Diff(req.Plan.Raw)
-	var policiesModified bool
-	for _, diff := range stateAndPlanDiff {
-		if diff.Path.Steps()[0].Equal(tftypes.AttributeName("policies")) {
-			policiesModified = true
-			break
-		}
-	}
-
-	if policiesModified {
-		// Get Remote Policies
-		policies, err := getPolicies(ctx, r.client, &resp.Diagnostics, policySetId)
-		if err != nil {
-			return
-		}
-
-		// Setup batch requests
-		deletePolicyBatchRequestItems := []citrixorchestration.BatchRequestItemModel{}
-		batchApiHeaders, httpResp, err := generateBatchApiHeaders(r.client)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error updating policies in policy set "+policySetName,
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nCould not update policies within the policy set, unexpected error: "+util.ReadClientError(err),
-			)
-			return
-		}
-		// Clean up all the policies, settings, and filters in policy set
-		for index, policy := range policies.Items {
-			relativeUrl := fmt.Sprintf("/gpo/policies/%s", policy.GetPolicyGuid())
-
-			var batchRequestItem citrixorchestration.BatchRequestItemModel
-			batchRequestItem.SetReference(fmt.Sprintf("deletePolicy%s", strconv.Itoa(index)))
-			batchRequestItem.SetMethod(http.MethodDelete)
-			batchRequestItem.SetRelativeUrl(r.client.GetBatchRequestItemRelativeUrl(relativeUrl))
-			batchRequestItem.SetHeaders(batchApiHeaders)
-			deletePolicyBatchRequestItems = append(deletePolicyBatchRequestItems, batchRequestItem)
-		}
-
-		var deletePolicyBatchRequestModel citrixorchestration.BatchRequestModel
-		deletePolicyBatchRequestModel.SetItems(deletePolicyBatchRequestItems)
-
-		successfulJobs, txId, err := citrixdaasclient.PerformBatchOperation(ctx, r.client, deletePolicyBatchRequestModel)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error cleanup Policies in Policy Set "+policySetName,
-				"TransactionId: "+txId+
-					"\nError message: "+util.ReadClientError(err),
-			)
-			return
-		}
-
-		if successfulJobs < len(deletePolicyBatchRequestItems) {
-			errMsg := fmt.Sprintf("An error occurred while deleting policies in the Policy Set. %d of %d policies were deleted from the Policy Set.", successfulJobs, len(deletePolicyBatchRequestItems))
-			resp.Diagnostics.AddError(
-				"Error deleting Policies to Policy Set "+policySetName,
-				"TransactionId: "+txId+
-					"\n"+errMsg,
-			)
-
-			return
-		}
-
-		// Create all the policies, settings, and filters in the plan
-		plannedPolicies := util.ObjectListToTypedArray[PolicyModel](ctx, &resp.Diagnostics, plan.Policies)
-		createPoliciesBatchRequestModel, err := constructCreatePolicyBatchRequestModel(ctx, &resp.Diagnostics, r.client, plannedPolicies, plan.Id.ValueString(), plan.Name.ValueString())
-		if err != nil {
-			return
-		}
-
-		successfulJobs, txId, err = citrixdaasclient.PerformBatchOperation(ctx, r.client, createPoliciesBatchRequestModel)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error adding Policies to Policy Set "+policySetName,
-				"TransactionId: "+txId+
-					"\nError message: "+util.ReadClientError(err),
-			)
-			return
-		}
-
-		if successfulJobs < len(createPoliciesBatchRequestModel.Items) {
-			errMsg := fmt.Sprintf("An error occurred while adding policies to the Policy Set. %d of %d policies were added to the Policy Set.", successfulJobs, len(createPoliciesBatchRequestModel.Items))
-			resp.Diagnostics.AddError(
-				"Error adding Policies to Policy Set "+policySetName,
-				"TransactionId: "+txId+
-					"\n"+errMsg,
-			)
-
-			return
-		}
-
-		// Update policy priority
-		policySet, err := getPolicySet(ctx, r.client, &resp.Diagnostics, policySetId)
-		if err != nil {
-			return
-		}
-
-		if len(policySet.Policies) > 0 {
-			plannedPolicies = util.ObjectListToTypedArray[PolicyModel](ctx, &resp.Diagnostics, plan.Policies)
-			policyPriorityRequest := constructPolicyPriorityRequest(ctx, r.client, policySet, plannedPolicies)
-			// Update policy priorities in the Policy Set
-			policyPriorityResponse, httpResp, err := citrixdaasclient.AddRequestData(policyPriorityRequest, r.client).Execute()
-			if err != nil || !policyPriorityResponse {
-				resp.Diagnostics.AddError(
-					"Error updating Policy Priorities in Policy Set "+policySet.GetPolicySetGuid(),
-					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-						"\nError message: "+util.ReadClientError(err),
-				)
-				return
-			}
 		}
 	}
 
@@ -453,10 +421,352 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
+	policiesInPlan := util.ObjectListToTypedArray[PolicyModel](ctx, &resp.Diagnostics, plan.Policies)
+	policyIdsInPlan := []string{}
+	policiesToCreate := []PolicyModel{}
+	policiesToUpdate := []PolicyModel{}
+	for _, policy := range policiesInPlan {
+		if policy.Id.ValueString() == "" {
+			policiesToCreate = append(policiesToCreate, policy)
+		} else {
+			policyIdsInPlan = append(policyIdsInPlan, policy.Id.ValueString())
+			policiesToUpdate = append(policiesToUpdate, policy)
+		}
+	}
+
+	policyIdsInState := []string{}
+	policyIdMapFromState := map[string]PolicyModel{}
+	for _, policy := range util.ObjectListToTypedArray[PolicyModel](ctx, &resp.Diagnostics, state.Policies) {
+		policyIdMapFromState[strings.ToLower(policy.Id.ValueString())] = policy
+		policyIdsInState = append(policyIdsInState, policy.Id.ValueString())
+	}
+
+	policyIdsToDelete := []string{}
+	// Check if any policies are to be deleted
+	for _, policyId := range policyIdsInState {
+		if !slices.ContainsFunc(policyIdsInPlan, func(policyIdInPlan string) bool {
+			return strings.EqualFold(policyId, policyIdInPlan)
+		}) {
+			policyIdsToDelete = append(policyIdsToDelete, policyId)
+		}
+	}
+
+	// Rename policies to update with their policy id to avoid naming collision
+	if len(policiesToUpdate) > 0 {
+		batchApiHeaders, httpResp, err := generateBatchApiHeaders(r.client)
+		if err != nil {
+			diags.AddError(
+				"Error updating policies in policy set "+policySetName,
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nCould not update policies within the policy set to be updated, unexpected error: "+util.ReadClientError(err),
+			)
+			return
+		}
+		batchRequestItems := []citrixorchestration.BatchRequestItemModel{}
+		var batchRequestModel citrixorchestration.BatchRequestModel
+		for policyIndex, policy := range policiesToUpdate {
+			var updatePolicyRequest = citrixorchestration.PolicyRequest{}
+			updatePolicyRequest.SetName(policy.Id.ValueString())
+			updatePolicyRequestBodyString, err := util.ConvertToString(updatePolicyRequest)
+			if err != nil {
+				diags.AddError(
+					"Error updating Policy "+policy.Name.ValueString()+" to Policy Set "+policySetName,
+					"An unexpected error occurred: "+err.Error(),
+				)
+				return
+			}
+
+			relativeUrl := fmt.Sprintf("/gpo/policies/%s", policy.Id.ValueString())
+
+			var batchRequestItem citrixorchestration.BatchRequestItemModel
+			batchRequestItem.SetReference(fmt.Sprintf("renamePolicy%d", policyIndex))
+			batchRequestItem.SetMethod(http.MethodPatch)
+			batchRequestItem.SetRelativeUrl(r.client.GetBatchRequestItemRelativeUrl(relativeUrl))
+			batchRequestItem.SetHeaders(batchApiHeaders)
+			batchRequestItem.SetBody(updatePolicyRequestBodyString)
+			batchRequestItems = append(batchRequestItems, batchRequestItem)
+		}
+		batchRequestModel.SetItems(batchRequestItems)
+		successfulJobs, txId, err := citrixdaasclient.PerformBatchOperation(ctx, r.client, batchRequestModel)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating Policies in Policy Set "+policySetName,
+				"TransactionId: "+txId+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return
+		}
+
+		if successfulJobs < len(batchRequestItems) {
+			errMsg := fmt.Sprintf("An error occurred while updating policies in the Policy Set. %d of %d policies were updated to the Policy Set.", successfulJobs, len(batchRequestItems))
+			resp.Diagnostics.AddError(
+				"Error updating Policies to Policy Set "+policySetName,
+				"TransactionId: "+txId+
+					"\n"+errMsg,
+			)
+			return
+		}
+	}
+
+	if len(policyIdsToDelete) > 0 {
+		// Setup batch requests
+		deletePolicyBatchRequestItems := []citrixorchestration.BatchRequestItemModel{}
+		batchApiHeaders, httpResp, err := generateBatchApiHeaders(r.client)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error deleting policies from policy set "+policySetName,
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nCould not delete policies from the policy set, unexpected error: "+util.ReadClientError(err),
+			)
+			return
+		}
+		// batch delete policies
+		for index, policyId := range policyIdsToDelete {
+			relativeUrl := fmt.Sprintf("/gpo/policies/%s", policyId)
+
+			var batchRequestItem citrixorchestration.BatchRequestItemModel
+			batchRequestItem.SetReference(fmt.Sprintf("deletePolicy%s", strconv.Itoa(index)))
+			batchRequestItem.SetMethod(http.MethodDelete)
+			batchRequestItem.SetRelativeUrl(r.client.GetBatchRequestItemRelativeUrl(relativeUrl))
+			batchRequestItem.SetHeaders(batchApiHeaders)
+			deletePolicyBatchRequestItems = append(deletePolicyBatchRequestItems, batchRequestItem)
+		}
+
+		var deletePolicyBatchRequestModel citrixorchestration.BatchRequestModel
+		deletePolicyBatchRequestModel.SetItems(deletePolicyBatchRequestItems)
+
+		successfulJobs, txId, err := citrixdaasclient.PerformBatchOperation(ctx, r.client, deletePolicyBatchRequestModel)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error deleting Policies from Policy Set "+policySetName,
+				"TransactionId: "+txId+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return
+		}
+
+		if successfulJobs < len(deletePolicyBatchRequestItems) {
+			errMsg := fmt.Sprintf("An error occurred while deleting policies from the Policy Set. %d of %d policies were deleted from the Policy Set.", successfulJobs, len(deletePolicyBatchRequestItems))
+			resp.Diagnostics.AddError(
+				"Error deleting Policies from Policy Set "+policySetName,
+				"TransactionId: "+txId+
+					"\n"+errMsg,
+			)
+
+			return
+		}
+	}
+
+	if len(policiesToCreate) > 0 {
+		// Create new policies
+		batchRequestModel, err := constructCreatePolicyBatchRequestModel(ctx, &resp.Diagnostics, r.client, policiesToCreate, policySetId, policySetName)
+		if err != nil {
+			return
+		}
+
+		successfulJobs, txId, err := citrixdaasclient.PerformBatchOperation(ctx, r.client, batchRequestModel)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error adding Policies to Policy Set "+policySetName,
+				"TransactionId: "+txId+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return
+		}
+
+		if successfulJobs < len(batchRequestModel.GetItems()) {
+			errMsg := fmt.Sprintf("An error occurred while adding policies to the Policy Set. %d of %d policies were added to the Policy Set.", successfulJobs, len(batchRequestModel.GetItems()))
+			resp.Diagnostics.AddError(
+				"Error adding Policies to Policy Set "+policySetName,
+				"TransactionId: "+txId+
+					"\n"+errMsg,
+			)
+			return
+		}
+	}
+
+	if len(policiesToUpdate) > 0 {
+		// Update policies in policy set
+		for _, policy := range policiesToUpdate {
+			var editPolicyRequestModel = &citrixorchestration.PolicyBodyRequest{}
+			editPolicyRequestModel.SetName(policy.Name.ValueString())
+			editPolicyRequestModel.SetDescription(policy.Description.ValueString())
+			editPolicyRequestModel.SetIsEnabled(policy.Enabled.ValueBool())
+
+			editPolicyRequest := r.client.ApiClient.GpoDAAS.GpoUpdateGpoPolicy(ctx, policy.Id.ValueString())
+			editPolicyRequest = editPolicyRequest.PolicyBodyRequest(*editPolicyRequestModel)
+
+			// Update policy
+			httpResp, err := citrixdaasclient.AddRequestData(editPolicyRequest, r.client).Execute()
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error Updating Policy "+policy.Name.ValueString(),
+					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+						"\nError message: "+util.ReadClientError(err),
+				)
+				return
+			}
+
+			policyInState := policyIdMapFromState[strings.ToLower(policy.Id.ValueString())]
+			// Perform policy setting updates
+			policySettingsInPlan := util.ObjectSetToTypedArray[PolicySettingModel](ctx, &resp.Diagnostics, policy.PolicySettings)
+			policySettingsInState := util.ObjectSetToTypedArray[PolicySettingModel](ctx, &resp.Diagnostics, policyInState.PolicySettings)
+			err = updatePolicySettings(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), policySettingsInPlan, policySettingsInState)
+			if err != nil {
+				return
+			}
+
+			// Perform policy filter updates
+			// Update Access Control Filters
+			accessControlFilterInterfaceInPlan := []PolicyFilterInterface{}
+			for _, filter := range util.ObjectSetToTypedArray[AccessControlFilterModel](ctx, &resp.Diagnostics, policy.AccessControlFilters) {
+				accessControlFilterInterfaceInPlan = append(accessControlFilterInterfaceInPlan, filter)
+			}
+			accessControlFilterInterfaceInState := []PolicyFilterInterface{}
+			for _, filter := range util.ObjectSetToTypedArray[AccessControlFilterModel](ctx, &resp.Diagnostics, policyInState.AccessControlFilters) {
+				accessControlFilterInterfaceInState = append(accessControlFilterInterfaceInState, filter)
+			}
+			err = updatePolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), accessControlFilterInterfaceInPlan, accessControlFilterInterfaceInState)
+			if err != nil {
+				return
+			}
+
+			// Update Branch Repeater Filter
+			branchRepeaterFilterInterfaceInPlan := []PolicyFilterInterface{}
+			if !policy.BranchRepeaterFilter.IsNull() {
+				filter := util.ObjectValueToTypedObject[BranchRepeaterFilterModel](ctx, &resp.Diagnostics, policy.BranchRepeaterFilter)
+				branchRepeaterFilterInterfaceInPlan = append(branchRepeaterFilterInterfaceInPlan, filter)
+			}
+			branchRepeaterFilterInterfaceInState := []PolicyFilterInterface{}
+			if !policyInState.BranchRepeaterFilter.IsNull() {
+				filter := util.ObjectValueToTypedObject[BranchRepeaterFilterModel](ctx, &resp.Diagnostics, policyInState.BranchRepeaterFilter)
+				branchRepeaterFilterInterfaceInState = append(branchRepeaterFilterInterfaceInState, filter)
+			}
+			err = updatePolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), branchRepeaterFilterInterfaceInPlan, branchRepeaterFilterInterfaceInState)
+			if err != nil {
+				return
+			}
+
+			// Update Client IP Filters
+			clientIpFilterInterfaceInPlan := []PolicyFilterInterface{}
+			for _, filter := range util.ObjectSetToTypedArray[ClientIPFilterModel](ctx, &resp.Diagnostics, policy.ClientIPFilters) {
+				clientIpFilterInterfaceInPlan = append(clientIpFilterInterfaceInPlan, filter)
+			}
+			clientIpFilterInterfaceInState := []PolicyFilterInterface{}
+			for _, filter := range util.ObjectSetToTypedArray[ClientIPFilterModel](ctx, &resp.Diagnostics, policyInState.ClientIPFilters) {
+				clientIpFilterInterfaceInState = append(clientIpFilterInterfaceInState, filter)
+			}
+			err = updatePolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), clientIpFilterInterfaceInPlan, clientIpFilterInterfaceInState)
+			if err != nil {
+				return
+			}
+
+			// Update Client Name Filters
+			clientNameFilterInterfaceInPlan := []PolicyFilterInterface{}
+			for _, filter := range util.ObjectSetToTypedArray[ClientNameFilterModel](ctx, &resp.Diagnostics, policy.ClientNameFilters) {
+				clientNameFilterInterfaceInPlan = append(clientNameFilterInterfaceInPlan, filter)
+			}
+			clientNameFilterInterfaceInState := []PolicyFilterInterface{}
+			for _, filter := range util.ObjectSetToTypedArray[ClientNameFilterModel](ctx, &resp.Diagnostics, policyInState.ClientNameFilters) {
+				clientNameFilterInterfaceInState = append(clientNameFilterInterfaceInState, filter)
+			}
+			err = updatePolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), clientNameFilterInterfaceInPlan, clientNameFilterInterfaceInState)
+			if err != nil {
+				return
+			}
+
+			// Update Delivery Group Filters
+			deliveryGroupFilterInterfaceInPlan := []PolicyFilterInterface{}
+			for _, filter := range util.ObjectSetToTypedArray[DeliveryGroupFilterModel](ctx, &resp.Diagnostics, policy.DeliveryGroupFilters) {
+				deliveryGroupFilterInterfaceInPlan = append(deliveryGroupFilterInterfaceInPlan, filter)
+			}
+			deliveryGroupFilterInterfaceInState := []PolicyFilterInterface{}
+			for _, filter := range util.ObjectSetToTypedArray[DeliveryGroupFilterModel](ctx, &resp.Diagnostics, policyInState.DeliveryGroupFilters) {
+				deliveryGroupFilterInterfaceInState = append(deliveryGroupFilterInterfaceInState, filter)
+			}
+			err = updatePolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), deliveryGroupFilterInterfaceInPlan, deliveryGroupFilterInterfaceInState)
+			if err != nil {
+				return
+			}
+
+			// Update Delivery Group Type Filters
+			deliveryGroupTypeFilterInterfaceInPlan := []PolicyFilterInterface{}
+			for _, filter := range util.ObjectSetToTypedArray[DeliveryGroupTypeFilterModel](ctx, &resp.Diagnostics, policy.DeliveryGroupTypeFilters) {
+				deliveryGroupTypeFilterInterfaceInPlan = append(deliveryGroupTypeFilterInterfaceInPlan, filter)
+			}
+			deliveryGroupTypeFilterInterfaceInState := []PolicyFilterInterface{}
+			for _, filter := range util.ObjectSetToTypedArray[DeliveryGroupTypeFilterModel](ctx, &resp.Diagnostics, policyInState.DeliveryGroupTypeFilters) {
+				deliveryGroupTypeFilterInterfaceInState = append(deliveryGroupTypeFilterInterfaceInState, filter)
+			}
+			err = updatePolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), deliveryGroupTypeFilterInterfaceInPlan, deliveryGroupTypeFilterInterfaceInState)
+			if err != nil {
+				return
+			}
+
+			// Update Tag Filters
+			tagFilterInterfaceInPlan := []PolicyFilterInterface{}
+			for _, filter := range util.ObjectSetToTypedArray[TagFilterModel](ctx, &resp.Diagnostics, policy.TagFilters) {
+				tagFilterInterfaceInPlan = append(tagFilterInterfaceInPlan, filter)
+			}
+			tagFilterInterfaceInState := []PolicyFilterInterface{}
+			for _, filter := range util.ObjectSetToTypedArray[TagFilterModel](ctx, &resp.Diagnostics, policyInState.TagFilters) {
+				tagFilterInterfaceInState = append(tagFilterInterfaceInState, filter)
+			}
+			err = updatePolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), tagFilterInterfaceInPlan, tagFilterInterfaceInState)
+			if err != nil {
+				return
+			}
+
+			// Update Ou Filters
+			ouFilterInterfaceInPlan := []PolicyFilterInterface{}
+			for _, filter := range util.ObjectSetToTypedArray[OuFilterModel](ctx, &resp.Diagnostics, policy.OuFilters) {
+				tagFilterInterfaceInPlan = append(tagFilterInterfaceInPlan, filter)
+			}
+			ouFilterInterfaceInState := []PolicyFilterInterface{}
+			for _, filter := range util.ObjectSetToTypedArray[OuFilterModel](ctx, &resp.Diagnostics, policyInState.OuFilters) {
+				ouFilterInterfaceInState = append(ouFilterInterfaceInState, filter)
+			}
+			err = updatePolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), ouFilterInterfaceInPlan, ouFilterInterfaceInState)
+			if err != nil {
+				return
+			}
+
+			// Update User Filters
+			userFilterInterfaceInPlan := []PolicyFilterInterface{}
+			for _, filter := range util.ObjectSetToTypedArray[UserFilterModel](ctx, &resp.Diagnostics, policy.UserFilters) {
+				userFilterInterfaceInPlan = append(userFilterInterfaceInPlan, filter)
+			}
+			userFilterInterfaceInState := []PolicyFilterInterface{}
+			for _, filter := range util.ObjectSetToTypedArray[UserFilterModel](ctx, &resp.Diagnostics, policyInState.UserFilters) {
+				userFilterInterfaceInState = append(userFilterInterfaceInState, filter)
+			}
+			err = updatePolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), userFilterInterfaceInPlan, userFilterInterfaceInState)
+			if err != nil {
+				return
+			}
+		}
+	}
+
+	// Update policy priority
 	// Try getting the new policy set with policy set GUID
 	policySet, err := getPolicySet(ctx, r.client, &resp.Diagnostics, policySetId)
 	if err != nil {
 		return
+	}
+
+	if len(policySet.Policies) > 0 {
+		// Update Policy Priority
+		policyPriorityRequest := constructPolicyPriorityRequest(ctx, r.client, policySet, policiesInPlan)
+		// Update policy priorities in the Policy Set
+		policyPriorityResponse, httpResp, err := citrixdaasclient.AddRequestData(policyPriorityRequest, r.client).Execute()
+		if err != nil || !policyPriorityResponse {
+			resp.Diagnostics.AddError(
+				"Error Changing Policy Priorities in Policy Set "+policySet.GetPolicySetGuid(),
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return
+		}
 	}
 
 	policies, err := getPolicies(ctx, r.client, &resp.Diagnostics, policySetId)
@@ -590,351 +900,6 @@ func (r *policySetResource) Delete(ctx context.Context, req resource.DeleteReque
 func (r *policySetResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Retrieve import ID and save to id attribute
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
-}
-
-// Gets the policy set and logs any errors
-func getPolicySets(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) ([]citrixorchestration.PolicySetResponse, error) {
-	getPolicySetsRequest := client.ApiClient.GpoDAAS.GpoReadGpoPolicySets(ctx)
-	policySets, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.CollectionEnvelopeOfPolicySetResponse](getPolicySetsRequest, client)
-	if err != nil {
-		diagnostics.AddError(
-			"Error Reading Policy Sets",
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-		return nil, err
-	}
-
-	return policySets.Items, err
-}
-
-func getPolicySet(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policySetId string) (*citrixorchestration.PolicySetResponse, error) {
-	getPolicySetRequest := client.ApiClient.GpoDAAS.GpoReadGpoPolicySet(ctx, policySetId)
-	getPolicySetRequest = getPolicySetRequest.WithPolicies(true)
-	policySet, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.PolicySetResponse](getPolicySetRequest, client)
-	if err != nil {
-		diagnostics.AddError(
-			"Error Reading Policy Set "+policySetId,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-	}
-
-	return policySet, err
-}
-
-func readPolicySet(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, policySetId string) (*citrixorchestration.PolicySetResponse, error) {
-	getPolicySetRequest := client.ApiClient.GpoDAAS.GpoReadGpoPolicySet(ctx, policySetId)
-	getPolicySetRequest = getPolicySetRequest.WithPolicies(true)
-	policySet, _, err := util.ReadResource[*citrixorchestration.PolicySetResponse](getPolicySetRequest, ctx, client, resp, "PolicySet", policySetId)
-	return policySet, err
-}
-
-// Gets the policy set and logs any errors
-func getPolicies(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policySetId string) (*citrixorchestration.CollectionEnvelopeOfPolicyResponse, error) {
-	getPoliciesRequest := client.ApiClient.GpoDAAS.GpoReadGpoPolicies(ctx)
-	getPoliciesRequest = getPoliciesRequest.PolicySetGuid(policySetId)
-	getPoliciesRequest = getPoliciesRequest.WithFilters(true)
-	getPoliciesRequest = getPoliciesRequest.WithSettings(true)
-	policies, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.CollectionEnvelopeOfPolicyResponse](getPoliciesRequest, client)
-	if err != nil {
-		diagnostics.AddError(
-			"Error Reading Policies in Policy Set "+policySetId,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-	}
-
-	return policies, err
-}
-
-func readPolicies(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, policySetId string) (*citrixorchestration.CollectionEnvelopeOfPolicyResponse, error) {
-	getPoliciesRequest := client.ApiClient.GpoDAAS.GpoReadGpoPolicies(ctx)
-	getPoliciesRequest = getPoliciesRequest.PolicySetGuid(policySetId)
-	getPoliciesRequest = getPoliciesRequest.WithFilters(true)
-	getPoliciesRequest = getPoliciesRequest.WithSettings(true)
-	policies, _, err := util.ReadResource[*citrixorchestration.CollectionEnvelopeOfPolicyResponse](getPoliciesRequest, ctx, client, resp, "Policies", policySetId)
-	return policies, err
-}
-
-func generateBatchApiHeaders(client *citrixdaasclient.CitrixDaasClient) ([]citrixorchestration.NameValueStringPairModel, *http.Response, error) {
-	headers := []citrixorchestration.NameValueStringPairModel{}
-
-	cwsAuthToken, httpResp, err := client.SignIn()
-	var token string
-	if err != nil {
-		return headers, httpResp, err
-	}
-
-	if cwsAuthToken != "" {
-		token = strings.Split(cwsAuthToken, "=")[1]
-		var header citrixorchestration.NameValueStringPairModel
-		header.SetName("Authorization")
-		header.SetValue("Bearer " + token)
-		headers = append(headers, header)
-	}
-
-	return headers, httpResp, err
-}
-
-func constructCreatePolicyBatchRequestModel(ctx context.Context, diags *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, policiesToCreate []PolicyModel, policySetGuid string, policySetName string) (citrixorchestration.BatchRequestModel, error) {
-	batchRequestItems := []citrixorchestration.BatchRequestItemModel{}
-	var batchRequestModel citrixorchestration.BatchRequestModel
-
-	for policyIndex, policyToCreate := range policiesToCreate {
-		var createPolicyRequest = citrixorchestration.PolicyRequest{}
-		createPolicyRequest.SetName(policyToCreate.Name.ValueString())
-		createPolicyRequest.SetDescription(policyToCreate.Description.ValueString())
-		createPolicyRequest.SetIsEnabled(policyToCreate.Enabled.ValueBool())
-		// Add Policy Settings
-		policySettings := []citrixorchestration.SettingRequest{}
-		policySettingsToCreate := util.ObjectSetToTypedArray[PolicySettingModel](ctx, diags, policyToCreate.PolicySettings)
-		for _, policySetting := range policySettingsToCreate {
-			settingRequest := citrixorchestration.SettingRequest{}
-			settingRequest.SetSettingName(policySetting.Name.ValueString())
-			settingRequest.SetUseDefault(policySetting.UseDefault.ValueBool())
-			if policySetting.Value.ValueString() != "" {
-				settingRequest.SetSettingValue(policySetting.Value.ValueString())
-			} else {
-				if policySetting.Enabled.ValueBool() {
-					settingRequest.SetSettingValue("1")
-				} else {
-					settingRequest.SetSettingValue("0")
-				}
-			}
-			policySettings = append(policySettings, settingRequest)
-		}
-		createPolicyRequest.SetSettings(policySettings)
-
-		// Add Policy Filters
-		policyFilters, err := constructPolicyFilterRequests(ctx, diags, client, policyToCreate)
-		if err != nil {
-			return batchRequestModel, err
-		}
-		createPolicyRequest.SetFilters(policyFilters)
-
-		createPolicyRequestBodyString, err := util.ConvertToString(createPolicyRequest)
-		if err != nil {
-			diags.AddError(
-				"Error adding Policy "+policyToCreate.Name.ValueString()+" to Policy Set "+policySetName,
-				"An unexpected error occurred: "+err.Error(),
-			)
-			return batchRequestModel, err
-		}
-
-		batchApiHeaders, httpResp, err := generateBatchApiHeaders(client)
-		if err != nil {
-			diags.AddError(
-				"Error deleting policy from policy set "+policySetName,
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nCould not delete policies within the policy set to be updated, unexpected error: "+util.ReadClientError(err),
-			)
-			return batchRequestModel, err
-		}
-
-		relativeUrl := fmt.Sprintf("/gpo/policies?policySetGuid=%s", policySetGuid)
-
-		var batchRequestItem citrixorchestration.BatchRequestItemModel
-		batchRequestItem.SetReference(fmt.Sprintf("createPolicy%d", policyIndex))
-		batchRequestItem.SetMethod(http.MethodPost)
-		batchRequestItem.SetRelativeUrl(client.GetBatchRequestItemRelativeUrl(relativeUrl))
-		batchRequestItem.SetHeaders(batchApiHeaders)
-		batchRequestItem.SetBody(createPolicyRequestBodyString)
-		batchRequestItems = append(batchRequestItems, batchRequestItem)
-	}
-
-	batchRequestModel.SetItems(batchRequestItems)
-	return batchRequestModel, nil
-}
-
-func constructPolicyFilterRequests(ctx context.Context, diags *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, policy PolicyModel) ([]citrixorchestration.FilterRequest, error) {
-	filterRequests := []citrixorchestration.FilterRequest{}
-
-	serverValue := ""
-	if client.AuthConfig.OnPremises || !client.AuthConfig.ApiGateway {
-		serverValue = client.ApiClient.GetConfig().Host
-	} else {
-		serverValue = fmt.Sprintf("%s.xendesktop.net", client.ClientConfig.CustomerId)
-	}
-
-	if !policy.AccessControlFilters.IsNull() && len(policy.AccessControlFilters.Elements()) > 0 {
-		accessControlFilters := util.ObjectSetToTypedArray[AccessControlFilterModel](ctx, diags, policy.AccessControlFilters)
-		for _, accessControlFilter := range accessControlFilters {
-			filterRequest := citrixorchestration.FilterRequest{}
-			filterRequest.SetFilterType("AccessControl")
-
-			policyFilterDataClientModel := PolicyFilterGatewayDataClientModel{
-				Connection: accessControlFilter.Connection,
-				Condition:  accessControlFilter.Condition,
-				Gateway:    accessControlFilter.Gateway,
-			}
-
-			policyFilterDataJson, err := json.Marshal(policyFilterDataClientModel)
-			if err != nil {
-				diags.AddError(
-					"Error adding Access Control Policy Filter to Policy Set. ",
-					"An unexpected error occurred: "+err.Error(),
-				)
-				return filterRequests, err
-			}
-			filterRequest.SetFilterData(string(policyFilterDataJson))
-			filterRequest.SetIsAllowed(accessControlFilter.Allowed.ValueBool())
-			filterRequest.SetIsEnabled(accessControlFilter.Enabled.ValueBool())
-			filterRequests = append(filterRequests, filterRequest)
-		}
-	}
-
-	if !policy.BranchRepeaterFilter.IsNull() {
-		branchRepeaterFilter := util.ObjectValueToTypedObject[BranchRepeaterFilterModel](ctx, diags, policy.BranchRepeaterFilter)
-		branchnRepeaterFilterRequest := citrixorchestration.FilterRequest{}
-		branchnRepeaterFilterRequest.SetFilterType("BranchRepeater")
-		branchnRepeaterFilterRequest.SetIsAllowed(branchRepeaterFilter.Allowed.ValueBool())
-		branchnRepeaterFilterRequest.SetIsEnabled(branchRepeaterFilter.Enabled.ValueBool())
-		filterRequests = append(filterRequests, branchnRepeaterFilterRequest)
-	}
-
-	if !policy.ClientIPFilters.IsNull() && len(policy.ClientIPFilters.Elements()) > 0 {
-		clientIpFilters := util.ObjectSetToTypedArray[ClientIPFilterModel](ctx, diags, policy.ClientIPFilters)
-		for _, clientIpFilter := range clientIpFilters {
-			filterRequest := citrixorchestration.FilterRequest{}
-			filterRequest.SetFilterType("ClientIP")
-
-			filterRequest.SetFilterData(clientIpFilter.IpAddress.ValueString())
-			filterRequest.SetIsAllowed(clientIpFilter.Allowed.ValueBool())
-			filterRequest.SetIsEnabled(clientIpFilter.Enabled.ValueBool())
-			filterRequests = append(filterRequests, filterRequest)
-		}
-	}
-
-	if !policy.ClientNameFilters.IsNull() && len(policy.ClientNameFilters.Elements()) > 0 {
-		clientNameFilters := util.ObjectSetToTypedArray[ClientNameFilterModel](ctx, diags, policy.ClientNameFilters)
-		for _, clientName := range clientNameFilters {
-			filterRequest := citrixorchestration.FilterRequest{}
-			filterRequest.SetFilterType("ClientName")
-
-			filterRequest.SetFilterData(clientName.ClientName.ValueString())
-			filterRequest.SetIsAllowed(clientName.Allowed.ValueBool())
-			filterRequest.SetIsEnabled(clientName.Enabled.ValueBool())
-			filterRequests = append(filterRequests, filterRequest)
-		}
-	}
-
-	if !policy.DeliveryGroupFilters.IsNull() && len(policy.DeliveryGroupFilters.Elements()) > 0 {
-		deliveryGroupFilters := util.ObjectSetToTypedArray[DeliveryGroupFilterModel](ctx, diags, policy.DeliveryGroupFilters)
-		for _, deliveryGroupFilter := range deliveryGroupFilters {
-			filterRequest := citrixorchestration.FilterRequest{}
-			filterRequest.SetFilterType("DesktopGroup")
-
-			policyFilterDataClientModel := PolicyFilterUuidDataClientModel{
-				Uuid:   deliveryGroupFilter.DeliveryGroupId.ValueString(),
-				Server: serverValue,
-			}
-
-			policyFilterDataJson, err := json.Marshal(policyFilterDataClientModel)
-			if err != nil {
-				diags.AddError(
-					"Error adding Access Control Policy Filter to Policy Set. ",
-					"An unexpected error occurred: "+err.Error(),
-				)
-				return filterRequests, err
-			}
-
-			filterRequest.SetFilterData(string(policyFilterDataJson))
-			filterRequest.SetIsAllowed(deliveryGroupFilter.Allowed.ValueBool())
-			filterRequest.SetIsEnabled(deliveryGroupFilter.Enabled.ValueBool())
-			filterRequests = append(filterRequests, filterRequest)
-		}
-	}
-
-	if !policy.DeliveryGroupTypeFilters.IsNull() && len(policy.DeliveryGroupTypeFilters.Elements()) > 0 {
-		deliveryGroupTypeFilters := util.ObjectSetToTypedArray[DeliveryGroupTypeFilterModel](ctx, diags, policy.DeliveryGroupTypeFilters)
-		for _, deliveryGroupTypeFilter := range deliveryGroupTypeFilters {
-			filterRequest := citrixorchestration.FilterRequest{}
-			filterRequest.SetFilterType("DesktopKind")
-
-			filterRequest.SetFilterData(deliveryGroupTypeFilter.DeliveryGroupType.ValueString())
-			filterRequest.SetIsAllowed(deliveryGroupTypeFilter.Allowed.ValueBool())
-			filterRequest.SetIsEnabled(deliveryGroupTypeFilter.Enabled.ValueBool())
-			filterRequests = append(filterRequests, filterRequest)
-		}
-	}
-
-	if !policy.TagFilters.IsNull() && len(policy.TagFilters.Elements()) > 0 {
-		tagFilters := util.ObjectSetToTypedArray[TagFilterModel](ctx, diags, policy.TagFilters)
-		for _, tagFilter := range tagFilters {
-			filterRequest := citrixorchestration.FilterRequest{}
-			filterRequest.SetFilterType("DesktopTag")
-
-			policyFilterDataClientModel := PolicyFilterUuidDataClientModel{
-				Uuid:   tagFilter.Tag.ValueString(),
-				Server: serverValue,
-			}
-
-			policyFilterDataJson, err := json.Marshal(policyFilterDataClientModel)
-			if err != nil {
-				diags.AddError(
-					"Error adding Access Control Policy Filter to Policy Set. ",
-					"An unexpected error occurred: "+err.Error(),
-				)
-				return filterRequests, err
-			}
-
-			filterRequest.SetFilterData(string(policyFilterDataJson))
-			filterRequest.SetIsAllowed(tagFilter.Allowed.ValueBool())
-			filterRequest.SetIsEnabled(tagFilter.Enabled.ValueBool())
-			filterRequests = append(filterRequests, filterRequest)
-		}
-	}
-
-	if !policy.OuFilters.IsNull() && len(policy.OuFilters.Elements()) > 0 {
-		ouFilters := util.ObjectSetToTypedArray[OuFilterModel](ctx, diags, policy.OuFilters)
-		for _, ouFilter := range ouFilters {
-			filterRequest := citrixorchestration.FilterRequest{}
-			filterRequest.SetFilterType("OU")
-
-			filterRequest.SetFilterData(ouFilter.Ou.ValueString())
-			filterRequest.SetIsAllowed(ouFilter.Allowed.ValueBool())
-			filterRequest.SetIsEnabled(ouFilter.Enabled.ValueBool())
-			filterRequests = append(filterRequests, filterRequest)
-		}
-	}
-
-	if !policy.UserFilters.IsNull() && len(policy.UserFilters.Elements()) > 0 {
-		userFilters := util.ObjectSetToTypedArray[UserFilterModel](ctx, diags, policy.UserFilters)
-		for _, userFilter := range userFilters {
-			filterRequest := citrixorchestration.FilterRequest{}
-			filterRequest.SetFilterType("User")
-
-			filterRequest.SetFilterData(userFilter.UserSid.ValueString())
-			filterRequest.SetIsAllowed(userFilter.Allowed.ValueBool())
-			filterRequest.SetIsEnabled(userFilter.Enabled.ValueBool())
-			filterRequests = append(filterRequests, filterRequest)
-		}
-	}
-
-	return filterRequests, nil
-}
-
-func constructPolicyPriorityRequest(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, policySet *citrixorchestration.PolicySetResponse, planedPolicies []PolicyModel) citrixorchestration.ApiGpoRankGpoPoliciesRequest {
-	// 1. Construct map of policy name: policy id
-	// 2. Construct array of policy id based on the policy name order
-	// 3. post policy priority
-	policyNameIdMap := map[types.String]types.String{}
-	if policySet.GetPolicies() != nil {
-		for _, policy := range policySet.GetPolicies() {
-			policyNameIdMap[types.StringValue(policy.GetPolicyName())] = types.StringValue(policy.GetPolicyGuid())
-		}
-	}
-	policyPriority := []types.String{}
-	for _, policyToCreate := range planedPolicies {
-		policyPriority = append(policyPriority, policyNameIdMap[policyToCreate.Name])
-	}
-
-	policySetId := policySet.GetPolicySetGuid()
-	createPolicyPriorityRequest := client.ApiClient.GpoDAAS.GpoRankGpoPolicies(ctx)
-	createPolicyPriorityRequest = createPolicyPriorityRequest.PolicySetGuid(policySetId)
-	createPolicyPriorityRequest = createPolicyPriorityRequest.RequestBody(util.ConvertBaseStringArrayToPrimitiveStringArray(policyPriority))
-	return createPolicyPriorityRequest
 }
 
 func (r *policySetResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {

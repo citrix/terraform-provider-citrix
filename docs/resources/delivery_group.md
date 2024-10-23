@@ -188,7 +188,7 @@ resource "citrix_delivery_group" "example-delivery-group" {
 - `app_protection` (Attributes) App Protection, an add-on feature for the Citrix Workspace app, provides enhanced security for Citrix published apps and desktops. The feature provides anti-keylogging and anti-screen capture capabilities for client sessions, helping protect data from keyloggers and screen scrapers.
 
 ~> **Please Note** Before using the feature, make sure that these [requirements](https://docs.citrix.com/en-us/citrix-workspace-app/app-protection.html#system-requirements) are met. (see [below for nested schema](#nestedatt--app_protection))
-- `associated_machine_catalogs` (Attributes List) Machine catalogs from which to assign machines to the newly created delivery group. (see [below for nested schema](#nestedatt--associated_machine_catalogs))
+- `associated_machine_catalogs` (Attributes Set) Machine catalogs from which to assign machines to the newly created delivery group. (see [below for nested schema](#nestedatt--associated_machine_catalogs))
 - `autoscale_settings` (Attributes) The power management settings governing the machine(s) in the delivery group. (see [below for nested schema](#nestedatt--autoscale_settings))
 - `custom_access_policies` (Attributes List) Custom Access Policies for the delivery group. To manage built-in access policies use the `default_access_policies` instead. (see [below for nested schema](#nestedatt--custom_access_policies))
 - `default_access_policies` (Attributes List) Manage built-in Access Policies for the delivery group. These are the Citrix Gateway Connections (via Access Gateway) and Non-Citrix Gateway Connections (not via Access Gateway) access policies.
@@ -196,6 +196,7 @@ resource "citrix_delivery_group" "example-delivery-group" {
 ~> **Please Note** Default Access Policies can only be modified; they cannot be deleted. If using this property, both default policies have to be specified.
 
 -> **Note** Use `Citrix Gateway connections` as the name for the default policy that is Via Access Gateway and `Non-Citrix Gateway connections` as the name for the default policy that is Not Via Access Gateway. (see [below for nested schema](#nestedatt--default_access_policies))
+- `default_desktop_icon` (String) The id of the icon to be used as the default icon for the desktops in the delivery group.
 - `delivery_group_folder_path` (String) The path of the folder in which the delivery group is located.
 - `description` (String) Description of the delivery group.
 - `desktops` (Attributes List) A list of Desktop resources to publish on the delivery group. Only 1 desktop can be added to a Remote PC Delivery Group. (see [below for nested schema](#nestedatt--desktops))

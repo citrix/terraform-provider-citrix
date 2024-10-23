@@ -243,6 +243,11 @@ func (r *TagResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 		return
 	}
 
+	// Skip modify plan when doing destroy action
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+
 	create := req.State.Raw.IsNull()
 
 	var plan TagResourceModel
