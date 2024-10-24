@@ -325,6 +325,9 @@ func (MachineDomainIdentityModel) GetSchema() schema.SingleNestedAttribute {
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(util.DomainFqdnRegex), "must be in FQDN format"),
 				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"domain_ou": schema.StringAttribute{
 				Description: "The organization unit that computer accounts will be created into.",

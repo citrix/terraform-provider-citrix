@@ -897,4 +897,52 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
 		return
 	}
+
+	if req.Plan.Raw.IsNull() || req.State.Raw.IsNull() {
+		return
+	}
+
+	var plan MachineCatalogResourceModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var state MachineCatalogResourceModel
+	diags = req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if !plan.ProvisioningScheme.IsNull() {
+		provSchemePlan := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
+		provSchemeState := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, state.ProvisioningScheme)
+
+		machineAccountCreationRulesPlan := util.ObjectValueToTypedObject[MachineAccountCreationRulesModel](ctx, &resp.Diagnostics, provSchemePlan.MachineAccountCreationRules)
+		machineAccountCreationRulesState := util.ObjectValueToTypedObject[MachineAccountCreationRulesModel](ctx, &resp.Diagnostics, provSchemeState.MachineAccountCreationRules)
+		machineDomainIdentityPlan := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemePlan.MachineDomainIdentity)
+		machineDomainIdentityState := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemeState.MachineDomainIdentity)
+
+		if machineDomainIdentityPlan != machineDomainIdentityState &&
+			provSchemePlan.NumTotalMachines.ValueInt64() == provSchemeState.NumTotalMachines.ValueInt64() {
+
+			resp.Diagnostics.AddError(
+				"Error updating Machine Catalog",
+				"machine_domain_identity can only be updated when adding or removing machines.",
+			)
+			return
+		}
+
+		if machineAccountCreationRulesPlan != machineAccountCreationRulesState &&
+			provSchemePlan.NumTotalMachines.ValueInt64() <= provSchemeState.NumTotalMachines.ValueInt64() {
+			resp.Diagnostics.AddError(
+				"Error updating Machine Catalog",
+				"machine_account_creation_rules can only be updated when adding machines.",
+			)
+			return
+		}
+
+	}
 }
