@@ -134,6 +134,11 @@ For Citrix Cloud customers: Use this to force override the Citrix DaaS service h
 -> **Note** Can be set via Environment Variable **CITRIX_HOSTNAME**.
 
 ~> **Please Note** This parameter is required for on-premises customers to be specified in the provider configuration or via environment variable.
+- `wem_region` (String) WEM Hosting Region of the Citrix Cloud customer. Available values are `US`, `EU`, and `APS`.
+
+-> **Note** Can be set via Environment Variable **CITRIX_WEM_REGION**.
+
+~> **Please Note** Only applicable for Citrix Workspace Environment Management (WEM) Cloud customers.
 
 
 <a id="nestedatt--storefront_remote_host"></a>

@@ -107,6 +107,7 @@ type cvadConfig struct {
 	ClientSecret           types.String `tfsdk:"client_secret"`
 	DisableSslVerification types.Bool   `tfsdk:"disable_ssl_verification"`
 	DisableDaaSClient      types.Bool   `tfsdk:"disable_daas_client"`
+	WemRegion              types.String `tfsdk:"wem_region"`
 }
 
 type storefrontConfig struct {
@@ -191,6 +192,19 @@ func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 							"\nSet to true to skip Citrix DaaS client setup. " +
 							"\n\n-> **Note** Can be set via Environment Variable **CITRIX_DISABLE_DAAS_CLIENT**.",
 						Optional: true,
+					},
+					"wem_region": schema.StringAttribute{
+						Description: "WEM Hosting Region of the Citrix Cloud customer. Available values are `US`, `EU`, and `APS`." +
+							"\n\n-> **Note** Can be set via Environment Variable **CITRIX_WEM_REGION**." +
+							"\n\n~> **Please Note** Only applicable for Citrix Workspace Environment Management (WEM) Cloud customers.",
+						Optional: true,
+						Validators: []validator.String{
+							stringvalidator.OneOf(
+								"US",
+								"EU",
+								"APS",
+							),
+						},
 					},
 				},
 			},
@@ -370,6 +384,8 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	customerId := os.Getenv("CITRIX_CUSTOMER_ID")
 	disableSslVerification := strings.EqualFold(os.Getenv("CITRIX_DISABLE_SSL_VERIFICATION"), "true")
 	disableDaasClient := strings.EqualFold(os.Getenv("CITRIX_DISABLE_DAAS_CLIENT"), "true")
+	wemRegion := os.Getenv("CITRIX_WEM_REGION")
+	wemHostName := os.Getenv("CITRIX_WEM_HOSTNAME")
 	quick_create_host_name := os.Getenv("CITRIX_QUICK_CREATE_HOST_NAME")
 
 	if cvadConfig := config.CvadConfig; cvadConfig != nil || (clientId != "" && clientSecret != "") {
@@ -401,10 +417,12 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 			if !cvadConfig.DisableDaaSClient.IsNull() {
 				disableDaasClient = cvadConfig.DisableDaaSClient.ValueBool()
 			}
-
+			if !cvadConfig.WemRegion.IsNull() {
+				wemRegion = cvadConfig.WemRegion.ValueString()
+			}
 		}
 
-		validateAndInitializeDaaSClient(ctx, resp, client, clientId, clientSecret, hostname, environment, customerId, quick_create_host_name, p.version, disableSslVerification, disableDaasClient)
+		validateAndInitializeDaaSClient(ctx, resp, client, clientId, clientSecret, hostname, environment, wemHostName, wemRegion, customerId, quick_create_host_name, p.version, disableSslVerification, disableDaasClient)
 		if resp.Diagnostics.HasError() {
 			return
 		}
@@ -458,7 +476,7 @@ func validateAndInitializeStorefrontClient(ctx context.Context, resp *provider.C
 	client.InitializeStoreFrontClient(ctx, storefront_computer_name, storefront_ad_admin_username, storefront_ad_admin_password, storefront_disable_ssl_verification)
 }
 
-func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.ConfigureResponse, client *citrixclient.CitrixDaasClient, clientId, clientSecret, hostname, environment, customerId, quick_create_host_name, version string, disableSslVerification bool, disableDaasClient bool) {
+func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.ConfigureResponse, client *citrixclient.CitrixDaasClient, clientId, clientSecret, hostname, environment, wemHostName, wemRegion, customerId, quick_create_host_name, version string, disableSslVerification bool, disableDaasClient bool) {
 	if clientId == "" {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("cvad_config").AtName("client_id"),
@@ -613,19 +631,20 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 		cwsHostName = "cws.ctxwsstgapi.us"
 	}
 
-	wemHostName := ""
-	if environment == "Production" {
-		wemHostName = "api.wem.cloud.com"
-	} else if environment == "Staging" {
-		wemHostName = "api.wem.cloudburrito.com"
-	} else if environment == "Japan" {
-		wemHostName = "api.wem.citrixcloud.jp"
-	} else if environment == "JapanStaging" {
-		wemHostName = "api.wem.citrixcloudstaging.jp"
-	} else if environment == "Gov" {
-		wemHostName = "api.wem.citrixworkspacesapi.us"
-	} else if environment == "GovStaging" {
-		wemHostName = "api.wem.ctxwsstgapi.us"
+	if wemHostName == "" {
+		if environment == "Production" {
+			if wemRegion == "EU" {
+				wemHostName = "eu-api.wem.cloud.com"
+			} else if wemRegion == "APS" {
+				wemHostName = "aps-api.wem.cloud.com"
+			} else {
+				wemHostName = "api.wem.cloud.com"
+			}
+		} else if environment == "Japan" {
+			wemHostName = "jp-api.wem.citrixcloud.jp"
+		} else if environment == "Staging" {
+			wemHostName = "api.wem.cloudburrito.com"
+		}
 	}
 
 	ctx = tflog.SetField(ctx, "citrix_hostname", hostname)
