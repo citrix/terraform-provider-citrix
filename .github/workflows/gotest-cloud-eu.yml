@@ -8,9 +8,6 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - 'internal/**'
-      - '**.go'
     types: [opened, reopened, synchronize]
   workflow_dispatch:
     # Inputs the workflow accepts.
@@ -59,7 +56,7 @@ jobs:
               -OnPremises $false
           azPSVersion: "latest"
 
-  gotest-cloud:
+  gotest-cloud-eu:
     needs: gotest-prep
     # GitHub environment for the job
     environment: Go Test - Cloud - EU
@@ -101,7 +98,6 @@ jobs:
           echo "TEST_HYPERV_SUBSCRIPTION_ID=${{secrets.TEST_HYPERV_SUBSCRIPTION_ID}}" >> $GITHUB_ENV
           echo "TEST_HYPERV_APPLICATION_ID=${{secrets.TEST_HYPERV_APPLICATION_ID}}" >> $GITHUB_ENV
           echo "TEST_HYPERV_APPLICATION_SECRET=${{secrets.TEST_HYPERV_APPLICATION_SECRET}}" >> $GITHUB_ENV
-          echo "TEST_HYPERV_APPLICATION_SECRET_EXPIRATION_DATE=${{secrets.TEST_HYPERV_APPLICATION_SECRET_EXPIRATION_DATE}}" >> $GITHUB_ENV
           echo "TEST_HYPERV_RP_NAME=${{vars.TEST_HYPERV_RP_NAME}}" >> $GITHUB_ENV
           echo "TEST_HYPERV_RP_REGION=${{secrets.TEST_HYPERV_RP_REGION}}" >> $GITHUB_ENV
           echo "TEST_HYPERV_RP_VIRTUAL_NETWORK_RESOURCE_GROUP=${{secrets.TEST_HYPERV_RP_VIRTUAL_NETWORK_RESOURCE_GROUP}}" >> $GITHUB_ENV
