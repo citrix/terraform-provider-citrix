@@ -40,6 +40,7 @@ data "citrix_cloud_saml_identity_provider" "example_saml_identity_provider" {
 - `authentication_context_comparison` (String) The authentication context comparison type.
 - `cert_common_name` (String) The common name of the SAML certificate.
 - `cert_expiration` (String) The expiration date time of the SAML certificate.
+- `cert_file_path` (String) The file path of the certificate.
 - `entity_id` (String) The entity ID of the SAML 2.0 Identity Provider.
 - `logout_binding` (String) The binding of the logout service.
 - `logout_url` (String) The URL of the logout service.

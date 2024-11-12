@@ -59,12 +59,17 @@ func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ct
 		return nil, err
 	}
 	body.SetSessionSupport(*sessionSupport)
-	persistChanges := citrixorchestration.PERSISTCHANGES_DISCARD
-	if *provisioningType == citrixorchestration.PROVISIONINGTYPE_MANUAL ||
-		(*provisioningType != citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING && *sessionSupport == citrixorchestration.SESSIONSUPPORT_SINGLE_SESSION && *allocationType == citrixorchestration.ALLOCATIONTYPE_STATIC) {
-		persistChanges = citrixorchestration.PERSISTCHANGES_ON_LOCAL
+	if !plan.PersistUserChanges.IsNull() {
+		body.SetPersistUserChanges(citrixorchestration.PersistChanges(plan.PersistUserChanges.ValueString()))
+	} else {
+		persistChanges := citrixorchestration.PERSISTCHANGES_DISCARD
+		if *provisioningType == citrixorchestration.PROVISIONINGTYPE_MANUAL ||
+			(*provisioningType != citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING && *sessionSupport == citrixorchestration.SESSIONSUPPORT_SINGLE_SESSION && *allocationType == citrixorchestration.ALLOCATIONTYPE_STATIC) {
+			persistChanges = citrixorchestration.PERSISTCHANGES_ON_LOCAL
+		}
+		body.SetPersistUserChanges(persistChanges)
 	}
-	body.SetPersistUserChanges(persistChanges)
+
 	body.SetZone(plan.Zone.ValueString())
 	if !plan.VdaUpgradeType.IsNull() {
 		body.SetVdaUpgradeType(citrixorchestration.VdaUpgradeType(plan.VdaUpgradeType.ValueString()))
@@ -245,7 +250,7 @@ func generateBatchApiHeaders(ctx context.Context, diagnostics *diag.Diagnostics,
 }
 
 func readMachineCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, machineCatalogId string) (*citrixorchestration.MachineCatalogDetailResponseModel, *http.Response, error) {
-	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId).Fields("Id,Name,Description,ProvisioningType,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC,Metadata,Scopes,UpgradeInfo,AdminFolder")
+	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId).Fields("Id,Name,Description,ProvisioningType,PersistChanges,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC,Metadata,Scopes,UpgradeInfo,AdminFolder")
 	catalog, httpResp, err := util.ReadResource[*citrixorchestration.MachineCatalogDetailResponseModel](getMachineCatalogRequest, ctx, client, resp, "Machine Catalog", machineCatalogId)
 
 	return catalog, httpResp, err
@@ -389,7 +394,7 @@ func allocationTypeEnumToString(conn citrixorchestration.AllocationType) string 
 	}
 }
 
-func (scope RemotePcOuModel) RefreshListItem(_ context.Context, _ *diag.Diagnostics, remote citrixorchestration.RemotePCEnrollmentScopeResponseModel) util.ModelWithAttributes {
+func (scope RemotePcOuModel) RefreshListItem(_ context.Context, _ *diag.Diagnostics, remote citrixorchestration.RemotePCEnrollmentScopeResponseModel) util.ResourceModelWithAttributes {
 	scope.OUName = types.StringValue(remote.GetOU())
 	scope.IncludeSubFolders = types.BoolValue(remote.GetIncludeSubfolders())
 

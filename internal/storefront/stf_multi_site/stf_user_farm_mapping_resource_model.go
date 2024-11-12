@@ -59,7 +59,7 @@ func (r UserFarmMappingGroup) GetKey() string {
 	return r.GroupName.ValueString()
 }
 
-func (r UserFarmMappingGroup) RefreshListItem(_ context.Context, _ *diag.Diagnostics, item citrixstorefront.STFGroupMemberResponseModel) util.ModelWithAttributes {
+func (r UserFarmMappingGroup) RefreshListItem(_ context.Context, _ *diag.Diagnostics, item citrixstorefront.STFGroupMemberResponseModel) util.ResourceModelWithAttributes {
 	// Implement the logic to refresh the list item based on the item
 	groupName := types.StringValue(*item.GroupName.Get())
 	r.GroupName = groupName
@@ -139,7 +139,7 @@ func (r EquivalentFarmSet) GetKey() string {
 	return r.Name.ValueString()
 }
 
-func (r EquivalentFarmSet) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, item citrixstorefront.STFFarmSetResponseModel) util.ModelWithAttributes {
+func (r EquivalentFarmSet) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, item citrixstorefront.STFFarmSetResponseModel) util.ResourceModelWithAttributes {
 	// Implement the logic to refresh the list item based on the item
 	name := types.StringValue(*item.Name.Get())
 	r.Name = name

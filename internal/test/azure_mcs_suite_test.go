@@ -27,6 +27,7 @@ func TestAzureMcsSuitePreCheck(t *testing.T) {
 	TestHypervisorResourcePoolPreCheck_Azure(t)
 	TestMachineCatalogPreCheck_Azure(t)
 	TestMachineCatalogPreCheck_Manual_Power_Managed_Azure(t)
+	TestDesktopIconPreCheck(t)
 	TestDeliveryGroupPreCheck(t)
 	TestAdminFolderPreCheck(t)
 	TestApplicationResourcePreCheck(t)
@@ -89,6 +90,7 @@ func TestAzureMcs(t *testing.T) {
 			TestHypervisorResourcePoolPreCheck_Azure(t)
 			TestMachineCatalogPreCheck_Azure(t)
 			TestMachineCatalogPreCheck_Manual_Power_Managed_Azure(t)
+			TestDesktopIconPreCheck(t)
 			TestDeliveryGroupPreCheck(t)
 			TestAdminFolderPreCheck(t)
 			TestApplicationResourcePreCheck(t)
@@ -296,7 +298,7 @@ func TestAzureMcs(t *testing.T) {
 			// Create and Read testing
 			{
 				Config: composeTestResourceTf(
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsOnly"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
@@ -308,6 +310,8 @@ func TestAzureMcs(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "name", deliveryGroupName),
 					// Verify description of delivery group
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "description", "Delivery Group for testing"),
+					// Verify delivery type of delivery group
+					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "delivery_type", "DesktopsOnly"),
 					// Verify number of desktops
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "desktops.#", "2"),
 					// Verify number of reboot schedules
@@ -334,7 +338,7 @@ func TestAzureMcs(t *testing.T) {
 			// Delivery Group: Update name, description and add machine testing
 			{
 				Config: composeTestResourceTf(
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updated),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updated, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
@@ -358,10 +362,14 @@ func TestAzureMcs(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "name", fmt.Sprintf("%s-updated", deliveryGroupName)),
 					// Verify description of delivery group
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "description", "Delivery Group for testing updated"),
+					// Verify delivery type of delivery group
+					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "delivery_type", "DesktopsAndApps"),
 					// Verify number of desktops
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "desktops.#", "1"),
 					// Verify number of reboot schedules
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "reboot_schedules.#", "1"),
+					// Verify number of reboot schedules
+					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "reboot_schedules.0.ignore_maintenance_mode", "false"),
 					// Verify total number of machines in delivery group
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "total_machines", "2"),
 					// Verify the policy set id is not assigned to the delivery group
@@ -373,7 +381,7 @@ func TestAzureMcs(t *testing.T) {
 			// Create Policy and assign to delivery group
 			{
 				Config: composeTestResourceTf(
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updatedWithPolicySetId),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updatedWithPolicySetId, ""),
 					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
@@ -392,7 +400,7 @@ func TestAzureMcs(t *testing.T) {
 			// Machine Catalog: Delete machine test
 			{
 				Config: composeTestResourceTf(
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsOnly"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
@@ -417,7 +425,7 @@ func TestAzureMcs(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildAdminFolderResource(t, testAdminFolderResource, "ContainsApplications"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsOnly"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
@@ -449,7 +457,7 @@ func TestAzureMcs(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildAdminFolderResource(t, testAdminFolderResource, "ContainsApplicationGroups"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsOnly"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
@@ -475,7 +483,7 @@ func TestAzureMcs(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildAdminFolderResource(t, testAdminFolderResource_nameAndParentPathUpdated1, "ContainsApplications"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsOnly"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
@@ -501,7 +509,7 @@ func TestAzureMcs(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildAdminFolderResource(t, testAdminFolderResource_parentPathRemoved, "ContainsApplications"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsOnly"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
@@ -525,7 +533,7 @@ func TestAzureMcs(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsOnly"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
@@ -557,7 +565,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildPolicySetResource(t, policy_set_testResource),
 					BuildApplicationResource(t, testApplicationResource),
 					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
@@ -674,7 +682,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildPolicySetResource(t, policy_set_updated_testResource),
 					BuildApplicationResource(t, testApplicationResource_updated),
 					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
@@ -736,7 +744,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildAdminUserResource(t, adminUserTestResource),
 					BuildAdminRoleResource(t, adminRoleTestResource_updated),
 					BuildAdminScopeResource(t, adminScopeTestResource_updated),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
@@ -772,7 +780,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildAdminUserResource(t, adminUserTestResource_updated),
 					BuildAdminRoleResource(t, adminRoleTestResource_updated),
 					BuildAdminScopeResource(t, adminScopeTestResource_updated),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),

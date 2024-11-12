@@ -32,7 +32,7 @@ type RightsModel struct {
 	Scope types.String `tfsdk:"scope"`
 }
 
-func (r AdminUserResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, adminUser *citrixorchestration.AdministratorResponseModel) AdminUserResourceModel {
+func (r AdminUserResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, isResource bool, adminUser *citrixorchestration.AdministratorResponseModel) AdminUserResourceModel {
 	// Overwrite admin user data with refreshed state
 	userDetails := adminUser.GetUser()
 	userFQDN := strings.Split(userDetails.GetSamName(), "\\")
@@ -40,7 +40,11 @@ func (r AdminUserResourceModel) RefreshPropertyValues(ctx context.Context, diagn
 	r.Id = types.StringValue(userDetails.GetSid())
 	r.Name = types.StringValue(userFQDN[len(userFQDN)-1])
 	r.DomainName = types.StringValue(userDetails.GetDomain())
-	r.Rights = util.TypedArrayToObjectList[RightsModel](ctx, diagnostics, r.refreshRights(ctx, diagnostics, adminUser.GetScopesAndRoles()))
+	if isResource {
+		r.Rights = util.TypedArrayToObjectList[RightsModel](ctx, diagnostics, r.refreshRights(ctx, diagnostics, adminUser.GetScopesAndRoles()))
+	} else {
+		r.Rights = util.DataSourceTypedArrayToObjectList[RightsModel](ctx, diagnostics, r.refreshRights(ctx, diagnostics, adminUser.GetScopesAndRoles()))
+	}
 	r.IsEnabled = types.BoolValue(adminUser.GetEnabled())
 
 	return r

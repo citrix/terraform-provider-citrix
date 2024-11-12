@@ -3,17 +3,10 @@
 package resource_locations
 
 import (
-	ccresourcelocations "github.com/citrix/citrix-daas-rest-go/ccresourcelocations"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type ResourceLocationsDataSourceModel struct {
-	Id   types.String `tfsdk:"id"`
-	Name types.String `tfsdk:"name"`
-}
-
-func (ResourceLocationsDataSourceModel) GetSchema() schema.Schema {
+func (ResourceLocationModel) GetDataSourceSchema() schema.Schema {
 	return schema.Schema{
 		Description: "Citrix Cloud --- Read data of an existing resource location.",
 
@@ -26,14 +19,14 @@ func (ResourceLocationsDataSourceModel) GetSchema() schema.Schema {
 				Description: "Name of the resource location.",
 				Required:    true,
 			},
+			"internal_only": schema.BoolAttribute{
+				Description: "Flag to determine if the resource location can only be used internally. Defaults to `false`.",
+				Computed:    true,
+			},
+			"time_zone": schema.StringAttribute{
+				Description: "Timezone associated with the resource location. Please refer to the `Timezone` column in the following [table](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/default-time-zones?view=windows-11#time-zones) for allowed values.",
+				Computed:    true,
+			},
 		},
 	}
-}
-
-func (r ResourceLocationsDataSourceModel) RefreshPropertyValues(ccResourceLocation *ccresourcelocations.CitrixCloudServicesRegistryApiModelsLocationsResourceLocationModel) ResourceLocationsDataSourceModel {
-	// Overwrite resource location with refreshed state
-	r.Id = types.StringValue(ccResourceLocation.GetId())
-	r.Name = types.StringValue(ccResourceLocation.GetName())
-
-	return r
 }

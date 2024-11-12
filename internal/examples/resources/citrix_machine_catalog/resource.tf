@@ -22,8 +22,10 @@ resource "citrix_machine_catalog" "example-azure-mtsession" {
             azure_master_image = {
                 # shared_subscription = var.azure_image_subscription # Uncomment if the image is from a subscription outside of the hypervisor's subscription
 
-                # For Azure master image from managed disk or snapshot
+                # Resource Group is required for any type of Azure master image
                 resource_group       = var.azure_resource_group
+
+                # For Azure master image from managed disk or snapshot
                 master_image         = var.azure_master_image
 
                 # For Azure image gallery
@@ -303,7 +305,7 @@ resource "citrix_machine_catalog" "example-manual-power-managed-mtsession" {
                 {
                     region = "East US"
                     resource_group_name = "machine-resource-group-name"
-                    machine_account = "DOMAIN\\MachineName"
+                    machine_account = "domain\\machine-name"
                     machine_name = "MachineName"
                 }
             ]
@@ -382,8 +384,10 @@ resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
             azure_master_image = {
                 # shared_subscription = var.azure_image_subscription # Uncomment if the image is from a subscription outside of the hypervisor's subscription
 
-                # For Azure master image from managed disk or snapshot
+                # Resource Group is required for any type of Azure master image
                 resource_group       = var.azure_resource_group
+
+                # For Azure master image from managed disk or snapshot
                 master_image         = var.azure_master_image
 
                 # For Azure image gallery

@@ -25,6 +25,9 @@ resource "citrix_delivery_group" "example-delivery-group" {
     ] 
     autoscale_settings = {
         autoscale_enabled = true
+        restrict_autoscale_tag = "example-tag"
+        peak_restrict_min_idle_untagged_percent = 10
+        off_peak_restrict_min_idle_untagged_percent = 10
         disconnect_peak_idle_session_after_seconds = 3600
         log_off_peak_disconnected_session_after_seconds = 3600
         peak_log_off_action = "Nothing"

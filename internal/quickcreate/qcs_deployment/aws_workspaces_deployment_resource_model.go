@@ -166,7 +166,7 @@ func (AwsWorkspacesDeploymentWorkspaceModel) GetAttributes() map[string]schema.A
 	return AwsWorkspacesDeploymentWorkspaceModel{}.GetSchema().Attributes
 }
 
-func (workspace AwsWorkspacesDeploymentWorkspaceModel) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, desktop citrixquickcreate.AwsEdcDeploymentMachine) util.ModelWithAttributes {
+func (workspace AwsWorkspacesDeploymentWorkspaceModel) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, desktop citrixquickcreate.AwsEdcDeploymentMachine) util.ResourceModelWithAttributes {
 	workspace.Username = types.StringValue(desktop.GetUsername())
 	workspace.RootVolumeSize = types.Int64Value(int64(desktop.GetRootVolumeSize()))
 	workspace.UserVolumeSize = types.Int64Value(int64(desktop.GetUserVolumeSize()))
@@ -375,7 +375,7 @@ func (r AwsWorkspacesDeploymentResourceModel) RefreshPropertyValues(ctx context.
 		scaleSettingsObbject := util.TypedObjectToObjectValue(ctx, diagnostics, scaleSettings)
 		r.ScaleSettings = scaleSettingsObbject
 	} else {
-		if attributes, err := util.AttributeMapFromObject(AwsWorkspacesScaleSettingsModel{}); err == nil {
+		if attributes, err := util.ResourceAttributeMapFromObject(AwsWorkspacesScaleSettingsModel{}); err == nil {
 			r.ScaleSettings = types.ObjectNull(attributes)
 		} else {
 			diagnostics.AddError("Error when creating null ScaleSettings", err.Error())

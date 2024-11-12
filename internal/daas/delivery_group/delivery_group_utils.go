@@ -694,10 +694,9 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 	}
 	body.SetMinimumFunctionalLevel(*functionalLevel)
 
-	deliveryKind := citrixorchestration.DELIVERYKIND_DESKTOPS_AND_APPS
-	if plan.SessionSupport.ValueString() == string(citrixorchestration.SESSIONSUPPORT_SINGLE_SESSION) ||
-		associatedMachineCatalogProperties.SessionSupport == citrixorchestration.SESSIONSUPPORT_SINGLE_SESSION {
-		deliveryKind = citrixorchestration.DELIVERYKIND_DESKTOPS_ONLY
+	deliveryKind, err := getDeliveryGroupDeliveryType(diagnostics, plan.DeliveryType, plan.SessionSupport.ValueString(), associatedMachineCatalogProperties.SessionSupport)
+	if err != nil {
+		return body, err
 	}
 
 	body.SetDeliveryType(deliveryKind)
@@ -723,6 +722,22 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 	if !plan.AutoscaleSettings.IsNull() {
 		autoscale := util.ObjectValueToTypedObject[DeliveryGroupPowerManagementSettings](ctx, diagnostics, plan.AutoscaleSettings)
 		body.SetAutoScaleEnabled(autoscale.AutoscaleEnabled.ValueBool())
+		if !autoscale.RestrictAutoscaleTag.IsNull() {
+			body.SetRestrictAutoscaleTag(autoscale.RestrictAutoscaleTag.ValueString())
+		}
+
+		if !autoscale.RestrictAutoscaleMinIdleUntaggedPercentDuringPeak.IsNull() {
+			body.SetRestrictAutoscaleMinIdleUntaggedPercentDuringPeak(autoscale.RestrictAutoscaleMinIdleUntaggedPercentDuringPeak.ValueInt32())
+		} else {
+			body.SetRestrictAutoscaleMinIdleUntaggedPercentDuringPeak(-1)
+		}
+
+		if !autoscale.RestrictAutoscaleMinIdleUntaggedPercentDuringOffPeak.IsNull() {
+			body.SetRestrictAutoscaleMinIdleUntaggedPercentDuringOffPeak(autoscale.RestrictAutoscaleMinIdleUntaggedPercentDuringOffPeak.ValueInt32())
+		} else {
+			body.SetRestrictAutoscaleMinIdleUntaggedPercentDuringOffPeak(-1)
+		}
+
 		body.SetTimeZone(autoscale.Timezone.ValueString())
 		body.SetPeakDisconnectTimeoutMinutes(int32(autoscale.PeakDisconnectTimeoutMinutes.ValueInt64()))
 		body.SetPeakLogOffAction(getSessionChangeHostingActionValue(autoscale.PeakLogOffAction.ValueString()))
@@ -913,6 +928,19 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 	var editDeliveryGroupRequestBody citrixorchestration.EditDeliveryGroupRequestModel
 	editDeliveryGroupRequestBody.SetName(plan.Name.ValueString())
 	editDeliveryGroupRequestBody.SetDescription(plan.Description.ValueString())
+
+	if !plan.DeliveryType.IsNull() {
+		deliveryKind, err := citrixorchestration.NewDeliveryKindFromValue(plan.DeliveryType.ValueString())
+		if err != nil {
+			diagnostics.AddError(
+				"Error creating Delivery Group",
+				fmt.Sprintf("Unsupported delivery type %s.", plan.DeliveryType.ValueString()),
+			)
+			return editDeliveryGroupRequestBody, err
+		}
+		editDeliveryGroupRequestBody.SetDeliveryType(*deliveryKind)
+	}
+
 	editDeliveryGroupRequestBody.SetDesktops(deliveryGroupDesktopsArray)
 	editDeliveryGroupRequestBody.SetRebootSchedules(deliveryGroupRebootScheduleArray)
 	editDeliveryGroupRequestBody.SetAdvancedAccessPolicy(advancedAccessPolicies)
@@ -939,6 +967,23 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 		}
 
 		editDeliveryGroupRequestBody.SetAutoScaleEnabled(autoscale.AutoscaleEnabled.ValueBool())
+		if !autoscale.RestrictAutoscaleTag.IsNull() {
+			editDeliveryGroupRequestBody.SetRestrictAutoscaleTag(autoscale.RestrictAutoscaleTag.ValueString())
+		} else {
+			editDeliveryGroupRequestBody.SetRestrictAutoscaleTag("")
+		}
+
+		if !autoscale.RestrictAutoscaleMinIdleUntaggedPercentDuringPeak.IsNull() {
+			editDeliveryGroupRequestBody.SetRestrictAutoscaleMinIdleUntaggedPercentDuringPeak(autoscale.RestrictAutoscaleMinIdleUntaggedPercentDuringPeak.ValueInt32())
+		} else {
+			editDeliveryGroupRequestBody.SetRestrictAutoscaleMinIdleUntaggedPercentDuringPeak(-1)
+		}
+
+		if !autoscale.RestrictAutoscaleMinIdleUntaggedPercentDuringOffPeak.IsNull() {
+			editDeliveryGroupRequestBody.SetRestrictAutoscaleMinIdleUntaggedPercentDuringOffPeak(autoscale.RestrictAutoscaleMinIdleUntaggedPercentDuringOffPeak.ValueInt32())
+		} else {
+			editDeliveryGroupRequestBody.SetRestrictAutoscaleMinIdleUntaggedPercentDuringOffPeak(-1)
+		}
 		editDeliveryGroupRequestBody.SetPeakDisconnectTimeoutMinutes(int32(autoscale.PeakDisconnectTimeoutMinutes.ValueInt64()))
 		editDeliveryGroupRequestBody.SetPeakLogOffAction(getSessionChangeHostingActionValue(autoscale.PeakLogOffAction.ValueString()))
 		editDeliveryGroupRequestBody.SetPeakLogOffTimeoutMinutes(int32(autoscale.PeakLogOffTimeoutMinutes.ValueInt64()))
@@ -1122,7 +1167,7 @@ func parseDeliveryGroupRebootScheduleToClientModel(ctx context.Context, diags *d
 
 }
 
-func (schedule DeliveryGroupRebootSchedule) RefreshListItem(ctx context.Context, diags *diag.Diagnostics, rebootSchedule citrixorchestration.RebootScheduleResponseModel) util.ModelWithAttributes {
+func (schedule DeliveryGroupRebootSchedule) RefreshListItem(ctx context.Context, diags *diag.Diagnostics, rebootSchedule citrixorchestration.RebootScheduleResponseModel) util.ResourceModelWithAttributes {
 	schedule.Name = types.StringValue(rebootSchedule.GetName())
 	if rebootSchedule.GetDescription() != "" {
 		schedule.Description = types.StringValue(rebootSchedule.GetDescription())
@@ -1174,7 +1219,7 @@ func (schedule DeliveryGroupRebootSchedule) RefreshListItem(ctx context.Context,
 	return schedule
 }
 
-func (dgDesktop DeliveryGroupDesktop) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, desktop citrixorchestration.DesktopResponseModel) util.ModelWithAttributes {
+func (dgDesktop DeliveryGroupDesktop) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, desktop citrixorchestration.DesktopResponseModel) util.ResourceModelWithAttributes {
 	dgDesktop.PublishedName = types.StringValue(desktop.GetPublishedName())
 	dgDesktop.DesktopDescription = types.StringValue(desktop.GetDescription())
 
@@ -1186,16 +1231,20 @@ func (dgDesktop DeliveryGroupDesktop) RefreshListItem(ctx context.Context, diagn
 	}
 
 	dgDesktop.Enabled = types.BoolValue(desktop.GetEnabled())
-	sessionReconnection := desktop.GetSessionReconnection()
-	if sessionReconnection == citrixorchestration.SESSIONRECONNECTION_ALWAYS {
-		dgDesktop.EnableSessionRoaming = types.BoolValue(true)
+	if desktop.SessionReconnection != nil {
+		sessionReconnection := desktop.GetSessionReconnection()
+		if sessionReconnection == citrixorchestration.SESSIONRECONNECTION_ALWAYS {
+			dgDesktop.EnableSessionRoaming = types.BoolValue(true)
+		} else {
+			dgDesktop.EnableSessionRoaming = types.BoolValue(false)
+		}
 	} else {
-		dgDesktop.EnableSessionRoaming = types.BoolValue(false)
+		dgDesktop.EnableSessionRoaming = types.BoolNull()
 	}
 
 	var users RestrictedAccessUsers
 	if !desktop.GetIncludedUserFilterEnabled() {
-		if attributes, err := util.AttributeMapFromObject(users); err == nil {
+		if attributes, err := util.ResourceAttributeMapFromObject(users); err == nil {
 			dgDesktop.RestrictedAccessUsers = types.ObjectNull(attributes)
 		} else {
 			diagnostics.AddWarning("Error when creating null RestrictedAccessUsers", err.Error())
@@ -1225,7 +1274,7 @@ func (dgDesktop DeliveryGroupDesktop) RefreshListItem(ctx context.Context, diagn
 	return dgDesktop
 }
 
-func (dgAccessPolicy DeliveryGroupAccessPolicyModel) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicy citrixorchestration.AdvancedAccessPolicyResponseModel) util.ModelWithAttributes {
+func (dgAccessPolicy DeliveryGroupAccessPolicyModel) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicy citrixorchestration.AdvancedAccessPolicyResponseModel) util.ResourceModelWithAttributes {
 	dgAccessPolicy.Id = types.StringValue(accessPolicy.GetId())
 
 	if accessPolicy.GetIsBuiltIn() {
@@ -1257,7 +1306,7 @@ func (dgAccessPolicy DeliveryGroupAccessPolicyModel) RefreshListItem(ctx context
 	return dgAccessPolicy
 }
 
-func (dgAccessPolicyTags DeliveryGroupAccessPolicyCriteriaTagsModel) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicyTag citrixorchestration.SmartAccessTagResponseModel) util.ModelWithAttributes {
+func (dgAccessPolicyTags DeliveryGroupAccessPolicyCriteriaTagsModel) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicyTag citrixorchestration.SmartAccessTagResponseModel) util.ResourceModelWithAttributes {
 	if !strings.EqualFold(dgAccessPolicyTags.FilterName.ValueString(), accessPolicyTag.GetFarm()) {
 		dgAccessPolicyTags.FilterName = types.StringValue(accessPolicyTag.GetFarm())
 	}
@@ -1268,7 +1317,7 @@ func (dgAccessPolicyTags DeliveryGroupAccessPolicyCriteriaTagsModel) RefreshList
 	return dgAccessPolicyTags
 }
 
-func (dgAppProtectionApplyContextually DeliveryGroupAppProtectionApplyContextuallyModel) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicy citrixorchestration.AdvancedAccessPolicyResponseModel) util.ModelWithAttributes {
+func (dgAppProtectionApplyContextually DeliveryGroupAppProtectionApplyContextuallyModel) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicy citrixorchestration.AdvancedAccessPolicyResponseModel) util.ResourceModelWithAttributes {
 	policyName := accessPolicy.GetName()
 	if accessPolicy.GetIsBuiltIn() {
 		policyName = dgAppProtectionApplyContextually.PolicyName.ValueString()
@@ -1346,12 +1395,14 @@ func verifyUsersAndParseDeliveryGroupDesktopsToClientModel(ctx context.Context, 
 		var desktopRequest citrixorchestration.DesktopRequestModel
 		desktopRequest.SetPublishedName(deliveryGroupDesktop.PublishedName.ValueString())
 		desktopRequest.SetDescription(deliveryGroupDesktop.DesktopDescription.ValueString())
-		sessionReconnection := citrixorchestration.SESSIONRECONNECTION_ALWAYS
-		if !deliveryGroupDesktop.EnableSessionRoaming.ValueBool() {
-			sessionReconnection = citrixorchestration.SESSIONRECONNECTION_SAME_ENDPOINT_ONLY
+		if !deliveryGroupDesktop.EnableSessionRoaming.IsNull() {
+			sessionReconnection := citrixorchestration.SESSIONRECONNECTION_ALWAYS
+			if !deliveryGroupDesktop.EnableSessionRoaming.ValueBool() {
+				sessionReconnection = citrixorchestration.SESSIONRECONNECTION_SAME_ENDPOINT_ONLY
+			}
+			desktopRequest.SetSessionReconnection(sessionReconnection)
 		}
 		desktopRequest.SetEnabled(deliveryGroupDesktop.Enabled.ValueBool())
-		desktopRequest.SetSessionReconnection(sessionReconnection)
 
 		includedUserIds := []string{}
 		excludedUserIds := []string{}
@@ -1465,10 +1516,6 @@ func (r DeliveryGroupResourceModel) updatePlanWithDesktops(ctx context.Context, 
 }
 
 func (r DeliveryGroupResourceModel) updatePlanWithAccessPolicies(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicies []citrixorchestration.AdvancedAccessPolicyResponseModel, isBuiltIn bool) DeliveryGroupResourceModel {
-	accessPolicies = slices.DeleteFunc(accessPolicies, func(policy citrixorchestration.AdvancedAccessPolicyResponseModel) bool {
-		return policy.GetIsBuiltIn() != isBuiltIn
-	})
-
 	stateAccessPolciies := r.CustomAccessPolicies
 	if isBuiltIn {
 		stateAccessPolciies = r.DefaultAccessPolicies
@@ -1510,7 +1557,7 @@ func (r DeliveryGroupResourceModel) updatePlanWithAppProtection(ctx context.Cont
 		appProtectionModel.EnableAntiKeyLogging = types.BoolValue(antiKeyLoggingEnabled)
 		appProtectionModel.EnableAntiScreenCapture = types.BoolValue(antiScreenCaptureEnabled)
 
-		attributesMap, err := util.AttributeMapFromObject(DeliveryGroupAppProtectionApplyContextuallyModel{})
+		attributesMap, err := util.ResourceAttributeMapFromObject(DeliveryGroupAppProtectionApplyContextuallyModel{})
 		if err != nil {
 			diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
 			return r
@@ -1528,7 +1575,7 @@ func (r DeliveryGroupResourceModel) updatePlanWithAppProtection(ctx context.Cont
 		appProtection.EnableAntiScreenCapture = types.BoolNull()
 		r.AppProtection = util.TypedObjectToObjectValue(ctx, diagnostics, appProtection)
 	} else {
-		if attributes, err := util.AttributeMapFromObject(DeliveryGroupAppProtection{}); err == nil {
+		if attributes, err := util.ResourceAttributeMapFromObject(DeliveryGroupAppProtection{}); err == nil {
 			r.AppProtection = types.ObjectNull(attributes)
 		} else {
 			diagnostics.AddWarning("Error when creating null DeliveryGroupAppProtection", err.Error())
@@ -1615,7 +1662,7 @@ func (r DeliveryGroupResourceModel) updatePlanWithRestrictedAccessUsers(ctx cont
 	}
 
 	if !accessPolicy.GetIncludedUserFilterEnabled() {
-		if attributes, err := util.AttributeMapFromObject(RestrictedAccessUsers{}); err == nil {
+		if attributes, err := util.ResourceAttributeMapFromObject(RestrictedAccessUsers{}); err == nil {
 			r.RestrictedAccessUsers = types.ObjectNull(attributes)
 		} else {
 			diagnostics.AddWarning("Error when creating null RestrictedAccessUsers", err.Error())
@@ -1641,7 +1688,7 @@ func (r DeliveryGroupResourceModel) updatePlanWithRestrictedAccessUsers(ctx cont
 	}
 
 	if users.AllowList.IsNull() && users.BlockList.IsNull() {
-		if attributes, err := util.AttributeMapFromObject(users); err == nil {
+		if attributes, err := util.ResourceAttributeMapFromObject(users); err == nil {
 			r.RestrictedAccessUsers = types.ObjectNull(attributes)
 		}
 	} else {
@@ -1658,6 +1705,23 @@ func (r DeliveryGroupResourceModel) updatePlanWithAutoscaleSettings(ctx context.
 
 	autoscale := util.ObjectValueToTypedObject[DeliveryGroupPowerManagementSettings](context.Background(), nil, r.AutoscaleSettings)
 	autoscale.AutoscaleEnabled = types.BoolValue(deliveryGroup.GetAutoScaleEnabled())
+
+	if deliveryGroup.RestrictAutoscaleTag != nil {
+		restrictAutoScaleTag := deliveryGroup.GetRestrictAutoscaleTag()
+		autoscale.RestrictAutoscaleTag = types.StringValue(restrictAutoScaleTag.GetName())
+
+		if deliveryGroup.GetRestrictAutoscaleMinIdleUntaggedPercentDuringOffPeak() >= 0 {
+			autoscale.RestrictAutoscaleMinIdleUntaggedPercentDuringOffPeak = types.Int32Value(deliveryGroup.GetRestrictAutoscaleMinIdleUntaggedPercentDuringOffPeak())
+		} else {
+			autoscale.RestrictAutoscaleMinIdleUntaggedPercentDuringOffPeak = types.Int32Null()
+		}
+
+		if deliveryGroup.GetRestrictAutoscaleMinIdleUntaggedPercentDuringPeak() >= 0 {
+			autoscale.RestrictAutoscaleMinIdleUntaggedPercentDuringPeak = types.Int32Value(deliveryGroup.GetRestrictAutoscaleMinIdleUntaggedPercentDuringPeak())
+		} else {
+			autoscale.RestrictAutoscaleMinIdleUntaggedPercentDuringPeak = types.Int32Null()
+		}
+	}
 
 	if !autoscale.Timezone.IsNull() {
 		autoscale.Timezone = types.StringValue(deliveryGroup.GetTimeZone())
@@ -1691,7 +1755,7 @@ func (r DeliveryGroupResourceModel) updatePlanWithAutoscaleSettings(ctx context.
 		parsedPowerTimeSchemes = preserveOrderInPowerTimeSchemes(ctx, diags, autoscalePowerTimeSchemes, parsedPowerTimeSchemes)
 		autoscale.PowerTimeSchemes = util.TypedArrayToObjectList(ctx, diags, parsedPowerTimeSchemes)
 	} else {
-		if attributeMap, err := util.AttributeMapFromObject(DeliveryGroupPowerTimeScheme{}); err == nil {
+		if attributeMap, err := util.ResourceAttributeMapFromObject(DeliveryGroupPowerTimeScheme{}); err == nil {
 			autoscale.PowerTimeSchemes = types.ListNull(types.ObjectType{AttrTypes: attributeMap})
 		} else {
 			diags.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
@@ -2057,4 +2121,26 @@ func getDeliveryGroupTags(ctx context.Context, diagnostics *diag.Diagnostics, cl
 	getTagsRequest = getTagsRequest.Fields("Id,Name,Description")
 	tagsResp, httpResp, err := citrixdaasclient.AddRequestData(getTagsRequest, client).Execute()
 	return util.ProcessTagsResponseCollection(diagnostics, tagsResp, httpResp, err, "Delivery Group", deliveryGroupId)
+}
+
+func getDeliveryGroupDeliveryType(diagnostics *diag.Diagnostics, deliveryType types.String, sessionSupport string, associatedCatalogSessionSupport citrixorchestration.SessionSupport) (citrixorchestration.DeliveryKind, error) {
+	var deliveryKind citrixorchestration.DeliveryKind
+	if deliveryType.IsNull() {
+		deliveryKind = citrixorchestration.DELIVERYKIND_DESKTOPS_AND_APPS
+		if sessionSupport == string(citrixorchestration.SESSIONSUPPORT_SINGLE_SESSION) ||
+			associatedCatalogSessionSupport == citrixorchestration.SESSIONSUPPORT_SINGLE_SESSION {
+			deliveryKind = citrixorchestration.DELIVERYKIND_DESKTOPS_ONLY
+		}
+	} else {
+		deliveryKindParsed, err := citrixorchestration.NewDeliveryKindFromValue(deliveryType.ValueString())
+		if err != nil {
+			diagnostics.AddError(
+				"Error creating Delivery Group",
+				fmt.Sprintf("Unsupported delivery type %s.", deliveryType.ValueString()),
+			)
+			return citrixorchestration.DELIVERYKIND_UNKNOWN, err
+		}
+		deliveryKind = *deliveryKindParsed
+	}
+	return deliveryKind, nil
 }

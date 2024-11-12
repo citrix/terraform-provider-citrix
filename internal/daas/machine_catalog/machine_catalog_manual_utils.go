@@ -443,6 +443,7 @@ func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Conte
 				if machinesNotPresetInRemote[strings.ToLower(machine.MachineAccount.ValueString())] {
 					continue
 				}
+				machine.MachineAccount = types.StringValue(strings.ToLower(machine.MachineAccount.ValueString()))
 				machineAccountMachines = append(machineAccountMachines, machine)
 			}
 			machineAccount.Machines = util.TypedArrayToObjectList[MachineCatalogMachineModel](ctx, diagnostics, machineAccountMachines)

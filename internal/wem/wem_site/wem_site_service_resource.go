@@ -62,10 +62,6 @@ func (w *wemSiteServiceResource) ModifyPlan(ctx context.Context, req resource.Mo
 		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
 		return
 	}
-
-	if w.client.AuthConfig.OnPremises {
-		resp.Diagnostics.AddError("Error managing WEM Configuration Sets", "Configuration Sets are only supported for Cloud customers.")
-	}
 }
 
 // Create implements resource.Resource.

@@ -5,6 +5,10 @@ package storefront_server
 import (
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -15,6 +19,39 @@ type StoreFrontServerResourceModel struct {
 	Description types.String `tfsdk:"description"`
 	Url         types.String `tfsdk:"url"`
 	Enabled     types.Bool   `tfsdk:"enabled"`
+}
+
+func (StoreFrontServerResourceModel) GetSchema() schema.Schema {
+	return schema.Schema{
+		Description: "CVAD --- Manages a StoreFront server.",
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Description: "GUID identifier of the StoreFront server.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"name": schema.StringAttribute{
+				Description: "Name of the StoreFront server.",
+				Required:    true,
+			},
+			"description": schema.StringAttribute{
+				Description: "Description of the StoreFront server.",
+				Required:    true,
+			},
+			"url": schema.StringAttribute{
+				Description: "URL for connecting to the StoreFront server.",
+				Required:    true,
+			},
+			"enabled": schema.BoolAttribute{
+				Description: "Indicates if the StoreFront server is enabled. Default is `true`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
+			},
+		},
+	}
 }
 
 func (r StoreFrontServerResourceModel) RefreshPropertyValues(sfServer *citrixorchestration.StoreFrontServerResponseModel) StoreFrontServerResourceModel {

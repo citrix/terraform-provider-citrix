@@ -163,7 +163,7 @@ func TestPolicySetResource(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildPolicySetResource(t, policy_set_testResource),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updated),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updated, "DesktopsAndApps"),
 					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
@@ -208,7 +208,7 @@ func TestPolicySetResource(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildPolicySetResource(t, policy_set_reordered_testResource),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updated),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updated, "DesktopsAndApps"),
 					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
@@ -245,7 +245,7 @@ func TestPolicySetResource(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildPolicySetResource(t, policy_set_updated_testResource),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updated),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updated, "DesktopsAndApps"),
 					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),

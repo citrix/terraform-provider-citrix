@@ -68,9 +68,9 @@ func (r *awsWorkspacesDeploymentDataSource) Read(ctx context.Context, req dataso
 	var deployment *citrixquickcreate.AwsEdcDeployment
 	var err error
 	// Try getting the AWS WorkSpaces Deployment
-	if data.Id.ValueString() != "" {
+	if !data.Id.IsNull() {
 		deployment, _, err = getAwsWorkspacesDeploymentUsingId(ctx, r.client, &resp.Diagnostics, data.Id.ValueString(), true)
-	} else if data.Name.ValueString() != "" {
+	} else {
 		deployment, _, err = getAwsWorkspacesDeploymentByName(ctx, r.client, &resp.Diagnostics, data.Name.ValueString(), data.AccountId.ValueString())
 	}
 	if err != nil {

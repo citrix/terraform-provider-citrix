@@ -104,18 +104,21 @@ In order to reduce errors this project has introduced a system to convert betwee
 
 | From | To | Function | Notes |
 |------|----|----------|-------|
-| `types.Object` | `T` | `ObjectValueToTypedObject` | `T` must implement `ModelWithAttributes` |
-| `T` | `types.Object` | `TypedObjectToObjectValue` | `T` must implement `ModelWithAttributes` |
-| `types.List` | `T[]` | `ObjectListToTypedArray[T]` | `T` must implement `ModelWithAttributes`. For a list of nested objects |
-| `T[]` | `types.List` | `TypedArrayToObjectList[T]` | `T` must implement `ModelWithAttributes`. For a list of nested objects |
-| `types.Set` | `T[]` | `ObjectSetToTypedArray[T]` | `T` must implement `ModelWithAttributes`. For a set of nested objects |
-| `T[]` | `types.Set` | `TypedArrayToObjectSet[T]` | `T` must implement `ModelWithAttributes`. For a set of nested objects |
+| `types.Object` | `T` | `ObjectValueToTypedObject` | `T` must implement `ResourceModelWithAttributes` or `DataSourceModelWithAttributes` |
+| `T` | `types.Object` | `TypedObjectToObjectValue` | `T` must implement `ResourceModelWithAttributes` |
+| `T` | `types.Object` | `DataSourceTypedObjectToObjectValue` | `T` must implement `DataSourceModelWithAttributes` |
+| `types.List` | `T[]` | `ObjectListToTypedArray[T]` | `T` must implement `ResourceModelWithAttributes` or `DataSourceModelWithAttributes`. For a list of nested objects |
+| `T[]` | `types.List` | `TypedArrayToObjectList[T]` | `T` must implement `ResourceModelWithAttributes`. For a list of nested resource objects |
+| `T[]` | `types.List` | `DataSourceTypedArrayToObjectSet[T]` | `T` must implement `DataSourceModelWithAttributes`. For a list of nested data source objects |
+| `types.Set` | `T[]` | `ObjectSetToTypedArray[T]` | `T` must implement `ResourceModelWithAttributes`. For a set of nested objects |
+| `T[]` | `types.Set` | `TypedArrayToObjectSet[T]` | `T` must implement `ResourceModelWithAttributes`. For a set of nested resource objects |
+| `T[]` | `types.Set` | `DataSourceTypedArrayToObjectSet[T]` | `T` must implement `DataSourceModelWithAttributes`. For a set of nested data source objects |
 | `types.List` | `string[]` | `StringListToStringArray` | For a list of strings |
 | `string[]` | `types.List` | `StringArrayToStringList` | For a list of strings |
 | `types.Set` | `string[]` | `StringSetToStringArray` | For a set of strings |
 | `string[]` | `types.Set` | `StringArrayToStringSet` | For a set of strings |
 
-In order to use the first 6 of these methods, the struct `T` needs to implement the [ModelWithAttributes](internal/util/types.go) interface which is ultimately populated from the attribute's Schema. This gives the Terraform type system the necessary information to populate a `types.Object` or `types.List` with a nested object.
+In order to use the first 9 of these methods, the struct `T` needs to implement the [ResourceModelWithAttributes](internal/util/types.go) or [DataSourceModelWithAttributes](internal/util/types.go) interface which is ultimately populated from the attribute's Schema. This gives the Terraform type system the necessary information to populate a `types.Object` or `types.List` with a nested object.
 
 ### Initalizing Terraform types
 When dealing with a struct that contains nested `types.List/Set/Object`, it is important to never work with an empty struct, but instead start with one that has all of the nested objects initialized to Terraform's `ListNull/SetNull/ObjectNull`. There are helpers to assist with this:
@@ -126,7 +129,7 @@ tfObject := ComplexTerraformObject{}
 tfObject ComplexTerraformObject
 
 // Instead:
-if attributesMap, err := util.AttributeMapFromObject(ComplexTerraformObject{}); err == nil {
+if attributesMap, err := util.ResourceAttributeMapFromObject(ComplexTerraformObject{}); err == nil {
     tfObject := types.ObjectNull(attributesMap)
 } else {
     diagnostics.AddWarning("Error when creating null ComplexTerraformObject", err.Error())

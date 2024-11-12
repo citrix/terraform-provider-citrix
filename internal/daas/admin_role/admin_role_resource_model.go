@@ -20,8 +20,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// AdminRoleResourceModel maps the resource schema data.
-type AdminRoleResourceModel struct {
+// AdminRoleModel maps the resource schema data.
+type AdminRoleModel struct {
 	Id               types.String `tfsdk:"id"`
 	Name             types.String `tfsdk:"name"`
 	IsBuiltIn        types.Bool   `tfsdk:"is_built_in"`
@@ -31,7 +31,7 @@ type AdminRoleResourceModel struct {
 	Permissions      types.Set    `tfsdk:"permissions"` //Set[string]
 }
 
-func (r AdminRoleResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, adminRole *citrixorchestration.RoleResponseModel) AdminRoleResourceModel {
+func (r AdminRoleModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, adminRole *citrixorchestration.RoleResponseModel) AdminRoleModel {
 
 	// Overwrite admin role with refreshed state
 	r.Id = types.StringValue(adminRole.GetId())
@@ -50,7 +50,7 @@ func (r AdminRoleResourceModel) RefreshPropertyValues(ctx context.Context, diagn
 	return r
 }
 
-func (AdminRoleResourceModel) GetSchema() schema.Schema {
+func (AdminRoleModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		// This description is used by the documentation generator and the language server.
 		Description: "CVAD --- Manages an administrator role.",
@@ -107,6 +107,6 @@ func (AdminRoleResourceModel) GetSchema() schema.Schema {
 	}
 }
 
-func (AdminRoleResourceModel) GetAttributes() map[string]schema.Attribute {
-	return AdminRoleResourceModel{}.GetSchema().Attributes
+func (AdminRoleModel) GetAttributes() map[string]schema.Attribute {
+	return AdminRoleModel{}.GetSchema().Attributes
 }

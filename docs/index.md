@@ -86,6 +86,7 @@ provider "citrix" {
 
 - `cvad_config` (Attributes) Configuration for CVAD service. (see [below for nested schema](#nestedatt--cvad_config))
 - `storefront_remote_host` (Attributes) StoreFront Remote Host for Citrix DaaS service. <br />Only applicable for Citrix on-premises StoreFront. Use this to specify StoreFront Remote Host. <br /> (see [below for nested schema](#nestedatt--storefront_remote_host))
+- `wem_on_prem_config` (Attributes) Configuration for WEM on-premises service. (see [below for nested schema](#nestedatt--wem_on_prem_config))
 
 <a id="nestedatt--cvad_config"></a>
 ### Nested Schema for `cvad_config`
@@ -134,6 +135,11 @@ For Citrix Cloud customers: Use this to force override the Citrix DaaS service h
 -> **Note** Can be set via Environment Variable **CITRIX_HOSTNAME**.
 
 ~> **Please Note** This parameter is required for on-premises customers to be specified in the provider configuration or via environment variable.
+- `wem_region` (String) WEM Hosting Region of the Citrix Cloud customer. Available values are `US`, `EU`, and `APS`.
+
+-> **Note** Can be set via Environment Variable **CITRIX_WEM_REGION**.
+
+~> **Please Note** Only applicable for Citrix Workspace Environment Management (WEM) Cloud customers.
 
 
 <a id="nestedatt--storefront_remote_host"></a>
@@ -141,7 +147,18 @@ For Citrix Cloud customers: Use this to force override the Citrix DaaS service h
 
 Optional:
 
-- `ad_admin_password` (String) Active Directory Admin Password to connect to storefront server <br />Use this to specify AD admin password<br />Can be set via Environment Variable **SF_AD_ADMIN_PASSWORD**.<br />This parameter is **required** to be specified in the provider configuration or via environment variable.
+- `ad_admin_password` (String, Sensitive) Active Directory Admin Password to connect to storefront server <br />Use this to specify AD admin password<br />Can be set via Environment Variable **SF_AD_ADMIN_PASSWORD**.<br />This parameter is **required** to be specified in the provider configuration or via environment variable.
 - `ad_admin_username` (String) Active Directory Admin Username to connect to storefront server <br />Use this to specify AD admin username <br />Can be set via Environment Variable **SF_AD_ADMIN_USERNAME**.<br />This parameter is **required** to be specified in the provider configuration or via environment variable.
 - `computer_name` (String) StoreFront server computer Name <br />Use this to specify StoreFront server computer name <br />Can be set via Environment Variable **SF_COMPUTER_NAME**.<br />This parameter is **required** to be specified in the provider configuration or via environment variable.
 - `disable_ssl_verification` (Boolean) Disable SSL verification against the target storefront server. <br />Only applicable to customers connecting to storefront server remotely. Customers should omit this option when running storefront provider locally. Set to true to skip SSL verification only when the target DDC does not have a valid SSL certificate issued by a trusted CA. <br />When set to true, please make sure that your provider storefront_remote_host is set for a known storefront hostname. <br />Can be set via Environment Variable **SF_DISABLE_SSL_VERIFICATION**.
+
+
+<a id="nestedatt--wem_on_prem_config"></a>
+### Nested Schema for `wem_on_prem_config`
+
+Optional:
+
+- `admin_password` (String, Sensitive) WEM Admin Password to connect to WEM service <br />Use this to specify WEM admin password<br />Can be set via Environment Variable **WEM_ADMIN_PASSWORD**.<br />This parameter is **required** to be specified in the provider configuration or via environment variable.
+- `admin_username` (String) WEM Admin Username to connect to WEM service <br />Use this to specify WEM admin username <br />Can be set via Environment Variable **WEM_ADMIN_USERNAME**.<br />This parameter is **required** to be specified in the provider configuration or via environment variable.
+- `disable_ssl_verification` (Boolean) Disable SSL verification against the target WEM service. <br />Set to true to skip SSL verification only when the target WEM service does not have a valid SSL certificate issued by a trusted CA. <br />When set to true, please make sure that your provider config is set for a known WEM hostname. <br />Can be set via Environment Variable **WEM_DISABLE_SSL_VERIFICATION**.
+- `hostname` (String) Name of server hosting Citrix WEM service. <br />Use this to specify WEM service hostname. <br />Can be set via Environment Variable **WEM_HOSTNAME**.<br />This parameter is **required** to be specified in the provider configuration or via environment variable.

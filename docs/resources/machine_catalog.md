@@ -4,11 +4,14 @@ page_title: "citrix_machine_catalog Resource - citrix"
 subcategory: "CVAD"
 description: |-
   Manages a machine catalog.
+  -> Note To bind a machine catalog to a Workspace Environment Management (WEM) configuration set, use citrix_wem_directory_object resource.
 ---
 
 # citrix_machine_catalog (Resource)
 
 Manages a machine catalog.
+
+-> **Note** To bind a machine catalog to a Workspace Environment Management (WEM) configuration set, use `citrix_wem_directory_object` resource.
 
 ## Example Usage
 
@@ -37,8 +40,10 @@ resource "citrix_machine_catalog" "example-azure-mtsession" {
             azure_master_image = {
                 # shared_subscription = var.azure_image_subscription # Uncomment if the image is from a subscription outside of the hypervisor's subscription
 
-                # For Azure master image from managed disk or snapshot
+                # Resource Group is required for any type of Azure master image
                 resource_group       = var.azure_resource_group
+
+                # For Azure master image from managed disk or snapshot
                 master_image         = var.azure_master_image
 
                 # For Azure image gallery
@@ -318,7 +323,7 @@ resource "citrix_machine_catalog" "example-manual-power-managed-mtsession" {
                 {
                     region = "East US"
                     resource_group_name = "machine-resource-group-name"
-                    machine_account = "DOMAIN\\MachineName"
+                    machine_account = "domain\\machine-name"
                     machine_name = "MachineName"
                 }
             ]
@@ -397,8 +402,10 @@ resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
             azure_master_image = {
                 # shared_subscription = var.azure_image_subscription # Uncomment if the image is from a subscription outside of the hypervisor's subscription
 
-                # For Azure master image from managed disk or snapshot
+                # Resource Group is required for any type of Azure master image
                 resource_group       = var.azure_resource_group
+
+                # For Azure master image from managed disk or snapshot
                 master_image         = var.azure_master_image
 
                 # For Azure image gallery
@@ -447,6 +454,7 @@ resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
 - `machine_catalog_folder_path` (String) The path to the folder in which the machine catalog is located.
 - `metadata` (Attributes List) Metadata for the Machine Catalog. (see [below for nested schema](#nestedatt--metadata))
 - `minimum_functional_level` (String) Specifies the minimum functional level for the VDA machines in the catalog. Defaults to `L7_20`.
+- `persist_user_changes` (String) Specify if user changes are persisted on the machines in the machine catalog. Choose between `Discard` and `OnLocal`. Defaults to OnLocal for manual or non-PVS single session static catalogs, Discard otherwise.
 - `provisioning_scheme` (Attributes) Machine catalog provisioning scheme. Required when `provisioning_type = MCS` or `provisioning_type = PVS_STREAMING`. (see [below for nested schema](#nestedatt--provisioning_scheme))
 - `remote_pc_ous` (Attributes List) Organizational Units to be included in the Remote PC machine catalog. Only to be used when `is_remote_pc = true`. For adding machines, use `machine_accounts`. (see [below for nested schema](#nestedatt--remote_pc_ous))
 - `scopes` (Set of String) The IDs of the scopes for the machine catalog to be a part of.
@@ -476,7 +484,7 @@ Optional:
 
 Required:
 
-- `machine_account` (String) The Computer AD Account for the machine. Must be in the format DOMAIN\MACHINE.
+- `machine_account` (String) The computer AD account for the machine must be in the format <domain>\<machine>, all in lowercase.
 
 Optional:
 
@@ -747,13 +755,16 @@ Required:
 
 Required:
 
-- `domain` (String) The AD domain name for the pool. Specify this in FQDN format; for example, MyDomain.com.
+- `domain` (String) The AD domain where machine accounts will be created. Specify this in FQDN format; for example, MyDomain.com.
 - `service_account` (String) Service account for the domain. Only the username is required; do not include the domain name.
 - `service_account_password` (String, Sensitive) Service account password for the domain.
 
 Optional:
 
 - `domain_ou` (String) The organization unit that computer accounts will be created into.
+- `service_account_domain` (String) The domain name of the service account. Specify this in FQDN format; for example, MyServiceDomain.com.
+
+~> **Please Note** Use this property if domain of the service account which is used to create the machine accounts resides in a domain different from what's specified in property `domain` where the machine accounts are created.
 
 
 <a id="nestedatt--provisioning_scheme--metadata"></a>

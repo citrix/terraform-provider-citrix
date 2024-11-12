@@ -38,6 +38,7 @@ type MachineCatalogResourceModel struct {
 	Description              types.String `tfsdk:"description"`
 	IsPowerManaged           types.Bool   `tfsdk:"is_power_managed"`
 	IsRemotePc               types.Bool   `tfsdk:"is_remote_pc"`
+	PersistUserChanges       types.String `tfsdk:"persist_user_changes"`
 	AllocationType           types.String `tfsdk:"allocation_type"`
 	SessionSupport           types.String `tfsdk:"session_support"`
 	Zone                     types.String `tfsdk:"zone"`
@@ -100,10 +101,11 @@ func (MachineCatalogMachineModel) GetSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
 			"machine_account": schema.StringAttribute{
-				Description: "The Computer AD Account for the machine. Must be in the format DOMAIN\\MACHINE.",
+				Description: "The computer AD account for the machine must be in the format <domain>\\<machine>, all in lowercase.",
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(util.SamRegex), "must be in the format DOMAIN\\MACHINE"),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.LowerCaseRegex), "must be in lowercase"),
 				},
 			},
 			"machine_name": schema.StringAttribute{
@@ -309,6 +311,7 @@ func (CustomPropertyModel) GetAttributes() map[string]schema.Attribute {
 type MachineDomainIdentityModel struct {
 	Domain                 types.String `tfsdk:"domain"`
 	Ou                     types.String `tfsdk:"domain_ou"`
+	ServiceAccountDomain   types.String `tfsdk:"service_account_domain"`
 	ServiceAccount         types.String `tfsdk:"service_account"`
 	ServiceAccountPassword types.String `tfsdk:"service_account_password"`
 }
@@ -320,7 +323,7 @@ func (MachineDomainIdentityModel) GetSchema() schema.SingleNestedAttribute {
 		Optional: true,
 		Attributes: map[string]schema.Attribute{
 			"domain": schema.StringAttribute{
-				Description: "The AD domain name for the pool. Specify this in FQDN format; for example, MyDomain.com.",
+				Description: "The AD domain where machine accounts will be created. Specify this in FQDN format; for example, MyDomain.com.",
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(util.DomainFqdnRegex), "must be in FQDN format"),
@@ -334,6 +337,14 @@ func (MachineDomainIdentityModel) GetSchema() schema.SingleNestedAttribute {
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"service_account_domain": schema.StringAttribute{
+				Description: "The domain name of the service account. Specify this in FQDN format; for example, MyServiceDomain.com." +
+					"\n\n~> **Please Note** Use this property if domain of the service account which is used to create the machine accounts resides in a domain different from what's specified in property `domain` where the machine accounts are created.",
+				Optional: true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.DomainFqdnRegex), "must be in FQDN format"),
 				},
 			},
 			"service_account": schema.StringAttribute{
@@ -459,7 +470,8 @@ func (RemotePcOuModel) GetAttributes() map[string]schema.Attribute {
 
 func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "CVAD --- Manages a machine catalog.",
+		Description: "CVAD --- Manages a machine catalog." +
+			"\n\n-> **Note** To bind a machine catalog to a Workspace Environment Management (WEM) configuration set, use `citrix_wem_directory_object` resource.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the machine catalog.",
@@ -477,6 +489,19 @@ func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(""),
+			},
+			"persist_user_changes": schema.StringAttribute{
+				Description: "Specify if user changes are persisted on the machines in the machine catalog. Choose between `Discard` and `OnLocal`. Defaults to OnLocal for manual or non-PVS single session static catalogs, Discard otherwise. ",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"Discard",
+						"OnLocal",
+					),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"is_power_managed": schema.BoolAttribute{
 				Description: "Specify if the machines in the machine catalog will be power managed.",
@@ -638,6 +663,12 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 	sessionSupport := catalog.GetSessionSupport()
 	r.SessionSupport = types.StringValue(string(sessionSupport))
 
+	if r.PersistUserChanges.IsNull() {
+		r.PersistUserChanges = types.StringNull()
+	} else {
+		r.PersistUserChanges = types.StringValue(string(catalog.GetPersistChanges()))
+	}
+
 	minimumFunctionalLevel := catalog.GetMinimumFunctionalLevel()
 	r.MinimumFunctionalLevel = types.StringValue(string(minimumFunctionalLevel))
 
@@ -709,7 +740,7 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 	r.Tags = util.RefreshTagSet(ctx, diagnostics, tags)
 
 	if catalog.ProvisioningScheme == nil {
-		if attributesMap, err := util.AttributeMapFromObject(ProvisioningSchemeModel{}); err == nil {
+		if attributesMap, err := util.ResourceAttributeMapFromObject(ProvisioningSchemeModel{}); err == nil {
 			r.ProvisioningScheme = types.ObjectNull(attributesMap)
 		} else {
 			diagnostics.AddWarning("Error when creating null ProvisioningSchemeModel", err.Error())
@@ -723,7 +754,7 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 	return r
 }
 
-func (networkMapping NetworkMappingModel) RefreshListItem(_ context.Context, _ *diag.Diagnostics, nic citrixorchestration.NetworkMapResponseModel) util.ModelWithAttributes {
+func (networkMapping NetworkMappingModel) RefreshListItem(_ context.Context, _ *diag.Diagnostics, nic citrixorchestration.NetworkMapResponseModel) util.ResourceModelWithAttributes {
 	networkMapping.NetworkDevice = types.StringValue(nic.GetDeviceId())
 	network := nic.GetNetwork()
 	segments := strings.Split(network.GetXDPath(), "\\")

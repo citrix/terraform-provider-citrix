@@ -82,6 +82,7 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 	createApplicationRequest.SetApplicationFolder(plan.ApplicationFolderPath.ValueString())
 	createApplicationRequest.SetIcon(plan.Icon.ValueString())
 	createApplicationRequest.SetClientFolder(plan.ApplicationCategoryPath.ValueString())
+	createApplicationRequest.SetEnabled(plan.Enabled.ValueBool())
 
 	if plan.LimitVisibilityToUsers.IsNull() {
 		createApplicationRequest.SetIncludedUserFilterEnabled(false)
@@ -134,24 +135,18 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 
 	// Try getting the new application with application name
 
-	applicationName := plan.Name.ValueString()
-
-	// If the application is present in an application folder, we specify the name in this format: {application folder path plus application name}.For example, FolderName1|FolderName2|ApplicationName.
-	if plan.ApplicationFolderPath.ValueString() != "" {
-		applicationName = strings.ReplaceAll(plan.ApplicationFolderPath.ValueString(), "\\", "|") + "|" + applicationName
-	}
-
-	application, err := getApplication(ctx, r.client, &resp.Diagnostics, applicationName)
+	applicationPath := util.BuildResourcePathForGetRequest(plan.ApplicationFolderPath.ValueString(), plan.Name.ValueString())
+	application, err := getApplication(ctx, r.client, &resp.Diagnostics, applicationPath)
 	if err != nil {
 		return
 	}
 
-	applicationDeliveryGroups, err := getApplicationDeliveryGroups(ctx, r.client, &resp.Diagnostics, applicationName)
+	applicationDeliveryGroups, err := getApplicationDeliveryGroups(ctx, r.client, &resp.Diagnostics, applicationPath)
 	if err != nil {
 		return
 	}
 
-	tags := getApplicationTags(ctx, &resp.Diagnostics, r.client, applicationName)
+	tags := getApplicationTags(ctx, &resp.Diagnostics, r.client, applicationPath)
 
 	// Map response body to schema and populate Computed attribute values
 	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, application, applicationDeliveryGroups, tags)
@@ -230,6 +225,7 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 	editApplicationRequestBody.SetApplicationFolder(plan.ApplicationFolderPath.ValueString())
 	editApplicationRequestBody.SetIcon(plan.Icon.ValueString())
 	editApplicationRequestBody.SetClientFolder(plan.ApplicationCategoryPath.ValueString())
+	editApplicationRequestBody.SetEnabled(plan.Enabled.ValueBool())
 
 	if plan.LimitVisibilityToUsers.IsNull() {
 		editApplicationRequestBody.SetIncludedUserFilterEnabled(false)

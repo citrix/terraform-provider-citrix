@@ -44,4 +44,5 @@ Read-Only:
 - `associated_delivery_group` (String) Delivery group which the VDA is associated with.
 - `associated_machine_catalog` (String) Machine catalog which the VDA is associated with.
 - `hosted_machine_id` (String) Machine ID within the hypervisor hosting unit.
+- `id` (String) Id of the VDA.
 - `machine_name` (String) Machine name of the VDA.

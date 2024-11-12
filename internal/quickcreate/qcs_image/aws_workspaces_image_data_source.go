@@ -32,7 +32,7 @@ func (d *AwsWorkspacesImageDataSource) Metadata(_ context.Context, req datasourc
 }
 
 func (d *AwsWorkspacesImageDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
-	resp.Schema = AwsWorkspacesImageDataSourceModel{}.GetSchema()
+	resp.Schema = AwsWorkspacesImageModel{}.GetDataSourceSchema()
 }
 
 func (d *AwsWorkspacesImageDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -45,7 +45,7 @@ func (d *AwsWorkspacesImageDataSource) Configure(ctx context.Context, req dataso
 }
 
 func (d *AwsWorkspacesImageDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var data AwsWorkspacesImageDataSourceModel
+	var data AwsWorkspacesImageModel
 
 	// Read Terraform configuration data into the model
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
@@ -57,9 +57,9 @@ func (d *AwsWorkspacesImageDataSource) Read(ctx context.Context, req datasource.
 	// Try getting the AWS WorkSpaces Image
 	var image *citrixquickcreate.AwsEdcImage
 	var err error
-	if data.Id.ValueString() != "" {
+	if !data.Id.IsNull() {
 		image, _, err = getAwsWorkspacesImageWithId(ctx, d.client, &resp.Diagnostics, data.AccountId.ValueString(), data.Id.ValueString(), false)
-	} else if data.Name.ValueString() != "" {
+	} else {
 		image, _, err = getAwsWorkspacesImageWithName(ctx, d.client, &resp.Diagnostics, data.AccountId.ValueString(), data.Name.ValueString())
 	}
 
@@ -68,7 +68,7 @@ func (d *AwsWorkspacesImageDataSource) Read(ctx context.Context, req datasource.
 	}
 
 	// Map response body to schema and populate computed attribute values
-	data = data.RefreshPropertyValues(ctx, &resp.Diagnostics, image)
+	data = data.RefreshPropertyValues(ctx, &resp.Diagnostics, false, image)
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

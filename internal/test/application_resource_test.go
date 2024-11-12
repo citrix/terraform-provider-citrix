@@ -56,7 +56,7 @@ func TestApplicationResource(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildApplicationResource(t, testApplicationResource),
 					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
@@ -90,7 +90,7 @@ func TestApplicationResource(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildApplicationResource(t, testApplicationResource_updated),
 					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
@@ -117,7 +117,7 @@ func TestApplicationResource(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildApplicationResource(t, testApplicationResource_withPriorityModel),
 					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
@@ -146,7 +146,7 @@ func TestApplicationResource(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildApplicationResource(t, testApplicationResource_withPriorityModel_updated),
 					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),

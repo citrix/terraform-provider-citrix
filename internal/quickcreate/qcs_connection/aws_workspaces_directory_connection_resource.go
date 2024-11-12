@@ -40,7 +40,7 @@ func (r *awsWorkspacesDirectoryConnectionResource) Metadata(_ context.Context, r
 
 // Schema defines the schema for the resource.
 func (r *awsWorkspacesDirectoryConnectionResource) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = AwsWorkspacesDirectoryConnectionResourceModel{}.GetSchema()
+	resp.Schema = AwsWorkspacesDirectoryConnectionModel{}.GetSchema()
 }
 
 // Configure adds the proider configured client to the resource.
@@ -57,7 +57,7 @@ func (r *awsWorkspacesDirectoryConnectionResource) Create(ctx context.Context, r
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
-	var plan AwsWorkspacesDirectoryConnectionResourceModel
+	var plan AwsWorkspacesDirectoryConnectionModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -95,7 +95,7 @@ func (r *awsWorkspacesDirectoryConnectionResource) Create(ctx context.Context, r
 	}
 
 	// Map response body to schema and populate computed attribute values
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, directoryConnection)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, true, directoryConnection)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, &plan)
@@ -110,7 +110,7 @@ func (r *awsWorkspacesDirectoryConnectionResource) Read(ctx context.Context, req
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from state
-	var state AwsWorkspacesDirectoryConnectionResourceModel
+	var state AwsWorkspacesDirectoryConnectionModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -133,7 +133,7 @@ func (r *awsWorkspacesDirectoryConnectionResource) Read(ctx context.Context, req
 	}
 
 	// Map response body to schema and populate computed attribute values
-	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, directoryConnection)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, true, directoryConnection)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, &state)
@@ -148,7 +148,7 @@ func (r *awsWorkspacesDirectoryConnectionResource) Update(ctx context.Context, r
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
-	var plan AwsWorkspacesDirectoryConnectionResourceModel
+	var plan AwsWorkspacesDirectoryConnectionModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -190,7 +190,7 @@ func (r *awsWorkspacesDirectoryConnectionResource) Update(ctx context.Context, r
 	}
 
 	// Update resource state with new connection details
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, directoryConnection)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, true, directoryConnection)
 
 	diags = resp.State.Set(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
@@ -204,7 +204,7 @@ func (r *awsWorkspacesDirectoryConnectionResource) Delete(ctx context.Context, r
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from state
-	var state AwsWorkspacesDirectoryConnectionResourceModel
+	var state AwsWorkspacesDirectoryConnectionModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -248,7 +248,7 @@ func (r *awsWorkspacesDirectoryConnectionResource) ValidateConfig(ctx context.Co
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from config
-	var data AwsWorkspacesDirectoryConnectionResourceModel
+	var data AwsWorkspacesDirectoryConnectionModel
 	diags := req.Config.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {

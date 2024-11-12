@@ -1,6 +1,6 @@
 // Copyright © 2024. Citrix Systems, Inc.
 
-package gac_settings
+package global_app_configuration
 
 import (
 	"context"
@@ -198,6 +198,7 @@ func (r *gacSettingsResource) Update(ctx context.Context, req resource.UpdateReq
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadGacError(err),
 		)
+		return
 	}
 
 	// Try to get Service Url settings from remote

@@ -40,7 +40,8 @@ data "citrix_quickcreate_aws_workspaces_image" "example_aws_workspaces_image" {
 
 ### Read-Only
 
-- `aws_image_id` (String) Id of the image on AWS.
+- `aws_image_id` (String) Id of the image to be imported in AWS.
+- `aws_imported_image_id` (String) The Id of the image imported in AWS WorkSpaces.
 - `description` (String) Description of the image.
 - `ingestion_process` (String) The type of ingestion process of the image. Possible values are `BYOL_REGULAR_BYOP` and `BYOL_GRAPHICS_G4DN_BYOP`.
 - `operating_system` (String) The type of operating system of the image. Possible values are `WINDOWS` and `LINUX`.

@@ -78,8 +78,7 @@ func (d *WemSiteDataSource) Read(ctx context.Context, req datasource.ReadRequest
 			return
 		}
 		getWemSiteRequest = getWemSiteRequest.Id(idInt64)
-	}
-	if !data.Name.IsNull() {
+	} else {
 		wemSiteNameOrId = data.Name.ValueString()
 		getWemSiteRequest = getWemSiteRequest.Name(data.Name.ValueString())
 	}

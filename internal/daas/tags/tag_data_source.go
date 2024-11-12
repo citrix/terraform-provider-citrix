@@ -57,10 +57,9 @@ func (d *TagDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 	// Read the data from the API
 	var tagNameOrId string
 
-	if data.Id.ValueString() != "" {
+	if !data.Id.IsNull() {
 		tagNameOrId = data.Id.ValueString()
-	}
-	if data.Name.ValueString() != "" {
+	} else {
 		tagNameOrId = data.Name.ValueString()
 	}
 

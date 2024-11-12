@@ -43,7 +43,7 @@ func (r *OktaIdentityProviderResource) Metadata(_ context.Context, req resource.
 
 // Schema defines the schema for the resource.
 func (r *OktaIdentityProviderResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = OktaIdentityProviderResourceModel{}.GetSchema()
+	resp.Schema = OktaIdentityProviderModel{}.GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -61,7 +61,7 @@ func (r *OktaIdentityProviderResource) Create(ctx context.Context, req resource.
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
-	var plan OktaIdentityProviderResourceModel
+	var plan OktaIdentityProviderModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -75,7 +75,7 @@ func (r *OktaIdentityProviderResource) Create(ctx context.Context, req resource.
 	}
 
 	// Refresh state with created Identity Provider before Identity Provider configuration
-	plan = plan.RefreshPropertyValues(idpStatus)
+	plan = plan.RefreshPropertyValues(true, idpStatus)
 	diags = resp.State.Set(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -110,7 +110,7 @@ func (r *OktaIdentityProviderResource) Create(ctx context.Context, req resource.
 	}
 
 	// Refresh plan
-	plan = plan.RefreshPropertyValues(idpStatus)
+	plan = plan.RefreshPropertyValues(true, idpStatus)
 
 	// Set state with fully populated data
 	diags = resp.State.Set(ctx, &plan)
@@ -125,7 +125,7 @@ func (r *OktaIdentityProviderResource) Read(ctx context.Context, req resource.Re
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Get current state
-	var state OktaIdentityProviderResourceModel
+	var state OktaIdentityProviderModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -138,7 +138,7 @@ func (r *OktaIdentityProviderResource) Read(ctx context.Context, req resource.Re
 		return
 	}
 
-	state = state.RefreshPropertyValues(idpStatus)
+	state = state.RefreshPropertyValues(true, idpStatus)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -153,7 +153,7 @@ func (r *OktaIdentityProviderResource) Update(ctx context.Context, req resource.
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
-	var plan OktaIdentityProviderResourceModel
+	var plan OktaIdentityProviderModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -171,7 +171,7 @@ func (r *OktaIdentityProviderResource) Update(ctx context.Context, req resource.
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(idpStatus)
+	plan = plan.RefreshPropertyValues(true, idpStatus)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &plan)
@@ -186,7 +186,7 @@ func (r *OktaIdentityProviderResource) Delete(ctx context.Context, req resource.
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from state
-	var state OktaIdentityProviderResourceModel
+	var state OktaIdentityProviderModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -204,7 +204,7 @@ func (r *OktaIdentityProviderResource) ImportState(ctx context.Context, req reso
 func (r *OktaIdentityProviderResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
-	var data OktaIdentityProviderResourceModel
+	var data OktaIdentityProviderModel
 	diags := req.Config.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -230,7 +230,7 @@ func (r *OktaIdentityProviderResource) ModifyPlan(ctx context.Context, req resou
 
 	// Retrieve values from plan
 	if !req.Plan.Raw.IsNull() {
-		var plan OktaIdentityProviderResourceModel
+		var plan OktaIdentityProviderModel
 		diags := req.Plan.Get(ctx, &plan)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {

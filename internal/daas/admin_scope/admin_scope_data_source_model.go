@@ -3,43 +3,13 @@
 package admin_scope
 
 import (
-	"context"
-
-	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type AdminScopeDataSourceModel struct {
-	Id            types.String `tfsdk:"id"`
-	Name          types.String `tfsdk:"name"`
-	Description   types.String `tfsdk:"description"`
-	IsBuiltIn     types.Bool   `tfsdk:"is_built_in"`
-	IsAllScope    types.Bool   `tfsdk:"is_all_scope"`
-	IsTenantScope types.Bool   `tfsdk:"is_tenant_scope"`
-	TenantId      types.String `tfsdk:"tenant_id"`
-	TenantName    types.String `tfsdk:"tenant_name"`
-}
-
-func (r AdminScopeDataSourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, adminScope *citrixorchestration.ScopeResponseModel) AdminScopeDataSourceModel {
-
-	r.Id = types.StringValue(adminScope.GetId())
-	r.Name = types.StringValue(adminScope.GetName())
-	r.Description = types.StringValue(adminScope.GetDescription())
-	r.IsBuiltIn = types.BoolValue(adminScope.GetIsBuiltIn())
-	r.IsAllScope = types.BoolValue(adminScope.GetIsAllScope())
-	r.IsTenantScope = types.BoolValue(adminScope.GetIsTenantScope())
-	r.TenantId = types.StringValue(adminScope.GetTenantId())
-	r.TenantName = types.StringValue(adminScope.GetTenantName())
-
-	return r
-}
-
-func GetAdminScopeDataSourceSchema() schema.Schema {
+func (AdminScopeModel) GetDataSourceSchema() schema.Schema {
 	return schema.Schema{
 		// This description is used by the documentation generator and the language server.
 		Description: "CVAD --- Data source to get details regarding a specific Administrator scope.",
@@ -50,11 +20,15 @@ func GetAdminScopeDataSourceSchema() schema.Schema {
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.ExactlyOneOf(path.MatchRoot("name")), // Ensures that only one of either Id or Name is provided. It will also cause a validation error if none are specified.
+					stringvalidator.LengthAtLeast(1),
 				},
 			},
 			"name": schema.StringAttribute{
 				Description: "Name of the Admin Scope.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
 			},
 			"description": schema.StringAttribute{
 				Description: "Description of the Admin Scope.",
@@ -82,5 +56,8 @@ func GetAdminScopeDataSourceSchema() schema.Schema {
 			},
 		},
 	}
+}
 
+func (AdminScopeModel) GetDataSourceAttributes() map[string]schema.Attribute {
+	return AdminScopeModel{}.GetDataSourceSchema().Attributes
 }

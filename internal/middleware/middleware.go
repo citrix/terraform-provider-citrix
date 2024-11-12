@@ -63,3 +63,28 @@ func MiddlewareAuthFunc(authClient *citrixclient.CitrixDaasClient, r *http.Reque
 		"transactionId": transactionId,
 	})
 }
+
+// Middleware Auth for Wem OnPrem Client with SessionId
+func MiddlewareAuthWithSessionIdFunc(authClient *citrixclient.CitrixDaasClient, r *http.Request) {
+	if authClient != nil && r.Header.Get("Authorization") == "" {
+		token, _, err := authClient.SignInWemOnPrem()
+		if err != nil {
+			tflog.Error(r.Context(), "Could not sign into Citrix Wem On-Premise Host, error: "+err.Error())
+		}
+		r.Header["Authorization"] = []string{token}
+	}
+
+	// TransactionId
+	transactionId := r.Header.Get("Citrix-TransactionId")
+	if transactionId == "" {
+		transactionId = uuid.NewString()
+		r.Header.Add("Citrix-TransactionId", transactionId)
+	}
+
+	// Log the request
+	tflog.Info(r.Context(), "WEM On-Prem Host API request", map[string]interface{}{
+		"url":           r.URL.String(),
+		"method":        r.Method,
+		"transactionId": transactionId,
+	})
+}

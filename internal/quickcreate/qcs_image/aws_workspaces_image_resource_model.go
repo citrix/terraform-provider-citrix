@@ -16,20 +16,21 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type AwsWorkspacesImageResourceModel struct {
-	Id               types.String `tfsdk:"id"`
-	AccountId        types.String `tfsdk:"account_id"`
-	AwsImageId       types.String `tfsdk:"aws_image_id"`
-	Name             types.String `tfsdk:"name"`
-	Description      types.String `tfsdk:"description"`
-	SessionSupport   types.String `tfsdk:"session_support"`
-	OperatingSystem  types.String `tfsdk:"operating_system"`
-	Tenancy          types.String `tfsdk:"tenancy"`
-	IngestionProcess types.String `tfsdk:"ingestion_process"`
-	State            types.String `tfsdk:"state"`
+type AwsWorkspacesImageModel struct {
+	Id                 types.String `tfsdk:"id"`
+	AccountId          types.String `tfsdk:"account_id"`
+	AwsImageId         types.String `tfsdk:"aws_image_id"`
+	AwsImportedImageId types.String `tfsdk:"aws_imported_image_id"`
+	Name               types.String `tfsdk:"name"`
+	Description        types.String `tfsdk:"description"`
+	SessionSupport     types.String `tfsdk:"session_support"`
+	OperatingSystem    types.String `tfsdk:"operating_system"`
+	Tenancy            types.String `tfsdk:"tenancy"`
+	IngestionProcess   types.String `tfsdk:"ingestion_process"`
+	State              types.String `tfsdk:"state"`
 }
 
-func (AwsWorkspacesImageResourceModel) GetSchema() schema.Schema {
+func (AwsWorkspacesImageModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "DaaS Quick Deploy - AWS WorkSpaces Core --- Manages an AWS WorkSpaces image.",
 		Attributes: map[string]schema.Attribute{
@@ -48,7 +49,7 @@ func (AwsWorkspacesImageResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"aws_image_id": schema.StringAttribute{
-				Description: "Id of the image on AWS.",
+				Description: "Id of the image to be imported in AWS.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -56,6 +57,10 @@ func (AwsWorkspacesImageResourceModel) GetSchema() schema.Schema {
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(util.AwsAmiAndWsiRegex), "must be in AMI (`ami-{ImageId}`) or WSI (`wsi-{ImageId}`) format"),
 				},
+			},
+			"aws_imported_image_id": schema.StringAttribute{
+				Description: "The Id of the image imported in AWS WorkSpaces.",
+				Computed:    true,
 			},
 			"name": schema.StringAttribute{
 				Description: "Name of the image.",
@@ -128,14 +133,17 @@ func (AwsWorkspacesImageResourceModel) GetSchema() schema.Schema {
 	}
 }
 
-func (AwsWorkspacesImageResourceModel) GetAttributes() map[string]schema.Attribute {
-	return AwsWorkspacesImageResourceModel{}.GetSchema().Attributes
+func (AwsWorkspacesImageModel) GetAttributes() map[string]schema.Attribute {
+	return AwsWorkspacesImageModel{}.GetSchema().Attributes
 }
 
-func (r AwsWorkspacesImageResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, image *quickcreateservice.AwsEdcImage) AwsWorkspacesImageResourceModel {
+func (r AwsWorkspacesImageModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, isResource bool, image *quickcreateservice.AwsEdcImage) AwsWorkspacesImageModel {
 	r.Id = types.StringValue(image.GetImageId())
 	r.AccountId = types.StringValue(image.GetAccountId())
-	r.AwsImageId = types.StringValue(image.GetAmazonImageId())
+	if !isResource {
+		r.AwsImageId = types.StringNull()
+	}
+	r.AwsImportedImageId = types.StringValue(image.GetAmazonImageId())
 	r.Name = types.StringValue(image.GetName())
 	r.Description = types.StringValue(image.GetDescription())
 	r.SessionSupport = types.StringValue(util.SessionSupportEnumToString(image.GetSessionSupport()))

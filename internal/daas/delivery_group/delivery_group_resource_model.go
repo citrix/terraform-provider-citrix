@@ -13,6 +13,7 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/citrix/terraform-provider-citrix/internal/validators"
 	"github.com/hashicorp/terraform-plugin-framework-validators/boolvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/int32validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
@@ -352,30 +353,33 @@ func (DeliveryGroupRebootSchedule) GetAttributes() map[string]schema.Attribute {
 }
 
 type DeliveryGroupPowerManagementSettings struct {
-	AutoscaleEnabled                               types.Bool   `tfsdk:"autoscale_enabled"`
-	Timezone                                       types.String `tfsdk:"timezone"`
-	PeakDisconnectTimeoutMinutes                   types.Int64  `tfsdk:"peak_disconnect_timeout_minutes"`
-	PeakLogOffAction                               types.String `tfsdk:"peak_log_off_action"`
-	PeakLogOffTimeoutMinutes                       types.Int64  `tfsdk:"peak_log_off_timeout_minutes"`
-	PeakDisconnectAction                           types.String `tfsdk:"peak_disconnect_action"`
-	PeakExtendedDisconnectAction                   types.String `tfsdk:"peak_extended_disconnect_action"`
-	PeakExtendedDisconnectTimeoutMinutes           types.Int64  `tfsdk:"peak_extended_disconnect_timeout_minutes"`
-	OffPeakDisconnectTimeoutMinutes                types.Int64  `tfsdk:"off_peak_disconnect_timeout_minutes"`
-	OffPeakLogOffAction                            types.String `tfsdk:"off_peak_log_off_action"`
-	OffPeakLogOffTimeoutMinutes                    types.Int64  `tfsdk:"off_peak_log_off_timeout_minutes"`
-	OffPeakDisconnectAction                        types.String `tfsdk:"off_peak_disconnect_action"`
-	OffPeakExtendedDisconnectAction                types.String `tfsdk:"off_peak_extended_disconnect_action"`
-	OffPeakExtendedDisconnectTimeoutMinutes        types.Int64  `tfsdk:"off_peak_extended_disconnect_timeout_minutes"`
-	PeakBufferSizePercent                          types.Int64  `tfsdk:"peak_buffer_size_percent"`
-	OffPeakBufferSizePercent                       types.Int64  `tfsdk:"off_peak_buffer_size_percent"`
-	PowerOffDelayMinutes                           types.Int64  `tfsdk:"power_off_delay_minutes"`
-	PeakAutoscaleAssignedPowerOnIdleAction         types.String `tfsdk:"peak_autoscale_assigned_power_on_idle_action"`
-	PeakAutoscaleAssignedPowerOnIdleTimeoutMinutes types.Int64  `tfsdk:"peak_autoscale_assigned_power_on_idle_timeout_minutes"`
-	DisconnectPeakIdleSessionAfterSeconds          types.Int64  `tfsdk:"disconnect_peak_idle_session_after_seconds"`
-	DisconnectOffPeakIdleSessionAfterSeconds       types.Int64  `tfsdk:"disconnect_off_peak_idle_session_after_seconds"`
-	LogoffPeakDisconnectedSessionAfterSeconds      types.Int64  `tfsdk:"log_off_peak_disconnected_session_after_seconds"`
-	LogoffOffPeakDisconnectedSessionAfterSeconds   types.Int64  `tfsdk:"log_off_off_peak_disconnected_session_after_seconds"`
-	PowerTimeSchemes                               types.List   `tfsdk:"power_time_schemes"` //List[DeliveryGroupPowerTimeScheme]
+	AutoscaleEnabled                                     types.Bool   `tfsdk:"autoscale_enabled"`
+	RestrictAutoscaleTag                                 types.String `tfsdk:"restrict_autoscale_tag"`
+	RestrictAutoscaleMinIdleUntaggedPercentDuringPeak    types.Int32  `tfsdk:"peak_restrict_min_idle_untagged_percent"`
+	RestrictAutoscaleMinIdleUntaggedPercentDuringOffPeak types.Int32  `tfsdk:"off_peak_restrict_min_idle_untagged_percent"`
+	Timezone                                             types.String `tfsdk:"timezone"`
+	PeakDisconnectTimeoutMinutes                         types.Int64  `tfsdk:"peak_disconnect_timeout_minutes"`
+	PeakLogOffAction                                     types.String `tfsdk:"peak_log_off_action"`
+	PeakLogOffTimeoutMinutes                             types.Int64  `tfsdk:"peak_log_off_timeout_minutes"`
+	PeakDisconnectAction                                 types.String `tfsdk:"peak_disconnect_action"`
+	PeakExtendedDisconnectAction                         types.String `tfsdk:"peak_extended_disconnect_action"`
+	PeakExtendedDisconnectTimeoutMinutes                 types.Int64  `tfsdk:"peak_extended_disconnect_timeout_minutes"`
+	OffPeakDisconnectTimeoutMinutes                      types.Int64  `tfsdk:"off_peak_disconnect_timeout_minutes"`
+	OffPeakLogOffAction                                  types.String `tfsdk:"off_peak_log_off_action"`
+	OffPeakLogOffTimeoutMinutes                          types.Int64  `tfsdk:"off_peak_log_off_timeout_minutes"`
+	OffPeakDisconnectAction                              types.String `tfsdk:"off_peak_disconnect_action"`
+	OffPeakExtendedDisconnectAction                      types.String `tfsdk:"off_peak_extended_disconnect_action"`
+	OffPeakExtendedDisconnectTimeoutMinutes              types.Int64  `tfsdk:"off_peak_extended_disconnect_timeout_minutes"`
+	PeakBufferSizePercent                                types.Int64  `tfsdk:"peak_buffer_size_percent"`
+	OffPeakBufferSizePercent                             types.Int64  `tfsdk:"off_peak_buffer_size_percent"`
+	PowerOffDelayMinutes                                 types.Int64  `tfsdk:"power_off_delay_minutes"`
+	PeakAutoscaleAssignedPowerOnIdleAction               types.String `tfsdk:"peak_autoscale_assigned_power_on_idle_action"`
+	PeakAutoscaleAssignedPowerOnIdleTimeoutMinutes       types.Int64  `tfsdk:"peak_autoscale_assigned_power_on_idle_timeout_minutes"`
+	DisconnectPeakIdleSessionAfterSeconds                types.Int64  `tfsdk:"disconnect_peak_idle_session_after_seconds"`
+	DisconnectOffPeakIdleSessionAfterSeconds             types.Int64  `tfsdk:"disconnect_off_peak_idle_session_after_seconds"`
+	LogoffPeakDisconnectedSessionAfterSeconds            types.Int64  `tfsdk:"log_off_peak_disconnected_session_after_seconds"`
+	LogoffOffPeakDisconnectedSessionAfterSeconds         types.Int64  `tfsdk:"log_off_off_peak_disconnected_session_after_seconds"`
+	PowerTimeSchemes                                     types.List   `tfsdk:"power_time_schemes"` //List[DeliveryGroupPowerTimeScheme]
 }
 
 func (DeliveryGroupPowerManagementSettings) GetSchema() schema.SingleNestedAttribute {
@@ -386,6 +390,31 @@ func (DeliveryGroupPowerManagementSettings) GetSchema() schema.SingleNestedAttri
 			"autoscale_enabled": schema.BoolAttribute{
 				Description: "Whether auto-scale is enabled for the delivery group.",
 				Required:    true,
+			},
+			"restrict_autoscale_tag": schema.StringAttribute{
+				Description: "Name of the tag on the machines that autoscale will apply on.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"peak_restrict_min_idle_untagged_percent": schema.Int32Attribute{
+				Description: "Specifies the percentage of remaining untagged capacity to fall below to start powering on tagged machines during peak hours. " +
+					"\n\n~> **Please Note** This setting is only applicable when the `restrict_autoscale_tag` is set.",
+				Optional: true,
+				Validators: []validator.Int32{
+					int32validator.Between(1, 100),
+					int32validator.AlsoRequires(path.MatchRelative().AtParent().AtName("restrict_autoscale_tag"), path.MatchRelative().AtParent().AtName("off_peak_restrict_min_idle_untagged_percent")),
+				},
+			},
+			"off_peak_restrict_min_idle_untagged_percent": schema.Int32Attribute{
+				Description: "Specifies the percentage of remaining untagged capacity to fall below to start powering on tagged machines during off peak hours. " +
+					"\n\n~> **Please Note** This setting is only applicable when the `restrict_autoscale_tag` is set.",
+				Optional: true,
+				Validators: []validator.Int32{
+					int32validator.Between(1, 100),
+					int32validator.AlsoRequires(path.MatchRelative().AtParent().AtName("restrict_autoscale_tag"), path.MatchRelative().AtParent().AtName("peak_restrict_min_idle_untagged_percent")),
+				},
 			},
 			"timezone": schema.StringAttribute{
 				Description: "The time zone in which this delivery group's machines reside.",
@@ -668,7 +697,7 @@ func (DeliveryGroupDesktop) GetSchema() schema.NestedAttributeObject {
 			"enable_session_roaming": schema.BoolAttribute{
 				Description: "When enabled, if the user launches this desktop and then moves to another device, the same session is used, and applications are available on both devices. When disabled, the session no longer roams between devices. " +
 					"\n\n~> **Please Note** Session roaming should be set to `false` for Remote PC Delivery Group.",
-				Required: true,
+				Optional: true,
 			},
 			"restricted_access_users": restrictedAccessUsers.GetSchema(),
 		},
@@ -907,6 +936,7 @@ type DeliveryGroupResourceModel struct {
 	Id                          types.String `tfsdk:"id"`
 	Name                        types.String `tfsdk:"name"`
 	Description                 types.String `tfsdk:"description"`
+	DeliveryType                types.String `tfsdk:"delivery_type"`
 	SessionSupport              types.String `tfsdk:"session_support"`
 	SharingKind                 types.String `tfsdk:"sharing_kind"`
 	RestrictedAccessUsers       types.Object `tfsdk:"restricted_access_users"`
@@ -954,8 +984,15 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 				Computed:    true,
 				Default:     stringdefault.StaticString(""),
 			},
+			"delivery_type": schema.StringAttribute{
+				Description: "Delivery type of the delivery group. Available values are `DesktopsOnly`, `AppsOnly`, and `DesktopsAndApps`. Defaults to `DesktopsOnly` for Delivery Groups with associated Machine Catalogs that have `allocation_type` set to `Static` and for Delivery Groups that have `sharing_kind` set to `private`. Otherwise defaults to `DesktopsAndApps",
+				Optional:    true,
+				Validators: []validator.String{
+					util.GetValidatorFromEnum(citrixorchestration.AllowedDeliveryKindEnumValues),
+				},
+			},
 			"session_support": schema.StringAttribute{
-				Description: "The session support for the delivery group. Can only be set to `SingleSession` or `MultiSession`. Specify only if you want to create a Delivery Group wthout any `associated_machine_catalogs`. Ensure session support is same as that of the prospective Machine Catalogs you will associate this Delivery Group with.",
+				Description: "The session support for the delivery group. Can only be set to `SingleSession` or `MultiSession`. Specify only if you want to create a Delivery Group without any `associated_machine_catalogs`. Ensure session support is same as that of the prospective Machine Catalogs you will associate this Delivery Group with.",
 				Optional:    true,
 				Validators: []validator.String{
 					util.GetValidatorFromEnum(citrixorchestration.AllowedSessionSupportEnumValues),
@@ -1136,10 +1173,11 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"default_desktop_icon": schema.StringAttribute{
-				Description: "The id of the icon to be used as the default icon for the desktops in the delivery group.",
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString("1"),
+				Description: "The id of the icon to be used as the default icon for the desktops in the delivery group." +
+					"\n\n~> **Please Note** This option is only supported for Citrix Cloud Customer",
+				Optional: true,
+				Computed: true,
+				Default:  stringdefault.StaticString("1"),
 			},
 		},
 	}
@@ -1162,6 +1200,12 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 		r.PolicySetId = types.StringValue(deliveryGroup.GetPolicySetGuid())
 	} else {
 		r.PolicySetId = types.StringNull()
+	}
+
+	if !r.DeliveryType.IsNull() {
+		r.DeliveryType = types.StringValue(string(deliveryGroup.GetDeliveryType()))
+	} else {
+		r.DeliveryType = types.StringNull()
 	}
 
 	minimumFunctionalLevel := deliveryGroup.GetMinimumFunctionalLevel()
@@ -1198,8 +1242,18 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 	r = r.updatePlanWithAutoscaleSettings(ctx, diagnostics, deliveryGroup, dgPowerTimeSchemes)
 	r = r.updatePlanWithRebootSchedule(ctx, diagnostics, dgRebootSchedule)
 	r = r.updatePlanWithAppProtection(ctx, diagnostics, deliveryGroup)
-	r = r.updatePlanWithDefaultAccessPolicies(ctx, diagnostics, deliveryGroup.GetAdvancedAccessPolicy())
-	r = r.updatePlanWithCustomAccessPolicies(ctx, diagnostics, deliveryGroup.GetAdvancedAccessPolicy())
+
+	var defaultAccessPolicies []citrixorchestration.AdvancedAccessPolicyResponseModel
+	var customAccessPolicies []citrixorchestration.AdvancedAccessPolicyResponseModel
+	for _, policy := range deliveryGroup.GetAdvancedAccessPolicy() {
+		if policy.GetIsBuiltIn() {
+			defaultAccessPolicies = append(defaultAccessPolicies, policy)
+		} else {
+			customAccessPolicies = append(customAccessPolicies, policy)
+		}
+	}
+	r = r.updatePlanWithDefaultAccessPolicies(ctx, diagnostics, defaultAccessPolicies)
+	r = r.updatePlanWithCustomAccessPolicies(ctx, diagnostics, customAccessPolicies)
 
 	if len(deliveryGroup.GetStoreFrontServersForHostedReceiver()) > 0 || !r.StoreFrontServers.IsNull() {
 		var remoteAssociatedStoreFrontServers []string

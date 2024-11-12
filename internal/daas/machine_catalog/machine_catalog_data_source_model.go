@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -33,11 +34,18 @@ func (MachineCatalogDataSourceModel) GetSchema() schema.Schema {
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the machine catalog.",
-				Computed:    true,
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.ExactlyOneOf(path.MatchRoot("name")), // Ensures that only one of either Id or Name is provided. It will also cause a validation error if none are specified.
+					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "Id must be a valid GUID"),
+				},
 			},
 			"name": schema.StringAttribute{
 				Description: "Name of the machine catalog.",
-				Required:    true,
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
 			},
 			"machine_catalog_folder_path": schema.StringAttribute{
 				Description: "The path to the folder in which the machine catalog is located.",
@@ -45,6 +53,7 @@ func (MachineCatalogDataSourceModel) GetSchema() schema.Schema {
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathWithBackslashRegex), "Admin Folder Path must not start or end with a backslash"),
 					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathSpecialCharactersRegex), "Admin Folder Path must not contain any of the following special characters: / ; : # . * ? = < > | [ ] ( ) { } \" ' ` ~ "),
+					stringvalidator.AlsoRequires(path.MatchRoot("name")),
 				},
 			},
 			"vdas": schema.ListNestedAttribute{
@@ -89,6 +98,7 @@ func (r MachineCatalogDataSourceModel) RefreshPropertyValues(ctx context.Context
 		deliveryGroupId := deliveryGroup.GetId()
 
 		res = append(res, vda.VdaModel{
+			Id:                       types.StringValue(model.GetId()),
 			MachineName:              types.StringValue(machineName),
 			HostedMachineId:          types.StringValue(hostedMachineId),
 			AssociatedMachineCatalog: types.StringValue(machineCatalogId),

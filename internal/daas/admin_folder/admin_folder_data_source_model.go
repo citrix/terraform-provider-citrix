@@ -2,33 +2,17 @@
 package admin_folder
 
 import (
-	"context"
 	"regexp"
-	"strings"
 
-	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type AdminFolderDataSourceModel struct {
-	Id                     types.String `tfsdk:"id"`
-	Name                   types.String `tfsdk:"name"`
-	Type                   types.Set    `tfsdk:"type"` // Set[String]
-	Path                   types.String `tfsdk:"path"`
-	ParentPath             types.String `tfsdk:"parent_path"`
-	TotalApplications      types.Int64  `tfsdk:"total_applications"`
-	TotalMachineCatalogs   types.Int64  `tfsdk:"total_machine_catalogs"`
-	TotalApplicationGroups types.Int64  `tfsdk:"total_application_groups"`
-	TotalDeliveryGroups    types.Int64  `tfsdk:"total_delivery_groups"`
-}
-
-func (AdminFolderDataSourceModel) GetSchema() schema.Schema {
+func (AdminFolderModel) GetDataSourceSchema() schema.Schema {
 	return schema.Schema{
 		// This description is used by the documentation generator and the language server.
 		Description: "CVAD --- Data source to get details regarding a specific admin folder.",
@@ -38,7 +22,8 @@ func (AdminFolderDataSourceModel) GetSchema() schema.Schema {
 				Description: "Identifier of the admin folder.",
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.ExactlyOneOf(path.MatchRoot("id"), path.MatchRoot("path")), // Ensures that only one of either Id or Path is provided. It will also cause a validation error if none are specified.
+					stringvalidator.ExactlyOneOf(path.MatchRoot("path")), // Ensures that only one of either Id or Path is provided. It will also cause a validation error if none are specified.
+					stringvalidator.LengthAtLeast(1),
 				},
 			},
 			"path": schema.StringAttribute{
@@ -80,36 +65,4 @@ func (AdminFolderDataSourceModel) GetSchema() schema.Schema {
 			},
 		},
 	}
-}
-
-func (r AdminFolderDataSourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, adminFolder *citrixorchestration.AdminFolderResponseModel) AdminFolderDataSourceModel {
-	// Overwrite application folder with refreshed state
-	r.Id = types.StringValue(adminFolder.GetId())
-	r.Name = types.StringValue(adminFolder.GetName())
-
-	r.Path = types.StringValue(strings.TrimSuffix(adminFolder.GetPath(), "\\"))
-
-	adminFolderTypes := []string{}
-	adminFolderMetadata := adminFolder.GetMetadata()
-	for _, metadata := range adminFolderMetadata {
-		typeInfo := metadata.GetName()
-		adminFolderTypes = append(adminFolderTypes, typeInfo)
-	}
-	adminFolderTypeSet := util.StringArrayToStringSet(ctx, diagnostics, adminFolderTypes)
-	r.Type = adminFolderTypeSet
-
-	var parentPath = strings.TrimSuffix(adminFolder.GetPath(), adminFolder.GetName()+"\\")
-	parentPath = strings.TrimSuffix(parentPath, "\\")
-	if parentPath != "" {
-		r.ParentPath = types.StringValue(parentPath)
-	} else {
-		r.ParentPath = types.StringNull()
-	}
-
-	r.TotalApplications = types.Int64Value(int64(adminFolder.GetTotalApplications()))
-	r.TotalMachineCatalogs = types.Int64Value(int64(adminFolder.GetTotalMachineCatalogs()))
-	r.TotalApplicationGroups = types.Int64Value(int64(adminFolder.GetTotalApplicationGroups()))
-	r.TotalDeliveryGroups = types.Int64Value(int64(adminFolder.GetTotalDesktopGroups()))
-
-	return r
 }

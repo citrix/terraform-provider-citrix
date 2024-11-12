@@ -29,7 +29,7 @@ func (h HypervisorStorageModel) GetKey() string {
 	return h.StorageName.ValueString()
 }
 
-func (v HypervisorStorageModel) RefreshListItem(_ context.Context, _ *diag.Diagnostics, remote citrixorchestration.HypervisorStorageResourceResponseModel) util.ModelWithAttributes {
+func (v HypervisorStorageModel) RefreshListItem(_ context.Context, _ *diag.Diagnostics, remote citrixorchestration.HypervisorStorageResourceResponseModel) util.ResourceModelWithAttributes {
 	v.StorageName = types.StringValue(remote.GetName())
 	v.Superseded = types.BoolValue(remote.GetSuperseded())
 	return v

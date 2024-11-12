@@ -34,4 +34,7 @@ data "citrix_cloud_okta_identity_provider" "example_okta_identity_provider" {
 
 ### Read-Only
 
+- `okta_api_token` (String) Okta API token for configuring Okta Identity Provider.
+- `okta_client_id` (String) ID of the Okta client for configuring Okta Identity Provider.
+- `okta_client_secret` (String) Secret of the Okta client for configuring Okta Identity Provider.
 - `okta_domain` (String) Okta domain name for configuring Okta Identity Provider.

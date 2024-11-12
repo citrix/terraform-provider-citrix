@@ -111,6 +111,14 @@
         "TEST_HYPERV_RP_AVAILABILITY_ZONE_AWS_EC2" :"{aws_ec2_availability_zone}",
         "Test_HYPERV_RP_SUBNETS_AWS_EC2"           :"[\"{subnet_mask}\"]",
 
+        // Machine Properties Go Tests
+        "TEST_MACHINE_PROPERTIES_RESOURCE_NAME": "{machine_id}",
+        "TEST_MACHINE_PROPERTIES_RESOURCE_NAME_UPDATED": "{machine_id_updated}",
+        "TEST_MACHINE_PROPERTIES_RESOURCE_MACHINE_CATALOG_ID": "{machine_catalog_id}",
+        "TEST_MACHINE_PROPERTIES_RESOURCE_MACHINE_CATALOG_ID_UPDATED": "{machine_catalog_id_updated}",
+        "TEST_MACHINE_PROPERTIES_RESOURCE_TAG": "{machine_tag_id}",
+        "TEST_MACHINE_PROPERTIES_RESOURCE_TAG_UPDATED": "{machine_tag_id_updated}",
+
         // Machine Catalog Go Tests - Azure
         "TEST_MC_NAME"                    :"{catalog_name}",
         "TEST_MC_SERVICE_ACCOUNT"         :"{admin_username}",
@@ -249,15 +257,29 @@
 
         // Admin role env variable
         "TEST_ROLE_NAME"                :"ctx-test-role",
+        // Admin Role Data Source env variable
+        "TEST_ADMIN_ROLE_DATA_SOURCE_ID": "{ADMIN_ROLE_ID}",
+        "TEST_ADMIN_ROLE_DATA_SOURCE_NAME": "{ADMIN_ROLE_NAME}",
+        "TEST_ADMIN_ROLE_DATA_SOURCE_EXPECTED_DESCRIPTION": "{ADMIN_ROLE_DESCRIPTION}",
+
         // Admin Scope Go Tests
         "TEST_ADMIN_SCOPE_NAME"         :"ctx-test-scope",
 
         // Policy Set env variable
+        // Policy Set Resource Tests env variables
         "TEST_POLICY_SET_NAME"          :"ctx-test-policy-set",
+        // Policy Set Data Source Tests env variables
+        "TEST_POLICY_SET_DATA_SOURCE_ID" : "{Policy Set Data Source ID}",
+        "TEST_POLICY_SET_DATA_SOURCE_NAME" : "{Policy Set Data Source Name}",
+        "TEST_POLICY_SET_DATA_SOURCE_EXPECTED_POLICY_COUNT" : "{Policy Set Data Source Policy Count}",
 
-        // GAC Go Tests
+        // GAC Settings Go Tests
         "TEST_SETTINGS_CONFIG_SERVICE_URL" : "{workspace_url_with_port_number}",
         "TEST_SETTINGS_CONFIG_NAME" : "test-settings-config",
+        // GAC Discovery Go Tests
+        "TEST_GAC_DISCOVERY_DOMAIN" : "{gac_discovery_domain}",
+        "TEST_GAC_DISCOVERY_SERVICE_URL" : "{gac_discovery_service_url}",
+        "TEST_GAC_DISCOVERY_SERVICE_URL_UPDATE" : "{gac_discovery_service_url}",
 
         // Resource Location Go Tests
         "TEST_RESOURCE_LOCATION_NAME": "ctx-test-resource-location",
@@ -486,7 +508,10 @@
         // WEM Datasource go tests
         "TEST_WEM_SITE_DATA_SOURCE_ID": "{Id of the WEM Configuration Set}",
         "TEST_WEM_SITE_DATA_SOURCE_NAME": "{Name of the WEM Configuration Set}",
-        "TEST_WEM_SITE_DATA_SOURCE_DESCRIPTION": "{Description of the WEM Configuration Set}"
+        "TEST_WEM_SITE_DATA_SOURCE_DESCRIPTION": "{Description of the WEM Configuration Set}",
+
+        // Desktop Icon Go Tests
+        "TEST_DESKTOP_ICON_RAW_DATA": "{Desktop Icon Raw Data}"
     },
     "go.testTimeout": "120m"
 }

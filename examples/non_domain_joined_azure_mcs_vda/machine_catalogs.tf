@@ -15,8 +15,10 @@ resource "citrix_machine_catalog" "example-catalog" {
             azure_master_image = {
                 # shared_subscription = var.azure_image_subscription # Uncomment if the image is from a subscription outside of the hypervisor's subscription
 
-                # For Azure master image from managed disk or snapshot
+                # Resource Group is required for any type of Azure master image
                 resource_group       = var.azure_resource_group
+
+                # For Azure master image from managed disk or snapshot
                 master_image         = var.azure_master_image
 
                 # For Azure image gallery

@@ -1,6 +1,6 @@
 // Copyright © 2024. Citrix Systems, Inc.
 
-package gac_settings
+package global_app_configuration
 
 import (
 	"context"

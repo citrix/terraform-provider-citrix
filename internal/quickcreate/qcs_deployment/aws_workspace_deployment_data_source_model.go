@@ -32,7 +32,7 @@ func (AwsWorkspacesDeploymentDataSourceModel) GetSchema() schema.Schema {
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
-					stringvalidator.ExactlyOneOf(path.MatchRoot("id"), path.MatchRoot("name")), // Ensures that only one of either Id or Name is provided. It will also cause a validation error if none are specified.
+					stringvalidator.ExactlyOneOf(path.MatchRoot("name")), // Ensures that only one of either Id or Name is provided. It will also cause a validation error if none are specified.
 				},
 			},
 			"name": schema.StringAttribute{
@@ -40,6 +40,7 @@ func (AwsWorkspacesDeploymentDataSourceModel) GetSchema() schema.Schema {
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.AlsoRequires(path.MatchRoot("account_id")),
+					stringvalidator.LengthAtLeast(1),
 				},
 			},
 			"account_id": schema.StringAttribute{
