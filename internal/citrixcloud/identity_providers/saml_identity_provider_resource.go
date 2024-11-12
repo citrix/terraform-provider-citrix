@@ -46,7 +46,7 @@ func (r *SamlIdentityProviderResource) Metadata(_ context.Context, req resource.
 
 // Schema defines the schema for the resource.
 func (r *SamlIdentityProviderResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = SamlIdentityProviderResourceModel{}.GetSchema()
+	resp.Schema = SamlIdentityProviderModel{}.GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -64,7 +64,7 @@ func (r *SamlIdentityProviderResource) Create(ctx context.Context, req resource.
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
-	var plan SamlIdentityProviderResourceModel
+	var plan SamlIdentityProviderModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -119,7 +119,7 @@ func (r *SamlIdentityProviderResource) Create(ctx context.Context, req resource.
 	}
 
 	// Refresh state with created Identity Provider before Identity Provider configuration
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, idpStatus, nil)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, true, idpStatus, nil)
 	diags = resp.State.Set(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -181,7 +181,7 @@ func (r *SamlIdentityProviderResource) Create(ctx context.Context, req resource.
 	}
 
 	// Refresh plan
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, idpStatus, samlConfig)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, true, idpStatus, samlConfig)
 
 	// Set state with fully populated data
 	diags = resp.State.Set(ctx, &plan)
@@ -196,7 +196,7 @@ func (r *SamlIdentityProviderResource) Read(ctx context.Context, req resource.Re
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Get current state
-	var state SamlIdentityProviderResourceModel
+	var state SamlIdentityProviderModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -216,7 +216,7 @@ func (r *SamlIdentityProviderResource) Read(ctx context.Context, req resource.Re
 		return
 	}
 
-	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, idpStatus, samlConfig)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, true, idpStatus, samlConfig)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -231,7 +231,7 @@ func (r *SamlIdentityProviderResource) Update(ctx context.Context, req resource.
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
-	var plan SamlIdentityProviderResourceModel
+	var plan SamlIdentityProviderModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -239,7 +239,7 @@ func (r *SamlIdentityProviderResource) Update(ctx context.Context, req resource.
 	}
 
 	// Retrieve values from state
-	var state SamlIdentityProviderResourceModel
+	var state SamlIdentityProviderModel
 	diags = req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -272,7 +272,7 @@ func (r *SamlIdentityProviderResource) Update(ctx context.Context, req resource.
 		return
 	}
 
-	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, idpStatus, samlConfig)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, true, idpStatus, samlConfig)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -287,7 +287,7 @@ func (r *SamlIdentityProviderResource) Delete(ctx context.Context, req resource.
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from state
-	var state SamlIdentityProviderResourceModel
+	var state SamlIdentityProviderModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -305,7 +305,7 @@ func (r *SamlIdentityProviderResource) ImportState(ctx context.Context, req reso
 func (r *SamlIdentityProviderResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
-	var data SamlIdentityProviderResourceModel
+	var data SamlIdentityProviderModel
 	diags := req.Config.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -331,7 +331,7 @@ func (r *SamlIdentityProviderResource) ModifyPlan(ctx context.Context, req resou
 
 	// Retrieve values from plan
 	if !req.Plan.Raw.IsNull() {
-		var plan SamlIdentityProviderResourceModel
+		var plan SamlIdentityProviderModel
 		diags := req.Plan.Get(ctx, &plan)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {

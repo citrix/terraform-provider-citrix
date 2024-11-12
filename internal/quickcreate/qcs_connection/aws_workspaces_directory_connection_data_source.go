@@ -32,7 +32,7 @@ func (d *AwsWorkspacesDirectoryConnectionDataSource) Metadata(_ context.Context,
 }
 
 func (d *AwsWorkspacesDirectoryConnectionDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
-	resp.Schema = AwsWorkspacesDirectoryConnectionDataSourceModel{}.GetSchema()
+	resp.Schema = AwsWorkspacesDirectoryConnectionModel{}.GetDataSourceSchema()
 }
 
 func (d *AwsWorkspacesDirectoryConnectionDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -45,7 +45,7 @@ func (d *AwsWorkspacesDirectoryConnectionDataSource) Configure(ctx context.Conte
 }
 
 func (d *AwsWorkspacesDirectoryConnectionDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var data AwsWorkspacesDirectoryConnectionDataSourceModel
+	var data AwsWorkspacesDirectoryConnectionModel
 
 	// Read Terraform configuration data into the model
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
@@ -58,10 +58,10 @@ func (d *AwsWorkspacesDirectoryConnectionDataSource) Read(ctx context.Context, r
 	var directoryConnection *citrixquickcreate.AwsEdcDirectoryConnection
 	var directoryConnectionIdentifier string
 	var err error
-	if data.DirectoryConnectionId.ValueString() != "" {
+	if !data.DirectoryConnectionId.IsNull() {
 		directoryConnectionIdentifier = data.DirectoryConnectionId.ValueString()
 		directoryConnection, _, err = getAwsWorkspacesDirectoryConnection(ctx, d.client, &resp.Diagnostics, data.AccountId.ValueString(), data.DirectoryConnectionId.ValueString(), false)
-	} else if data.Name.ValueString() != "" {
+	} else {
 		directoryConnectionIdentifier = data.Name.ValueString()
 		directoryConnection, _, err = getAwsWorkspacesDirectoryConnectionWithName(ctx, d.client, &resp.Diagnostics, data.AccountId.ValueString(), data.Name.ValueString())
 	}
@@ -78,7 +78,7 @@ func (d *AwsWorkspacesDirectoryConnectionDataSource) Read(ctx context.Context, r
 		return
 	}
 	// Map response body to schema and populate computed attribute values
-	data = data.RefreshPropertyValues(ctx, &resp.Diagnostics, directoryConnection)
+	data = data.RefreshPropertyValues(ctx, &resp.Diagnostics, false, directoryConnection)
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

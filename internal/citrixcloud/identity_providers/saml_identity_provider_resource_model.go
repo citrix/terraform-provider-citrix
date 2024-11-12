@@ -109,7 +109,7 @@ func (SamlAttributeNameMappings) GetAttributes() map[string]schema.Attribute {
 	return SamlAttributeNameMappings{}.GetSchema().Attributes
 }
 
-type SamlIdentityProviderResourceModel struct {
+type SamlIdentityProviderModel struct {
 	Id             types.String `tfsdk:"id"`
 	Name           types.String `tfsdk:"name"`
 	AuthDomainName types.String `tfsdk:"auth_domain_name"`
@@ -135,7 +135,7 @@ type SamlIdentityProviderResourceModel struct {
 	ScopedEntityIdSuffix types.String `tfsdk:"scoped_entity_id_suffix"`
 }
 
-func (SamlIdentityProviderResourceModel) GetSchema() schema.Schema {
+func (SamlIdentityProviderModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "Citrix Cloud --- Manages a SAML 2.0 Identity Provider instance. Note that this feature is in Tech Preview.",
 
@@ -322,11 +322,11 @@ func (SamlIdentityProviderResourceModel) GetSchema() schema.Schema {
 	}
 }
 
-func (SamlIdentityProviderResourceModel) GetAttributes() map[string]schema.Attribute {
-	return SamlIdentityProviderResourceModel{}.GetSchema().Attributes
+func (SamlIdentityProviderModel) GetAttributes() map[string]schema.Attribute {
+	return SamlIdentityProviderModel{}.GetSchema().Attributes
 }
 
-func (r SamlIdentityProviderResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, samlIdp *citrixcws.IdpStatusModel, samlConfig *citrixcws.SamlConfigModel) SamlIdentityProviderResourceModel {
+func (r SamlIdentityProviderModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, isResource bool, samlIdp *citrixcws.IdpStatusModel, samlConfig *citrixcws.SamlConfigModel) SamlIdentityProviderModel {
 
 	// Overwrite SAML 2.0 Identity Provider Resource with refreshed state
 	r.Id = types.StringValue(samlIdp.GetIdpInstanceId())
@@ -353,6 +353,9 @@ func (r SamlIdentityProviderResourceModel) RefreshPropertyValues(ctx context.Con
 	r.SingleSignOnServiceUrl = types.StringValue(samlConfig.GetSamlSingleSignOnServiceUrl())
 	r.SingleSignOnServiceBinding = types.StringValue(samlConfig.GetSamlSingleSignOnServiceBinding())
 	r.SamlResponse = types.StringValue(samlConfig.GetSamlResponse())
+	if !isResource {
+		r.CertFilePath = types.StringNull()
+	}
 	r.AuthenticationContext = types.StringValue(samlConfig.GetSamlAuthenticationContext())
 	r.AuthenticationContextComparison = types.StringValue(samlConfig.GetSamlAuthenticationContextComparison())
 	r.LogoutUrl = types.StringValue(samlConfig.GetSamlLogoutUrl())
@@ -373,7 +376,12 @@ func (r SamlIdentityProviderResourceModel) RefreshPropertyValues(ctx context.Con
 	samlAttributeNameMappings.UserGivenName = types.StringValue(samlConfig.GetSamlAttributeNameForUserGivenName())
 	samlAttributeNameMappings.UserFamilyName = types.StringValue(samlConfig.GetSamlAttributeNameForUserFamilyName())
 
-	samlAttributeNameMappingsObject := util.TypedObjectToObjectValue(ctx, diagnostics, samlAttributeNameMappings)
+	var samlAttributeNameMappingsObject types.Object
+	if isResource {
+		samlAttributeNameMappingsObject = util.TypedObjectToObjectValue(ctx, diagnostics, samlAttributeNameMappings)
+	} else {
+		samlAttributeNameMappingsObject = util.DataSourceTypedObjectToObjectValue(ctx, diagnostics, samlAttributeNameMappings)
+	}
 	r.AttributeNames = samlAttributeNameMappingsObject
 
 	// Refresh Computed Values

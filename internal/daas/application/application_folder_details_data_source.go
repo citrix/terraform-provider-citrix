@@ -4,12 +4,14 @@ package application
 
 import (
 	"context"
-	"strings"
+	"regexp"
 
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -39,6 +41,10 @@ func (d *ApplicationDataSource) Schema(ctx context.Context, req datasource.Schem
 			"path": schema.StringAttribute{
 				Description: "The path of the folder to get the applications from.",
 				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathWithBackslashRegex), "Application Folder Path must not start or end with a backslash"),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathSpecialCharactersRegex), "Application Folder Path must not contain any of the following special characters: / ; : # . * ? = < > | [ ] ( ) { } \" ' ` ~ "),
+				},
 			},
 			"total_applications": schema.Int64Attribute{
 				Description: "The total number of applications in the folder.",
@@ -122,14 +128,13 @@ func (d *ApplicationDataSource) Read(ctx context.Context, req datasource.ReadReq
 	}
 
 	// Get the list of applications using the path
-	path := data.Path.ValueString()
-	if path != "" {
-		applicationFolderPath := strings.ReplaceAll(path, "\\", "|")
+	if !data.Path.IsNull() {
+		applicationFolderPath := util.BuildResourcePathForGetRequest(data.Path.ValueString(), "")
 		getApplicationsRequest := d.client.ApiClient.AdminFoldersAPIsDAAS.AdminFoldersGetAdminFolderApplications(ctx, applicationFolderPath)
 		apps, httpResp, err := citrixdaasclient.AddRequestData(getApplicationsRequest, d.client).Execute()
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error getting Applications from folder "+path,
+				"Error getting Applications from folder "+data.Path.ValueString(),
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadClientError(err),
 			)

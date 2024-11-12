@@ -40,7 +40,7 @@ func (r *resourceLocationResource) Metadata(_ context.Context, req resource.Meta
 
 // Schema defines the schema for the resource.
 func (r *resourceLocationResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = ResourceLocationResourceModel{}.GetSchema()
+	resp.Schema = ResourceLocationModel{}.GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -57,7 +57,7 @@ func (r *resourceLocationResource) Create(ctx context.Context, req resource.Crea
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
-	var plan ResourceLocationResourceModel
+	var plan ResourceLocationModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -108,7 +108,7 @@ func (r *resourceLocationResource) Read(ctx context.Context, req resource.ReadRe
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Get current state
-	var state ResourceLocationResourceModel
+	var state ResourceLocationModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -137,7 +137,7 @@ func (r *resourceLocationResource) Update(ctx context.Context, req resource.Upda
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
-	var plan ResourceLocationResourceModel
+	var plan ResourceLocationModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -184,7 +184,7 @@ func (r *resourceLocationResource) Delete(ctx context.Context, req resource.Dele
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from state
-	var state ResourceLocationResourceModel
+	var state ResourceLocationModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -217,7 +217,7 @@ func readResourceLocation(ctx context.Context, client *citrixdaasclient.CitrixDa
 func (r *resourceLocationResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
-	var data ResourceLocationResourceModel
+	var data ResourceLocationModel
 	diags := req.Config.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -243,7 +243,7 @@ func (r *resourceLocationResource) ModifyPlan(ctx context.Context, req resource.
 
 	// Retrieve values from plan
 	if !req.Plan.Raw.IsNull() {
-		var plan ResourceLocationResourceModel
+		var plan ResourceLocationModel
 		diags := req.Plan.Get(ctx, &plan)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {

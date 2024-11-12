@@ -17,15 +17,19 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// AdminScopeResourceModel maps the resource schema data.
-type AdminScopeResourceModel struct {
+// AdminScopeModel maps the resource schema data.
+type AdminScopeModel struct {
 	Id            types.String `tfsdk:"id"`
 	Name          types.String `tfsdk:"name"`
 	Description   types.String `tfsdk:"description"`
 	IsTenantScope types.Bool   `tfsdk:"is_tenant_scope"`
+	IsBuiltIn     types.Bool   `tfsdk:"is_built_in"`
+	IsAllScope    types.Bool   `tfsdk:"is_all_scope"`
+	TenantId      types.String `tfsdk:"tenant_id"`
+	TenantName    types.String `tfsdk:"tenant_name"`
 }
 
-func (r AdminScopeResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, adminScope *citrixorchestration.ScopeResponseModel) AdminScopeResourceModel {
+func (r AdminScopeModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, adminScope *citrixorchestration.ScopeResponseModel) AdminScopeModel {
 
 	// Overwrite admin scope with refreshed state
 	r.Id = types.StringValue(adminScope.GetId())
@@ -33,10 +37,15 @@ func (r AdminScopeResourceModel) RefreshPropertyValues(ctx context.Context, diag
 	r.Description = types.StringValue(adminScope.GetDescription())
 	r.IsTenantScope = types.BoolValue(adminScope.GetIsTenantScope())
 
+	r.IsBuiltIn = types.BoolValue(adminScope.GetIsBuiltIn())
+	r.IsAllScope = types.BoolValue(adminScope.GetIsAllScope())
+	r.TenantId = types.StringValue(adminScope.GetTenantId())
+	r.TenantName = types.StringValue(adminScope.GetTenantName())
+
 	return r
 }
 
-func (AdminScopeResourceModel) GetSchema() schema.Schema {
+func (AdminScopeModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		// This description is used by the documentation generator and the language server.
 		Description: "CVAD --- Manages an administrator scope.",
@@ -67,10 +76,26 @@ func (AdminScopeResourceModel) GetSchema() schema.Schema {
 					boolplanmodifier.RequiresReplace(),
 				},
 			},
+			"is_built_in": schema.BoolAttribute{
+				Description: "Indicates whether the Admin Scope is built-in or not.",
+				Computed:    true,
+			},
+			"is_all_scope": schema.BoolAttribute{
+				Description: "Indicates whether the Admin Scope is all scope or not.",
+				Computed:    true,
+			},
+			"tenant_id": schema.StringAttribute{
+				Description: "ID of the tenant to which the Admin Scope belongs.",
+				Computed:    true,
+			},
+			"tenant_name": schema.StringAttribute{
+				Description: "Name of the tenant to which the Admin Scope belongs.",
+				Computed:    true,
+			},
 		},
 	}
 }
 
-func (AdminScopeResourceModel) GetAttributes() map[string]schema.Attribute {
-	return AdminScopeResourceModel{}.GetSchema().Attributes
+func (AdminScopeModel) GetAttributes() map[string]schema.Attribute {
+	return AdminScopeModel{}.GetSchema().Attributes
 }

@@ -16,7 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type OktaIdentityProviderResourceModel struct {
+type OktaIdentityProviderModel struct {
 	Id               types.String `tfsdk:"id"`
 	Name             types.String `tfsdk:"name"`
 	OktaDomain       types.String `tfsdk:"okta_domain"`
@@ -25,7 +25,7 @@ type OktaIdentityProviderResourceModel struct {
 	OktaApiToken     types.String `tfsdk:"okta_api_token"`
 }
 
-func (OktaIdentityProviderResourceModel) GetSchema() schema.Schema {
+func (OktaIdentityProviderModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		// This description is used by the documentation generator and the language server.
 		Description: "Citrix Cloud --- Manages a Citrix Cloud Okta Identity Provider instance. Note that this feature is in Tech Preview.",
@@ -79,19 +79,27 @@ func (OktaIdentityProviderResourceModel) GetSchema() schema.Schema {
 	}
 }
 
-func (OktaIdentityProviderResourceModel) GetAttributes() map[string]schema.Attribute {
-	return OktaIdentityProviderResourceModel{}.GetSchema().Attributes
+func (OktaIdentityProviderModel) GetAttributes() map[string]schema.Attribute {
+	return OktaIdentityProviderModel{}.GetSchema().Attributes
 }
 
-func (r OktaIdentityProviderResourceModel) RefreshPropertyValues(oktaIdp *citrixcws.IdpStatusModel) OktaIdentityProviderResourceModel {
+func (r OktaIdentityProviderModel) RefreshPropertyValues(isResource bool, oktaIdp *citrixcws.IdpStatusModel) OktaIdentityProviderModel {
 
 	// Overwrite Okta Identity Provider Resource with refreshed state
 	r.Id = types.StringValue(oktaIdp.GetIdpInstanceId())
 	r.Name = types.StringValue(oktaIdp.GetIdpNickname())
+	r.OktaClientId = types.StringValue(oktaIdp.GetClientId())
 
 	additionalInfo := oktaIdp.GetAdditionalStatusInfo()
 	if additionalInfo != nil {
 		r.OktaDomain = types.StringValue(strings.ReplaceAll(additionalInfo["oktaDomain"], "https://", ""))
+	} else if !isResource {
+		r.OktaDomain = types.StringNull()
+	}
+
+	if !isResource {
+		r.OktaClientSecret = types.StringNull()
+		r.OktaApiToken = types.StringNull()
 	}
 
 	return r

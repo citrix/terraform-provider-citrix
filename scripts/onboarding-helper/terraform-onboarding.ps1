@@ -158,6 +158,17 @@ function Get-AuthToken {
         return $jsonObj.Token
     }
     else {
+        # Return the token if its still valid
+        if($null -eq $script:Token){
+            Write-Verbose "Requesting new token."
+        }
+        elseif ((Get-Date) -lt $script:TokenExpiryTime) {
+            Write-Verbose "Refresh token is still valid. Returning the existing token."
+            return $script:Token
+        }else {
+            Write-Verbose "Refresh token Expired. Requesting new token."
+        }
+
         if ($script:environment -eq "Production") {
             $url = "https://api.cloud.com/cctrustoauth2/$script:customerId/tokens/clients"
         }
@@ -173,7 +184,11 @@ function Get-AuthToken {
         $contentType = 'application/x-www-form-urlencoded'
         $response = Invoke-WebRequestWithRetry -Uri $url -Method 'POST' -body $body -ContentType $contentType
         $jsonObj = ConvertFrom-Json $([String]::new($response.Content))
-        return $jsonObj.access_token
+        
+        # Save the new token and calculate the expiry time of the refresh token
+        $script:Token = $jsonObj.access_token
+        $script:TokenExpiryTime = (Get-Date).AddSeconds([int]($jsonObj.expires_in * 0.9)) # Calculate the expiry time of the refresh token with buffer
+        return $script:Token
     }
 }
 
@@ -192,6 +207,7 @@ function Start-GetRequest {
         $headers = @{
             "Authorization"     = "CwsAuth Bearer=$token"
             "Citrix-CustomerId" = $script:customerId
+            "Accept"            = "application/json, text/plain, */*"
         }
         if ($null -ne $script:siteId) {
             $headers["Citrix-InstanceId"] = $script:siteId
@@ -264,6 +280,43 @@ provider "citrix" {
 
 }
 
+# Function to get the URL for WEM objects
+function Get-UrlForWemObjects {
+    param(
+        [parameter(Mandatory = $true)]
+        [string] $requestPath
+    )
+
+    if($script:environment -eq "Production") {
+        $script:wemHostName = "api.wem.cloud.com"
+    } else {
+        $script:wemHostName = "api.wem.cloudburrito.com"
+    }
+
+    if($requestPath -eq "sites") {
+        return "https://$script:wemHostName/services/wem/sites?includeHidden=true&includeUnboundAgentsSite=true"
+    }
+    else {
+        return "https://$script:wemHostName/services/wem/machines"
+    }
+}
+
+# Function to find Catalog AD objects
+function Find-CatalogADObjects {
+    param(
+        [parameter(Mandatory = $true)]
+        [array] $items
+    )
+
+    $catalogItems = @()
+    foreach ($item in $items) {
+        if ($item.type -eq "Catalog") {
+            $catalogItems += $item
+        }
+    }
+    return $catalogItems
+}
+
 # Function to get list of resources for a given resource provider
 function Get-ResourceList {
     param(
@@ -276,8 +329,30 @@ function Get-ResourceList {
 
     $url = "$script:urlBase/$requestPath"
 
-    $response = Start-GetRequest -url $url
+    # Update url for WEM Objects
+    if($resourceProviderName -in "wem_configuration_set", "wem_directory_object") {
+        $url = Get-UrlForWemObjects -requestPath $requestPath
+    }
+    
+    # Check if the resource provider is supported in the current environment (eg. WEM is not supported for most environments)
+    try {
+        $response = Start-GetRequest -url $url
+    }
+    catch {
+        # Ignore 503 errors for WEM objects
+        if (-not($_.Exception.Response.StatusCode -eq 503)) {
+            Write-Error "Failed to get $resourceProviderName. Error: $($_.Exception.Message)" -ErrorAction Continue
+        }
+        return @()
+    }
+    
     $items = $response.Items
+
+    # WEM supports AD object type 'Catalog'. Filter out other object types
+    if($resourceProviderName -eq "wem_directory_object" -and $items.Count -gt 0) {
+        $items = Find-CatalogADObjects -items $items
+    }
+
     $resourceList = @()
     $pathMap = @{}
     foreach ($item in $items) {
@@ -432,6 +507,22 @@ function Get-ExistingCVADResources {
         }
     }
 
+    # Add WEM resources for cloud customer environment
+    if (-not($script:onPremise)) {
+        $wemResources = @{
+            "wem_configuration_set"    = @{
+                "resourceApi"          = "sites"
+                "resourceProviderName" = "wem_configuration_set"
+            }
+            "wem_directory_object"    = @{
+                "resourceApi"          = "ad_objects"
+                "resourceProviderName" = "wem_directory_object"
+            }
+        }
+
+        $resources += $wemResources
+    }
+
     $script:cvadResourcesMap = @{}
 
     foreach ($resource in $resources.Keys) {
@@ -557,7 +648,13 @@ function RemoveComputedProperties {
         "(\s+)assigned(\s+)= (\S+)",
         "(\s+)is_built_in(\s+)= (\S+)",
         "(\s+)built_in_scopes\s*=\s*\[[\s\S]*?\]",
-        "(\s+)inherited_scopes\s*=\s*\[[\s\S]*?\]"
+        "(\s+)inherited_scopes\s*=\s*\[[\s\S]*?\]",
+        "(\s+)total_application_groups(\s+)= (\S+)",
+        "(\s+)total_applications(\s+)= (\S+)",
+        "(\s+)total_delivery_groups(\s+)= (\S+)",
+        "(\s+)total_machine_catalogs(\s+)= (\S+)",
+        "(\s+)total_machines(\s+)= (\S+)",
+        "(\s+)is_all_scope(\s+)= (\S+)"
     )
 
     # Identify the delivery_groups_priority block
@@ -600,6 +697,9 @@ function ReplaceDependencyRelationships {
     Write-Verbose "Creating dependency relationships between resources."
     # Create dependency relationships between resources with id references
     foreach ($resource in $script:cvadResourcesMap.Keys) {
+        if ($resource -like "wem_*") {
+            continue
+        }
         foreach ($id in $script:cvadResourcesMap[$resource].Keys) {
             $content = $content -replace "`"$id`"", "citrix_$($resource).$($script:cvadResourcesMap[$resource][$id]).id"
         }
@@ -646,7 +746,7 @@ function ExtractAndSaveApplicationIcons {
 
     # Check if application icon exists; if not, then exit
     if ($content -notmatch 'citrix_application_icon') {
-        return
+        return $content
     }
 
     Write-Verbose "Extracting and saving application icons into icons folder."
@@ -778,6 +878,7 @@ $script:hypervisorResourceMap = @{
 }
 $NUTANIX_PLUGIN_ID = "AcropolisFactory"
 $script:applicationFolderPathMap = @{}
+$script:TokenExpiryTime = (Get-Date).AddMinutes(-1) # Initialize the expiry time of the refresh token to an earlier time
 
 # Set environment variables for client secret
 $env:CITRIX_CLIENT_SECRET = $ClientSecret

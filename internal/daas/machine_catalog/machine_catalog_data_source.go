@@ -4,7 +4,6 @@ package machine_catalog
 
 import (
 	"context"
-	"strings"
 
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
@@ -60,37 +59,38 @@ func (d *MachineCatalogDataSource) Read(ctx context.Context, req datasource.Read
 		return
 	}
 
-	// Get refreshed machine catalog state from Orchestration
-	machineCatalogName := data.Name.ValueString()
-	machineCatalogPath := strings.ReplaceAll(data.MachineCatalogFolderPath.ValueString(), "\\", "|")
-	if machineCatalogPath != "" {
-		machineCatalogPath = machineCatalogPath + "|" + machineCatalogName
+	var machineCatalogPathOrId string
+	var machineCatalogNameOrId string
+	if !data.Id.IsNull() {
+		machineCatalogPathOrId = data.Id.ValueString()
+		machineCatalogNameOrId = data.Id.ValueString()
 	} else {
-		machineCatalogPath += machineCatalogName
+		// Get refreshed machine catalog state from Orchestration
+		machineCatalogNameOrId = util.BuildResourcePathForGetRequest(data.MachineCatalogFolderPath.ValueString(), data.Name.ValueString())
 	}
-	getMachineCatalogRequest := d.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogPath).Fields("Id,Name,Description,ProvisioningType,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC")
+	getMachineCatalogRequest := d.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogPathOrId).Fields("Id,Name,Description,ProvisioningType,PersistChanges,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC")
 	machineCatalog, httpResp, err := citrixdaasclient.AddRequestData(getMachineCatalogRequest, d.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error reading Machine Catalog "+machineCatalogName,
+			"Error reading Machine Catalog "+machineCatalogNameOrId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 	}
 
 	// Get VDAs associated with the machine catalog
-	getMachineCatalogMachinesRequest := d.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogMachines(ctx, machineCatalogPath)
+	getMachineCatalogMachinesRequest := d.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogMachines(ctx, machineCatalogPathOrId)
 	machineCatalogVdas, httpResp, err := citrixdaasclient.AddRequestData(getMachineCatalogMachinesRequest, d.client).Execute()
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error listing VDAs in Machine Catalog "+machineCatalogName,
+			"Error listing VDAs in Machine Catalog "+machineCatalogNameOrId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 	}
 
-	tags := getMachineCatalogTags(ctx, &resp.Diagnostics, d.client, machineCatalogPath)
+	tags := getMachineCatalogTags(ctx, &resp.Diagnostics, d.client, machineCatalogPathOrId)
 
 	data = data.RefreshPropertyValues(ctx, &resp.Diagnostics, machineCatalog, machineCatalogVdas, tags)
 

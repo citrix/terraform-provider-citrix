@@ -4,7 +4,6 @@ package delivery_group
 
 import (
 	"context"
-	"strings"
 
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
@@ -61,36 +60,39 @@ func (d *DeliveryGroupDataSource) Read(ctx context.Context, req datasource.ReadR
 	}
 
 	// Get refreshed delivery group state from Orchestration
-	deliveryGroupName := data.Name.ValueString()
-	deliveryGroupPath := strings.ReplaceAll(data.DeliveryGroupFolderPath.ValueString(), "\\", "|")
-	if deliveryGroupPath != "" {
-		deliveryGroupPath = deliveryGroupPath + "|" + deliveryGroupName
+	var deliveryGroupPathOrId string
+	var deliveryGroupNameOrId string
+	if !data.Id.IsNull() {
+		deliveryGroupPathOrId = data.Id.ValueString()
+		deliveryGroupNameOrId = data.Id.ValueString()
 	} else {
-		deliveryGroupPath = deliveryGroupName
+		deliveryGroupNameOrId = data.Name.ValueString()
+		deliveryGroupPathOrId = util.BuildResourcePathForGetRequest(data.DeliveryGroupFolderPath.ValueString(), deliveryGroupNameOrId)
 	}
-	getDeliveryGroupRequest := d.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroup(ctx, deliveryGroupPath)
+
+	getDeliveryGroupRequest := d.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroup(ctx, deliveryGroupPathOrId)
 	deliveryGroup, httpResp, err := citrixdaasclient.AddRequestData(getDeliveryGroupRequest, d.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error reading Delivery Group "+deliveryGroupName,
+			"Error reading Delivery Group "+deliveryGroupNameOrId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 	}
 
 	// Get VDAs associated with the delivery group
-	getDeliveryGroupMachinesRequest := d.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroupMachines(ctx, deliveryGroupName)
+	getDeliveryGroupMachinesRequest := d.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroupMachines(ctx, deliveryGroupPathOrId)
 	deliveryGroupVdas, httpResp, err := citrixdaasclient.AddRequestData(getDeliveryGroupMachinesRequest, d.client).Execute()
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error listing VDAs in Delivery Group "+deliveryGroupName,
+			"Error listing VDAs in Delivery Group "+deliveryGroupNameOrId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 	}
 
-	tags := getDeliveryGroupTags(ctx, &resp.Diagnostics, d.client, deliveryGroupName)
+	tags := getDeliveryGroupTags(ctx, &resp.Diagnostics, d.client, deliveryGroupPathOrId)
 
 	data = data.RefreshPropertyValues(ctx, &resp.Diagnostics, deliveryGroup, deliveryGroupVdas, tags)
 

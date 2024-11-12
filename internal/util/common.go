@@ -59,6 +59,9 @@ const AwsSubnetIdFormat = `^subnet-[a-zA-Z0-9]+$`
 // Domain FQDN
 const DomainFqdnRegex string = `^(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}$`
 
+// Lowercase Regex
+const LowerCaseRegex string = `^[^A-Z]*$`
+
 // SAM
 const SamRegex string = `^[a-zA-Z][a-zA-Z0-9\-_]{0,61}[a-zA-Z0-9]\\\w[\w\.\- ]+$`
 
@@ -131,7 +134,7 @@ const SamlIdpCertRegex string = `\.[Pp][Ee][Mm]$|\.[Cc][Rr][Tt]$|\.[Cc][Ee][Rr]$
 
 // Admin Folder Path
 const AdminFolderPathWithBackslashRegex string = `^[^\\].*[^\\]$`
-const AdminFolderPathSpecialCharactersRegex string = `^[^/;:#.*?=<>|[\](){}"'\` + "`~]+$"
+const AdminFolderPathSpecialCharactersRegex string = `^[^\/;:#.*?=<>|[\](){}"'\` + "`~]+$"
 
 // String REGEX without trailing and leading whitespace
 const StringWithoutTrailingLeadingWhitespaceRegex string = `^\S(.*\S)?$`
@@ -591,10 +594,10 @@ type RefreshableListItemWithAttributes[clientType any] interface {
 	GetKey() string
 
 	// Refreshes the item with the client model and returns the updated item
-	RefreshListItem(context.Context, *diag.Diagnostics, clientType) ModelWithAttributes
+	RefreshListItem(context.Context, *diag.Diagnostics, clientType) ResourceModelWithAttributes
 
 	// Has to implement the ModelWithAttributes interface for conversion back to a Terraform model
-	ModelWithAttributes
+	ResourceModelWithAttributes
 }
 
 // These functions are used by RefreshListProperties
@@ -699,7 +702,7 @@ func refreshListProperties[tfType RefreshableListItemWithAttributes[clientType],
 			newState[index] = tfItem.RefreshListItem(ctx, diagnostics, clientItem).(tfType)
 		} else {
 			var tfStructItem tfType
-			if attributeMap, err := AttributeMapFromObject(tfStructItem); err == nil {
+			if attributeMap, err := ResourceAttributeMapFromObject(tfStructItem); err == nil {
 				// start with the null object to populate all nested lists/objects as null
 				tfStructItem = defaultObjectFromObjectValue[tfType](ctx, types.ObjectNull(attributeMap))
 				newStateItem := tfStructItem.RefreshListItem(ctx, diagnostics, clientItem).(tfType)
@@ -821,7 +824,7 @@ func GetAllowedFunctionalLevelValues() []string {
 // <summary>
 // Helper function to check the version requirement for DDC.
 // </summary>
-func CheckProductVersion(client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, requiredOrchestrationApiVersion int32, requiredProductMajorVersion int, requiredProductMinorVersion int, errorSummary, feature string) bool {
+func CheckProductVersion(client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, requiredCloudOrchestrationApiVersion int32, requiredOnPremOrchestrationApiVersion int32, requiredProductMajorVersion int, requiredProductMinorVersion int, errorSummary, feature string) bool {
 	// Validate DDC version
 	if client.AuthConfig.OnPremises {
 		productVersionSplit := strings.Split(client.ClientConfig.ProductVersion, ".")
@@ -851,15 +854,24 @@ func CheckProductVersion(client *citrixdaasclient.CitrixDaasClient, diagnostics 
 			)
 			return false
 		}
-	}
 
-	// Validate Orchestration version
-	if client.ClientConfig.OrchestrationApiVersion < requiredOrchestrationApiVersion {
-		diagnostics.AddError(
-			errorSummary,
-			fmt.Sprintf("%s is not supported for current DDC version %d. Please upgrade your DDC product version to %d or above.", feature, client.ClientConfig.OrchestrationApiVersion, requiredOrchestrationApiVersion),
-		)
-		return false
+		// Validate Orchestration version
+		if client.ClientConfig.OrchestrationApiVersion < requiredOnPremOrchestrationApiVersion {
+			diagnostics.AddError(
+				errorSummary,
+				fmt.Sprintf("%s is not supported for current DDC Orchestration Service version %d. Please upgrade your DDC Orchestration Service version to %d or above.", feature, client.ClientConfig.OrchestrationApiVersion, requiredOnPremOrchestrationApiVersion),
+			)
+			return false
+		}
+	} else {
+		// Validate Orchestration version
+		if client.ClientConfig.OrchestrationApiVersion < requiredCloudOrchestrationApiVersion {
+			diagnostics.AddError(
+				errorSummary,
+				fmt.Sprintf("%s is not supported for current DDC Orchestration Service version %d. Please upgrade your DDC Orchestration Service version to %d or above.", feature, client.ClientConfig.OrchestrationApiVersion, requiredCloudOrchestrationApiVersion),
+			)
+			return false
+		}
 	}
 
 	return true
@@ -1108,7 +1120,7 @@ func VerifyIdentityUserListCompleteness(inputUserNames []string, remoteUsers []c
 	return nil
 }
 
-func GetConfigValuesForSchema(ctx context.Context, diags *diag.Diagnostics, m ModelWithAttributes) (string, map[string]interface{}) {
+func GetConfigValuesForSchema(ctx context.Context, diags *diag.Diagnostics, m ResourceModelWithAttributes) (string, map[string]interface{}) {
 	sensitiveFields := GetSensitiveFieldsForAttribute(ctx, diags, m.GetAttributes())
 	dataObj := TypedObjectToObjectValue(ctx, diags, m)
 	return reflect.TypeOf(m).String(), GetConfigValuesForObject(ctx, diags, dataObj, sensitiveFields)

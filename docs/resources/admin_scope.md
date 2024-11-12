@@ -34,6 +34,10 @@ resource "citrix_admin_scope" "example-admin-scope" {
 ### Read-Only
 
 - `id` (String) ID of the admin scope.
+- `is_all_scope` (Boolean) Indicates whether the Admin Scope is all scope or not.
+- `is_built_in` (Boolean) Indicates whether the Admin Scope is built-in or not.
+- `tenant_id` (String) ID of the tenant to which the Admin Scope belongs.
+- `tenant_name` (String) Name of the tenant to which the Admin Scope belongs.
 
 ## Import
 

@@ -42,7 +42,7 @@ func (r *adminScopeResource) Metadata(_ context.Context, req resource.MetadataRe
 
 // Schema defines the schema for the resource.
 func (r *adminScopeResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = AdminScopeResourceModel{}.GetSchema()
+	resp.Schema = AdminScopeModel{}.GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -59,7 +59,7 @@ func (r *adminScopeResource) Create(ctx context.Context, req resource.CreateRequ
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
-	var plan AdminScopeResourceModel
+	var plan AdminScopeModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -108,7 +108,7 @@ func (r *adminScopeResource) Read(ctx context.Context, req resource.ReadRequest,
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Get current state
-	var state AdminScopeResourceModel
+	var state AdminScopeModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -136,7 +136,7 @@ func (r *adminScopeResource) Update(ctx context.Context, req resource.UpdateRequ
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
-	var plan AdminScopeResourceModel
+	var plan AdminScopeModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -185,7 +185,7 @@ func (r *adminScopeResource) Delete(ctx context.Context, req resource.DeleteRequ
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from state
-	var state AdminScopeResourceModel
+	var state AdminScopeModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -235,7 +235,7 @@ func readAdminScope(ctx context.Context, client *citrixdaasclient.CitrixDaasClie
 func (r *adminScopeResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
-	var data AdminScopeResourceModel
+	var data AdminScopeModel
 	diags := req.Config.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -261,7 +261,7 @@ func (r *adminScopeResource) ModifyPlan(ctx context.Context, req resource.Modify
 
 	create := req.State.Raw.IsNull()
 
-	var plan AdminScopeResourceModel
+	var plan AdminScopeModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {

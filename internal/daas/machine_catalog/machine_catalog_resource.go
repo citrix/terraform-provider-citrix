@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -104,14 +103,8 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 	if err != nil {
 		return
 	}
-	machineCatalogName := plan.Name.ValueString()
-	machineCatalogPath := strings.ReplaceAll(plan.MachineCatalogFolderPath.ValueString(), "\\", "|")
-	if machineCatalogPath != "" {
-		machineCatalogPath = machineCatalogPath + "|" + machineCatalogName
-	} else {
-		machineCatalogPath += machineCatalogName
-	}
 
+	machineCatalogPath := util.BuildResourcePathForGetRequest(plan.MachineCatalogFolderPath.ValueString(), plan.Name.ValueString())
 	setMachineCatalogTags(ctx, &resp.Diagnostics, r.client, machineCatalogPath, plan.Tags)
 
 	// Get the new catalog
@@ -432,6 +425,15 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 			"Incorrect Attribute Configuration",
 			"Static allocation type is not supported by MultiSession session type machine catalog.",
 		)
+	}
+
+	if data.SessionSupport.ValueString() == string(citrixorchestration.SESSIONSUPPORT_SINGLE_SESSION) && data.AllocationType.ValueString() == string(citrixorchestration.ALLOCATIONTYPE_RANDOM) && data.PersistUserChanges.ValueString() == string(citrixorchestration.PERSISTCHANGES_ON_LOCAL) {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("persist_user_changes"),
+			"Incorrect Attribute Configuration",
+			"persist_user_changes cannot be set to OnLocal when session_support is set to Static and allocation_type is set to Random.",
+		)
+		return
 	}
 
 	if !data.Metadata.IsNull() {
@@ -943,6 +945,5 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 			)
 			return
 		}
-
 	}
 }

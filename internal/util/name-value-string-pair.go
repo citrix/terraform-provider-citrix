@@ -26,7 +26,7 @@ type NameValueStringPairModel struct {
 }
 
 // RefreshListItem implements RefreshableListItemWithAttributes.
-func (r NameValueStringPairModel) RefreshListItem(ctx context.Context, diag *diag.Diagnostics, retmote citrixorchestration.NameValueStringPairModel) ModelWithAttributes {
+func (r NameValueStringPairModel) RefreshListItem(ctx context.Context, diag *diag.Diagnostics, retmote citrixorchestration.NameValueStringPairModel) ResourceModelWithAttributes {
 	r.Name = types.StringValue(retmote.GetName())
 	r.Value = types.StringValue(retmote.GetValue())
 

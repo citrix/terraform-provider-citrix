@@ -18,15 +18,19 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type AdminFolderResourceModel struct {
-	Id         types.String `tfsdk:"id"`
-	Name       types.String `tfsdk:"name"`
-	Type       types.Set    `tfsdk:"type"` // Set[String]
-	Path       types.String `tfsdk:"path"`
-	ParentPath types.String `tfsdk:"parent_path"`
+type AdminFolderModel struct {
+	Id                     types.String `tfsdk:"id"`
+	Name                   types.String `tfsdk:"name"`
+	Type                   types.Set    `tfsdk:"type"` // Set[String]
+	Path                   types.String `tfsdk:"path"`
+	ParentPath             types.String `tfsdk:"parent_path"`
+	TotalApplications      types.Int64  `tfsdk:"total_applications"`
+	TotalMachineCatalogs   types.Int64  `tfsdk:"total_machine_catalogs"`
+	TotalApplicationGroups types.Int64  `tfsdk:"total_application_groups"`
+	TotalDeliveryGroups    types.Int64  `tfsdk:"total_delivery_groups"`
 }
 
-func (AdminFolderResourceModel) GetSchema() schema.Schema {
+func (AdminFolderModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "CVAD --- Manages an admin folder.",
 		Attributes: map[string]schema.Attribute{
@@ -71,15 +75,31 @@ func (AdminFolderResourceModel) GetSchema() schema.Schema {
 				Description: "Path to the admin folder.",
 				Computed:    true,
 			},
+			"total_applications": schema.Int64Attribute{
+				Description: "Number of applications contained in the admin folder.",
+				Computed:    true,
+			},
+			"total_machine_catalogs": schema.Int64Attribute{
+				Description: "Number of machine catalogs contained in the admin folder.",
+				Computed:    true,
+			},
+			"total_application_groups": schema.Int64Attribute{
+				Description: "Number of application groups contained in the admin folder.",
+				Computed:    true,
+			},
+			"total_delivery_groups": schema.Int64Attribute{
+				Description: "Number of delivery groups contained in the admin folder.",
+				Computed:    true,
+			},
 		},
 	}
 }
 
-func (AdminFolderResourceModel) GetAttributes() map[string]schema.Attribute {
-	return AdminFolderResourceModel{}.GetSchema().Attributes
+func (AdminFolderModel) GetAttributes() map[string]schema.Attribute {
+	return AdminFolderModel{}.GetSchema().Attributes
 }
 
-func (r AdminFolderResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, adminFolder *citrixorchestration.AdminFolderResponseModel) AdminFolderResourceModel {
+func (r AdminFolderModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, adminFolder *citrixorchestration.AdminFolderResponseModel) AdminFolderModel {
 	// Overwrite application folder with refreshed state
 	r.Id = types.StringValue(adminFolder.GetId())
 	r.Name = types.StringValue(adminFolder.GetName())
@@ -103,6 +123,11 @@ func (r AdminFolderResourceModel) RefreshPropertyValues(ctx context.Context, dia
 	} else {
 		r.ParentPath = types.StringNull()
 	}
+
+	r.TotalApplications = types.Int64Value(int64(adminFolder.GetTotalApplications()))
+	r.TotalMachineCatalogs = types.Int64Value(int64(adminFolder.GetTotalMachineCatalogs()))
+	r.TotalApplicationGroups = types.Int64Value(int64(adminFolder.GetTotalApplicationGroups()))
+	r.TotalDeliveryGroups = types.Int64Value(int64(adminFolder.GetTotalDesktopGroups()))
 
 	return r
 }

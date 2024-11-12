@@ -21,7 +21,7 @@ import (
 
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
 	cc_admin_user "github.com/citrix/terraform-provider-citrix/internal/citrixcloud/admin_user"
-	"github.com/citrix/terraform-provider-citrix/internal/citrixcloud/gac_settings"
+	"github.com/citrix/terraform-provider-citrix/internal/citrixcloud/global_app_configuration"
 	cc_identity_providers "github.com/citrix/terraform-provider-citrix/internal/citrixcloud/identity_providers"
 	"github.com/citrix/terraform-provider-citrix/internal/citrixcloud/resource_locations"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_role"
@@ -97,6 +97,7 @@ type citrixProvider struct {
 type citrixProviderModel struct {
 	CvadConfig           *cvadConfig       `tfsdk:"cvad_config"`
 	StoreFrontRemoteHost *storefrontConfig `tfsdk:"storefront_remote_host"`
+	WemOnPremConfig      *wemonpremconfig  `tfsdk:"wem_on_prem_config"`
 }
 
 type cvadConfig struct {
@@ -107,12 +108,20 @@ type cvadConfig struct {
 	ClientSecret           types.String `tfsdk:"client_secret"`
 	DisableSslVerification types.Bool   `tfsdk:"disable_ssl_verification"`
 	DisableDaaSClient      types.Bool   `tfsdk:"disable_daas_client"`
+	WemRegion              types.String `tfsdk:"wem_region"`
 }
 
 type storefrontConfig struct {
 	ComputerName           types.String `tfsdk:"computer_name"`
 	ADadminUserName        types.String `tfsdk:"ad_admin_username"`
 	AdAdminPassword        types.String `tfsdk:"ad_admin_password"`
+	DisableSslVerification types.Bool   `tfsdk:"disable_ssl_verification"`
+}
+
+type wemonpremconfig struct {
+	Hostname               types.String `tfsdk:"hostname"`
+	AdminUserName          types.String `tfsdk:"admin_username"`
+	AdminPassword          types.String `tfsdk:"admin_password"`
 	DisableSslVerification types.Bool   `tfsdk:"disable_ssl_verification"`
 }
 
@@ -192,6 +201,19 @@ func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 							"\n\n-> **Note** Can be set via Environment Variable **CITRIX_DISABLE_DAAS_CLIENT**.",
 						Optional: true,
 					},
+					"wem_region": schema.StringAttribute{
+						Description: "WEM Hosting Region of the Citrix Cloud customer. Available values are `US`, `EU`, and `APS`." +
+							"\n\n-> **Note** Can be set via Environment Variable **CITRIX_WEM_REGION**." +
+							"\n\n~> **Please Note** Only applicable for Citrix Workspace Environment Management (WEM) Cloud customers.",
+						Optional: true,
+						Validators: []validator.String{
+							stringvalidator.OneOf(
+								"US",
+								"EU",
+								"APS",
+							),
+						},
+					},
 				},
 			},
 			"storefront_remote_host": schema.SingleNestedAttribute{
@@ -218,13 +240,49 @@ func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 							"Use this to specify AD admin password" + "<br />" +
 							"Can be set via Environment Variable **SF_AD_ADMIN_PASSWORD**." + "<br />" +
 							"This parameter is **required** to be specified in the provider configuration or via environment variable.",
-						Optional: true,
+						Optional:  true,
+						Sensitive: true,
 					},
 					"disable_ssl_verification": schema.BoolAttribute{
 						Description: "Disable SSL verification against the target storefront server. " + "<br />" +
 							"Only applicable to customers connecting to storefront server remotely. Customers should omit this option when running storefront provider locally. Set to true to skip SSL verification only when the target DDC does not have a valid SSL certificate issued by a trusted CA. " + "<br />" +
 							"When set to true, please make sure that your provider storefront_remote_host is set for a known storefront hostname. " + "<br />" +
 							"Can be set via Environment Variable **SF_DISABLE_SSL_VERIFICATION**.",
+						Optional: true,
+					},
+				},
+			},
+			"wem_on_prem_config": schema.SingleNestedAttribute{
+				Description: "Configuration for WEM on-premises service.",
+				Optional:    true,
+				Attributes: map[string]schema.Attribute{
+					"hostname": schema.StringAttribute{
+						Description: "Name of server hosting Citrix WEM service. " + "<br />" +
+							"Use this to specify WEM service hostname. " + "<br />" +
+							"Can be set via Environment Variable **WEM_HOSTNAME**." + "<br />" +
+							"This parameter is **required** to be specified in the provider configuration or via environment variable.",
+						Optional: true,
+					},
+					"admin_username": schema.StringAttribute{
+						Description: "WEM Admin Username to connect to WEM service " + "<br />" +
+							"Use this to specify WEM admin username " + "<br />" +
+							"Can be set via Environment Variable **WEM_ADMIN_USERNAME**." + "<br />" +
+							"This parameter is **required** to be specified in the provider configuration or via environment variable.",
+						Optional: true,
+					},
+					"admin_password": schema.StringAttribute{
+						Description: "WEM Admin Password to connect to WEM service " + "<br />" +
+							"Use this to specify WEM admin password" + "<br />" +
+							"Can be set via Environment Variable **WEM_ADMIN_PASSWORD**." + "<br />" +
+							"This parameter is **required** to be specified in the provider configuration or via environment variable.",
+						Optional:  true,
+						Sensitive: true,
+					},
+					"disable_ssl_verification": schema.BoolAttribute{
+						Description: "Disable SSL verification against the target WEM service. " + "<br />" +
+							"Set to true to skip SSL verification only when the target WEM service does not have a valid SSL certificate issued by a trusted CA. " + "<br />" +
+							"When set to true, please make sure that your provider config is set for a known WEM hostname. " + "<br />" +
+							"Can be set via Environment Variable **WEM_DISABLE_SSL_VERIFICATION**.",
 						Optional: true,
 					},
 				},
@@ -332,6 +390,7 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 	storeFrontClientInitialized := false
 	daasClientInitialized := false
+	wemOnPremClientInitialized := false
 
 	// Initialize storefront client
 	storefront_computer_name := os.Getenv("SF_COMPUTER_NAME")
@@ -370,7 +429,15 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	customerId := os.Getenv("CITRIX_CUSTOMER_ID")
 	disableSslVerification := strings.EqualFold(os.Getenv("CITRIX_DISABLE_SSL_VERIFICATION"), "true")
 	disableDaasClient := strings.EqualFold(os.Getenv("CITRIX_DISABLE_DAAS_CLIENT"), "true")
+	wemRegion := os.Getenv("CITRIX_WEM_REGION")
+	wemHostName := os.Getenv("CITRIX_WEM_HOSTNAME")
 	quick_create_host_name := os.Getenv("CITRIX_QUICK_CREATE_HOST_NAME")
+
+	// Initialize WEM on-prem client if WEM on-prem config is provided
+	wemOnPremHostName := os.Getenv("WEM_HOSTNAME")
+	wem_admin_username := os.Getenv("WEM_ADMIN_USERNAME")
+	wem_admin_password := os.Getenv("WEM_ADMIN_PASSWORD")
+	wem_disable_ssl_verification := strings.EqualFold(os.Getenv("WEM_DISABLE_SSL_VERIFICATION"), "true")
 
 	if cvadConfig := config.CvadConfig; cvadConfig != nil || (clientId != "" && clientSecret != "") {
 		if cvadConfig != nil {
@@ -402,19 +469,49 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 				disableDaasClient = cvadConfig.DisableDaaSClient.ValueBool()
 			}
 
+			if !cvadConfig.WemRegion.IsNull() {
+				wemRegion = cvadConfig.WemRegion.ValueString()
+			}
 		}
 
-		validateAndInitializeDaaSClient(ctx, resp, client, clientId, clientSecret, hostname, environment, customerId, quick_create_host_name, p.version, disableSslVerification, disableDaasClient)
+		if wemOnPremConfig := config.WemOnPremConfig; wemOnPremConfig != nil || (wemOnPremHostName != "" && wem_admin_username != "" && wem_admin_password != "") {
+			if wemOnPremConfig != nil {
+				if !wemOnPremConfig.Hostname.IsNull() {
+					wemOnPremHostName = wemOnPremConfig.Hostname.ValueString()
+				}
+				if !wemOnPremConfig.AdminUserName.IsNull() {
+					wem_admin_username = wemOnPremConfig.AdminUserName.ValueString()
+				}
+				if !wemOnPremConfig.AdminPassword.IsNull() {
+					wem_admin_password = wemOnPremConfig.AdminPassword.ValueString()
+				}
+				if !wemOnPremConfig.DisableSslVerification.IsNull() {
+					wem_disable_ssl_verification = wemOnPremConfig.DisableSslVerification.ValueBool()
+				}
+			}
+
+			validateWemOnPremClient(resp, wemOnPremHostName, wem_admin_username, wem_admin_password)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+
+		}
+
+		validateAndInitializeDaaSClient(ctx, resp, client, clientId, clientSecret, hostname, environment, wemHostName, wemRegion, customerId, quick_create_host_name, p.version, wemOnPremHostName, wem_admin_username, wem_admin_password, disableSslVerification, disableDaasClient, wem_disable_ssl_verification)
 		if resp.Diagnostics.HasError() {
 			return
 		}
 		daasClientInitialized = true
+
+		if wemOnPremHostName != "" {
+			wemOnPremClientInitialized = true
+		}
 	}
 
-	if !storeFrontClientInitialized && !daasClientInitialized {
+	if !storeFrontClientInitialized && !wemOnPremClientInitialized && !daasClientInitialized {
 		resp.Diagnostics.AddError(
 			"Invalid Provider Configuration",
-			"At least one of `cvad_config` and `storefront_remote_host` attributes must be specified.",
+			"At least one of `cvad_config`, `storefront_remote_host` or `wem_on_prem_config` attributes must be specified.",
 		)
 		return
 	}
@@ -425,6 +522,36 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	resp.ResourceData = client
 
 	tflog.Info(ctx, "Configured Citrix API client", map[string]any{"success": true})
+}
+
+func validateWemOnPremClient(resp *provider.ConfigureResponse, wem_hostname, wem_admin_username, wem_admin_password string) {
+	if wem_hostname == "" {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("wem_on_prem_config").AtName("hostname"),
+			"Unknown WEM Hostname",
+			"The provider cannot create the Citrix WEM client as there is an unknown configuration value for the WEM Hostname. "+
+				"Either set the value in the provider configuration, or use the WEM_HOSTNAME environment variable.",
+		)
+		return
+	}
+	if wem_admin_username == "" {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("wem_on_prem_config").AtName("admin_username"),
+			"Unknown WEM Admin Username",
+			"The provider cannot create the Citrix WEM client as there is an unknown configuration value for the WEM Admin Username. "+
+				"Either set the value in the provider configuration, or use the WEM_ADMIN_USERNAME environment variable.",
+		)
+		return
+	}
+	if wem_admin_password == "" {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("wem_on_prem_config").AtName("admin_password"),
+			"Unknown WEM Admin Password",
+			"The provider cannot create the Citrix WEM client as there is an unknown configuration value for the WEM Admin Password. "+
+				"Either set the value in the provider configuration, or use the WEM_ADMIN_PASSWORD environment variable.",
+		)
+		return
+	}
 }
 
 func validateAndInitializeStorefrontClient(ctx context.Context, resp *provider.ConfigureResponse, client *citrixclient.CitrixDaasClient, storefront_computer_name, storefront_ad_admin_username, storefront_ad_admin_password string, storefront_disable_ssl_verification bool) {
@@ -458,7 +585,7 @@ func validateAndInitializeStorefrontClient(ctx context.Context, resp *provider.C
 	client.InitializeStoreFrontClient(ctx, storefront_computer_name, storefront_ad_admin_username, storefront_ad_admin_password, storefront_disable_ssl_verification)
 }
 
-func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.ConfigureResponse, client *citrixclient.CitrixDaasClient, clientId, clientSecret, hostname, environment, customerId, quick_create_host_name, version string, disableSslVerification bool, disableDaasClient bool) {
+func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.ConfigureResponse, client *citrixclient.CitrixDaasClient, clientId, clientSecret, hostname, environment, wemHostName, wemRegion, customerId, quick_create_host_name, version, wemOnPremHostName, wem_admin_username, wem_admin_password string, disableSslVerification, disableDaasClient, wem_disable_ssl_verification bool) {
 	if clientId == "" {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("cvad_config").AtName("client_id"),
@@ -497,6 +624,11 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 	if customerId == "" {
 		customerId = "CitrixOnPremises"
 		onPremises = true
+	}
+
+	wemAuthUrl := ""
+	if onPremises && wemOnPremHostName != "" {
+		wemAuthUrl = fmt.Sprintf("https://%s/services/wem/onPrem/LogIn", wemOnPremHostName)
 	}
 
 	// If any of the expected configurations are missing, return
@@ -613,19 +745,20 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 		cwsHostName = "cws.ctxwsstgapi.us"
 	}
 
-	wemHostName := ""
-	if environment == "Production" {
-		wemHostName = "api.wem.cloud.com"
-	} else if environment == "Staging" {
-		wemHostName = "api.wem.cloudburrito.com"
-	} else if environment == "Japan" {
-		wemHostName = "api.wem.citrixcloud.jp"
-	} else if environment == "JapanStaging" {
-		wemHostName = "api.wem.citrixcloudstaging.jp"
-	} else if environment == "Gov" {
-		wemHostName = "api.wem.citrixworkspacesapi.us"
-	} else if environment == "GovStaging" {
-		wemHostName = "api.wem.ctxwsstgapi.us"
+	if wemHostName == "" && wemAuthUrl == "" {
+		if environment == "Production" {
+			if wemRegion == "EU" {
+				wemHostName = "eu-api.wem.cloud.com"
+			} else if wemRegion == "APS" {
+				wemHostName = "aps-api.wem.cloud.com"
+			} else {
+				wemHostName = "api.wem.cloud.com"
+			}
+		} else if environment == "Japan" {
+			wemHostName = "jp-api.wem.citrixcloud.jp"
+		} else if environment == "Staging" {
+			wemHostName = "api.wem.cloudburrito.com"
+		}
 	}
 
 	ctx = tflog.SetField(ctx, "citrix_hostname", hostname)
@@ -655,6 +788,11 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 		ctx = tflog.MaskAllFieldValuesStrings(ctx, customerId)
 	}
 
+	if wemOnPremHostName != "" {
+		ctx = tflog.SetField(ctx, "citrix_wem_onprem_host", wemOnPremHostName)
+		ctx = tflog.SetField(ctx, "citrix_wem_admin_username", wem_admin_username)
+		ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "citrix_wem_admin_password", wem_admin_password)
+	}
 	tflog.Debug(ctx, "Creating Citrix API client")
 
 	userAgent := "citrix-terraform-provider/" + version + " (https://github.com/citrix/terraform-provider-citrix)"
@@ -675,6 +813,12 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 			)
 		}
 		return
+	}
+
+	// Setup the WEM On-Prem Client API
+	if wemAuthUrl != "" {
+		tflog.Debug(ctx, "Creating WEM API client")
+		client.SetupWemOnPremClientContext(ctx, middleware.MiddlewareAuthWithSessionIdFunc, wemAuthUrl, wemOnPremHostName, wem_admin_username, wem_admin_password, wem_disable_ssl_verification)
 	}
 
 	// Initialize the Cloud Clients if not on-premises
@@ -725,7 +869,7 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 	}
 	// Set WEM Client
 	if wemHostName != "" {
-		client.InitializeWemClient(ctx, wemHostName, middleware.MiddlewareAuthFunc)
+		client.InitializeWemClient(ctx, wemHostName, middleware.MiddlewareAuthFunc, false, false)
 	}
 }
 
@@ -783,11 +927,15 @@ func (p *citrixProvider) DataSources(_ context.Context) []func() datasource.Data
 		vda.NewVdaDataSource,
 		application.NewApplicationDataSourceSource,
 		admin_folder.NewAdminFolderDataSource,
+		admin_role.NewAdminRoleDataSource,
 		admin_scope.NewAdminScopeDataSource,
+		admin_user.NewAdminUserDataSource,
 		machine_catalog.NewPvsDataSource,
 		bearer_token.NewBearerTokenDataSource,
 		cvad_site.NewSiteDataSource,
 		tags.NewTagDataSource,
+		policies.NewPolicySetDataSource,
+		storefront_server.NewStoreFrontServerDataSource,
 		// StoreFront DataSources
 		stf_roaming.NewSTFRoamingServiceDataSource,
 		// QuickCreate DataSources
@@ -826,6 +974,7 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		hypervisor_resource_pool.NewNutanixHypervisorResourcePoolResource,
 		hypervisor_resource_pool.NewSCVMMHypervisorResourcePoolResource,
 		machine_catalog.NewMachineCatalogResource,
+		machine_catalog.NewMachinePropertiesResource,
 		delivery_group.NewDeliveryGroupResource,
 		storefront_server.NewStoreFrontServerResource,
 		application.NewApplicationResource,
@@ -837,7 +986,8 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		admin_scope.NewAdminScopeResource,
 		policies.NewPolicySetResource,
 		admin_user.NewAdminUserResource,
-		gac_settings.NewGacSettingsResource,
+		global_app_configuration.NewGacSettingsResource,
+		global_app_configuration.NewGacDiscoveryResource,
 		resource_locations.NewResourceLocationResource,
 		cc_admin_user.NewCCAdminUserResource,
 		tags.NewTagResource,

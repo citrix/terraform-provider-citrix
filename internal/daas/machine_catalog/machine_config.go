@@ -1183,7 +1183,7 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 				}
 
 				// Clear gallery image details
-				attributeMap, err := util.AttributeMapFromObject(GalleryImageModel{})
+				attributeMap, err := util.ResourceAttributeMapFromObject(GalleryImageModel{})
 				if err != nil {
 					diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
 				} else {
@@ -1218,7 +1218,7 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 		machineProfileModel := parseAzureMachineProfileResponseToModel(machineProfile)
 		mc.MachineProfile = util.TypedObjectToObjectValue(ctx, diagnostics, machineProfileModel)
 	} else {
-		if attributesMap, err := util.AttributeMapFromObject(AzureMachineProfileModel{}); err == nil {
+		if attributesMap, err := util.ResourceAttributeMapFromObject(AzureMachineProfileModel{}); err == nil {
 			mc.MachineProfile = types.ObjectNull(attributesMap)
 		} else {
 			diagnostics.AddWarning("Error when creating null AzureMachineProfileModel", err.Error())
@@ -1338,7 +1338,7 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 	}
 
 	if !isDesSet && !mc.DiskEncryptionSet.IsNull() {
-		if attributesMap, err := util.AttributeMapFromObject(AzureDiskEncryptionSetModel{}); err == nil {
+		if attributesMap, err := util.ResourceAttributeMapFromObject(AzureDiskEncryptionSetModel{}); err == nil {
 			mc.DiskEncryptionSet = types.ObjectNull(attributesMap)
 		} else {
 			diagnostics.AddWarning("Error when creating null AzureDiskEcryptionSetModel", err.Error())
@@ -1346,7 +1346,7 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 	}
 
 	if !isUseSharedImageGallerySet && !mc.UseAzureComputeGallery.IsNull() {
-		if attributesMap, err := util.AttributeMapFromObject(AzureComputeGallerySettings{}); err == nil {
+		if attributesMap, err := util.ResourceAttributeMapFromObject(AzureComputeGallerySettings{}); err == nil {
 			mc.UseAzureComputeGallery = types.ObjectNull(attributesMap)
 		} else {
 			diagnostics.AddWarning("Error when creating null AzureComputeGallerySettings", err.Error())

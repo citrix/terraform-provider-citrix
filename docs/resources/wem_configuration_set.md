@@ -4,14 +4,11 @@ page_title: "citrix_wem_configuration_set Resource - citrix"
 subcategory: "WEM"
 description: |-
   Manages configuration sets within a WEM deployment.
-  ~> Disclaimer This feature is supported for Citrix Cloud customers, and will be made available for On-Premises soon.
 ---
 
 # citrix_wem_configuration_set (Resource)
 
 Manages configuration sets within a WEM deployment.
-
-~> **Disclaimer** This feature is supported for Citrix Cloud customers, and will be made available for On-Premises soon.
 
 ## Example Usage
 

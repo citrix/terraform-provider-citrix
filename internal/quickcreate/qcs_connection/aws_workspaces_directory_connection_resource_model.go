@@ -20,7 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type AwsWorkspacesDirectoryConnectionResourceModel struct {
+type AwsWorkspacesDirectoryConnectionModel struct {
 	DirectoryConnectionId           types.String `tfsdk:"id"`
 	AccountId                       types.String `tfsdk:"account"`
 	Name                            types.String `tfsdk:"name"`
@@ -34,7 +34,7 @@ type AwsWorkspacesDirectoryConnectionResourceModel struct {
 	DefaultOu                       types.String `tfsdk:"default_ou"`
 }
 
-func (AwsWorkspacesDirectoryConnectionResourceModel) GetSchema() schema.Schema {
+func (AwsWorkspacesDirectoryConnectionModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "DaaS Quick Deploy - AWS WorkSpaces Core --- Manages an AWS WorkSpaces directory connection.",
 		Attributes: map[string]schema.Attribute{
@@ -148,18 +148,18 @@ func (AwsWorkspacesDirectoryConnectionResourceModel) GetSchema() schema.Schema {
 	}
 }
 
-func (AwsWorkspacesDirectoryConnectionResourceModel) GetAttributes() map[string]schema.Attribute {
-	return AwsWorkspacesDirectoryConnectionResourceModel{}.GetSchema().Attributes
+func (AwsWorkspacesDirectoryConnectionModel) GetAttributes() map[string]schema.Attribute {
+	return AwsWorkspacesDirectoryConnectionModel{}.GetSchema().Attributes
 }
 
-func (r AwsWorkspacesDirectoryConnectionResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, directory *quickcreateservice.AwsEdcDirectoryConnection) AwsWorkspacesDirectoryConnectionResourceModel {
+func (r AwsWorkspacesDirectoryConnectionModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, isResource bool, directory *quickcreateservice.AwsEdcDirectoryConnection) AwsWorkspacesDirectoryConnectionModel {
 	r.DirectoryConnectionId = types.StringValue(directory.GetConnectionId())
 	r.Name = types.StringValue(directory.GetName())
 	r.AccountId = types.StringValue(directory.GetAccountId())
-	if !r.ZoneId.IsNull() {
+	if !r.ZoneId.IsNull() || !isResource {
 		r.ZoneId = types.StringValue(directory.GetZoneId())
 	}
-	if !r.ResourceLocationId.IsNull() {
+	if !r.ResourceLocationId.IsNull() || !isResource {
 		r.ResourceLocationId = types.StringValue(directory.GetResourceLocationId())
 	}
 	r.Directory = types.StringValue(directory.GetDirectoryId())

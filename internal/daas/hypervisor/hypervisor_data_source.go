@@ -60,13 +60,18 @@ func (d *HypervisorDataSource) Read(ctx context.Context, req datasource.ReadRequ
 	}
 
 	// Get refreshed hypervisor state from Orchestration
-	hypervisorName := data.Name.ValueString()
-	getHypervisorRequest := d.client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisor(ctx, hypervisorName)
+	var hypervisorNameOrId string
+	if !data.Name.IsNull() {
+		hypervisorNameOrId = data.Name.ValueString()
+	} else {
+		hypervisorNameOrId = data.Id.ValueString()
+	}
+	getHypervisorRequest := d.client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisor(ctx, hypervisorNameOrId)
 	hypervisor, httpResp, err := citrixdaasclient.AddRequestData(getHypervisorRequest, d.client).Execute()
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error reading Hypervisor "+hypervisorName,
+			"Error reading Hypervisor "+hypervisorNameOrId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)

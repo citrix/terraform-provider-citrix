@@ -202,7 +202,7 @@ func (PolicyModel) GetAttributes() map[string]schema.Attribute {
 	return PolicyModel{}.GetSchema().Attributes
 }
 
-type PolicySetResourceModel struct {
+type PolicySetModel struct {
 	Id          types.String `tfsdk:"id"`
 	Name        types.String `tfsdk:"name"`
 	Type        types.String `tfsdk:"type"`
@@ -212,7 +212,7 @@ type PolicySetResourceModel struct {
 	Policies    types.List   `tfsdk:"policies"` // List[PolicyModel]
 }
 
-func (PolicySetResourceModel) GetSchema() schema.Schema {
+func (PolicySetModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "CVAD --- Manages a policy set and the policies within it. The order of the policies specified in this resource reflect the policy priority.",
 		Attributes: map[string]schema.Attribute{
@@ -276,11 +276,11 @@ func (PolicySetResourceModel) GetSchema() schema.Schema {
 	}
 }
 
-func (PolicySetResourceModel) GetAttributes() map[string]schema.Attribute {
-	return PolicySetResourceModel{}.GetSchema().Attributes
+func (PolicySetModel) GetAttributes() map[string]schema.Attribute {
+	return PolicySetModel{}.GetSchema().Attributes
 }
 
-func (r PolicySetResourceModel) RefreshPropertyValues(ctx context.Context, diags *diag.Diagnostics, policySet *citrixorchestration.PolicySetResponse, policies *citrixorchestration.CollectionEnvelopeOfPolicyResponse, policySetScopes []string) PolicySetResourceModel {
+func (r PolicySetModel) RefreshPropertyValues(ctx context.Context, diags *diag.Diagnostics, isResource bool, policySet *citrixorchestration.PolicySetResponse, policies *citrixorchestration.CollectionEnvelopeOfPolicyResponse, policySetScopes []string) PolicySetModel {
 	// Set required values
 	r.Id = types.StringValue(policySet.GetPolicySetGuid())
 	r.Name = types.StringValue(policySet.GetName())
@@ -339,12 +339,21 @@ func (r PolicySetResourceModel) RefreshPropertyValues(ctx context.Context, diags
 				}
 			}
 
-			policyModel.PolicySettings = util.TypedArrayToObjectSet(ctx, diags, refreshedPolicySettings)
+			if isResource {
+				policyModel.PolicySettings = util.TypedArrayToObjectSet(ctx, diags, refreshedPolicySettings)
+			} else {
+				policyModel.PolicySettings = util.DataSourceTypedArrayToObjectSet(ctx, diags, refreshedPolicySettings)
+			}
 
 			var accessControlFilters []AccessControlFilterModel
 
-			attributes, _ := util.AttributeMapFromObject(BranchRepeaterFilterModel{})
-			policyModel.BranchRepeaterFilter = types.ObjectNull(attributes)
+			if isResource {
+				attributes, _ := util.ResourceAttributeMapFromObject(BranchRepeaterFilterModel{})
+				policyModel.BranchRepeaterFilter = types.ObjectNull(attributes)
+			} else {
+				attributes, _ := util.DataSourceAttributeMapFromObject(BranchRepeaterFilterModel{})
+				policyModel.BranchRepeaterFilter = types.ObjectNull(attributes)
+			}
 
 			var clientIpFilters []ClientIPFilterModel
 			var clientNameFilters []ClientNameFilterModel
@@ -430,25 +439,49 @@ func (r PolicySetResourceModel) RefreshPropertyValues(ctx context.Context, diags
 					}
 				}
 			}
-			policyModel.AccessControlFilters = util.TypedArrayToObjectSet(ctx, diags, accessControlFilters)
-			policyModel.ClientIPFilters = util.TypedArrayToObjectSet(ctx, diags, clientIpFilters)
-			policyModel.ClientNameFilters = util.TypedArrayToObjectSet(ctx, diags, clientNameFilters)
-			policyModel.DeliveryGroupFilters = util.TypedArrayToObjectSet(ctx, diags, desktopGroupFilters)
-			policyModel.DeliveryGroupTypeFilters = util.TypedArrayToObjectSet(ctx, diags, desktopKindFilters)
-			policyModel.TagFilters = util.TypedArrayToObjectSet(ctx, diags, desktopTagFilters)
-			policyModel.OuFilters = util.TypedArrayToObjectSet(ctx, diags, ouFilters)
-			policyModel.UserFilters = util.TypedArrayToObjectSet(ctx, diags, userFilters)
+			if isResource {
+				policyModel.AccessControlFilters = util.TypedArrayToObjectSet(ctx, diags, accessControlFilters)
+				policyModel.ClientIPFilters = util.TypedArrayToObjectSet(ctx, diags, clientIpFilters)
+				policyModel.ClientNameFilters = util.TypedArrayToObjectSet(ctx, diags, clientNameFilters)
+				policyModel.DeliveryGroupFilters = util.TypedArrayToObjectSet(ctx, diags, desktopGroupFilters)
+				policyModel.DeliveryGroupTypeFilters = util.TypedArrayToObjectSet(ctx, diags, desktopKindFilters)
+				policyModel.TagFilters = util.TypedArrayToObjectSet(ctx, diags, desktopTagFilters)
+				policyModel.OuFilters = util.TypedArrayToObjectSet(ctx, diags, ouFilters)
+				policyModel.UserFilters = util.TypedArrayToObjectSet(ctx, diags, userFilters)
+			} else {
+				policyModel.AccessControlFilters = util.DataSourceTypedArrayToObjectSet(ctx, diags, accessControlFilters)
+				policyModel.ClientIPFilters = util.DataSourceTypedArrayToObjectSet(ctx, diags, clientIpFilters)
+				policyModel.ClientNameFilters = util.DataSourceTypedArrayToObjectSet(ctx, diags, clientNameFilters)
+				policyModel.DeliveryGroupFilters = util.DataSourceTypedArrayToObjectSet(ctx, diags, desktopGroupFilters)
+				policyModel.DeliveryGroupTypeFilters = util.DataSourceTypedArrayToObjectSet(ctx, diags, desktopKindFilters)
+				policyModel.TagFilters = util.DataSourceTypedArrayToObjectSet(ctx, diags, desktopTagFilters)
+				policyModel.OuFilters = util.DataSourceTypedArrayToObjectSet(ctx, diags, ouFilters)
+				policyModel.UserFilters = util.DataSourceTypedArrayToObjectSet(ctx, diags, userFilters)
+			}
 
 			refreshedPolicies = append(refreshedPolicies, policyModel)
 		}
-		updatedPolicies := util.TypedArrayToObjectList(ctx, diags, refreshedPolicies)
+		var updatedPolicies types.List
+		if isResource {
+			updatedPolicies = util.TypedArrayToObjectList(ctx, diags, refreshedPolicies)
+		} else {
+			updatedPolicies = util.DataSourceTypedArrayToObjectList(ctx, diags, refreshedPolicies)
+		}
 		r.Policies = updatedPolicies
 	} else {
-		attributesMap, err := util.AttributeMapFromObject(PolicyModel{})
-		if err != nil {
-			diags.AddError("Error converting schema to attribute map. Error: ", err.Error())
+		var attributesMap map[string]attr.Type
+		var err error
+		if isResource {
+			attributesMap, err = util.ResourceAttributeMapFromObject(PolicyModel{})
+			if err != nil {
+				diags.AddError("Error converting schema to attribute map. Error: ", err.Error())
+			}
+		} else {
+			attributesMap, err = util.DataSourceAttributeMapFromObject(PolicyModel{})
+			if err != nil {
+				diags.AddError("Error converting schema to attribute map. Error: ", err.Error())
+			}
 		}
-
 		r.Policies = types.ListNull(types.ObjectType{AttrTypes: attributesMap})
 	}
 

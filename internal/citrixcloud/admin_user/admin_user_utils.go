@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	ccadmins "github.com/citrix/citrix-daas-rest-go/ccadmins"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -112,25 +113,73 @@ func getAdminUserPolicies(ctx context.Context, diagnostics *diag.Diagnostics, cl
 
 	// If access type is Custom, retrieve and add policies
 	if strings.EqualFold(adminUserResourceModel.AccessType.ValueString(), string(ccadmins.ADMINISTRATORACCESSTYPE_CUSTOM)) {
-		accessPolicies, err := getListOfAllAccessPolicies(ctx, client)
-		if err != nil {
-			return nil, err
-		}
-		policies := util.ObjectListToTypedArray[CCAdminPolicyResourceModel](ctx, diagnostics, adminUserResourceModel.Policies)
-		adminPolicyAccessModels := []ccadmins.AdministratorAccessPolicyModel{}
-		for _, policy := range policies {
-			adminAccessPolicyModel, err := getAdminAccessPolicy(ctx, diagnostics, policy, accessPolicies.GetPolicies())
-			if err != nil {
-				return nil, err
-			}
-			adminPolicyAccessModels = append(adminPolicyAccessModels, adminAccessPolicyModel)
-		}
-		return adminPolicyAccessModels, nil
+		return fetchAdminPoliciesWithRetry(ctx, diagnostics, client, adminUserResourceModel)
 	}
 	return nil, fmt.Errorf("invalid access type")
 }
 
-func getAdminAccessPolicy(ctx context.Context, diagnostics *diag.Diagnostics, adminPolicyResourceModel CCAdminPolicyResourceModel, remoteAdminPolicies []ccadmins.AdministratorAccessPolicyModel) (ccadmins.AdministratorAccessPolicyModel, error) {
+func fetchAdminPoliciesWithRetry(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, adminUserResourceModel CCAdminUserResourceModel) ([]ccadmins.AdministratorAccessPolicyModel, error) {
+	adminId, err := getAdminIdFromAuthToken(client)
+	if err != nil {
+		err = fmt.Errorf("Unable to verify access of the admin user\n" + err.Error())
+		return nil, err
+	}
+
+	if adminId == "" {
+		err = fmt.Errorf("admin user not found")
+		return nil, err
+	}
+
+	// Adding a retry logic to fetch the admin policies when a role name or scope name is not found. This is necessary because when a new role or scope is created using the orchestration API, the CC Admin API may take up to 3 minutes
+	// to reflect the updated list. Therefore, we need to wait before throwing an error indicating that the value is not found.
+	const (
+		maxRetries    = 7
+		retryInterval = 30 * time.Second
+	)
+
+	var (
+		accessPolicies          *ccadmins.AdministratorAccessModel
+		adminPolicyAccessModels []ccadmins.AdministratorAccessPolicyModel
+		itemFound               bool
+	)
+
+	for retryCount := 0; retryCount < maxRetries; retryCount++ {
+		accessPolicies, err = getAccessPolicies(ctx, client, adminId)
+		if err != nil {
+			return nil, err
+		}
+
+		adminPolicyAccessModels, itemFound, err = fetchAdminPolicyAccessModels(ctx, diagnostics, adminUserResourceModel, accessPolicies)
+		// If no error or item found, break the loop
+		if err == nil || itemFound {
+			break
+		}
+		// Sleep for the retry interval before trying again
+		time.Sleep(retryInterval)
+	}
+
+	if err != nil {
+		err = fmt.Errorf("error fetching admin policy access models\n" + err.Error())
+		return nil, err
+	}
+
+	return adminPolicyAccessModels, nil
+}
+
+func fetchAdminPolicyAccessModels(ctx context.Context, diagnostics *diag.Diagnostics, adminUserResourceModel CCAdminUserResourceModel, accessPolicies *ccadmins.AdministratorAccessModel) ([]ccadmins.AdministratorAccessPolicyModel, bool, error) {
+	policies := util.ObjectListToTypedArray[CCAdminPolicyResourceModel](ctx, diagnostics, adminUserResourceModel.Policies)
+	adminPolicyAccessModels := []ccadmins.AdministratorAccessPolicyModel{}
+	for _, policy := range policies {
+		adminAccessPolicyModel, itemFound, err := getAdminAccessPolicy(ctx, diagnostics, policy, accessPolicies.GetPolicies())
+		if err != nil {
+			return nil, itemFound, err
+		}
+		adminPolicyAccessModels = append(adminPolicyAccessModels, adminAccessPolicyModel)
+	}
+	return adminPolicyAccessModels, false, nil
+}
+
+func getAdminAccessPolicy(ctx context.Context, diagnostics *diag.Diagnostics, adminPolicyResourceModel CCAdminPolicyResourceModel, remoteAdminPolicies []ccadmins.AdministratorAccessPolicyModel) (ccadmins.AdministratorAccessPolicyModel, bool, error) {
 	policyDisplayName := adminPolicyResourceModel.Name.ValueString()
 	serviceName := adminPolicyResourceModel.ServiceName.ValueString()
 	scopes := util.StringSetToStringArray(ctx, diagnostics, adminPolicyResourceModel.Scopes)
@@ -173,13 +222,13 @@ func getAdminAccessPolicy(ctx context.Context, diagnostics *diag.Diagnostics, ad
 					}
 					if !scopeNameExists {
 						err := fmt.Errorf("scope with name: %s not found", scope)
-						return createAdminPolicyModel, err
+						return createAdminPolicyModel, false, err
 					}
 					createAdminPolicyModel.SetScopeChoices(createScopeChoices)
 				}
 			} else if len(scopes) > 0 {
 				err := fmt.Errorf("policy with name: %s does not contain any scopes", policyDisplayName)
-				return createAdminPolicyModel, err
+				return createAdminPolicyModel, true, err
 			} else {
 				createAdminPolicyModel.SetScopeChoices(remotePolicyScopeChoices)
 			}
@@ -187,33 +236,18 @@ func getAdminAccessPolicy(ctx context.Context, diagnostics *diag.Diagnostics, ad
 	}
 	if !policyNameExists {
 		err := fmt.Errorf("policy with name: %s not found", policyDisplayName)
-		return createAdminPolicyModel, err
+		return createAdminPolicyModel, false, err
 	}
 	if len(serviceNameList) > 1 {
 		err := fmt.Errorf("policy with name: %s is associated with multiple services %v. Please specify one of the services in the 'service_name' attribute", policyDisplayName, strings.Join(serviceNameList, ", "))
-		return createAdminPolicyModel, err
+		return createAdminPolicyModel, true, err
 	}
 
 	if createAdminPolicyModel.GetServiceName() == ADMINISTRATORSERVICENAME_XENDESKTOP && len(scopes) == 0 {
 		err := fmt.Errorf("policy '%s' with service name '%s' has no scopes; please add scope values", policyDisplayName, ADMINISTRATORSERVICENAME_XENDESKTOP)
-		return createAdminPolicyModel, err
+		return createAdminPolicyModel, true, err
 	}
-	return createAdminPolicyModel, nil
-}
-
-func getListOfAllAccessPolicies(ctx context.Context, client *citrixdaasclient.CitrixDaasClient) (*ccadmins.AdministratorAccessModel, error) {
-	adminId, err := getAdminIdFromAuthToken(client)
-	if err != nil {
-		err = fmt.Errorf("Unable to verify access of the admin user\n" + err.Error())
-		return nil, err
-	}
-
-	if adminId == "" {
-		err = fmt.Errorf("admin user not found")
-		return nil, err
-	}
-	// Get all access policies for the admin user
-	return getAccessPolicies(ctx, client, adminId)
+	return createAdminPolicyModel, true, nil
 }
 
 func getAccessPolicies(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, adminId string) (*ccadmins.AdministratorAccessModel, error) {

@@ -26,8 +26,7 @@ type WemSiteResourceModel struct {
 
 func (WemSiteResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "WEM --- Manages configuration sets within a WEM deployment." +
-			"\n\n~> **Disclaimer** This feature is supported for Citrix Cloud customers, and will be made available for On-Premises soon.",
+		Description: "WEM --- Manages configuration sets within a WEM deployment.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "Identifier of the configuration set.",

@@ -74,7 +74,7 @@ func TestAdminUserResource(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildAdminUserResource(t, adminUserTestResource),
 					BuildAdminScopeResource(t, adminScopeTestResource),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsOnly"),
 					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
@@ -109,7 +109,7 @@ func TestAdminUserResource(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildAdminUserResource(t, adminUserTestResource_updated),
 					BuildAdminScopeResource(t, adminScopeTestResource),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsOnly"),
 					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),

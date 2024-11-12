@@ -10,8 +10,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
-func TestResourceLocationDataResourcePreCheck(t *testing.T) {
-	if v := os.Getenv("TEST_RESOURCE_LOCATION_NAME"); v == "" {
+func TestResourceLocationDataSourcePreCheck(t *testing.T) {
+	if v := os.Getenv("TEST_RESOURCE_LOCATION_DATASOURCE_NAME"); v == "" {
 		t.Fatal("TEST_RESOURCE_LOCATION_DATASOURCE_NAME must be set for acceptance tests")
 	}
 
@@ -20,23 +20,23 @@ func TestResourceLocationDataResourcePreCheck(t *testing.T) {
 	}
 }
 
-func TestResourceLocationDataResource(t *testing.T) {
-	name := os.Getenv("TEST_RESOURCE_LOCATION_NAME")
-	id := os.Getenv("TEST_RESOURCE_LOCATION_DATASOURCE_NAME")
+func TestResourceLocationDataSource(t *testing.T) {
+	name := os.Getenv("TEST_RESOURCE_LOCATION_DATASOURCE_NAME")
+	id := os.Getenv("TEST_RESOURCE_LOCATION_ID")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		PreCheck: func() {
 			TestProviderPreCheck(t)
-			TestResourceLocationDataResourcePreCheck(t)
+			TestResourceLocationDataSourcePreCheck(t)
 		},
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: BuildResourceLocationDataResource(t, resourceLocationTestDataResource, name),
+				Config: BuildResourceLocationDataSource(t, resourceLocationTestDataSource, name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the id of the resource location data source
-					resource.TestCheckResourceAttr("citrix_cloud_resource_location.test_resource_location", "id", id),
+					resource.TestCheckResourceAttr("data.citrix_cloud_resource_location.test_resource_location", "id", id),
 				),
 			},
 		},
@@ -44,14 +44,14 @@ func TestResourceLocationDataResource(t *testing.T) {
 }
 
 var (
-	resourceLocationTestDataResource = `
-resource "citrix_cloud_resource_location" "test_resource_location" {
+	resourceLocationTestDataSource = `
+data "citrix_cloud_resource_location" "test_resource_location" {
 	name = "%s"
 }
 `
 )
 
-func BuildResourceLocationDataResource(t *testing.T, resourceLocation string, resourceLocationName string) string {
+func BuildResourceLocationDataSource(t *testing.T, resourceLocation string, resourceLocationName string) string {
 	tfbody := fmt.Sprintf(resourceLocation, resourceLocationName)
 	return tfbody
 }

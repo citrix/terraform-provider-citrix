@@ -59,7 +59,7 @@ func (r *policySetResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 	}
 
 	// Retrieve values from plan
-	var plan PolicySetResourceModel
+	var plan PolicySetModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -69,7 +69,7 @@ func (r *policySetResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 	// Validate DDC Version
 	errorSummary := fmt.Sprintf("Error %s Policy Set", operation)
 	feature := "Policy Set resource"
-	isDdcVersionSupported := util.CheckProductVersion(r.client, &resp.Diagnostics, 120, 7, 41, errorSummary, feature)
+	isDdcVersionSupported := util.CheckProductVersion(r.client, &resp.Diagnostics, 120, 118, 7, 41, errorSummary, feature)
 
 	if !isDdcVersionSupported {
 		return
@@ -108,8 +108,18 @@ func (r *policySetResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 
 	for _, policy := range plannedPolicies {
 		policyContainsUserSetting := false
+		existingPolicySettingNames := map[string]bool{}
 		policySettings := util.ObjectSetToTypedArray[PolicySettingModel](ctx, &resp.Diagnostics, policy.PolicySettings)
 		for _, setting := range policySettings {
+			if existingPolicySettingNames[setting.Name.ValueString()] {
+				resp.Diagnostics.AddError(
+					"Error "+operation+" Policy Set",
+					"Each type of policy settings can only be specified once in the same group policy.",
+				)
+				return
+			} else {
+				existingPolicySettingNames[setting.Name.ValueString()] = true
+			}
 			if slices.ContainsFunc(userSettings, func(userSetting string) bool {
 				return strings.EqualFold(userSetting, setting.Name.ValueString())
 			}) {
@@ -194,7 +204,7 @@ func (r *policySetResource) Configure(_ context.Context, req resource.ConfigureR
 
 // Schema implements resource.Resource.
 func (*policySetResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = PolicySetResourceModel{}.GetSchema()
+	resp.Schema = PolicySetModel{}.GetSchema()
 }
 
 // Create implements resource.Resource.
@@ -202,7 +212,7 @@ func (r *policySetResource) Create(ctx context.Context, req resource.CreateReque
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
-	var plan PolicySetResourceModel
+	var plan PolicySetModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -316,7 +326,7 @@ func (r *policySetResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, policySet, policies, policySetScopes)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, true, policySet, policies, policySetScopes)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -330,7 +340,7 @@ func (r *policySetResource) Create(ctx context.Context, req resource.CreateReque
 func (r *policySetResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
-	var state PolicySetResourceModel
+	var state PolicySetModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -353,7 +363,7 @@ func (r *policySetResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, policySet, policies, policySetScopes)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, true, policySet, policies, policySetScopes)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -368,14 +378,14 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
-	var plan PolicySetResourceModel
+	var plan PolicySetModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	var state PolicySetResourceModel
+	var state PolicySetModel
 	diags = req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -422,15 +432,16 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 
 	policiesInPlan := util.ObjectListToTypedArray[PolicyModel](ctx, &resp.Diagnostics, plan.Policies)
-	policyIdsInPlan := []string{}
 	policiesToCreate := []PolicyModel{}
 	policiesToUpdate := []PolicyModel{}
+	policiesWithUpdatedNames := []PolicyModel{}
+	policyIdMapInPlan := map[string]PolicyModel{}
 	for _, policy := range policiesInPlan {
 		if policy.Id.ValueString() == "" {
 			policiesToCreate = append(policiesToCreate, policy)
 		} else {
-			policyIdsInPlan = append(policyIdsInPlan, policy.Id.ValueString())
 			policiesToUpdate = append(policiesToUpdate, policy)
+			policyIdMapInPlan[policy.Id.ValueString()] = policy
 		}
 	}
 
@@ -439,20 +450,21 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 	for _, policy := range util.ObjectListToTypedArray[PolicyModel](ctx, &resp.Diagnostics, state.Policies) {
 		policyIdMapFromState[strings.ToLower(policy.Id.ValueString())] = policy
 		policyIdsInState = append(policyIdsInState, policy.Id.ValueString())
+		if policyInPlan, ok := policyIdMapInPlan[policy.Id.ValueString()]; ok && policy.Name.ValueString() != policyInPlan.Name.ValueString() {
+			policiesWithUpdatedNames = append(policiesWithUpdatedNames, policy)
+		}
 	}
 
 	policyIdsToDelete := []string{}
 	// Check if any policies are to be deleted
 	for _, policyId := range policyIdsInState {
-		if !slices.ContainsFunc(policyIdsInPlan, func(policyIdInPlan string) bool {
-			return strings.EqualFold(policyId, policyIdInPlan)
-		}) {
+		if _, ok := policyIdMapInPlan[policyId]; !ok {
 			policyIdsToDelete = append(policyIdsToDelete, policyId)
 		}
 	}
 
 	// Rename policies to update with their policy id to avoid naming collision
-	if len(policiesToUpdate) > 0 {
+	if len(policiesWithUpdatedNames) > 0 {
 		batchApiHeaders, httpResp, err := generateBatchApiHeaders(r.client)
 		if err != nil {
 			diags.AddError(
@@ -464,7 +476,7 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 		}
 		batchRequestItems := []citrixorchestration.BatchRequestItemModel{}
 		var batchRequestModel citrixorchestration.BatchRequestModel
-		for policyIndex, policy := range policiesToUpdate {
+		for policyIndex, policy := range policiesWithUpdatedNames {
 			var updatePolicyRequest = citrixorchestration.PolicyRequest{}
 			updatePolicyRequest.SetName(policy.Id.ValueString())
 			updatePolicyRequestBodyString, err := util.ConvertToString(updatePolicyRequest)
@@ -780,7 +792,7 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, policySet, policies, policySetScopes)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, true, policySet, policies, policySetScopes)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -795,7 +807,7 @@ func (r *policySetResource) Delete(ctx context.Context, req resource.DeleteReque
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from state
-	var state PolicySetResourceModel
+	var state PolicySetModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -905,7 +917,7 @@ func (r *policySetResource) ImportState(ctx context.Context, req resource.Import
 func (r *policySetResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
-	var data PolicySetResourceModel
+	var data PolicySetModel
 	diags := req.Config.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {

@@ -111,6 +111,14 @@
         "TEST_HYPERV_RP_VPC_AWS_EC2"               :"{aws_ec2_vpc_name}",
         "TEST_HYPERV_RP_AVAILABILITY_ZONE_AWS_EC2" :"{aws_ec2_availability_zone}",
         "Test_HYPERV_RP_SUBNETS_AWS_EC2"           :"[\"{subnet_mask}\"]",
+
+        // Machine Properties Go Tests
+        "TEST_MACHINE_PROPERTIES_RESOURCE_NAME": "{machine_id}",
+        "TEST_MACHINE_PROPERTIES_RESOURCE_NAME_UPDATED": "{machine_id_updated}",
+        "TEST_MACHINE_PROPERTIES_RESOURCE_MACHINE_CATALOG_ID": "{machine_catalog_id}",
+        "TEST_MACHINE_PROPERTIES_RESOURCE_MACHINE_CATALOG_ID_UPDATED": "{machine_catalog_id_updated}",
+        "TEST_MACHINE_PROPERTIES_RESOURCE_TAG": "{machine_tag_id}",
+        "TEST_MACHINE_PROPERTIES_RESOURCE_TAG_UPDATED": "{machine_tag_id_updated}",
  
         // Machine Catalog Go Tests - Azure
         "TEST_MC_NAME"                  :"{catalog_name}",
@@ -269,14 +277,27 @@
         
         // Admin role env variable
         "TEST_ROLE_NAME"                :"ctx-test-role",
+        // Admin Role Data Source env variable
+        "TEST_ADMIN_ROLE_DATA_SOURCE_ID": "{ADMIN_ROLE_ID}",
+        "TEST_ADMIN_ROLE_DATA_SOURCE_NAME": "{ADMIN_ROLE_NAME}",
+        "TEST_ADMIN_ROLE_DATA_SOURCE_EXPECTED_DESCRIPTION": "{ADMIN_ROLE_DESCRIPTION}",
+        
         // Admin Scope Go Tests
         "TEST_ADMIN_SCOPE_NAME"         :"ctx-test-scope",
         // Admin User Go Tests
         "TEST_ADMIN_USER_NAME"         :"user0001",
         "TEST_ADMIN_USER_DOMAIN"       :"CTX-AD",
+        // Admin User Data Source Go Tests
+        "TEST_ADMIN_USER_DATA_SOURCE_ID"            :"{ADMIN_USER_ID}",
+        "TEST_ADMIN_USER_DATA_SOURCE_IS_ENABLED"    :"{IS_ENABLED}",
 
         // Policy Set env variable
+        // Policy Set Resource Tests env variables
         "TEST_POLICY_SET_NAME"          :"ctx-test-policy-set",
+        // Policy Set Data Source Tests env variables
+        "TEST_POLICY_SET_DATA_SOURCE_ID" : "{Policy Set Data Source ID}",
+        "TEST_POLICY_SET_DATA_SOURCE_NAME" : "{Policy Set Data Source Name}",
+        "TEST_POLICY_SET_DATA_SOURCE_EXPECTED_POLICY_COUNT" : "{Policy Set Data Source Policy Count}",
 
         // StoreFront env variable
         "SF_COMPUTER_NAME"              : "{storefront_computer_name}",
@@ -361,7 +382,10 @@
         "TEST_TAG_DATA_SOURCE_DESCRIPTION": "{Description of the tag}",
         // Tag Resource Go Tests Env Variables
         "TEST_TAG_RESOURCE_NAME": "{Name of the tag resource}",
-        "TEST_TAG_RESOURCE_DESCRIPTION": "{Description of the tag resource}"
+        "TEST_TAG_RESOURCE_DESCRIPTION": "{Description of the tag resource}",
+
+        // Desktop Icon Go Tests
+        "TEST_DESKTOP_ICON_RAW_DATA": "{Desktop Icon Raw Data}"
     },
     "go.testTimeout": "30m"
 }

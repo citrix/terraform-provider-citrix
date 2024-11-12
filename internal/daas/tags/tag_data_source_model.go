@@ -35,11 +35,15 @@ func (TagDataSourceModel) GetSchema() schema.Schema {
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.ExactlyOneOf(path.MatchRoot("name")), // Ensures that only one of either Id or Name is provided. It will also cause a validation error if none are specified.
+					stringvalidator.LengthAtLeast(1),
 				},
 			},
 			"name": schema.StringAttribute{
 				Description: "Name of the tag.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
 			},
 			"description": schema.StringAttribute{
 				Description: "Description of the tag.",

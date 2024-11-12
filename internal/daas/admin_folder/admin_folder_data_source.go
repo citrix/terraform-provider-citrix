@@ -3,7 +3,6 @@ package admin_folder
 
 import (
 	"context"
-	"strings"
 
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
@@ -27,7 +26,7 @@ func (d *AdminFolderDataSource) Metadata(_ context.Context, req datasource.Metad
 }
 
 func (d *AdminFolderDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
-	resp.Schema = AdminFolderDataSourceModel{}.GetSchema()
+	resp.Schema = AdminFolderModel{}.GetDataSourceSchema()
 }
 
 func (d *AdminFolderDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -47,7 +46,7 @@ func (d *AdminFolderDataSource) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	var data AdminFolderDataSourceModel
+	var data AdminFolderModel
 
 	// Read Terraform configuration data into the model
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
@@ -59,12 +58,10 @@ func (d *AdminFolderDataSource) Read(ctx context.Context, req datasource.ReadReq
 	// Read the data from the API
 	var adminFolderIdOrPath string
 
-	if data.Id.ValueString() != "" {
+	if !data.Id.IsNull() {
 		adminFolderIdOrPath = data.Id.ValueString()
-	}
-	if data.Path.ValueString() != "" {
-		adminFolderIdOrPath = data.Path.ValueString() + "\\"
-		adminFolderIdOrPath = strings.ReplaceAll(adminFolderIdOrPath, "\\", "|")
+	} else {
+		adminFolderIdOrPath = util.BuildResourcePathForGetRequest(data.Path.ValueString(), "")
 	}
 
 	adminFolder, err := getAdminFolder(ctx, d.client, &resp.Diagnostics, adminFolderIdOrPath)

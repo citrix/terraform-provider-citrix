@@ -13,15 +13,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// ResourceLocationResourceModel maps the resource schema data.
-type ResourceLocationResourceModel struct {
+// ResourceLocationModel maps the resource schema data.
+type ResourceLocationModel struct {
 	Id           types.String `tfsdk:"id"`
 	Name         types.String `tfsdk:"name"`
 	InternalOnly types.Bool   `tfsdk:"internal_only"`
 	TimeZone     types.String `tfsdk:"time_zone"`
 }
 
-func (ResourceLocationResourceModel) GetSchema() schema.Schema {
+func (ResourceLocationModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		// This description is used by the documentation generator and the language server.
 		Description: "Citrix Cloud --- Manages a Citrix Cloud resource location.",
@@ -54,11 +54,11 @@ func (ResourceLocationResourceModel) GetSchema() schema.Schema {
 	}
 }
 
-func (ResourceLocationResourceModel) GetAttributes() map[string]schema.Attribute {
-	return ResourceLocationResourceModel{}.GetSchema().Attributes
+func (ResourceLocationModel) GetAttributes() map[string]schema.Attribute {
+	return ResourceLocationModel{}.GetSchema().Attributes
 }
 
-func (r ResourceLocationResourceModel) RefreshPropertyValues(ccResourceLocation *ccresourcelocations.CitrixCloudServicesRegistryApiModelsLocationsResourceLocationModel) ResourceLocationResourceModel {
+func (r ResourceLocationModel) RefreshPropertyValues(ccResourceLocation *ccresourcelocations.CitrixCloudServicesRegistryApiModelsLocationsResourceLocationModel) ResourceLocationModel {
 
 	// Overwrite resource location with refreshed state
 	r.Id = types.StringValue(ccResourceLocation.GetId())

@@ -47,7 +47,7 @@ func GetHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.Cit
 }
 
 func GetMachineCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, machineCatalogId string, addErrorToDiagnostics bool) (*citrixorchestration.MachineCatalogDetailResponseModel, error) {
-	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId).Fields("Id,Name,Description,ProvisioningType,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC,Metadata,Scopes,UpgradeInfo,AdminFolder")
+	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId).Fields("Id,Name,Description,ProvisioningType,PersistChanges,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC,Metadata,Scopes,UpgradeInfo,AdminFolder")
 	catalog, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.MachineCatalogDetailResponseModel](getMachineCatalogRequest, client)
 	if err != nil && addErrorToDiagnostics {
 		diagnostics.AddError(
@@ -460,5 +460,13 @@ func GetAllScopedObjects(ctx context.Context, client *citrixdaasclient.CitrixDaa
 		return append(responseModel.GetItems(), childResponse...), err
 	} else {
 		return responseModel.GetItems(), nil
+	}
+}
+
+func BuildResourcePathForGetRequest(resourcePathInput string, resourceName string) string {
+	if resourcePathInput != "" {
+		return strings.ReplaceAll(resourcePathInput, "\\", "|") + "|" + resourceName
+	} else {
+		return resourceName
 	}
 }

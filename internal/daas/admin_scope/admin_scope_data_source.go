@@ -28,7 +28,7 @@ func (d *AdminScopeDataSource) Metadata(_ context.Context, req datasource.Metada
 }
 
 func (d *AdminScopeDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
-	resp.Schema = GetAdminScopeDataSourceSchema()
+	resp.Schema = AdminScopeModel{}.GetDataSourceSchema()
 }
 
 func (d *AdminScopeDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -48,7 +48,7 @@ func (d *AdminScopeDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		return
 	}
 
-	var data AdminScopeDataSourceModel
+	var data AdminScopeModel
 
 	// Read Terraform configuration data into the model
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
@@ -60,10 +60,9 @@ func (d *AdminScopeDataSource) Read(ctx context.Context, req datasource.ReadRequ
 	// Read the data from the API
 	var adminScopeNameOrId string
 
-	if data.Id.ValueString() != "" {
+	if !data.Id.IsNull() {
 		adminScopeNameOrId = data.Id.ValueString()
-	}
-	if data.Name.ValueString() != "" {
+	} else {
 		adminScopeNameOrId = data.Name.ValueString()
 	}
 

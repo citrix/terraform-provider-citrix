@@ -42,7 +42,7 @@ func (r *adminRoleResource) Metadata(_ context.Context, req resource.MetadataReq
 
 // Schema defines the schema for the resource.
 func (r *adminRoleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = AdminRoleResourceModel{}.GetSchema()
+	resp.Schema = AdminRoleModel{}.GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -59,7 +59,7 @@ func (r *adminRoleResource) Create(ctx context.Context, req resource.CreateReque
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
-	var plan AdminRoleResourceModel
+	var plan AdminRoleModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -120,7 +120,7 @@ func (r *adminRoleResource) Read(ctx context.Context, req resource.ReadRequest, 
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Get current state
-	var state AdminRoleResourceModel
+	var state AdminRoleModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -148,7 +148,7 @@ func (r *adminRoleResource) Update(ctx context.Context, req resource.UpdateReque
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
-	var plan AdminRoleResourceModel
+	var plan AdminRoleModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -200,7 +200,7 @@ func (r *adminRoleResource) Delete(ctx context.Context, req resource.DeleteReque
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from state
-	var state AdminRoleResourceModel
+	var state AdminRoleModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -251,7 +251,7 @@ func readAdminRole(ctx context.Context, client *citrixdaasclient.CitrixDaasClien
 func (r *adminRoleResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
-	var data AdminRoleResourceModel
+	var data AdminRoleModel
 	diags := req.Config.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -272,7 +272,7 @@ func (r *adminRoleResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 
 	// Retrieve values from plan
 	if !req.Plan.Raw.IsNull() {
-		var plan AdminRoleResourceModel
+		var plan AdminRoleModel
 		diags := req.Plan.Get(ctx, &plan)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {

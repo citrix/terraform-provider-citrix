@@ -623,10 +623,18 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 		operation = "creating"
 	}
 
+	if r.client.AuthConfig.OnPremises && !plan.DefaultDesktopIcon.IsNull() && plan.DefaultDesktopIcon.ValueString() != "1" {
+		resp.Diagnostics.AddError(
+			fmt.Sprintf("Error %s Delivery Group", operation),
+			"Customizing the `default_desktop_icon` is not supported for on-premises delivery group desktops.",
+		)
+		return
+	}
+
 	if plan.AssociatedMachineCatalogs.IsNull() {
 		errorSummary := fmt.Sprintf("Error %s Delivery Group", operation)
 		feature := "Delivery Groups without associated machine catalogs"
-		isFeatureSupportedForCurrentDDC := util.CheckProductVersion(r.client, &resp.Diagnostics, 118, 7, 42, errorSummary, feature)
+		isFeatureSupportedForCurrentDDC := util.CheckProductVersion(r.client, &resp.Diagnostics, 118, 118, 7, 42, errorSummary, feature)
 
 		if !isFeatureSupportedForCurrentDDC {
 			return
@@ -646,6 +654,29 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 	associatedMachineCatalogProperties, err := validateAndReturnMachineCatalogSessionSupport(ctx, *r.client, &resp.Diagnostics, associatedMachineCatalogs, !create)
 	if err != nil || associatedMachineCatalogProperties.SessionSupport == "" {
 		return
+	}
+
+	// Validate Delivery Type
+	if !plan.DeliveryType.IsNull() && !plan.DeliveryType.IsUnknown() && !plan.SessionSupport.IsUnknown() && !plan.SharingKind.IsUnknown() {
+		deliveryType := plan.DeliveryType.ValueString()
+		sharingKind := plan.SharingKind.ValueString()
+		if (associatedMachineCatalogProperties.AllocationType == citrixorchestration.ALLOCATIONTYPE_STATIC || sharingKind == string(citrixorchestration.SHARINGKIND_PRIVATE)) &&
+			deliveryType == string(citrixorchestration.DELIVERYKIND_DESKTOPS_AND_APPS) {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("delivery_type"),
+				"Incorrect Attribute Configuration",
+				fmt.Sprintf("`delivery_type` can only be `%s` or `%s` when allocation type of the associated machine catalog is `%s` or `sharing_kind` is `%s`.", string(citrixorchestration.DELIVERYKIND_DESKTOPS_ONLY), string(citrixorchestration.DELIVERYKIND_APPS_ONLY), string(citrixorchestration.ALLOCATIONTYPE_STATIC), string(citrixorchestration.SHARINGKIND_PRIVATE)),
+			)
+			return
+		}
+
+		if deliveryType == string(citrixorchestration.DELIVERYKIND_APPS_ONLY) && !plan.Desktops.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("delivery_type"),
+				"Incorrect Attribute Configuration",
+				fmt.Sprintf("`delivery_type` cannot be `%s` when `desktops` is specified.", string(citrixorchestration.DELIVERYKIND_APPS_ONLY)),
+			)
+		}
 	}
 
 	isValid, errMsg := validatePowerManagementSettings(ctx, &resp.Diagnostics, plan, associatedMachineCatalogProperties.AllocationType, associatedMachineCatalogProperties.SessionSupport)
@@ -702,5 +733,39 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 			"Incorrect Attribute Configuration",
 			"make_resources_available_in_lhc can only be set for power managed Single Session OS Random (pooled) VDAs.",
 		)
+		return
+	}
+
+	if !plan.Desktops.IsNull() {
+		sessionRoamingShouldBeSet := true
+		if associatedMachineCatalogProperties.AllocationType == citrixorchestration.ALLOCATIONTYPE_STATIC {
+			sessionRoamingShouldBeSet = false
+		}
+
+		if !plan.SharingKind.IsNull() {
+			sharingKind := plan.SharingKind.ValueString()
+			if sharingKind == string(citrixorchestration.SHARINGKIND_PRIVATE) {
+				sessionRoamingShouldBeSet = false
+			}
+		}
+
+		desktops := util.ObjectListToTypedArray[DeliveryGroupDesktop](ctx, &resp.Diagnostics, plan.Desktops)
+		for _, desktop := range desktops {
+			if desktop.EnableSessionRoaming.IsUnknown() {
+				continue
+			} else if !desktop.EnableSessionRoaming.IsNull() && !sessionRoamingShouldBeSet {
+				resp.Diagnostics.AddError(
+					"Error "+operation+" Delivery Group "+plan.Name.ValueString(),
+					"`enable_session_roaming` cannot be set when `sharing_kind` is `Private` or associated machine catalogs have `Static` allocation type.",
+				)
+				return
+			} else if desktop.EnableSessionRoaming.IsNull() && sessionRoamingShouldBeSet {
+				resp.Diagnostics.AddError(
+					"Error "+operation+" Delivery Group "+plan.Name.ValueString(),
+					"`enable_session_roaming` should be set when `sharing_kind` is `Shared` or associated machine catalogs have `Random` allocation type.",
+				)
+				return
+			}
+		}
 	}
 }

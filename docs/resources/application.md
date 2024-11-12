@@ -75,6 +75,7 @@ resource "citrix_application" "example-application" {
 -> **Note** The order of delivery group in the `delivery_groups` list determines the priority of the delivery group. Alternatively, you can use the `delivery_groups_priority` attribute to selectively set the priority of delivery groups.
 - `delivery_groups_priority` (Attributes Set) Set of delivery groups with their corresponding priority. (see [below for nested schema](#nestedatt--delivery_groups_priority))
 - `description` (String) Description of the application.
+- `enabled` (Boolean) Indicates whether the application is enabled or disabled. Default is `true`.
 - `icon` (String) The Id of the icon to be associated with the application.
 - `limit_visibility_to_users` (Set of String) By default, the application is visible to all users within a delivery group. However, you can restrict its visibility to only certain users by specifying them in the `limit_visibility_to_users` list.
 

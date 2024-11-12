@@ -65,9 +65,9 @@ func (r *awsWorkspacesAccountDataSource) Read(ctx context.Context, req datasourc
 
 	var account *citrixquickcreate.AwsEdcAccount
 	var err error
-	if data.AccountId.ValueString() != "" {
+	if !data.AccountId.IsNull() {
 		account, _, err = getAwsWorkspacesAccountUsingId(ctx, r.client, &resp.Diagnostics, data.AccountId.ValueString())
-	} else if data.Name.ValueString() != "" {
+	} else {
 		account, _, err = getAwsWorkspacesAccountUsingName(ctx, r.client, &resp.Diagnostics, data.Name.ValueString())
 	}
 	if err != nil {

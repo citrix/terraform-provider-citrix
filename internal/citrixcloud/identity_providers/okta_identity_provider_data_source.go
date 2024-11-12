@@ -28,7 +28,7 @@ func (d *OktaIdentityProviderDataSource) Metadata(_ context.Context, req datasou
 }
 
 func (d *OktaIdentityProviderDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
-	resp.Schema = OktaIdentityProviderDataSourceModel{}.GetSchema()
+	resp.Schema = OktaIdentityProviderModel{}.GetDataSourceSchema()
 }
 
 func (d *OktaIdentityProviderDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -49,7 +49,7 @@ func (d *OktaIdentityProviderDataSource) Read(ctx context.Context, req datasourc
 		return
 	}
 
-	var data OktaIdentityProviderDataSourceModel
+	var data OktaIdentityProviderModel
 	// Read Terraform configuration data into the model
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -59,9 +59,9 @@ func (d *OktaIdentityProviderDataSource) Read(ctx context.Context, req datasourc
 	// Read the data from the API
 	var idpStatus *citrixcws.IdpStatusModel
 	var err error
-	if data.Id.ValueString() != "" {
+	if !data.Id.IsNull() {
 		idpStatus, err = getIdentityProviderById(ctx, d.client, &resp.Diagnostics, d.idpType, data.Id.ValueString())
-	} else if data.Name.ValueString() != "" {
+	} else {
 		idpStatus, err = getIdentityProviderByName(ctx, d.client, &resp.Diagnostics, d.idpType, data.Name.ValueString())
 	}
 
@@ -69,7 +69,7 @@ func (d *OktaIdentityProviderDataSource) Read(ctx context.Context, req datasourc
 		return
 	}
 
-	data = data.RefreshPropertyValues(idpStatus)
+	data = data.RefreshPropertyValues(false, idpStatus)
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

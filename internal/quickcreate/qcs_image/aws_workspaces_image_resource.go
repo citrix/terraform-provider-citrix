@@ -42,7 +42,7 @@ func (r *awsWorkspacesImageResource) Metadata(_ context.Context, req resource.Me
 
 // Schema defines the schema for the resource.
 func (r *awsWorkspacesImageResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = AwsWorkspacesImageResourceModel{}.GetSchema()
+	resp.Schema = AwsWorkspacesImageModel{}.GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.
@@ -59,7 +59,7 @@ func (r *awsWorkspacesImageResource) Create(ctx context.Context, req resource.Cr
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
-	var plan AwsWorkspacesImageResourceModel
+	var plan AwsWorkspacesImageModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -125,7 +125,7 @@ func (r *awsWorkspacesImageResource) Create(ctx context.Context, req resource.Cr
 	}
 
 	// Map response body to schema and populate computed attribute values
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, image)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, true, image)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -140,7 +140,7 @@ func (r *awsWorkspacesImageResource) Read(ctx context.Context, req resource.Read
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from state
-	var state AwsWorkspacesImageResourceModel
+	var state AwsWorkspacesImageModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -156,7 +156,7 @@ func (r *awsWorkspacesImageResource) Read(ctx context.Context, req resource.Read
 	}
 
 	// Map response body to schema and populate computed attribute values
-	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, image)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, true, image)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, state)
@@ -181,7 +181,7 @@ func (r *awsWorkspacesImageResource) Delete(ctx context.Context, req resource.De
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from state
-	var state AwsWorkspacesImageResourceModel
+	var state AwsWorkspacesImageModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -222,7 +222,7 @@ func (r *awsWorkspacesImageResource) ImportState(ctx context.Context, req resour
 func (r *awsWorkspacesImageResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
-	var data AwsWorkspacesImageResourceModel
+	var data AwsWorkspacesImageModel
 	diags := req.Config.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {

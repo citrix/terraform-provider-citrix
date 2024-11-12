@@ -644,7 +644,11 @@ func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan Provisioning
 }
 
 func generateAdminCredentialHeader(machineDomainIdentityModel MachineDomainIdentityModel) string {
-	credential := fmt.Sprintf("%s\\%s:%s", machineDomainIdentityModel.Domain.ValueString(), machineDomainIdentityModel.ServiceAccount.ValueString(), machineDomainIdentityModel.ServiceAccountPassword.ValueString())
+	domain := machineDomainIdentityModel.Domain.ValueString()
+	if !machineDomainIdentityModel.ServiceAccountDomain.IsNull() {
+		domain = machineDomainIdentityModel.ServiceAccountDomain.ValueString()
+	}
+	credential := fmt.Sprintf("%s\\%s:%s", domain, machineDomainIdentityModel.ServiceAccount.ValueString(), machineDomainIdentityModel.ServiceAccountPassword.ValueString())
 	encodedData := base64.StdEncoding.EncodeToString([]byte(credential))
 	header := fmt.Sprintf("Basic %s", encodedData)
 

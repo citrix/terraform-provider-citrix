@@ -33,7 +33,7 @@ func (d *ResourceLocationsDataSource) Metadata(ctx context.Context, req datasour
 }
 
 func (d *ResourceLocationsDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
-	resp.Schema = ResourceLocationsDataSourceModel{}.GetSchema()
+	resp.Schema = ResourceLocationModel{}.GetDataSourceSchema()
 }
 
 func (d *ResourceLocationsDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -53,7 +53,7 @@ func (d *ResourceLocationsDataSource) Read(ctx context.Context, req datasource.R
 		return
 	}
 
-	var data ResourceLocationsDataSourceModel
+	var data ResourceLocationModel
 
 	// Read Terraform configuration data into the model
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)

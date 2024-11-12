@@ -52,7 +52,7 @@ func (r *adminFolderResource) Configure(_ context.Context, req resource.Configur
 
 // Schema defines the schema for the data source.
 func (r *adminFolderResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = AdminFolderResourceModel{}.GetSchema()
+	resp.Schema = AdminFolderModel{}.GetSchema()
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -60,7 +60,7 @@ func (r *adminFolderResource) Create(ctx context.Context, req resource.CreateReq
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
-	var plan AdminFolderResourceModel
+	var plan AdminFolderModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -112,7 +112,7 @@ func (r *adminFolderResource) Read(ctx context.Context, req resource.ReadRequest
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Get current state
-	var state AdminFolderResourceModel
+	var state AdminFolderModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -140,7 +140,7 @@ func (r *adminFolderResource) Update(ctx context.Context, req resource.UpdateReq
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
-	var plan AdminFolderResourceModel
+	var plan AdminFolderModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -194,7 +194,7 @@ func (r *adminFolderResource) Delete(ctx context.Context, req resource.DeleteReq
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from state
-	var state AdminFolderResourceModel
+	var state AdminFolderModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -230,7 +230,7 @@ func (r *adminFolderResource) ImportState(ctx context.Context, req resource.Impo
 func (r *adminFolderResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
-	var data AdminFolderResourceModel
+	var data AdminFolderModel
 	diags := req.Config.Get(ctx, &data)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {

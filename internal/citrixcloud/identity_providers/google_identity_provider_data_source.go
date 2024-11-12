@@ -59,9 +59,9 @@ func (d *GoogleIdentityProviderDataSource) Read(ctx context.Context, req datasou
 	// Read the data from the API
 	var idpStatus *citrixcws.IdpStatusModel
 	var err error
-	if data.Id.ValueString() != "" {
+	if !data.Id.IsNull() {
 		idpStatus, err = getIdentityProviderById(ctx, d.client, &resp.Diagnostics, d.idpType, data.Id.ValueString())
-	} else if data.Name.ValueString() != "" {
+	} else {
 		idpStatus, err = getIdentityProviderByName(ctx, d.client, &resp.Diagnostics, d.idpType, data.Name.ValueString())
 	}
 

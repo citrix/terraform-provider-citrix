@@ -2,34 +2,17 @@
 package qcs_connection
 
 import (
-	"context"
 	"regexp"
 
-	quickcreateservice "github.com/citrix/citrix-daas-rest-go/citrixquickcreate"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type AwsWorkspacesDirectoryConnectionDataSourceModel struct {
-	DirectoryConnectionId           types.String `tfsdk:"id"`
-	AccountId                       types.String `tfsdk:"account"`
-	Name                            types.String `tfsdk:"name"`
-	ZoneId                          types.String `tfsdk:"zone"`
-	ResourceLocationId              types.String `tfsdk:"resource_location"`
-	Directory                       types.String `tfsdk:"directory"`
-	Subnets                         types.Set    `tfsdk:"subnets"`
-	Tenancy                         types.String `tfsdk:"tenancy"`
-	UserEnabledAsLocalAdministrator types.Bool   `tfsdk:"user_enabled_as_local_administrator"`
-	SecurityGroup                   types.String `tfsdk:"security_group"`
-	DefaultOu                       types.String `tfsdk:"default_ou"`
-}
-
-func (AwsWorkspacesDirectoryConnectionDataSourceModel) GetSchema() schema.Schema {
+func (AwsWorkspacesDirectoryConnectionModel) GetDataSourceSchema() schema.Schema {
 	return schema.Schema{
 		Description: "DaaS Quick Deploy - AWS WorkSpaces Core --- Data Source of an AWS WorkSpaces directory connection.",
 		Attributes: map[string]schema.Attribute{
@@ -38,12 +21,15 @@ func (AwsWorkspacesDirectoryConnectionDataSourceModel) GetSchema() schema.Schema
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
-					stringvalidator.ExactlyOneOf(path.MatchRoot("id"), path.MatchRoot("name")), // Ensures that only one of either Id or Name is provided. It will also cause a validation error if none are specified.
+					stringvalidator.ExactlyOneOf(path.MatchRoot("name")), // Ensures that only one of either Id or Name is provided. It will also cause a validation error if none are specified.
 				},
 			},
 			"name": schema.StringAttribute{
 				Description: "Name of the directory connection.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
 			},
 			"account": schema.StringAttribute{
 				Description: "ID of the account the directory connection is associated with.",
@@ -89,22 +75,6 @@ func (AwsWorkspacesDirectoryConnectionDataSourceModel) GetSchema() schema.Schema
 	}
 }
 
-func (AwsWorkspacesDirectoryConnectionDataSourceModel) GetAttributes() map[string]schema.Attribute {
-	return AwsWorkspacesDirectoryConnectionDataSourceModel{}.GetSchema().Attributes
-}
-
-func (r AwsWorkspacesDirectoryConnectionDataSourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, directory *quickcreateservice.AwsEdcDirectoryConnection) AwsWorkspacesDirectoryConnectionDataSourceModel {
-	r.DirectoryConnectionId = types.StringValue(directory.GetConnectionId())
-	r.Name = types.StringValue(directory.GetName())
-	r.AccountId = types.StringValue(directory.GetAccountId())
-	r.ZoneId = types.StringValue(directory.GetZoneId())
-	r.ResourceLocationId = types.StringValue(directory.GetResourceLocationId())
-	r.Directory = types.StringValue(directory.GetDirectoryId())
-	r.Subnets = util.StringArrayToStringSet(ctx, diagnostics, []string{directory.GetSubnet1Id(), directory.GetSubnet2Id()})
-	r.Tenancy = types.StringValue(string(directory.GetTenancy()))
-	r.UserEnabledAsLocalAdministrator = types.BoolValue(directory.GetUserEnabledAsLocalAdministrator())
-	r.SecurityGroup = types.StringValue(directory.GetSecurityGroupId())
-	r.DefaultOu = types.StringValue(directory.GetDefaultOU())
-
-	return r
+func (AwsWorkspacesDirectoryConnectionModel) GetDataSourceAttributes() map[string]schema.Attribute {
+	return AwsWorkspacesDirectoryConnectionModel{}.GetDataSourceSchema().Attributes
 }

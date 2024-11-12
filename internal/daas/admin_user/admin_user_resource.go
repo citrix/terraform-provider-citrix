@@ -103,7 +103,7 @@ func (r *adminUserResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	// Map response body to schema and populate computed attribute values
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, adminUser)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, true, adminUser)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -131,7 +131,7 @@ func (r *adminUserResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, adminUser)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, true, adminUser)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -190,7 +190,7 @@ func (r *adminUserResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 
 	// Update resource state with updated property values
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, updatedAdminUser)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, true, updatedAdminUser)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

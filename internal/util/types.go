@@ -10,14 +10,19 @@ import (
 	"sync"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	datasourceSchema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	resourceSchema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
-type ModelWithAttributes interface {
-	GetAttributes() map[string]schema.Attribute // workaround because NestedAttributeObject and SingleNestedAttribute do not share a base type
+type ResourceModelWithAttributes interface {
+	GetAttributes() map[string]resourceSchema.Attribute // workaround because NestedAttributeObject and SingleNestedAttribute do not share a base type
+}
+
+type DataSourceModelWithAttributes interface {
+	GetDataSourceAttributes() map[string]datasourceSchema.Attribute // workaround because NestedAttributeObject and SingleNestedAttribute do not share a base type
 }
 
 // Store the attribute map for each model type so we don't have to regenerate it every time
@@ -27,18 +32,18 @@ var attributeMapCache sync.Map
 var defaultObjectCache sync.Map
 
 // <summary>
-// Helper function to convert a model to a map of attribute types. Used when converting back to a types.Object
+// Helper function to convert a resource model to a map of attribute types. Used when converting back to a types.Object
 // </summary>
-// <param name="m">Model to convert, must implement the ModelWithSchema interface</param>
+// <param name="m">Model to convert, must implement the ResourceModelWithSchema interface</param>
 // <returns>Map of attribute types</returns>
-func AttributeMapFromObject(m ModelWithAttributes) (map[string]attr.Type, error) {
+func ResourceAttributeMapFromObject(m ResourceModelWithAttributes) (map[string]attr.Type, error) {
 	keyName := reflect.TypeOf(m).String()
 	if attributes, ok := attributeMapCache.Load(keyName); ok {
 		return attributes.(map[string]attr.Type), nil
 	}
 
 	// not doing an extra sync/double checked lock because generating the attribute map is pretty quick
-	attributeMap, err := attributeMapFromSchema(m.GetAttributes())
+	attributeMap, err := resourceAttributeMapFromSchema(m.GetAttributes())
 	if err != nil {
 		return nil, err
 	}
@@ -47,14 +52,34 @@ func AttributeMapFromObject(m ModelWithAttributes) (map[string]attr.Type, error)
 }
 
 // <summary>
-// Helper function to convert a schema map to a map of attribute types. Used when converting back to a types.Object
+// Helper function to convert a data source model to a map of attribute types. Used when converting back to a types.Object
+// </summary>
+// <param name="m">Model to convert, must implement the DataSourceModelWithSchema interface</param>
+// <returns>Map of attribute types</returns>
+func DataSourceAttributeMapFromObject(m DataSourceModelWithAttributes) (map[string]attr.Type, error) {
+	keyName := reflect.TypeOf(m).String()
+	if attributes, ok := attributeMapCache.Load(keyName); ok {
+		return attributes.(map[string]attr.Type), nil
+	}
+
+	// not doing an extra sync/double checked lock because generating the attribute map is pretty quick
+	attributeMap, err := dataSourceAttributeMapFromSchema(m.GetDataSourceAttributes())
+	if err != nil {
+		return nil, err
+	}
+	attributeMapCache.Store(keyName, attributeMap)
+	return attributeMap, nil
+}
+
+// <summary>
+// Helper function to convert a resource schema map to a map of attribute types. Used when converting back to a types.Object
 // </summary>
 // <param name="s">Schema map of the object</param>
 // <returns>Map of attribute types</returns>
-func attributeMapFromSchema(s map[string]schema.Attribute) (map[string]attr.Type, error) {
+func resourceAttributeMapFromSchema(s map[string]resourceSchema.Attribute) (map[string]attr.Type, error) {
 	var attributeTypes = map[string]attr.Type{}
 	for attributeName, attribute := range s {
-		attrib, err := attributeToTerraformType(attribute)
+		attrib, err := resourceAttributeToTerraformType(attribute)
 		if err != nil {
 			return nil, err
 		}
@@ -63,55 +88,129 @@ func attributeMapFromSchema(s map[string]schema.Attribute) (map[string]attr.Type
 	return attributeTypes, nil
 }
 
-// Converts a schema.Attribute to a terraform attr.Type. Will recurse if the attribute contains a nested object or list of nested objects.
-func attributeToTerraformType(attribute schema.Attribute) (attr.Type, error) {
+// <summary>
+// Helper function to convert a data source schema map to a map of attribute types. Used when converting back to a types.Object
+// </summary>
+// <param name="s">Schema map of the object</param>
+// <returns>Map of attribute types</returns>
+func dataSourceAttributeMapFromSchema(s map[string]datasourceSchema.Attribute) (map[string]attr.Type, error) {
+	var attributeTypes = map[string]attr.Type{}
+	for attributeName, attribute := range s {
+		attrib, err := dataSourceAttributeToTerraformType(attribute)
+		if err != nil {
+			return nil, err
+		}
+		attributeTypes[attributeName] = attrib
+	}
+	return attributeTypes, nil
+}
+
+// Converts a resource schema.Attribute to a terraform attr.Type. Will recurse if the attribute contains a nested object or list of nested objects.
+func resourceAttributeToTerraformType(attribute resourceSchema.Attribute) (attr.Type, error) {
 	switch attrib := attribute.(type) {
-	case schema.StringAttribute:
+	case resourceSchema.StringAttribute:
 		return types.StringType, nil
-	case schema.BoolAttribute:
+	case resourceSchema.BoolAttribute:
 		return types.BoolType, nil
-	case schema.NumberAttribute:
+	case resourceSchema.NumberAttribute:
 		return types.NumberType, nil
-	case schema.Int64Attribute:
+	case resourceSchema.Int64Attribute:
 		return types.Int64Type, nil
-	case schema.Int32Attribute:
+	case resourceSchema.Int32Attribute:
 		return types.Int32Type, nil
-	case schema.Float64Attribute:
+	case resourceSchema.Float64Attribute:
 		return types.Float64Type, nil
-	case schema.Float32Attribute:
+	case resourceSchema.Float32Attribute:
 		return types.Float32Type, nil
-	case schema.ListAttribute:
+	case resourceSchema.ListAttribute:
 		return types.ListType{ElemType: attrib.ElementType}, nil
-	case schema.ListNestedAttribute:
+	case resourceSchema.ListNestedAttribute:
 		// list of object, recurse
-		nestedAttributes, err := attributeMapFromSchema(attrib.NestedObject.Attributes)
+		nestedAttributes, err := resourceAttributeMapFromSchema(attrib.NestedObject.Attributes)
 		if err != nil {
 			return nil, err
 		}
 		return types.ListType{ElemType: types.ObjectType{AttrTypes: nestedAttributes}}, nil
-	case schema.ObjectAttribute:
+	case resourceSchema.ObjectAttribute:
 		return attrib.GetType(), nil
-	case schema.SingleNestedAttribute:
+	case resourceSchema.SingleNestedAttribute:
 		// object, recurse
-		nestedAttributes, err := attributeMapFromSchema(attrib.Attributes)
+		nestedAttributes, err := resourceAttributeMapFromSchema(attrib.Attributes)
 		if err != nil {
 			return nil, err
 		}
 		return types.ObjectType{AttrTypes: nestedAttributes}, nil
-	case schema.SetAttribute:
+	case resourceSchema.SetAttribute:
 		return types.SetType{ElemType: attrib.ElementType}, nil
-	case schema.SetNestedAttribute:
+	case resourceSchema.SetNestedAttribute:
 		// set of object, recurse
-		nestedAttributes, err := attributeMapFromSchema(attrib.NestedObject.Attributes)
+		nestedAttributes, err := resourceAttributeMapFromSchema(attrib.NestedObject.Attributes)
 		if err != nil {
 			return nil, err
 		}
 		return types.SetType{ElemType: types.ObjectType{AttrTypes: nestedAttributes}}, nil
-	case schema.MapAttribute:
+	case resourceSchema.MapAttribute:
 		return types.MapType{ElemType: attrib.ElementType}, nil
-	case schema.MapNestedAttribute:
+	case resourceSchema.MapNestedAttribute:
 		// map of object, recurse
-		nestedAttributes, err := attributeMapFromSchema(attrib.NestedObject.Attributes)
+		nestedAttributes, err := resourceAttributeMapFromSchema(attrib.NestedObject.Attributes)
+		if err != nil {
+			return nil, err
+		}
+		return types.MapType{ElemType: types.ObjectType{AttrTypes: nestedAttributes}}, nil
+	}
+	return nil, fmt.Errorf("unsupported attribute type: %s", attribute)
+}
+
+// Converts a data source schema.Attribute to a terraform attr.Type. Will recurse if the attribute contains a nested object or list of nested objects.
+func dataSourceAttributeToTerraformType(attribute datasourceSchema.Attribute) (attr.Type, error) {
+	switch attrib := attribute.(type) {
+	case datasourceSchema.StringAttribute:
+		return types.StringType, nil
+	case datasourceSchema.BoolAttribute:
+		return types.BoolType, nil
+	case datasourceSchema.NumberAttribute:
+		return types.NumberType, nil
+	case datasourceSchema.Int64Attribute:
+		return types.Int64Type, nil
+	case datasourceSchema.Int32Attribute:
+		return types.Int32Type, nil
+	case datasourceSchema.Float64Attribute:
+		return types.Float64Type, nil
+	case datasourceSchema.Float32Attribute:
+		return types.Float32Type, nil
+	case datasourceSchema.ListAttribute:
+		return types.ListType{ElemType: attrib.ElementType}, nil
+	case datasourceSchema.ListNestedAttribute:
+		// list of object, recurse
+		nestedAttributes, err := dataSourceAttributeMapFromSchema(attrib.NestedObject.Attributes)
+		if err != nil {
+			return nil, err
+		}
+		return types.ListType{ElemType: types.ObjectType{AttrTypes: nestedAttributes}}, nil
+	case datasourceSchema.ObjectAttribute:
+		return attrib.GetType(), nil
+	case datasourceSchema.SingleNestedAttribute:
+		// object, recurse
+		nestedAttributes, err := dataSourceAttributeMapFromSchema(attrib.Attributes)
+		if err != nil {
+			return nil, err
+		}
+		return types.ObjectType{AttrTypes: nestedAttributes}, nil
+	case datasourceSchema.SetAttribute:
+		return types.SetType{ElemType: attrib.ElementType}, nil
+	case datasourceSchema.SetNestedAttribute:
+		// set of object, recurse
+		nestedAttributes, err := dataSourceAttributeMapFromSchema(attrib.NestedObject.Attributes)
+		if err != nil {
+			return nil, err
+		}
+		return types.SetType{ElemType: types.ObjectType{AttrTypes: nestedAttributes}}, nil
+	case datasourceSchema.MapAttribute:
+		return types.MapType{ElemType: attrib.ElementType}, nil
+	case datasourceSchema.MapNestedAttribute:
+		// map of object, recurse
+		nestedAttributes, err := dataSourceAttributeMapFromSchema(attrib.NestedObject.Attributes)
 		if err != nil {
 			return nil, err
 		}
@@ -196,8 +295,34 @@ func ObjectValueToTypedObject[objTyp any](ctx context.Context, diagnostics *diag
 // <param name="v">Object of the specified type</param>
 // <param name="s">Schema map of the object</param>
 // <returns>Object in the native terraform types.Object wrapper</returns>
-func TypedObjectToObjectValue(ctx context.Context, diagnostics *diag.Diagnostics, v ModelWithAttributes) types.Object {
-	attributesMap, err := AttributeMapFromObject(v)
+func TypedObjectToObjectValue(ctx context.Context, diagnostics *diag.Diagnostics, v ResourceModelWithAttributes) types.Object {
+	attributesMap, err := ResourceAttributeMapFromObject(v)
+	if err != nil {
+		diagnostics.AddError("Error converting schema to attribute map", err.Error())
+	}
+	if v == nil {
+		return types.ObjectNull(attributesMap)
+	}
+
+	obj, diags := types.ObjectValueFrom(ctx, attributesMap, v)
+	if diags != nil {
+		diagnostics.Append(diags...)
+		return types.ObjectUnknown(attributesMap)
+	}
+	return obj
+}
+
+// <summary>
+// Helper function to convert a golang object to a native terraform object.
+// Use ObjectValueToTypedObject to go the other way.
+// </summary>
+// <param name="ctx">"context</param>
+// <param name="diagnostics">Any issues will be appended to these diagnostics</param>
+// <param name="v">Object of the specified type</param>
+// <param name="s">Schema map of the object</param>
+// <returns>Object in the native terraform types.Object wrapper</returns>
+func DataSourceTypedObjectToObjectValue(ctx context.Context, diagnostics *diag.Diagnostics, v DataSourceModelWithAttributes) types.Object {
+	attributesMap, err := DataSourceAttributeMapFromObject(v)
 	if err != nil {
 		diagnostics.AddError("Error converting schema to attribute map", err.Error())
 	}
@@ -249,9 +374,9 @@ func ObjectListToTypedArray[objTyp any](ctx context.Context, diagnostics *diag.D
 // <param name="diagnostics">Any issues will be appended to these diagnostics</param>
 // <param name="v">Slice of objects</param>
 // <returns>types.List</returns>
-func TypedArrayToObjectList[objTyp ModelWithAttributes](ctx context.Context, diagnostics *diag.Diagnostics, v []objTyp) types.List {
+func TypedArrayToObjectList[objTyp ResourceModelWithAttributes](ctx context.Context, diagnostics *diag.Diagnostics, v []objTyp) types.List {
 	var t objTyp
-	attributesMap, err := AttributeMapFromObject(t)
+	attributesMap, err := ResourceAttributeMapFromObject(t)
 	if err != nil {
 		diagnostics.AddError("Error converting schema to attribute map", err.Error())
 	}
@@ -263,6 +388,36 @@ func TypedArrayToObjectList[objTyp ModelWithAttributes](ctx context.Context, dia
 	res := make([]types.Object, 0, len(v))
 	for _, val := range v {
 		res = append(res, TypedObjectToObjectValue(ctx, diagnostics, val))
+	}
+	list, diags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: attributesMap}, res)
+	if diags != nil {
+		diagnostics.Append(diags...)
+		return types.ListNull(types.ObjectType{AttrTypes: attributesMap})
+	}
+	return list
+}
+
+// <summary>
+// Helper function to convert a golang slice to a native terraform list of objects.
+// Use ObjectListToTypedArray to go the other way.
+// </summary>
+// <param name="diagnostics">Any issues will be appended to these diagnostics</param>
+// <param name="v">Slice of objects</param>
+// <returns>types.List</returns>
+func DataSourceTypedArrayToObjectList[objTyp DataSourceModelWithAttributes](ctx context.Context, diagnostics *diag.Diagnostics, v []objTyp) types.List {
+	var t objTyp
+	attributesMap, err := DataSourceAttributeMapFromObject(t)
+	if err != nil {
+		diagnostics.AddError("Error converting schema to attribute map", err.Error())
+	}
+
+	if v == nil {
+		return types.ListNull(types.ObjectType{AttrTypes: attributesMap})
+	}
+
+	res := make([]types.Object, 0, len(v))
+	for _, val := range v {
+		res = append(res, DataSourceTypedObjectToObjectValue(ctx, diagnostics, val))
 	}
 	list, diags := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: attributesMap}, res)
 	if diags != nil {
@@ -308,9 +463,9 @@ func ObjectSetToTypedArray[objTyp any](ctx context.Context, diagnostics *diag.Di
 // <param name="diagnostics">Any issues will be appended to these diagnostics</param>
 // <param name="v">Slice of objects</param>
 // <returns>types.Set</returns>
-func TypedArrayToObjectSet[objTyp ModelWithAttributes](ctx context.Context, diagnostics *diag.Diagnostics, v []objTyp) types.Set {
+func TypedArrayToObjectSet[objTyp ResourceModelWithAttributes](ctx context.Context, diagnostics *diag.Diagnostics, v []objTyp) types.Set {
 	var t objTyp
-	attributesMap, err := AttributeMapFromObject(t)
+	attributesMap, err := ResourceAttributeMapFromObject(t)
 	if err != nil {
 		diagnostics.AddError("Error converting schema to attribute map", err.Error())
 	}
@@ -322,6 +477,36 @@ func TypedArrayToObjectSet[objTyp ModelWithAttributes](ctx context.Context, diag
 	res := make([]types.Object, 0, len(v))
 	for _, val := range v {
 		res = append(res, TypedObjectToObjectValue(ctx, diagnostics, val))
+	}
+	set, diags := types.SetValueFrom(ctx, types.ObjectType{AttrTypes: attributesMap}, res)
+	if diags != nil {
+		diagnostics.Append(diags...)
+		return types.SetNull(types.ObjectType{AttrTypes: attributesMap})
+	}
+	return set
+}
+
+// <summary>
+// Helper function to convert a golang slice to a native terraform list of objects.
+// Use ObjectSetToTypedArray to go the other way.
+// </summary>
+// <param name="diagnostics">Any issues will be appended to these diagnostics</param>
+// <param name="v">Slice of objects</param>
+// <returns>types.Set</returns>
+func DataSourceTypedArrayToObjectSet[objTyp DataSourceModelWithAttributes](ctx context.Context, diagnostics *diag.Diagnostics, v []objTyp) types.Set {
+	var t objTyp
+	attributesMap, err := DataSourceAttributeMapFromObject(t)
+	if err != nil {
+		diagnostics.AddError("Error converting schema to attribute map", err.Error())
+	}
+
+	if v == nil {
+		return types.SetNull(types.ObjectType{AttrTypes: attributesMap})
+	}
+
+	res := make([]types.Object, 0, len(v))
+	for _, val := range v {
+		res = append(res, DataSourceTypedObjectToObjectValue(ctx, diagnostics, val))
 	}
 	set, diags := types.SetValueFrom(ctx, types.ObjectType{AttrTypes: attributesMap}, res)
 	if diags != nil {

@@ -29,3 +29,5 @@ data "citrix_cloud_resource_location" "example-resource-location" {
 ### Read-Only
 
 - `id` (String) ID of the resource location.
+- `internal_only` (Boolean) Flag to determine if the resource location can only be used internally. Defaults to `false`.
+- `time_zone` (String) Timezone associated with the resource location. Please refer to the `Timezone` column in the following [table](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/default-time-zones?view=windows-11#time-zones) for allowed values.

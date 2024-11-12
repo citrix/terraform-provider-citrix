@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -116,6 +117,7 @@ type ApplicationResourceModel struct {
 	ApplicationCategoryPath types.String `tfsdk:"application_category_path"`
 	Metadata                types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
 	Tags                    types.Set    `tfsdk:"tags"`     // Set[string]
+	Enabled                 types.Bool   `tfsdk:"enabled"`
 }
 
 // Schema defines the schema for the data source.
@@ -216,6 +218,12 @@ func (ApplicationResourceModel) GetSchema() schema.Schema {
 					),
 				},
 			},
+			"enabled": schema.BoolAttribute{
+				Description: "Indicates whether the application is enabled or disabled. Default is `true`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
+			},
 		},
 	}
 }
@@ -232,6 +240,7 @@ func (r ApplicationResourceModel) RefreshPropertyValues(ctx context.Context, dia
 	r.Description = types.StringValue(application.GetDescription())
 	r.Icon = types.StringValue(application.GetIconId())
 	r.ApplicationCategoryPath = types.StringValue(application.GetClientFolder())
+	r.Enabled = types.BoolValue(application.GetEnabled())
 
 	// Set optional values
 	adminFolder := application.GetApplicationFolder()

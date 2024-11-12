@@ -40,6 +40,9 @@ resource "citrix_delivery_group" "example-delivery-group" {
     ] 
     autoscale_settings = {
         autoscale_enabled = true
+        restrict_autoscale_tag = "example-tag"
+        peak_restrict_min_idle_untagged_percent = 10
+        off_peak_restrict_min_idle_untagged_percent = 10
         disconnect_peak_idle_session_after_seconds = 3600
         log_off_peak_disconnected_session_after_seconds = 3600
         peak_log_off_action = "Nothing"
@@ -197,7 +200,10 @@ resource "citrix_delivery_group" "example-delivery-group" {
 
 -> **Note** Use `Citrix Gateway connections` as the name for the default policy that is Via Access Gateway and `Non-Citrix Gateway connections` as the name for the default policy that is Not Via Access Gateway. (see [below for nested schema](#nestedatt--default_access_policies))
 - `default_desktop_icon` (String) The id of the icon to be used as the default icon for the desktops in the delivery group.
+
+~> **Please Note** This option is only supported for Citrix Cloud Customer
 - `delivery_group_folder_path` (String) The path of the folder in which the delivery group is located.
+- `delivery_type` (String) Delivery type of the delivery group. Available values are `DesktopsOnly`, `AppsOnly`, and `DesktopsAndApps`. Defaults to `DesktopsOnly` for Delivery Groups with associated Machine Catalogs that have `allocation_type` set to `Static` and for Delivery Groups that have `sharing_kind` set to `private`. Otherwise defaults to `DesktopsAndApps
 - `description` (String) Description of the delivery group.
 - `desktops` (Attributes List) A list of Desktop resources to publish on the delivery group. Only 1 desktop can be added to a Remote PC Delivery Group. (see [below for nested schema](#nestedatt--desktops))
 - `make_resources_available_in_lhc` (Boolean) In the event of a service disruption or loss of connectivity, select if you want Local Host Cache to keep resources in the delivery group available to launch new sessions. Existing sessions are not impacted. 
@@ -211,7 +217,7 @@ resource "citrix_delivery_group" "example-delivery-group" {
 - `reboot_schedules` (Attributes List) The reboot schedule for the delivery group. (see [below for nested schema](#nestedatt--reboot_schedules))
 - `restricted_access_users` (Attributes) Restrict access to this Delivery Group by specifying users and groups in the allow and block list. If no value is specified, all authenticated users will have access to this Delivery Group. To give access to unauthenticated users, use the `allow_anonymous_access` property. (see [below for nested schema](#nestedatt--restricted_access_users))
 - `scopes` (Set of String) The IDs of the scopes for the delivery group to be a part of.
-- `session_support` (String) The session support for the delivery group. Can only be set to `SingleSession` or `MultiSession`. Specify only if you want to create a Delivery Group wthout any `associated_machine_catalogs`. Ensure session support is same as that of the prospective Machine Catalogs you will associate this Delivery Group with.
+- `session_support` (String) The session support for the delivery group. Can only be set to `SingleSession` or `MultiSession`. Specify only if you want to create a Delivery Group without any `associated_machine_catalogs`. Ensure session support is same as that of the prospective Machine Catalogs you will associate this Delivery Group with.
 - `sharing_kind` (String) The sharing kind for the delivery group. Can only be set to `Shared` or `Private`. Specify only if you want to create a Delivery Group wthout any `associated_machine_catalogs`.
 - `storefront_servers` (Set of String) A list of GUID identifiers of StoreFront Servers to associate with the delivery group.
 - `tags` (Set of String) A set of identifiers of tags to associate with the delivery group.
@@ -279,6 +285,9 @@ Optional:
 - `off_peak_extended_disconnect_timeout_minutes` (Number) The number of minutes before the second configured action should be performed after a user session disconnects outside peak hours.
 - `off_peak_log_off_action` (String) The action to be performed after a configurable period of a user session ending outside peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.
 - `off_peak_log_off_timeout_minutes` (Number) The number of minutes before the configured action should be performed after a user session ends outside peak hours.
+- `off_peak_restrict_min_idle_untagged_percent` (Number) Specifies the percentage of remaining untagged capacity to fall below to start powering on tagged machines during off peak hours. 
+
+~> **Please Note** This setting is only applicable when the `restrict_autoscale_tag` is set.
 - `peak_autoscale_assigned_power_on_idle_action` (String) The action to be performed on an assigned machine previously started by autoscale that subsequently remains unused. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.
 - `peak_autoscale_assigned_power_on_idle_timeout_minutes` (Number) The number of minutes before the configured action is performed on an assigned machine previously started by autoscale that subsequently remains unused.
 - `peak_buffer_size_percent` (Number) The percentage of machines in the delivery group that should be kept available in an idle state in peak hours.
@@ -288,6 +297,9 @@ Optional:
 - `peak_extended_disconnect_timeout_minutes` (Number) The number of minutes before the second configured action should be performed after a user session disconnects in peak hours.
 - `peak_log_off_action` (String) The action to be performed after a configurable period of a user session ending in peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.
 - `peak_log_off_timeout_minutes` (Number) The number of minutes before the configured action should be performed after a user session ends in peak hours.
+- `peak_restrict_min_idle_untagged_percent` (Number) Specifies the percentage of remaining untagged capacity to fall below to start powering on tagged machines during peak hours. 
+
+~> **Please Note** This setting is only applicable when the `restrict_autoscale_tag` is set.
 - `power_off_delay_minutes` (Number) Delay before machines are powered off, when scaling down. Specified in minutes. 
 
 ~> **Please Note** Applies only to multi-session machines. 
@@ -296,6 +308,7 @@ Optional:
 - `power_time_schemes` (Attributes List) Power management time schemes.
 
 ~> **Please Note** It is not allowed to have more than one power time scheme that cover the same day of the week for the same delivery group. (see [below for nested schema](#nestedatt--autoscale_settings--power_time_schemes))
+- `restrict_autoscale_tag` (String) Name of the tag on the machines that autoscale will apply on.
 - `timezone` (String) The time zone in which this delivery group's machines reside.
 
 <a id="nestedatt--autoscale_settings--power_time_schemes"></a>
@@ -416,14 +429,14 @@ Required:
 
 Required:
 
-- `enable_session_roaming` (Boolean) When enabled, if the user launches this desktop and then moves to another device, the same session is used, and applications are available on both devices. When disabled, the session no longer roams between devices. 
-
-~> **Please Note** Session roaming should be set to `false` for Remote PC Delivery Group.
 - `published_name` (String) A display name for the desktop.
 
 Optional:
 
 - `description` (String) A description for the published desktop. The name and description are shown in Citrix Workspace app.
+- `enable_session_roaming` (Boolean) When enabled, if the user launches this desktop and then moves to another device, the same session is used, and applications are available on both devices. When disabled, the session no longer roams between devices. 
+
+~> **Please Note** Session roaming should be set to `false` for Remote PC Delivery Group.
 - `enabled` (Boolean) Specify whether to enable the delivery of this desktop. Default is `true`.
 - `restrict_to_tag` (String) Restrict session launch to machines with tag specified in GUID.
 - `restricted_access_users` (Attributes) Restrict access to this Desktop by specifying users and groups in the allow and block list. If no value is specified, all users that have access to this Delivery Group will have access to the Desktop. 

@@ -30,11 +30,15 @@ func (GoogleIdentityProviderDataSourceModel) GetSchema() schema.Schema {
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.ExactlyOneOf(path.MatchRoot("name")),
+					stringvalidator.LengthAtLeast(1),
 				},
 			},
 			"name": schema.StringAttribute{
 				Description: "Name of the Citrix Cloud Google Cloud Identity Provider instance.",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
 			},
 			"auth_domain_name": schema.StringAttribute{
 				Description: "User authentication domain name for Google Cloud Identity Provider.",

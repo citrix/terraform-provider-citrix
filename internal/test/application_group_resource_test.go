@@ -35,7 +35,7 @@ func TestApplicationGroupResource(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildApplicationGroupResource(t, testApplicationGroupResource),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsOnly"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
@@ -64,7 +64,7 @@ func TestApplicationGroupResource(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildApplicationGroupResource(t, testApplicationGroupResource_updated),
 					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsOnly"),
 					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),

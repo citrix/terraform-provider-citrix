@@ -59,15 +59,22 @@ func (d *HypervisorResourcePoolDataSource) Read(ctx context.Context, req datasou
 		return
 	}
 
+	var resourcePoolNameOrId string
+	if !data.Id.IsNull() {
+		resourcePoolNameOrId = data.Id.ValueString()
+	} else {
+		// Get refreshed machine catalog state from Orchestration
+		resourcePoolNameOrId = data.Name.ValueString()
+	}
+
 	// Get refreshed hypervisor resource pool state from Orchestration
 	hypervisorName := data.HypervisorName.ValueString()
-	resourcePoolName := data.Name.ValueString()
-	getHypervisorResourcePoolRequest := d.client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorResourcePool(ctx, hypervisorName, resourcePoolName)
+	getHypervisorResourcePoolRequest := d.client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorResourcePool(ctx, hypervisorName, resourcePoolNameOrId)
 	resourcePool, httpResp, err := citrixdaasclient.AddRequestData(getHypervisorResourcePoolRequest, d.client).Execute()
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error reading Resource Pool "+resourcePoolName+" of Hypervisor "+hypervisorName,
+			"Error reading Resource Pool "+resourcePoolNameOrId+" of Hypervisor "+hypervisorName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)

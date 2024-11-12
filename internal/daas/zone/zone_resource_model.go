@@ -50,7 +50,7 @@ func (ZoneResourceModel) GetSchema() schema.Schema {
 				Optional: true,
 				Computed: true,
 				Validators: []validator.String{
-					stringvalidator.ExactlyOneOf(path.MatchRoot("name"), path.MatchRoot("resource_location_id")),
+					stringvalidator.ExactlyOneOf(path.MatchRoot("name")),
 				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),

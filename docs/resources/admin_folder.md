@@ -47,6 +47,10 @@ resource "citrix_admin_folder" "example-admin-folder-3" {
 
 - `id` (String) Identifier of the admin folder.
 - `path` (String) Path to the admin folder.
+- `total_application_groups` (Number) Number of application groups contained in the admin folder.
+- `total_applications` (Number) Number of applications contained in the admin folder.
+- `total_delivery_groups` (Number) Number of delivery groups contained in the admin folder.
+- `total_machine_catalogs` (Number) Number of machine catalogs contained in the admin folder.
 
 ## Import
 

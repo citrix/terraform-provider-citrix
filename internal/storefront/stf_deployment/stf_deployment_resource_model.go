@@ -70,7 +70,7 @@ func (r STFSecureTicketAuthority) GetKey() string {
 	return r.StaUrl.ValueString()
 }
 
-func (r STFSecureTicketAuthority) RefreshListItem(_ context.Context, _ *diag.Diagnostics, sta citrixstorefront.STFSTAUrlModel) util.ModelWithAttributes {
+func (r STFSecureTicketAuthority) RefreshListItem(_ context.Context, _ *diag.Diagnostics, sta citrixstorefront.STFSTAUrlModel) util.ResourceModelWithAttributes {
 	r.AuthorityId = types.StringValue(*sta.AuthorityId.Get())
 	r.StaUrl = types.StringValue(*sta.StaUrl.Get())
 	r.StaValidationEnabled = types.BoolValue(*sta.StaValidationEnabled.Get())
@@ -142,7 +142,7 @@ func (r RoamingGateway) GetKey() string {
 	return r.Name.ValueString()
 }
 
-func (r RoamingGateway) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, roamingGateway citrixstorefront.STFRoamingGatewayResponseModel) util.ModelWithAttributes {
+func (r RoamingGateway) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, roamingGateway citrixstorefront.STFRoamingGatewayResponseModel) util.ResourceModelWithAttributes {
 	r.Name = types.StringValue(*roamingGateway.Name.Get())
 	r.LogonType = types.StringValue(*roamingGateway.LogonType.Get())
 	if roamingGateway.SmartCardFallbackLogonType.IsSet() {

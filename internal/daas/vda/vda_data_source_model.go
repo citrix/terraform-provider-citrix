@@ -46,6 +46,7 @@ func (VdaDataSourceModel) GetSchema() schema.Schema {
 
 // VdaModel defines the single VDA data model implementation.
 type VdaModel struct {
+	Id                       types.String `tfsdk:"id"`
 	MachineName              types.String `tfsdk:"machine_name"`
 	HostedMachineId          types.String `tfsdk:"hosted_machine_id"`
 	AssociatedMachineCatalog types.String `tfsdk:"associated_machine_catalog"`
@@ -55,6 +56,10 @@ type VdaModel struct {
 func (VdaModel) GetSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Description: "Id of the VDA.",
+				Computed:    true,
+			},
 			"machine_name": schema.StringAttribute{
 				Description: "Machine name of the VDA.",
 				Computed:    true,
@@ -88,6 +93,7 @@ func (r VdaDataSourceModel) RefreshPropertyValues(vdas *citrixorchestration.Mach
 		deliveryGroupId := deliveryGroup.GetId()
 
 		res = append(res, VdaModel{
+			Id:                       types.StringValue(model.GetId()),
 			MachineName:              types.StringValue(machineName),
 			HostedMachineId:          types.StringValue(hostedMachineId),
 			AssociatedMachineCatalog: types.StringValue(machineCatalogId),

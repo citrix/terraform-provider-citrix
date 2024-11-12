@@ -12,10 +12,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -42,36 +38,7 @@ func (r *storeFrontServerResource) Metadata(_ context.Context, req resource.Meta
 
 // Schema defines the schema for the resource.
 func (r *storeFrontServerResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Description: "CVAD --- Manages a StoreFront server.",
-		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "GUID identifier of the StoreFront server.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"name": schema.StringAttribute{
-				Description: "Name of the StoreFront server.",
-				Required:    true,
-			},
-			"description": schema.StringAttribute{
-				Description: "Description of the StoreFront server.",
-				Required:    true,
-			},
-			"url": schema.StringAttribute{
-				Description: "URL for connecting to the StoreFront server.",
-				Required:    true,
-			},
-			"enabled": schema.BoolAttribute{
-				Description: "Indicates if the StoreFront server is enabled. Default is `true`.",
-				Optional:    true,
-				Computed:    true,
-				Default:     booldefault.StaticBool(true),
-			},
-		},
-	}
+	resp.Schema = StoreFrontServerResourceModel{}.GetSchema()
 }
 
 // Configure adds the provider configured client to the resource.

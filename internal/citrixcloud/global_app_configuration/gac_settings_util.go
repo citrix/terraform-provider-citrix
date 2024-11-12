@@ -1,6 +1,6 @@
 // Copyright © 2024. Citrix Systems, Inc.
 
-package gac_settings
+package global_app_configuration
 
 import (
 	"context"
@@ -345,7 +345,7 @@ func verifyStruct(mapData map[string]interface{}, goType interface{}) bool {
 func WindowsSettingsDefaultValues(ctx context.Context, diagnostics *diag.Diagnostics, windowsSetting *WindowsSettings) {
 	windowsSetting.ValueList = types.ListNull(types.StringType)
 	//setting null for LocalAppAllowList
-	localAppAllowListAttributesMap, err := util.AttributeMapFromObject(LocalAppAllowListModel{})
+	localAppAllowListAttributesMap, err := util.ResourceAttributeMapFromObject(LocalAppAllowListModel{})
 	if err != nil {
 		diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
 		return
@@ -353,7 +353,7 @@ func WindowsSettingsDefaultValues(ctx context.Context, diagnostics *diag.Diagnos
 	windowsSetting.LocalAppAllowList = types.ListNull(types.ObjectType{AttrTypes: localAppAllowListAttributesMap})
 
 	//setting null for ExtensionInstallAllowList
-	installAllowListAttributesMap, err := util.AttributeMapFromObject(ExtensionInstallAllowListModel{})
+	installAllowListAttributesMap, err := util.ResourceAttributeMapFromObject(ExtensionInstallAllowListModel{})
 	if err != nil {
 		diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
 		return
@@ -361,7 +361,7 @@ func WindowsSettingsDefaultValues(ctx context.Context, diagnostics *diag.Diagnos
 	windowsSetting.ExtensionInstallAllowList = types.ListNull(types.ObjectType{AttrTypes: installAllowListAttributesMap})
 
 	//setting null for EnterpriseBroswerSSO
-	enterpriseBrowserAttributesMap, err := util.AttributeMapFromObject(CitrixEnterpriseBrowserModel{})
+	enterpriseBrowserAttributesMap, err := util.ResourceAttributeMapFromObject(CitrixEnterpriseBrowserModel{})
 	if err != nil {
 		diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
 		return
@@ -369,7 +369,7 @@ func WindowsSettingsDefaultValues(ctx context.Context, diagnostics *diag.Diagnos
 	windowsSetting.EnterpriseBroswerSSO = types.ObjectNull(enterpriseBrowserAttributesMap)
 
 	//setting null for AutoLaunchProtocolsFromOrigins
-	autoLaunchProtocolAttributesMap, err := util.AttributeMapFromObject(AutoLaunchProtocolsFromOriginsModel{AllowedOrigins: types.ListNull(types.StringType)})
+	autoLaunchProtocolAttributesMap, err := util.ResourceAttributeMapFromObject(AutoLaunchProtocolsFromOriginsModel{AllowedOrigins: types.ListNull(types.StringType)})
 	if err != nil {
 		diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
 		return
@@ -377,7 +377,7 @@ func WindowsSettingsDefaultValues(ctx context.Context, diagnostics *diag.Diagnos
 	windowsSetting.AutoLaunchProtocolsFromOrigins = types.ListNull(types.ObjectType{AttrTypes: autoLaunchProtocolAttributesMap})
 
 	//setting null for ManagedBookmarks
-	bookMarkAttributesMap, err := util.AttributeMapFromObject(BookMarkValueModel{})
+	bookMarkAttributesMap, err := util.ResourceAttributeMapFromObject(BookMarkValueModel{})
 	if err != nil {
 		diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
 		return
@@ -388,7 +388,7 @@ func WindowsSettingsDefaultValues(ctx context.Context, diagnostics *diag.Diagnos
 func MacosSettingsDefaultValues(ctx context.Context, diagnostics *diag.Diagnostics, macosSetting *MacosSettings) {
 	macosSetting.ValueList = types.ListNull(types.StringType)
 	//setting null for AutoLaunchProtocolsFromOrigins
-	autoLaunchProtocolAttributesMap, err := util.AttributeMapFromObject(AutoLaunchProtocolsFromOriginsModel{AllowedOrigins: types.ListNull(types.StringType)})
+	autoLaunchProtocolAttributesMap, err := util.ResourceAttributeMapFromObject(AutoLaunchProtocolsFromOriginsModel{AllowedOrigins: types.ListNull(types.StringType)})
 	if err != nil {
 		diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
 		return
@@ -396,7 +396,7 @@ func MacosSettingsDefaultValues(ctx context.Context, diagnostics *diag.Diagnosti
 	macosSetting.AutoLaunchProtocolsFromOrigins = types.ListNull(types.ObjectType{AttrTypes: autoLaunchProtocolAttributesMap})
 
 	//setting null for ManagedBookmarks
-	bookMarkAttributesMap, err := util.AttributeMapFromObject(BookMarkValueModel{})
+	bookMarkAttributesMap, err := util.ResourceAttributeMapFromObject(BookMarkValueModel{})
 	if err != nil {
 		diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
 		return
@@ -404,7 +404,7 @@ func MacosSettingsDefaultValues(ctx context.Context, diagnostics *diag.Diagnosti
 	macosSetting.ManagedBookmarks = types.ListNull(types.ObjectType{AttrTypes: bookMarkAttributesMap})
 
 	//setting null for ExtensionInstallAllowList
-	installAllowListAttributesMap, err := util.AttributeMapFromObject(ExtensionInstallAllowListModel{})
+	installAllowListAttributesMap, err := util.ResourceAttributeMapFromObject(ExtensionInstallAllowListModel{})
 	if err != nil {
 		diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
 		return
@@ -412,7 +412,7 @@ func MacosSettingsDefaultValues(ctx context.Context, diagnostics *diag.Diagnosti
 	macosSetting.ExtensionInstallAllowList = types.ListNull(types.ObjectType{AttrTypes: installAllowListAttributesMap})
 
 	//setting null for EnterpriseBroswerSSO
-	enterpriseBrowserAttributesMap, err := util.AttributeMapFromObject(CitrixEnterpriseBrowserModel{})
+	enterpriseBrowserAttributesMap, err := util.ResourceAttributeMapFromObject(CitrixEnterpriseBrowserModel{})
 	if err != nil {
 		diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
 		return
@@ -423,7 +423,7 @@ func MacosSettingsDefaultValues(ctx context.Context, diagnostics *diag.Diagnosti
 func LinuxSettingsDefaultValues(ctx context.Context, diagnostics *diag.Diagnostics, linuxSetting *LinuxSettings) {
 	linuxSetting.ValueList = types.ListNull(types.StringType)
 	//setting null for AutoLaunchProtocolsFromOrigins
-	autoLaunchProtocolAttributesMap, err := util.AttributeMapFromObject(AutoLaunchProtocolsFromOriginsModel{AllowedOrigins: types.ListNull(types.StringType)})
+	autoLaunchProtocolAttributesMap, err := util.ResourceAttributeMapFromObject(AutoLaunchProtocolsFromOriginsModel{AllowedOrigins: types.ListNull(types.StringType)})
 	if err != nil {
 		diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
 		return
@@ -431,7 +431,7 @@ func LinuxSettingsDefaultValues(ctx context.Context, diagnostics *diag.Diagnosti
 	linuxSetting.AutoLaunchProtocolsFromOrigins = types.ListNull(types.ObjectType{AttrTypes: autoLaunchProtocolAttributesMap})
 
 	//setting null for ManagedBookmarks
-	bookMarkAttributesMap, err := util.AttributeMapFromObject(BookMarkValueModel{})
+	bookMarkAttributesMap, err := util.ResourceAttributeMapFromObject(BookMarkValueModel{})
 	if err != nil {
 		diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
 		return
@@ -439,7 +439,7 @@ func LinuxSettingsDefaultValues(ctx context.Context, diagnostics *diag.Diagnosti
 	linuxSetting.ManagedBookmarks = types.ListNull(types.ObjectType{AttrTypes: bookMarkAttributesMap})
 
 	//setting null for ExtensionInstallAllowList
-	installAllowListAttributesMap, err := util.AttributeMapFromObject(ExtensionInstallAllowListModel{})
+	installAllowListAttributesMap, err := util.ResourceAttributeMapFromObject(ExtensionInstallAllowListModel{})
 	if err != nil {
 		diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
 		return

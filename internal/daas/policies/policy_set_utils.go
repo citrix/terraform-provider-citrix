@@ -311,17 +311,53 @@ func constructSettingRequest(policySetting PolicySettingModel) citrixorchestrati
 }
 
 func updatePolicySettings(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policyId string, policyName string, policySettingsInPlan []PolicySettingModel, policySettingsInState []PolicySettingModel) error {
+	// Detect deleted settings
+	policySettingsToDelete := []PolicySettingModel{}
+	for _, policySetting := range policySettingsInState {
+		if !slices.ContainsFunc(policySettingsInPlan, func(policySettingInPlan PolicySettingModel) bool {
+			return strings.EqualFold(policySetting.Name.ValueString(), policySettingInPlan.Name.ValueString())
+		}) {
+			policySettingsToDelete = append(policySettingsToDelete, policySetting)
+		}
+	}
+
+	policySettingsToCreate := []PolicySettingModel{}
+	policySettingsToUpdate := []PolicySettingModel{}
+	for _, policySetting := range policySettingsInPlan {
+		policyInStateIndex := slices.IndexFunc(policySettingsInState, func(policySettingInState PolicySettingModel) bool {
+			return strings.EqualFold(policySetting.Name.ValueString(), policySettingInState.Name.ValueString())
+		})
+		if policyInStateIndex != -1 {
+			policySettingInState := policySettingsInState[policyInStateIndex]
+			if policySetting.Enabled.ValueBool() != policySettingInState.Enabled.ValueBool() ||
+				policySetting.Value.ValueString() != policySettingInState.Value.ValueString() ||
+				policySetting.UseDefault.ValueBool() != policySettingInState.UseDefault.ValueBool() {
+				policySettingsToUpdate = append(policySettingsToUpdate, policySetting)
+			}
+		} else {
+			policySettingsToCreate = append(policySettingsToCreate, policySetting)
+		}
+	}
+
 	// Delete policy settings
-	if len(policySettingsInState) > 0 {
-		err := deletePolicySettings(ctx, client, diagnostics, policyId)
+	if len(policySettingsToDelete) > 0 {
+		err := deletePolicySettings(ctx, client, diagnostics, policyId, policySettingsToDelete)
 		if err != nil {
 			return err
 		}
 	}
 
 	// Create policy settings
-	if len(policySettingsInPlan) > 0 {
-		err := createPolicySettings(ctx, client, diagnostics, policyId, policyName, policySettingsInPlan)
+	if len(policySettingsToCreate) > 0 {
+		err := createPolicySettings(ctx, client, diagnostics, policyId, policyName, policySettingsToCreate)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Update policy settings
+	if len(policySettingsToUpdate) > 0 {
+		err := updatePolicySettingDetails(ctx, client, diagnostics, policyId, policyName, policySettingsToUpdate)
 		if err != nil {
 			return err
 		}
@@ -388,7 +424,84 @@ func createPolicySettings(ctx context.Context, client *citrixdaasclient.CitrixDa
 	return nil
 }
 
-func deletePolicySettings(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policyId string) error {
+func updatePolicySettingDetails(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policyId string, policyName string, policySettingsToUpdate []PolicySettingModel) error {
+	// Batch create new policy settings
+	updatePolicySettingBatchRequestItems := []citrixorchestration.BatchRequestItemModel{}
+	batchApiHeaders, httpResp, err := generateBatchApiHeaders(client)
+	if err != nil {
+		diagnostics.AddError(
+			"Error updating policy settings in policy "+policyName,
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nCould not update policy settings in the policy, unexpected error: "+util.ReadClientError(err),
+		)
+		return err
+	}
+
+	policySettings, err := getPolicySettings(ctx, client, diagnostics, policyId)
+	if err != nil {
+		return err
+	}
+
+	policySettingIdMap := map[string]PolicySettingModel{}
+	for _, policySettingInPlan := range policySettingsToUpdate {
+		for _, policySettingInRemote := range policySettings.GetItems() {
+			if strings.EqualFold(policySettingInPlan.Name.ValueString(), policySettingInRemote.GetSettingName()) {
+				policySettingIdMap[policySettingInRemote.GetSettingGuid()] = policySettingInPlan
+				continue
+			}
+		}
+	}
+
+	// Update policy settings
+	policySettingUpdateCounter := 0
+	for id, policySetting := range policySettingIdMap {
+		relativeUrl := fmt.Sprintf("/gpo/settings/%s", id)
+
+		settingRequest := constructSettingRequest(policySetting)
+		settingRequestStringBody, err := util.ConvertToString(settingRequest)
+		if err != nil {
+			diagnostics.AddError(
+				"Error updating policy setting in policy "+policyName,
+				"An unexpected error occurred: "+err.Error(),
+			)
+			return err
+		}
+
+		var batchRequestItem citrixorchestration.BatchRequestItemModel
+		batchRequestItem.SetReference(fmt.Sprintf("updatePolicySetting%s", strconv.Itoa(policySettingUpdateCounter)))
+		batchRequestItem.SetMethod(http.MethodPatch)
+		batchRequestItem.SetRelativeUrl(client.GetBatchRequestItemRelativeUrl(relativeUrl))
+		batchRequestItem.SetHeaders(batchApiHeaders)
+		batchRequestItem.SetBody(settingRequestStringBody)
+		updatePolicySettingBatchRequestItems = append(updatePolicySettingBatchRequestItems, batchRequestItem)
+		policySettingUpdateCounter++
+	}
+
+	var batchRequestModel citrixorchestration.BatchRequestModel
+	batchRequestModel.SetItems(updatePolicySettingBatchRequestItems)
+	successfulJobs, txId, err := citrixdaasclient.PerformBatchOperation(ctx, client, batchRequestModel)
+	if err != nil {
+		diagnostics.AddError(
+			"Error updating Policy Settings in Policy "+policyName,
+			"TransactionId: "+txId+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		return err
+	}
+
+	if successfulJobs < len(updatePolicySettingBatchRequestItems) {
+		errMsg := fmt.Sprintf("An error occurred while updating policy settings to the Policy. %d of %d policy settings were updated.", successfulJobs, len(updatePolicySettingBatchRequestItems))
+		diagnostics.AddError(
+			"Error updating policy settings in Policy "+policyName,
+			"TransactionId: "+txId+
+				"\n"+errMsg,
+		)
+		return err
+	}
+	return nil
+}
+
+func deletePolicySettings(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policyId string, policySettingsToDelete []PolicySettingModel) error {
 	// Setup batch requests
 	deletePolicySettingBatchRequestItems := []citrixorchestration.BatchRequestItemModel{}
 	batchApiHeaders, httpResp, err := generateBatchApiHeaders(client)
@@ -405,9 +518,19 @@ func deletePolicySettings(ctx context.Context, client *citrixdaasclient.CitrixDa
 	if err != nil {
 		return err
 	}
+
+	policySettingIdsToDelete := []string{}
+	for _, policySetting := range policySettings.GetItems() {
+		if slices.ContainsFunc(policySettingsToDelete, func(policySettingToDelete PolicySettingModel) bool {
+			return strings.EqualFold(policySetting.GetSettingName(), policySettingToDelete.Name.ValueString())
+		}) {
+			policySettingIdsToDelete = append(policySettingIdsToDelete, policySetting.GetSettingGuid())
+		}
+	}
+
 	// batch delete policy settings
-	for index, policySetting := range policySettings.GetItems() {
-		relativeUrl := fmt.Sprintf("/gpo/settings/%s", policySetting.GetSettingGuid())
+	for index, policySettingId := range policySettingIdsToDelete {
+		relativeUrl := fmt.Sprintf("/gpo/settings/%s", policySettingId)
 
 		var batchRequestItem citrixorchestration.BatchRequestItemModel
 		batchRequestItem.SetReference(fmt.Sprintf("removeSetting%s", strconv.Itoa(index)))

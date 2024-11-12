@@ -235,7 +235,7 @@ func (r CCAdminUserResourceModel) RefreshPropertyValues(ctx context.Context, dia
 	return r
 }
 
-func (r CCAdminPolicyResourceModel) RefreshListItem(ctx context.Context, diags *diag.Diagnostics, adminAccessPolicy ccadmins.AdministratorAccessPolicyModel) util.ModelWithAttributes {
+func (r CCAdminPolicyResourceModel) RefreshListItem(ctx context.Context, diags *diag.Diagnostics, adminAccessPolicy ccadmins.AdministratorAccessPolicyModel) util.ResourceModelWithAttributes {
 	// Update the name and service name from the admin access policy
 	r.Name = types.StringValue(adminAccessPolicy.GetDisplayName())
 	r.ServiceName = types.StringValue(adminAccessPolicy.GetServiceName())
