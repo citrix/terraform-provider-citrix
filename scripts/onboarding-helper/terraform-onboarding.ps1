@@ -1,4 +1,4 @@
-﻿
+﻿﻿
 # Copyright © 2024. Citrix Systems, Inc. All Rights Reserved.
 <#
 Currently this script is still in TechPreview
@@ -159,13 +159,14 @@ function Get-AuthToken {
     }
     else {
         # Return the token if its still valid
-        if($null -eq $script:Token){
+        if ($null -eq $script:Token) {
             Write-Verbose "Requesting new token."
         }
         elseif ((Get-Date) -lt $script:TokenExpiryTime) {
             Write-Verbose "Refresh token is still valid. Returning the existing token."
             return $script:Token
-        }else {
+        }
+        else {
             Write-Verbose "Refresh token Expired. Requesting new token."
         }
 
@@ -287,13 +288,14 @@ function Get-UrlForWemObjects {
         [string] $requestPath
     )
 
-    if($script:environment -eq "Production") {
+    if ($script:environment -eq "Production") {
         $script:wemHostName = "api.wem.cloud.com"
-    } else {
+    }
+    else {
         $script:wemHostName = "api.wem.cloudburrito.com"
     }
 
-    if($requestPath -eq "sites") {
+    if ($requestPath -eq "sites") {
         return "https://$script:wemHostName/services/wem/sites?includeHidden=true&includeUnboundAgentsSite=true"
     }
     else {
@@ -330,7 +332,7 @@ function Get-ResourceList {
     $url = "$script:urlBase/$requestPath"
 
     # Update url for WEM Objects
-    if($resourceProviderName -in "wem_configuration_set", "wem_directory_object") {
+    if ($resourceProviderName -in "wem_configuration_set", "wem_directory_object") {
         $url = Get-UrlForWemObjects -requestPath $requestPath
     }
     
@@ -349,7 +351,7 @@ function Get-ResourceList {
     $items = $response.Items
 
     # WEM supports AD object type 'Catalog'. Filter out other object types
-    if($resourceProviderName -eq "wem_directory_object" -and $items.Count -gt 0) {
+    if ($resourceProviderName -eq "wem_directory_object" -and $items.Count -gt 0) {
         $items = Find-CatalogADObjects -items $items
     }
 
@@ -510,11 +512,11 @@ function Get-ExistingCVADResources {
     # Add WEM resources for cloud customer environment
     if (-not($script:onPremise)) {
         $wemResources = @{
-            "wem_configuration_set"    = @{
+            "wem_configuration_set" = @{
                 "resourceApi"          = "sites"
                 "resourceProviderName" = "wem_configuration_set"
             }
-            "wem_directory_object"    = @{
+            "wem_directory_object"  = @{
                 "resourceApi"          = "ad_objects"
                 "resourceProviderName" = "wem_directory_object"
             }
@@ -618,7 +620,7 @@ function RemoveComputedPropertiesForZone {
             if ($line -like 'resource "citrix_zone"*') {
                 $insideCitrixZone = $true
             }
-        
+
             if ($insideCitrixZone -and $line -like '*name*') {
                 continue
             }
@@ -643,7 +645,6 @@ function RemoveComputedProperties {
     # Define an array of regex patterns to remove computed properties
     $regexPatterns = @(
         "(\s+)id(\s+)= (\S+)",
-        "(\s+)total_machines(\s+)= (\S+)",
         '(\s+)path\s*=\s*"(.*?)"',
         "(\s+)assigned(\s+)= (\S+)",
         "(\s+)is_built_in(\s+)= (\S+)",
@@ -679,8 +680,24 @@ function RemoveComputedProperties {
 
     # Remove contents for zone resource
     $content = RemoveComputedPropertiesForZone -content $content
-    
+
     Write-Verbose "Computed properties removed successfully."
+    return $content
+}
+
+function RemoveNullAndEmptyStringValues {
+    param(
+        [parameter(Mandatory = $true)]
+        [string] $content
+    )
+
+    Write-Verbose "Removing null values and empty strings from terraform output."
+    # Remove null values and empty strings from terraform output
+    $lines = $content -split "`r?`n"
+    $filteredLines = $lines | Where-Object { $_ -notmatch 'null' -and $_ -notmatch '^\s*[^=]+\s*=\s*""' }
+    $content = $filteredLines -join "`n"
+    
+    Write-Verbose "Null values and empty strings removed successfully."
     return $content
 }
 
@@ -825,6 +842,9 @@ function PostProcessTerraformOutput {
     # Post-process the terraform output
     $content = Get-Content -Path ".\resource.tf" -Raw
 
+    # Remove null values and empty strings
+    $content = RemoveNullAndEmptyStringValues -content $content
+
     # Remove computed properties
     $content = RemoveComputedProperties -content $content
 
@@ -898,7 +918,8 @@ try {
     Import-ResourcesToState
 
     # Export terraform resources
-    terraform show >> ".\resource.tf"
+    # Add -no-color to disable output with coloring
+    terraform show -no-color >> ".\resource.tf"
 
     # Post-process citrix.tf output
     PostProcessProviderConfig
