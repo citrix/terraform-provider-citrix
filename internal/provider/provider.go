@@ -30,6 +30,7 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/daas/bearer_token"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/cvad_site"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/desktop_icon"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/image_definition"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/storefront_server"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/tags"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/vda"
@@ -134,7 +135,7 @@ func (p *citrixProvider) Metadata(_ context.Context, _ provider.MetadataRequest,
 // Schema defines the provider-level schema for configuration data.
 func (p *citrixProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manage and deploy Citrix resources easily using the Citrix Terraform provider. The provider currently supports both Citrix Virtual Apps & Desktops(CVAD) and Citrix Desktop as a Service (DaaS) solutions. You can automate creation of site setup including host connections, machine catalogs and delivery groups etc for both CVAD and Citrix DaaS. You can deploy resources in Citrix supported hypervisors and public clouds. Currently, we support deployments in Nutanix, VMware vSphere, XenServer, Microsoft Azure, AWS EC2 and Google Cloud Compute. Additionally, you can also use Manual provisioning or RemotePC to add workloads. The provider is developed and maintained by Citrix.",
+		Description: "Manage and deploy Citrix resources easily using the Citrix Terraform provider. The provider currently supports both Citrix Virtual Apps & Desktops (CVAD 2311+) and Citrix Desktop as a Service (DaaS) solutions. You can automate creation of site setup including host connections, machine catalogs and delivery groups etc for both CVAD and Citrix DaaS. You can deploy resources in Citrix supported hypervisors and public clouds. Currently, we support deployments in Nutanix, VMware vSphere, XenServer, Microsoft Azure, AWS EC2 and Google Cloud Compute. Additionally, you can also use Manual provisioning or RemotePC to add workloads. The provider is developed and maintained by Citrix.",
 		Attributes: map[string]schema.Attribute{
 			"cvad_config": schema.SingleNestedAttribute{
 				Description: "Configuration for CVAD service.",
@@ -936,6 +937,7 @@ func (p *citrixProvider) DataSources(_ context.Context) []func() datasource.Data
 		tags.NewTagDataSource,
 		policies.NewPolicySetDataSource,
 		storefront_server.NewStoreFrontServerDataSource,
+		image_definition.NewImageDefinitionDataSource,
 		// StoreFront DataSources
 		stf_roaming.NewSTFRoamingServiceDataSource,
 		// QuickCreate DataSources
@@ -991,6 +993,8 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		resource_locations.NewResourceLocationResource,
 		cc_admin_user.NewCCAdminUserResource,
 		tags.NewTagResource,
+		image_definition.NewImageDefinitionResource,
+		image_definition.NewImageVersionResource,
 		// StoreFront Resources
 		stf_deployment.NewSTFDeploymentResource,
 		stf_authentication.NewSTFAuthenticationServiceResource,

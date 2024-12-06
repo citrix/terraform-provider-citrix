@@ -4,7 +4,9 @@ package application
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
@@ -91,7 +93,7 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 		limitVisibilityToUsers := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.LimitVisibilityToUsers)
 		limitVisibilityToUserIds, httpResponse, err := util.GetUserIdsUsingIdentity(ctx, r.client, limitVisibilityToUsers)
 		if err != nil {
-			diags.AddError(
+			resp.Diagnostics.AddError(
 				"Error fetching user details for application resource",
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResponse)+
 					"\nError message: "+util.ReadClientError(err),
@@ -234,7 +236,7 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 		limitVisibilityToUsers := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.LimitVisibilityToUsers)
 		limitVisibilityToUserIds, httpResponse, err := util.GetUserIdsUsingIdentity(ctx, r.client, limitVisibilityToUsers)
 		if err != nil {
-			diags.AddError(
+			resp.Diagnostics.AddError(
 				"Error fetching user details for application resource",
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResponse)+
 					"\nError message: "+util.ReadClientError(err),
@@ -360,6 +362,62 @@ func (r *applicationResource) ModifyPlan(ctx context.Context, req resource.Modif
 	if r.client != nil && r.client.ApiClient == nil {
 		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
 		return
+	}
+
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+
+	create := req.State.Raw.IsNull()
+
+	var plan ApplicationResourceModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	operation := "updating"
+	if create {
+		operation = "creating"
+	}
+
+	deliveryGroupIdsToBeChecked := []string{}
+	if !plan.DeliveryGroups.IsNull() {
+		deliveryGroupIdsToBeChecked = util.StringListToStringArray(ctx, &resp.Diagnostics, plan.DeliveryGroups)
+	} else if !plan.DeliveryGroupsPriority.IsNull() {
+		for _, deliveryGroupPriority := range util.ObjectSetToTypedArray[DeliveryGroupPriorityModel](ctx, &resp.Diagnostics, plan.DeliveryGroupsPriority) {
+			deliveryGroupIdsToBeChecked = append(deliveryGroupIdsToBeChecked, deliveryGroupPriority.Id.ValueString())
+		}
+	}
+
+	if len(deliveryGroupIdsToBeChecked) > 0 {
+		allDeliveryGroups, err := util.GetDeliveryGroups(ctx, r.client, &resp.Diagnostics, "Id,DeliveryType")
+		if err != nil {
+			return
+		}
+		for _, deliveryGroupIdToCheck := range deliveryGroupIdsToBeChecked {
+			index := slices.IndexFunc(allDeliveryGroups, func(dg citrixorchestration.DeliveryGroupResponseModel) bool {
+				return strings.EqualFold(dg.GetId(), deliveryGroupIdToCheck)
+			})
+			if index < 0 {
+				resp.Diagnostics.AddError(
+					"Error "+operation+" Application",
+					fmt.Sprintf("Delivery Group `%s` does not exist.", deliveryGroupIdToCheck),
+				)
+				return
+			} else {
+				deliveryGroup := allDeliveryGroups[index]
+				if deliveryGroup.GetDeliveryType() != citrixorchestration.DELIVERYKIND_APPS_ONLY &&
+					deliveryGroup.GetDeliveryType() != citrixorchestration.DELIVERYKIND_DESKTOPS_AND_APPS {
+					resp.Diagnostics.AddError(
+						"Error "+operation+" Application",
+						fmt.Sprintf("Cannot add application to Delivery Group `%s` with delivery_type `%s`.", deliveryGroupIdToCheck, deliveryGroup.GetDeliveryType()),
+					)
+					return
+				}
+			}
+		}
 	}
 }
 

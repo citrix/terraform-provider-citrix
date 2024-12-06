@@ -170,7 +170,7 @@ ou_filters = [
     {
         enabled = true
         allowed = true
-        ou      = "{Path of the oranizational unit to be filtered}"
+        ou      = "{Path of the organizational unit to be filtered}"
     }
 ]
 ```

@@ -75,7 +75,7 @@ func (MachineCatalogDataSourceModel) GetSchema() schema.Schema {
 	}
 }
 
-func (r MachineCatalogDataSourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, catalog *citrixorchestration.MachineCatalogDetailResponseModel, vdas *citrixorchestration.MachineResponseModelCollection, tags []string) MachineCatalogDataSourceModel {
+func (r MachineCatalogDataSourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, catalog *citrixorchestration.MachineCatalogDetailResponseModel, vdas []citrixorchestration.MachineResponseModel, tags []string) MachineCatalogDataSourceModel {
 	r.Id = types.StringValue(catalog.GetId())
 	r.Name = types.StringValue(catalog.GetName())
 
@@ -88,7 +88,7 @@ func (r MachineCatalogDataSourceModel) RefreshPropertyValues(ctx context.Context
 	}
 
 	res := []vda.VdaModel{}
-	for _, model := range vdas.GetItems() {
+	for _, model := range vdas {
 		machineName := model.GetName()
 		hosting := model.GetHosting()
 		hostedMachineId := hosting.GetHostedMachineId()

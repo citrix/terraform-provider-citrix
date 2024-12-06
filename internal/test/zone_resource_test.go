@@ -12,6 +12,7 @@ import (
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
@@ -22,13 +23,26 @@ func init() {
 			ctx := context.Background()
 			client := sharedClientForSweepers(ctx)
 
+			var errs *multierror.Error
+
 			if v := os.Getenv("CITRIX_CUSTOMER_ID"); v != "" && v != "CitrixOnPremises" {
 				// For Cloud Customers, there is no need to remove remote zones
 				return nil
 			}
 			zoneName := os.Getenv("TEST_ZONE_INPUT")
+
 			err := zoneSweeper(ctx, zoneName, client)
-			return err
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			}
+
+			zoneNameUpdated := zoneName + "-updated"
+			err = zoneSweeper(ctx, zoneNameUpdated, client)
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			}
+
+			return errs.ErrorOrNil()
 		},
 		Dependencies: []string{"citrix_hypervisor"},
 	})

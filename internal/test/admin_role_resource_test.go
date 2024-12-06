@@ -12,6 +12,7 @@ import (
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
@@ -22,10 +23,23 @@ func init() {
 			ctx := context.Background()
 			client := sharedClientForSweepers(ctx)
 
+			var errs *multierror.Error
+
 			// adminRoleName := os.Getenv("TEST_ROLE_NAME")
 			adminRoleName := "sweeper-role"
 			err := adminRoleSweeper(ctx, adminRoleName, client)
-			return err
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			}
+
+			// test updated role
+			adminRoleNameUpdated := adminRoleName + "-updated"
+			err = adminRoleSweeper(ctx, adminRoleNameUpdated, client)
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			}
+
+			return errs.ErrorOrNil()
 		},
 		Dependencies: []string{"citrix_admin_user"},
 	})

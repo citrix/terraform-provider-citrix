@@ -180,13 +180,13 @@ func deleteMachinesFromManualCatalog(ctx context.Context, client *citrixdaasclie
 	}
 
 	machinesToDelete := []citrixorchestration.MachineResponseModel{}
-	for _, machine := range getMachinesResponse.Items {
+	for _, machine := range getMachinesResponse {
 		if deleteMachinesList[strings.ToLower(machine.GetName())] {
 			machinesToDelete = append(machinesToDelete, machine)
 		}
 	}
 
-	return deleteMachinesFromCatalog(ctx, client, resp, ProvisioningSchemeModel{}, machinesToDelete, catalogNameOrId, false)
+	return deleteMachinesFromCatalog(ctx, client, resp, ProvisioningSchemeModel{}, machinesToDelete, catalogNameOrId, false, []MachineADAccountModel{})
 }
 
 func addMachinesToManualCatalog(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, addMachinesList []MachineAccountsModel, catalogIdOrName string) error {
@@ -323,14 +323,14 @@ func createAddAndRemoveMachinesListForManualCatalogs(ctx context.Context, diagno
 	return addMachinesList, deleteMachinesMap
 }
 
-func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, machines *citrixorchestration.MachineResponseModelCollection) MachineCatalogResourceModel {
-	if machines == nil {
+func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, machines []citrixorchestration.MachineResponseModel) MachineCatalogResourceModel {
+	if len(machines) == 0 {
 		r.MachineAccounts = util.TypedArrayToObjectList[MachineAccountsModel](ctx, diagnostics, nil)
 		return r
 	}
 
 	machineMapFromRemote := map[string]citrixorchestration.MachineResponseModel{}
-	for _, machine := range machines.GetItems() {
+	for _, machine := range machines {
 		machineMapFromRemote[strings.ToLower(machine.GetName())] = machine
 	}
 

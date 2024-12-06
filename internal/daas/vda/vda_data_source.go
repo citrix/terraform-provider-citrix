@@ -62,15 +62,10 @@ func (d *VdaDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 	// Get refreshed machine catalog state from Orchestration
 	machineCatalogId := data.MachineCatalog.ValueString()
 	if machineCatalogId != "" {
-		getMachineCatalogMachinesRequest := d.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogMachines(ctx, machineCatalogId)
-		machineCatalogVdas, httpResp, err := citrixdaasclient.AddRequestData(getMachineCatalogMachinesRequest, d.client).Execute()
+		machineCatalogVdas, err := util.GetMachineCatalogMachines(ctx, d.client, &resp.Diagnostics, machineCatalogId)
 
 		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error listing Machine Catalog VDAs"+machineCatalogId,
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+util.ReadClientError(err),
-			)
+			return
 		}
 
 		data = data.RefreshPropertyValues(machineCatalogVdas)
@@ -78,15 +73,9 @@ func (d *VdaDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 
 	deliveryGroupId := data.DeliveryGroup.ValueString()
 	if deliveryGroupId != "" {
-		getDeliveryGroupMachinesRequest := d.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroupMachines(ctx, deliveryGroupId)
-		deliveryGroupVdas, httpResp, err := citrixdaasclient.AddRequestData(getDeliveryGroupMachinesRequest, d.client).Execute()
-
+		deliveryGroupVdas, err := util.GetDeliveryGroupMachines(ctx, d.client, &resp.Diagnostics, deliveryGroupId)
 		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error listing Delivery Group VDAs"+deliveryGroupId,
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+util.ReadClientError(err),
-			)
+			return
 		}
 
 		data = data.RefreshPropertyValues(deliveryGroupVdas)

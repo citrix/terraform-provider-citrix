@@ -77,20 +77,6 @@ func getDeliveryGroupPowerTimeSchemes(ctx context.Context, client *citrixdaascli
 	return deliveryGroupPowerTimeSchemes, err
 }
 
-func getDeliveryGroupMachines(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string) (*citrixorchestration.MachineResponseModelCollection, error) {
-	getDeliveryGroupMachineCatalogsRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroupMachines(ctx, deliveryGroupId)
-	deliveryGroupMachines, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.MachineResponseModelCollection](getDeliveryGroupMachineCatalogsRequest, client)
-	if err != nil {
-		diagnostics.AddError(
-			"Error reading Machines for Delivery Group "+deliveryGroupId,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-	}
-
-	return deliveryGroupMachines, err
-}
-
 func getDeliveryGroupRebootSchedules(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string) (*citrixorchestration.RebootScheduleResponseModelCollection, error) {
 	getDeliveryGroupRebootScheduleRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroupRebootSchedules(ctx, deliveryGroupId)
 	deliveryGroupRebootSchedule, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.RebootScheduleResponseModelCollection](getDeliveryGroupRebootScheduleRequest, client)
@@ -120,10 +106,54 @@ func sessionHostingActionEnumValidator() validator.String {
 }
 
 func validatePowerManagementSettings(ctx context.Context, diags *diag.Diagnostics, plan DeliveryGroupResourceModel, allocationType citrixorchestration.AllocationType, sessionSupport citrixorchestration.SessionSupport) (bool, string) {
-	if plan.AutoscaleSettings.IsNull() || allocationType == citrixorchestration.ALLOCATIONTYPE_STATIC {
+	if plan.AutoscaleSettings.IsNull() {
 		return true, ""
 	}
 	autoscale := util.ObjectValueToTypedObject[DeliveryGroupPowerManagementSettings](ctx, diags, plan.AutoscaleSettings)
+
+	if sessionSupport == citrixorchestration.SESSIONSUPPORT_SINGLE_SESSION {
+		errStringSuffix := "cannot be set for a SingleSession catalog"
+
+		if autoscale.LimitSecondsToForceLogOffUserDuringOffPeak.ValueInt32() != 0 {
+			return false, "LimitSecondsToForceLogOffUserDuringOffPeak " + errStringSuffix
+		}
+
+		if autoscale.LimitSecondsToForceLogOffUserDuringPeak.ValueInt32() != 0 {
+			return false, "LimitSecondsToForceLogOffUserDuringPeak " + errStringSuffix
+		}
+
+		if !autoscale.LogOffWarningMessage.IsNull() && autoscale.LogOffWarningMessage.ValueString() != "" {
+			return false, "LogOffWarningMessage " + errStringSuffix
+		}
+
+		if !autoscale.LogOffWarningTitle.IsNull() && autoscale.LogOffWarningTitle.ValueString() != "" {
+			return false, "LogOffWarningTitle " + errStringSuffix
+		}
+
+		if autoscale.AutoscaleLogOffReminderEnabled.ValueBool() {
+			return false, "AutoscaleLogOffReminderEnabled " + errStringSuffix
+		}
+
+		if autoscale.AutoscaleLogOffReminderIntervalSecondsOffPeak.ValueInt32() != 0 {
+			return false, "AutoscaleLogOffReminderIntervalSecondsOffPeak " + errStringSuffix
+		}
+
+		if autoscale.AutoscaleLogOffReminderIntervalSecondsPeak.ValueInt32() != 0 {
+			return false, "AutoscaleLogOffReminderIntervalSecondsPeak " + errStringSuffix
+		}
+
+		if !autoscale.AutoscaleLogOffReminderMessage.IsNull() && autoscale.AutoscaleLogOffReminderMessage.ValueString() != "" {
+			return false, "AutoscaleLogOffReminderMessage " + errStringSuffix
+		}
+
+		if !autoscale.AutoscaleLogOffReminderTitle.IsNull() && autoscale.AutoscaleLogOffReminderTitle.ValueString() != "" {
+			return false, "AutoscaleLogOffReminderTitle " + errStringSuffix
+		}
+	}
+
+	if allocationType == citrixorchestration.ALLOCATIONTYPE_STATIC {
+		return true, ""
+	}
 
 	errStringSuffix := "cannot be set for a catalog with Random allocation type"
 
@@ -152,7 +182,7 @@ func validatePowerManagementSettings(ctx context.Context, diags *diag.Diagnostic
 	}
 
 	if sessionSupport == citrixorchestration.SESSIONSUPPORT_MULTI_SESSION {
-		errStringSuffix = "cannot be set for a Multisession catalog"
+		errStringSuffix = "cannot be set for a MultiSession catalog"
 
 		if autoscale.PeakDisconnectAction.ValueString() != "Nothing" {
 			return false, "PeakDisconnectAction " + errStringSuffix
@@ -289,9 +319,9 @@ func getDeliveryGroupAddMachinesRequest(associatedMachineCatalogs []DeliveryGrou
 	return deliveryGroupMachineCatalogsArray
 }
 
-func createExistingCatalogsAndMachinesMap(deliveryGroupMachines *citrixorchestration.MachineResponseModelCollection) map[string][]string {
+func createExistingCatalogsAndMachinesMap(deliveryGroupMachines []citrixorchestration.MachineResponseModel) map[string][]string {
 	catalogAndMachinesMap := map[string][]string{}
-	for _, dgMachine := range deliveryGroupMachines.GetItems() {
+	for _, dgMachine := range deliveryGroupMachines {
 		machineCatalog := dgMachine.GetMachineCatalog()
 		machineCatalogId := machineCatalog.GetId()
 		machineCatalogMachines := catalogAndMachinesMap[machineCatalogId]
@@ -344,7 +374,7 @@ func removeMachinesFromDeliveryGroup(ctx context.Context, client *citrixdaasclie
 }
 
 func addRemoveMachinesFromDeliveryGroup(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string, plan DeliveryGroupResourceModel) error {
-	deliveryGroupMachines, err := getDeliveryGroupMachines(ctx, client, diagnostics, deliveryGroupId)
+	deliveryGroupMachines, err := util.GetDeliveryGroupMachines(ctx, client, diagnostics, deliveryGroupId)
 
 	if err != nil {
 		return err
@@ -652,6 +682,8 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 	var body citrixorchestration.CreateDeliveryGroupRequestModel
 	body.SetName(plan.Name.ValueString())
 	body.SetDescription(plan.Description.ValueString())
+	//we are not setting the enabled value here as it is not respected by the API, we are invoking it in the update function
+	//body.SetEnabled(plan.Enabled.ValueBool())
 	body.SetRebootSchedules(deliveryGroupRebootScheduleArray)
 	body.SetDefaultDesktopIcon(plan.DefaultDesktopIcon.ValueString())
 
@@ -703,7 +735,6 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 	body.SetDesktops(deliveryGroupDesktopsArray)
 	body.SetDefaultDesktopPublishedName(plan.Name.ValueString())
 	body.SetSimpleAccessPolicy(simpleAccessPolicy)
-	body.SetPolicySetGuid(plan.PolicySetId.ValueString())
 	if associatedMachineCatalogProperties.IdentityType == citrixorchestration.IDENTITYTYPE_AZURE_AD {
 		body.SetMachineLogOnType(citrixorchestration.MACHINELOGONTYPE_AZURE_AD)
 	} else if associatedMachineCatalogProperties.IdentityType == citrixorchestration.IDENTITYTYPE_WORKGROUP {
@@ -764,8 +795,23 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 		body.SetLogoffPeakDisconnectedSessionAfterSeconds(int32(autoscale.LogoffPeakDisconnectedSessionAfterSeconds.ValueInt64()))
 		body.SetLogoffOffPeakDisconnectedSessionAfterSeconds(int32(autoscale.LogoffOffPeakDisconnectedSessionAfterSeconds.ValueInt64()))
 
+		body.SetLimitSecondsToForceLogOffUserDuringOffPeak(autoscale.LimitSecondsToForceLogOffUserDuringOffPeak.ValueInt32())
+		body.SetLimitSecondsToForceLogOffUserDuringPeak(autoscale.LimitSecondsToForceLogOffUserDuringPeak.ValueInt32())
+		if !autoscale.LogOffWarningMessage.IsNull() {
+			body.SetLogOffWarningMessage(autoscale.LogOffWarningMessage.ValueString())
+		}
+		if !autoscale.LogOffWarningTitle.IsNull() {
+			body.SetLogOffWarningTitle(autoscale.LogOffWarningTitle.ValueString())
+		}
+
 		powerTimeSchemes := parsePowerTimeSchemesPluginToClientModel(ctx, diagnostics, util.ObjectListToTypedArray[DeliveryGroupPowerTimeScheme](ctx, diagnostics, autoscale.PowerTimeSchemes))
 		body.SetPowerTimeSchemes(powerTimeSchemes)
+
+		body.SetAutoscaleLogOffReminderEnabled(autoscale.AutoscaleLogOffReminderEnabled.ValueBool())
+		body.SetAutoscaleLogOffReminderIntervalSecondsOffPeak(autoscale.AutoscaleLogOffReminderIntervalSecondsOffPeak.ValueInt32())
+		body.SetAutoscaleLogOffReminderIntervalSecondsPeak(autoscale.AutoscaleLogOffReminderIntervalSecondsPeak.ValueInt32())
+		body.SetAutoscaleLogOffReminderMessage(autoscale.AutoscaleLogOffReminderMessage.ValueString())
+		body.SetAutoscaleLogOffReminderTitle(autoscale.AutoscaleLogOffReminderTitle.ValueString())
 	}
 
 	if !plan.Scopes.IsNull() {
@@ -928,6 +974,7 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 	var editDeliveryGroupRequestBody citrixorchestration.EditDeliveryGroupRequestModel
 	editDeliveryGroupRequestBody.SetName(plan.Name.ValueString())
 	editDeliveryGroupRequestBody.SetDescription(plan.Description.ValueString())
+	editDeliveryGroupRequestBody.SetEnabled(plan.Enabled.ValueBool())
 
 	if !plan.DeliveryType.IsNull() {
 		deliveryKind, err := citrixorchestration.NewDeliveryKindFromValue(plan.DeliveryType.ValueString())
@@ -949,12 +996,6 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 	if !plan.Scopes.IsNull() {
 		plannedScopes := util.StringSetToStringArray(ctx, diagnostics, plan.Scopes)
 		editDeliveryGroupRequestBody.SetScopes(plannedScopes)
-	}
-
-	if plan.PolicySetId.ValueString() != "" {
-		editDeliveryGroupRequestBody.SetPolicySetGuid(plan.PolicySetId.ValueString())
-	} else {
-		editDeliveryGroupRequestBody.SetPolicySetGuid(util.DefaultSitePolicySetId)
 	}
 
 	editDeliveryGroupRequestBody.SetReuseMachinesWithoutShutdownInOutage(plan.MakeResourcesAvailableInLHC.ValueBool())
@@ -1006,8 +1047,20 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 		editDeliveryGroupRequestBody.SetLogoffPeakDisconnectedSessionAfterSeconds(int32(autoscale.LogoffPeakDisconnectedSessionAfterSeconds.ValueInt64()))
 		editDeliveryGroupRequestBody.SetLogoffOffPeakDisconnectedSessionAfterSeconds(int32(autoscale.LogoffOffPeakDisconnectedSessionAfterSeconds.ValueInt64()))
 
+		editDeliveryGroupRequestBody.SetLimitSecondsToForceLogOffUserDuringOffPeak(autoscale.LimitSecondsToForceLogOffUserDuringOffPeak.ValueInt32())
+		editDeliveryGroupRequestBody.SetLimitSecondsToForceLogOffUserDuringPeak(autoscale.LimitSecondsToForceLogOffUserDuringPeak.ValueInt32())
+		editDeliveryGroupRequestBody.SetLogOffWarningMessage(autoscale.LogOffWarningMessage.ValueString())
+		editDeliveryGroupRequestBody.SetLogOffWarningTitle(autoscale.LogOffWarningTitle.ValueString())
+
 		powerTimeSchemes := parsePowerTimeSchemesPluginToClientModel(ctx, diagnostics, util.ObjectListToTypedArray[DeliveryGroupPowerTimeScheme](ctx, diagnostics, autoscale.PowerTimeSchemes))
 		editDeliveryGroupRequestBody.SetPowerTimeSchemes(powerTimeSchemes)
+		editDeliveryGroupRequestBody.SetAutoscaleLogOffReminderEnabled(autoscale.AutoscaleLogOffReminderEnabled.ValueBool())
+		editDeliveryGroupRequestBody.SetAutoscaleLogOffReminderIntervalSecondsOffPeak(autoscale.AutoscaleLogOffReminderIntervalSecondsOffPeak.ValueInt32())
+		editDeliveryGroupRequestBody.SetAutoscaleLogOffReminderIntervalSecondsPeak(autoscale.AutoscaleLogOffReminderIntervalSecondsPeak.ValueInt32())
+		editDeliveryGroupRequestBody.SetAutoscaleLogOffReminderMessage(autoscale.AutoscaleLogOffReminderMessage.ValueString())
+		editDeliveryGroupRequestBody.SetAutoscaleLogOffReminderTitle(autoscale.AutoscaleLogOffReminderTitle.ValueString())
+	} else {
+		editDeliveryGroupRequestBody.SetAutoScaleEnabled(false)
 	}
 
 	storeFrontServersList := []citrixorchestration.StoreFrontServerRequestModel{}
@@ -1484,10 +1537,10 @@ func (r DeliveryGroupResourceModel) updatePlanWithRebootSchedule(ctx context.Con
 	return r
 }
 
-func (r DeliveryGroupResourceModel) updatePlanWithAssociatedCatalogs(ctx context.Context, diags *diag.Diagnostics, machines *citrixorchestration.MachineResponseModelCollection) DeliveryGroupResourceModel {
+func (r DeliveryGroupResourceModel) updatePlanWithAssociatedCatalogs(ctx context.Context, diags *diag.Diagnostics, machines []citrixorchestration.MachineResponseModel) DeliveryGroupResourceModel {
 	machineCatalogMap := map[string]int{}
 
-	for _, machine := range machines.GetItems() {
+	for _, machine := range machines {
 		machineCatalog := machine.GetMachineCatalog()
 		machineCatalogId := machineCatalog.GetId()
 		machineCatalogMap[machineCatalogId] += 1
@@ -1749,6 +1802,11 @@ func (r DeliveryGroupResourceModel) updatePlanWithAutoscaleSettings(ctx context.
 	autoscale.LogoffPeakDisconnectedSessionAfterSeconds = types.Int64Value(int64(deliveryGroup.GetLogoffPeakDisconnectedSessionAfterSeconds()))
 	autoscale.LogoffOffPeakDisconnectedSessionAfterSeconds = types.Int64Value(int64(deliveryGroup.GetLogoffOffPeakDisconnectedSessionAfterSeconds()))
 
+	autoscale.LimitSecondsToForceLogOffUserDuringOffPeak = types.Int32Value(deliveryGroup.GetLimitSecondsToForceLogOffUserDuringOffPeak())
+	autoscale.LimitSecondsToForceLogOffUserDuringPeak = types.Int32Value(deliveryGroup.GetLimitSecondsToForceLogOffUserDuringPeak())
+	autoscale.LogOffWarningTitle = types.StringValue(deliveryGroup.GetLogOffWarningTitle())
+	autoscale.LogOffWarningMessage = types.StringValue(deliveryGroup.GetLogOffWarningMessage())
+
 	parsedPowerTimeSchemes := parsePowerTimeSchemesClientToPluginModel(ctx, diags, dgPowerTimeSchemes.GetItems())
 	if parsedPowerTimeSchemes != nil {
 		autoscalePowerTimeSchemes := util.ObjectListToTypedArray[DeliveryGroupPowerTimeScheme](ctx, diags, autoscale.PowerTimeSchemes)
@@ -1761,6 +1819,12 @@ func (r DeliveryGroupResourceModel) updatePlanWithAutoscaleSettings(ctx context.
 			diags.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
 		}
 	}
+
+	autoscale.AutoscaleLogOffReminderEnabled = types.BoolValue(deliveryGroup.GetAutoscaleLogOffReminderEnabled())
+	autoscale.AutoscaleLogOffReminderIntervalSecondsOffPeak = types.Int32Value(deliveryGroup.GetAutoscaleLogOffReminderIntervalSecondsOffPeak())
+	autoscale.AutoscaleLogOffReminderIntervalSecondsPeak = types.Int32Value(deliveryGroup.GetAutoscaleLogOffReminderIntervalSecondsPeak())
+	autoscale.AutoscaleLogOffReminderTitle = types.StringValue(deliveryGroup.GetAutoscaleLogOffReminderTitle())
+	autoscale.AutoscaleLogOffReminderMessage = types.StringValue(deliveryGroup.GetAutoscaleLogOffReminderMessage())
 
 	r.AutoscaleSettings = util.TypedObjectToObjectValue(ctx, diags, autoscale)
 	return r

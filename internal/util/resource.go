@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 )
 
+const AZURERM_FACTORY_NAME string = "AzureRmFactory"
 const NUTANIX_PLUGIN_ID string = "AcropolisFactory"
 
 // Gets the hypervisor and logs any errors
@@ -74,6 +75,50 @@ func GetMachineCatalogIdWithPath(ctx context.Context, client *citrixdaasclient.C
 	return catalog.GetId(), err
 }
 
+func GetDeliveryGroups(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, fields string) ([]citrixorchestration.DeliveryGroupResponseModel, error) {
+	req := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroups(ctx)
+	req = req.Limit(250)
+	if fields != "" {
+		req = req.Fields(fields)
+	}
+
+	deliveryGroups := []citrixorchestration.DeliveryGroupResponseModel{}
+	continuationToken := ""
+	for {
+		req = req.ContinuationToken(continuationToken)
+
+		responseModel, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.DeliveryGroupResponseModelCollection](req, client)
+		if err != nil {
+			diagnostics.AddError(
+				"Error reading delivery groups",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+ReadClientError(err),
+			)
+			return deliveryGroups, err
+		}
+		deliveryGroups = append(deliveryGroups, responseModel.GetItems()...)
+
+		if responseModel.GetContinuationToken() == "" {
+			return deliveryGroups, nil
+		}
+		continuationToken = responseModel.GetContinuationToken()
+	}
+}
+
+func GetDeliveryGroup(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string) (*citrixorchestration.DeliveryGroupDetailResponseModel, error) {
+	getDeliveryGroupRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroup(ctx, deliveryGroupId)
+	deliveryGroup, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.DeliveryGroupDetailResponseModel](getDeliveryGroupRequest, client)
+	if err != nil {
+		diagnostics.AddError(
+			"Error reading Delivery Group "+deliveryGroupId,
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+ReadClientError(err),
+		)
+	}
+
+	return deliveryGroup, err
+}
+
 func GetDeliveryGroupIdWithPath(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupPath string) (string, error) {
 	getDeliveryGroupRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroup(ctx, deliveryGroupPath).Fields("Id")
 	deliveryGroup, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.DeliveryGroupDetailResponseModel](getDeliveryGroupRequest, client)
@@ -86,6 +131,31 @@ func GetDeliveryGroupIdWithPath(ctx context.Context, client *citrixdaasclient.Ci
 	}
 
 	return deliveryGroup.GetId(), err
+}
+
+func GetDeliveryGroupMachines(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string) ([]citrixorchestration.MachineResponseModel, error) {
+	req := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroupMachines(ctx, deliveryGroupId)
+	req = req.Limit(250)
+
+	responses := []citrixorchestration.MachineResponseModel{}
+	continuationToken := ""
+	for {
+		req = req.ContinuationToken(continuationToken)
+		responseModel, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.MachineResponseModelCollection](req, client)
+		if err != nil {
+			diagnostics.AddError(
+				"Error reading Machines for Delivery Group "+deliveryGroupId,
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+ReadClientError(err),
+			)
+			return responses, err
+		}
+		responses = append(responses, responseModel.GetItems()...)
+		if responseModel.GetContinuationToken() == "" {
+			return responses, nil
+		}
+		continuationToken = responseModel.GetContinuationToken()
+	}
 }
 
 func GetApplicationGroupIdWithPath(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, appGroupPath string) (string, error) {
@@ -102,18 +172,29 @@ func GetApplicationGroupIdWithPath(ctx context.Context, client *citrixdaasclient
 	return appGroup.GetId(), err
 }
 
-func GetMachineCatalogMachines(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, machineCatalogId string) (*citrixorchestration.MachineResponseModelCollection, error) {
-	getMachineCatalogMachinesRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogMachines(ctx, machineCatalogId).Fields("Id,Name,Hosting,DeliveryGroup")
-	machines, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.MachineResponseModelCollection](getMachineCatalogMachinesRequest, client)
-	if err != nil {
-		diagnostics.AddError(
-			"Error reading Machines for Machine Catalog "+machineCatalogId,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+ReadClientError(err),
-		)
-	}
+func GetMachineCatalogMachines(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, machineCatalogId string) ([]citrixorchestration.MachineResponseModel, error) {
+	req := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogMachines(ctx, machineCatalogId).Fields("Id,Name,Hosting,DeliveryGroup")
+	req = req.Limit(250)
 
-	return machines, err
+	responses := []citrixorchestration.MachineResponseModel{}
+	continuationToken := ""
+	for {
+		req = req.ContinuationToken(continuationToken)
+		responseModel, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.MachineResponseModelCollection](req, client)
+		if err != nil {
+			diagnostics.AddError(
+				"Error reading Machines for Machine Catalog "+machineCatalogId,
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+ReadClientError(err),
+			)
+			return responses, err
+		}
+		responses = append(responses, responseModel.GetItems()...)
+		if responseModel.GetContinuationToken() == "" {
+			return responses, nil
+		}
+		continuationToken = responseModel.GetContinuationToken()
+	}
 }
 
 func GetSingleResourceFromHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName string) (*citrixorchestration.HypervisorResourceResponseModel, *http.Response, error) {

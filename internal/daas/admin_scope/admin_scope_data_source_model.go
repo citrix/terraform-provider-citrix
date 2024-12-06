@@ -24,7 +24,7 @@ func (AdminScopeModel) GetDataSourceSchema() schema.Schema {
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "Name of the Admin Scope.",
+				Description: "Name of the Admin Scope. For `tenant` scope please use `tenant customer Id` for this field.",
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),

@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
@@ -28,6 +29,7 @@ import (
 // ApplicationGroupResource maps the resource schema data.
 type ApplicationGroupResourceModel struct {
 	Id                         types.String `tfsdk:"id"`
+	Enabled                    types.Bool   `tfsdk:"enabled"`
 	Name                       types.String `tfsdk:"name"`
 	Description                types.String `tfsdk:"description"`
 	RestrictToTag              types.String `tfsdk:"restrict_to_tag"`
@@ -52,6 +54,12 @@ func (ApplicationGroupResourceModel) GetSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
+			},
+			"enabled": schema.BoolAttribute{
+				Description: "Whether the application group is enabled or not. Defaults to `true`.",
+				Computed:    true,
+				Optional:    true,
+				Default:     booldefault.StaticBool(true),
 			},
 			"name": schema.StringAttribute{
 				Description: "Name of the application group to create.",
@@ -160,6 +168,7 @@ func (r ApplicationGroupResourceModel) RefreshPropertyValues(ctx context.Context
 	r.Name = types.StringValue(applicationGroup.GetName())
 
 	// Set optional values
+	r.Enabled = types.BoolValue(applicationGroup.GetEnabled())
 	r.Description = types.StringValue(applicationGroup.GetDescription())
 
 	restrictToTag := applicationGroup.GetRestrictToTag()

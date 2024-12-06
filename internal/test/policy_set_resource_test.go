@@ -60,6 +60,7 @@ resource "citrix_policy_set" "testPolicySet" {
             ]
         }
     ]
+	%s
 }
 `
 
@@ -100,6 +101,7 @@ resource "citrix_policy_set" "testPolicySet" {
             ]
         }
     ]
+	%s
 }
 `
 
@@ -129,6 +131,7 @@ resource "citrix_policy_set" "testPolicySet" {
             ]
         }
     ]
+	%s
 }
 `
 )
@@ -139,14 +142,32 @@ func TestPolicySetResourcePreCheck(t *testing.T) {
 	}
 }
 
+func TestPolicySetResourceWithDeliveryGroupIdPreCheck(t *testing.T) {
+	if v := os.Getenv("TEST_POLICY_SET_NAME"); v == "" {
+		t.Fatal("TEST_POLICY_SET_NAME must be set for acceptance tests")
+	}
+
+	if v := os.Getenv("TEST_POLICY_SET_DELIVERY_GROUP_ID"); v == "" {
+		t.Fatal("TEST_POLICY_SET_DELIVERY_GROUP_ID must be set for acceptance tests")
+	}
+}
+
 func BuildPolicySetResource(t *testing.T, policySet string) string {
 	policySetName := os.Getenv("TEST_POLICY_SET_NAME")
 
-	return fmt.Sprintf(policySet, policySetName)
+	return fmt.Sprintf(policySet, policySetName, "")
+}
+
+func BuildPolicySetResourceWithDeliveryGroupId(t *testing.T, policySet string, deliveryGroupId string) string {
+	policySetName := os.Getenv("TEST_POLICY_SET_NAME")
+
+	return fmt.Sprintf(policySet, policySetName, "delivery_groups = [ \""+deliveryGroupId+"\" ]")
 }
 
 func TestPolicySetResource(t *testing.T) {
 	zoneInput := os.Getenv("TEST_ZONE_INPUT_AZURE")
+	deliveryGroupId := os.Getenv("TEST_POLICY_SET_DELIVERY_GROUP_ID")
+	deliveryGroupId_updated := os.Getenv("TEST_POLICY_SET_DELIVERY_GROUP_ID_UPDATED")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -157,14 +178,14 @@ func TestPolicySetResource(t *testing.T) {
 			TestMachineCatalogPreCheck_Azure(t)
 			TestDeliveryGroupPreCheck(t)
 			TestPolicySetResourcePreCheck(t)
+			TestPolicySetResourceWithDeliveryGroupIdPreCheck(t)
 		},
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
 				Config: composeTestResourceTf(
-					BuildPolicySetResource(t, policy_set_testResource),
+					BuildPolicySetResourceWithDeliveryGroupId(t, policy_set_testResource, deliveryGroupId),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updated, "DesktopsAndApps"),
-					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
@@ -202,6 +223,10 @@ func TestPolicySetResource(t *testing.T) {
 						"name":        "AdvanceWarningPeriod",
 						"use_default": "true",
 					}),
+					// Verify delivery groups association of the policy set
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "delivery_groups.#", "1"),
+					// Verify delivery group id associated with the policy set
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "delivery_groups.0", deliveryGroupId),
 				),
 			},
 			// Reorder and Read testing
@@ -209,7 +234,6 @@ func TestPolicySetResource(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildPolicySetResource(t, policy_set_reordered_testResource),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updated, "DesktopsAndApps"),
-					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
@@ -230,6 +254,8 @@ func TestPolicySetResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.name", "second-test-policy"),
 					// Verify name of the second policy in the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.1.name", "first-test-policy"),
+					// Verify delivery groups association of the policy set
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "delivery_groups.#", "0"),
 				),
 			},
 			// ImportState testing
@@ -239,14 +265,13 @@ func TestPolicySetResource(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{"last_updated", "assigned"},
 			},
 			// Update and Read testing
 			{
 				Config: composeTestResourceTf(
-					BuildPolicySetResource(t, policy_set_updated_testResource),
+					BuildPolicySetResourceWithDeliveryGroupId(t, policy_set_updated_testResource, deliveryGroupId_updated),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updated, "DesktopsAndApps"),
-					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
@@ -265,6 +290,10 @@ func TestPolicySetResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.#", "1"),
 					// Verify name of the second policy in the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.name", "first-test-policy"),
+					// Verify delivery groups association of the policy set
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "delivery_groups.#", "1"),
+					// Verify delivery group id associated with the policy set
+					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "delivery_groups.0", deliveryGroupId_updated),
 				),
 			},
 		},

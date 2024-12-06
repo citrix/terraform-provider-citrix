@@ -116,7 +116,6 @@ resource "citrix_delivery_group" "example-delivery-group" {
 			}
 		}
 	]
-    policy_set_id            = citrix_policy_set.example-policy-set.id
     minimum_functional_level = "L7_20"
     app_protection = {
         # apply_contextually = [
@@ -206,6 +205,7 @@ resource "citrix_delivery_group" "example-delivery-group" {
 - `delivery_type` (String) Delivery type of the delivery group. Available values are `DesktopsOnly`, `AppsOnly`, and `DesktopsAndApps`. Defaults to `DesktopsOnly` for Delivery Groups with associated Machine Catalogs that have `allocation_type` set to `Static` and for Delivery Groups that have `sharing_kind` set to `private`. Otherwise defaults to `DesktopsAndApps
 - `description` (String) Description of the delivery group.
 - `desktops` (Attributes List) A list of Desktop resources to publish on the delivery group. Only 1 desktop can be added to a Remote PC Delivery Group. (see [below for nested schema](#nestedatt--desktops))
+- `enabled` (Boolean) Whether the delivery group is enabled or not. Defaults to `true`.
 - `make_resources_available_in_lhc` (Boolean) In the event of a service disruption or loss of connectivity, select if you want Local Host Cache to keep resources in the delivery group available to launch new sessions. Existing sessions are not impacted. 
 
 ~> **Please Note** This setting only impacts Single Session OS Random (pooled) desktops which are power managed. LHC is always enabled for Single Session OS static and Multi Session OS desktops.
@@ -213,7 +213,6 @@ resource "citrix_delivery_group" "example-delivery-group" {
 -> **Note** When set to `true`, machines will remain available and allow new connections and changes to the machine caused by a user might be present in subsequent sessions. When set to `false`, machines in the delivery group will be unavailable for new connections during a Local Host Cache event.
 - `metadata` (Attributes List) Metadata for the Delivery Group. (see [below for nested schema](#nestedatt--metadata))
 - `minimum_functional_level` (String) Specifies the minimum functional level for the VDA machines in the delivery group. Defaults to `L7_20`.
-- `policy_set_id` (String) GUID identifier of the policy set.
 - `reboot_schedules` (Attributes List) The reboot schedule for the delivery group. (see [below for nested schema](#nestedatt--reboot_schedules))
 - `restricted_access_users` (Attributes) Restrict access to this Delivery Group by specifying users and groups in the allow and block list. If no value is specified, all authenticated users will have access to this Delivery Group. To give access to unauthenticated users, use the `allow_anonymous_access` property. (see [below for nested schema](#nestedatt--restricted_access_users))
 - `scopes` (Set of String) The IDs of the scopes for the delivery group to be a part of.
@@ -278,12 +277,19 @@ Optional:
 - `disconnect_peak_idle_session_after_seconds` (Number) Specifies the time in seconds after which an idle session belonging to the delivery group is disconnected during peak time.
 - `log_off_off_peak_disconnected_session_after_seconds` (Number) Specifies the time in seconds after which a disconnected session belonging to the delivery group is terminated during off peak time.
 - `log_off_peak_disconnected_session_after_seconds` (Number) Specifies the time in seconds after which a disconnected session belonging to the delivery group is terminated during peak time.
+- `log_off_reminder_enabled` (Boolean) Indicates whether log off reminder is enabled. Defaults to `false`.
+- `log_off_reminder_message` (String) The message to be displayed in the log off reminder.
+- `log_off_reminder_title` (String) The title of the log off reminder.
+- `log_off_warning_message` (String) The message to be displayed in the log off warning.
+- `log_off_warning_title` (String) The title of the log off warning.
 - `off_peak_buffer_size_percent` (Number) The percentage of machines in the delivery group that should be kept available in an idle state outside peak hours.
 - `off_peak_disconnect_action` (String) The action to be performed after a configurable period of a user session disconnecting outside peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.
 - `off_peak_disconnect_timeout_minutes` (Number) The number of minutes before the configured action should be performed after a user session disconnectts outside peak hours.
 - `off_peak_extended_disconnect_action` (String) The action to be performed after a second configurable period of a user session disconnecting outside peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.
 - `off_peak_extended_disconnect_timeout_minutes` (Number) The number of minutes before the second configured action should be performed after a user session disconnects outside peak hours.
+- `off_peak_limit_seconds_to_force_log_off_user` (Number) Limit in seconds to force log off user after user logs off from their sessions during off-peak hours. Defaults to `0`.
 - `off_peak_log_off_action` (String) The action to be performed after a configurable period of a user session ending outside peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.
+- `off_peak_log_off_reminder_interval` (Number) The interval in seconds at which the log off reminder is sent during off-peak hours. Defaults to `0`.
 - `off_peak_log_off_timeout_minutes` (Number) The number of minutes before the configured action should be performed after a user session ends outside peak hours.
 - `off_peak_restrict_min_idle_untagged_percent` (Number) Specifies the percentage of remaining untagged capacity to fall below to start powering on tagged machines during off peak hours. 
 
@@ -295,7 +301,9 @@ Optional:
 - `peak_disconnect_timeout_minutes` (Number) The number of minutes before the configured action should be performed after a user session disconnects in peak hours.
 - `peak_extended_disconnect_action` (String) The action to be performed after a second configurable period of a user session disconnecting in peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.
 - `peak_extended_disconnect_timeout_minutes` (Number) The number of minutes before the second configured action should be performed after a user session disconnects in peak hours.
+- `peak_limit_seconds_to_force_log_off_user` (Number) Limit in seconds to force log off user after user logs off from their sessions during peak hours. Defaults to `0`.
 - `peak_log_off_action` (String) The action to be performed after a configurable period of a user session ending in peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.
+- `peak_log_off_reminder_interval` (Number) The interval in seconds at which the log off reminder is sent during peak hours. Defaults to `0`.
 - `peak_log_off_timeout_minutes` (Number) The number of minutes before the configured action should be performed after a user session ends in peak hours.
 - `peak_restrict_min_idle_untagged_percent` (Number) Specifies the percentage of remaining untagged capacity to fall below to start powering on tagged machines during peak hours. 
 

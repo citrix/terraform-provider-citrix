@@ -81,15 +81,10 @@ func (d *DeliveryGroupDataSource) Read(ctx context.Context, req datasource.ReadR
 	}
 
 	// Get VDAs associated with the delivery group
-	getDeliveryGroupMachinesRequest := d.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroupMachines(ctx, deliveryGroupPathOrId)
-	deliveryGroupVdas, httpResp, err := citrixdaasclient.AddRequestData(getDeliveryGroupMachinesRequest, d.client).Execute()
+	deliveryGroupVdas, err := util.GetDeliveryGroupMachines(ctx, d.client, &resp.Diagnostics, deliveryGroup.GetId())
 
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error listing VDAs in Delivery Group "+deliveryGroupNameOrId,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
+		return
 	}
 
 	tags := getDeliveryGroupTags(ctx, &resp.Diagnostics, d.client, deliveryGroupPathOrId)

@@ -30,7 +30,7 @@ data "citrix_admin_scope" "test_scope_by_id" {
 ### Optional
 
 - `id` (String) ID of the Admin Scope.
-- `name` (String) Name of the Admin Scope.
+- `name` (String) Name of the Admin Scope. For `tenant` scope please use `tenant customer Id` for this field.
 
 ### Read-Only
 

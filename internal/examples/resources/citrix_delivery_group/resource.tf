@@ -101,7 +101,6 @@ resource "citrix_delivery_group" "example-delivery-group" {
 			}
 		}
 	]
-    policy_set_id            = citrix_policy_set.example-policy-set.id
     minimum_functional_level = "L7_20"
     app_protection = {
         # apply_contextually = [

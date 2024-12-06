@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -101,10 +102,9 @@ func (MachineCatalogMachineModel) GetSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
 			"machine_account": schema.StringAttribute{
-				Description: "The computer AD account for the machine must be in the format <domain>\\<machine>, all in lowercase.",
+				Description: "For domain-joined machines, the Active Directory (AD) account must be in the format <domain>\\<machine>, all in lowercase. For non-domain-joined the computer name, all in lowercase.",
 				Required:    true,
 				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.SamRegex), "must be in the format DOMAIN\\MACHINE"),
 					stringvalidator.RegexMatches(regexp.MustCompile(util.LowerCaseRegex), "must be in lowercase"),
 				},
 			},
@@ -165,6 +165,7 @@ type ProvisioningSchemeModel struct {
 	IdentityType                types.String `tfsdk:"identity_type"`
 	MachineDomainIdentity       types.Object `tfsdk:"machine_domain_identity"`        // MachineDomainIdentityModel
 	MachineAccountCreationRules types.Object `tfsdk:"machine_account_creation_rules"` // MachineAccountCreationRulesModel
+	MachineADAccounts           types.List   `tfsdk:"machine_ad_accounts"`            // Set[MachineADAccountModel]
 	CustomProperties            types.List   `tfsdk:"custom_properties"`              // List[CustomPropertyModel]
 	Metadata                    types.List   `tfsdk:"metadata"`                       // List[NameValueStringPairModel]
 }
@@ -207,7 +208,7 @@ func (ProvisioningSchemeModel) GetSchema() schema.SingleNestedAttribute {
 				Description: "Specifies how the attached NICs are mapped to networks. If this parameter is omitted, provisioned VMs are created with a single NIC, which is mapped to the default network in the hypervisor resource pool. If this parameter is supplied, machines are created with the number of NICs specified in the map, and each NIC is attached to the specified network." + "<br />" +
 					"Required when `provisioning_scheme.identity_type` is `AzureAD`.",
 				Optional:     true,
-				NestedObject: NetworkMappingModel{}.GetSchema(),
+				NestedObject: util.NetworkMappingModel{}.GetSchema(),
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
 				},
@@ -256,6 +257,17 @@ func (ProvisioningSchemeModel) GetSchema() schema.SingleNestedAttribute {
 				},
 			},
 			"machine_account_creation_rules": MachineAccountCreationRulesModel{}.GetSchema(),
+			"machine_ad_accounts": schema.ListNestedAttribute{
+				Description: "Existing machine account in the AD to be used. If specified for machine catalog creation, the number of machine AD accounts need to be greater or equals to the number of total machines." +
+					" \n\n-> **Note** During machine catalog creation, if `machine_ad_accounts` is specified, the machine_account_creation_rules will not be applied. " +
+					"During update, machine accounts will be used first for new machines. If there is insufficient amount of machine accounts, then the machine account creation rules will be applied to create new machine accounts in the directory.",
+				Optional:     true,
+				NestedObject: MachineADAccountModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+					listvalidator.AtLeastOneOf(path.MatchRelative().AtParent().AtName("machine_account_creation_rules")),
+				},
+			},
 			"custom_properties": schema.ListNestedAttribute{
 				Description:  "**This is an advanced feature. Use with caution.** Custom properties to be set for the machine catalog. For properties that are already supported as a terraform configuration field, please use terraform field instead.",
 				Optional:     true,
@@ -373,7 +385,7 @@ type MachineAccountCreationRulesModel struct {
 func (MachineAccountCreationRulesModel) GetSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
 		Description: "Rules specifying how Active Directory machine accounts should be created when machines are provisioned.",
-		Required:    true,
+		Optional:    true,
 		Attributes: map[string]schema.Attribute{
 			"naming_scheme": schema.StringAttribute{
 				Description: "Defines the template name for AD accounts created in the identity pool.",
@@ -394,47 +406,75 @@ func (MachineAccountCreationRulesModel) GetAttributes() map[string]schema.Attrib
 	return MachineAccountCreationRulesModel{}.GetSchema().Attributes
 }
 
-// ensure NetworkMappingModel implements RefreshableListItemWithAttributes
-var _ util.RefreshableListItemWithAttributes[citrixorchestration.NetworkMapResponseModel] = NetworkMappingModel{}
+var _ util.RefreshableListItemWithAttributes[citrixorchestration.ProvisioningSchemeMachineAccountResponseModel] = MachineADAccountModel{}
 
-// NetworkMappingModel maps the nested network mapping resource schema data.
-type NetworkMappingModel struct {
-	NetworkDevice types.String `tfsdk:"network_device"`
-	Network       types.String `tfsdk:"network"`
+type MachineADAccountModel struct {
+	ADAccountName  types.String `tfsdk:"ad_account_name"`
+	PasswordFormat types.String `tfsdk:"password_format"`
+	ResetPassword  types.Bool   `tfsdk:"reset_password"`
+	Password       types.String `tfsdk:"password"`
+	State          types.String `tfsdk:"state"`
 }
 
-func (n NetworkMappingModel) GetKey() string {
-	return n.NetworkDevice.ValueString()
-}
-
-func (NetworkMappingModel) GetSchema() schema.NestedAttributeObject {
+func (MachineADAccountModel) GetSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
-			"network_device": schema.StringAttribute{
-				Description: "Name or Id of the network device.",
+			"ad_account_name": schema.StringAttribute{
+				Description: "The computer account name in the Active Directory.",
 				Required:    true,
 				Validators: []validator.String{
-					stringvalidator.AlsoRequires(path.Expressions{
-						path.MatchRelative().AtParent().AtName("network"),
-					}...),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.ComputerAccountRegex), "must be in the format domain\\machine$"),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.LowerCaseRegex), "must be in lowercase"),
 				},
 			},
-			"network": schema.StringAttribute{
-				Description: "The name of the virtual network that the device should be attached to. This must be a subnet within a Virtual Private Cloud item in the resource pool to which the Machine Catalog is associated." + "<br />" +
-					"For AWS, please specify the network mask of the network you want to use within the VPC.",
-				Required: true,
+			"password_format": schema.StringAttribute{
+				Description: "Password format to be used for machine account. Choose between `PlainText` and `Base64`. Defaults to `PlainText`.",
+				Optional:    true,
+				Computed:    true,
 				Validators: []validator.String{
-					stringvalidator.AlsoRequires(path.Expressions{
-						path.MatchRelative().AtParent().AtName("network_device"),
-					}...),
+					util.GetValidatorFromEnum(citrixorchestration.AllowedIdentityPasswordFormatEnumValues),
 				},
+				Default: stringdefault.StaticString(string(citrixorchestration.IDENTITYPASSWORDFORMAT_PLAIN_TEXT)),
+			},
+			"reset_password": schema.BoolAttribute{
+				Description: "Specify if the password for the machine account should be reset. Defaults to `false`",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+				Validators: []validator.Bool{
+					validators.AlsoRequiresOnBoolValues([]bool{false}, path.MatchRelative().AtParent().AtName("password")),
+					validators.ConflictsWithOnBoolValues([]bool{true}, path.MatchRelative().AtParent().AtName("password")),
+				},
+			},
+			"password": schema.StringAttribute{
+				Description: "Password of the machine account. This value will be applied only if `reset_password = false`",
+				Optional:    true,
+				Sensitive:   true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"state": schema.StringAttribute{
+				Description: "State of the machine account.",
+				Computed:    true,
 			},
 		},
 	}
 }
 
-func (NetworkMappingModel) GetAttributes() map[string]schema.Attribute {
-	return NetworkMappingModel{}.GetSchema().Attributes
+func (MachineADAccountModel) GetAttributes() map[string]schema.Attribute {
+	return MachineADAccountModel{}.GetSchema().Attributes
+}
+
+// GetKey implements util.RefreshableListItemWithAttributes.
+func (r MachineADAccountModel) GetKey() string {
+	return r.ADAccountName.ValueString()
+}
+
+func (r MachineADAccountModel) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, account citrixorchestration.ProvisioningSchemeMachineAccountResponseModel) util.ResourceModelWithAttributes {
+	r.ADAccountName = types.StringValue(strings.ToLower(account.GetSamName()))
+	r.State = types.StringValue(string(account.GetState()))
+	return r
 }
 
 // ensure RemotePcOuModel implements RefreshableListItemWithAttributes
@@ -653,7 +693,7 @@ func (MachineCatalogResourceModel) GetAttributes() map[string]schema.Attribute {
 	return MachineCatalogResourceModel{}.GetSchema().Attributes
 }
 
-func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixclient.CitrixDaasClient, catalog *citrixorchestration.MachineCatalogDetailResponseModel, connectionType *citrixorchestration.HypervisorConnectionType, machines *citrixorchestration.MachineResponseModelCollection, pluginId string, tags []string) MachineCatalogResourceModel {
+func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixclient.CitrixDaasClient, catalog *citrixorchestration.MachineCatalogDetailResponseModel, connectionType *citrixorchestration.HypervisorConnectionType, machines []citrixorchestration.MachineResponseModel, pluginId string, tags []string, machineAdAccounts []citrixorchestration.ProvisioningSchemeMachineAccountResponseModel) MachineCatalogResourceModel {
 	// Machine Catalog Properties
 	r.Id = types.StringValue(catalog.GetId())
 	r.Name = types.StringValue(catalog.GetName())
@@ -749,26 +789,7 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 	}
 
 	// Provisioning Scheme Properties
-	r = r.updateCatalogWithProvScheme(ctx, diagnostics, client, catalog, connectionType, pluginId, provScheme)
+	r = r.updateCatalogWithProvScheme(ctx, diagnostics, client, catalog, connectionType, pluginId, provScheme, machineAdAccounts)
 
 	return r
-}
-
-func (networkMapping NetworkMappingModel) RefreshListItem(_ context.Context, _ *diag.Diagnostics, nic citrixorchestration.NetworkMapResponseModel) util.ResourceModelWithAttributes {
-	networkMapping.NetworkDevice = types.StringValue(nic.GetDeviceId())
-	network := nic.GetNetwork()
-	segments := strings.Split(network.GetXDPath(), "\\")
-	lastIndex := len(segments)
-
-	networkName := (strings.TrimSuffix(segments[lastIndex-1], ".network"))
-	matchAws := regexp.MustCompile(util.AwsNetworkNameRegex)
-	if matchAws.MatchString(networkName) {
-		/* For AWS Network, the XDPath looks like:
-		* XDHyp:\\HostingUnits\\{resource pool}\\{availability zone}.availabilityzone\\{network ip}`/{prefix length} (vpc-{vpc-id}).network
-		* The Network property should be set to {network ip}/{prefix length}
-		 */
-		networkName = strings.ReplaceAll(strings.Split((networkName), " ")[0], "`/", "/")
-	}
-	networkMapping.Network = types.StringValue(networkName)
-	return networkMapping
 }

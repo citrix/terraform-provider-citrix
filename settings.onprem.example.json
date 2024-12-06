@@ -262,7 +262,6 @@
 
         // Delivery Group Testing Env Variables
         "TEST_DG_NAME"                :"ak-test-delivery-group",
-        "TEST_POLICY_SET_WITHOUT_DG_NAME" : "test-policy-set-without-dg",
 
         // Application Go Tests
         "TEST_APP_NAME"                 :"app-test",
@@ -294,10 +293,45 @@
         // Policy Set env variable
         // Policy Set Resource Tests env variables
         "TEST_POLICY_SET_NAME"          :"ctx-test-policy-set",
+        "TEST_POLICY_SET_DELIVERY_GROUP_ID"          :"{delivery_group_id_to_be_associated}",
+        "TEST_POLICY_SET_DELIVERY_GROUP_ID_UPDATED"          :"{delivery_group_id_to_be_associated_updated}",
         // Policy Set Data Source Tests env variables
         "TEST_POLICY_SET_DATA_SOURCE_ID" : "{Policy Set Data Source ID}",
         "TEST_POLICY_SET_DATA_SOURCE_NAME" : "{Policy Set Data Source Name}",
         "TEST_POLICY_SET_DATA_SOURCE_EXPECTED_POLICY_COUNT" : "{Policy Set Data Source Policy Count}",
+
+        // Image Definition Resource Go Tests
+        "TEST_IMAGE_DEFINITION_NAME": "{image_definition_name}",
+        "TEST_IMAGE_DEFINITION_DESCRIPTION": "{image_definition_description}",
+        "TEST_IMAGE_DEFINITION_OS_TYPE": "{image_definition_os_type}",
+        "TEST_IMAGE_DEFINITION_SESSION_SUPPORT": "{image_definition_session_support}",
+
+        "TEST_IMAGE_DEFINITION_NAME_UPDATED": "{image_definition_updated_name}",
+        "TEST_IMAGE_DEFINITION_DESCRIPTION_UPDATED": "{image_definition_updated_description}",
+        "TEST_IMAGE_DEFINITION_OS_TYPE_UPDATED": "{image_definition_updated_os_type}",
+        "TEST_IMAGE_DEFINITION_SESSION_SUPPORT_UPDATED": "{image_definition_updated_session_support}",
+
+        // Image Definition Data Source Go Tests
+        "TEST_IMAGE_DEFINITION_DATA_SOURCE_ID": "{image_definition_guid}",
+        "TEST_IMAGE_DEFINITION_DATA_SOURCE_NAME": "{image_definition_name}",
+        "TEST_IMAGE_DEFINITION_DATA_SOURCE_DESCRIPTION": "{image_definition_description}",
+        "TEST_IMAGE_DEFINITION_DATA_SOURCE_OS_TYPE": "{image_definition_os_type}",
+        "TEST_IMAGE_DEFINITION_DATA_SOURCE_SESSION_SUPPORT": "{image_definition_session_support}",
+
+        // Image Version Resource Go Tests
+        "TEST_AZURE_IMAGE_VERSION_RESOURCE_POOL":"{image_version_resource_pool_id}",
+        "TEST_AZURE_IMAGE_VERSION_DESCRIPTION":"{image_version_description}",
+        "TEST_AZURE_IMAGE_VERSION_SERVICE_OFFERING":"{image_version_service_offering}",
+        "TEST_AZURE_IMAGE_VERSION_SUBNET":"{image_version_subnet}",
+        "TEST_AZURE_IMAGE_VERSION_RESOURCE_GROUP":"{image_version_base_image_resource_group}",
+        "TEST_AZURE_IMAGE_VERSION_MASTER_IMAGE":"{image_version_master_image_name}",
+        "TEST_AZURE_IMAGE_VERSION_GALLERY":"{image_version_image_gallery_name}",
+        "TEST_AZURE_IMAGE_VERSION_GALLERY_DEFINITION":"{image_version_image_gallery_definition}",
+        "TEST_AZURE_IMAGE_VERSION_GALLERY_VERSION":"{image_version_image_gallery_version}",
+        "TEST_AZURE_IMAGE_VERSION_MACHINE_PROFILE_RESOURCE_GROUP":"{image_version_machine_profile_resource_group}",
+        "TEST_AZURE_IMAGE_VERSION_MACHINE_PROFILE_VM_NAME":"{image_version_machine_profile_vm_name}",
+        "TEST_AZURE_IMAGE_VERSION_DES_NAME":"{image_version_disk_encryption_set_name}",
+        "TEST_AZURE_IMAGE_VERSION_DES_RESOURCE_GROUP":"{image_version_disk_encryption_set_resource_group}",
 
         // StoreFront env variable
         "SF_COMPUTER_NAME"              : "{storefront_computer_name}",

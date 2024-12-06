@@ -8,6 +8,7 @@ Citrix has developed a custom Terraform provider for automating Citrix product d
   - [Contacting the Maintainers](#contacting-the-maintainers)
   - [Examples](#examples)
     - [Deployment guides](#deployment-guides)
+    - [Demo video](#demo-video)
   - [Plugin for Terraform Provider for Citrix® Documentation](#plugin-for-terraform-provider-for-citrix-documentation)
     - [Navigating the repository](#navigating-the-repository)
     - [Provider Configuration](#provider-configuration)
@@ -39,14 +40,20 @@ This project uses GitHub to track all issues. See [CONTRIBUTING.md](CONTRIBUTING
 Basic example templates for getting started can be found in the repository at [examples/](/examples/README.md)
 
 ### Deployment guides
-Complete steps from start to finsh for a variety of senarios from [Citrix Tech Zone](https://community.citrix.com/tech-zone/automation/):
+Please refer to [Citrix Tech Zone](https://community.citrix.com/tech-zone/automation/) to find detailed guides on how to deploy and manage resources using the Citrix provider:
 - [Installing and configuring the provider](https://community.citrix.com/tech-zone/automation/terraform-install-and-config/)
+- [Daily administrative operations](https://community.citrix.com/tech-zone/automation/terraform-daily-administration/)
 - [AWS EC2](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-aws/) via MCS
 - [Azure](https://community.citrix.com/tech-zone/build/deployment-guides/citrix-daas-terraform-azure/) via MCS
 - [GCP](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-gcp/) via MCS
 - [vSphere](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-vsphere8/) via MCS
 - [XenServer](https://community.citrix.com/tech-zone/automation/citrix-terraform-xenserver) via MCS
 - [Citrix policies](https://community.citrix.com/tech-zone/automation/cvad-terraform-policies/)
+
+### Demo video
+[![alt text](images/techzone-youtube-thumbnail.png)](https://www.youtube.com/watch?v=c33sMLaCVjY)
+
+https://www.youtube.com/watch?v=c33sMLaCVjY
 
 ## Plugin for Terraform Provider for Citrix® Documentation
 

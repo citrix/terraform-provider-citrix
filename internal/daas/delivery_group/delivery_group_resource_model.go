@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int32default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -379,7 +380,16 @@ type DeliveryGroupPowerManagementSettings struct {
 	DisconnectOffPeakIdleSessionAfterSeconds             types.Int64  `tfsdk:"disconnect_off_peak_idle_session_after_seconds"`
 	LogoffPeakDisconnectedSessionAfterSeconds            types.Int64  `tfsdk:"log_off_peak_disconnected_session_after_seconds"`
 	LogoffOffPeakDisconnectedSessionAfterSeconds         types.Int64  `tfsdk:"log_off_off_peak_disconnected_session_after_seconds"`
+	LimitSecondsToForceLogOffUserDuringOffPeak           types.Int32  `tfsdk:"off_peak_limit_seconds_to_force_log_off_user"`
+	LimitSecondsToForceLogOffUserDuringPeak              types.Int32  `tfsdk:"peak_limit_seconds_to_force_log_off_user"`
+	LogOffWarningMessage                                 types.String `tfsdk:"log_off_warning_message"`
+	LogOffWarningTitle                                   types.String `tfsdk:"log_off_warning_title"`
 	PowerTimeSchemes                                     types.List   `tfsdk:"power_time_schemes"` //List[DeliveryGroupPowerTimeScheme]
+	AutoscaleLogOffReminderEnabled                       types.Bool   `tfsdk:"log_off_reminder_enabled"`
+	AutoscaleLogOffReminderIntervalSecondsOffPeak        types.Int32  `tfsdk:"off_peak_log_off_reminder_interval"`
+	AutoscaleLogOffReminderIntervalSecondsPeak           types.Int32  `tfsdk:"peak_log_off_reminder_interval"`
+	AutoscaleLogOffReminderMessage                       types.String `tfsdk:"log_off_reminder_message"`
+	AutoscaleLogOffReminderTitle                         types.String `tfsdk:"log_off_reminder_title"`
 }
 
 func (DeliveryGroupPowerManagementSettings) GetSchema() schema.SingleNestedAttribute {
@@ -572,6 +582,30 @@ func (DeliveryGroupPowerManagementSettings) GetSchema() schema.SingleNestedAttri
 				Computed:    true,
 				Default:     int64default.StaticInt64(0),
 			},
+			"off_peak_limit_seconds_to_force_log_off_user": schema.Int32Attribute{
+				Description: "Limit in seconds to force log off user after user logs off from their sessions during off-peak hours. Defaults to `0`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     int32default.StaticInt32(0),
+			},
+			"peak_limit_seconds_to_force_log_off_user": schema.Int32Attribute{
+				Description: "Limit in seconds to force log off user after user logs off from their sessions during peak hours. Defaults to `0`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     int32default.StaticInt32(0),
+			},
+			"log_off_warning_message": schema.StringAttribute{
+				Description: "The message to be displayed in the log off warning.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(""),
+			},
+			"log_off_warning_title": schema.StringAttribute{
+				Description: "The title of the log off warning.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(""),
+			},
 			"power_time_schemes": schema.ListNestedAttribute{
 				Description: "Power management time schemes." +
 					"\n\n~> **Please Note** It is not allowed to have more than one power time scheme that cover the same day of the week for the same delivery group.",
@@ -580,6 +614,42 @@ func (DeliveryGroupPowerManagementSettings) GetSchema() schema.SingleNestedAttri
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
 				},
+			},
+			"log_off_reminder_enabled": schema.BoolAttribute{
+				Description: "Indicates whether log off reminder is enabled. Defaults to `false`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+			"off_peak_log_off_reminder_interval": schema.Int32Attribute{
+				Description: "The interval in seconds at which the log off reminder is sent during off-peak hours. Defaults to `0`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     int32default.StaticInt32(0),
+				Validators: []validator.Int32{
+					int32validator.AtLeast(0),
+				},
+			},
+			"peak_log_off_reminder_interval": schema.Int32Attribute{
+				Description: "The interval in seconds at which the log off reminder is sent during peak hours. Defaults to `0`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     int32default.StaticInt32(0),
+				Validators: []validator.Int32{
+					int32validator.AtLeast(0),
+				},
+			},
+			"log_off_reminder_message": schema.StringAttribute{
+				Description: "The message to be displayed in the log off reminder.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(""),
+			},
+			"log_off_reminder_title": schema.StringAttribute{
+				Description: "The title of the log off reminder.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(""),
 			},
 		},
 	}
@@ -934,6 +1004,7 @@ func (DeliveryGroupAccessPolicyCriteriaTagsModel) GetAttributes() map[string]sch
 // DeliveryGroupResourceModel maps the resource schema data.
 type DeliveryGroupResourceModel struct {
 	Id                          types.String `tfsdk:"id"`
+	Enabled                     types.Bool   `tfsdk:"enabled"`
 	Name                        types.String `tfsdk:"name"`
 	Description                 types.String `tfsdk:"description"`
 	DeliveryType                types.String `tfsdk:"delivery_type"`
@@ -946,7 +1017,6 @@ type DeliveryGroupResourceModel struct {
 	AutoscaleSettings           types.Object `tfsdk:"autoscale_settings"`          // DeliveryGroupPowerManagementSettings
 	RebootSchedules             types.List   `tfsdk:"reboot_schedules"`            // List[DeliveryGroupRebootSchedule]
 	TotalMachines               types.Int64  `tfsdk:"total_machines"`
-	PolicySetId                 types.String `tfsdk:"policy_set_id"`
 	MinimumFunctionalLevel      types.String `tfsdk:"minimum_functional_level"`
 	StoreFrontServers           types.Set    `tfsdk:"storefront_servers"` //Set[string]
 	Scopes                      types.Set    `tfsdk:"scopes"`             //Set[String]
@@ -973,6 +1043,12 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
+			},
+			"enabled": schema.BoolAttribute{
+				Description: "Whether the delivery group is enabled or not. Defaults to `true`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
 			},
 			"name": schema.StringAttribute{
 				Description: "Name of the delivery group.",
@@ -1058,13 +1134,6 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 			"total_machines": schema.Int64Attribute{
 				Description: "The total number of machines in the delivery group.",
 				Computed:    true,
-			},
-			"policy_set_id": schema.StringAttribute{
-				Description: "GUID identifier of the policy set.",
-				Optional:    true,
-				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
-				},
 			},
 			"minimum_functional_level": schema.StringAttribute{
 				Description: "Specifies the minimum functional level for the VDA machines in the delivery group. Defaults to `L7_20`.",
@@ -1187,7 +1256,7 @@ func (DeliveryGroupResourceModel) GetAttributes() map[string]schema.Attribute {
 	return DeliveryGroupResourceModel{}.GetSchema().Attributes
 }
 
-func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixclient.CitrixDaasClient, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, dgDesktops *citrixorchestration.DesktopResponseModelCollection, dgPowerTimeSchemes *citrixorchestration.PowerTimeSchemeResponseModelCollection, dgMachines *citrixorchestration.MachineResponseModelCollection, dgRebootSchedule *citrixorchestration.RebootScheduleResponseModelCollection, tags []string) DeliveryGroupResourceModel {
+func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixclient.CitrixDaasClient, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, dgDesktops *citrixorchestration.DesktopResponseModelCollection, dgPowerTimeSchemes *citrixorchestration.PowerTimeSchemeResponseModelCollection, dgMachines []citrixorchestration.MachineResponseModel, dgRebootSchedule *citrixorchestration.RebootScheduleResponseModelCollection, tags []string) DeliveryGroupResourceModel {
 
 	// Set required values
 	r.Id = types.StringValue(deliveryGroup.GetId())
@@ -1196,12 +1265,7 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 	r.Description = types.StringValue(deliveryGroup.GetDescription())
 
 	// Set optional values
-	if deliveryGroup.GetPolicySetGuid() != "" {
-		r.PolicySetId = types.StringValue(deliveryGroup.GetPolicySetGuid())
-	} else {
-		r.PolicySetId = types.StringNull()
-	}
-
+	r.Enabled = types.BoolValue(deliveryGroup.GetEnabled())
 	if !r.DeliveryType.IsNull() {
 		r.DeliveryType = types.StringValue(string(deliveryGroup.GetDeliveryType()))
 	} else {
@@ -1231,7 +1295,7 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 		r.MakeResourcesAvailableInLHC = types.BoolValue(false)
 	}
 
-	if len(dgMachines.GetItems()) < 1 || !r.SessionSupport.IsNull() {
+	if len(dgMachines) < 1 || !r.SessionSupport.IsNull() {
 		r.SessionSupport = types.StringValue(string(deliveryGroup.GetSessionSupport()))
 		r.SharingKind = types.StringValue(string(deliveryGroup.GetSharingKind()))
 	}

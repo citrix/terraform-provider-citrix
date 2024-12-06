@@ -2,6 +2,7 @@
 package util
 
 import (
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	quickcreateservice "github.com/citrix/citrix-daas-rest-go/citrixquickcreate"
 )
 
@@ -42,7 +43,7 @@ func AwsEdcWorkspaceImageStateEnumToString(imageState quickcreateservice.AwsEdcW
 	}
 }
 
-func SessionSupportEnumToString(imageState quickcreateservice.SessionSupport) string {
+func QcsSessionSupportEnumToString(imageState quickcreateservice.SessionSupport) string {
 	switch imageState {
 	case quickcreateservice.SESSIONSUPPORT_SINGLE_SESSION:
 		return "SingleSession"
@@ -115,3 +116,24 @@ func TaskStateEnumToString(os quickcreateservice.TaskState) string {
 	}
 }
 
+func OrchestrationOSTypeEnumToString(os citrixorchestration.OsType) string {
+	switch os {
+	case citrixorchestration.OSTYPE_WINDOWS:
+		return "Windows"
+	case citrixorchestration.OSTYPE_LINUX:
+		return "Linux"
+	default:
+		return ""
+	}
+}
+
+func SessionSupportEnumToString(sessionSupport citrixorchestration.SessionSupport) string {
+	switch sessionSupport {
+	case citrixorchestration.SESSIONSUPPORT_SINGLE_SESSION:
+		return "SingleSession"
+	case citrixorchestration.SESSIONSUPPORT_MULTI_SESSION:
+		return "MultiSession"
+	default:
+		return ""
+	}
+}

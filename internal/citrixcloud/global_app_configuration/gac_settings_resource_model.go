@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strings"
 
 	globalappconfiguration "github.com/citrix/citrix-daas-rest-go/globalappconfiguration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
@@ -15,9 +16,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -30,6 +31,7 @@ type GACSettingsResourceModel struct {
 	Description     types.String `tfsdk:"description"`
 	UseForAppConfig types.Bool   `tfsdk:"use_for_app_config"`
 	AppSettings     types.Object `tfsdk:"app_settings"` // AppSettings
+	TestChannel     types.Bool   `tfsdk:"test_channel"`
 }
 
 func (GACSettingsResourceModel) GetAttributes() map[string]schema.Attribute {
@@ -37,13 +39,13 @@ func (GACSettingsResourceModel) GetAttributes() map[string]schema.Attribute {
 }
 
 type AppSettings struct {
-	Windows  types.Set `tfsdk:"windows"`  //[]Windows
-	Ios      types.Set `tfsdk:"ios"`      //[]Ios
-	Android  types.Set `tfsdk:"android"`  //[]Android
-	Chromeos types.Set `tfsdk:"chromeos"` //[]Chromeos
-	Html5    types.Set `tfsdk:"html5"`    //[]Html5
-	Macos    types.Set `tfsdk:"macos"`    //[]Macos
-	Linux    types.Set `tfsdk:"linux"`    //[]Linux
+	Windows  types.Set `tfsdk:"windows"`  //Set[Windows]
+	Ios      types.Set `tfsdk:"ios"`      //Set[Ios]
+	Android  types.Set `tfsdk:"android"`  //Set[Android]
+	Chromeos types.Set `tfsdk:"chromeos"` //Set[Chromeos]
+	Html5    types.Set `tfsdk:"html5"`    //Set[Html5]
+	Macos    types.Set `tfsdk:"macos"`    //Set[Macos]
+	Linux    types.Set `tfsdk:"linux"`    //Set[Linux]
 }
 
 func (AppSettings) GetSchema() schema.SingleNestedAttribute {
@@ -118,7 +120,7 @@ func (AppSettings) GetAttributes() map[string]schema.Attribute {
 type Windows struct {
 	Category     types.String `tfsdk:"category"`
 	UserOverride types.Bool   `tfsdk:"user_override"`
-	Settings     types.List   `tfsdk:"settings"` //[]WindowsSettings
+	Settings     types.Set    `tfsdk:"settings"` //Set[WindowsSettings]
 }
 
 func (Windows) GetSchema() schema.NestedAttributeObject {
@@ -128,18 +130,18 @@ func (Windows) GetSchema() schema.NestedAttributeObject {
 				Description: "Defines the category of the setting.",
 				Required:    true,
 				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.GacCategoryNameRegex), "\nCategory name must start with a single uppercase letter followed by zero or more lowercase letters "),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.LowerCaseRegex), "\nCategory name must be all lowercase letters "),
 				},
 			},
 			"user_override": schema.BoolAttribute{
 				Description: "Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.",
 				Required:    true,
 			},
-			"settings": schema.ListNestedAttribute{
-				Description: "A list of name value pairs for the settings. Please refer to [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
+			"settings": schema.SetNestedAttribute{
+				Description: "A set of name value pairs for the settings. Please refer to [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
 				Required:    true,
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 				NestedObject: WindowsSettings{}.GetSchema(),
 			},
@@ -154,7 +156,7 @@ func (Windows) GetAttributes() map[string]schema.Attribute {
 type Ios struct {
 	Category     types.String `tfsdk:"category"`
 	UserOverride types.Bool   `tfsdk:"user_override"`
-	Settings     types.List   `tfsdk:"settings"` //[]IosSettings
+	Settings     types.Set    `tfsdk:"settings"` //Set[IosSettings]
 }
 
 func (Ios) GetSchema() schema.NestedAttributeObject {
@@ -164,18 +166,18 @@ func (Ios) GetSchema() schema.NestedAttributeObject {
 				Description: "Defines the category of the setting",
 				Required:    true,
 				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.GacCategoryNameRegex), "\nCategory name must start with a single uppercase letter followed by zero or more lowercase letters "),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.LowerCaseRegex), "\nCategory name must be all lowercase letters "),
 				},
 			},
 			"user_override": schema.BoolAttribute{
 				Description: "Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.",
 				Required:    true,
 			},
-			"settings": schema.ListNestedAttribute{
-				Description: "A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
+			"settings": schema.SetNestedAttribute{
+				Description: "A set of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
 				Required:    true,
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 				NestedObject: IosSettings{}.GetSchema(),
 			},
@@ -190,7 +192,7 @@ func (Ios) GetAttributes() map[string]schema.Attribute {
 type Android struct {
 	Category     types.String `tfsdk:"category"`
 	UserOverride types.Bool   `tfsdk:"user_override"`
-	Settings     types.List   `tfsdk:"settings"` //[]AndroidSettings
+	Settings     types.Set    `tfsdk:"settings"` //Set[AndroidSettings]
 }
 
 func (Android) GetSchema() schema.NestedAttributeObject {
@@ -200,18 +202,18 @@ func (Android) GetSchema() schema.NestedAttributeObject {
 				Description: "Defines the category of the setting.",
 				Required:    true,
 				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.GacCategoryNameRegex), "\nCategory name must start with a single uppercase letter followed by zero or more lowercase letters "),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.LowerCaseRegex), "\nCategory name must be all lowercase letters "),
 				},
 			},
 			"user_override": schema.BoolAttribute{
 				Description: "Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.",
 				Required:    true,
 			},
-			"settings": schema.ListNestedAttribute{
-				Description: "A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
+			"settings": schema.SetNestedAttribute{
+				Description: "A set of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
 				Required:    true,
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 				NestedObject: AndroidSettings{}.GetSchema(),
 			},
@@ -226,7 +228,7 @@ func (Android) GetAttributes() map[string]schema.Attribute {
 type Chromeos struct {
 	Category     types.String `tfsdk:"category"`
 	UserOverride types.Bool   `tfsdk:"user_override"`
-	Settings     types.List   `tfsdk:"settings"` //[]ChromeosSettings
+	Settings     types.Set    `tfsdk:"settings"` //Set[ChromeosSettings]
 }
 
 func (Chromeos) GetSchema() schema.NestedAttributeObject {
@@ -236,18 +238,18 @@ func (Chromeos) GetSchema() schema.NestedAttributeObject {
 				Description: "Defines the category of the setting.",
 				Required:    true,
 				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.GacCategoryNameRegex), "\nCategory name must start with a single uppercase letter followed by zero or more lowercase letters "),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.LowerCaseRegex), "\nCategory name must be all lowercase letters "),
 				},
 			},
 			"user_override": schema.BoolAttribute{
 				Description: "Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.",
 				Required:    true,
 			},
-			"settings": schema.ListNestedAttribute{
-				Description: "A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
+			"settings": schema.SetNestedAttribute{
+				Description: "A set of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
 				Required:    true,
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 				NestedObject: ChromeosSettings{}.GetSchema(),
 			},
@@ -262,7 +264,7 @@ func (Chromeos) GetAttributes() map[string]schema.Attribute {
 type Html5 struct {
 	Category     types.String `tfsdk:"category"`
 	UserOverride types.Bool   `tfsdk:"user_override"`
-	Settings     types.List   `tfsdk:"settings"` //[]Html5Settings
+	Settings     types.Set    `tfsdk:"settings"` //Set[Html5Settings]
 }
 
 func (Html5) GetSchema() schema.NestedAttributeObject {
@@ -272,18 +274,18 @@ func (Html5) GetSchema() schema.NestedAttributeObject {
 				Description: "Defines the category of the setting.",
 				Required:    true,
 				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.GacCategoryNameRegex), "\nCategory name must start with a single uppercase letter followed by zero or more lowercase letters "),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.LowerCaseRegex), "\nCategory name must be all lowercase letters "),
 				},
 			},
 			"user_override": schema.BoolAttribute{
 				Description: "Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.",
 				Required:    true,
 			},
-			"settings": schema.ListNestedAttribute{
-				Description: "A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
+			"settings": schema.SetNestedAttribute{
+				Description: "A set of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
 				Required:    true,
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 				NestedObject: Html5Settings{}.GetSchema(),
 			},
@@ -298,7 +300,7 @@ func (Html5) GetAttributes() map[string]schema.Attribute {
 type Macos struct {
 	Category     types.String `tfsdk:"category"`
 	UserOverride types.Bool   `tfsdk:"user_override"`
-	Settings     types.List   `tfsdk:"settings"` //[]MacosSettings
+	Settings     types.Set    `tfsdk:"settings"` //Set[MacosSettings]
 }
 
 func (Macos) GetSchema() schema.NestedAttributeObject {
@@ -308,18 +310,18 @@ func (Macos) GetSchema() schema.NestedAttributeObject {
 				Description: "Defines the category of the setting.",
 				Required:    true,
 				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.GacCategoryNameRegex), "\nCategory name must start with a single uppercase letter followed by zero or more lowercase letters "),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.LowerCaseRegex), "\nCategory name must be all lowercase letters "),
 				},
 			},
 			"user_override": schema.BoolAttribute{
 				Description: "Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.",
 				Required:    true,
 			},
-			"settings": schema.ListNestedAttribute{
-				Description: "A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
+			"settings": schema.SetNestedAttribute{
+				Description: "A set of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
 				Required:    true,
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 				NestedObject: MacosSettings{}.GetSchema(),
 			},
@@ -334,7 +336,7 @@ func (Macos) GetAttributes() map[string]schema.Attribute {
 type Linux struct {
 	Category     types.String `tfsdk:"category"`
 	UserOverride types.Bool   `tfsdk:"user_override"`
-	Settings     types.List   `tfsdk:"settings"` //[]LinuxSettings
+	Settings     types.Set    `tfsdk:"settings"` //Set[LinuxSettings]
 }
 
 func (Linux) GetSchema() schema.NestedAttributeObject {
@@ -344,18 +346,18 @@ func (Linux) GetSchema() schema.NestedAttributeObject {
 				Description: "Defines the category of the setting.",
 				Required:    true,
 				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.GacCategoryNameRegex), "\nCategory name must start with a single uppercase letter followed by zero or more lowercase letters "),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.LowerCaseRegex), "\nCategory name must be all lowercase letters "),
 				},
 			},
 			"user_override": schema.BoolAttribute{
 				Description: "Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.",
 				Required:    true,
 			},
-			"settings": schema.ListNestedAttribute{
-				Description: "A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
+			"settings": schema.SetNestedAttribute{
+				Description: "A set of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform.",
 				Required:    true,
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 				NestedObject: LinuxSettings{}.GetSchema(),
 			},
@@ -371,10 +373,10 @@ type WindowsSettings struct {
 	Name                           types.String `tfsdk:"name"`
 	ValueString                    types.String `tfsdk:"value_string"`
 	ValueList                      types.List   `tfsdk:"value_list"`
-	LocalAppAllowList              types.List   `tfsdk:"local_app_allow_list"`               //list[LocalAppAllowListModel]
-	ExtensionInstallAllowList      types.List   `tfsdk:"extension_install_allow_list"`       //list[ExtensionInstallAllowListModel]
-	AutoLaunchProtocolsFromOrigins types.List   `tfsdk:"auto_launch_protocols_from_origins"` //List[AutoLaunchProtocolsFromOriginsModel]
-	ManagedBookmarks               types.List   `tfsdk:"managed_bookmarks"`                  //List[BookMarkValueModel]
+	LocalAppAllowList              types.Set    `tfsdk:"local_app_allow_list"`               //Set[LocalAppAllowSetModel]
+	ExtensionInstallAllowList      types.Set    `tfsdk:"extension_install_allow_list"`       //Set[ExtensionInstallAllowSetModel]
+	AutoLaunchProtocolsFromOrigins types.Set    `tfsdk:"auto_launch_protocols_from_origins"` //Set[AutoLaunchProtocolsFromOriginsModel]
+	ManagedBookmarks               types.Set    `tfsdk:"managed_bookmarks"`                  //Set[BookMarkValueModel]
 	EnterpriseBroswerSSO           types.Object `tfsdk:"enterprise_browser_sso"`             //CitrixEnterpriseBrowserModel
 }
 
@@ -400,36 +402,36 @@ func (WindowsSettings) GetSchema() schema.NestedAttributeObject {
 					listvalidator.SizeAtLeast(1),
 				},
 			},
-			"local_app_allow_list": schema.ListNestedAttribute{
+			"local_app_allow_list": schema.SetNestedAttribute{
 				Optional:     true,
-				Description:  "List of App Object to allow list for Local App Discovery.",
+				Description:  "Set of App Object to allow list for Local App Discovery.",
 				NestedObject: LocalAppAllowListModel{}.GetSchema(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 			},
-			"extension_install_allow_list": schema.ListNestedAttribute{
+			"extension_install_allow_list": schema.SetNestedAttribute{
 				Optional:     true,
 				Description:  "An allowed list of extensions that users can add to the Citrix Enterprise Browser. This list uses the Chrome Web Store.",
 				NestedObject: ExtensionInstallAllowListModel{}.GetSchema(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 			},
-			"auto_launch_protocols_from_origins": schema.ListNestedAttribute{
+			"auto_launch_protocols_from_origins": schema.SetNestedAttribute{
 				Optional:     true,
-				Description:  "A list of protocols that can launch an external application from the listed origins without prompting the user.",
+				Description:  "A set of protocols that can launch an external application from the listed origins without prompting the user.",
 				NestedObject: AutoLaunchProtocolsFromOriginsModel{}.GetSchema(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 			},
-			"managed_bookmarks": schema.ListNestedAttribute{
+			"managed_bookmarks": schema.SetNestedAttribute{
 				Optional:     true,
-				Description:  "A list of bookmarks to push to the Citrix Enterprise Browser.",
+				Description:  "A set of bookmarks to push to the Citrix Enterprise Browser.",
 				NestedObject: BookMarkValueModel{}.GetSchema(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 			},
 			"enterprise_browser_sso": CitrixEnterpriseBrowserModel{}.GetSchema(),
@@ -455,7 +457,7 @@ func (IosSettings) GetSchema() schema.NestedAttributeObject {
 			},
 			"value_string": schema.StringAttribute{
 				Description: "String value (if any) associated with the setting.",
-				Optional:    true,
+				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
 				},
@@ -485,7 +487,6 @@ func (AndroidSettings) GetSchema() schema.NestedAttributeObject {
 				Description: "String value (if any) associated with the setting.",
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_list")),
 					stringvalidator.LengthAtLeast(1),
 				},
 			},
@@ -522,7 +523,6 @@ func (ChromeosSettings) GetSchema() schema.NestedAttributeObject {
 				Description: "String value (if any) associated with the setting.",
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_list")),
 					stringvalidator.LengthAtLeast(1),
 				},
 			},
@@ -559,7 +559,6 @@ func (Html5Settings) GetSchema() schema.NestedAttributeObject {
 				Description: "String value (if any) associated with the setting.",
 				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("value_list")),
 					stringvalidator.LengthAtLeast(1),
 				},
 			},
@@ -583,9 +582,9 @@ type LinuxSettings struct {
 	Name                           types.String `tfsdk:"name"`
 	ValueString                    types.String `tfsdk:"value_string"`
 	ValueList                      types.List   `tfsdk:"value_list"`
-	ExtensionInstallAllowList      types.List   `tfsdk:"extension_install_allow_list"`       //list[ExtensionInstallAllowListModel]
-	AutoLaunchProtocolsFromOrigins types.List   `tfsdk:"auto_launch_protocols_from_origins"` //List[AutoLaunchProtocolsFromOriginsModel]
-	ManagedBookmarks               types.List   `tfsdk:"managed_bookmarks"`                  //List[BookMarkValueModel]
+	ExtensionInstallAllowList      types.Set    `tfsdk:"extension_install_allow_list"`       //Set[ExtensionInstallAllowListModel]
+	AutoLaunchProtocolsFromOrigins types.Set    `tfsdk:"auto_launch_protocols_from_origins"` //Set[AutoLaunchProtocolsFromOriginsModel]
+	ManagedBookmarks               types.Set    `tfsdk:"managed_bookmarks"`                  //Set[BookMarkValueModel]
 }
 
 func (LinuxSettings) GetSchema() schema.NestedAttributeObject {
@@ -610,28 +609,28 @@ func (LinuxSettings) GetSchema() schema.NestedAttributeObject {
 					listvalidator.SizeAtLeast(1),
 				},
 			},
-			"extension_install_allow_list": schema.ListNestedAttribute{
+			"extension_install_allow_list": schema.SetNestedAttribute{
 				Optional:     true,
 				Description:  "An allowed list of extensions that users can add to the Citrix Enterprise Browser. This list uses the Chrome Web Store.",
 				NestedObject: ExtensionInstallAllowListModel{}.GetSchema(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 			},
-			"auto_launch_protocols_from_origins": schema.ListNestedAttribute{
+			"auto_launch_protocols_from_origins": schema.SetNestedAttribute{
 				Optional:     true,
-				Description:  "A list of protocols that can launch an external application from the listed origins without prompting the user.",
+				Description:  "A set of protocols that can launch an external application from the listed origins without prompting the user.",
 				NestedObject: AutoLaunchProtocolsFromOriginsModel{}.GetSchema(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 			},
-			"managed_bookmarks": schema.ListNestedAttribute{
+			"managed_bookmarks": schema.SetNestedAttribute{
 				Optional:     true,
-				Description:  "A list of bookmarks to push to the Citrix Enterprise Browser.",
+				Description:  "A set of bookmarks to push to the Citrix Enterprise Browser.",
 				NestedObject: BookMarkValueModel{}.GetSchema(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 			},
 		},
@@ -646,9 +645,9 @@ type MacosSettings struct {
 	Name                           types.String `tfsdk:"name"`
 	ValueString                    types.String `tfsdk:"value_string"`
 	ValueList                      types.List   `tfsdk:"value_list"`
-	AutoLaunchProtocolsFromOrigins types.List   `tfsdk:"auto_launch_protocols_from_origins"` //[]AutoLaunchProtocolsFromOrigins
-	ManagedBookmarks               types.List   `tfsdk:"managed_bookmarks"`                  //[]BookMarkValue
-	ExtensionInstallAllowList      types.List   `tfsdk:"extension_install_allow_list"`       //[]ExtensionInstallAllowList
+	AutoLaunchProtocolsFromOrigins types.Set    `tfsdk:"auto_launch_protocols_from_origins"` //Set[AutoLaunchProtocolsFromOrigins]
+	ManagedBookmarks               types.Set    `tfsdk:"managed_bookmarks"`                  //Set[BookMarkValue]
+	ExtensionInstallAllowList      types.Set    `tfsdk:"extension_install_allow_list"`       //Set[ExtensionInstallAllowList]
 	EnterpriseBroswerSSO           types.Object `tfsdk:"enterprise_browser_sso"`             //CitrixEnterpriseBrowserModel
 }
 
@@ -674,28 +673,28 @@ func (MacosSettings) GetSchema() schema.NestedAttributeObject {
 					listvalidator.SizeAtLeast(1),
 				},
 			},
-			"auto_launch_protocols_from_origins": schema.ListNestedAttribute{
+			"auto_launch_protocols_from_origins": schema.SetNestedAttribute{
 				Optional:     true,
 				Description:  "Specify a list of protocols that can launch an external application from the listed origins without prompting the user.",
 				NestedObject: AutoLaunchProtocolsFromOriginsModel{}.GetSchema(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 			},
-			"managed_bookmarks": schema.ListNestedAttribute{
+			"managed_bookmarks": schema.SetNestedAttribute{
 				Optional:     true,
 				Description:  "Array of objects of type ManagedBookmarks. For example: {name:\"bookmark_name1\",url:\"bookmark_url1\"}",
 				NestedObject: BookMarkValueModel{}.GetSchema(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 			},
-			"extension_install_allow_list": schema.ListNestedAttribute{
+			"extension_install_allow_list": schema.SetNestedAttribute{
 				Optional:     true,
 				Description:  "Array of objects of type ExtensionInstallAllowlist. For example: {id:\"extension_id1\",name:\"extension_name1\",install link:\"chrome store url for the extension\"}",
 				NestedObject: ExtensionInstallAllowListModel{}.GetSchema(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
 				},
 			},
 			"enterprise_browser_sso": CitrixEnterpriseBrowserModel{}.GetSchema(),
@@ -716,6 +715,12 @@ func (r GACSettingsResourceModel) RefreshPropertyValues(ctx context.Context, dia
 	r.Name = types.StringValue(settings.GetName())
 	r.Description = types.StringValue(settings.GetDescription())
 	r.UseForAppConfig = types.BoolValue(settings.GetUseForAppConfig())
+
+	if settingsRecordModel.SettingsChannel != nil && settingsRecordModel.SettingsChannel.GetChannelName() != "" {
+		r.TestChannel = types.BoolValue(true)
+	} else {
+		r.TestChannel = types.BoolValue(false)
+	}
 
 	var appSettings = settings.GetAppSettings()
 	var windowsSettings = appSettings.GetWindows()
@@ -767,14 +772,14 @@ func (r GACSettingsResourceModel) getWindowsSettings(ctx context.Context, diagno
 	// Prepare the windows settings list to be stored in the state
 	var windowsSettingsForState []Windows
 	for _, stateWindowsSetting := range stateWindowsSettings {
-		remoteWindowsSetting, exists := remoteWindowsSettingsMap[stateWindowsSetting.Category.ValueString()]
+		remoteWindowsSetting, exists := remoteWindowsSettingsMap[strings.ToLower(stateWindowsSetting.Category.ValueString())]
 		if !exists {
 			// If windows setting is not present in the remote, then don't add it to the state
 			continue
 		}
 
 		windowsSettingsForState = append(windowsSettingsForState, Windows{
-			Category:     types.StringValue(remoteWindowsSetting.platformSetting.GetCategory()),
+			Category:     types.StringValue(strings.ToLower(remoteWindowsSetting.platformSetting.GetCategory())),
 			UserOverride: types.BoolValue(remoteWindowsSetting.platformSetting.GetUserOverride()),
 			Settings:     getWindowsCategorySettings(ctx, diagnostics, stateWindowsSetting.Settings, remoteWindowsSetting.platformSetting.GetSettings()),
 		})
@@ -787,7 +792,7 @@ func (r GACSettingsResourceModel) getWindowsSettings(ctx context.Context, diagno
 	for _, remoteWindowsSetting := range remoteWindowsSettingsMap {
 		if !remoteWindowsSetting.IsVisited {
 			windowsSettingsForState = append(windowsSettingsForState, Windows{
-				Category:     types.StringValue(remoteWindowsSetting.platformSetting.GetCategory()),
+				Category:     types.StringValue(strings.ToLower(remoteWindowsSetting.platformSetting.GetCategory())),
 				UserOverride: types.BoolValue(remoteWindowsSetting.platformSetting.GetUserOverride()),
 				Settings:     parseWindowsSettings(ctx, diagnostics, remoteWindowsSetting.platformSetting.GetSettings()),
 			})
@@ -830,7 +835,7 @@ func (r GACSettingsResourceModel) getLinuxSettings(ctx context.Context, diagnost
 		}
 
 		linuxSettingsForState = append(linuxSettingsForState, Linux{
-			Category:     types.StringValue(remoteLinuxSetting.platformSetting.GetCategory()),
+			Category:     types.StringValue(strings.ToLower(remoteLinuxSetting.platformSetting.GetCategory())),
 			UserOverride: types.BoolValue(remoteLinuxSetting.platformSetting.GetUserOverride()),
 			Settings:     getLinuxCategorySettings(ctx, diagnostics, stateLinuxSetting.Settings, remoteLinuxSetting.platformSetting.GetSettings()),
 		})
@@ -843,7 +848,7 @@ func (r GACSettingsResourceModel) getLinuxSettings(ctx context.Context, diagnost
 	for _, remoteLinuxSetting := range remoteLinuxSettingsMap {
 		if !remoteLinuxSetting.IsVisited {
 			linuxSettingsForState = append(linuxSettingsForState, Linux{
-				Category:     types.StringValue(remoteLinuxSetting.platformSetting.GetCategory()),
+				Category:     types.StringValue(strings.ToLower(remoteLinuxSetting.platformSetting.GetCategory())),
 				UserOverride: types.BoolValue(remoteLinuxSetting.platformSetting.GetUserOverride()),
 				Settings:     parseLinuxSettings(ctx, diagnostics, remoteLinuxSetting.platformSetting.GetSettings()),
 			})
@@ -886,7 +891,7 @@ func (r GACSettingsResourceModel) getIosSettings(ctx context.Context, diagnostic
 		}
 
 		iosSettingsForState = append(iosSettingsForState, Ios{
-			Category:     types.StringValue(remoteIosSetting.platformSetting.GetCategory()),
+			Category:     types.StringValue(strings.ToLower(remoteIosSetting.platformSetting.GetCategory())),
 			UserOverride: types.BoolValue(remoteIosSetting.platformSetting.GetUserOverride()),
 			Settings:     getIosCategorySettings(ctx, diagnostics, stateIosSetting.Settings, remoteIosSetting.platformSetting.GetSettings()),
 		})
@@ -899,7 +904,7 @@ func (r GACSettingsResourceModel) getIosSettings(ctx context.Context, diagnostic
 	for _, remoteIosSetting := range remoteIosSettingsMap {
 		if !remoteIosSetting.IsVisited {
 			iosSettingsForState = append(iosSettingsForState, Ios{
-				Category:     types.StringValue(remoteIosSetting.platformSetting.GetCategory()),
+				Category:     types.StringValue(strings.ToLower(remoteIosSetting.platformSetting.GetCategory())),
 				UserOverride: types.BoolValue(remoteIosSetting.platformSetting.GetUserOverride()),
 				Settings:     parseIosSettings(ctx, diagnostics, remoteIosSetting.platformSetting.GetSettings()),
 			})
@@ -942,7 +947,7 @@ func (r GACSettingsResourceModel) getAndroidSettings(ctx context.Context, diagno
 		}
 
 		androidSettingsForState = append(androidSettingsForState, Android{
-			Category:     types.StringValue(remoteAndroidSetting.platformSetting.GetCategory()),
+			Category:     types.StringValue(strings.ToLower(remoteAndroidSetting.platformSetting.GetCategory())),
 			UserOverride: types.BoolValue(remoteAndroidSetting.platformSetting.GetUserOverride()),
 			Settings:     getAndroidCategorySettings(ctx, diagnostics, stateAndroidSetting.Settings, remoteAndroidSetting.platformSetting.GetSettings()),
 		})
@@ -955,7 +960,7 @@ func (r GACSettingsResourceModel) getAndroidSettings(ctx context.Context, diagno
 	for _, remoteAndroidSetting := range remoteAndroidSettingsMap {
 		if !remoteAndroidSetting.IsVisited {
 			androidSettingsForState = append(androidSettingsForState, Android{
-				Category:     types.StringValue(remoteAndroidSetting.platformSetting.GetCategory()),
+				Category:     types.StringValue(strings.ToLower(remoteAndroidSetting.platformSetting.GetCategory())),
 				UserOverride: types.BoolValue(remoteAndroidSetting.platformSetting.GetUserOverride()),
 				Settings:     parseAndroidSettings(ctx, diagnostics, remoteAndroidSetting.platformSetting.GetSettings()),
 			})
@@ -998,7 +1003,7 @@ func (r GACSettingsResourceModel) getHtml5Settings(ctx context.Context, diagnost
 		}
 
 		html5SettingsForState = append(html5SettingsForState, Html5{
-			Category:     types.StringValue(remoteHtml5Setting.platformSetting.GetCategory()),
+			Category:     types.StringValue(strings.ToLower(remoteHtml5Setting.platformSetting.GetCategory())),
 			UserOverride: types.BoolValue(remoteHtml5Setting.platformSetting.GetUserOverride()),
 			Settings:     getHtml5CategorySettings(ctx, diagnostics, stateHtml5Setting.Settings, remoteHtml5Setting.platformSetting.GetSettings()),
 		})
@@ -1011,7 +1016,7 @@ func (r GACSettingsResourceModel) getHtml5Settings(ctx context.Context, diagnost
 	for _, remoteHtml5Setting := range remoteHtml5SettingsMap {
 		if !remoteHtml5Setting.IsVisited {
 			html5SettingsForState = append(html5SettingsForState, Html5{
-				Category:     types.StringValue(remoteHtml5Setting.platformSetting.GetCategory()),
+				Category:     types.StringValue(strings.ToLower(remoteHtml5Setting.platformSetting.GetCategory())),
 				UserOverride: types.BoolValue(remoteHtml5Setting.platformSetting.GetUserOverride()),
 				Settings:     parseHtml5Settings(ctx, diagnostics, remoteHtml5Setting.platformSetting.GetSettings()),
 			})
@@ -1054,7 +1059,7 @@ func (r GACSettingsResourceModel) getChromeosSettings(ctx context.Context, diagn
 		}
 
 		chromeosSettingsForState = append(chromeosSettingsForState, Chromeos{
-			Category:     types.StringValue(remoteChromeosSetting.platformSetting.GetCategory()),
+			Category:     types.StringValue(strings.ToLower(remoteChromeosSetting.platformSetting.GetCategory())),
 			UserOverride: types.BoolValue(remoteChromeosSetting.platformSetting.GetUserOverride()),
 			Settings:     getChromeosCategorySettings(ctx, diagnostics, stateChromeosSetting.Settings, remoteChromeosSetting.platformSetting.GetSettings()),
 		})
@@ -1067,7 +1072,7 @@ func (r GACSettingsResourceModel) getChromeosSettings(ctx context.Context, diagn
 	for _, remoteChromeosSetting := range remoteChromeosSettingsMap {
 		if !remoteChromeosSetting.IsVisited {
 			chromeosSettingsForState = append(chromeosSettingsForState, Chromeos{
-				Category:     types.StringValue(remoteChromeosSetting.platformSetting.GetCategory()),
+				Category:     types.StringValue(strings.ToLower(remoteChromeosSetting.platformSetting.GetCategory())),
 				UserOverride: types.BoolValue(remoteChromeosSetting.platformSetting.GetUserOverride()),
 				Settings:     parseChromeosSettings(ctx, diagnostics, remoteChromeosSetting.platformSetting.GetSettings()),
 			})
@@ -1110,7 +1115,7 @@ func (r GACSettingsResourceModel) getMacosSettings(ctx context.Context, diagnost
 		}
 
 		macosSettingsForState = append(macosSettingsForState, Macos{
-			Category:     types.StringValue(remoteMacosSetting.platformSetting.GetCategory()),
+			Category:     types.StringValue(strings.ToLower(remoteMacosSetting.platformSetting.GetCategory())),
 			UserOverride: types.BoolValue(remoteMacosSetting.platformSetting.GetUserOverride()),
 			Settings:     getMacosCategorySettings(ctx, diagnostics, stateMacosSetting.Settings, remoteMacosSetting.platformSetting.GetSettings()),
 		})
@@ -1123,7 +1128,7 @@ func (r GACSettingsResourceModel) getMacosSettings(ctx context.Context, diagnost
 	for _, remoteMacosSetting := range remoteMacosSettingsMap {
 		if !remoteMacosSetting.IsVisited {
 			macosSettingsForState = append(macosSettingsForState, Macos{
-				Category:     types.StringValue(remoteMacosSetting.platformSetting.GetCategory()),
+				Category:     types.StringValue(strings.ToLower(remoteMacosSetting.platformSetting.GetCategory())),
 				UserOverride: types.BoolValue(remoteMacosSetting.platformSetting.GetUserOverride()),
 				Settings:     parseMacosSettings(ctx, diagnostics, remoteMacosSetting.platformSetting.GetSettings()),
 			})
@@ -1133,7 +1138,7 @@ func (r GACSettingsResourceModel) getMacosSettings(ctx context.Context, diagnost
 	return util.TypedArrayToObjectSet[Macos](ctx, diagnostics, macosSettingsForState)
 }
 
-func parseWindowsSettings(ctx context.Context, diagnostics *diag.Diagnostics, remoteWindowsSettings []globalappconfiguration.CategorySettings) types.List {
+func parseWindowsSettings(ctx context.Context, diagnostics *diag.Diagnostics, remoteWindowsSettings []globalappconfiguration.CategorySettings) types.Set {
 	var windowsSettings []WindowsSettings
 	var errMsg string
 
@@ -1148,25 +1153,25 @@ func parseWindowsSettings(ctx context.Context, diagnostics *diag.Diagnostics, re
 		case reflect.Slice:
 			localAppAllowList := GACSettingsUpdate[LocalAppAllowListModel, LocalAppAllowListModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
 			if localAppAllowList != nil {
-				windowsSetting.LocalAppAllowList = util.TypedArrayToObjectList(ctx, diagnostics, localAppAllowList)
+				windowsSetting.LocalAppAllowList = util.TypedArrayToObjectSet(ctx, diagnostics, localAppAllowList)
 				break
 			}
 
 			extentionInstallAllowList := GACSettingsUpdate[ExtensionInstallAllowListModel, ExtensionInstallAllowListModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
 			if extentionInstallAllowList != nil {
-				windowsSetting.ExtensionInstallAllowList = util.TypedArrayToObjectList(ctx, diagnostics, extentionInstallAllowList)
+				windowsSetting.ExtensionInstallAllowList = util.TypedArrayToObjectSet(ctx, diagnostics, extentionInstallAllowList)
 				break
 			}
 
 			autoLaunchProtocolsList := GACSettingsUpdate[AutoLaunchProtocolsFromOriginsModel, AutoLaunchProtocolsFromOriginsModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
 			if autoLaunchProtocolsList != nil {
-				windowsSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectList(ctx, diagnostics, autoLaunchProtocolsList)
+				windowsSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectSet(ctx, diagnostics, autoLaunchProtocolsList)
 				break
 			}
 
 			managedBookmarkList := GACSettingsUpdate[BookMarkValueModel, BookMarkValueModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
 			if managedBookmarkList != nil {
-				windowsSetting.ManagedBookmarks = util.TypedArrayToObjectList(ctx, diagnostics, managedBookmarkList)
+				windowsSetting.ManagedBookmarks = util.TypedArrayToObjectSet(ctx, diagnostics, managedBookmarkList)
 				break
 			}
 
@@ -1200,10 +1205,10 @@ func parseWindowsSettings(ctx context.Context, diagnostics *diag.Diagnostics, re
 		windowsSettings = append(windowsSettings, windowsSetting)
 	}
 
-	return util.TypedArrayToObjectList[WindowsSettings](ctx, diagnostics, windowsSettings)
+	return util.TypedArrayToObjectSet[WindowsSettings](ctx, diagnostics, windowsSettings)
 }
 
-func parseLinuxSettings(ctx context.Context, diagnostics *diag.Diagnostics, remoteLinuxSettings []globalappconfiguration.CategorySettings) types.List {
+func parseLinuxSettings(ctx context.Context, diagnostics *diag.Diagnostics, remoteLinuxSettings []globalappconfiguration.CategorySettings) types.Set {
 	var linuxSettings []LinuxSettings
 	var errMsg string
 
@@ -1218,19 +1223,19 @@ func parseLinuxSettings(ctx context.Context, diagnostics *diag.Diagnostics, remo
 		case reflect.Slice:
 			extentionInstallAllowList := GACSettingsUpdate[ExtensionInstallAllowListModel, ExtensionInstallAllowListModel_Go](ctx, diagnostics, remoteLinuxSetting.Value)
 			if extentionInstallAllowList != nil {
-				linuxSetting.ExtensionInstallAllowList = util.TypedArrayToObjectList(ctx, diagnostics, extentionInstallAllowList)
+				linuxSetting.ExtensionInstallAllowList = util.TypedArrayToObjectSet(ctx, diagnostics, extentionInstallAllowList)
 				break
 			}
 
 			autoLaunchProtocolsList := GACSettingsUpdate[AutoLaunchProtocolsFromOriginsModel, AutoLaunchProtocolsFromOriginsModel_Go](ctx, diagnostics, remoteLinuxSetting.Value)
 			if autoLaunchProtocolsList != nil {
-				linuxSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectList(ctx, diagnostics, autoLaunchProtocolsList)
+				linuxSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectSet(ctx, diagnostics, autoLaunchProtocolsList)
 				break
 			}
 
 			managedBookmarkList := GACSettingsUpdate[BookMarkValueModel, BookMarkValueModel_Go](ctx, diagnostics, remoteLinuxSetting.Value)
 			if managedBookmarkList != nil {
-				linuxSetting.ManagedBookmarks = util.TypedArrayToObjectList(ctx, diagnostics, managedBookmarkList)
+				linuxSetting.ManagedBookmarks = util.TypedArrayToObjectSet(ctx, diagnostics, managedBookmarkList)
 				break
 			}
 
@@ -1248,10 +1253,10 @@ func parseLinuxSettings(ctx context.Context, diagnostics *diag.Diagnostics, remo
 		linuxSettings = append(linuxSettings, linuxSetting)
 	}
 
-	return util.TypedArrayToObjectList[LinuxSettings](ctx, diagnostics, linuxSettings)
+	return util.TypedArrayToObjectSet[LinuxSettings](ctx, diagnostics, linuxSettings)
 }
 
-func parseIosSettings(ctx context.Context, diagnostics *diag.Diagnostics, remoteIosSettings []globalappconfiguration.CategorySettings) types.List {
+func parseIosSettings(ctx context.Context, diagnostics *diag.Diagnostics, remoteIosSettings []globalappconfiguration.CategorySettings) types.Set {
 	var iosSettings []IosSettings
 	var errMsg string
 
@@ -1275,10 +1280,10 @@ func parseIosSettings(ctx context.Context, diagnostics *diag.Diagnostics, remote
 		iosSettings = append(iosSettings, iosSetting)
 	}
 
-	return util.TypedArrayToObjectList[IosSettings](ctx, diagnostics, iosSettings)
+	return util.TypedArrayToObjectSet[IosSettings](ctx, diagnostics, iosSettings)
 }
 
-func parseAndroidSettings(ctx context.Context, diagnostics *diag.Diagnostics, remoteAndroidSettings []globalappconfiguration.CategorySettings) types.List {
+func parseAndroidSettings(ctx context.Context, diagnostics *diag.Diagnostics, remoteAndroidSettings []globalappconfiguration.CategorySettings) types.Set {
 	var androidSettings []AndroidSettings
 	var errMsg string
 
@@ -1305,10 +1310,10 @@ func parseAndroidSettings(ctx context.Context, diagnostics *diag.Diagnostics, re
 		androidSettings = append(androidSettings, androidSetting)
 	}
 
-	return util.TypedArrayToObjectList[AndroidSettings](ctx, diagnostics, androidSettings)
+	return util.TypedArrayToObjectSet[AndroidSettings](ctx, diagnostics, androidSettings)
 }
 
-func parseHtml5Settings(ctx context.Context, diagnostics *diag.Diagnostics, remoteHtml5Settings []globalappconfiguration.CategorySettings) types.List {
+func parseHtml5Settings(ctx context.Context, diagnostics *diag.Diagnostics, remoteHtml5Settings []globalappconfiguration.CategorySettings) types.Set {
 	var html5Settings []Html5Settings
 	var errMsg string
 
@@ -1335,10 +1340,10 @@ func parseHtml5Settings(ctx context.Context, diagnostics *diag.Diagnostics, remo
 		html5Settings = append(html5Settings, html5Setting)
 	}
 
-	return util.TypedArrayToObjectList[Html5Settings](ctx, diagnostics, html5Settings)
+	return util.TypedArrayToObjectSet[Html5Settings](ctx, diagnostics, html5Settings)
 }
 
-func parseMacosSettings(ctx context.Context, diagnostics *diag.Diagnostics, remoteMacosSettings []globalappconfiguration.CategorySettings) types.List {
+func parseMacosSettings(ctx context.Context, diagnostics *diag.Diagnostics, remoteMacosSettings []globalappconfiguration.CategorySettings) types.Set {
 	var macosSettings []MacosSettings
 	var errMsg string
 
@@ -1354,20 +1359,20 @@ func parseMacosSettings(ctx context.Context, diagnostics *diag.Diagnostics, remo
 			// Check if the value is of type LocalAppAllowList
 			autoLaunchProtocolsList := GACSettingsUpdate[AutoLaunchProtocolsFromOriginsModel, AutoLaunchProtocolsFromOriginsModel_Go](ctx, diagnostics, remoteMacosSetting.Value)
 			if autoLaunchProtocolsList != nil {
-				macosSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectList(ctx, diagnostics, autoLaunchProtocolsList)
+				macosSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectSet(ctx, diagnostics, autoLaunchProtocolsList)
 				break
 			}
 
 			// Check if the value is of type BookMarkValue
 			managedBookmarkList := GACSettingsUpdate[BookMarkValueModel, BookMarkValueModel_Go](ctx, diagnostics, remoteMacosSetting.Value)
 			if managedBookmarkList != nil {
-				macosSetting.ManagedBookmarks = util.TypedArrayToObjectList(ctx, diagnostics, managedBookmarkList)
+				macosSetting.ManagedBookmarks = util.TypedArrayToObjectSet(ctx, diagnostics, managedBookmarkList)
 				break
 			}
 			// Check if the value is of type ExtensionInstallAllowList
 			extensionInstallAllowList := GACSettingsUpdate[ExtensionInstallAllowListModel, ExtensionInstallAllowListModel_Go](ctx, diagnostics, remoteMacosSetting.Value)
 			if extensionInstallAllowList != nil {
-				macosSetting.ExtensionInstallAllowList = util.TypedArrayToObjectList(ctx, diagnostics, extensionInstallAllowList)
+				macosSetting.ExtensionInstallAllowList = util.TypedArrayToObjectSet(ctx, diagnostics, extensionInstallAllowList)
 				break
 			}
 
@@ -1403,10 +1408,10 @@ func parseMacosSettings(ctx context.Context, diagnostics *diag.Diagnostics, remo
 		macosSettings = append(macosSettings, macosSetting)
 	}
 
-	return util.TypedArrayToObjectList[MacosSettings](ctx, diagnostics, macosSettings)
+	return util.TypedArrayToObjectSet[MacosSettings](ctx, diagnostics, macosSettings)
 }
 
-func parseChromeosSettings(ctx context.Context, diagnostics *diag.Diagnostics, remoteChromeosSettings []globalappconfiguration.CategorySettings) types.List {
+func parseChromeosSettings(ctx context.Context, diagnostics *diag.Diagnostics, remoteChromeosSettings []globalappconfiguration.CategorySettings) types.Set {
 	var chromeosSettings []ChromeosSettings
 	var errMsg string
 
@@ -1433,15 +1438,15 @@ func parseChromeosSettings(ctx context.Context, diagnostics *diag.Diagnostics, r
 		chromeosSettings = append(chromeosSettings, chromeosSetting)
 	}
 
-	return util.TypedArrayToObjectList[ChromeosSettings](ctx, diagnostics, chromeosSettings)
+	return util.TypedArrayToObjectSet[ChromeosSettings](ctx, diagnostics, chromeosSettings)
 }
 
-func getWindowsCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, windowsSettings types.List, remoteWindowsSettings []globalappconfiguration.CategorySettings) types.List {
+func getWindowsCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, windowsSettings types.Set, remoteWindowsSettings []globalappconfiguration.CategorySettings) types.Set {
 
 	var windowsSettingsForState []WindowsSettings
 	var errMsg string
 
-	stateWindowsSettings := util.ObjectListToTypedArray[WindowsSettings](ctx, diagnostics, windowsSettings)
+	stateWindowsSettings := util.ObjectSetToTypedArray[WindowsSettings](ctx, diagnostics, windowsSettings)
 
 	type RemoteSettingsTracker struct {
 		Value     interface{}
@@ -1476,25 +1481,25 @@ func getWindowsCategorySettings(ctx context.Context, diagnostics *diag.Diagnosti
 		case reflect.Slice:
 			localAppAllowList := GACSettingsUpdate[LocalAppAllowListModel, LocalAppAllowListModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
 			if localAppAllowList != nil {
-				windowsSetting.LocalAppAllowList = util.TypedArrayToObjectList(ctx, diagnostics, localAppAllowList)
+				windowsSetting.LocalAppAllowList = util.TypedArrayToObjectSet(ctx, diagnostics, localAppAllowList)
 				break
 			}
 
 			extentionInstallAllowList := GACSettingsUpdate[ExtensionInstallAllowListModel, ExtensionInstallAllowListModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
 			if extentionInstallAllowList != nil {
-				windowsSetting.ExtensionInstallAllowList = util.TypedArrayToObjectList(ctx, diagnostics, extentionInstallAllowList)
+				windowsSetting.ExtensionInstallAllowList = util.TypedArrayToObjectSet(ctx, diagnostics, extentionInstallAllowList)
 				break
 			}
 
 			autoLaunchProtocolsList := GACSettingsUpdate[AutoLaunchProtocolsFromOriginsModel, AutoLaunchProtocolsFromOriginsModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
 			if autoLaunchProtocolsList != nil {
-				windowsSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectList(ctx, diagnostics, autoLaunchProtocolsList)
+				windowsSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectSet(ctx, diagnostics, autoLaunchProtocolsList)
 				break
 			}
 
 			managedBookmarkList := GACSettingsUpdate[BookMarkValueModel, BookMarkValueModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
 			if managedBookmarkList != nil {
-				windowsSetting.ManagedBookmarks = util.TypedArrayToObjectList(ctx, diagnostics, managedBookmarkList)
+				windowsSetting.ManagedBookmarks = util.TypedArrayToObjectSet(ctx, diagnostics, managedBookmarkList)
 				break
 			}
 
@@ -1545,25 +1550,25 @@ func getWindowsCategorySettings(ctx context.Context, diagnostics *diag.Diagnosti
 			case reflect.Slice:
 				localAppAllowList := GACSettingsUpdate[LocalAppAllowListModel, LocalAppAllowListModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
 				if localAppAllowList != nil {
-					windowsSetting.LocalAppAllowList = util.TypedArrayToObjectList(ctx, diagnostics, localAppAllowList)
+					windowsSetting.LocalAppAllowList = util.TypedArrayToObjectSet(ctx, diagnostics, localAppAllowList)
 					break
 				}
 
 				extentionInstallAllowList := GACSettingsUpdate[ExtensionInstallAllowListModel, ExtensionInstallAllowListModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
 				if extentionInstallAllowList != nil {
-					windowsSetting.ExtensionInstallAllowList = util.TypedArrayToObjectList(ctx, diagnostics, extentionInstallAllowList)
+					windowsSetting.ExtensionInstallAllowList = util.TypedArrayToObjectSet(ctx, diagnostics, extentionInstallAllowList)
 					break
 				}
 
 				autoLaunchProtocolsList := GACSettingsUpdate[AutoLaunchProtocolsFromOriginsModel, AutoLaunchProtocolsFromOriginsModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
 				if autoLaunchProtocolsList != nil {
-					windowsSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectList(ctx, diagnostics, autoLaunchProtocolsList)
+					windowsSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectSet(ctx, diagnostics, autoLaunchProtocolsList)
 					break
 				}
 
 				managedBookmarkList := GACSettingsUpdate[BookMarkValueModel, BookMarkValueModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
 				if managedBookmarkList != nil {
-					windowsSetting.ManagedBookmarks = util.TypedArrayToObjectList(ctx, diagnostics, managedBookmarkList)
+					windowsSetting.ManagedBookmarks = util.TypedArrayToObjectSet(ctx, diagnostics, managedBookmarkList)
 					break
 				}
 
@@ -1599,15 +1604,15 @@ func getWindowsCategorySettings(ctx context.Context, diagnostics *diag.Diagnosti
 		}
 	}
 
-	return util.TypedArrayToObjectList[WindowsSettings](ctx, diagnostics, windowsSettingsForState)
+	return util.TypedArrayToObjectSet[WindowsSettings](ctx, diagnostics, windowsSettingsForState)
 }
 
-func getLinuxCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, linuxSettings types.List, remoteLinuxSettings []globalappconfiguration.CategorySettings) types.List {
+func getLinuxCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, linuxSettings types.Set, remoteLinuxSettings []globalappconfiguration.CategorySettings) types.Set {
 
 	var linuxSettingsForState []LinuxSettings
 	var errMsg string
 
-	stateLinuxSettings := util.ObjectListToTypedArray[LinuxSettings](ctx, diagnostics, linuxSettings)
+	stateLinuxSettings := util.ObjectSetToTypedArray[LinuxSettings](ctx, diagnostics, linuxSettings)
 
 	type RemoteSettingsTracker struct {
 		Value     interface{}
@@ -1642,19 +1647,19 @@ func getLinuxCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 		case reflect.Slice:
 			extentionInstallAllowList := GACSettingsUpdate[ExtensionInstallAllowListModel, ExtensionInstallAllowListModel_Go](ctx, diagnostics, remoteLinuxSetting.Value)
 			if extentionInstallAllowList != nil {
-				linuxSetting.ExtensionInstallAllowList = util.TypedArrayToObjectList(ctx, diagnostics, extentionInstallAllowList)
+				linuxSetting.ExtensionInstallAllowList = util.TypedArrayToObjectSet(ctx, diagnostics, extentionInstallAllowList)
 				break
 			}
 
 			autoLaunchProtocolsList := GACSettingsUpdate[AutoLaunchProtocolsFromOriginsModel, AutoLaunchProtocolsFromOriginsModel_Go](ctx, diagnostics, remoteLinuxSetting.Value)
 			if autoLaunchProtocolsList != nil {
-				linuxSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectList(ctx, diagnostics, autoLaunchProtocolsList)
+				linuxSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectSet(ctx, diagnostics, autoLaunchProtocolsList)
 				break
 			}
 
 			managedBookmarkList := GACSettingsUpdate[BookMarkValueModel, BookMarkValueModel_Go](ctx, diagnostics, remoteLinuxSetting.Value)
 			if managedBookmarkList != nil {
-				linuxSetting.ManagedBookmarks = util.TypedArrayToObjectList(ctx, diagnostics, managedBookmarkList)
+				linuxSetting.ManagedBookmarks = util.TypedArrayToObjectSet(ctx, diagnostics, managedBookmarkList)
 				break
 			}
 
@@ -1687,19 +1692,19 @@ func getLinuxCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 			case reflect.Slice:
 				extentionInstallAllowList := GACSettingsUpdate[ExtensionInstallAllowListModel, ExtensionInstallAllowListModel_Go](ctx, diagnostics, remoteLinuxSetting.Value)
 				if extentionInstallAllowList != nil {
-					linuxSetting.ExtensionInstallAllowList = util.TypedArrayToObjectList(ctx, diagnostics, extentionInstallAllowList)
+					linuxSetting.ExtensionInstallAllowList = util.TypedArrayToObjectSet(ctx, diagnostics, extentionInstallAllowList)
 					break
 				}
 
 				autoLaunchProtocolsList := GACSettingsUpdate[AutoLaunchProtocolsFromOriginsModel, AutoLaunchProtocolsFromOriginsModel_Go](ctx, diagnostics, remoteLinuxSetting.Value)
 				if autoLaunchProtocolsList != nil {
-					linuxSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectList(ctx, diagnostics, autoLaunchProtocolsList)
+					linuxSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectSet(ctx, diagnostics, autoLaunchProtocolsList)
 					break
 				}
 
 				managedBookmarkList := GACSettingsUpdate[BookMarkValueModel, BookMarkValueModel_Go](ctx, diagnostics, remoteLinuxSetting.Value)
 				if managedBookmarkList != nil {
-					linuxSetting.ManagedBookmarks = util.TypedArrayToObjectList(ctx, diagnostics, managedBookmarkList)
+					linuxSetting.ManagedBookmarks = util.TypedArrayToObjectSet(ctx, diagnostics, managedBookmarkList)
 					break
 				}
 
@@ -1718,15 +1723,15 @@ func getLinuxCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 		}
 	}
 
-	return util.TypedArrayToObjectList[LinuxSettings](ctx, diagnostics, linuxSettingsForState)
+	return util.TypedArrayToObjectSet[LinuxSettings](ctx, diagnostics, linuxSettingsForState)
 }
 
-func getIosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, iosSettings types.List, remoteIosSettings []globalappconfiguration.CategorySettings) types.List {
+func getIosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, iosSettings types.Set, remoteIosSettings []globalappconfiguration.CategorySettings) types.Set {
 
 	var iosSettingsForState []IosSettings
 	var errMsg string
 
-	stateIosSettings := util.ObjectListToTypedArray[IosSettings](ctx, diagnostics, iosSettings)
+	stateIosSettings := util.ObjectSetToTypedArray[IosSettings](ctx, diagnostics, iosSettings)
 
 	type RemoteSettingsTracker struct {
 		Value     interface{}
@@ -1796,15 +1801,15 @@ func getIosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, 
 		}
 	}
 
-	return util.TypedArrayToObjectList[IosSettings](ctx, diagnostics, iosSettingsForState)
+	return util.TypedArrayToObjectSet[IosSettings](ctx, diagnostics, iosSettingsForState)
 }
 
-func getAndroidCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, androidSettings types.List, remoteAndroidSettings []globalappconfiguration.CategorySettings) types.List {
+func getAndroidCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, androidSettings types.Set, remoteAndroidSettings []globalappconfiguration.CategorySettings) types.Set {
 
 	var androidSettingsForState []AndroidSettings
 	var errMsg string
 
-	stateAndroidSettings := util.ObjectListToTypedArray[AndroidSettings](ctx, diagnostics, androidSettings)
+	stateAndroidSettings := util.ObjectSetToTypedArray[AndroidSettings](ctx, diagnostics, androidSettings)
 
 	type RemoteSettingsTracker struct {
 		Value     interface{}
@@ -1878,15 +1883,15 @@ func getAndroidCategorySettings(ctx context.Context, diagnostics *diag.Diagnosti
 		}
 	}
 
-	return util.TypedArrayToObjectList[AndroidSettings](ctx, diagnostics, androidSettingsForState)
+	return util.TypedArrayToObjectSet[AndroidSettings](ctx, diagnostics, androidSettingsForState)
 }
 
-func getChromeosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, chromeosSettings types.List, remoteChromeosSettings []globalappconfiguration.CategorySettings) types.List {
+func getChromeosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, chromeosSettings types.Set, remoteChromeosSettings []globalappconfiguration.CategorySettings) types.Set {
 
 	var chromeosSettingsForState []ChromeosSettings
 	var errMsg string
 
-	stateChromeosSettings := util.ObjectListToTypedArray[ChromeosSettings](ctx, diagnostics, chromeosSettings)
+	stateChromeosSettings := util.ObjectSetToTypedArray[ChromeosSettings](ctx, diagnostics, chromeosSettings)
 
 	type RemoteSettingsTracker struct {
 		Value     interface{}
@@ -1963,15 +1968,15 @@ func getChromeosCategorySettings(ctx context.Context, diagnostics *diag.Diagnost
 		}
 	}
 
-	return util.TypedArrayToObjectList[ChromeosSettings](ctx, diagnostics, chromeosSettingsForState)
+	return util.TypedArrayToObjectSet[ChromeosSettings](ctx, diagnostics, chromeosSettingsForState)
 }
 
-func getHtml5CategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, html5Settings types.List, remoteHtml5Settings []globalappconfiguration.CategorySettings) types.List {
+func getHtml5CategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, html5Settings types.Set, remoteHtml5Settings []globalappconfiguration.CategorySettings) types.Set {
 
 	var html5SettingsForState []Html5Settings
 	var errMsg string
 
-	stateHtml5Settings := util.ObjectListToTypedArray[Html5Settings](ctx, diagnostics, html5Settings)
+	stateHtml5Settings := util.ObjectSetToTypedArray[Html5Settings](ctx, diagnostics, html5Settings)
 
 	type RemoteSettingsTracker struct {
 		Value     interface{}
@@ -2048,15 +2053,15 @@ func getHtml5CategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 		}
 	}
 
-	return util.TypedArrayToObjectList[Html5Settings](ctx, diagnostics, html5SettingsForState)
+	return util.TypedArrayToObjectSet[Html5Settings](ctx, diagnostics, html5SettingsForState)
 }
 
-func getMacosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, macosSettings types.List, remoteMacosSettings []globalappconfiguration.CategorySettings) types.List {
+func getMacosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, macosSettings types.Set, remoteMacosSettings []globalappconfiguration.CategorySettings) types.Set {
 
 	var macosSettingsForState []MacosSettings
 	var errMsg string
 
-	stateMacosSettings := util.ObjectListToTypedArray[MacosSettings](ctx, diagnostics, macosSettings)
+	stateMacosSettings := util.ObjectSetToTypedArray[MacosSettings](ctx, diagnostics, macosSettings)
 
 	type RemoteSettingsTracker struct {
 		Value     interface{}
@@ -2092,20 +2097,20 @@ func getMacosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 			// Check if the value is of type LocalAppAllowList
 			autoLaunchProtocolsList := GACSettingsUpdate[AutoLaunchProtocolsFromOriginsModel, AutoLaunchProtocolsFromOriginsModel_Go](ctx, diagnostics, remoteMacosSetting.Value)
 			if autoLaunchProtocolsList != nil {
-				macosSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectList(ctx, diagnostics, autoLaunchProtocolsList)
+				macosSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectSet(ctx, diagnostics, autoLaunchProtocolsList)
 				break
 			}
 
 			// Check if the value is of type BookMarkValue
 			managedBookmarkList := GACSettingsUpdate[BookMarkValueModel, BookMarkValueModel_Go](ctx, diagnostics, remoteMacosSetting.Value)
 			if managedBookmarkList != nil {
-				macosSetting.ManagedBookmarks = util.TypedArrayToObjectList(ctx, diagnostics, managedBookmarkList)
+				macosSetting.ManagedBookmarks = util.TypedArrayToObjectSet(ctx, diagnostics, managedBookmarkList)
 				break
 			}
 			// Check if the value is of type ExtensionInstallAllowList
 			extensionInstallAllowList := GACSettingsUpdate[ExtensionInstallAllowListModel, ExtensionInstallAllowListModel_Go](ctx, diagnostics, remoteMacosSetting.Value)
 			if extensionInstallAllowList != nil {
-				macosSetting.ExtensionInstallAllowList = util.TypedArrayToObjectList(ctx, diagnostics, extensionInstallAllowList)
+				macosSetting.ExtensionInstallAllowList = util.TypedArrayToObjectSet(ctx, diagnostics, extensionInstallAllowList)
 				break
 			}
 
@@ -2158,19 +2163,19 @@ func getMacosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 				// Check if the value is of type LocalAppAllowList
 				autoLaunchProtocolsList := GACSettingsUpdate[AutoLaunchProtocolsFromOriginsModel, AutoLaunchProtocolsFromOriginsModel_Go](ctx, diagnostics, remoteMacosSetting.Value)
 				if autoLaunchProtocolsList != nil {
-					macosSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectList(ctx, diagnostics, autoLaunchProtocolsList)
+					macosSetting.AutoLaunchProtocolsFromOrigins = util.TypedArrayToObjectSet(ctx, diagnostics, autoLaunchProtocolsList)
 					break
 				}
 				// Check if the value is of type BookMarkValue
 				managedBookmarkList := GACSettingsUpdate[BookMarkValueModel, BookMarkValueModel_Go](ctx, diagnostics, remoteMacosSetting.Value)
 				if managedBookmarkList != nil {
-					macosSetting.ManagedBookmarks = util.TypedArrayToObjectList(ctx, diagnostics, managedBookmarkList)
+					macosSetting.ManagedBookmarks = util.TypedArrayToObjectSet(ctx, diagnostics, managedBookmarkList)
 					break
 				}
 				// Check if the value is of type ExtensionInstallAllowList
 				extensionInstallAllowList := GACSettingsUpdate[ExtensionInstallAllowListModel, ExtensionInstallAllowListModel_Go](ctx, diagnostics, remoteMacosSetting.Value)
 				if extensionInstallAllowList != nil {
-					macosSetting.ExtensionInstallAllowList = util.TypedArrayToObjectList(ctx, diagnostics, extensionInstallAllowList)
+					macosSetting.ExtensionInstallAllowList = util.TypedArrayToObjectSet(ctx, diagnostics, extensionInstallAllowList)
 					break
 				}
 				macosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteMacosSetting.Value.([]interface{}))
@@ -2205,7 +2210,7 @@ func getMacosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 		}
 	}
 
-	return util.TypedArrayToObjectList[MacosSettings](ctx, diagnostics, macosSettingsForState)
+	return util.TypedArrayToObjectSet[MacosSettings](ctx, diagnostics, macosSettingsForState)
 }
 
 func (GACSettingsResourceModel) GetSchema() schema.Schema {
@@ -2234,6 +2239,15 @@ func (GACSettingsResourceModel) GetSchema() schema.Schema {
 				Default:     booldefault.StaticBool(true),
 			},
 			"app_settings": AppSettings{}.GetSchema(),
+			"test_channel": schema.BoolAttribute{
+				Description: "Defines whether to use the test channel for settings or not. Defaults to `false`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.RequiresReplace(),
+				},
+			},
 		},
 	}
 }

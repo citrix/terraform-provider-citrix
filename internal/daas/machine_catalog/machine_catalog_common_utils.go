@@ -4,6 +4,7 @@ package machine_catalog
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -256,7 +257,7 @@ func readMachineCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaas
 	return catalog, httpResp, err
 }
 
-func deleteMachinesFromCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, provisioningSchemePlan ProvisioningSchemeModel, machinesToDelete []citrixorchestration.MachineResponseModel, catalogNameOrId string, isMcsOrPvsCatalog bool) error {
+func deleteMachinesFromCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, provisioningSchemePlan ProvisioningSchemeModel, machinesToDelete []citrixorchestration.MachineResponseModel, catalogNameOrId string, isMcsOrPvsCatalog bool, machineADAccountsInPlan []MachineADAccountModel) error {
 	batchApiHeaders, httpResp, err := generateBatchApiHeaders(ctx, &resp.Diagnostics, client, provisioningSchemePlan, false)
 	txId := citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
 	if err != nil {
@@ -339,14 +340,16 @@ func deleteMachinesFromCatalog(ctx context.Context, client *citrixdaasclient.Cit
 		return err
 	}
 
-	deleteAccountOpion := "Leave"
-	if isMcsOrPvsCatalog {
-		deleteAccountOpion = "Delete"
-	}
 	batchRequestItems = []citrixorchestration.BatchRequestItemModel{}
 	for index, machineToDelete := range machinesToDelete {
+		deleteAccountOption := "Leave"
+		if isMcsOrPvsCatalog && !slices.ContainsFunc(machineADAccountsInPlan, func(v MachineADAccountModel) bool {
+			return strings.EqualFold(v.ADAccountName.ValueString(), machineToDelete.GetName()+"$")
+		}) {
+			deleteAccountOption = "Delete"
+		}
 		var batchRequestItem citrixorchestration.BatchRequestItemModel
-		relativeUrl := fmt.Sprintf("/Machines/%s?deleteVm=%t&purgeDBOnly=false&deleteAccount=%s", machineToDelete.GetId(), isMcsOrPvsCatalog, deleteAccountOpion)
+		relativeUrl := fmt.Sprintf("/Machines/%s?deleteVm=%t&purgeDBOnly=false&deleteAccount=%s", machineToDelete.GetId(), isMcsOrPvsCatalog, deleteAccountOption)
 		batchRequestItem.SetReference(strconv.Itoa(index))
 		batchRequestItem.SetMethod(http.MethodDelete)
 		batchRequestItem.SetHeaders(batchApiHeaders)
@@ -481,9 +484,72 @@ func setMachineCatalogTags(ctx context.Context, diagnostics *diag.Diagnostics, c
 	}
 }
 
+func getMachineCatalogMachineADAccounts(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, machineCatalogId string) ([]citrixorchestration.ProvisioningSchemeMachineAccountResponseModel, error) {
+	getADAccountsRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogMachineAccounts(ctx, machineCatalogId)
+	adAccountsResp, httpResp, err := citrixdaasclient.AddRequestData(getADAccountsRequest, client).Execute()
+	accounts := []citrixorchestration.ProvisioningSchemeMachineAccountResponseModel{}
+	if err != nil {
+		diagnostics.AddError(
+			fmt.Sprintf("Error getting machine AD accounts for Machine Catalog %s", machineCatalogId),
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		// Continue without return in order to get other attributes refreshed in state
+		return accounts, err
+	}
+	if adAccountsResp == nil || len(adAccountsResp.GetItems()) == 0 {
+		return accounts, nil
+	}
+	return adAccountsResp.GetItems(), nil
+}
+
 func getMachineCatalogTags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, machineCatalogId string) []string {
 	getTagsRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogTags(ctx, machineCatalogId)
 	getTagsRequest = getTagsRequest.Fields("Id,Name,Description")
 	tagsResp, httpResp, err := citrixdaasclient.AddRequestData(getTagsRequest, client).Execute()
 	return util.ProcessTagsResponseCollection(diagnostics, tagsResp, httpResp, err, "Machine Catalog", machineCatalogId)
+}
+
+func validateInUseMachineAccounts(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, catalogName string, provSchemePlan ProvisioningSchemeModel, machineAccountsToCheck []MachineADAccountModel) error {
+	batchApiHeaders, httpResp, err := generateBatchApiHeaders(ctx, diagnostics, client, provSchemePlan, false)
+	txId := citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
+	if err != nil {
+		diagnostics.AddError(
+			"Error validating machine accounts in Machine Catalog "+catalogName,
+			"TransactionId: "+txId+
+				"\nError Message: "+util.ReadClientError(err),
+		)
+		return err
+	}
+	batchRequestItems := []citrixorchestration.BatchRequestItemModel{}
+
+	for index, machineAccount := range machineAccountsToCheck {
+		machineAccountForUrl := strings.TrimSuffix(machineAccount.ADAccountName.ValueString(), "$")
+		machineAccountForUrl = strings.ReplaceAll(machineAccountForUrl, "\\", "|")
+		relativeUrl := fmt.Sprintf("/Machines/%s/MachineCatalog", machineAccountForUrl)
+
+		var batchRequestItem citrixorchestration.BatchRequestItemModel
+		batchRequestItem.SetReference(strconv.Itoa(index))
+		batchRequestItem.SetMethod(http.MethodGet)
+		batchRequestItem.SetRelativeUrl(client.GetBatchRequestItemRelativeUrl(relativeUrl))
+		batchRequestItem.SetHeaders(batchApiHeaders)
+		batchRequestItems = append(batchRequestItems, batchRequestItem)
+	}
+
+	if len(batchRequestItems) > 0 {
+		// If there are any machines that need to be put in maintenance mode
+		var batchRequestModel citrixorchestration.BatchRequestModel
+		batchRequestModel.SetItems(batchRequestItems)
+		successfulJobs, _, _ := citrixdaasclient.PerformBatchOperation(ctx, client, batchRequestModel)
+
+		if successfulJobs > 0 {
+			err := errors.New("One or more machine accounts specified are in use by other Machine Catalogs.")
+			diagnostics.AddError(
+				"Error validating machine accounts for Machine Catalog "+catalogName,
+				err.Error(),
+			)
+			return err
+		}
+	}
+	return nil
 }
