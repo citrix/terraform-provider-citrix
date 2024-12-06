@@ -96,7 +96,12 @@ func (d *PolicySetDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	data = data.RefreshPropertyValues(ctx, &resp.Diagnostics, false, policySet, policies, policySetScopes)
+	deliveryGroups, err := util.GetDeliveryGroups(ctx, d.client, &resp.Diagnostics, "Id,PolicySetGuid")
+	if err != nil {
+		return
+	}
+
+	data = data.RefreshPropertyValues(ctx, &resp.Diagnostics, false, policySet, policies, policySetScopes, deliveryGroups)
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

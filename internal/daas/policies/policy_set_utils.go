@@ -755,3 +755,77 @@ func deletePolicyFilters(ctx context.Context, client *citrixdaasclient.CitrixDaa
 	}
 	return nil
 }
+
+func constructEditDeliveryGroupPolicySetBatchRequestModel(diags *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, policySetGuid string, deliveryGroupIds []string) (citrixorchestration.BatchRequestModel, error) {
+	batchRequestItems := []citrixorchestration.BatchRequestItemModel{}
+	var batchRequestModel citrixorchestration.BatchRequestModel
+
+	batchApiHeaders, httpResp, err := generateBatchApiHeaders(client)
+	if err != nil {
+		diags.AddError(
+			fmt.Sprintf("Error associated policy set %s to delivery groups ", policySetGuid),
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError Message: "+util.ReadClientError(err),
+		)
+		return batchRequestModel, err
+	}
+
+	for index, deliveryGroupId := range deliveryGroupIds {
+		var editDeliveryGroupRequest = citrixorchestration.EditDeliveryGroupRequestModel{}
+		editDeliveryGroupRequest.SetPolicySetGuid(policySetGuid)
+
+		editDeliveryGroupRequestBodyString, err := util.ConvertToString(editDeliveryGroupRequest)
+		if err != nil {
+			diags.AddError(
+				"Error associate delivery group "+deliveryGroupId+" with Policy Set "+policySetGuid,
+				"An unexpected error occurred: "+err.Error(),
+			)
+			return batchRequestModel, err
+		}
+
+		relativeUrl := fmt.Sprintf("/DeliveryGroups/%s", deliveryGroupId)
+
+		var batchRequestItem citrixorchestration.BatchRequestItemModel
+		batchRequestItem.SetReference(fmt.Sprintf("editDeliveryGroup%d", index))
+		batchRequestItem.SetMethod(http.MethodPatch)
+		batchRequestItem.SetRelativeUrl(client.GetBatchRequestItemRelativeUrl(relativeUrl))
+		batchRequestItem.SetHeaders(batchApiHeaders)
+		batchRequestItem.SetBody(editDeliveryGroupRequestBodyString)
+		batchRequestItems = append(batchRequestItems, batchRequestItem)
+	}
+
+	batchRequestModel.SetItems(batchRequestItems)
+	return batchRequestModel, nil
+}
+
+func updateDeliveryGroupsWithPolicySet(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, policySetName string, policySetGuid string, deliveryGroups []string, errorMessage string) error {
+	if len(deliveryGroups) == 0 {
+		return nil
+	}
+	// Update Delivery Groups in the Policy Set
+	batchRequestModel, err := constructEditDeliveryGroupPolicySetBatchRequestModel(diagnostics, client, policySetGuid, deliveryGroups)
+	if err != nil {
+		return err
+	}
+
+	successfulJobs, txId, err := citrixdaasclient.PerformBatchOperation(ctx, client, batchRequestModel)
+	if err != nil {
+		diagnostics.AddError(
+			fmt.Sprintf("Error %s.", errorMessage),
+			"TransactionId: "+txId+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		return err
+	}
+
+	if successfulJobs < len(deliveryGroups) {
+		errMsg := fmt.Sprintf("An error occurred while %s. %d of %d delivery groups were updated.", errorMessage, successfulJobs, len(deliveryGroups))
+		diagnostics.AddError(
+			fmt.Sprintf("Error %s.", errorMessage),
+			"TransactionId: "+txId+
+				"\n"+errMsg,
+		)
+		return err
+	}
+	return nil
+}

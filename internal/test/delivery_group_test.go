@@ -12,6 +12,7 @@ import (
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
@@ -22,9 +23,21 @@ func init() {
 			ctx := context.Background()
 			client := sharedClientForSweepers(ctx)
 
+			var errs *multierror.Error
+
 			deliveryGroupName := os.Getenv("TEST_DG_NAME")
 			err := deliveryGroupSweeper(ctx, deliveryGroupName, client)
-			return err
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			}
+
+			deliveryGroupNameUpdated := fmt.Sprintf("%s-updated", deliveryGroupName)
+			err = deliveryGroupSweeper(ctx, deliveryGroupNameUpdated, client)
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			}
+
+			return errs.ErrorOrNil()
 		},
 	})
 }
@@ -34,10 +47,6 @@ func init() {
 func TestDeliveryGroupPreCheck(t *testing.T) {
 	if v := os.Getenv("TEST_DG_NAME"); v == "" {
 		t.Fatal("TEST_DG_NAME must be set for acceptance tests")
-	}
-
-	if v := os.Getenv("TEST_POLICY_SET_WITHOUT_DG_NAME"); v == "" {
-		t.Fatal("TEST_POLICY_SET_WITHOUT_DG_NAME must be set for acceptance tests")
 	}
 }
 
@@ -60,7 +69,6 @@ func TestDeliveryGroupResourceAzureRM(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsOnly"),
-					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
@@ -80,8 +88,6 @@ func TestDeliveryGroupResourceAzureRM(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "reboot_schedules.#", "2"),
 					// Verify total number of machines in delivery group
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "total_machines", "1"),
-					// Verify the policy set id assigned to the delivery group
-					resource.TestCheckNoResourceAttr("citrix_delivery_group.testDeliveryGroup", "policy_set_id"),
 				),
 			},
 
@@ -99,7 +105,6 @@ func TestDeliveryGroupResourceAzureRM(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updated, "DesktopsAndApps"),
-					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
@@ -121,8 +126,6 @@ func TestDeliveryGroupResourceAzureRM(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "reboot_schedules.0.ignore_maintenance_mode", "false"),
 					// Verify total number of machines in delivery group
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "total_machines", "2"),
-					// Verify the policy set id assigned to the delivery group
-					resource.TestCheckNoResourceAttr("citrix_delivery_group.testDeliveryGroup", "policy_set_id"),
 				),
 			},
 
@@ -130,7 +133,6 @@ func TestDeliveryGroupResourceAzureRM(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsOnly"),
-					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
@@ -140,26 +142,8 @@ func TestDeliveryGroupResourceAzureRM(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify total number of machines in delivery group
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "total_machines", "1"),
-					// Verify the policy set id assigned to the delivery group
-					resource.TestCheckNoResourceAttr("citrix_delivery_group.testDeliveryGroup", "policy_set_id"),
 					// Verify delivery type of delivery group
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "delivery_type", "DesktopsOnly"),
-				),
-			},
-			// Update policy set testing
-			{
-				Config: composeTestResourceTf(
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updatedWithPolicySetId, ""),
-					BuildPolicySetResourceWithoutDeliveryGroup(t),
-					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
-					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
-					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zoneInput, false),
-				),
-
-				Check: resource.ComposeAggregateTestCheckFunc(
-					// Verify the policy set id assigned to the delivery group
-					resource.TestCheckResourceAttrSet("citrix_delivery_group.testDeliveryGroup", "policy_set_id"),
 				),
 			},
 		},
@@ -328,96 +312,6 @@ resource "citrix_delivery_group" "testDeliveryGroup" {
 }
 
 `
-
-	testDeliveryGroupResources_updatedWithPolicySetId = `
-resource "citrix_delivery_group" "testDeliveryGroup" {
-    name        = "%s-updated"
-    description = "Delivery Group for testing updated"
-	associated_machine_catalogs = [
-		{
-			machine_catalog = citrix_machine_catalog.testMachineCatalog.id
-			machine_count = 2
-		}
-	]
-	desktops = [
-		{
-            published_name = "desktop-1"
-            enabled = true
-            enable_session_roaming = true
-        }
-	]
-	autoscale_settings = {
-		autoscale_enabled = true
-		power_time_schemes = [
-        	{
-        	    "days_of_week" = [
-        	        "Monday",
-        	        "Tuesday",
-        	        "Wednesday",
-        	        "Thursday",
-        	        "Friday"
-        	    ]
-        	    "name" = "weekdays test"
-        	    "display_name" = "weekdays schedule"
-        	    "peak_time_ranges" = [
-        	        "09:00-17:00"
-        	    ]
-        	    "pool_size_schedules": [
-        	        {
-        	            "time_range": "00:00-00:00",
-        	            "pool_size": 1
-        	        }
-        	    ],
-        	    "pool_using_percentage": false
-        	},
-    	]	
-	}
-	reboot_schedules = [
-		{
-			name = "test_reboot_schedule"
-			reboot_schedule_enabled = true
-			frequency = "Weekly"
-			frequency_factor = 1
-			days_in_week = [
-				"Monday",
-				"Tuesday",
-				"Wednesday"
-				]
-			start_time = "12:12"
-			start_date = "2024-05-25"
-			reboot_duration_minutes = 0
-			ignore_maintenance_mode = true
-			natural_reboot_schedule = false
-		}
-	]
-	policy_set_id = citrix_policy_set.testPolicySetWithoutDG.id
-	%s
-	%s
-}
-
-`
-
-	policy_set_no_delivery_group_testResource = `
-resource "citrix_policy_set" "testPolicySetWithoutDG" {
-    name = "%s"
-    description = "Test policy set description updated"
-    type = "DeliveryGroupPolicies"
-    policies = [
-        {
-            name = "first-test-policy"
-            description = "First test policy with priority 0"
-            enabled = true
-            policy_settings = [
-                {
-                    name = "AdvanceWarningPeriod"
-                    value = "13:00:00"
-                    use_default = false
-                },
-            ]
-        }
-    ]
-}
-`
 )
 
 func BuildDeliveryGroupResource(t *testing.T, deliveryGroup string, deliveryType string) string {
@@ -439,12 +333,6 @@ func BuildDeliveryGroupResource(t *testing.T, deliveryGroup string, deliveryType
 		return BuildDesktopIconResource(t, testDesktopIconResource) + fmt.Sprintf(deliveryGroup, name, deliveryTypeString, "default_desktop_icon = citrix_desktop_icon.testDesktopIcon.id")
 	}
 
-}
-
-func BuildPolicySetResourceWithoutDeliveryGroup(t *testing.T) string {
-	policySetName := os.Getenv("TEST_POLICY_SET_WITHOUT_DG_NAME")
-
-	return fmt.Sprintf(policy_set_no_delivery_group_testResource, policySetName)
 }
 
 func deliveryGroupSweeper(ctx context.Context, deliveryGroupName string, client *citrixclient.CitrixDaasClient) error {

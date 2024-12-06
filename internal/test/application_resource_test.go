@@ -10,6 +10,7 @@ import (
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
@@ -20,9 +21,21 @@ func init() {
 			ctx := context.Background()
 			client := sharedClientForSweepers(ctx)
 
+			var errs *multierror.Error
+
 			appName := os.Getenv("TEST_APP_NAME")
 			err := applicationSweeper(ctx, appName, client)
-			return err
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			}
+
+			appNameUpdated := appName + "-updated"
+			err = applicationSweeper(ctx, appNameUpdated, client)
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			}
+
+			return errs.ErrorOrNil()
 		},
 	})
 }
@@ -57,7 +70,6 @@ func TestApplicationResource(t *testing.T) {
 					BuildApplicationResource(t, testApplicationResource),
 					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
-					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
@@ -91,7 +103,6 @@ func TestApplicationResource(t *testing.T) {
 					BuildApplicationResource(t, testApplicationResource_updated),
 					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
-					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
@@ -118,7 +129,6 @@ func TestApplicationResource(t *testing.T) {
 					BuildApplicationResource(t, testApplicationResource_withPriorityModel),
 					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
-					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
@@ -147,7 +157,6 @@ func TestApplicationResource(t *testing.T) {
 					BuildApplicationResource(t, testApplicationResource_withPriorityModel_updated),
 					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
-					BuildPolicySetResourceWithoutDeliveryGroup(t),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),

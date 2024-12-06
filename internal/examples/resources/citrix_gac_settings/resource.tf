@@ -6,7 +6,7 @@ resource "citrix_gac_settings" "test_settings_configuration" {
         windows = [
             {
                 user_override = false,
-                category = "ICA Client",
+                category = "ica client",
                 settings = [
                     {
                         name = "Allow Client Clipboard Redirection",
@@ -16,7 +16,7 @@ resource "citrix_gac_settings" "test_settings_configuration" {
             },
             {
                 user_override = false,
-                category = "Browser",
+                category = "browser",
                 settings = [
                     {
                         name = "delete browsing data on exit",
@@ -55,7 +55,7 @@ resource "citrix_gac_settings" "test_settings_configuration" {
         ],
         html5 = [
             {
-                category = "Virtual Channel",
+                category = "virtual channel",
                 user_override = false,
                 settings = [
                     {
@@ -67,7 +67,7 @@ resource "citrix_gac_settings" "test_settings_configuration" {
         ],
         ios = [
             {
-                category = "Audio",
+                category = "audio",
                 user_override = false,
                 settings = [
                     {
@@ -93,7 +93,7 @@ resource "citrix_gac_settings" "test_settings_configuration" {
             },
              {
                 user_override = false,
-                category = "Browser",
+                category = "browser",
                 settings = [
                     {
                         name = "managed bookmarks",
@@ -122,6 +122,19 @@ resource "citrix_gac_settings" "test_settings_configuration" {
                     }
                 ]
             }
+        ]
+        ,
+        android = [
+        {
+            category      = "keyboard",
+            user_override = false,
+            settings = [
+            {
+                name         = "enable client ime",
+                value_string = "true"
+            }
+            ]
+        }
         ]
     }
 }

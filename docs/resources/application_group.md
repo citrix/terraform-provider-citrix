@@ -33,6 +33,7 @@ resource "citrix_application_group" "example-application-group" {
 
 - `application_group_folder_path` (String) The path of the folder in which the application group is located.
 - `description` (String) Description of the application group.
+- `enabled` (Boolean) Whether the application group is enabled or not. Defaults to `true`.
 - `included_users` (Set of String) Users who can use this application group. 
 
 -> **Note** User must be in `Domain\UserOrGroupName` or `user@domain.com` format

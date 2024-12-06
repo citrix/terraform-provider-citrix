@@ -8,10 +8,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/boolvalidator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/helpers/validatordiag"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 )
 
 var (
@@ -24,6 +26,18 @@ type AlsoRequiresOnValuesValidator struct {
 	OnStringValues  []string
 	OnBoolValues    []bool
 	PathExpressions path.Expressions
+}
+
+type AlsoRequiresOnValuesValidatorRequest struct {
+	Config         tfsdk.Config
+	ConfigValue    attr.Value
+	Path           path.Path
+	PathExpression path.Expression
+	ValuesMessage  string
+}
+
+type AlsoRequiresOnValuesValidatorResponse struct {
+	Diagnostics diag.Diagnostics
 }
 
 // Description implements validator.String.
@@ -45,6 +59,55 @@ func (v AlsoRequiresOnValuesValidator) MarkdownDescription(context.Context) stri
 	return ""
 }
 
+func (v AlsoRequiresOnValuesValidator) Validate(ctx context.Context, req AlsoRequiresOnValuesValidatorRequest, res *AlsoRequiresOnValuesValidatorResponse) {
+	// If attribute configuration is null, there is nothing else to validate
+	if req.ConfigValue.IsNull() {
+		return
+	}
+
+	expressions := req.PathExpression.MergeExpressions(v.PathExpressions...)
+
+	for _, expression := range expressions {
+		matchedPaths, diags := req.Config.PathMatches(ctx, expression)
+
+		res.Diagnostics.Append(diags...)
+
+		// Collect all errors
+		if diags.HasError() {
+			continue
+		}
+
+		for _, mp := range matchedPaths {
+			// If the user specifies the same attribute this validator is applied to,
+			// also as part of the input, skip it
+			if mp.Equal(req.Path) {
+				continue
+			}
+
+			var mpVal attr.Value
+			diags := req.Config.GetAttribute(ctx, mp, &mpVal)
+			res.Diagnostics.Append(diags...)
+
+			// Collect all errors
+			if diags.HasError() {
+				continue
+			}
+
+			// Delay validation until all involved attribute have a known value
+			if mpVal.IsUnknown() {
+				return
+			}
+
+			if mpVal.IsNull() {
+				res.Diagnostics.Append(validatordiag.InvalidAttributeCombinationDiagnostic(
+					req.Path,
+					fmt.Sprintf("Attribute %q must be specified when %q is specified with values [ %s ]", mp, req.Path, req.ValuesMessage),
+				))
+			}
+		}
+	}
+}
+
 // ValidateString implements validator.String.
 func (v AlsoRequiresOnValuesValidator) ValidateString(ctx context.Context, req validator.StringRequest, resp *validator.StringResponse) {
 	// If attribute configuration is null, there is nothing else to validate
@@ -52,9 +115,24 @@ func (v AlsoRequiresOnValuesValidator) ValidateString(ctx context.Context, req v
 		return
 	}
 
+	valueMessageArr := []string{}
+	for _, stringValue := range v.OnStringValues {
+		valueMessageArr = append(valueMessageArr, fmt.Sprintf("`%s`", stringValue))
+	}
+
 	for _, value := range v.OnStringValues {
 		if value == req.ConfigValue.ValueString() {
-			stringvalidator.AlsoRequires(v.PathExpressions...).ValidateString(ctx, req, resp)
+			validateReq := AlsoRequiresOnValuesValidatorRequest{
+				Config:         req.Config,
+				ConfigValue:    req.ConfigValue,
+				Path:           req.Path,
+				PathExpression: req.PathExpression,
+				ValuesMessage:  strings.Join(valueMessageArr, ", "),
+			}
+			validateResp := &AlsoRequiresOnValuesValidatorResponse{}
+
+			v.Validate(ctx, validateReq, validateResp)
+			resp.Diagnostics.Append(validateResp.Diagnostics...)
 			return
 		}
 	}
@@ -67,9 +145,24 @@ func (v AlsoRequiresOnValuesValidator) ValidateBool(ctx context.Context, req val
 		return
 	}
 
+	valueMessageArr := []string{}
+	for _, boolValue := range v.OnBoolValues {
+		valueMessageArr = append(valueMessageArr, fmt.Sprintf("`%t`", boolValue))
+	}
+
 	for _, value := range v.OnBoolValues {
 		if value == req.ConfigValue.ValueBool() {
-			boolvalidator.AlsoRequires(v.PathExpressions...).ValidateBool(ctx, req, resp)
+			validateReq := AlsoRequiresOnValuesValidatorRequest{
+				Config:         req.Config,
+				ConfigValue:    req.ConfigValue,
+				Path:           req.Path,
+				PathExpression: req.PathExpression,
+				ValuesMessage:  strings.Join(valueMessageArr, ", "),
+			}
+			validateResp := &AlsoRequiresOnValuesValidatorResponse{}
+
+			v.Validate(ctx, validateReq, validateResp)
+			resp.Diagnostics.Append(validateResp.Diagnostics...)
 			return
 		}
 	}

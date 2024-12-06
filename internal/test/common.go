@@ -2,6 +2,11 @@
 
 package test
 
+import (
+	"os"
+	"testing"
+)
+
 // Used to skip a test case if environment is cloud
 func skipForCloud(isOnPremises bool) func() (bool, error) {
 	return func() (bool, error) {
@@ -42,4 +47,12 @@ func composeTestResourceTf(resources ...string) string {
 		result += resource
 	}
 	return result
+}
+
+func checkTestEnvironmentVariables(t *testing.T, envVarNames []string) {
+	for _, v := range envVarNames {
+		if os.Getenv(v) == "" {
+			t.Fatalf("%s must be set for acceptance tests", v)
+		}
+	}
 }

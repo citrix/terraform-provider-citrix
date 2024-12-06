@@ -12,6 +12,7 @@ import (
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
@@ -22,16 +23,39 @@ func init() {
 			ctx := context.Background()
 			client := sharedClientForSweepers(ctx)
 
+			var errs *multierror.Error
+
 			// Default hypervisor to Azure
 			hypervisorName := os.Getenv("TEST_HYPERV_NAME_AZURE")
 			if hypervisor == "aws" {
 				hypervisorName = os.Getenv("TEST_HYPERV_NAME_AWS_EC2")
+				err := hypervisorSweeper(ctx, hypervisorName, client)
+				if err != nil {
+					errs = multierror.Append(errs, err)
+				}
+
+				hypervisorNameUpdated := hypervisorName + "-updated"
+				err = hypervisorSweeper(ctx, hypervisorNameUpdated, client)
+				if err != nil {
+					errs = multierror.Append(errs, err)
+				}
+
 			}
 			if hypervisor == "gcp" {
 				hypervisorName = os.Getenv("TEST_HYPERV_NAME_GCP")
+				err := hypervisorSweeper(ctx, hypervisorName, client)
+				if err != nil {
+					errs = multierror.Append(errs, err)
+				}
+
+				hypervisorNameUpdated := hypervisorName + "-updated"
+				err = hypervisorSweeper(ctx, hypervisorNameUpdated, client)
+				if err != nil {
+					errs = multierror.Append(errs, err)
+				}
 			}
-			err := hypervisorSweeper(ctx, hypervisorName, client)
-			return err
+
+			return errs.ErrorOrNil()
 		},
 		Dependencies: []string{"citrix_hypervisor_resource_pool"},
 	})

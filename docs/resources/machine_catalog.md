@@ -484,7 +484,7 @@ Optional:
 
 Required:
 
-- `machine_account` (String) The computer AD account for the machine must be in the format <domain>\<machine>, all in lowercase.
+- `machine_account` (String) For domain-joined machines, the Active Directory (AD) account must be in the format <domain>\<machine>, all in lowercase. For non-domain-joined the computer name, all in lowercase.
 
 Optional:
 
@@ -516,7 +516,6 @@ Required:
 - `hypervisor` (String) Id of the hypervisor for creating the machines. Required only if using power managed machines.
 - `hypervisor_resource_pool` (String) Id of the hypervisor resource pool that will be used for provisioning operations.
 - `identity_type` (String) The identity type of the machines to be created. Supported values are`ActiveDirectory`, `AzureAD`, and `HybridAzureAD`.
-- `machine_account_creation_rules` (Attributes) Rules specifying how Active Directory machine accounts should be created when machines are provisioned. (see [below for nested schema](#nestedatt--provisioning_scheme--machine_account_creation_rules))
 - `number_of_total_machines` (Number) Number of VDA machines allocated in the catalog.
 
 Optional:
@@ -526,6 +525,10 @@ Optional:
 - `azure_machine_config` (Attributes) Machine Configuration For Azure MCS and PVS Streaming catalogs. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config))
 - `custom_properties` (Attributes List) **This is an advanced feature. Use with caution.** Custom properties to be set for the machine catalog. For properties that are already supported as a terraform configuration field, please use terraform field instead. (see [below for nested schema](#nestedatt--provisioning_scheme--custom_properties))
 - `gcp_machine_config` (Attributes) Machine Configuration For GCP MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--gcp_machine_config))
+- `machine_account_creation_rules` (Attributes) Rules specifying how Active Directory machine accounts should be created when machines are provisioned. (see [below for nested schema](#nestedatt--provisioning_scheme--machine_account_creation_rules))
+- `machine_ad_accounts` (Attributes List) Existing machine account in the AD to be used. If specified for machine catalog creation, the number of machine AD accounts need to be greater or equals to the number of total machines. 
+
+-> **Note** During machine catalog creation, if `machine_ad_accounts` is specified, the machine_account_creation_rules will not be applied. During update, machine accounts will be used first for new machines. If there is insufficient amount of machine accounts, then the machine account creation rules will be applied to create new machine accounts in the directory. (see [below for nested schema](#nestedatt--provisioning_scheme--machine_ad_accounts))
 - `machine_domain_identity` (Attributes) The domain identity for machines in the machine catalog.<br />Required when identity_type is set to `ActiveDirectory` (see [below for nested schema](#nestedatt--provisioning_scheme--machine_domain_identity))
 - `metadata` (Attributes List) Metadata for the Provisioning Scheme
 
@@ -535,15 +538,6 @@ Optional:
 - `scvmm_machine_config` (Attributes) Machine Configuration for SCVMM MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--scvmm_machine_config))
 - `vsphere_machine_config` (Attributes) Machine Configuration for vSphere MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--vsphere_machine_config))
 - `xenserver_machine_config` (Attributes) Machine Configuration For XenServer MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--xenserver_machine_config))
-
-<a id="nestedatt--provisioning_scheme--machine_account_creation_rules"></a>
-### Nested Schema for `provisioning_scheme.machine_account_creation_rules`
-
-Required:
-
-- `naming_scheme` (String) Defines the template name for AD accounts created in the identity pool.
-- `naming_scheme_type` (String) Type of naming scheme. This defines the format of the variable part of the AD account names that will be created. Choose between `Numeric`, `Alphabetic` and `Unicode`.
-
 
 <a id="nestedatt--provisioning_scheme--aws_machine_config"></a>
 ### Nested Schema for `provisioning_scheme.aws_machine_config`
@@ -687,7 +681,7 @@ Required:
 
 - `persist_os_disk` (Boolean) Persist the OS disk when power cycling the non-persistent provisioned virtual machine.
 - `persist_vm` (Boolean) Persist the non-persistent provisioned virtual machine in Azure environments when power cycling. This property only applies when the PersistOsDisk property is set to True.
-- `wbc_disk_storage_type` (String) Type of naming scheme. Choose between Numeric and Alphabetic.
+- `wbc_disk_storage_type` (String) Type of the storage for Write-back Cache disk. Choose between `Standard_LRS`, `StandardSSD_LRS`, and `Premium_LRS`.
 - `writeback_cache_disk_size_gb` (Number) The size in GB of any temporary storage disk used by the write back cache.
 
 Optional:
@@ -748,6 +742,33 @@ Required:
 - `writeback_cache_disk_size_gb` (Number) The size in GB of any temporary storage disk used by the write back cache.
 - `writeback_cache_memory_size_mb` (Number) The size of the in-memory write back cache in MB.
 
+
+
+<a id="nestedatt--provisioning_scheme--machine_account_creation_rules"></a>
+### Nested Schema for `provisioning_scheme.machine_account_creation_rules`
+
+Required:
+
+- `naming_scheme` (String) Defines the template name for AD accounts created in the identity pool.
+- `naming_scheme_type` (String) Type of naming scheme. This defines the format of the variable part of the AD account names that will be created. Choose between `Numeric`, `Alphabetic` and `Unicode`.
+
+
+<a id="nestedatt--provisioning_scheme--machine_ad_accounts"></a>
+### Nested Schema for `provisioning_scheme.machine_ad_accounts`
+
+Required:
+
+- `ad_account_name` (String) The computer account name in the Active Directory.
+
+Optional:
+
+- `password` (String, Sensitive) Password of the machine account. This value will be applied only if `reset_password = false`
+- `password_format` (String) Password format to be used for machine account. Choose between `PlainText` and `Base64`. Defaults to `PlainText`.
+- `reset_password` (Boolean) Specify if the password for the machine account should be reset. Defaults to `false`
+
+Read-Only:
+
+- `state` (String) State of the machine account.
 
 
 <a id="nestedatt--provisioning_scheme--machine_domain_identity"></a>

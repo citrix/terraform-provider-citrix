@@ -14,7 +14,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -133,6 +132,10 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 
 	//Create Reboot Schedule after delivery group is created
 	var editbody citrixorchestration.EditDeliveryGroupRequestModel
+	// We need to set enabled in the edit request if it is false, as it is ignored in create request
+	if !plan.Enabled.ValueBool() {
+		editbody.SetEnabled(plan.Enabled.ValueBool())
+	}
 	editbody.SetRebootSchedules(body.GetRebootSchedules())
 	advancedAccessPoliciesRequest := []citrixorchestration.AdvancedAccessPolicyRequestModel{}
 
@@ -220,7 +223,7 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 
 	setDeliveryGroupTags(ctx, &resp.Diagnostics, r.client, deliveryGroupId, plan.Tags)
 
-	deliveryGroup, err = getDeliveryGroup(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
+	deliveryGroup, err = util.GetDeliveryGroup(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
 	if err != nil {
 		return
 	}
@@ -240,7 +243,7 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 	}
 
 	// Get machines
-	deliveryGroupMachines, err := getDeliveryGroupMachines(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
+	deliveryGroupMachines, err := util.GetDeliveryGroupMachines(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
 	if err != nil {
 		return
 	}
@@ -249,12 +252,6 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 	deliveryGroupRebootSchedule, err := getDeliveryGroupRebootSchedules(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
 	if err != nil {
 		return
-	}
-
-	if plan.PolicySetId.ValueString() != "" {
-		deliveryGroup.SetPolicySetGuid(plan.PolicySetId.ValueString())
-	} else {
-		deliveryGroup.SetPolicySetGuid(types.StringNull().ValueString())
 	}
 
 	if r.client.AuthConfig.OnPremises {
@@ -304,7 +301,7 @@ func (r *deliveryGroupResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
-	deliveryGroupMachines, err := getDeliveryGroupMachines(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
+	deliveryGroupMachines, err := util.GetDeliveryGroupMachines(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
 
 	if err != nil {
 		return
@@ -360,7 +357,7 @@ func (r *deliveryGroupResource) Update(ctx context.Context, req resource.UpdateR
 	// Get refreshed delivery group properties from Orchestration
 	deliveryGroupId := plan.Id.ValueString()
 	deliveryGroupName := plan.Name.ValueString()
-	currentDeliveryGroup, err := getDeliveryGroup(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
+	currentDeliveryGroup, err := util.GetDeliveryGroup(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
 	if err != nil {
 		return
 	}
@@ -406,7 +403,7 @@ func (r *deliveryGroupResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	// Get machines
-	deliveryGroupMachines, err := getDeliveryGroupMachines(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
+	deliveryGroupMachines, err := util.GetDeliveryGroupMachines(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
 
 	if err != nil {
 		return
@@ -419,16 +416,10 @@ func (r *deliveryGroupResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	// Fetch updated delivery group from GetDeliveryGroup.
-	updatedDeliveryGroup, err := getDeliveryGroup(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
+	updatedDeliveryGroup, err := util.GetDeliveryGroup(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
 
 	if err != nil {
 		return
-	}
-
-	if plan.PolicySetId.ValueString() != "" {
-		updatedDeliveryGroup.SetPolicySetGuid(plan.PolicySetId.ValueString())
-	} else {
-		updatedDeliveryGroup.SetPolicySetGuid(types.StringNull().ValueString())
 	}
 
 	if r.client.AuthConfig.OnPremises {
@@ -586,6 +577,22 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 	if !data.AutoscaleSettings.IsNull() {
 		autoscale := util.ObjectValueToTypedObject[DeliveryGroupPowerManagementSettings](ctx, &resp.Diagnostics, data.AutoscaleSettings)
 		validatePowerTimeSchemes(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[DeliveryGroupPowerTimeScheme](ctx, &resp.Diagnostics, autoscale.PowerTimeSchemes))
+
+		if autoscale.LogOffWarningMessage.ValueString() != "" && autoscale.LogOffWarningTitle.ValueString() == "" {
+			resp.Diagnostics.AddError(
+				"Error validating autoscale settings for Delivery Group "+data.Name.ValueString(),
+				"`log_off_warning_title` cannot be empty string if `log_off_warning_message` is not empty string.",
+			)
+			return
+		}
+
+		if autoscale.AutoscaleLogOffReminderMessage.ValueString() != "" && autoscale.AutoscaleLogOffReminderTitle.ValueString() == "" {
+			resp.Diagnostics.AddError(
+				"Error validating autoscale settings for Delivery Group "+data.Name.ValueString(),
+				"`log_off_reminder_title` cannot be empty string if `log_off_reminder_message` is not empty string.",
+			)
+			return
+		}
 	}
 
 	if !data.RebootSchedules.IsNull() {

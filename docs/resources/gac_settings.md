@@ -34,7 +34,7 @@ resource "citrix_gac_settings" "test_settings_configuration" {
         windows = [
             {
                 user_override = false,
-                category = "ICA Client",
+                category = "ica client",
                 settings = [
                     {
                         name = "Allow Client Clipboard Redirection",
@@ -44,7 +44,7 @@ resource "citrix_gac_settings" "test_settings_configuration" {
             },
             {
                 user_override = false,
-                category = "Browser",
+                category = "browser",
                 settings = [
                     {
                         name = "delete browsing data on exit",
@@ -83,7 +83,7 @@ resource "citrix_gac_settings" "test_settings_configuration" {
         ],
         html5 = [
             {
-                category = "Virtual Channel",
+                category = "virtual channel",
                 user_override = false,
                 settings = [
                     {
@@ -95,7 +95,7 @@ resource "citrix_gac_settings" "test_settings_configuration" {
         ],
         ios = [
             {
-                category = "Audio",
+                category = "audio",
                 user_override = false,
                 settings = [
                     {
@@ -121,7 +121,7 @@ resource "citrix_gac_settings" "test_settings_configuration" {
             },
              {
                 user_override = false,
-                category = "Browser",
+                category = "browser",
                 settings = [
                     {
                         name = "managed bookmarks",
@@ -151,6 +151,19 @@ resource "citrix_gac_settings" "test_settings_configuration" {
                 ]
             }
         ]
+        ,
+        android = [
+        {
+            category      = "keyboard",
+            user_override = false,
+            settings = [
+            {
+                name         = "enable client ime",
+                value_string = "true"
+            }
+            ]
+        }
+        ]
     }
 }
 ```
@@ -167,6 +180,7 @@ resource "citrix_gac_settings" "test_settings_configuration" {
 
 ### Optional
 
+- `test_channel` (Boolean) Defines whether to use the test channel for settings or not. Defaults to `false`.
 - `use_for_app_config` (Boolean) Defines whether to use the settings for app configuration or not. Defaults to `true`.
 
 <a id="nestedatt--app_settings"></a>
@@ -188,7 +202,7 @@ Optional:
 Required:
 
 - `category` (String) Defines the category of the setting.
-- `settings` (Attributes List) A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform. (see [below for nested schema](#nestedatt--app_settings--android--settings))
+- `settings` (Attributes Set) A set of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform. (see [below for nested schema](#nestedatt--app_settings--android--settings))
 - `user_override` (Boolean) Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.
 
 <a id="nestedatt--app_settings--android--settings"></a>
@@ -211,7 +225,7 @@ Optional:
 Required:
 
 - `category` (String) Defines the category of the setting.
-- `settings` (Attributes List) A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform. (see [below for nested schema](#nestedatt--app_settings--chromeos--settings))
+- `settings` (Attributes Set) A set of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform. (see [below for nested schema](#nestedatt--app_settings--chromeos--settings))
 - `user_override` (Boolean) Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.
 
 <a id="nestedatt--app_settings--chromeos--settings"></a>
@@ -234,7 +248,7 @@ Optional:
 Required:
 
 - `category` (String) Defines the category of the setting.
-- `settings` (Attributes List) A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform. (see [below for nested schema](#nestedatt--app_settings--html5--settings))
+- `settings` (Attributes Set) A set of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform. (see [below for nested schema](#nestedatt--app_settings--html5--settings))
 - `user_override` (Boolean) Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.
 
 <a id="nestedatt--app_settings--html5--settings"></a>
@@ -257,7 +271,7 @@ Optional:
 Required:
 
 - `category` (String) Defines the category of the setting
-- `settings` (Attributes List) A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform. (see [below for nested schema](#nestedatt--app_settings--ios--settings))
+- `settings` (Attributes Set) A set of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform. (see [below for nested schema](#nestedatt--app_settings--ios--settings))
 - `user_override` (Boolean) Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.
 
 <a id="nestedatt--app_settings--ios--settings"></a>
@@ -266,9 +280,6 @@ Required:
 Required:
 
 - `name` (String) Name of the setting.
-
-Optional:
-
 - `value_string` (String) String value (if any) associated with the setting.
 
 
@@ -279,7 +290,7 @@ Optional:
 Required:
 
 - `category` (String) Defines the category of the setting.
-- `settings` (Attributes List) A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform. (see [below for nested schema](#nestedatt--app_settings--linux--settings))
+- `settings` (Attributes Set) A set of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform. (see [below for nested schema](#nestedatt--app_settings--linux--settings))
 - `user_override` (Boolean) Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.
 
 <a id="nestedatt--app_settings--linux--settings"></a>
@@ -291,9 +302,9 @@ Required:
 
 Optional:
 
-- `auto_launch_protocols_from_origins` (Attributes List) A list of protocols that can launch an external application from the listed origins without prompting the user. (see [below for nested schema](#nestedatt--app_settings--linux--settings--auto_launch_protocols_from_origins))
-- `extension_install_allow_list` (Attributes List) An allowed list of extensions that users can add to the Citrix Enterprise Browser. This list uses the Chrome Web Store. (see [below for nested schema](#nestedatt--app_settings--linux--settings--extension_install_allow_list))
-- `managed_bookmarks` (Attributes List) A list of bookmarks to push to the Citrix Enterprise Browser. (see [below for nested schema](#nestedatt--app_settings--linux--settings--managed_bookmarks))
+- `auto_launch_protocols_from_origins` (Attributes Set) A set of protocols that can launch an external application from the listed origins without prompting the user. (see [below for nested schema](#nestedatt--app_settings--linux--settings--auto_launch_protocols_from_origins))
+- `extension_install_allow_list` (Attributes Set) An allowed list of extensions that users can add to the Citrix Enterprise Browser. This list uses the Chrome Web Store. (see [below for nested schema](#nestedatt--app_settings--linux--settings--extension_install_allow_list))
+- `managed_bookmarks` (Attributes Set) A set of bookmarks to push to the Citrix Enterprise Browser. (see [below for nested schema](#nestedatt--app_settings--linux--settings--managed_bookmarks))
 - `value_list` (List of String) List value (if any) associated with the setting.
 - `value_string` (String) String value (if any) associated with the setting.
 
@@ -336,7 +347,7 @@ Required:
 Required:
 
 - `category` (String) Defines the category of the setting.
-- `settings` (Attributes List) A list of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform. (see [below for nested schema](#nestedatt--app_settings--macos--settings))
+- `settings` (Attributes Set) A set of name value pairs for the settings. Please refer to the following [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform. (see [below for nested schema](#nestedatt--app_settings--macos--settings))
 - `user_override` (Boolean) Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.
 
 <a id="nestedatt--app_settings--macos--settings"></a>
@@ -348,10 +359,10 @@ Required:
 
 Optional:
 
-- `auto_launch_protocols_from_origins` (Attributes List) Specify a list of protocols that can launch an external application from the listed origins without prompting the user. (see [below for nested schema](#nestedatt--app_settings--macos--settings--auto_launch_protocols_from_origins))
+- `auto_launch_protocols_from_origins` (Attributes Set) Specify a list of protocols that can launch an external application from the listed origins without prompting the user. (see [below for nested schema](#nestedatt--app_settings--macos--settings--auto_launch_protocols_from_origins))
 - `enterprise_browser_sso` (Attributes) Enables Single Sign-on (SSO) for all the web and SaaS apps for the selected Operating System for the IdP domains added as long as the same IdP is used to sign in to the Citrix Workspace app and the relevant web or SaaS app. (see [below for nested schema](#nestedatt--app_settings--macos--settings--enterprise_browser_sso))
-- `extension_install_allow_list` (Attributes List) Array of objects of type ExtensionInstallAllowlist. For example: {id:"extension_id1",name:"extension_name1",install link:"chrome store url for the extension"} (see [below for nested schema](#nestedatt--app_settings--macos--settings--extension_install_allow_list))
-- `managed_bookmarks` (Attributes List) Array of objects of type ManagedBookmarks. For example: {name:"bookmark_name1",url:"bookmark_url1"} (see [below for nested schema](#nestedatt--app_settings--macos--settings--managed_bookmarks))
+- `extension_install_allow_list` (Attributes Set) Array of objects of type ExtensionInstallAllowlist. For example: {id:"extension_id1",name:"extension_name1",install link:"chrome store url for the extension"} (see [below for nested schema](#nestedatt--app_settings--macos--settings--extension_install_allow_list))
+- `managed_bookmarks` (Attributes Set) Array of objects of type ManagedBookmarks. For example: {name:"bookmark_name1",url:"bookmark_url1"} (see [below for nested schema](#nestedatt--app_settings--macos--settings--managed_bookmarks))
 - `value_list` (List of String) List value (if any) associated with the setting.
 - `value_string` (String) String value (if any) associated with the setting.
 
@@ -403,7 +414,7 @@ Required:
 Required:
 
 - `category` (String) Defines the category of the setting.
-- `settings` (Attributes List) A list of name value pairs for the settings. Please refer to [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform. (see [below for nested schema](#nestedatt--app_settings--windows--settings))
+- `settings` (Attributes Set) A set of name value pairs for the settings. Please refer to [table](https://developer-docs.citrix.com/en-us/server-integration/global-app-configuration-service/getting-started#supported-settings-and-their-values-per-platform) for the supported settings name and their values per platform. (see [below for nested schema](#nestedatt--app_settings--windows--settings))
 - `user_override` (Boolean) Defines if users can modify or change the value of as obtained settings from the Global App Citrix Workspace configuration service.
 
 <a id="nestedatt--app_settings--windows--settings"></a>
@@ -415,11 +426,11 @@ Required:
 
 Optional:
 
-- `auto_launch_protocols_from_origins` (Attributes List) A list of protocols that can launch an external application from the listed origins without prompting the user. (see [below for nested schema](#nestedatt--app_settings--windows--settings--auto_launch_protocols_from_origins))
+- `auto_launch_protocols_from_origins` (Attributes Set) A set of protocols that can launch an external application from the listed origins without prompting the user. (see [below for nested schema](#nestedatt--app_settings--windows--settings--auto_launch_protocols_from_origins))
 - `enterprise_browser_sso` (Attributes) Enables Single Sign-on (SSO) for all the web and SaaS apps for the selected Operating System for the IdP domains added as long as the same IdP is used to sign in to the Citrix Workspace app and the relevant web or SaaS app. (see [below for nested schema](#nestedatt--app_settings--windows--settings--enterprise_browser_sso))
-- `extension_install_allow_list` (Attributes List) An allowed list of extensions that users can add to the Citrix Enterprise Browser. This list uses the Chrome Web Store. (see [below for nested schema](#nestedatt--app_settings--windows--settings--extension_install_allow_list))
-- `local_app_allow_list` (Attributes List) List of App Object to allow list for Local App Discovery. (see [below for nested schema](#nestedatt--app_settings--windows--settings--local_app_allow_list))
-- `managed_bookmarks` (Attributes List) A list of bookmarks to push to the Citrix Enterprise Browser. (see [below for nested schema](#nestedatt--app_settings--windows--settings--managed_bookmarks))
+- `extension_install_allow_list` (Attributes Set) An allowed list of extensions that users can add to the Citrix Enterprise Browser. This list uses the Chrome Web Store. (see [below for nested schema](#nestedatt--app_settings--windows--settings--extension_install_allow_list))
+- `local_app_allow_list` (Attributes Set) Set of App Object to allow list for Local App Discovery. (see [below for nested schema](#nestedatt--app_settings--windows--settings--local_app_allow_list))
+- `managed_bookmarks` (Attributes Set) A set of bookmarks to push to the Citrix Enterprise Browser. (see [below for nested schema](#nestedatt--app_settings--windows--settings--managed_bookmarks))
 - `value_list` (List of String) List value (if any) associated with the setting.
 - `value_string` (String) String value (if any) associated with the setting.
 

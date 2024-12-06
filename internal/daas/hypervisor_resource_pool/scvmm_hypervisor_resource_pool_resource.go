@@ -157,7 +157,7 @@ func (r *scvmmHypervisorResourcePoolResource) Create(ctx context.Context, req re
 
 	host, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, &resp.Diagnostics, hypervisorId, "", plan.Host.ValueString(), util.HostResourceType, "", hypervisor)
 	if err != nil {
-		diags.AddError(
+		resp.Diagnostics.AddError(
 			"Error creating Hypervisor Resource Pool for SCVMM",
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				fmt.Sprintf("\nFailed to resolve resource %s, error: %s", plan.Host.ValueString(), err.Error()),
@@ -289,7 +289,7 @@ func (r *scvmmHypervisorResourcePoolResource) Update(ctx context.Context, req re
 
 	host, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, &resp.Diagnostics, hypervisorId, "", plan.Host.ValueString(), util.HostResourceType, "", hypervisor)
 	if err != nil {
-		diags.AddError(
+		resp.Diagnostics.AddError(
 			"Error creating Hypervisor Resource Pool for SCVMM",
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				fmt.Sprintf("\nFailed to resolve resource %s, error: %s", plan.Host.ValueString(), err.Error()),

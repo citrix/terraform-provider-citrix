@@ -66,7 +66,8 @@ func (d *MachineCatalogDataSource) Read(ctx context.Context, req datasource.Read
 		machineCatalogNameOrId = data.Id.ValueString()
 	} else {
 		// Get refreshed machine catalog state from Orchestration
-		machineCatalogNameOrId = util.BuildResourcePathForGetRequest(data.MachineCatalogFolderPath.ValueString(), data.Name.ValueString())
+		machineCatalogNameOrId = data.Name.ValueString()
+		machineCatalogPathOrId = util.BuildResourcePathForGetRequest(data.MachineCatalogFolderPath.ValueString(), data.Name.ValueString())
 	}
 	getMachineCatalogRequest := d.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogPathOrId).Fields("Id,Name,Description,ProvisioningType,PersistChanges,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC")
 	machineCatalog, httpResp, err := citrixdaasclient.AddRequestData(getMachineCatalogRequest, d.client).Execute()
@@ -78,19 +79,15 @@ func (d *MachineCatalogDataSource) Read(ctx context.Context, req datasource.Read
 		)
 	}
 
-	// Get VDAs associated with the machine catalog
-	getMachineCatalogMachinesRequest := d.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogMachines(ctx, machineCatalogPathOrId)
-	machineCatalogVdas, httpResp, err := citrixdaasclient.AddRequestData(getMachineCatalogMachinesRequest, d.client).Execute()
+	machineCatalogId := machineCatalog.GetId()
 
+	// Get VDAs associated with the machine catalog
+	machineCatalogVdas, err := util.GetMachineCatalogMachines(ctx, d.client, &resp.Diagnostics, machineCatalogId)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error listing VDAs in Machine Catalog "+machineCatalogNameOrId,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
+		return
 	}
 
-	tags := getMachineCatalogTags(ctx, &resp.Diagnostics, d.client, machineCatalogPathOrId)
+	tags := getMachineCatalogTags(ctx, &resp.Diagnostics, d.client, machineCatalogId)
 
 	data = data.RefreshPropertyValues(ctx, &resp.Diagnostics, machineCatalog, machineCatalogVdas, tags)
 

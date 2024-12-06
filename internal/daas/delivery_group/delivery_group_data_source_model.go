@@ -80,7 +80,7 @@ func (DeliveryGroupDataSourceModel) GetSchema() schema.Schema {
 	}
 }
 
-func (r DeliveryGroupDataSourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, vdas *citrixorchestration.MachineResponseModelCollection, tags []string) DeliveryGroupDataSourceModel {
+func (r DeliveryGroupDataSourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, vdas []citrixorchestration.MachineResponseModel, tags []string) DeliveryGroupDataSourceModel {
 	r.Id = types.StringValue(deliveryGroup.GetId())
 	r.Name = types.StringValue(deliveryGroup.GetName())
 
@@ -96,7 +96,7 @@ func (r DeliveryGroupDataSourceModel) RefreshPropertyValues(ctx context.Context,
 	r.DeliveryType = types.StringValue(deliveryType)
 
 	res := []vda.VdaModel{}
-	for _, model := range vdas.GetItems() {
+	for _, model := range vdas {
 		machineName := model.GetName()
 		hosting := model.GetHosting()
 		hostedMachineId := hosting.GetHostedMachineId()

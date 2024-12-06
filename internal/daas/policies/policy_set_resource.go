@@ -48,7 +48,7 @@ func (r *policySetResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 	}
 
 	// Skip modify plan when doing destroy action
-	if req.Plan.Raw.IsNull() {
+	if req.Plan.Raw.IsNull() || !req.Plan.Raw.IsFullyKnown() {
 		return
 	}
 
@@ -81,6 +81,27 @@ func (r *policySetResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 				"Error "+operation+" Policy Set",
 				fmt.Sprintf("Id `%s` for Scope `All` should not be added to the policy set scopes.", util.AllScopeId),
 			)
+		}
+	}
+
+	if !plan.DeliveryGroups.IsNull() {
+		deliveryGroupsToCheck := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.DeliveryGroups)
+		if len(deliveryGroupsToCheck) > 0 {
+			deliveryGroups, err := util.GetDeliveryGroups(ctx, r.client, &resp.Diagnostics, "Id")
+			if err != nil {
+				return
+			}
+			for _, deliveryGroupToCheck := range deliveryGroupsToCheck {
+				if !slices.ContainsFunc(deliveryGroups, func(deliveryGroup citrixorchestration.DeliveryGroupResponseModel) bool {
+					return strings.EqualFold(deliveryGroup.GetId(), deliveryGroupToCheck)
+				}) {
+					resp.Diagnostics.AddError(
+						"Error "+operation+" Policy Set",
+						fmt.Sprintf("Specified Delivery Group with Id `%s` does not exist.", deliveryGroupToCheck),
+					)
+					return
+				}
+			}
 		}
 	}
 
@@ -139,11 +160,11 @@ func (r *policySetResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 		}
 
 		if !policyContainsUserSetting {
-			if (!policy.AccessControlFilters.IsNull() && !policy.AccessControlFilters.IsUnknown()) ||
-				(!policy.BranchRepeaterFilter.IsNull() && !policy.BranchRepeaterFilter.IsUnknown()) ||
-				(!policy.ClientIPFilters.IsNull() && !policy.ClientIPFilters.IsUnknown()) ||
-				(!policy.ClientNameFilters.IsNull() && !policy.ClientNameFilters.IsUnknown()) ||
-				(!policy.UserFilters.IsNull() && !policy.UserFilters.IsUnknown()) {
+			if !policy.AccessControlFilters.IsNull() ||
+				!policy.BranchRepeaterFilter.IsNull() ||
+				!policy.ClientIPFilters.IsNull() ||
+				!policy.ClientNameFilters.IsNull() ||
+				!policy.UserFilters.IsNull() {
 				resp.Diagnostics.AddError(
 					fmt.Sprintf("Error configuring Policy %s in Policy Set %s", policy.Name.ValueString(), plan.Name.ValueString()),
 					"None of `access_control_filters`, `branch_repeater_filter`, `client_ip_filters`, `client_name_filters`, and `user_filters` can be specified when policy does not contain any user setting.",
@@ -287,6 +308,13 @@ func (r *policySetResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
+	// Associated the created policy set with the delivery groups
+	deliveryGroups := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.DeliveryGroups)
+	err = updateDeliveryGroupsWithPolicySet(ctx, &resp.Diagnostics, r.client, policySetResponse.GetName(), policySetResponse.GetPolicySetGuid(), deliveryGroups, fmt.Sprintf("associating Policy Set %s with Delivery Group", policySetResponse.GetName()))
+	if err != nil {
+		return
+	}
+
 	// Try getting the new policy set with policy set GUID
 	policySet, err := getPolicySet(ctx, r.client, &resp.Diagnostics, policySetResponse.GetPolicySetGuid())
 	if err != nil {
@@ -325,8 +353,13 @@ func (r *policySetResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
+	associatedDeliveryGroups, err := util.GetDeliveryGroups(ctx, r.client, &resp.Diagnostics, "Id,PolicySetGuid")
+	if err != nil {
+		return
+	}
+
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, true, policySet, policies, policySetScopes)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, true, policySet, policies, policySetScopes, associatedDeliveryGroups)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -363,7 +396,12 @@ func (r *policySetResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, true, policySet, policies, policySetScopes)
+	deliveryGroups, err := util.GetDeliveryGroups(ctx, r.client, &resp.Diagnostics, "Id,PolicySetGuid")
+	if err != nil {
+		return
+	}
+
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, true, policySet, policies, policySetScopes, deliveryGroups)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -467,7 +505,7 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 	if len(policiesWithUpdatedNames) > 0 {
 		batchApiHeaders, httpResp, err := generateBatchApiHeaders(r.client)
 		if err != nil {
-			diags.AddError(
+			resp.Diagnostics.AddError(
 				"Error updating policies in policy set "+policySetName,
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nCould not update policies within the policy set to be updated, unexpected error: "+util.ReadClientError(err),
@@ -481,7 +519,7 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 			updatePolicyRequest.SetName(policy.Id.ValueString())
 			updatePolicyRequestBodyString, err := util.ConvertToString(updatePolicyRequest)
 			if err != nil {
-				diags.AddError(
+				resp.Diagnostics.AddError(
 					"Error updating Policy "+policy.Name.ValueString()+" to Policy Set "+policySetName,
 					"An unexpected error occurred: "+err.Error(),
 				)
@@ -781,6 +819,33 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 		}
 	}
 
+	// Update delivery groups with policy set
+	deliveryGroupsToBeRemoved := []string{}
+	deliveryGroupsToBeAdded := []string{}
+	deliveryGroupsInPlan := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.DeliveryGroups)
+	deliveryGroupsInState := util.StringSetToStringArray(ctx, &resp.Diagnostics, state.DeliveryGroups)
+	for _, deliveryGroupInState := range deliveryGroupsInState {
+		if !slices.Contains(deliveryGroupsInPlan, deliveryGroupInState) {
+			deliveryGroupsToBeRemoved = append(deliveryGroupsToBeRemoved, deliveryGroupInState)
+		}
+	}
+
+	for _, deliveryGroupInPlan := range deliveryGroupsInPlan {
+		if !slices.Contains(deliveryGroupsInState, deliveryGroupInPlan) {
+			deliveryGroupsToBeAdded = append(deliveryGroupsToBeAdded, deliveryGroupInPlan)
+		}
+	}
+
+	err = updateDeliveryGroupsWithPolicySet(ctx, &resp.Diagnostics, r.client, policySet.GetName(), util.DefaultSitePolicySetId, deliveryGroupsToBeRemoved, fmt.Sprintf("removing Policy Set %s's associations with Delivery Group", policySet.GetName()))
+	if err != nil {
+		return
+	}
+
+	err = updateDeliveryGroupsWithPolicySet(ctx, &resp.Diagnostics, r.client, policySet.GetName(), policySet.GetPolicySetGuid(), deliveryGroupsToBeAdded, fmt.Sprintf("associating Policy Set %s with Delivery Group", policySet.GetName()))
+	if err != nil {
+		return
+	}
+
 	policies, err := getPolicies(ctx, r.client, &resp.Diagnostics, policySetId)
 	if err != nil {
 		return
@@ -791,8 +856,13 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
+	associatedDeliveryGroups, err := util.GetDeliveryGroups(ctx, r.client, &resp.Diagnostics, "Id,PolicySetGuid")
+	if err != nil {
+		return
+	}
+
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, true, policySet, policies, policySetScopes)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, true, policySet, policies, policySetScopes, associatedDeliveryGroups)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -817,18 +887,13 @@ func (r *policySetResource) Delete(ctx context.Context, req resource.DeleteReque
 	policySetId := state.Id.ValueString()
 	policySetName := state.Name.ValueString()
 	// Get delivery groups and check if the current policy set is assigned to one of them
-	getDeliveryGroupsRequest := r.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroups(ctx)
-	deliveryGroups, httpResp, err := citrixdaasclient.AddRequestData(getDeliveryGroupsRequest, r.client).Execute()
+	deliveryGroups, err := util.GetDeliveryGroups(ctx, r.client, &resp.Diagnostics, "Id,PolicySetGuid")
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error unassign policy set "+policySetName+" from delivery groups "+policySetName,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nCould not get delivery group associated with the policy set, unexpected error: "+util.ReadClientError(err),
-		)
 		return
 	}
+
 	associatedDeliveryGroupIds := []string{}
-	for _, deliveryGroup := range deliveryGroups.Items {
+	for _, deliveryGroup := range deliveryGroups {
 		if deliveryGroup.GetPolicySetGuid() == policySetId {
 			associatedDeliveryGroupIds = append(associatedDeliveryGroupIds, deliveryGroup.GetId())
 		}
@@ -897,7 +962,7 @@ func (r *policySetResource) Delete(ctx context.Context, req resource.DeleteReque
 
 	// Delete existing Policy Set
 	deletePolicySetRequest := r.client.ApiClient.GpoDAAS.GpoDeleteGpoPolicySet(ctx, policySetId)
-	httpResp, err = citrixdaasclient.AddRequestData(deletePolicySetRequest, r.client).Execute()
+	httpResp, err := citrixdaasclient.AddRequestData(deletePolicySetRequest, r.client).Execute()
 	if err != nil && httpResp.StatusCode != http.StatusNotFound {
 		resp.Diagnostics.AddError(
 			"Error Deleting Policy Set "+policySetName,

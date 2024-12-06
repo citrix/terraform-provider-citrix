@@ -57,7 +57,7 @@ resource "citrix_policy_set" "example-policy-set" {
             ]
             ou_filters = [
                 {
-                    ou     = "{Path of the oranizational unit to be filtered}"
+                    ou     = "{Path of the organizational unit to be filtered}"
                     enabled = true
                     allowed = true
                 },
@@ -84,4 +84,5 @@ resource "citrix_policy_set" "example-policy-set" {
             policy_settings = []
         }
     ]
+    delivery_groups = [ "{delivery_group_id}" ]
 }

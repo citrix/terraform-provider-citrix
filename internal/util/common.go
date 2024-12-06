@@ -70,6 +70,9 @@ const UpnRegex string = `^[^@]+@\b(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}$`
 
 const SamAndUpnRegex string = `^[a-zA-Z][a-zA-Z0-9\-_]{0,61}[a-zA-Z0-9]\\\w[\w\.\- ]+$|^[^@]+@\b(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}$`
 
+// SAM
+const ComputerAccountRegex string = `^[a-zA-Z0-9\-_]{0,61}[a-zA-Z0-9]\\\w[\w\.\- ]+\$$`
+
 // GUID
 const GuidRegex string = `^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}[}]?$`
 
@@ -191,6 +194,8 @@ const WindowsServerLicenseType string = "Windows_Server"
 // GAC
 const AssignmentPriority = 0
 const GacAppName = "Workspace"
+const GacTestChannelShortName = "testrolloutchannel1"
+const GacTestChannelName = "Test Rollout Channel 1"
 
 const SensitiveFieldMaskedValue = "*****"
 
@@ -1372,4 +1377,8 @@ func ProcessTagsResponseCollection(diagnostics *diag.Diagnostics, tagsResp *citr
 		tags = append(tags, tag.GetId())
 	}
 	return tags
+}
+
+func GetMachineAdAccountKey(r citrixorchestration.ProvisioningSchemeMachineAccountResponseModel) string {
+	return strings.ToLower(r.GetSamName())
 }

@@ -228,7 +228,7 @@ func (r *MachinePropertiesResource) ModifyPlan(ctx context.Context, req resource
 		return
 	}
 
-	if req.Plan.Raw.IsNull() || !req.Plan.Raw.IsFullyKnown() {
+	if req.Plan.Raw.IsNull() {
 		return
 	}
 

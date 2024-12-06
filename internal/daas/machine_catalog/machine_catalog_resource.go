@@ -6,6 +6,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
+	"strconv"
+	"strings"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -67,6 +70,19 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
+	if !plan.ProvisioningScheme.IsNull() {
+		provSchemePlan := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
+		if !provSchemePlan.MachineADAccounts.IsNull() {
+			machineAccountsInPlan := util.ObjectListToTypedArray[MachineADAccountModel](ctx, &resp.Diagnostics, provSchemePlan.MachineADAccounts)
+			if len(machineAccountsInPlan) > 0 {
+				err := validateInUseMachineAccounts(ctx, &resp.Diagnostics, r.client, plan.Name.ValueString(), provSchemePlan, machineAccountsInPlan)
+				if err != nil {
+					return
+				}
+			}
+		}
+	}
+
 	body, err := getRequestModelForCreateMachineCatalog(plan, ctx, r.client, &resp.Diagnostics, r.client.AuthConfig.OnPremises)
 	if err != nil {
 		return
@@ -109,13 +125,11 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 
 	// Get the new catalog
 	catalog, err := util.GetMachineCatalog(ctx, r.client, &resp.Diagnostics, machineCatalogPath, true)
-
 	if err != nil {
 		return
 	}
 
 	machines, err := util.GetMachineCatalogMachines(ctx, r.client, &resp.Diagnostics, catalog.GetId())
-
 	if err != nil {
 		return
 	}
@@ -136,8 +150,18 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 
 	tags := getMachineCatalogTags(ctx, &resp.Diagnostics, r.client, catalog.GetId())
 
+	var machineAdAccounts []citrixorchestration.ProvisioningSchemeMachineAccountResponseModel
+	if catalog.GetProvisioningType() == citrixorchestration.PROVISIONINGTYPE_MANUAL {
+		machineAdAccounts = []citrixorchestration.ProvisioningSchemeMachineAccountResponseModel{}
+	} else {
+		machineAdAccounts, err = getMachineCatalogMachineADAccounts(ctx, &resp.Diagnostics, r.client, catalog.GetId())
+		if err != nil {
+			return
+		}
+	}
+
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, catalog, &connectionType, machines, pluginId, tags)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, catalog, &connectionType, machines, pluginId, tags, machineAdAccounts)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -191,8 +215,19 @@ func (r *machineCatalogResource) Read(ctx context.Context, req resource.ReadRequ
 
 	tags := getMachineCatalogTags(ctx, &resp.Diagnostics, r.client, catalog.GetId())
 
+	var machineAdAccounts []citrixorchestration.ProvisioningSchemeMachineAccountResponseModel
+	if provScheme.GetId() == "" || catalog.GetProvisioningType() == citrixorchestration.PROVISIONINGTYPE_MANUAL {
+		// if the provScheme doesn't exist or the provisioning type is manual, then there are no machine accounts to fetch
+		machineAdAccounts = []citrixorchestration.ProvisioningSchemeMachineAccountResponseModel{}
+	} else {
+		machineAdAccounts, err = getMachineCatalogMachineADAccounts(ctx, &resp.Diagnostics, r.client, catalog.GetId())
+		if err != nil {
+			return
+		}
+	}
+
 	// Overwrite items with refreshed state
-	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, catalog, connectionType, machineCatalogMachines, pluginId, tags)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, catalog, connectionType, machineCatalogMachines, pluginId, tags, machineAdAccounts)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -225,9 +260,38 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 	catalogId := plan.Id.ValueString()
 	catalogName := plan.Name.ValueString()
 	catalog, err := util.GetMachineCatalog(ctx, r.client, &resp.Diagnostics, catalogId, true)
-
 	if err != nil {
 		return
+	}
+
+	var machineAdAccounts []citrixorchestration.ProvisioningSchemeMachineAccountResponseModel
+	if catalog.GetProvisioningType() == citrixorchestration.PROVISIONINGTYPE_MANUAL {
+		machineAdAccounts = []citrixorchestration.ProvisioningSchemeMachineAccountResponseModel{}
+	} else {
+		machineAdAccounts, err = getMachineCatalogMachineADAccounts(ctx, &resp.Diagnostics, r.client, catalog.GetId())
+		if err != nil {
+			return
+		}
+	}
+
+	if !plan.ProvisioningScheme.IsNull() {
+		provSchemePlan := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
+		machineAccountsInPlan := util.ObjectListToTypedArray[MachineADAccountModel](ctx, &resp.Diagnostics, provSchemePlan.MachineADAccounts)
+
+		machineAccountsToBeAdded := []MachineADAccountModel{}
+		for _, machineAccountInPlan := range machineAccountsInPlan {
+			if !slices.ContainsFunc(machineAdAccounts, func(machineAccountInCatalog citrixorchestration.ProvisioningSchemeMachineAccountResponseModel) bool {
+				return strings.EqualFold(machineAccountInCatalog.GetSamName(), machineAccountInPlan.ADAccountName.ValueString())
+			}) {
+				machineAccountsToBeAdded = append(machineAccountsToBeAdded, machineAccountInPlan)
+			}
+		}
+		if len(machineAccountsToBeAdded) > 0 {
+			err := validateInUseMachineAccounts(ctx, &resp.Diagnostics, r.client, plan.Name.ValueString(), provSchemePlan, machineAccountsToBeAdded)
+			if err != nil {
+				return
+			}
+		}
 	}
 
 	body, err := getRequestModelForUpdateMachineCatalog(plan, state, ctx, r.client, resp, r.client.AuthConfig.OnPremises)
@@ -265,6 +329,7 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		deleteMachinesFromManualCatalog(ctx, r.client, resp, deleteMachinesMap, catalogId)
 	} else {
 		provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
+		machineAccountsInPlan := util.ObjectListToTypedArray[MachineADAccountModel](ctx, &resp.Diagnostics, provSchemeModel.MachineADAccounts)
 		err = updateCatalogImageAndMachineProfile(ctx, r.client, resp, catalog, plan, provisioningType)
 
 		if err != nil {
@@ -273,8 +338,218 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 
 		if catalog.GetTotalCount() > int32(provSchemeModel.NumTotalMachines.ValueInt64()) {
 			// delete machines from machine catalog
-			err = deleteMachinesFromMcsPvsCatalog(ctx, r.client, resp, catalog, provSchemeModel)
+			err = deleteMachinesFromMcsPvsCatalog(ctx, r.client, resp, catalog, provSchemeModel, machineAccountsInPlan)
 			if err != nil {
+				return
+			}
+		}
+		machineAccountsInCatalog, err := getMachineCatalogMachineADAccounts(ctx, &resp.Diagnostics, r.client, catalog.GetId())
+		if err != nil {
+			return
+		}
+
+		machineAccountsToAdd := []MachineADAccountModel{}
+		machineAccountsToDelete := []citrixorchestration.ProvisioningSchemeMachineAccountResponseModel{}
+		for _, machineAccountInCatalog := range machineAccountsInCatalog {
+			if machineAccountInCatalog.GetState() != citrixorchestration.PROVISIONINGSCHEMEMACHINEACCOUNTSTATE_IN_USE && !slices.ContainsFunc(machineAccountsInPlan, func(machineAccountInPlan MachineADAccountModel) bool {
+				return strings.EqualFold(machineAccountInPlan.ADAccountName.ValueString(), machineAccountInCatalog.GetSamName())
+			}) {
+				machineAccountsToDelete = append(machineAccountsToDelete, machineAccountInCatalog)
+			}
+		}
+
+		machineAccountsToUpdate := []MachineADAccountModel{}
+		for _, machineAccountInPlan := range machineAccountsInPlan {
+			machineAccountIndex := slices.IndexFunc(machineAccountsInCatalog, func(machineAccountInCatalog citrixorchestration.ProvisioningSchemeMachineAccountResponseModel) bool {
+				return strings.EqualFold(machineAccountInPlan.ADAccountName.ValueString(), machineAccountInCatalog.GetSamName())
+			})
+			if machineAccountIndex >= 0 {
+				machineState := machineAccountsInCatalog[machineAccountIndex].GetState()
+				if machineState != citrixorchestration.PROVISIONINGSCHEMEMACHINEACCOUNTSTATE_IN_USE &&
+					machineState != citrixorchestration.PROVISIONINGSCHEMEMACHINEACCOUNTSTATE_AVAILABLE {
+					machineAccountsToUpdate = append(machineAccountsToUpdate, machineAccountInPlan)
+				}
+			} else {
+				machineAccountsToAdd = append(machineAccountsToAdd, machineAccountInPlan)
+			}
+		}
+
+		// Remove Machine Accounts from Catalog here
+		if len(machineAccountsToDelete) > 0 {
+			batchApiHeaders, httpResp, err := generateBatchApiHeaders(ctx, &resp.Diagnostics, r.client, provSchemeModel, true)
+			txId := citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error updating Machine Catalog "+catalogName,
+					"TransactionId: "+txId+
+						"\nCould not delete machine account(s) from Machine Catalog, unexpected error: "+util.ReadClientError(err),
+				)
+				return
+			}
+
+			batchRequestItems := []citrixorchestration.BatchRequestItemModel{}
+			for i, machineAccount := range machineAccountsToDelete {
+				relativeUrl := fmt.Sprintf("/MachineCatalogs/%s/MachineAccounts/%s", catalogId, machineAccount.GetSamName())
+				var batchRequestItem citrixorchestration.BatchRequestItemModel
+				batchRequestItem.SetMethod(http.MethodDelete)
+				batchRequestItem.SetReference(strconv.Itoa(i))
+				batchRequestItem.SetRelativeUrl(r.client.GetBatchRequestItemRelativeUrl(relativeUrl))
+				batchRequestItem.SetHeaders(batchApiHeaders)
+				batchRequestItems = append(batchRequestItems, batchRequestItem)
+			}
+
+			var batchRequestModel citrixorchestration.BatchRequestModel
+			batchRequestModel.SetItems(batchRequestItems)
+			successfulJobs, txId, err := citrixdaasclient.PerformBatchOperation(ctx, r.client, batchRequestModel)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error deleting machine account(s) from Machine Catalog "+catalogName,
+					"TransactionId: "+txId+
+						"\nError message: "+util.ReadClientError(err),
+				)
+				return
+			}
+
+			if successfulJobs < len(machineAccountsToDelete) {
+				errMsg := fmt.Sprintf("An error occurred while deleting machine account(s) from the Machine Catalog. %d of %d machine account(s) were deleted from the Machine Catalog.", successfulJobs, len(machineAccountsToDelete))
+				resp.Diagnostics.AddError(
+					"Error updating Machine Catalog "+catalogName,
+					"TransactionId: "+txId+
+						"\n"+errMsg,
+				)
+				return
+			}
+		}
+
+		if len(machineAccountsToUpdate) > 0 {
+			batchApiHeaders, httpResp, err := generateBatchApiHeaders(ctx, &resp.Diagnostics, r.client, provSchemeModel, true)
+			txId := citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error updating Machine Catalog "+catalogName,
+					"TransactionId: "+txId+
+						"\nCould not update machine account(s) in Machine Catalog, unexpected error: "+util.ReadClientError(err),
+				)
+				return
+			}
+
+			batchRequestItems := []citrixorchestration.BatchRequestItemModel{}
+			for i, machineAccount := range machineAccountsToUpdate {
+				resetPassword := machineAccount.ResetPassword.ValueBool()
+				updateAdMachineBody := citrixorchestration.UpdateMachineAccountRequestModel{}
+				passwordFormat, err := citrixorchestration.NewIdentityPasswordFormatFromValue(machineAccount.PasswordFormat.ValueString())
+				if err != nil {
+					resp.Diagnostics.AddError(
+						"Error updating Machine Catalog",
+						fmt.Sprintf("Unsupported machine account password format type. Error: %s", err.Error()),
+					)
+					return
+				}
+				updateAdMachineBody.SetPasswordFormat(*passwordFormat)
+				updateAdMachineBody.SetResetPassword(resetPassword)
+				if !resetPassword {
+					updateAdMachineBody.SetPassword(machineAccount.Password.ValueString())
+				}
+
+				updateAccountRequestString, err := util.ConvertToString(updateAdMachineBody)
+				if err != nil {
+					resp.Diagnostics.AddError(
+						"Error updating machine account(s) for Machine Catalog "+catalogName,
+						"An unexpected error occurred: "+err.Error(),
+					)
+					return
+				}
+
+				relativeUrl := fmt.Sprintf("/MachineCatalogs/%s/MachineAccounts/%s", catalogId, machineAccount.ADAccountName.ValueString())
+				var batchRequestItem citrixorchestration.BatchRequestItemModel
+				batchRequestItem.SetMethod(http.MethodPatch)
+				batchRequestItem.SetReference(strconv.Itoa(i))
+				batchRequestItem.SetRelativeUrl(r.client.GetBatchRequestItemRelativeUrl(relativeUrl))
+				batchRequestItem.SetHeaders(batchApiHeaders)
+				batchRequestItem.SetBody(updateAccountRequestString)
+				batchRequestItems = append(batchRequestItems, batchRequestItem)
+			}
+
+			var batchRequestModel citrixorchestration.BatchRequestModel
+			batchRequestModel.SetItems(batchRequestItems)
+			successfulJobs, txId, err := citrixdaasclient.PerformBatchOperation(ctx, r.client, batchRequestModel)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error updating machine account(s) from Machine Catalog "+catalogName,
+					"TransactionId: "+txId+
+						"\nError message: "+util.ReadClientError(err),
+				)
+				return
+			}
+
+			if successfulJobs < len(machineAccountsToUpdate) {
+				errMsg := fmt.Sprintf("An error occurred while updating machine account(s) for the Machine Catalog. %d of %d machine account(s) were updated in the Machine Catalog.", successfulJobs, len(machineAccountsToUpdate))
+				resp.Diagnostics.AddError(
+					"Error updating Machine Catalog "+catalogName,
+					"TransactionId: "+txId+
+						"\n"+errMsg,
+				)
+				return
+			}
+		}
+
+		// Add new Machine Accounts to Catalog. Accounts to be add will be passed to the addMachinesToMcsPvsCatalog function
+		if len(machineAccountsToAdd) > 0 {
+			batchApiHeaders, httpResp, err := generateBatchApiHeaders(ctx, &resp.Diagnostics, r.client, provSchemeModel, true)
+			txId := citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error updating Machine Catalog "+catalogName,
+					"TransactionId: "+txId+
+						"\nCould not add machine account(s) to Machine Catalog, unexpected error: "+util.ReadClientError(err),
+				)
+				return
+			}
+
+			batchRequestItems := []citrixorchestration.BatchRequestItemModel{}
+			relativeUrl := fmt.Sprintf("/MachineCatalogs/%s/MachineAccounts", catalogId)
+			addMachineAccountRequests, err := constructAvailableMachineAccountsRequestModel(&resp.Diagnostics, machineAccountsToAdd, "updating")
+			if err != nil {
+				return
+			}
+			for i, addAccountRequest := range addMachineAccountRequests {
+				addAccountRequestString, err := util.ConvertToString(addAccountRequest)
+				if err != nil {
+					resp.Diagnostics.AddError(
+						"Error adding machine account(s) to Machine Catalog "+catalogName,
+						"An unexpected error occurred: "+err.Error(),
+					)
+					return
+				}
+
+				var batchRequestItem citrixorchestration.BatchRequestItemModel
+				batchRequestItem.SetMethod(http.MethodPost)
+				batchRequestItem.SetReference(strconv.Itoa(i))
+				batchRequestItem.SetRelativeUrl(r.client.GetBatchRequestItemRelativeUrl(relativeUrl))
+				batchRequestItem.SetHeaders(batchApiHeaders)
+				batchRequestItem.SetBody(addAccountRequestString)
+				batchRequestItems = append(batchRequestItems, batchRequestItem)
+			}
+
+			var batchRequestModel citrixorchestration.BatchRequestModel
+			batchRequestModel.SetItems(batchRequestItems)
+			successfulJobs, txId, err := citrixdaasclient.PerformBatchOperation(ctx, r.client, batchRequestModel)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error adding machine account(s) to Machine Catalog "+catalogName,
+					"TransactionId: "+txId+
+						"\nError message: "+util.ReadClientError(err),
+				)
+				return
+			}
+
+			if successfulJobs < len(machineAccountsToAdd) {
+				errMsg := fmt.Sprintf("An error occurred while adding machine account(s) to the Machine Catalog. %d of %d machine account(s) were adding to the Machine Catalog.", successfulJobs, len(machineAccountsToAdd))
+				resp.Diagnostics.AddError(
+					"Error updating Machine Catalog "+catalogName,
+					"TransactionId: "+txId+
+						"\n"+errMsg,
+				)
 				return
 			}
 		}
@@ -317,8 +592,17 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 
 	tags := getMachineCatalogTags(ctx, &resp.Diagnostics, r.client, catalogId)
 
+	if catalog.GetProvisioningType() == citrixorchestration.PROVISIONINGTYPE_MANUAL {
+		machineAdAccounts = []citrixorchestration.ProvisioningSchemeMachineAccountResponseModel{}
+	} else {
+		machineAdAccounts, err = getMachineCatalogMachineADAccounts(ctx, &resp.Diagnostics, r.client, catalog.GetId())
+		if err != nil {
+			return
+		}
+	}
+
 	// Update resource state with updated items and timestamp
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, catalog, &connectionType, machines, pluginId, tags)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, catalog, &connectionType, machines, pluginId, tags, machineAdAccounts)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -900,7 +1184,7 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 		return
 	}
 
-	if req.Plan.Raw.IsNull() || req.State.Raw.IsNull() {
+	if req.Plan.Raw.IsNull() {
 		return
 	}
 
@@ -908,6 +1192,51 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if !plan.ProvisioningScheme.IsNull() {
+		provSchemePlan := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
+
+		if !provSchemePlan.MachineADAccounts.IsNull() {
+			machineAccountsInPlan := util.ObjectListToTypedArray[MachineADAccountModel](ctx, &resp.Diagnostics, provSchemePlan.MachineADAccounts)
+
+			if len(machineAccountsInPlan) > 0 {
+				machineAccountsNamesInPlan := []string{}
+				for _, machineAccountInPlan := range machineAccountsInPlan {
+					if !machineAccountInPlan.ResetPassword.ValueBool() && machineAccountInPlan.Password.ValueString() == "" {
+						resp.Diagnostics.AddError(
+							"Error validating machine accounts for Machine Catalog "+plan.Name.ValueString(),
+							"Password cannot be empty when `reset_password` is set to `false`.",
+						)
+						return
+					}
+					machineAccountsNamesInPlan = append(machineAccountsNamesInPlan, strings.TrimSuffix(machineAccountInPlan.ADAccountName.ValueString(), "$"))
+				}
+				_, _, err := getMachinesUsingIdentity(ctx, r.client, machineAccountsNamesInPlan)
+				if err != nil {
+					resp.Diagnostics.AddError(
+						"Error validating machine accounts for Machine Catalog "+plan.Name.ValueString(),
+						"Error Message: "+err.Error(),
+					)
+					return
+				}
+			}
+
+			if req.State.Raw.IsNull() {
+				// Ensure machine account count is greater or equals to the number of machines in the catalog during create
+				if len(machineAccountsInPlan) < int(provSchemePlan.NumTotalMachines.ValueInt64()) {
+					resp.Diagnostics.AddError(
+						"Error creating Machine Catalog",
+						"Number of machine accounts must be greater than or equal to the number of machines during machine catalog creation.",
+					)
+				}
+				return
+			}
+		}
+	}
+
+	if req.State.Raw.IsNull() {
 		return
 	}
 
@@ -921,29 +1250,60 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 	if !plan.ProvisioningScheme.IsNull() {
 		provSchemePlan := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
 		provSchemeState := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, state.ProvisioningScheme)
+		machineAccountsInPlan := util.ObjectListToTypedArray[MachineADAccountModel](ctx, &resp.Diagnostics, provSchemePlan.MachineADAccounts)
 
-		machineAccountCreationRulesPlan := util.ObjectValueToTypedObject[MachineAccountCreationRulesModel](ctx, &resp.Diagnostics, provSchemePlan.MachineAccountCreationRules)
-		machineAccountCreationRulesState := util.ObjectValueToTypedObject[MachineAccountCreationRulesModel](ctx, &resp.Diagnostics, provSchemeState.MachineAccountCreationRules)
-		machineDomainIdentityPlan := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemePlan.MachineDomainIdentity)
-		machineDomainIdentityState := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemeState.MachineDomainIdentity)
-
-		if machineDomainIdentityPlan != machineDomainIdentityState &&
-			provSchemePlan.NumTotalMachines.ValueInt64() == provSchemeState.NumTotalMachines.ValueInt64() {
-
+		if len(machineAccountsInPlan) < int(provSchemePlan.NumTotalMachines.ValueInt64()) && provSchemePlan.MachineAccountCreationRules.IsNull() {
 			resp.Diagnostics.AddError(
-				"Error updating Machine Catalog",
-				"machine_domain_identity can only be updated when adding or removing machines.",
+				"Error updating Machine Catalog "+state.Name.ValueString(),
+				"`machine_account_creation_rules` must be specified when machine accounts associated with catalog is less than the desired number of machines.",
 			)
 			return
 		}
+		if !provSchemeState.MachineADAccounts.IsNull() {
+			inUseMachineAccountsToBeDeleted := []string{}
+			machineAccountsInState := util.ObjectListToTypedArray[MachineADAccountModel](ctx, &resp.Diagnostics, provSchemeState.MachineADAccounts)
+			// Ensure machine accounts with state InUse is not deleted.
+			for _, machineAccountInState := range machineAccountsInState {
+				if machineAccountInState.State.ValueString() == string(citrixorchestration.PROVISIONINGSCHEMEMACHINEACCOUNTSTATE_IN_USE) &&
+					!slices.ContainsFunc(machineAccountsInPlan, func(machineAccountInPlan MachineADAccountModel) bool {
+						return strings.EqualFold(machineAccountInState.ADAccountName.ValueString(), machineAccountInPlan.ADAccountName.ValueString())
+					}) {
+					inUseMachineAccountsToBeDeleted = append(inUseMachineAccountsToBeDeleted, machineAccountInState.ADAccountName.ValueString())
+				}
+			}
+			if len(inUseMachineAccountsToBeDeleted) > 0 {
+				resp.Diagnostics.AddError(
+					"Error updating Machine Catalog "+state.Name.ValueString(),
+					fmt.Sprintf("Machine account(s) [ %s ] with state `InUse` cannot be deleted ", strings.Join(inUseMachineAccountsToBeDeleted, ", ")),
+				)
+				return
+			}
+		}
 
-		if machineAccountCreationRulesPlan != machineAccountCreationRulesState &&
-			provSchemePlan.NumTotalMachines.ValueInt64() <= provSchemeState.NumTotalMachines.ValueInt64() {
-			resp.Diagnostics.AddError(
-				"Error updating Machine Catalog",
-				"machine_account_creation_rules can only be updated when adding machines.",
-			)
-			return
+		if !provSchemePlan.MachineAccountCreationRules.IsNull() {
+			machineAccountCreationRulesPlan := util.ObjectValueToTypedObject[MachineAccountCreationRulesModel](ctx, &resp.Diagnostics, provSchemePlan.MachineAccountCreationRules)
+			machineAccountCreationRulesState := util.ObjectValueToTypedObject[MachineAccountCreationRulesModel](ctx, &resp.Diagnostics, provSchemeState.MachineAccountCreationRules)
+			machineDomainIdentityPlan := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemePlan.MachineDomainIdentity)
+			machineDomainIdentityState := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemeState.MachineDomainIdentity)
+
+			if machineDomainIdentityPlan != machineDomainIdentityState &&
+				provSchemePlan.NumTotalMachines.ValueInt64() == provSchemeState.NumTotalMachines.ValueInt64() {
+
+				resp.Diagnostics.AddError(
+					"Error updating Machine Catalog "+state.Name.ValueString(),
+					"machine_domain_identity can only be updated when adding or removing machines.",
+				)
+				return
+			}
+
+			if machineAccountCreationRulesPlan != machineAccountCreationRulesState &&
+				provSchemePlan.NumTotalMachines.ValueInt64() == provSchemeState.NumTotalMachines.ValueInt64() {
+				resp.Diagnostics.AddError(
+					"Error updating Machine Catalog "+state.Name.ValueString(),
+					"machine_account_creation_rules can only be updated when adding machines.",
+				)
+				return
+			}
 		}
 	}
 }

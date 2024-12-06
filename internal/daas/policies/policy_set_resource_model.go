@@ -203,13 +203,14 @@ func (PolicyModel) GetAttributes() map[string]schema.Attribute {
 }
 
 type PolicySetModel struct {
-	Id          types.String `tfsdk:"id"`
-	Name        types.String `tfsdk:"name"`
-	Type        types.String `tfsdk:"type"`
-	Description types.String `tfsdk:"description"`
-	Scopes      types.Set    `tfsdk:"scopes"` // Set[String]
-	IsAssigned  types.Bool   `tfsdk:"assigned"`
-	Policies    types.List   `tfsdk:"policies"` // List[PolicyModel]
+	Id             types.String `tfsdk:"id"`
+	Name           types.String `tfsdk:"name"`
+	Type           types.String `tfsdk:"type"`
+	Description    types.String `tfsdk:"description"`
+	Scopes         types.Set    `tfsdk:"scopes"` // Set[String]
+	IsAssigned     types.Bool   `tfsdk:"assigned"`
+	Policies       types.List   `tfsdk:"policies"`        // List[PolicyModel]
+	DeliveryGroups types.Set    `tfsdk:"delivery_groups"` // Set[String]
 }
 
 func (PolicySetModel) GetSchema() schema.Schema {
@@ -272,6 +273,20 @@ func (PolicySetModel) GetSchema() schema.Schema {
 				Description: "Indicate whether the policy set is being assigned to delivery groups.",
 				Computed:    true,
 			},
+			"delivery_groups": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "The IDs of the delivery groups for the policy set to apply on.",
+				Optional:    true,
+				Computed:    true,
+				Default:     setdefault.StaticValue(types.SetValueMust(types.StringType, []attr.Value{})),
+				Validators: []validator.Set{
+					setvalidator.ValueStringsAre(
+						validator.String(
+							stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
+						),
+					),
+				},
+			},
 		},
 	}
 }
@@ -280,7 +295,7 @@ func (PolicySetModel) GetAttributes() map[string]schema.Attribute {
 	return PolicySetModel{}.GetSchema().Attributes
 }
 
-func (r PolicySetModel) RefreshPropertyValues(ctx context.Context, diags *diag.Diagnostics, isResource bool, policySet *citrixorchestration.PolicySetResponse, policies *citrixorchestration.CollectionEnvelopeOfPolicyResponse, policySetScopes []string) PolicySetModel {
+func (r PolicySetModel) RefreshPropertyValues(ctx context.Context, diags *diag.Diagnostics, isResource bool, policySet *citrixorchestration.PolicySetResponse, policies *citrixorchestration.CollectionEnvelopeOfPolicyResponse, policySetScopes []string, deliveryGroups []citrixorchestration.DeliveryGroupResponseModel) PolicySetModel {
 	// Set required values
 	r.Id = types.StringValue(policySet.GetPolicySetGuid())
 	r.Name = types.StringValue(policySet.GetName())
@@ -297,6 +312,14 @@ func (r PolicySetModel) RefreshPropertyValues(ctx context.Context, diags *diag.D
 	}
 
 	r.Scopes = util.StringArrayToStringSet(ctx, diags, updatedPolicySetScopes)
+
+	deliveryGroupIds := []string{}
+	for _, deliveryGroup := range deliveryGroups {
+		if strings.EqualFold(policySet.GetPolicySetGuid(), deliveryGroup.GetPolicySetGuid()) {
+			deliveryGroupIds = append(deliveryGroupIds, deliveryGroup.GetId())
+		}
+	}
+	r.DeliveryGroups = util.StringArrayToStringSet(ctx, diags, deliveryGroupIds)
 
 	if policies != nil && policies.Items != nil {
 		policyItems := policies.Items
@@ -369,7 +392,7 @@ func (r PolicySetModel) RefreshPropertyValues(ctx context.Context, diags *diag.D
 					_ = json.Unmarshal([]byte(filter.GetFilterData()), &uuidFilterData)
 
 					var gatewayFilterData PolicyFilterGatewayDataClientModel
-					_ = json.Unmarshal([]byte(filter.GetFilterData()), &uuidFilterData)
+					_ = json.Unmarshal([]byte(filter.GetFilterData()), &gatewayFilterData)
 
 					filterType := filter.GetFilterType()
 					switch filterType {

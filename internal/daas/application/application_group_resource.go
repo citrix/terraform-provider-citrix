@@ -77,7 +77,7 @@ func (r *applicationGroupResource) Create(ctx context.Context, req resource.Crea
 		includedUsers := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.IncludedUsers)
 		includedUserIds, httpResp, err := util.GetUserIdsUsingIdentity(ctx, r.client, includedUsers)
 		if err != nil {
-			diags.AddError(
+			resp.Diagnostics.AddError(
 				"Error fetching user details for application group",
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadClientError(err),
@@ -122,6 +122,23 @@ func (r *applicationGroupResource) Create(ctx context.Context, req resource.Crea
 	}
 
 	applicationGroupId := addAppGroupResp.GetId()
+	//Update application group enabled flag
+	if !plan.Enabled.ValueBool() {
+		var editApplicationGroupRequestBody = &citrixorchestration.EditApplicationGroupRequestModel{}
+		editApplicationGroupRequestBody.SetName(plan.Name.ValueString())
+		editApplicationGroupRequestBody.SetDescription(plan.Description.ValueString())
+		editApplicationGroupRequestBody.SetEnabled(plan.Enabled.ValueBool())
+		editApplicationRequest := r.client.ApiClient.ApplicationGroupsAPIsDAAS.ApplicationGroupsUpdateApplicationGroup(ctx, applicationGroupId)
+		editApplicationRequest = editApplicationRequest.EditApplicationGroupRequestModel(*editApplicationGroupRequestBody)
+		httpResp, err = citrixdaasclient.AddRequestData(editApplicationRequest, r.client).Execute()
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error disabling Application Group "+plan.Name.ValueString(),
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadClientError(err),
+			)
+		}
+	}
 	// Update application group tags
 	setApplicationGroupTags(ctx, &resp.Diagnostics, r.client, applicationGroupId, plan.Tags)
 
@@ -212,6 +229,7 @@ func (r *applicationGroupResource) Update(ctx context.Context, req resource.Upda
 	var editApplicationGroupRequestBody = &citrixorchestration.EditApplicationGroupRequestModel{}
 	editApplicationGroupRequestBody.SetName(plan.Name.ValueString())
 	editApplicationGroupRequestBody.SetDescription(plan.Description.ValueString())
+	editApplicationGroupRequestBody.SetEnabled(plan.Enabled.ValueBool())
 
 	editApplicationGroupRequestBody.SetRestrictToTag(plan.RestrictToTag.ValueString())
 	if !plan.IncludedUsers.IsNull() {
@@ -219,7 +237,7 @@ func (r *applicationGroupResource) Update(ctx context.Context, req resource.Upda
 		includedUsers := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.IncludedUsers)
 		includedUserIds, httpResp, err := util.GetUserIdsUsingIdentity(ctx, r.client, includedUsers)
 		if err != nil {
-			diags.AddError(
+			resp.Diagnostics.AddError(
 				"Error fetching user details for application group"+applicationGroupName,
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadClientError(err),

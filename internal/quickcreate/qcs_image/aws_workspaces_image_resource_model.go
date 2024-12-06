@@ -146,7 +146,7 @@ func (r AwsWorkspacesImageModel) RefreshPropertyValues(ctx context.Context, diag
 	r.AwsImportedImageId = types.StringValue(image.GetAmazonImageId())
 	r.Name = types.StringValue(image.GetName())
 	r.Description = types.StringValue(image.GetDescription())
-	r.SessionSupport = types.StringValue(util.SessionSupportEnumToString(image.GetSessionSupport()))
+	r.SessionSupport = types.StringValue(util.QcsSessionSupportEnumToString(image.GetSessionSupport()))
 	r.OperatingSystem = types.StringValue(util.OperatingSystemTypeEnumToString(image.GetOperatingSystem()))
 	r.Tenancy = types.StringValue(util.AwsEdcWorkspaceImageTenancyEnumToString(image.GetWorkspaceImageTenancy()))
 	r.IngestionProcess = types.StringValue(util.AwsEdcWorkspaceImageIngestionProcessEnumToString(image.GetIngestionProcess()))

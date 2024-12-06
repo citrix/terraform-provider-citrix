@@ -26,7 +26,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"golang.org/x/exp/slices"
 )
 
 type AzureMachineConfigModel struct {
@@ -120,7 +119,7 @@ func (AzureMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 					boolplanmodifier.RequiresReplace(),
 				},
 			},
-			"disk_encryption_set": AzureDiskEncryptionSetModel{}.GetSchema(),
+			"disk_encryption_set": util.AzureDiskEncryptionSetModel{}.GetSchema(),
 			"vda_resource_group": schema.StringAttribute{
 				Description: "Designated resource group where the VDA VMs will be located on Azure.",
 				Optional:    true,
@@ -135,7 +134,7 @@ func (AzureMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 					boolplanmodifier.RequiresReplace(),
 				},
 			},
-			"machine_profile": AzureMachineProfileModel{}.GetSchema(),
+			"machine_profile": util.AzureMachineProfileModel{}.GetSchema(),
 			"writeback_cache": AzureWritebackCacheModel{}.GetSchema(),
 		},
 	}
@@ -529,51 +528,6 @@ func (SCVMMMachineConfigModel) GetAttributes() map[string]schema.Attribute {
 	return SCVMMMachineConfigModel{}.GetSchema().Attributes
 }
 
-type GalleryImageModel struct {
-	Gallery    types.String `tfsdk:"gallery"`
-	Definition types.String `tfsdk:"definition"`
-	Version    types.String `tfsdk:"version"`
-}
-
-func (GalleryImageModel) GetSchema() schema.SingleNestedAttribute {
-	return schema.SingleNestedAttribute{
-		Description: "Details of the Azure Image Gallery image to use for creating machines. Only Applicable to Azure Image Gallery image.",
-		Optional:    true,
-		Attributes: map[string]schema.Attribute{
-			"gallery": schema.StringAttribute{
-				Description: "The Azure Image Gallery where the image for creating machines is located. Only applicable to Azure Image Gallery image.",
-				Required:    true,
-			},
-			"definition": schema.StringAttribute{
-				Description: "The image definition for the image to be used in the Azure Image Gallery. Only applicable to Azure Image Gallery image.",
-				Required:    true,
-			},
-			"version": schema.StringAttribute{
-				Description: "The image version for the image to be used in the Azure Image Gallery. Only applicable to Azure Image Gallery image.",
-				Required:    true,
-			},
-		},
-		Validators: []validator.Object{
-			objectvalidator.AlsoRequires(path.Expressions{
-				path.MatchRelative().AtParent().AtName("resource_group"),
-			}...),
-			objectvalidator.ConflictsWith(path.Expressions{
-				path.MatchRelative().AtParent().AtName("storage_account"),
-			}...),
-			objectvalidator.ConflictsWith(path.Expressions{
-				path.MatchRelative().AtParent().AtName("container"),
-			}...),
-			objectvalidator.ConflictsWith(path.Expressions{
-				path.MatchRelative().AtParent().AtName("master_image"),
-			}...),
-		},
-	}
-}
-
-func (GalleryImageModel) GetAttributes() map[string]schema.Attribute {
-	return GalleryImageModel{}.GetSchema().Attributes
-}
-
 type AzureMasterImageModel struct {
 	ResourceGroup      types.String `tfsdk:"resource_group"`
 	SharedSubscription types.String `tfsdk:"shared_subscription"`
@@ -627,7 +581,7 @@ func (AzureMasterImageModel) GetSchema() schema.SingleNestedAttribute {
 					}...),
 				},
 			},
-			"gallery_image": GalleryImageModel{}.GetSchema(),
+			"gallery_image": util.GalleryImageModel{}.GetSchema(),
 		},
 	}
 }
@@ -671,65 +625,6 @@ func (AzurePvsConfigurationModel) GetAttributes() map[string]schema.Attribute {
 	return AzurePvsConfigurationModel{}.GetSchema().Attributes
 }
 
-type AzureMachineProfileModel struct {
-	MachineProfileVmName              types.String `tfsdk:"machine_profile_vm_name"`
-	MachineProfileTemplateSpecName    types.String `tfsdk:"machine_profile_template_spec_name"`
-	MachineProfileTemplateSpecVersion types.String `tfsdk:"machine_profile_template_spec_version"`
-	MachineProfileResourceGroup       types.String `tfsdk:"machine_profile_resource_group"`
-}
-
-func (AzureMachineProfileModel) GetSchema() schema.SingleNestedAttribute {
-	return schema.SingleNestedAttribute{
-		Description: "The name of the virtual machine or template spec that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone." + "<br />" +
-			"Required when provisioning_type is set to PVSStreaming or when identity_type is set to `AzureAD`",
-		Optional: true,
-		Attributes: map[string]schema.Attribute{
-			"machine_profile_vm_name": schema.StringAttribute{
-				Description: "The name of the machine profile virtual machine.",
-				Optional:    true,
-			},
-			"machine_profile_template_spec_name": schema.StringAttribute{
-				Description: "The name of the machine profile template spec.",
-				Optional:    true,
-				Validators: []validator.String{
-					stringvalidator.AlsoRequires(path.Expressions{
-						path.MatchRelative().AtParent().AtName("machine_profile_template_spec_version"),
-					}...),
-					stringvalidator.ExactlyOneOf(path.Expressions{
-						path.MatchRelative().AtParent().AtName("machine_profile_vm_name"),
-					}...),
-				},
-			},
-			"machine_profile_template_spec_version": schema.StringAttribute{
-				Description: "The version of the machine profile template spec.",
-				Optional:    true,
-				Validators: []validator.String{
-					stringvalidator.AlsoRequires(path.Expressions{
-						path.MatchRelative().AtParent().AtName("machine_profile_template_spec_name"),
-					}...),
-				},
-			},
-			"machine_profile_resource_group": schema.StringAttribute{
-				Description: "The name of the resource group where the machine profile VM or template spec is located.",
-				Required:    true,
-			},
-		},
-		PlanModifiers: []planmodifier.Object{
-			objectplanmodifier.RequiresReplaceIf(
-				func(_ context.Context, req planmodifier.ObjectRequest, resp *objectplanmodifier.RequiresReplaceIfFuncResponse) {
-					resp.RequiresReplace = req.ConfigValue.IsNull() != req.StateValue.IsNull()
-				},
-				"Force replace when machine_profile is added or removed. Update is allowed only if previously set.",
-				"Force replace when machine_profile is added or removed. Update is allowed only if previously set.",
-			),
-		},
-	}
-}
-
-func (AzureMachineProfileModel) GetAttributes() map[string]schema.Attribute {
-	return AzureMachineProfileModel{}.GetSchema().Attributes
-}
-
 // WritebackCacheModel maps the write back cacheconfiguration schema data.
 type AzureWritebackCacheModel struct {
 	PersistWBC                 types.Bool   `tfsdk:"persist_wbc"`
@@ -754,7 +649,7 @@ func (AzureWritebackCacheModel) GetSchema() schema.SingleNestedAttribute {
 				Optional:    true,
 			},
 			"wbc_disk_storage_type": schema.StringAttribute{
-				Description: "Type of naming scheme. Choose between Numeric and Alphabetic.",
+				Description: "Type of the storage for Write-back Cache disk. Choose between `Standard_LRS`, `StandardSSD_LRS`, and `Premium_LRS`.",
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.OneOf(
@@ -992,35 +887,6 @@ func (VsphereAndSCVMMWritebackCacheModel) GetAttributes() map[string]schema.Attr
 	return VsphereAndSCVMMWritebackCacheModel{}.GetSchema().Attributes
 }
 
-type AzureDiskEncryptionSetModel struct {
-	DiskEncryptionSetName          types.String `tfsdk:"disk_encryption_set_name"`
-	DiskEncryptionSetResourceGroup types.String `tfsdk:"disk_encryption_set_resource_group"`
-}
-
-func (AzureDiskEncryptionSetModel) GetSchema() schema.SingleNestedAttribute {
-	return schema.SingleNestedAttribute{
-		Description: "The configuration for Disk Encryption Set (DES). The DES must be in the same subscription and region as your resources. If your master image is encrypted with a DES, use the same DES when creating this machine catalog. When using a DES, if you later disable the key with which the corresponding DES is associated in Azure, you can no longer power on the machines in this catalog or add machines to it.",
-		Optional:    true,
-		PlanModifiers: []planmodifier.Object{
-			objectplanmodifier.RequiresReplace(),
-		},
-		Attributes: map[string]schema.Attribute{
-			"disk_encryption_set_name": schema.StringAttribute{
-				Description: "The name of the disk encryption set.",
-				Required:    true,
-			},
-			"disk_encryption_set_resource_group": schema.StringAttribute{
-				Description: "The name of the resource group in which the disk encryption set resides.",
-				Required:    true,
-			},
-		},
-	}
-}
-
-func (AzureDiskEncryptionSetModel) GetAttributes() map[string]schema.Attribute {
-	return AzureDiskEncryptionSetModel{}.GetSchema().Attributes
-}
-
 type ImageUpdateRebootOptionsModel struct {
 	RebootDuration        types.Int64  `tfsdk:"reboot_duration"`
 	WarningDuration       types.Int64  `tfsdk:"warning_duration"`
@@ -1125,70 +991,23 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 			resourceType := resourceTag[len(resourceTag)-1]
 
 			if strings.EqualFold(resourceType, util.ImageVersionResourceType) {
-				/* For Azure Image Gallery image, the XDPath looks like:
-				* XDHyp:\\HostingUnits\\{resource pool}\\image.folder\\{resource group}.resourcegroup\\{gallery name}.gallery\\{image name}.imagedefinition\\{image version}.imageversion
-				* The Name property in MasterImage will be image version instead of image definition (name of the image)
-				 */
-				azureGalleryImageModel := util.ObjectValueToTypedObject[GalleryImageModel](ctx, diagnostics, azureMasterImage.GalleryImage)
-				azureGalleryImageModel.Version = types.StringValue(masterImage.GetName())
-				// Extract {image name} from {image name}.imagedefinition
-				azureGalleryImageModel.Definition = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".imagedefinition"))
-				// Extract {gallery name} from {gallery name}.gallery
-				azureGalleryImageModel.Gallery = types.StringValue(strings.TrimSuffix(segments[lastIndex-3], ".gallery"))
-
-				azureMasterImage.GalleryImage = util.TypedObjectToObjectValue(ctx, diagnostics, azureGalleryImageModel)
-				azureMasterImage.ResourceGroup = types.StringValue(strings.TrimSuffix(segments[lastIndex-4], ".resourcegroup"))
-				segment := strings.Split(segments[lastIndex-5], ".")
-				resourceType := segment[len(segment)-1]
-				if strings.EqualFold(resourceType, util.SharedSubscriptionResourceType) {
-					azureMasterImage.SharedSubscription = types.StringValue(segment[0])
-				} else {
-					azureMasterImage.SharedSubscription = types.StringNull()
-				}
+				azureMasterImage.GalleryImage,
+					azureMasterImage.ResourceGroup,
+					azureMasterImage.SharedSubscription =
+					util.ParseMasterImageToUpdateGalleryImageModel(ctx, diagnostics, azureMasterImage.GalleryImage, masterImage, segments, lastIndex)
 
 				// Clear other master image details
 				azureMasterImage.MasterImage = types.StringNull()
 				azureMasterImage.StorageAccount = types.StringNull()
 				azureMasterImage.Container = types.StringNull()
 			} else {
-				if strings.EqualFold(resourceType, util.VhdResourceType) {
-					// VHD image
-					azureMasterImage.MasterImage = types.StringValue(masterImage.GetName())
-					azureMasterImage.Container = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".container"))
-					azureMasterImage.StorageAccount = types.StringValue(strings.TrimSuffix(segments[lastIndex-3], ".storageaccount"))
-					azureMasterImage.ResourceGroup = types.StringValue(strings.TrimSuffix(segments[lastIndex-4], ".resourcegroup"))
-
-					segment := strings.Split(segments[lastIndex-5], ".")
-					resourceType := segment[len(segment)-1]
-					if strings.EqualFold(resourceType, util.SharedSubscriptionResourceType) {
-						azureMasterImage.SharedSubscription = types.StringValue(segment[0])
-					} else {
-						azureMasterImage.SharedSubscription = types.StringNull()
-					}
-				} else {
-					// Snapshot or Managed Disk
-					azureMasterImage.MasterImage = types.StringValue(masterImage.GetName())
-					azureMasterImage.ResourceGroup = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".resourcegroup"))
-					segment := strings.Split(segments[lastIndex-3], ".")
-					resourceType := segment[len(segment)-1]
-					if strings.EqualFold(resourceType, util.SharedSubscriptionResourceType) {
-						azureMasterImage.SharedSubscription = types.StringValue(segment[0])
-					} else {
-						azureMasterImage.SharedSubscription = types.StringNull()
-					}
-
-					// Clear VHD image details
-					azureMasterImage.StorageAccount = types.StringNull()
-					azureMasterImage.Container = types.StringNull()
-				}
-
-				// Clear gallery image details
-				attributeMap, err := util.ResourceAttributeMapFromObject(GalleryImageModel{})
-				if err != nil {
-					diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
-				} else {
-					azureMasterImage.GalleryImage = types.ObjectNull(attributeMap)
-				}
+				azureMasterImage.MasterImage,
+					azureMasterImage.ResourceGroup,
+					azureMasterImage.SharedSubscription,
+					azureMasterImage.GalleryImage,
+					azureMasterImage.StorageAccount,
+					azureMasterImage.Container =
+					util.ParseMasterImageToUpdateAzureImageSpecs(ctx, diagnostics, resourceType, masterImage, segments, lastIndex)
 			}
 		}
 
@@ -1215,10 +1034,10 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 	// Refresh Machine Profile
 	if provScheme.MachineProfile != nil {
 		machineProfile := provScheme.GetMachineProfile()
-		machineProfileModel := parseAzureMachineProfileResponseToModel(machineProfile)
+		machineProfileModel := util.ParseAzureMachineProfileResponseToModel(machineProfile)
 		mc.MachineProfile = util.TypedObjectToObjectValue(ctx, diagnostics, machineProfileModel)
 	} else {
-		if attributesMap, err := util.ResourceAttributeMapFromObject(AzureMachineProfileModel{}); err == nil {
+		if attributesMap, err := util.ResourceAttributeMapFromObject(util.AzureMachineProfileModel{}); err == nil {
 			mc.MachineProfile = types.ObjectNull(attributesMap)
 		} else {
 			diagnostics.AddWarning("Error when creating null AzureMachineProfileModel", err.Error())
@@ -1287,17 +1106,8 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 			isLicenseTypeSet = true
 		case "DiskEncryptionSetId":
 			desId := stringPair.GetValue()
-			desArray := strings.Split(desId, "/")
-			desName := desArray[len(desArray)-1]
-			resourceGroupsIndex := slices.Index(desArray, "resourceGroups")
-			resourceGroupName := desArray[resourceGroupsIndex+1]
-			diskEncryptionSetModel := util.ObjectValueToTypedObject[AzureDiskEncryptionSetModel](ctx, diagnostics, mc.DiskEncryptionSet)
-			if !strings.EqualFold(diskEncryptionSetModel.DiskEncryptionSetName.ValueString(), desName) {
-				diskEncryptionSetModel.DiskEncryptionSetName = types.StringValue(desName)
-			}
-			if !strings.EqualFold(diskEncryptionSetModel.DiskEncryptionSetResourceGroup.ValueString(), resourceGroupName) {
-				diskEncryptionSetModel.DiskEncryptionSetResourceGroup = types.StringValue(resourceGroupName)
-			}
+			diskEncryptionSetModel := util.ObjectValueToTypedObject[util.AzureDiskEncryptionSetModel](ctx, diagnostics, mc.DiskEncryptionSet)
+			diskEncryptionSetModel = util.RefreshDiskEncryptionSetModel(diskEncryptionSetModel, desId)
 
 			mc.DiskEncryptionSet = util.TypedObjectToObjectValue(ctx, diagnostics, diskEncryptionSetModel)
 
@@ -1338,7 +1148,7 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 	}
 
 	if !isDesSet && !mc.DiskEncryptionSet.IsNull() {
-		if attributesMap, err := util.ResourceAttributeMapFromObject(AzureDiskEncryptionSetModel{}); err == nil {
+		if attributesMap, err := util.ResourceAttributeMapFromObject(util.AzureDiskEncryptionSetModel{}); err == nil {
 			mc.DiskEncryptionSet = types.ObjectNull(attributesMap)
 		} else {
 			diagnostics.AddWarning("Error when creating null AzureDiskEcryptionSetModel", err.Error())
@@ -1571,41 +1381,6 @@ func (mc *SCVMMMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 	}
 
 	mc.UseFullDiskCloneProvisioning = types.BoolValue(provScheme.GetUseFullDiskCloneProvisioning())
-}
-
-func parseAzureMachineProfileResponseToModel(machineProfileResponse citrixorchestration.HypervisorResourceRefResponseModel) *AzureMachineProfileModel {
-	machineProfileModel := AzureMachineProfileModel{}
-	if machineProfileName := machineProfileResponse.GetName(); machineProfileName != "" {
-		machineProfileSegments := strings.Split(machineProfileResponse.GetXDPath(), "\\")
-		lastIndex := len(machineProfileSegments) - 1
-		if strings.HasSuffix(machineProfileSegments[lastIndex], "templatespecversion") {
-			machineProfileModel.MachineProfileTemplateSpecVersion = types.StringValue(machineProfileName)
-
-			templateSpecIndex := slices.IndexFunc(machineProfileSegments, func(machineProfileSegment string) bool {
-				return strings.Contains(machineProfileSegment, ".templatespec")
-			})
-
-			if templateSpecIndex != -1 {
-				templateSpec := strings.TrimSuffix(machineProfileSegments[templateSpecIndex], ".templatespec")
-				machineProfileModel.MachineProfileTemplateSpecName = types.StringValue(templateSpec)
-			}
-		} else {
-			machineProfileModel.MachineProfileVmName = types.StringValue(machineProfileName)
-		}
-
-		resourceGroupIndex := slices.IndexFunc(machineProfileSegments, func(machineProfileSegment string) bool {
-			return strings.Contains(machineProfileSegment, ".resourcegroup")
-		})
-
-		if resourceGroupIndex != -1 {
-			resourceGroup := strings.TrimSuffix(machineProfileSegments[resourceGroupIndex], ".resourcegroup")
-			machineProfileModel.MachineProfileResourceGroup = types.StringValue(resourceGroup)
-		}
-	} else {
-		machineProfileModel.MachineProfileVmName = types.StringNull()
-		machineProfileModel.MachineProfileResourceGroup = types.StringNull()
-	}
-	return &machineProfileModel
 }
 
 func parseOnPremImagePath(catalog citrixorchestration.MachineCatalogDetailResponseModel) (masterImage, imageSnapshot string, resourcePoolPath string) {

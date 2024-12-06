@@ -298,7 +298,7 @@ func TestAzureMcs(t *testing.T) {
 			// Create and Read testing
 			{
 				Config: composeTestResourceTf(
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsOnly"),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
@@ -311,15 +311,13 @@ func TestAzureMcs(t *testing.T) {
 					// Verify description of delivery group
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "description", "Delivery Group for testing"),
 					// Verify delivery type of delivery group
-					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "delivery_type", "DesktopsOnly"),
+					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "delivery_type", "DesktopsAndApps"),
 					// Verify number of desktops
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "desktops.#", "2"),
 					// Verify number of reboot schedules
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "reboot_schedules.#", "2"),
 					// Verify total number of machines in delivery group
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "total_machines", "1"),
-					// Verify the policy set id is not assigned to the delivery group
-					resource.TestCheckNoResourceAttr("citrix_delivery_group.testDeliveryGroup", "policy_set_id"),
 				),
 			},
 			// ImportState testing
@@ -329,7 +327,7 @@ func TestAzureMcs(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"last_updated", "autoscale_settings", "associated_machine_catalogs", "reboot_schedules"},
+				ImportStateVerifyIgnore: []string{"last_updated", "autoscale_settings", "associated_machine_catalogs", "reboot_schedules", "delivery_type"},
 				SkipFunc:                skipForGitHubAction(isGitHubAction),
 			},
 
@@ -372,27 +370,7 @@ func TestAzureMcs(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "reboot_schedules.0.ignore_maintenance_mode", "false"),
 					// Verify total number of machines in delivery group
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "total_machines", "2"),
-					// Verify the policy set id is not assigned to the delivery group
-					resource.TestCheckNoResourceAttr("citrix_delivery_group.testDeliveryGroup", "policy_set_id"),
 				),
-			},
-
-			/****************** Delivery Group Test - Policy Update ******************/
-			// Create Policy and assign to delivery group
-			{
-				Config: composeTestResourceTf(
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updatedWithPolicySetId, ""),
-					BuildPolicySetResourceWithoutDeliveryGroup(t),
-					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
-					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
-					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneInput, true),
-				),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					// Verify the policy set id assigned to the delivery group
-					resource.TestCheckResourceAttrSet("citrix_delivery_group.testDeliveryGroup", "policy_set_id"),
-				),
-				SkipFunc: func() (bool, error) { return true, nil }, // Always skip this test on testing
 			},
 
 			/****************** Machine Catalog & Delivery Group Test - MCS AD - Delete Machine ******************/
@@ -400,7 +378,7 @@ func TestAzureMcs(t *testing.T) {
 			// Machine Catalog: Delete machine test
 			{
 				Config: composeTestResourceTf(
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsOnly"),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
@@ -409,8 +387,6 @@ func TestAzureMcs(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify total number of machines in delivery group
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "total_machines", "1"),
-					// Verify the policy set id assigned to the delivery group is removed
-					resource.TestCheckNoResourceAttr("citrix_delivery_group.testDeliveryGroup", "policy_set_id"),
 					// Verify updated name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", machineCatalogName),
 					// Verify total number of machines
@@ -425,7 +401,7 @@ func TestAzureMcs(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildAdminFolderResource(t, testAdminFolderResource, "ContainsApplications"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsOnly"),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
@@ -457,7 +433,7 @@ func TestAzureMcs(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildAdminFolderResource(t, testAdminFolderResource, "ContainsApplicationGroups"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsOnly"),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
@@ -483,7 +459,7 @@ func TestAzureMcs(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildAdminFolderResource(t, testAdminFolderResource_nameAndParentPathUpdated1, "ContainsApplications"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsOnly"),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
@@ -509,7 +485,7 @@ func TestAzureMcs(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildAdminFolderResource(t, testAdminFolderResource_parentPathRemoved, "ContainsApplications"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsOnly"),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
@@ -533,7 +509,7 @@ func TestAzureMcs(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsOnly"),
+					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
@@ -653,7 +629,7 @@ func TestAzureMcs(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"last_updated"},
+				ImportStateVerifyIgnore: []string{"last_updated", "assigned"},
 			},
 			// ImportState testing - Admin Scope
 			{

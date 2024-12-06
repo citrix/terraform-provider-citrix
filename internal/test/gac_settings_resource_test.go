@@ -42,21 +42,21 @@ func TestGacSettingsResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "description", "This is a test resource"),
 					// Check permissions for Windows
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.windows.#", "1"),
-					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.windows.0.category", "ICA Client"),
+					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.windows.0.category", "ica client"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.windows.0.user_override", "false"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.windows.0.settings.#", "1"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.windows.0.settings.0.name", "Allow Client Clipboard Redirection"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.windows.0.settings.0.value_string", "true"),
 					// Check permissions for HTML5
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.html5.#", "1"),
-					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.html5.0.category", "Virtual Channel"),
+					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.html5.0.category", "virtual channel"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.html5.0.user_override", "false"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.html5.0.settings.#", "1"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.html5.0.settings.0.name", "Clipboard Operations Between VDA And Local Device"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.html5.0.settings.0.value_string", "true"),
 					// Check permissions for ChromeOS
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.chromeos.#", "1"),
-					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.chromeos.0.category", "Virtual Channel"),
+					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.chromeos.0.category", "virtual channel"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.chromeos.0.user_override", "false"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.chromeos.0.settings.#", "1"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.chromeos.0.settings.0.name", "Clipboard Operations Between VDA And Local Device"),
@@ -90,12 +90,12 @@ func TestGacSettingsResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "description", "Updated description for test resource"),
 					// Check permissions for Windows
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.windows.#", "2"),
-					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.windows.0.category", "ICA Client"),
+					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.windows.0.category", "ica client"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.windows.0.user_override", "false"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.windows.0.settings.#", "1"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.windows.0.settings.0.name", "Allow Client Clipboard Redirection"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.windows.0.settings.0.value_string", "true"),
-					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.windows.1.category", "Browser"),
+					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.windows.1.category", "browser"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.windows.1.user_override", "false"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.windows.1.settings.#", "2"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.windows.1.settings.0.name", "delete browsing data on exit"),
@@ -106,14 +106,14 @@ func TestGacSettingsResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.windows.1.settings.1.value_string", "3600000"),
 					// Check permissions for HTML5
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.html5.#", "1"),
-					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.html5.0.category", "Virtual Channel"),
+					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.html5.0.category", "virtual channel"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.html5.0.user_override", "false"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.html5.0.settings.#", "1"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.html5.0.settings.0.name", "Clipboard Operations Between VDA And Local Device"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.html5.0.settings.0.value_string", "true"),
 					// Check permissions for iOS
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.ios.#", "1"),
-					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.ios.0.category", "Audio"),
+					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.ios.0.category", "audio"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.ios.0.user_override", "false"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.ios.0.settings.#", "1"),
 					resource.TestCheckResourceAttr("citrix_gac_settings.test_settings_configuration", "app_settings.ios.0.settings.0.name", "audio"),
@@ -149,7 +149,7 @@ var (
 		app_settings = {
 			windows = [
 				{
-					category = "ICA Client",
+					category = "ica client",
 					user_override = false,
 					settings = [
 						{
@@ -161,7 +161,7 @@ var (
 			],
 			html5 = [
 				{
-					category = "Virtual Channel",
+					category = "virtual channel",
 					user_override = false,
 					settings = [
 						{
@@ -173,7 +173,7 @@ var (
 			],
 			chromeos = [
 				{
-					category = "Virtual Channel",
+					category = "virtual channel",
 					user_override = false,
 					settings = [
 						{
@@ -207,7 +207,7 @@ var (
 			windows = [
 				{
 					user_override = false,
-					category = "ICA Client",
+					category = "ica client",
 					settings = [
 						{
 							name = "Allow Client Clipboard Redirection",
@@ -217,7 +217,7 @@ var (
 				},
 				{
 					user_override = false,
-					category = "Browser",
+					category = "browser",
 					settings = [
 						{
 							name = "delete browsing data on exit",
@@ -235,7 +235,7 @@ var (
 			],
 			html5 = [
 				{
-					category = "Virtual Channel",
+					category = "virtual channel",
 					user_override = false,
 					settings = [
 						{
@@ -247,7 +247,7 @@ var (
 			],
 			ios = [
 				{
-					category = "Audio",
+					category = "audio",
 					user_override = false,
 					settings = [
 						{

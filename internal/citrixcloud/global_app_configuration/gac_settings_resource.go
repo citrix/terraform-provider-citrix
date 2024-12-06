@@ -87,9 +87,15 @@ func (r *gacSettingsResource) Create(ctx context.Context, req resource.CreateReq
 	settings.SetAppSettings(appSettings)
 
 	var body globalappconfiguration.SettingsRecordModel
-
 	body.SetServiceURL(serviceUrlModel)
 	body.SetSettings(settings)
+
+	// Set the test channel
+	if plan.TestChannel.ValueBool() {
+		var settingsChannel globalappconfiguration.SettingsChannel
+		settingsChannel.SetChannelName(util.GacTestChannelName)
+		body.SetSettingsChannel(settingsChannel)
+	}
 
 	// Call the API
 	createSettingsRequest := r.client.GacClient.SettingsControllerDAAS.PostSettingsApiUsingPOST(ctx, util.GacAppName)
@@ -106,8 +112,7 @@ func (r *gacSettingsResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	//Try to get the new settings configuration from remote
-	settingsConfiguration, err := getSettingsConfiguration(ctx, r.client, &resp.Diagnostics, plan.ServiceUrl.ValueString())
+	settingsConfiguration, err := getSettingsConfiguration(ctx, r.client, &resp.Diagnostics, plan.ServiceUrl.ValueString(), plan.TestChannel.ValueBool())
 	if err != nil {
 		return
 	}
@@ -136,7 +141,7 @@ func (r *gacSettingsResource) Read(ctx context.Context, req resource.ReadRequest
 	}
 
 	// Try to get Service Url settings from remote
-	settingsConfiguration, err := readSettingsConfiguration(ctx, r.client, resp, state.ServiceUrl.ValueString())
+	settingsConfiguration, err := readSettingsConfiguration(ctx, r.client, resp, state.ServiceUrl.ValueString(), state.TestChannel.ValueBool())
 	if err != nil {
 		return
 	}
@@ -183,9 +188,15 @@ func (r *gacSettingsResource) Update(ctx context.Context, req resource.UpdateReq
 	settings.SetAppSettings(appSettings)
 
 	var body globalappconfiguration.SettingsRecordModel
-
 	body.SetServiceURL(serviceUrlModel)
 	body.SetSettings(settings)
+
+	// Set the test channel
+	if plan.TestChannel.ValueBool() {
+		var settingsChannel globalappconfiguration.SettingsChannel
+		settingsChannel.SetChannelName(util.GacTestChannelName)
+		body.SetSettingsChannel(settingsChannel)
+	}
 
 	// Call the API
 	updateSettingsRequest := r.client.GacClient.SettingsControllerDAAS.PutSettingsApiUsingPUT(ctx, util.GacAppName, b64.StdEncoding.EncodeToString([]byte(plan.ServiceUrl.ValueString())))
@@ -202,7 +213,7 @@ func (r *gacSettingsResource) Update(ctx context.Context, req resource.UpdateReq
 	}
 
 	// Try to get Service Url settings from remote
-	updatedSettingsConfiguration, err := getSettingsConfiguration(ctx, r.client, &resp.Diagnostics, plan.ServiceUrl.ValueString())
+	updatedSettingsConfiguration, err := getSettingsConfiguration(ctx, r.client, &resp.Diagnostics, plan.ServiceUrl.ValueString(), plan.TestChannel.ValueBool())
 	if err != nil {
 		return
 	}
@@ -228,19 +239,33 @@ func (r *gacSettingsResource) Delete(ctx context.Context, req resource.DeleteReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	//Delete settings configuration for the service url
 	encodedServiceUrl := b64.StdEncoding.EncodeToString([]byte(state.ServiceUrl.ValueString()))
-	deleteSettingsRequest := r.client.GacClient.SettingsControllerDAAS.DeleteSettingsApiUsingDELETE(ctx, util.GacAppName, encodedServiceUrl)
-	httpResp, err := citrixdaasclient.AddRequestData(deleteSettingsRequest, r.client).Execute()
+	if state.TestChannel.ValueBool() {
+		//Delete settings configuration for the test channel
+		deleteSettingsForChannelRequest := r.client.GacClient.SettingsControllerDAAS.DeleteSettingsForChannel(ctx, util.GacAppName, util.GacTestChannelShortName, encodedServiceUrl)
+		httpResp, err := citrixdaasclient.AddRequestData(deleteSettingsForChannelRequest, r.client).Execute()
 
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error deleting settings configuration for service url: "+state.ServiceUrl.ValueString(),
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadGacError(err),
-		)
-		return
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error deleting settings configuration for test channel service url: "+state.ServiceUrl.ValueString(),
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadGacError(err),
+			)
+			return
+		}
+	} else {
+		//Delete settings configuration for the service url
+		deleteSettingsRequest := r.client.GacClient.SettingsControllerDAAS.DeleteSettingsApiUsingDELETE(ctx, util.GacAppName, encodedServiceUrl)
+		httpResp, err := citrixdaasclient.AddRequestData(deleteSettingsRequest, r.client).Execute()
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error deleting settings configuration for service url: "+state.ServiceUrl.ValueString(),
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadGacError(err),
+			)
+			return
+		}
 	}
 
 }
@@ -250,26 +275,44 @@ func (r *gacSettingsResource) ImportState(ctx context.Context, req resource.Impo
 	resource.ImportStatePassthroughID(ctx, path.Root("service_url"), req, resp)
 }
 
-func getSettingsConfiguration(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, serviceUrl string) (*globalappconfiguration.GetAllSettingResponse, error) {
+func getSettingsConfiguration(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, serviceUrl string, isTestChannel bool) (*globalappconfiguration.GetAllSettingResponse, error) {
 	encodedServiceUrl := b64.StdEncoding.EncodeToString([]byte(serviceUrl))
-	getSettingsRequest := client.GacClient.SettingsControllerDAAS.GetSettingsApiUsingGET(ctx, util.GacAppName, encodedServiceUrl)
-	getSettingsResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*globalappconfiguration.GetAllSettingResponse](getSettingsRequest, client)
-	if err != nil {
-		diagnostics.AddError(
-			"Error fetching settings configuration for service url: "+serviceUrl,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadGacError(err),
-		)
+	if isTestChannel {
+		getSettingsForChannelRequest := client.GacClient.SettingsControllerDAAS.RetrieveSettingsForChannel(ctx, util.GacAppName, util.GacTestChannelShortName, encodedServiceUrl)
+		getSettingsResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*globalappconfiguration.GetAllSettingResponse](getSettingsForChannelRequest, client)
+		if err != nil {
+			diagnostics.AddError(
+				"Error fetching settings configuration for test channel service url: "+serviceUrl,
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadGacError(err),
+			)
+		}
+		return getSettingsResponse, nil
+	} else {
+		getSettingsRequest := client.GacClient.SettingsControllerDAAS.GetSettingsApiUsingGET(ctx, util.GacAppName, encodedServiceUrl)
+		getSettingsResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*globalappconfiguration.GetAllSettingResponse](getSettingsRequest, client)
+		if err != nil {
+			diagnostics.AddError(
+				"Error fetching settings configuration for service url: "+serviceUrl,
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadGacError(err),
+			)
+		}
+		return getSettingsResponse, nil
 	}
-
-	return getSettingsResponse, nil
 }
 
-func readSettingsConfiguration(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, serviceUrl string) (*globalappconfiguration.GetAllSettingResponse, error) {
+func readSettingsConfiguration(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, serviceUrl string, isTestChannel bool) (*globalappconfiguration.GetAllSettingResponse, error) {
 	encodedServiceUrl := b64.StdEncoding.EncodeToString([]byte(serviceUrl))
-	getSettingsRequest := client.GacClient.SettingsControllerDAAS.GetSettingsApiUsingGET(ctx, util.GacAppName, encodedServiceUrl)
-	getSettingsResponse, _, err := util.ReadResource[*globalappconfiguration.GetAllSettingResponse](getSettingsRequest, ctx, client, resp, "ServiceUrl Settings Configuration", serviceUrl)
-	return getSettingsResponse, err
+	if isTestChannel {
+		getSettingsForChannelRequest := client.GacClient.SettingsControllerDAAS.RetrieveSettingsForChannel(ctx, util.GacAppName, util.GacTestChannelShortName, encodedServiceUrl)
+		getSettingsResponse, _, err := util.ReadResource[*globalappconfiguration.GetAllSettingResponse](getSettingsForChannelRequest, ctx, client, resp, "Test Channel Settings Configuration", serviceUrl)
+		return getSettingsResponse, err
+	} else {
+		getSettingsRequest := client.GacClient.SettingsControllerDAAS.GetSettingsApiUsingGET(ctx, util.GacAppName, encodedServiceUrl)
+		getSettingsResponse, _, err := util.ReadResource[*globalappconfiguration.GetAllSettingResponse](getSettingsRequest, ctx, client, resp, "ServiceUrl Settings Configuration", serviceUrl)
+		return getSettingsResponse, err
+	}
 }
 
 func GetAppSettingsForWindows(ctx context.Context, diagnostics *diag.Diagnostics, windowsList types.Set) []globalappconfiguration.PlatformSettings {
@@ -384,9 +427,9 @@ func GetAppSettingsForMacos(ctx context.Context, diagnostics *diag.Diagnostics, 
 	return platformSettings
 }
 
-func CreateCategorySettingsForWindows(ctx context.Context, diagnostics *diag.Diagnostics, windowsSettingsList types.List) []globalappconfiguration.CategorySettings {
+func CreateCategorySettingsForWindows(ctx context.Context, diagnostics *diag.Diagnostics, windowsSettingsList types.Set) []globalappconfiguration.CategorySettings {
 	var categorySettings []globalappconfiguration.CategorySettings
-	windowsSettings := util.ObjectListToTypedArray[WindowsSettings](ctx, diagnostics, windowsSettingsList)
+	windowsSettings := util.ObjectSetToTypedArray[WindowsSettings](ctx, diagnostics, windowsSettingsList)
 
 	for _, windowsSetting := range windowsSettings {
 		var categorySetting globalappconfiguration.CategorySettings
@@ -398,7 +441,7 @@ func CreateCategorySettingsForWindows(ctx context.Context, diagnostics *diag.Dia
 			categorySetting.SetValue(util.StringListToStringArray(ctx, diagnostics, windowsSetting.ValueList))
 		} else if len(windowsSetting.LocalAppAllowList.Elements()) > 0 {
 			var localAppAllowListGo []LocalAppAllowListModel_Go
-			localAppAllowList := util.ObjectListToTypedArray[LocalAppAllowListModel](ctx, diagnostics, windowsSetting.LocalAppAllowList)
+			localAppAllowList := util.ObjectSetToTypedArray[LocalAppAllowListModel](ctx, diagnostics, windowsSetting.LocalAppAllowList)
 			for _, localApp := range localAppAllowList {
 				var localAppAllowListGoItem LocalAppAllowListModel_Go
 				ConvertStruct(localApp, &localAppAllowListGoItem)
@@ -414,7 +457,7 @@ func CreateCategorySettingsForWindows(ctx context.Context, diagnostics *diag.Dia
 			categorySetting.SetValue(enterpriseBrowserSSO)
 		} else if !windowsSetting.ExtensionInstallAllowList.IsNull() {
 			var extensionInstallAllowListGo []ExtensionInstallAllowListModel_Go
-			extensionInstallAllowList := util.ObjectListToTypedArray[ExtensionInstallAllowListModel](ctx, diagnostics, windowsSetting.ExtensionInstallAllowList)
+			extensionInstallAllowList := util.ObjectSetToTypedArray[ExtensionInstallAllowListModel](ctx, diagnostics, windowsSetting.ExtensionInstallAllowList)
 			for _, extensionInstall := range extensionInstallAllowList {
 				var extensionInstallAllowListGoItem ExtensionInstallAllowListModel_Go
 				ConvertStruct(extensionInstall, &extensionInstallAllowListGoItem)
@@ -423,7 +466,7 @@ func CreateCategorySettingsForWindows(ctx context.Context, diagnostics *diag.Dia
 			categorySetting.SetValue(extensionInstallAllowListGo)
 		} else if !windowsSetting.AutoLaunchProtocolsFromOrigins.IsNull() {
 			var autoLaunchProtocolsFromOriginsGo []AutoLaunchProtocolsFromOriginsModel_Go
-			autoLaunchProtocolsFromOriginsList := util.ObjectListToTypedArray[AutoLaunchProtocolsFromOriginsModel](ctx, diagnostics, windowsSetting.AutoLaunchProtocolsFromOrigins)
+			autoLaunchProtocolsFromOriginsList := util.ObjectSetToTypedArray[AutoLaunchProtocolsFromOriginsModel](ctx, diagnostics, windowsSetting.AutoLaunchProtocolsFromOrigins)
 			for _, autoLaunchProtocolsFromOrigins := range autoLaunchProtocolsFromOriginsList {
 				var autoLaunchProtocolItem AutoLaunchProtocolsFromOriginsModel_Go
 				autoLaunchProtocolItem.Protocol = autoLaunchProtocolsFromOrigins.Protocol.ValueString()
@@ -435,7 +478,7 @@ func CreateCategorySettingsForWindows(ctx context.Context, diagnostics *diag.Dia
 			categorySetting.SetValue(autoLaunchProtocolsFromOriginsGo)
 		} else if !windowsSetting.ManagedBookmarks.IsNull() {
 			var managedBookmarksGo []BookMarkValueModel_Go
-			managedBookmarksList := util.ObjectListToTypedArray[BookMarkValueModel](ctx, diagnostics, windowsSetting.ManagedBookmarks)
+			managedBookmarksList := util.ObjectSetToTypedArray[BookMarkValueModel](ctx, diagnostics, windowsSetting.ManagedBookmarks)
 			for _, managedBookmark := range managedBookmarksList {
 				var managedBookmarkItem BookMarkValueModel_Go
 				managedBookmarkItem.Name = managedBookmark.Name.ValueString()
@@ -449,9 +492,9 @@ func CreateCategorySettingsForWindows(ctx context.Context, diagnostics *diag.Dia
 	return categorySettings
 }
 
-func CreateCategorySettingsForLinux(ctx context.Context, diagnostics *diag.Diagnostics, linuxSettingsList types.List) []globalappconfiguration.CategorySettings {
+func CreateCategorySettingsForLinux(ctx context.Context, diagnostics *diag.Diagnostics, linuxSettingsList types.Set) []globalappconfiguration.CategorySettings {
 	var categorySettings []globalappconfiguration.CategorySettings
-	linuxSettings := util.ObjectListToTypedArray[LinuxSettings](ctx, diagnostics, linuxSettingsList)
+	linuxSettings := util.ObjectSetToTypedArray[LinuxSettings](ctx, diagnostics, linuxSettingsList)
 
 	for _, linuxSetting := range linuxSettings {
 		var categorySetting globalappconfiguration.CategorySettings
@@ -463,7 +506,7 @@ func CreateCategorySettingsForLinux(ctx context.Context, diagnostics *diag.Diagn
 			categorySetting.SetValue(util.StringListToStringArray(ctx, diagnostics, linuxSetting.ValueList))
 		} else if !linuxSetting.ExtensionInstallAllowList.IsNull() {
 			var extensionInstallAllowListGo []ExtensionInstallAllowListModel_Go
-			extensionInstallAllowList := util.ObjectListToTypedArray[ExtensionInstallAllowListModel](ctx, diagnostics, linuxSetting.ExtensionInstallAllowList)
+			extensionInstallAllowList := util.ObjectSetToTypedArray[ExtensionInstallAllowListModel](ctx, diagnostics, linuxSetting.ExtensionInstallAllowList)
 			for _, extensionInstall := range extensionInstallAllowList {
 				var extensionInstallAllowListGoItem ExtensionInstallAllowListModel_Go
 				ConvertStruct(extensionInstall, &extensionInstallAllowListGoItem)
@@ -472,7 +515,7 @@ func CreateCategorySettingsForLinux(ctx context.Context, diagnostics *diag.Diagn
 			categorySetting.SetValue(extensionInstallAllowListGo)
 		} else if !linuxSetting.AutoLaunchProtocolsFromOrigins.IsNull() {
 			var autoLaunchProtocolsFromOriginsGo []AutoLaunchProtocolsFromOriginsModel_Go
-			autoLaunchProtocolsFromOriginsList := util.ObjectListToTypedArray[AutoLaunchProtocolsFromOriginsModel](ctx, diagnostics, linuxSetting.AutoLaunchProtocolsFromOrigins)
+			autoLaunchProtocolsFromOriginsList := util.ObjectSetToTypedArray[AutoLaunchProtocolsFromOriginsModel](ctx, diagnostics, linuxSetting.AutoLaunchProtocolsFromOrigins)
 			for _, autoLaunchProtocolsFromOrigins := range autoLaunchProtocolsFromOriginsList {
 				var autoLaunchProtocolItem AutoLaunchProtocolsFromOriginsModel_Go
 				autoLaunchProtocolItem.Protocol = autoLaunchProtocolsFromOrigins.Protocol.ValueString()
@@ -484,7 +527,7 @@ func CreateCategorySettingsForLinux(ctx context.Context, diagnostics *diag.Diagn
 			categorySetting.SetValue(autoLaunchProtocolsFromOriginsGo)
 		} else if !linuxSetting.ManagedBookmarks.IsNull() {
 			var managedBookmarksGo []BookMarkValueModel_Go
-			managedBookmarksList := util.ObjectListToTypedArray[BookMarkValueModel](ctx, diagnostics, linuxSetting.ManagedBookmarks)
+			managedBookmarksList := util.ObjectSetToTypedArray[BookMarkValueModel](ctx, diagnostics, linuxSetting.ManagedBookmarks)
 			for _, managedBookmark := range managedBookmarksList {
 				var managedBookmarkItem BookMarkValueModel_Go
 				managedBookmarkItem.Name = managedBookmark.Name.ValueString()
@@ -498,9 +541,9 @@ func CreateCategorySettingsForLinux(ctx context.Context, diagnostics *diag.Diagn
 	return categorySettings
 }
 
-func CreateCategorySettingsForIos(ctx context.Context, diagnostics *diag.Diagnostics, iosSettingsList types.List) []globalappconfiguration.CategorySettings {
+func CreateCategorySettingsForIos(ctx context.Context, diagnostics *diag.Diagnostics, iosSettingsList types.Set) []globalappconfiguration.CategorySettings {
 	var categorySettings []globalappconfiguration.CategorySettings
-	iosSettings := util.ObjectListToTypedArray[IosSettings](ctx, diagnostics, iosSettingsList)
+	iosSettings := util.ObjectSetToTypedArray[IosSettings](ctx, diagnostics, iosSettingsList)
 
 	for _, iosSetting := range iosSettings {
 		var categorySetting globalappconfiguration.CategorySettings
@@ -514,9 +557,9 @@ func CreateCategorySettingsForIos(ctx context.Context, diagnostics *diag.Diagnos
 	return categorySettings
 }
 
-func CreateCategorySettingsForAndroid(ctx context.Context, diagnostics *diag.Diagnostics, androidSettingsList types.List) []globalappconfiguration.CategorySettings {
+func CreateCategorySettingsForAndroid(ctx context.Context, diagnostics *diag.Diagnostics, androidSettingsList types.Set) []globalappconfiguration.CategorySettings {
 	var categorySettings []globalappconfiguration.CategorySettings
-	androidSettings := util.ObjectListToTypedArray[AndroidSettings](ctx, diagnostics, androidSettingsList)
+	androidSettings := util.ObjectSetToTypedArray[AndroidSettings](ctx, diagnostics, androidSettingsList)
 
 	for _, androidSetting := range androidSettings {
 		var categorySetting globalappconfiguration.CategorySettings
@@ -532,9 +575,9 @@ func CreateCategorySettingsForAndroid(ctx context.Context, diagnostics *diag.Dia
 	return categorySettings
 }
 
-func CreateCategorySettingsForHtml5(ctx context.Context, diagnostics *diag.Diagnostics, html5SettingsList types.List) []globalappconfiguration.CategorySettings {
+func CreateCategorySettingsForHtml5(ctx context.Context, diagnostics *diag.Diagnostics, html5SettingsList types.Set) []globalappconfiguration.CategorySettings {
 	var categorySettings []globalappconfiguration.CategorySettings
-	html5Settings := util.ObjectListToTypedArray[Html5Settings](ctx, diagnostics, html5SettingsList)
+	html5Settings := util.ObjectSetToTypedArray[Html5Settings](ctx, diagnostics, html5SettingsList)
 
 	for _, html5Setting := range html5Settings {
 		var categorySetting globalappconfiguration.CategorySettings
@@ -550,9 +593,9 @@ func CreateCategorySettingsForHtml5(ctx context.Context, diagnostics *diag.Diagn
 	return categorySettings
 }
 
-func CreateCategorySettingsForChromeos(ctx context.Context, diagnostics *diag.Diagnostics, chromeosSettingsList types.List) []globalappconfiguration.CategorySettings {
+func CreateCategorySettingsForChromeos(ctx context.Context, diagnostics *diag.Diagnostics, chromeosSettingsList types.Set) []globalappconfiguration.CategorySettings {
 	var categorySettings []globalappconfiguration.CategorySettings
-	chromeosSettings := util.ObjectListToTypedArray[ChromeosSettings](ctx, diagnostics, chromeosSettingsList)
+	chromeosSettings := util.ObjectSetToTypedArray[ChromeosSettings](ctx, diagnostics, chromeosSettingsList)
 
 	for _, chromeosSetting := range chromeosSettings {
 		var categorySetting globalappconfiguration.CategorySettings
@@ -568,9 +611,9 @@ func CreateCategorySettingsForChromeos(ctx context.Context, diagnostics *diag.Di
 	return categorySettings
 }
 
-func CreateCategorySettingsForMacos(ctx context.Context, diagnostics *diag.Diagnostics, macosSettingsList types.List) []globalappconfiguration.CategorySettings {
+func CreateCategorySettingsForMacos(ctx context.Context, diagnostics *diag.Diagnostics, macosSettingsList types.Set) []globalappconfiguration.CategorySettings {
 	var categorySettings []globalappconfiguration.CategorySettings
-	macosSettings := util.ObjectListToTypedArray[MacosSettings](ctx, diagnostics, macosSettingsList)
+	macosSettings := util.ObjectSetToTypedArray[MacosSettings](ctx, diagnostics, macosSettingsList)
 
 	for _, macosSetting := range macosSettings {
 		var categorySetting globalappconfiguration.CategorySettings
@@ -582,7 +625,7 @@ func CreateCategorySettingsForMacos(ctx context.Context, diagnostics *diag.Diagn
 			categorySetting.SetValue(util.StringListToStringArray(ctx, diagnostics, macosSetting.ValueList))
 		} else if !macosSetting.AutoLaunchProtocolsFromOrigins.IsNull() {
 			var autoLaunchProtocolsFromOriginsGo []AutoLaunchProtocolsFromOriginsModel_Go
-			autoLaunchProtocolsFromOriginsList := util.ObjectListToTypedArray[AutoLaunchProtocolsFromOriginsModel](ctx, diagnostics, macosSetting.AutoLaunchProtocolsFromOrigins)
+			autoLaunchProtocolsFromOriginsList := util.ObjectSetToTypedArray[AutoLaunchProtocolsFromOriginsModel](ctx, diagnostics, macosSetting.AutoLaunchProtocolsFromOrigins)
 			for _, autoLaunchProtocolsFromOrigins := range autoLaunchProtocolsFromOriginsList {
 				var autoLaunchProtocolItem AutoLaunchProtocolsFromOriginsModel_Go
 				autoLaunchProtocolItem.Protocol = autoLaunchProtocolsFromOrigins.Protocol.ValueString()
@@ -601,7 +644,7 @@ func CreateCategorySettingsForMacos(ctx context.Context, diagnostics *diag.Diagn
 			categorySetting.SetValue(enterpriseBrowserSSO)
 		} else if !macosSetting.ExtensionInstallAllowList.IsNull() {
 			var extensionInstallAllowListGo []ExtensionInstallAllowListModel_Go
-			extensionInstallAllowList := util.ObjectListToTypedArray[ExtensionInstallAllowListModel](ctx, diagnostics, macosSetting.ExtensionInstallAllowList)
+			extensionInstallAllowList := util.ObjectSetToTypedArray[ExtensionInstallAllowListModel](ctx, diagnostics, macosSetting.ExtensionInstallAllowList)
 			for _, extensionInstall := range extensionInstallAllowList {
 				var extensionInstallAllowListGoItem ExtensionInstallAllowListModel_Go
 				ConvertStruct(extensionInstall, &extensionInstallAllowListGoItem)
@@ -610,7 +653,7 @@ func CreateCategorySettingsForMacos(ctx context.Context, diagnostics *diag.Diagn
 			categorySetting.SetValue(extensionInstallAllowListGo)
 		} else if !macosSetting.ManagedBookmarks.IsNull() {
 			var managedBookmarksGo []BookMarkValueModel_Go
-			managedBookmarksList := util.ObjectListToTypedArray[BookMarkValueModel](ctx, diagnostics, macosSetting.ManagedBookmarks)
+			managedBookmarksList := util.ObjectSetToTypedArray[BookMarkValueModel](ctx, diagnostics, macosSetting.ManagedBookmarks)
 			for _, managedBookmark := range managedBookmarksList {
 				var managedBookmarkItem BookMarkValueModel_Go
 				managedBookmarkItem.Name = managedBookmark.Name.ValueString()
@@ -634,6 +677,19 @@ func (r *gacSettingsResource) ModifyPlan(ctx context.Context, req resource.Modif
 	}
 }
 
+func exactlyOneValueTypeIsSet(valueTypes ...bool) bool {
+	count := 0
+	for _, valueType := range valueTypes {
+		if !valueType {
+			count++
+			if count > 1 {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func (r *gacSettingsResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
@@ -649,10 +705,13 @@ func (r *gacSettingsResource) ValidateConfig(ctx context.Context, req resource.V
 	if !appSettings.Windows.IsNull() && !appSettings.Windows.IsUnknown() {
 		windowsList := util.ObjectSetToTypedArray[Windows](ctx, &resp.Diagnostics, appSettings.Windows)
 		for _, windowsInstance := range windowsList {
-			appSettings := util.ObjectListToTypedArray[WindowsSettings](ctx, &resp.Diagnostics, windowsInstance.Settings)
+			appSettings := util.ObjectSetToTypedArray[WindowsSettings](ctx, &resp.Diagnostics, windowsInstance.Settings)
 			for _, appSetting := range appSettings {
 				if appSetting.LocalAppAllowList.IsNull() && appSetting.EnterpriseBroswerSSO.IsNull() && appSetting.ExtensionInstallAllowList.IsNull() && appSetting.ValueList.IsNull() && appSetting.ValueString.IsNull() && appSetting.AutoLaunchProtocolsFromOrigins.IsNull() && appSetting.ManagedBookmarks.IsNull() {
 					resp.Diagnostics.AddError("Error in Windows Settings", "At least one value should be specified for Windows Settings")
+				}
+				if !exactlyOneValueTypeIsSet(appSetting.ValueString.IsNull(), appSetting.ValueList.IsNull(), appSetting.AutoLaunchProtocolsFromOrigins.IsNull(), appSetting.ManagedBookmarks.IsNull(), appSetting.ExtensionInstallAllowList.IsNull(), appSetting.EnterpriseBroswerSSO.IsNull(), appSetting.LocalAppAllowList.IsNull()) {
+					resp.Diagnostics.AddError("Error in Windows Settings", "Only one value should be specified for Windows Settings")
 				}
 			}
 		}
@@ -662,10 +721,13 @@ func (r *gacSettingsResource) ValidateConfig(ctx context.Context, req resource.V
 	if !appSettings.Macos.IsNull() && !appSettings.Macos.IsUnknown() {
 		macosList := util.ObjectSetToTypedArray[Macos](ctx, &resp.Diagnostics, appSettings.Macos)
 		for _, macosInstance := range macosList {
-			appSettings := util.ObjectListToTypedArray[MacosSettings](ctx, &resp.Diagnostics, macosInstance.Settings)
+			appSettings := util.ObjectSetToTypedArray[MacosSettings](ctx, &resp.Diagnostics, macosInstance.Settings)
 			for _, appSetting := range appSettings {
 				if appSetting.EnterpriseBroswerSSO.IsNull() && appSetting.ExtensionInstallAllowList.IsNull() && appSetting.ValueList.IsNull() && appSetting.ValueString.IsNull() && appSetting.AutoLaunchProtocolsFromOrigins.IsNull() && appSetting.ManagedBookmarks.IsNull() {
 					resp.Diagnostics.AddError("Error in MacOs Settings", "At least one value should be specified for MacOs Settings")
+				}
+				if !exactlyOneValueTypeIsSet(appSetting.ValueString.IsNull(), appSetting.ValueList.IsNull(), appSetting.AutoLaunchProtocolsFromOrigins.IsNull(), appSetting.ManagedBookmarks.IsNull(), appSetting.ExtensionInstallAllowList.IsNull(), appSetting.EnterpriseBroswerSSO.IsNull()) {
+					resp.Diagnostics.AddError("Error in MacOs Settings", "Only one value should be specified for MacOs Settings")
 				}
 			}
 		}
@@ -673,12 +735,63 @@ func (r *gacSettingsResource) ValidateConfig(ctx context.Context, req resource.V
 
 	// Validate the configuration for Linux
 	if !appSettings.Linux.IsNull() && !appSettings.Linux.IsUnknown() {
-		htmls5List := util.ObjectSetToTypedArray[Linux](ctx, &resp.Diagnostics, appSettings.Linux)
-		for _, LinuxInstance := range htmls5List {
-			appSettings := util.ObjectListToTypedArray[LinuxSettings](ctx, &resp.Diagnostics, LinuxInstance.Settings)
+		linuxList := util.ObjectSetToTypedArray[Linux](ctx, &resp.Diagnostics, appSettings.Linux)
+		for _, LinuxInstance := range linuxList {
+			appSettings := util.ObjectSetToTypedArray[LinuxSettings](ctx, &resp.Diagnostics, LinuxInstance.Settings)
 			for _, appSetting := range appSettings {
 				if appSetting.ValueString.IsNull() && appSetting.ValueList.IsNull() && appSetting.AutoLaunchProtocolsFromOrigins.IsNull() && appSetting.ManagedBookmarks.IsNull() && appSetting.ExtensionInstallAllowList.IsNull() {
 					resp.Diagnostics.AddError("Error in Linux Settings", "At least one value should be specified for Linux Settings")
+				}
+				if !exactlyOneValueTypeIsSet(appSetting.ValueString.IsNull(), appSetting.ValueList.IsNull(), appSetting.AutoLaunchProtocolsFromOrigins.IsNull(), appSetting.ManagedBookmarks.IsNull(), appSetting.ExtensionInstallAllowList.IsNull()) {
+					resp.Diagnostics.AddError("Error in Linux Settings", "Only one value should be specified for Linux Settings")
+				}
+			}
+		}
+	}
+
+	// Validate the configuration for ChromeOs
+	if !appSettings.Chromeos.IsNull() && !appSettings.Chromeos.IsUnknown() {
+		chromeosList := util.ObjectSetToTypedArray[Chromeos](ctx, &resp.Diagnostics, appSettings.Chromeos)
+		for _, chromeosInstance := range chromeosList {
+			appSettings := util.ObjectSetToTypedArray[ChromeosSettings](ctx, &resp.Diagnostics, chromeosInstance.Settings)
+			for _, appSetting := range appSettings {
+				if appSetting.ValueString.IsNull() && appSetting.ValueList.IsNull() {
+					resp.Diagnostics.AddError("Error in Chrome OS Settings", "At least one value should be specified for Chrome OS Settings")
+				}
+				if !exactlyOneValueTypeIsSet(appSetting.ValueString.IsNull(), appSetting.ValueList.IsNull()) {
+					resp.Diagnostics.AddError("Error in Chrome OS Settings", "Only one value should be specified for Chrome OS Settings")
+				}
+			}
+		}
+	}
+
+	// Validate the configuration for Html5
+	if !appSettings.Html5.IsNull() && !appSettings.Html5.IsUnknown() {
+		htmls5List := util.ObjectSetToTypedArray[Html5](ctx, &resp.Diagnostics, appSettings.Html5)
+		for _, html5Instance := range htmls5List {
+			appSettings := util.ObjectSetToTypedArray[Html5Settings](ctx, &resp.Diagnostics, html5Instance.Settings)
+			for _, appSetting := range appSettings {
+				if appSetting.ValueString.IsNull() && appSetting.ValueList.IsNull() {
+					resp.Diagnostics.AddError("Error in Html5 Settings", "At least one value should be specified for Html5 Settings")
+				}
+				if !exactlyOneValueTypeIsSet(appSetting.ValueString.IsNull(), appSetting.ValueList.IsNull()) {
+					resp.Diagnostics.AddError("Error in Html5 Settings", "Only one value should be specified for Html5 Settings")
+				}
+			}
+		}
+	}
+
+	// Validate the configuration for Android
+	if !appSettings.Android.IsNull() && !appSettings.Android.IsUnknown() {
+		androidList := util.ObjectSetToTypedArray[Android](ctx, &resp.Diagnostics, appSettings.Android)
+		for _, androidInstance := range androidList {
+			appSettings := util.ObjectSetToTypedArray[AndroidSettings](ctx, &resp.Diagnostics, androidInstance.Settings)
+			for _, appSetting := range appSettings {
+				if appSetting.ValueString.IsNull() && appSetting.ValueList.IsNull() {
+					resp.Diagnostics.AddError("Error in Android Settings", "At least one value should be specified for Android Settings")
+				}
+				if !exactlyOneValueTypeIsSet(appSetting.ValueString.IsNull(), appSetting.ValueList.IsNull()) {
+					resp.Diagnostics.AddError("Error in Android Settings", "Only one value should be specified for Android Settings")
 				}
 			}
 		}
