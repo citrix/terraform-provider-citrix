@@ -917,9 +917,17 @@ try {
     # Import terraform resources into state
     Import-ResourcesToState
 
-    # Export terraform resources
-    # Add -no-color to disable output with coloring
+    # Save the current console output encoding
+    $prev = [Console]::OutputEncoding
+
+    # Set the console output encoding to UTF-8
+    [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+
+    # Run terraform show command and output to resource.tf file. Add -no-color to disable output with coloring
     terraform show -no-color >> ".\resource.tf"
+
+    # Restore the previous console output encoding
+    [Console]::OutputEncoding = $prev
 
     # Post-process citrix.tf output
     PostProcessProviderConfig
