@@ -1,4 +1,4 @@
-﻿﻿
+﻿
 # Copyright © 2024. Citrix Systems, Inc. All Rights Reserved.
 <#
 Currently this script is still in TechPreview
