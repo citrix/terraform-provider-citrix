@@ -97,7 +97,7 @@ func (AdminRoleModel) GetSchema() schema.Schema {
 			"permissions": schema.SetAttribute{
 				ElementType: types.StringType,
 				Description: "Permissions to be associated with the admin role. " +
-					"\n\n-> **Note** To get a list of supported permissions, please refer to [Admin Predefined Permissions for Cloud](https://developer-docs.citrix.com/en-us/citrix-daas-service-apis/citrix-daas-rest-apis/apis/#/Admin-APIs/Admin-GetPredefinedPermissions) and [Admin Predefined Permissions for On-Premise](https://developer-docs.citrix.com/en-us/citrix-virtual-apps-desktops/citrix-cvad-rest-apis/apis/#/Admin-APIs/Admin-GetPredefinedPermissions).",
+					"\n\n-> **Note** To get a list of supported permissions, please refer to [Admin Predefined Permissions for Cloud](https://developer-docs.citrix.com/en-us/citrix-daas-service-apis/citrix-daas-rest-apis/apis/#/Admin-APIs/Admin-GetPredefinedPermissions) and [Admin Predefined Permissions for On-Premise](https://developer-docs.citrix.com/en-us/citrix-virtual-apps-desktops/citrix-cvad-rest-apis/apis/#/Admin-APIs/Admin-GetPredefinedPermissions), or use the `citrix_admin_permissions` data source.",
 				Required: true,
 				Validators: []validator.Set{
 					setvalidator.SizeAtLeast(1),

@@ -33,6 +33,7 @@ type AzureMachineConfigModel struct {
 	/** Azure Hypervisor **/
 	AzureMasterImage         types.Object `tfsdk:"azure_master_image"`
 	AzurePvsConfiguration    types.Object `tfsdk:"azure_pvs_config"`
+	AzurePreparedImage       types.Object `tfsdk:"prepared_image"` // PreparedImageConfigModel
 	MasterImageNote          types.String `tfsdk:"master_image_note"`
 	ImageUpdateRebootOptions types.Object `tfsdk:"image_update_reboot_options"`
 	VdaResourceGroup         types.String `tfsdk:"vda_resource_group"`
@@ -57,11 +58,15 @@ func (AzureMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 			},
 			"azure_pvs_config":   AzurePvsConfigurationModel{}.GetSchema(),
 			"azure_master_image": AzureMasterImageModel{}.GetSchema(),
+			"prepared_image":     PreparedImageConfigModel{}.GetSchema(),
 			"master_image_note": schema.StringAttribute{
 				Description: "The note for the master image.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(""),
+				Validators: []validator.String{
+					stringvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("prepared_image")),
+				},
 			},
 			"image_update_reboot_options": ImageUpdateRebootOptionsModel{}.GetSchema(),
 			"storage_type": schema.StringAttribute{
@@ -583,6 +588,18 @@ func (AzureMasterImageModel) GetSchema() schema.SingleNestedAttribute {
 			},
 			"gallery_image": util.GalleryImageModel{}.GetSchema(),
 		},
+		PlanModifiers: []planmodifier.Object{
+			objectplanmodifier.RequiresReplaceIf(
+				func(_ context.Context, req planmodifier.ObjectRequest, resp *objectplanmodifier.RequiresReplaceIfFuncResponse) {
+					resp.RequiresReplace = !req.StateValue.IsUnknown() && !req.StateValue.IsNull() && req.PlanValue.IsNull()
+				},
+				"Changing machine catalog image type requires replacing the machine catalog resource.",
+				"Changing machine catalog image type requires replacing the machine catalog resource.",
+			),
+		},
+		Validators: []validator.Object{
+			objectvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("prepared_image")),
+		},
 	}
 }
 
@@ -616,7 +633,7 @@ func (AzurePvsConfigurationModel) GetSchema() schema.SingleNestedAttribute {
 			},
 		},
 		Validators: []validator.Object{
-			objectvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("azure_master_image")),
+			objectvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("azure_master_image"), path.MatchRelative().AtParent().AtName("prepared_image")),
 		},
 	}
 }
@@ -981,41 +998,62 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 
 	// Refresh Master Image for non PVS catalogs
 	if *provisioningType != citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING {
-		masterImage := provScheme.GetMasterImage()
-		azureMasterImage := util.ObjectValueToTypedObject[AzureMasterImageModel](ctx, diagnostics, mc.AzureMasterImage)
-		masterImageXdPath := masterImage.GetXDPath()
-		if masterImageXdPath != "" {
-			segments := strings.Split(masterImage.GetXDPath(), "\\")
-			lastIndex := len(segments)
-			resourceTag := strings.Split(segments[lastIndex-1], ".")
-			resourceType := resourceTag[len(resourceTag)-1]
+		if provScheme.CurrentImageVersion != nil {
+			currentImage := provScheme.GetCurrentImageVersion()
+			imageVersion := currentImage.GetImageVersion()
+			imageDefinition := imageVersion.GetImageDefinition()
+			preparedImageConfig := util.ObjectValueToTypedObject[PreparedImageConfigModel](ctx, diagnostics, mc.AzurePreparedImage)
+			preparedImageConfig.ImageDefinition = types.StringValue(imageDefinition.GetId())
+			preparedImageConfig.ImageVersion = types.StringValue(imageVersion.GetId())
+			mc.AzurePreparedImage = util.TypedObjectToObjectValue(ctx, diagnostics, preparedImageConfig)
 
-			if strings.EqualFold(resourceType, util.ImageVersionResourceType) {
-				azureMasterImage.GalleryImage,
-					azureMasterImage.ResourceGroup,
-					azureMasterImage.SharedSubscription =
-					util.ParseMasterImageToUpdateGalleryImageModel(ctx, diagnostics, azureMasterImage.GalleryImage, masterImage, segments, lastIndex)
-
-				// Clear other master image details
-				azureMasterImage.MasterImage = types.StringNull()
-				azureMasterImage.StorageAccount = types.StringNull()
-				azureMasterImage.Container = types.StringNull()
+			if attributesMap, err := util.ResourceAttributeMapFromObject(AzureMasterImageModel{}); err == nil {
+				mc.AzureMasterImage = types.ObjectNull(attributesMap)
 			} else {
-				azureMasterImage.MasterImage,
-					azureMasterImage.ResourceGroup,
-					azureMasterImage.SharedSubscription,
+				diagnostics.AddWarning("Error when creating null AzureMasterImageModel", err.Error())
+			}
+		} else {
+			masterImage := provScheme.GetMasterImage()
+			azureMasterImage := util.ObjectValueToTypedObject[AzureMasterImageModel](ctx, diagnostics, mc.AzureMasterImage)
+			masterImageXdPath := masterImage.GetXDPath()
+			if masterImageXdPath != "" {
+				segments := strings.Split(masterImage.GetXDPath(), "\\")
+				lastIndex := len(segments)
+				resourceTag := strings.Split(segments[lastIndex-1], ".")
+				resourceType := resourceTag[len(resourceTag)-1]
+
+				if strings.EqualFold(resourceType, util.ImageVersionResourceType) {
 					azureMasterImage.GalleryImage,
-					azureMasterImage.StorageAccount,
-					azureMasterImage.Container =
-					util.ParseMasterImageToUpdateAzureImageSpecs(ctx, diagnostics, resourceType, masterImage, segments, lastIndex)
+						azureMasterImage.ResourceGroup,
+						azureMasterImage.SharedSubscription =
+						util.ParseMasterImageToUpdateGalleryImageModel(ctx, diagnostics, azureMasterImage.GalleryImage, masterImage, segments, lastIndex)
+
+					// Clear other master image details
+					azureMasterImage.MasterImage = types.StringNull()
+					azureMasterImage.StorageAccount = types.StringNull()
+					azureMasterImage.Container = types.StringNull()
+				} else {
+					azureMasterImage.MasterImage,
+						azureMasterImage.ResourceGroup,
+						azureMasterImage.SharedSubscription,
+						azureMasterImage.GalleryImage,
+						azureMasterImage.StorageAccount,
+						azureMasterImage.Container =
+						util.ParseMasterImageToUpdateAzureImageSpecs(ctx, diagnostics, resourceType, masterImage, segments, lastIndex)
+				}
+			}
+
+			mc.AzureMasterImage = util.TypedObjectToObjectValue(ctx, diagnostics, azureMasterImage)
+			// Refresh Master Image Note
+			currentDiskImage := provScheme.GetCurrentDiskImage()
+			mc.MasterImageNote = types.StringValue(currentDiskImage.GetMasterImageNote())
+
+			if attributesMap, err := util.ResourceAttributeMapFromObject(PreparedImageConfigModel{}); err == nil {
+				mc.AzurePreparedImage = types.ObjectNull(attributesMap)
+			} else {
+				diagnostics.AddWarning("Error when creating null PreparedImageConfigModel", err.Error())
 			}
 		}
-
-		mc.AzureMasterImage = util.TypedObjectToObjectValue(ctx, diagnostics, azureMasterImage)
-
-		// Refresh Master Image Note
-		currentDiskImage := provScheme.GetCurrentDiskImage()
-		mc.MasterImageNote = types.StringValue(currentDiskImage.GetMasterImageNote())
 	} else {
 		azurePvsConfiguration := util.ObjectValueToTypedObject[AzurePvsConfigurationModel](ctx, diagnostics, mc.AzurePvsConfiguration)
 		// Set values for PVS Streaming catalogs
@@ -1423,4 +1461,45 @@ func parseOnPremImagePath(catalog citrixorchestration.MachineCatalogDetailRespon
 	imageSnapshot = strings.ReplaceAll(snapshotPath, ".snapshot", "")
 
 	return masterImage, imageSnapshot, resourcePoolPath
+}
+
+type PreparedImageConfigModel struct {
+	ImageDefinition types.String `tfsdk:"image_definition"`
+	ImageVersion    types.String `tfsdk:"image_version"`
+}
+
+func (PreparedImageConfigModel) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "Specifying the prepared master image to be used for machine catalog.",
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			"image_definition": schema.StringAttribute{
+				Description: "ID of the image definition.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
+				},
+			},
+			"image_version": schema.StringAttribute{
+				Description: "ID of the image version.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
+				},
+			},
+		},
+		PlanModifiers: []planmodifier.Object{
+			objectplanmodifier.RequiresReplaceIf(
+				func(_ context.Context, req planmodifier.ObjectRequest, resp *objectplanmodifier.RequiresReplaceIfFuncResponse) {
+					resp.RequiresReplace = !req.StateValue.IsUnknown() && !req.StateValue.IsNull() && req.PlanValue.IsNull()
+				},
+				"Changing machine catalog image type requires replacing the machine catalog resource.",
+				"Changing machine catalog image type requires replacing the machine catalog resource.",
+			),
+		},
+	}
+}
+
+func (PreparedImageConfigModel) GetAttributes() map[string]schema.Attribute {
+	return PreparedImageConfigModel{}.GetSchema().Attributes
 }

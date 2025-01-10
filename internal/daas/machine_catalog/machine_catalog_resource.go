@@ -12,6 +12,7 @@ import (
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/image_definition"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -757,11 +758,12 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 				azureMachineConfigModel := util.ObjectValueToTypedObject[AzureMachineConfigModel](ctx, &resp.Diagnostics, provSchemeModel.AzureMachineConfig)
 				// Validate Azure Machine Config
 				// Validate Azure Master Image
-				if !azureMachineConfigModel.AzureMasterImage.IsUnknown() && azureMachineConfigModel.AzureMasterImage.IsNull() {
+				if (!azureMachineConfigModel.AzureMasterImage.IsUnknown() && azureMachineConfigModel.AzureMasterImage.IsNull()) &&
+					(!azureMachineConfigModel.AzurePreparedImage.IsUnknown() && azureMachineConfigModel.AzurePreparedImage.IsNull()) {
 					resp.Diagnostics.AddAttributeError(
-						path.Root("azure_master_image"),
+						path.Root("azure_machine_config"),
 						"Missing Attribute Configuration",
-						fmt.Sprintf("Expected azure_master_image to be configured when provisioning_type is %s.", provisioningTypeMcs),
+						fmt.Sprintf("Expected either `azure_master_image` or `prepared_image` to be configured when provisioning_type is %s.", provisioningTypeMcs),
 					)
 				}
 
@@ -1195,10 +1197,10 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 		return
 	}
 
-	if !plan.ProvisioningScheme.IsNull() {
+	if !plan.ProvisioningScheme.IsUnknown() && !plan.ProvisioningScheme.IsNull() {
 		provSchemePlan := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
 
-		if !provSchemePlan.MachineADAccounts.IsNull() {
+		if !provSchemePlan.MachineADAccounts.IsUnknown() && !provSchemePlan.MachineADAccounts.IsNull() {
 			machineAccountsInPlan := util.ObjectListToTypedArray[MachineADAccountModel](ctx, &resp.Diagnostics, provSchemePlan.MachineADAccounts)
 
 			if len(machineAccountsInPlan) > 0 {
@@ -1232,6 +1234,122 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 					)
 				}
 				return
+			}
+		}
+
+		if !provSchemePlan.AzureMachineConfig.IsUnknown() && !provSchemePlan.AzureMachineConfig.IsNull() {
+			azureMachineConfig := util.ObjectValueToTypedObject[AzureMachineConfigModel](ctx, &resp.Diagnostics, provSchemePlan.AzureMachineConfig)
+			if !azureMachineConfig.AzurePreparedImage.IsUnknown() && !azureMachineConfig.AzurePreparedImage.IsNull() {
+				isPreparedImageSupported := util.CheckProductVersion(r.client, &resp.Diagnostics, 121, 118, 7, 41, "Error using Prepared Image in citrix_machine_catalog resource", "Prepared Image")
+				if !isPreparedImageSupported {
+					return
+				}
+				if !azureMachineConfig.UseManagedDisks.IsUnknown() && !azureMachineConfig.UseManagedDisks.IsNull() {
+					if !azureMachineConfig.UseManagedDisks.ValueBool() {
+						resp.Diagnostics.AddError(
+							"Error validating azure_machine_config",
+							"use_managed_disks must be set to true when using prepared image.",
+						)
+						return
+					}
+				}
+				azurePreparedImage := util.ObjectValueToTypedObject[PreparedImageConfigModel](ctx, &resp.Diagnostics, azureMachineConfig.AzurePreparedImage)
+				imageDefinition, err := image_definition.GetImageDefinition(ctx, r.client, &resp.Diagnostics, azurePreparedImage.ImageDefinition.ValueString())
+				if err != nil {
+					return
+				}
+
+				imageVersion, err := image_definition.GetImageVersion(ctx, r.client, &resp.Diagnostics, imageDefinition.GetId(), azurePreparedImage.ImageVersion.ValueString())
+				if err != nil {
+					return
+				}
+
+				imageVersionStatus := imageVersion.GetImageVersionStatus()
+				if imageVersionStatus != citrixorchestration.IMAGEVERSIONSTATUS_SUCCESS {
+					resp.Diagnostics.AddError(
+						"Error validating azure_machine_config",
+						fmt.Sprintf("Image version in state `%s` cannot be used to create machine catalog.", string(imageVersionStatus)),
+					)
+					return
+				}
+
+				imageContextConfigured := false
+				var imageScheme citrixorchestration.ImageSchemeResponseModel
+				var imageSpecs citrixorchestration.ImageVersionSpecResponseModel
+				for _, spec := range imageVersion.GetImageVersionSpecs() {
+					if spec.Context != nil {
+						context := spec.GetContext()
+						if context.ImageScheme == nil {
+							continue
+						}
+						imageContextConfigured = true
+						imageScheme = context.GetImageScheme()
+						imageSpecs = spec
+					}
+				}
+				imageRuntimeEnvironment := imageSpecs.GetImageRuntimeEnvironment()
+				if imageContextConfigured {
+					// Validate session support
+					if !plan.SessionSupport.IsUnknown() && imageRuntimeEnvironment.GetVDASessionSupport() != "" {
+						if !strings.EqualFold(plan.SessionSupport.ValueString(), imageRuntimeEnvironment.GetVDASessionSupport()) {
+							resp.Diagnostics.AddError(
+								"Error validating azure_machine_config",
+								"session_support specified does not match the session support configured in the prepared image.",
+							)
+							return
+						}
+					}
+
+					// Validate machine profile
+					if imageScheme.MachineProfile != nil && azureMachineConfig.MachineProfile.IsNull() {
+						resp.Diagnostics.AddError(
+							"Error validating azure_machine_config",
+							"machine_profile needs to be specified when using prepared image configrued with machine profile.",
+						)
+						return
+					}
+					if imageScheme.MachineProfile == nil && !azureMachineConfig.MachineProfile.IsNull() && !azureMachineConfig.MachineProfile.IsUnknown() {
+						resp.Diagnostics.AddError(
+							"Error validating azure_machine_config",
+							"machine_profile cannot be specified when using prepared image without a machine profile.",
+						)
+						return
+					}
+
+					// Validate disk encryption set
+					for _, customerProperty := range imageScheme.GetCustomProperties() {
+						if strings.EqualFold(customerProperty.GetName(), "DiskEncryptionSetId") && customerProperty.GetValue() != "" {
+							desName, desResourceGroup := util.ParseDiskEncryptionSetIdToNameAndResourceGroup(customerProperty.GetValue())
+							if azureMachineConfig.DiskEncryptionSet.IsNull() {
+								resp.Diagnostics.AddError(
+									"Error validating azure_machine_config",
+									"disk_encryption_set needs to be specified with the same disk encryption set configuration used for the prepared image.",
+								)
+								return
+							} else if !azureMachineConfig.DiskEncryptionSet.IsUnknown() {
+								diskEncryptionSet := util.ObjectValueToTypedObject[util.AzureDiskEncryptionSetModel](ctx, &resp.Diagnostics, azureMachineConfig.DiskEncryptionSet)
+								if diskEncryptionSet.DiskEncryptionSetName.ValueString() != desName || diskEncryptionSet.DiskEncryptionSetResourceGroup.ValueString() != desResourceGroup {
+									resp.Diagnostics.AddError(
+										"Error validating azure_machine_config",
+										"disk_encryption_set specified does not match the disk encryption set configured in the prepared image.",
+									)
+									return
+								}
+							}
+						}
+					}
+
+					if !provSchemePlan.HypervisorResourcePool.IsUnknown() && !provSchemePlan.HypervisorResourcePool.IsNull() {
+						imageVersionResourcePool := imageSpecs.GetResourcePool()
+						if imageVersionResourcePool.GetId() != provSchemePlan.HypervisorResourcePool.ValueString() {
+							resp.Diagnostics.AddError(
+								"Error validating azure_machine_config",
+								"resource pool specified in the prepared image does not match the resource pool configured in the provisioning scheme.",
+							)
+							return
+						}
+					}
+				}
 			}
 		}
 	}
@@ -1286,12 +1404,12 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 			machineDomainIdentityPlan := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemePlan.MachineDomainIdentity)
 			machineDomainIdentityState := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemeState.MachineDomainIdentity)
 
-			if machineDomainIdentityPlan != machineDomainIdentityState &&
-				provSchemePlan.NumTotalMachines.ValueInt64() == provSchemeState.NumTotalMachines.ValueInt64() {
+			if machineDomainIdentityPlan.Ou != machineDomainIdentityState.Ou &&
+				provSchemePlan.NumTotalMachines.ValueInt64() <= provSchemeState.NumTotalMachines.ValueInt64() {
 
 				resp.Diagnostics.AddError(
 					"Error updating Machine Catalog "+state.Name.ValueString(),
-					"machine_domain_identity can only be updated when adding or removing machines.",
+					"Machine Catalog OU can only be updated when adding machines.",
 				)
 				return
 			}

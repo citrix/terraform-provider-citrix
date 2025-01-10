@@ -127,7 +127,7 @@ func (r *ImageDefinitionResource) Create(ctx context.Context, req resource.Creat
 		}
 	}
 
-	imageDefinitionResp, err := getImageDefinition(ctx, r.client, &resp.Diagnostics, plan.Name.ValueString())
+	imageDefinitionResp, err := GetImageDefinition(ctx, r.client, &resp.Diagnostics, plan.Name.ValueString())
 	if err != nil {
 		return
 	}
@@ -348,7 +348,7 @@ func (r *ImageDefinitionResource) ModifyPlan(ctx context.Context, req resource.M
 	}
 }
 
-func getImageDefinition(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, imageDefinitionNameOrId string) (*citrixorchestration.ImageDefinitionResponseModel, error) {
+func GetImageDefinition(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, imageDefinitionNameOrId string) (*citrixorchestration.ImageDefinitionResponseModel, error) {
 	getImageDefinitionRequest := client.ApiClient.ImageDefinitionsAPIsDAAS.ImageDefinitionsGetImageDefinition(ctx, imageDefinitionNameOrId)
 	imageDefinitionResource, httpResp, err := citrixdaasclient.AddRequestData(getImageDefinitionRequest, client).Execute()
 	if err != nil {

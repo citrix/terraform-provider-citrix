@@ -309,7 +309,7 @@ Optional:
 - `value_string` (String) String value (if any) associated with the setting.
 
 <a id="nestedatt--app_settings--linux--settings--auto_launch_protocols_from_origins"></a>
-### Nested Schema for `app_settings.linux.settings.value_string`
+### Nested Schema for `app_settings.linux.settings.auto_launch_protocols_from_origins`
 
 Required:
 
@@ -321,7 +321,7 @@ Optional:
 
 
 <a id="nestedatt--app_settings--linux--settings--extension_install_allow_list"></a>
-### Nested Schema for `app_settings.linux.settings.value_string`
+### Nested Schema for `app_settings.linux.settings.extension_install_allow_list`
 
 Required:
 
@@ -331,7 +331,7 @@ Required:
 
 
 <a id="nestedatt--app_settings--linux--settings--managed_bookmarks"></a>
-### Nested Schema for `app_settings.linux.settings.value_string`
+### Nested Schema for `app_settings.linux.settings.managed_bookmarks`
 
 Required:
 
@@ -367,7 +367,7 @@ Optional:
 - `value_string` (String) String value (if any) associated with the setting.
 
 <a id="nestedatt--app_settings--macos--settings--auto_launch_protocols_from_origins"></a>
-### Nested Schema for `app_settings.macos.settings.value_string`
+### Nested Schema for `app_settings.macos.settings.auto_launch_protocols_from_origins`
 
 Required:
 
@@ -379,7 +379,7 @@ Optional:
 
 
 <a id="nestedatt--app_settings--macos--settings--enterprise_browser_sso"></a>
-### Nested Schema for `app_settings.macos.settings.value_string`
+### Nested Schema for `app_settings.macos.settings.enterprise_browser_sso`
 
 Required:
 
@@ -388,7 +388,7 @@ Required:
 
 
 <a id="nestedatt--app_settings--macos--settings--extension_install_allow_list"></a>
-### Nested Schema for `app_settings.macos.settings.value_string`
+### Nested Schema for `app_settings.macos.settings.extension_install_allow_list`
 
 Required:
 
@@ -398,7 +398,7 @@ Required:
 
 
 <a id="nestedatt--app_settings--macos--settings--managed_bookmarks"></a>
-### Nested Schema for `app_settings.macos.settings.value_string`
+### Nested Schema for `app_settings.macos.settings.managed_bookmarks`
 
 Required:
 
@@ -435,7 +435,7 @@ Optional:
 - `value_string` (String) String value (if any) associated with the setting.
 
 <a id="nestedatt--app_settings--windows--settings--auto_launch_protocols_from_origins"></a>
-### Nested Schema for `app_settings.windows.settings.value_string`
+### Nested Schema for `app_settings.windows.settings.auto_launch_protocols_from_origins`
 
 Required:
 
@@ -447,7 +447,7 @@ Optional:
 
 
 <a id="nestedatt--app_settings--windows--settings--enterprise_browser_sso"></a>
-### Nested Schema for `app_settings.windows.settings.value_string`
+### Nested Schema for `app_settings.windows.settings.enterprise_browser_sso`
 
 Required:
 
@@ -456,7 +456,7 @@ Required:
 
 
 <a id="nestedatt--app_settings--windows--settings--extension_install_allow_list"></a>
-### Nested Schema for `app_settings.windows.settings.value_string`
+### Nested Schema for `app_settings.windows.settings.extension_install_allow_list`
 
 Required:
 
@@ -466,7 +466,7 @@ Required:
 
 
 <a id="nestedatt--app_settings--windows--settings--local_app_allow_list"></a>
-### Nested Schema for `app_settings.windows.settings.value_string`
+### Nested Schema for `app_settings.windows.settings.local_app_allow_list`
 
 Required:
 
@@ -476,7 +476,7 @@ Required:
 
 
 <a id="nestedatt--app_settings--windows--settings--managed_bookmarks"></a>
-### Nested Schema for `app_settings.windows.settings.value_string`
+### Nested Schema for `app_settings.windows.settings.managed_bookmarks`
 
 Required:
 

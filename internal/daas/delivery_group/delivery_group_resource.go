@@ -638,6 +638,49 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 		return
 	}
 
+	if !plan.SharingKind.IsNull() && !plan.AssociatedMachineCatalogs.IsNull() {
+		associatedMachineCatalogs := util.ObjectSetToTypedArray[DeliveryGroupMachineCatalogModel](ctx, &resp.Diagnostics, plan.AssociatedMachineCatalogs)
+		associatedMachineCatalogProperties, err := validateAndReturnMachineCatalogSessionSupport(ctx, *r.client, &resp.Diagnostics, associatedMachineCatalogs, !create)
+		if err != nil || associatedMachineCatalogProperties.SessionSupport == "" {
+			return
+		}
+
+		if plan.SharingKind.ValueString() == string(citrixorchestration.SHARINGKIND_PRIVATE) && associatedMachineCatalogProperties.AllocationType != citrixorchestration.ALLOCATIONTYPE_STATIC {
+			resp.Diagnostics.AddError(
+				fmt.Sprintf("Error %s Delivery Group", operation),
+				"When `sharing_kind` is `Private`, the associated machine catalogs must have `Static` allocation type.",
+			)
+			return
+		}
+
+		if plan.SharingKind.ValueString() == string(citrixorchestration.SHARINGKIND_SHARED) && associatedMachineCatalogProperties.AllocationType != citrixorchestration.ALLOCATIONTYPE_RANDOM {
+			resp.Diagnostics.AddError(
+				fmt.Sprintf("Error %s Delivery Group", operation),
+				"When `sharing_kind` is `Shared`, the associated machine catalogs must have `Random` allocation type.",
+			)
+			return
+		}
+	}
+
+	if !plan.Desktops.IsNull() {
+		sessionRoamingShouldBeSet := true
+		if !plan.SharingKind.IsNull() {
+			sharingKind := plan.SharingKind.ValueString()
+			if sharingKind == string(citrixorchestration.SHARINGKIND_PRIVATE) {
+				sessionRoamingShouldBeSet = false
+			}
+		}
+		desktops := util.ObjectListToTypedArray[DeliveryGroupDesktop](ctx, &resp.Diagnostics, plan.Desktops)
+		isValid, errMsg := validateSessionRoaming(desktops, sessionRoamingShouldBeSet)
+		if !isValid {
+			resp.Diagnostics.AddError(
+				"Error "+operation+" Delivery Group "+plan.Name.ValueString(),
+				"Error message: "+errMsg,
+			)
+			return
+		}
+	}
+
 	if plan.AssociatedMachineCatalogs.IsNull() {
 		errorSummary := fmt.Sprintf("Error %s Delivery Group", operation)
 		feature := "Delivery Groups without associated machine catalogs"
@@ -653,7 +696,6 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 				"Autoscale settings can only be configured if associated machine catalogs are specified.",
 			)
 		}
-
 		return
 	}
 
@@ -743,36 +785,15 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 		return
 	}
 
-	if !plan.Desktops.IsNull() {
-		sessionRoamingShouldBeSet := true
-		if associatedMachineCatalogProperties.AllocationType == citrixorchestration.ALLOCATIONTYPE_STATIC {
-			sessionRoamingShouldBeSet = false
-		}
-
-		if !plan.SharingKind.IsNull() {
-			sharingKind := plan.SharingKind.ValueString()
-			if sharingKind == string(citrixorchestration.SHARINGKIND_PRIVATE) {
-				sessionRoamingShouldBeSet = false
-			}
-		}
-
+	if associatedMachineCatalogProperties.AllocationType == citrixorchestration.ALLOCATIONTYPE_STATIC && !plan.Desktops.IsNull() {
 		desktops := util.ObjectListToTypedArray[DeliveryGroupDesktop](ctx, &resp.Diagnostics, plan.Desktops)
-		for _, desktop := range desktops {
-			if desktop.EnableSessionRoaming.IsUnknown() {
-				continue
-			} else if !desktop.EnableSessionRoaming.IsNull() && !sessionRoamingShouldBeSet {
-				resp.Diagnostics.AddError(
-					"Error "+operation+" Delivery Group "+plan.Name.ValueString(),
-					"`enable_session_roaming` cannot be set when `sharing_kind` is `Private` or associated machine catalogs have `Static` allocation type.",
-				)
-				return
-			} else if desktop.EnableSessionRoaming.IsNull() && sessionRoamingShouldBeSet {
-				resp.Diagnostics.AddError(
-					"Error "+operation+" Delivery Group "+plan.Name.ValueString(),
-					"`enable_session_roaming` should be set when `sharing_kind` is `Shared` or associated machine catalogs have `Random` allocation type.",
-				)
-				return
-			}
+		isValid, errMsg := validateSessionRoaming(desktops, false)
+		if !isValid {
+			resp.Diagnostics.AddError(
+				"Error "+operation+" Delivery Group "+plan.Name.ValueString(),
+				"Error message: "+errMsg,
+			)
+			return
 		}
 	}
 }

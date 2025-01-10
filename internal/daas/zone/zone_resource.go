@@ -101,10 +101,6 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 		// Get resource location from remote using id
 		resourceLocation, err := resource_locations.GetResourceLocation(ctx, r.client, &resp.Diagnostics, plan.ResourceLocationId.ValueString())
 		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error creating Zone with Resource Location ID",
-				"Resource Location "+plan.ResourceLocationId.ValueString()+" not found. Ensure the resource location has been created manually or via terraform, then try again.",
-			)
 			return
 		}
 

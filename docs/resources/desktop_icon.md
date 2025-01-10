@@ -39,3 +39,13 @@ Import is supported using the following syntax:
 # Desktop icon can be imported by specifying the ID
 terraform import citrix_desktop_icon.example-desktop-icon 1
 ```
+
+## Generating Raw Data of an icon
+To generate in Linux/Mac terminal use the command:
+```
+base64 fileName.ico
+```
+To generate in Powershell:
+```
+[System.Convert]::ToBase64String(Get-Content fileName.ico -Encoding Byte)
+```

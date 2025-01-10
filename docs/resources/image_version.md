@@ -72,6 +72,8 @@ resource "citrix_image_version" "example_azure_image_version" {
 ### Read-Only
 
 - `id` (String) The id of the image version.
+- `os_type` (String) The OS type of the image version.
+- `session_support` (String) Session support for the image version.
 - `version_number` (Number) The version number of the image version.
 
 <a id="nestedatt--azure_image_specs"></a>

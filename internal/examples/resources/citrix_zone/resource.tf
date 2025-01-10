@@ -10,7 +10,7 @@ resource "citrix_zone" "example-onpremises-zone" {
     ]
 }
 
-# Exmaple for Cloud Zone
+# Example for Cloud Zone
 resource "citrix_cloud_resource_location" "example-resource-location" {
     name = "example-resource-location"
 }

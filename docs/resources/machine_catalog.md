@@ -72,6 +72,50 @@ resource "citrix_machine_catalog" "example-azure-mtsession" {
 	}
 }
 
+resource "citrix_machine_catalog" "example_azure_prepared_image_mtsession" {
+	name                		= "example_azure_prepared_image_mtsession"
+	description					= "Example multi-session catalog on Azure hypervisor with Prepared Image"
+	zone						= "<zone Id>"
+	allocation_type				= "Random"
+	session_support				= "MultiSession"
+	provisioning_type 			= "MCS"
+	provisioning_scheme			= 	{
+		hypervisor = citrix_azure_hypervisor.example-azure-hypervisor.id
+		hypervisor_resource_pool = citrix_azure_hypervisor_resource_pool.example-azure-hypervisor-resource-pool.id
+		identity_type      = "ActiveDirectory"
+		machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+			domain_ou				 = "<DomainOU>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+		azure_machine_config = {
+			storage_type = "Standard_LRS"
+			use_managed_disks = true
+            service_offering = "Standard_D2_v2"
+            prepared_image = {
+                image_definition = citrix_image_definition.example_image_definition.id
+                image_version    = citrix_image_version.example_azure_image_version.id
+            }
+			writeback_cache = {
+				wbc_disk_storage_type = "pd-standard"
+				persist_wbc = true
+				persist_os_disk = true
+				persist_vm = true
+				writeback_cache_disk_size_gb = 127
+                writeback_cache_memory_size_mb = 256
+				storage_cost_saving = true
+			}
+        }
+		availability_zones = ["1","2"]
+		number_of_total_machines = 	1
+		machine_account_creation_rules ={
+			naming_scheme =     "az-multi-##"
+			naming_scheme_type ="Numeric"
+		}
+	}
+}
+
 resource "citrix_machine_catalog" "example-aws-mtsession" {
     name                        = "example-aws-mtsession"
     description                 = "Example multi-session catalog on AWS hypervisor"
@@ -588,6 +632,7 @@ Optional:
 - `license_type` (String) Windows license type used to provision virtual machines in Azure at the base compute rate. License types include: `Windows_Client` and `Windows_Server`.
 - `machine_profile` (Attributes) The name of the virtual machine or template spec that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone.<br />Required when provisioning_type is set to PVSStreaming or when identity_type is set to `AzureAD` (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--machine_profile))
 - `master_image_note` (String) The note for the master image.
+- `prepared_image` (Attributes) Specifying the prepared master image to be used for machine catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--prepared_image))
 - `use_azure_compute_gallery` (Attributes) Use this to place prepared image in Azure Compute Gallery. Required when `storage_type = Azure_Ephemeral_OS_Disk`. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--use_azure_compute_gallery))
 - `use_managed_disks` (Boolean) Indicate whether to use Azure managed disks for the provisioned virtual machine.
 - `vda_resource_group` (String) Designated resource group where the VDA VMs will be located on Azure.
@@ -609,7 +654,7 @@ Optional:
 - `storage_account` (String) The Azure Storage Account where the image VHD for creating machines is located. Only applicable to Azure VHD image blob.
 
 <a id="nestedatt--provisioning_scheme--azure_machine_config--azure_master_image--gallery_image"></a>
-### Nested Schema for `provisioning_scheme.azure_machine_config.azure_master_image.storage_account`
+### Nested Schema for `provisioning_scheme.azure_machine_config.azure_master_image.gallery_image`
 
 Required:
 
@@ -663,6 +708,15 @@ Optional:
 - `machine_profile_template_spec_name` (String) The name of the machine profile template spec.
 - `machine_profile_template_spec_version` (String) The version of the machine profile template spec.
 - `machine_profile_vm_name` (String) The name of the machine profile virtual machine.
+
+
+<a id="nestedatt--provisioning_scheme--azure_machine_config--prepared_image"></a>
+### Nested Schema for `provisioning_scheme.azure_machine_config.prepared_image`
+
+Required:
+
+- `image_definition` (String) ID of the image definition.
+- `image_version` (String) ID of the image version.
 
 
 <a id="nestedatt--provisioning_scheme--azure_machine_config--use_azure_compute_gallery"></a>

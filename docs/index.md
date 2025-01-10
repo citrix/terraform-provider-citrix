@@ -35,7 +35,7 @@ Please refer to [Citrix Tech Zone](https://community.citrix.com/tech-zone/automa
 - [Citrix policies](https://community.citrix.com/tech-zone/automation/cvad-terraform-policies/)
 
 ### Demo video
-[![alt text](../images/techzone-youtube-thumbnail.png)](https://www.youtube.com/watch?v=c33sMLaCVjY)
+[![alt text](https://raw.githubusercontent.com/citrix/terraform-provider-citrix/refs/heads/main/images/techzone-youtube-thumbnail.png)](https://www.youtube.com/watch?v=c33sMLaCVjY)
 https://www.youtube.com/watch?v=c33sMLaCVjY
 
 ### (On-Premises Only) Enable Web Studio

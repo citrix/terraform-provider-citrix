@@ -200,7 +200,7 @@ func (r *ImageVersionResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	imageVersion, err = getImageVersion(ctx, r.client, &resp.Diagnostics, plan.ImageDefinition.ValueString(), imageVersion.GetId())
+	imageVersion, err = GetImageVersion(ctx, r.client, &resp.Diagnostics, plan.ImageDefinition.ValueString(), imageVersion.GetId())
 	if err != nil {
 		return
 	}
@@ -286,7 +286,7 @@ func (r *ImageVersionResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	imageVersion, err = getImageVersion(ctx, r.client, &resp.Diagnostics, plan.ImageDefinition.ValueString(), imageVersion.GetId())
+	imageVersion, err = GetImageVersion(ctx, r.client, &resp.Diagnostics, plan.ImageDefinition.ValueString(), imageVersion.GetId())
 	if err != nil {
 		return
 	}
@@ -397,7 +397,7 @@ func (r *ImageVersionResource) ModifyPlan(ctx context.Context, req resource.Modi
 		return
 	}
 
-	imageDefinition, err := getImageDefinition(ctx, r.client, &resp.Diagnostics, plan.ImageDefinition.ValueString())
+	imageDefinition, err := GetImageDefinition(ctx, r.client, &resp.Diagnostics, plan.ImageDefinition.ValueString())
 	if err != nil {
 		return
 	}
@@ -486,7 +486,7 @@ func readImageVersion(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 	return imageVersionResource, err
 }
 
-func getImageVersion(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, imageDefinitionId string, imageVersionId string) (*citrixorchestration.ImageVersionResponseModel, error) {
+func GetImageVersion(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, imageDefinitionId string, imageVersionId string) (*citrixorchestration.ImageVersionResponseModel, error) {
 	getImageVersionRequest := client.ApiClient.ImageDefinitionsAPIsDAAS.ImageDefinitionsGetImageDefinitionImageVersion(ctx, imageDefinitionId, imageVersionId)
 	imageVersionResource, httpResp, err := citrixdaasclient.AddRequestData(getImageVersionRequest, client).Execute()
 	if err != nil {

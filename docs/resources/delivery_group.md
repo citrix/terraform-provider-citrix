@@ -214,7 +214,9 @@ resource "citrix_delivery_group" "example-delivery-group" {
 - `metadata` (Attributes List) Metadata for the Delivery Group. (see [below for nested schema](#nestedatt--metadata))
 - `minimum_functional_level` (String) Specifies the minimum functional level for the VDA machines in the delivery group. Defaults to `L7_20`.
 - `reboot_schedules` (Attributes List) The reboot schedule for the delivery group. (see [below for nested schema](#nestedatt--reboot_schedules))
-- `restricted_access_users` (Attributes) Restrict access to this Delivery Group by specifying users and groups in the allow and block list. If no value is specified, all authenticated users will have access to this Delivery Group. To give access to unauthenticated users, use the `allow_anonymous_access` property. (see [below for nested schema](#nestedatt--restricted_access_users))
+- `restricted_access_users` (Attributes) Restrict access to this Delivery Group by specifying users and groups in the allow and block list. To give access to unauthenticated users, use the `allow_anonymous_access` property.
+
+~> **Please Note** If `restricted_access_users` attribute is omitted or set to `null`, all authenticated users will have access to this Delivery Group. If attribute is specified as an empty object i.e. `{}`, then no user will have access to the delivery group because `allow_list` and `block_list` will be set as empty sets by default. (see [below for nested schema](#nestedatt--restricted_access_users))
 - `scopes` (Set of String) The IDs of the scopes for the delivery group to be a part of.
 - `session_support` (String) The session support for the delivery group. Can only be set to `SingleSession` or `MultiSession`. Specify only if you want to create a Delivery Group without any `associated_machine_catalogs`. Ensure session support is same as that of the prospective Machine Catalogs you will associate this Delivery Group with.
 - `sharing_kind` (String) The sharing kind for the delivery group. Can only be set to `Shared` or `Private`. Specify only if you want to create a Delivery Group wthout any `associated_machine_catalogs`.
@@ -447,7 +449,9 @@ Optional:
 ~> **Please Note** Session roaming should be set to `false` for Remote PC Delivery Group.
 - `enabled` (Boolean) Specify whether to enable the delivery of this desktop. Default is `true`.
 - `restrict_to_tag` (String) Restrict session launch to machines with tag specified in GUID.
-- `restricted_access_users` (Attributes) Restrict access to this Desktop by specifying users and groups in the allow and block list. If no value is specified, all users that have access to this Delivery Group will have access to the Desktop. 
+- `restricted_access_users` (Attributes) Restrict access to this Desktop by specifying users and groups in the allow and block list. 
+
+~> **Please Note** If `restricted_access_users` attribute is omitted or set to `null`, all authenticated users will have access to this Desktop. If attribute is specified as an empty object i.e. `{}`, then no user will have access to the desktop because `allow_list` and `block_list` will be set as empty sets by default.
 
 ~> **Please Note** For Remote PC Delivery Groups desktops, `restricted_access_users` has to be set. (see [below for nested schema](#nestedatt--desktops--restricted_access_users))
 

@@ -157,7 +157,36 @@ const AllScopeId string = "00000000-0000-0000-0000-000000000000"
 // ID of the Citrix Managed Users Scope
 const CtxManagedScopeId string = "f71a1148-7030-467a-a6d3-4a6bcf6a6532"
 
-// ID of the Citrix Managed Users Scope
+// Restricted permissions in the cloud
+var RestrictedPermissionsInCloud = map[string]bool{
+	"Admin_FullControl":                 true,
+	"C365_EA_Acct":                      true,
+	"C365_EA_Broker":                    true,
+	"C365_EA_Hyp":                       true,
+	"C365_EA_Prov":                      true,
+	"Configuration_Read":                true,
+	"Configuration_Unrestricted_Write":  true,
+	"Controller_EditProperties":         true,
+	"Controllers_Remove":                true,
+	"Database_Read":                     true,
+	"Director_Admin":                    true,
+	"EA_Acct":                           true,
+	"EA_Broker":                         true,
+	"EA_Hyp":                            true,
+	"EA_Prov":                           true,
+	"EdgeService_Admin":                 true,
+	"Licensing_ChangeLicenseServer":     true,
+	"Licensing_EditLicensingProperties": true,
+	"Licensing_Read ":                   true,
+	"Logging_Delete":                    true,
+	"Orchestration_RestApi":             true,
+	"Paladin_Admin":                     true,
+	"PerformUpgrade":                    true,
+	"PVS_Admin":                         true,
+	"Trust_ServiceKeys":                 true,
+}
+
+// Username for decoupled workspaces
 const UsernameForDecoupledWorkspaces string = "[UNDEFINED]"
 
 // Default QuickCreateService AWS Workspaces Scale Settings
@@ -212,6 +241,10 @@ const MetadataCitrixPrefix = "citrix_"
 const MetadataImageManagementPrepPrefix = "imagemanagementprep_"
 const MetadataTaskDataPrefix = "taskdata_"
 const MetadataTaskStatePrefix = "taskstate_"
+
+const ReplicaRatio = "SharedImageGalleryReplicaRatio"
+const ReplicaMaximum = "SharedImageGalleryReplicaMaximum"
+const SharedGallery = "UseSharedImageGallery"
 
 // CC Admin User
 const AdminUserMonitorAccessPolicySuffix = " - Access to 'Monitor' tab only"
