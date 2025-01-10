@@ -1,4 +1,4 @@
-
+﻿
 # Copyright © 2024. Citrix Systems, Inc. All Rights Reserved.
 <#
 Currently this script is still in TechPreview
@@ -694,7 +694,7 @@ function RemoveNullAndEmptyStringValues {
     Write-Verbose "Removing null values and empty strings from terraform output."
     # Remove null values and empty strings from terraform output
     $lines = $content -split "`r?`n"
-    $filteredLines = $lines | Where-Object { $_ -notmatch 'null' -and $_ -notmatch '^\s*[^=]+\s*=\s*""' }
+    $filteredLines = $lines | Where-Object { $_ -notmatch '.*= null.*' -and $_ -notmatch '^\s*[^=]+\s*=\s*""' }
     $content = $filteredLines -join "`n"
     
     Write-Verbose "Null values and empty strings removed successfully."
@@ -779,7 +779,7 @@ function ExtractAndSaveApplicationIcons {
     }
 
     foreach ($line in $lines) {
-        if ($line -match 'raw_data\s*=\s*"([^"]+)"') {
+        if ($line -match '.*raw_data\s*=.*') {
             $rawDataValue = $matches[1]
             $iconBytes = [System.Convert]::FromBase64String($rawDataValue)
             $iconFileName = "$iconsFolder\app_icon_$iconCounter.ico"

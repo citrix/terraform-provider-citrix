@@ -65,12 +65,12 @@ func (d *ImageDefinitionDataSource) Read(ctx context.Context, req datasource.Rea
 		imageDefinitionNameOrId = data.Name.ValueString()
 	}
 
-	iamgeDefinition, err := getImageDefinition(ctx, d.client, &resp.Diagnostics, imageDefinitionNameOrId)
+	imageDefinition, err := GetImageDefinition(ctx, d.client, &resp.Diagnostics, imageDefinitionNameOrId)
 	if err != nil {
 		return
 	}
 
-	data = data.RefreshPropertyValues(ctx, &resp.Diagnostics, false, iamgeDefinition)
+	data = data.RefreshPropertyValues(ctx, &resp.Diagnostics, false, imageDefinition)
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

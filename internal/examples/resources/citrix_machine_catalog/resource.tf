@@ -54,6 +54,50 @@ resource "citrix_machine_catalog" "example-azure-mtsession" {
 	}
 }
 
+resource "citrix_machine_catalog" "example_azure_prepared_image_mtsession" {
+	name                		= "example_azure_prepared_image_mtsession"
+	description					= "Example multi-session catalog on Azure hypervisor with Prepared Image"
+	zone						= "<zone Id>"
+	allocation_type				= "Random"
+	session_support				= "MultiSession"
+	provisioning_type 			= "MCS"
+	provisioning_scheme			= 	{
+		hypervisor = citrix_azure_hypervisor.example-azure-hypervisor.id
+		hypervisor_resource_pool = citrix_azure_hypervisor_resource_pool.example-azure-hypervisor-resource-pool.id
+		identity_type      = "ActiveDirectory"
+		machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+			domain_ou				 = "<DomainOU>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+		azure_machine_config = {
+			storage_type = "Standard_LRS"
+			use_managed_disks = true
+            service_offering = "Standard_D2_v2"
+            prepared_image = {
+                image_definition = citrix_image_definition.example_image_definition.id
+                image_version    = citrix_image_version.example_azure_image_version.id
+            }
+			writeback_cache = {
+				wbc_disk_storage_type = "pd-standard"
+				persist_wbc = true
+				persist_os_disk = true
+				persist_vm = true
+				writeback_cache_disk_size_gb = 127
+                writeback_cache_memory_size_mb = 256
+				storage_cost_saving = true
+			}
+        }
+		availability_zones = ["1","2"]
+		number_of_total_machines = 	1
+		machine_account_creation_rules ={
+			naming_scheme =     "az-multi-##"
+			naming_scheme_type ="Numeric"
+		}
+	}
+}
+
 resource "citrix_machine_catalog" "example-aws-mtsession" {
     name                        = "example-aws-mtsession"
     description                 = "Example multi-session catalog on AWS hypervisor"

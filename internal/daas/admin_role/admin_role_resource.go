@@ -281,10 +281,30 @@ func (r *adminRoleResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 
 		if r.client.AuthConfig.OnPremises {
 			if !plan.CanLaunchManage.ValueBool() {
-				resp.Diagnostics.AddError("CanLaunchManage", "CanLaunchManage can only be set to true for On-Premise deployments. Please either set the attribute to true or remove it from the configuration and try again.")
+				resp.Diagnostics.AddError("can_launch_manage set to false", "can_launch_manage can only be set to true for On-Premise deployments. Please either set the attribute to true or remove it from the configuration and try again.")
 			}
 			if !plan.CanLaunchMonitor.ValueBool() {
-				resp.Diagnostics.AddError("CanLaunchMonitor", "CanLaunchMonitor can only be set to true for On-Premise deployments. Please either set the attribute to true or remove it from the configuration and try again.")
+				resp.Diagnostics.AddError("can_launch_monitor set to false", "can_launch_monitor can only be set to true for On-Premise deployments. Please either set the attribute to true or remove it from the configuration and try again.")
+			}
+		}
+
+		predefinedPermissions, err := getAdminPermissions(ctx, r.client, &resp.Diagnostics, false)
+		if err != nil {
+			return
+		}
+		// convert permissions from a slice of predefined permissions to a set of strings
+		var predefinedPermissionsSet = make(map[string]bool)
+		for _, permission := range predefinedPermissions {
+			predefinedPermissionsSet[permission.GetId()] = true
+		}
+
+		permissions := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Permissions)
+		for _, permission := range permissions {
+			if _, ok := predefinedPermissionsSet[permission]; !ok {
+				resp.Diagnostics.AddError("Unknown permission "+permission, "Permission "+permission+" was not found. Please remove the permission from the configuration and try again.")
+			}
+			if _, ok := util.RestrictedPermissionsInCloud[permission]; !r.client.AuthConfig.OnPremises && ok {
+				resp.Diagnostics.AddError("Permission not supported for cloud deployments", "Permission "+permission+" is not supported for cloud deployments. Please remove the permission from the configuration and try again.")
 			}
 		}
 	}

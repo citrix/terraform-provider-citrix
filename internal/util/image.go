@@ -13,6 +13,7 @@ import (
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	dataSourceSchema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -92,15 +93,41 @@ func (AzureDiskEncryptionSetModel) GetSchema() schema.SingleNestedAttribute {
 	}
 }
 
+func (AzureDiskEncryptionSetModel) GetDataSourceSchema() dataSourceSchema.SingleNestedAttribute {
+	return dataSourceSchema.SingleNestedAttribute{
+		Description: "The configuration for Disk Encryption Set (DES). The DES must be in the same subscription and region as your resources. If your master image is encrypted with a DES, use the same DES when creating this machine catalog. When using a DES, if you later disable the key with which the corresponding DES is associated in Azure, you can no longer power on the machines in this catalog or add machines to it.",
+		Computed:    true,
+		Attributes: map[string]dataSourceSchema.Attribute{
+			"disk_encryption_set_name": dataSourceSchema.StringAttribute{
+				Description: "The name of the disk encryption set.",
+				Computed:    true,
+			},
+			"disk_encryption_set_resource_group": dataSourceSchema.StringAttribute{
+				Description: "The name of the resource group in which the disk encryption set resides.",
+				Computed:    true,
+			},
+		},
+	}
+}
+
 func (AzureDiskEncryptionSetModel) GetAttributes() map[string]schema.Attribute {
 	return AzureDiskEncryptionSetModel{}.GetSchema().Attributes
 }
 
-func RefreshDiskEncryptionSetModel(diskEncryptionSetModelToRefresh AzureDiskEncryptionSetModel, desId string) AzureDiskEncryptionSetModel {
+func (AzureDiskEncryptionSetModel) GetDataSourceAttributes() map[string]dataSourceSchema.Attribute {
+	return AzureDiskEncryptionSetModel{}.GetDataSourceSchema().Attributes
+}
+
+func ParseDiskEncryptionSetIdToNameAndResourceGroup(desId string) (string, string) {
 	desArray := strings.Split(desId, "/")
 	desName := desArray[len(desArray)-1]
 	resourceGroupsIndex := slices.Index(desArray, "resourceGroups")
 	resourceGroupName := desArray[resourceGroupsIndex+1]
+	return desName, resourceGroupName
+}
+
+func RefreshDiskEncryptionSetModel(diskEncryptionSetModelToRefresh AzureDiskEncryptionSetModel, desId string) AzureDiskEncryptionSetModel {
+	desName, resourceGroupName := ParseDiskEncryptionSetIdToNameAndResourceGroup(desId)
 	if !strings.EqualFold(diskEncryptionSetModelToRefresh.DiskEncryptionSetName.ValueString(), desName) {
 		diskEncryptionSetModelToRefresh.DiskEncryptionSetName = types.StringValue(desName)
 	}
@@ -228,8 +255,37 @@ func (AzureMachineProfileModel) GetSchema() schema.SingleNestedAttribute {
 	}
 }
 
+func (AzureMachineProfileModel) GetDataSourceSchema() dataSourceSchema.SingleNestedAttribute {
+	return dataSourceSchema.SingleNestedAttribute{
+		Description: "The name of the virtual machine or template spec that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone.",
+		Computed:    true,
+		Attributes: map[string]dataSourceSchema.Attribute{
+			"machine_profile_vm_name": dataSourceSchema.StringAttribute{
+				Description: "The name of the machine profile virtual machine.",
+				Computed:    true,
+			},
+			"machine_profile_template_spec_name": dataSourceSchema.StringAttribute{
+				Description: "The name of the machine profile template spec.",
+				Computed:    true,
+			},
+			"machine_profile_template_spec_version": dataSourceSchema.StringAttribute{
+				Description: "The version of the machine profile template spec.",
+				Computed:    true,
+			},
+			"machine_profile_resource_group": dataSourceSchema.StringAttribute{
+				Description: "The name of the resource group where the machine profile VM or template spec is located.",
+				Computed:    true,
+			},
+		},
+	}
+}
+
 func (AzureMachineProfileModel) GetAttributes() map[string]schema.Attribute {
 	return AzureMachineProfileModel{}.GetSchema().Attributes
+}
+
+func (AzureMachineProfileModel) GetDataSourceAttributes() map[string]dataSourceSchema.Attribute {
+	return AzureMachineProfileModel{}.GetDataSourceSchema().Attributes
 }
 
 func HandleMachineProfileForAzureMcsPvsCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diag *diag.Diagnostics, hypervisorName string, resourcePoolName string, machineProfile AzureMachineProfileModel, errorTitle string) (string, error) {

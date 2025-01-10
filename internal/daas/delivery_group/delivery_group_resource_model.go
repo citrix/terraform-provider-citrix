@@ -674,10 +674,12 @@ func (RestrictedAccessUsers) GetSchemaForDeliveryGroup() schema.SingleNestedAttr
 
 func (RestrictedAccessUsers) getSchemaInternal(forDeliveryGroup bool) schema.SingleNestedAttribute {
 	resource := "Delivery Group"
-	description := "Restrict access to this Delivery Group by specifying users and groups in the allow and block list. If no value is specified, all authenticated users will have access to this Delivery Group. To give access to unauthenticated users, use the `allow_anonymous_access` property."
+	description := "Restrict access to this Delivery Group by specifying users and groups in the allow and block list. To give access to unauthenticated users, use the `allow_anonymous_access` property." +
+		"\n\n~> **Please Note** If `restricted_access_users` attribute is omitted or set to `null`, all authenticated users will have access to this Delivery Group. If attribute is specified as an empty object i.e. `{}`, then no user will have access to the delivery group because `allow_list` and `block_list` will be set as empty sets by default."
 	if !forDeliveryGroup {
 		resource = "Desktop"
-		description = "Restrict access to this Desktop by specifying users and groups in the allow and block list. If no value is specified, all users that have access to this Delivery Group will have access to the Desktop. " +
+		description = "Restrict access to this Desktop by specifying users and groups in the allow and block list. " +
+			"\n\n~> **Please Note** If `restricted_access_users` attribute is omitted or set to `null`, all authenticated users will have access to this Desktop. If attribute is specified as an empty object i.e. `{}`, then no user will have access to the desktop because `allow_list` and `block_list` will be set as empty sets by default." +
 			"\n\n~> **Please Note** For Remote PC Delivery Groups desktops, `restricted_access_users` has to be set."
 	}
 
@@ -688,15 +690,13 @@ func (RestrictedAccessUsers) getSchemaInternal(forDeliveryGroup bool) schema.Sin
 				ElementType: types.StringType,
 				Description: fmt.Sprintf("Users who can use this %s. \n\n-> **Note** Users must be in `DOMAIN\\UserOrGroupName` or `user@domain.com` format", resource),
 				Optional:    true,
+				Computed:    true,
+				Default:     setdefault.StaticValue(types.SetValueMust(types.StringType, []attr.Value{})),
 				Validators: []validator.Set{
 					setvalidator.ValueStringsAre(
 						validator.String(
 							stringvalidator.RegexMatches(regexp.MustCompile(util.SamAndUpnRegex), "must be in `DOMAIN\\UserOrGroupName` or `user@domain.com` format"),
 						),
-					),
-					setvalidator.SizeAtLeast(1),
-					setvalidator.AtLeastOneOf(
-						path.MatchRelative().AtParent().AtName("block_list"),
 					),
 				},
 			},
@@ -704,13 +704,14 @@ func (RestrictedAccessUsers) getSchemaInternal(forDeliveryGroup bool) schema.Sin
 				ElementType: types.StringType,
 				Description: fmt.Sprintf("Users who cannot use this %s. A block list is meaningful only when used to block users in the allow list. \n\n-> **Note** Users must be in `DOMAIN\\UserOrGroupName` or `user@domain.com` format", resource),
 				Optional:    true,
+				Computed:    true,
+				Default:     setdefault.StaticValue(types.SetValueMust(types.StringType, []attr.Value{})),
 				Validators: []validator.Set{
 					setvalidator.ValueStringsAre(
 						validator.String(
 							stringvalidator.RegexMatches(regexp.MustCompile(util.SamAndUpnRegex), "must be in `DOMAIN\\UserOrGroupName` or `user@domain.com` format"),
 						),
 					),
-					setvalidator.SizeAtLeast(1),
 				},
 			},
 		},

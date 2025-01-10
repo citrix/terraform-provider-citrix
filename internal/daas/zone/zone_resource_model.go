@@ -29,7 +29,8 @@ type ZoneResourceModel struct {
 
 func (ZoneResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "CVAD --- Manages a zone.",
+		Description: "CVAD --- Manages a zone. " +
+			"\n\n~> **Please Note** For Citrix Cloud Customer, Citrix Cloud Resource Location permissions are required to manage DaaS Zones.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the zone.",

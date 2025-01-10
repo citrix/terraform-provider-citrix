@@ -929,6 +929,7 @@ func (p *citrixProvider) DataSources(_ context.Context) []func() datasource.Data
 		application.NewApplicationDataSourceSource,
 		admin_folder.NewAdminFolderDataSource,
 		admin_role.NewAdminRoleDataSource,
+		admin_role.NewAdminPermissionsDataSource,
 		admin_scope.NewAdminScopeDataSource,
 		admin_user.NewAdminUserDataSource,
 		machine_catalog.NewPvsDataSource,
@@ -938,6 +939,7 @@ func (p *citrixProvider) DataSources(_ context.Context) []func() datasource.Data
 		policies.NewPolicySetDataSource,
 		storefront_server.NewStoreFrontServerDataSource,
 		image_definition.NewImageDefinitionDataSource,
+		image_definition.NewImageVersionDataSource,
 		// StoreFront DataSources
 		stf_roaming.NewSTFRoamingServiceDataSource,
 		// QuickCreate DataSources

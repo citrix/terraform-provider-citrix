@@ -306,6 +306,19 @@ func validateAndReturnMachineCatalogSessionSupport(ctx context.Context, client c
 	return associatedMachineCatalogProperties, err
 }
 
+func validateSessionRoaming(desktops []DeliveryGroupDesktop, sessionRoamingShouldBeSet bool) (bool, string) {
+	for _, desktop := range desktops {
+		if desktop.EnableSessionRoaming.IsUnknown() {
+			continue
+		} else if !desktop.EnableSessionRoaming.IsNull() && !sessionRoamingShouldBeSet {
+			return false, "`enable_session_roaming` cannot be set when `sharing_kind` is `Private` or associated machine catalogs have `Static` allocation type."
+		} else if desktop.EnableSessionRoaming.IsNull() && sessionRoamingShouldBeSet {
+			return false, "`enable_session_roaming` should be set when `sharing_kind` is `Shared` or associated machine catalogs have `Random` allocation type."
+		}
+	}
+	return true, ""
+}
+
 func getDeliveryGroupAddMachinesRequest(associatedMachineCatalogs []DeliveryGroupMachineCatalogModel) []citrixorchestration.DeliveryGroupAddMachinesRequestModel {
 	var deliveryGroupMachineCatalogsArray []citrixorchestration.DeliveryGroupAddMachinesRequestModel
 	for _, associatedMachineCatalog := range associatedMachineCatalogs {
@@ -1310,17 +1323,9 @@ func (dgDesktop DeliveryGroupDesktop) RefreshListItem(ctx context.Context, diagn
 	includedUsers := desktop.GetIncludedUsers()
 	excludedUsers := desktop.GetExcludedUsers()
 
-	if len(includedUsers) == 0 {
-		users.AllowList = types.SetNull(types.StringType)
-	} else {
-		users.AllowList = util.RefreshUsersList(ctx, diagnostics, users.AllowList, includedUsers)
-	}
+	users.AllowList = util.RefreshUsersList(ctx, diagnostics, users.AllowList, includedUsers)
+	users.BlockList = util.RefreshUsersList(ctx, diagnostics, users.BlockList, excludedUsers)
 
-	if len(excludedUsers) == 0 {
-		users.BlockList = types.SetNull(types.StringType)
-	} else {
-		users.BlockList = util.RefreshUsersList(ctx, diagnostics, users.BlockList, excludedUsers)
-	}
 	usersObj := util.TypedObjectToObjectValue(ctx, diagnostics, users)
 	dgDesktop.RestrictedAccessUsers = usersObj
 
@@ -1714,7 +1719,7 @@ func (r DeliveryGroupResourceModel) updatePlanWithRestrictedAccessUsers(ctx cont
 		}
 	}
 
-	if !accessPolicy.GetIncludedUserFilterEnabled() {
+	if !accessPolicy.GetIncludedUserFilterEnabled() || !accessPolicy.GetExcludedUserFilterEnabled() {
 		if attributes, err := util.ResourceAttributeMapFromObject(RestrictedAccessUsers{}); err == nil {
 			r.RestrictedAccessUsers = types.ObjectNull(attributes)
 		} else {
@@ -1725,28 +1730,10 @@ func (r DeliveryGroupResourceModel) updatePlanWithRestrictedAccessUsers(ctx cont
 
 	users := util.ObjectValueToTypedObject[RestrictedAccessUsers](ctx, diagnostics, r.RestrictedAccessUsers)
 
-	remoteIncludedUsers := accessPolicy.GetIncludedUsers()
-	if len(remoteIncludedUsers) == 0 {
-		users.AllowList = types.SetNull(types.StringType)
-	} else {
-		users.AllowList = util.RefreshUsersList(ctx, diagnostics, users.AllowList, accessPolicy.GetIncludedUsers())
-	}
+	users.AllowList = util.RefreshUsersList(ctx, diagnostics, users.AllowList, accessPolicy.GetIncludedUsers())
+	users.BlockList = util.RefreshUsersList(ctx, diagnostics, users.BlockList, accessPolicy.GetExcludedUsers())
 
-	if accessPolicy.GetExcludedUserFilterEnabled() {
-		if len(accessPolicy.GetExcludedUsers()) == 0 {
-			users.BlockList = types.SetNull(types.StringType)
-		} else {
-			users.BlockList = util.RefreshUsersList(ctx, diagnostics, users.BlockList, accessPolicy.GetExcludedUsers())
-		}
-	}
-
-	if users.AllowList.IsNull() && users.BlockList.IsNull() {
-		if attributes, err := util.ResourceAttributeMapFromObject(users); err == nil {
-			r.RestrictedAccessUsers = types.ObjectNull(attributes)
-		}
-	} else {
-		r.RestrictedAccessUsers = util.TypedObjectToObjectValue(ctx, diagnostics, users)
-	}
+	r.RestrictedAccessUsers = util.TypedObjectToObjectValue(ctx, diagnostics, users)
 
 	return r
 }

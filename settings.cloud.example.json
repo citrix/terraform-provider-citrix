@@ -322,6 +322,13 @@
         "TEST_AZURE_IMAGE_VERSION_DES_NAME":"{image_version_disk_encryption_set_name}",
         "TEST_AZURE_IMAGE_VERSION_DES_RESOURCE_GROUP":"{image_version_disk_encryption_set_resource_group}",
 
+        // Image Version Data Source Go Tests
+        "TEST_IMAGE_VERSION_DATA_SOURCE_ID":"{image_version_id}",
+		"TEST_IMAGE_VERSION_DATA_SOURCE_VERSION_NUMBER":"{image_version_number}",
+		"TEST_IMAGE_VERSION_DATA_SOURCE_IMAGE_DEFINITION_ID":"{image_version_definition_id}",
+        "TEST_IMAGE_VERSION_DATA_SOURCE_SESSION_SUPPORT":"{image_version_session_support}",
+		"TEST_IMAGE_VERSION_DATA_SOURCE_OS_TYPE":"{image_version_os_type}",
+
         // StoreFront env variable
         "SF_COMPUTER_NAME"              : "{storefront_computer_name}",
         "SF_AD_ADMIN_USERNAME"         : "{storefront_admin_username}",

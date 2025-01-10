@@ -4,11 +4,14 @@ page_title: "citrix_zone Resource - citrix"
 subcategory: "CVAD"
 description: |-
   Manages a zone.
+  ~> Please Note For Citrix Cloud Customer, Citrix Cloud Resource Location permissions are required to manage DaaS Zones.
 ---
 
 # citrix_zone (Resource)
 
-Manages a zone.
+Manages a zone. 
+
+~> **Please Note** For Citrix Cloud Customer, Citrix Cloud Resource Location permissions are required to manage DaaS Zones.
 
 ## Zone For Citrix Cloud Customers
 
@@ -33,7 +36,7 @@ resource "citrix_zone" "example-onpremises-zone" {
     ]
 }
 
-# Exmaple for Cloud Zone
+# Example for Cloud Zone
 resource "citrix_cloud_resource_location" "example-resource-location" {
     name = "example-resource-location"
 }

@@ -507,7 +507,7 @@ func validateDeliveryGroupsPriority(ctx context.Context, diagnostics *diag.Diagn
 		deliveryGroupMap := map[string]bool{}
 		isValid := true
 		for _, dg := range dgPriority {
-			if !dg.Priority.IsNull() {
+			if !dg.Priority.IsUnknown() && !dg.Priority.IsNull() {
 				if priorityMap[dg.Priority.ValueInt32()] {
 					isValid = false
 				} else {
@@ -515,7 +515,7 @@ func validateDeliveryGroupsPriority(ctx context.Context, diagnostics *diag.Diagn
 				}
 			}
 
-			if !dg.Id.IsNull() {
+			if !dg.Id.IsUnknown() && !dg.Id.IsNull() {
 				if deliveryGroupMap[dg.Id.ValueString()] {
 					isValid = false
 				} else {

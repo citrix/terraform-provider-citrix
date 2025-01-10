@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -133,6 +134,8 @@ type ImageVersionModel struct {
 	// Optional Attributes
 	Description     types.String `tfsdk:"description"`
 	AzureImageSpecs types.Object `tfsdk:"azure_image_specs"`
+	SessionSupport  types.String `tfsdk:"session_support"`
+	OsType          types.String `tfsdk:"os_type"`
 }
 
 func (ImageVersionModel) GetSchema() schema.Schema {
@@ -190,6 +193,14 @@ func (ImageVersionModel) GetSchema() schema.Schema {
 				Default:     stringdefault.StaticString(""),
 			},
 			"azure_image_specs": AzureImageSpecsModel{}.GetSchema(),
+			"session_support": schema.StringAttribute{
+				Description: "Session support for the image version.",
+				Computed:    true,
+			},
+			"os_type": schema.StringAttribute{
+				Description: "The OS type of the image version.",
+				Computed:    true,
+			},
 		},
 	}
 }
@@ -199,84 +210,42 @@ func (ImageVersionModel) GetAttributes() map[string]schema.Attribute {
 }
 
 func (r ImageVersionModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, imageVersion *citrixorchestration.ImageVersionResponseModel) ImageVersionModel {
-	r.Id = types.StringValue(imageVersion.GetId())
-	r.VersionNumber = types.Int32Value(imageVersion.GetNumber())
-	imageDefinition := imageVersion.GetImageDefinition()
-	r.ImageDefinition = types.StringValue(imageDefinition.GetId())
-	r.Description = types.StringValue(imageVersion.GetDescription())
+	r, imageSpecs, specConfigured := r.RefreshImageVersionBaseProperties(ctx, diagnostics, imageVersion)
+	if specConfigured {
+		return r
+	}
+	imageContext := imageSpecs.GetContext()
 
-	var imageContext citrixorchestration.ImageVersionSpecContextResponseModel
-	var masterImage citrixorchestration.HypervisorResourceRefResponseModel
-	imageContextConfigured := false
-	for _, spec := range imageVersion.GetImageVersionSpecs() {
-		if spec.Context != nil {
-			context := spec.GetContext()
-			if context.ImageScheme == nil {
-				continue
-			}
-			masterImage = spec.GetMasterImage()
-			imageContext = spec.GetContext()
-			resourcePool := spec.GetResourcePool()
-			hypervisor := resourcePool.GetHypervisor()
-			r.Hypervisor = types.StringValue(hypervisor.GetId())
-			r.ResourcePool = types.StringValue(resourcePool.GetId())
-			imageContextConfigured = true
-			break
-		}
-	}
-	if !imageContextConfigured {
-		diagnostics.AddError(
-			"Error refreshing Image Version",
-			"Image Version does not have image context configured",
-		)
-	}
+	resourcePool := imageSpecs.GetResourcePool()
+	hypervisor := resourcePool.GetHypervisor()
+	r.Hypervisor = types.StringValue(hypervisor.GetId())
+	r.ResourcePool = types.StringValue(resourcePool.GetId())
+
+	imageRuntimeEnvironment := imageSpecs.GetImageRuntimeEnvironment()
+	r.SessionSupport = types.StringValue(imageRuntimeEnvironment.GetVDASessionSupport())
+	vdaOS := imageRuntimeEnvironment.GetOperatingSystem()
+	r.OsType = types.StringValue(vdaOS.GetType())
+
+	masterImage := imageSpecs.GetMasterImage()
 
 	switch imageContext.GetPluginFactoryName() {
 	case util.AZURERM_FACTORY_NAME:
 		imageScheme := imageContext.GetImageScheme()
 		azureImageSpecs := util.ObjectValueToTypedObject[AzureImageSpecsModel](ctx, diagnostics, r.AzureImageSpecs)
 
-		serviceOfferingXdPath := imageScheme.GetServiceOffering()
-		serviceOfferingSegments := strings.Split(serviceOfferingXdPath, "\\")
-		serviceOfferingLastIndex := len(serviceOfferingSegments)
-		serviceOffering := strings.TrimSuffix(serviceOfferingSegments[serviceOfferingLastIndex-1], ".serviceoffering")
-		azureImageSpecs.ServiceOffering = types.StringValue(serviceOffering)
+		azureImageSpecs.ServiceOffering = parseAzureImageVersionServiceOffering(imageScheme.GetServiceOffering())
 
-		// Set initial values before refreshing the custom properties
-		azureImageSpecs.LicenseType = types.StringNull()
-		azureImageSpecs.StorageType = types.StringNull()
-		attributeMap, err := util.ResourceAttributeMapFromObject(util.AzureDiskEncryptionSetModel{})
+		licenseType, storageType, des, err := parseAzureImageCustomProperties(ctx, diagnostics, true, imageScheme.GetCustomProperties(), azureImageSpecs.DiskEncryptionSet)
 		if err != nil {
-			diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
 			return r
 		}
-		azureImageSpecs.DiskEncryptionSet = types.ObjectNull(attributeMap)
+		azureImageSpecs.LicenseType = licenseType
+		azureImageSpecs.StorageType = storageType
+		azureImageSpecs.DiskEncryptionSet = des
 
-		for _, customerProperty := range imageScheme.GetCustomProperties() {
-			if strings.EqualFold(customerProperty.GetName(), "LicenseType") && customerProperty.GetValue() != "" {
-				azureImageSpecs.LicenseType = types.StringValue(customerProperty.GetValue())
-			} else if strings.EqualFold(customerProperty.GetName(), "StorageType") && customerProperty.GetValue() != "" {
-				azureImageSpecs.StorageType = types.StringValue(customerProperty.GetValue())
-			} else if strings.EqualFold(customerProperty.GetName(), "DiskEncryptionSetId") && customerProperty.GetValue() != "" {
-				diskEncryptionSetModel := util.ObjectValueToTypedObject[util.AzureDiskEncryptionSetModel](ctx, diagnostics, azureImageSpecs.DiskEncryptionSet)
-				diskEncryptionSetModel = util.RefreshDiskEncryptionSetModel(diskEncryptionSetModel, customerProperty.GetValue())
-				diskEncryptionSetModel.DiskEncryptionSetResourceGroup = types.StringValue(strings.ToLower(diskEncryptionSetModel.DiskEncryptionSetResourceGroup.ValueString()))
-				diskEncryptionSetModel.DiskEncryptionSetName = types.StringValue(strings.ToLower(diskEncryptionSetModel.DiskEncryptionSetName.ValueString()))
-				azureImageSpecs.DiskEncryptionSet = util.TypedObjectToObjectValue(ctx, diagnostics, diskEncryptionSetModel)
-			}
-		}
-
-		if imageScheme.MachineProfile != nil {
-			// Refresh machine profile
-			machineProfile := imageScheme.GetMachineProfile()
-			machineProfileModel := util.ParseAzureMachineProfileResponseToModel(machineProfile)
-			azureImageSpecs.MachineProfile = util.TypedObjectToObjectValue(ctx, diagnostics, machineProfileModel)
-		} else {
-			if attributesMap, err := util.ResourceAttributeMapFromObject(util.AzureMachineProfileModel{}); err == nil {
-				azureImageSpecs.MachineProfile = types.ObjectNull(attributesMap)
-			} else {
-				diagnostics.AddWarning("Error when creating null AzureMachineProfileModel", err.Error())
-			}
+		updatedMachineProfile, err := refreshAzureImageVersionMachineProfile(ctx, diagnostics, true, imageScheme)
+		if err == nil {
+			azureImageSpecs.MachineProfile = updatedMachineProfile
 		}
 
 		// Refresh NetworkMapping
@@ -324,4 +293,118 @@ func ParseMasterImageToAzureImageModel(ctx context.Context, diagnostics *diag.Di
 			util.ParseMasterImageToUpdateAzureImageSpecs(ctx, diagnostics, masterImageResourceType, masterImage, masterImageSegments, masterImageLastIndex)
 	}
 	return azureImageSpecs
+}
+
+func (r ImageVersionModel) RefreshImageVersionBaseProperties(ctx context.Context, diagnostics *diag.Diagnostics, imageVersion *citrixorchestration.ImageVersionResponseModel) (ImageVersionModel, citrixorchestration.ImageVersionSpecResponseModel, bool) {
+	r.Id = types.StringValue(imageVersion.GetId())
+	r.VersionNumber = types.Int32Value(imageVersion.GetNumber())
+	imageDefinition := imageVersion.GetImageDefinition()
+	r.ImageDefinition = types.StringValue(imageDefinition.GetId())
+	r.Description = types.StringValue(imageVersion.GetDescription())
+
+	imageSpecs, specConfigured := identifyImageVersionSpec(diagnostics, imageVersion.GetImageVersionSpecs())
+	if !specConfigured {
+		return r, imageSpecs, false
+	}
+
+	resourcePool := imageSpecs.GetResourcePool()
+	hypervisor := resourcePool.GetHypervisor()
+	r.Hypervisor = types.StringValue(hypervisor.GetId())
+	r.ResourcePool = types.StringValue(resourcePool.GetId())
+
+	imageRuntimeEnvironment := imageSpecs.GetImageRuntimeEnvironment()
+	r.SessionSupport = types.StringValue(imageRuntimeEnvironment.GetVDASessionSupport())
+	vdaOS := imageRuntimeEnvironment.GetOperatingSystem()
+	r.OsType = types.StringValue(vdaOS.GetType())
+	return r, imageSpecs, false
+}
+
+func refreshAzureImageVersionMachineProfile(ctx context.Context, diagnostics *diag.Diagnostics, isResource bool, imageScheme citrixorchestration.ImageSchemeResponseModel) (types.Object, error) {
+	var machineProfileToReturn types.Object
+
+	if imageScheme.MachineProfile != nil {
+		// Refresh machine profile
+		machineProfile := imageScheme.GetMachineProfile()
+		machineProfileModel := util.ParseAzureMachineProfileResponseToModel(machineProfile)
+		if isResource {
+			machineProfileToReturn = util.TypedObjectToObjectValue(ctx, diagnostics, machineProfileModel)
+		} else {
+			machineProfileToReturn = util.DataSourceTypedObjectToObjectValue(ctx, diagnostics, machineProfileModel)
+		}
+		return machineProfileToReturn, nil
+	} else {
+		var attributesMap map[string]attr.Type
+		var err error
+		if isResource {
+			attributesMap, err = util.ResourceAttributeMapFromObject(util.AzureMachineProfileModel{})
+		} else {
+			attributesMap, err = util.DataSourceAttributeMapFromObject(util.AzureMachineProfileModel{})
+		}
+		if err != nil {
+			diagnostics.AddWarning("Error when creating null AzureMachineProfileModel", err.Error())
+			return machineProfileToReturn, err
+		}
+		machineProfileToReturn = types.ObjectNull(attributesMap)
+		return machineProfileToReturn, err
+	}
+}
+
+func identifyImageVersionSpec(diagnostics *diag.Diagnostics, imageVersionSpecs []citrixorchestration.ImageVersionSpecResponseModel) (citrixorchestration.ImageVersionSpecResponseModel, bool) {
+	for _, spec := range imageVersionSpecs {
+		if spec.Context != nil {
+			context := spec.GetContext()
+			if context.ImageScheme == nil {
+				continue
+			}
+			return spec, true
+		}
+	}
+	diagnostics.AddError(
+		"Error refreshing Image Version",
+		"Image Version does not have image context configured",
+	)
+	return citrixorchestration.ImageVersionSpecResponseModel{}, false
+}
+
+func parseAzureImageVersionServiceOffering(serviceOfferingXdPath string) types.String {
+	serviceOfferingSegments := strings.Split(serviceOfferingXdPath, "\\")
+	serviceOfferingLastIndex := len(serviceOfferingSegments)
+	serviceOffering := strings.TrimSuffix(serviceOfferingSegments[serviceOfferingLastIndex-1], ".serviceoffering")
+	return types.StringValue(serviceOffering)
+}
+
+func parseAzureImageCustomProperties(ctx context.Context, diagnostics *diag.Diagnostics, isResource bool, customProperties []citrixorchestration.NameValueStringPairModel, des types.Object) (types.String, types.String, types.Object, error) {
+	// Set initial values before refreshing the custom properties\
+	licenseType := types.StringNull()
+	storageType := types.StringNull()
+	var attributeMap map[string]attr.Type
+	var err error
+	if isResource {
+		attributeMap, err = util.ResourceAttributeMapFromObject(util.AzureDiskEncryptionSetModel{})
+	} else {
+		attributeMap, err = util.DataSourceAttributeMapFromObject(util.AzureDiskEncryptionSetModel{})
+	}
+	if err != nil {
+		diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
+		return licenseType, storageType, des, err
+	}
+	des = types.ObjectNull(attributeMap)
+	for _, customerProperty := range customProperties {
+		if strings.EqualFold(customerProperty.GetName(), "LicenseType") && customerProperty.GetValue() != "" {
+			licenseType = types.StringValue(customerProperty.GetValue())
+		} else if strings.EqualFold(customerProperty.GetName(), "StorageType") && customerProperty.GetValue() != "" {
+			storageType = types.StringValue(customerProperty.GetValue())
+		} else if strings.EqualFold(customerProperty.GetName(), "DiskEncryptionSetId") && customerProperty.GetValue() != "" {
+			diskEncryptionSetModel := util.AzureDiskEncryptionSetModel{}
+			desName, desResourceGroup := util.ParseDiskEncryptionSetIdToNameAndResourceGroup(customerProperty.GetValue())
+			diskEncryptionSetModel.DiskEncryptionSetResourceGroup = types.StringValue(strings.ToLower(desResourceGroup))
+			diskEncryptionSetModel.DiskEncryptionSetName = types.StringValue(strings.ToLower(desName))
+			if isResource {
+				des = util.TypedObjectToObjectValue(ctx, diagnostics, diskEncryptionSetModel)
+			} else {
+				des = util.DataSourceTypedObjectToObjectValue(ctx, diagnostics, diskEncryptionSetModel)
+			}
+		}
+	}
+	return licenseType, storageType, des, nil
 }
