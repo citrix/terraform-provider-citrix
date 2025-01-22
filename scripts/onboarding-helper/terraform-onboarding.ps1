@@ -374,6 +374,13 @@ function Get-ResourceList {
             continue
         }
 
+        #Handle special case for Built-in Admin Roles
+        if($requestPath -eq "Admin/Roles"){
+            if($item.IsBuiltIn){
+                continue;
+            }
+        }
+
         # Handle special case for Policies
         if ($item.policySetGuid -and $item.policySetType -like "*Policies*") {
             $resourceList += $item.policySetGuid
@@ -737,49 +744,22 @@ function InjectPlaceHolderSensitiveValues {
         [string] $content
     )
 
-    Write-Verbose "Injecting placeholder for sensitive values in terraform output."
-    ### hypervisor secrets ###
-    ######   Azure   ######
-    $content = InjectSecretValues -targetProperty "application_id" -newProperty "application_secret" -content $content
-    ######    AWS    ######
-    $content = InjectSecretValues -targetProperty "api_key" -newProperty "secret_key" -content $content
-    ######    GCP    ######
-    $content = InjectSecretValues -targetProperty "service_account_id" -newProperty "service_account_credentials" -content $content
-    ###### XenServer / vSphere ######
-    $content = InjectSecretValues -targetProperty "username" -newProperty "password" -content $content
-
-    ### machine catalog service accounts ###
-    $content = InjectSecretValues -targetProperty "domain" -newProperty "service_account" -content $content
-    $content = InjectSecretValues -targetProperty "domain" -newProperty "service_account_password" -content $content
-
-    return $content
-}
-
-function ExtractAndSaveApplicationIcons {
-    param(
-        [parameter(Mandatory = $true)]
-        [string] $content
-    )
-
-    # Check if application icon exists; if not, then exit
-    if ($content -notmatch 'citrix_application_icon') {
-        return $content
-    }
-
-    Write-Verbose "Extracting and saving application icons into icons folder."
-
     $filteredOutput = @()
     $lines = $content -split "`r?`n"
     $iconCounter = 0
-
-    # Create the icons folder
     $iconsFolder = Join-Path -Path $PSScriptRoot -ChildPath "icons"
-    if (-not (Test-Path -Path $iconsFolder)) {
-        New-Item -ItemType Directory -Path $iconsFolder | Out-Null
+    
+    # Check if application icon exists; if not, then exit
+    if ($content -match 'citrix_application_icon') {
+    
+        # Create the icons folder
+        if (-not (Test-Path -Path $iconsFolder)) {
+            New-Item -ItemType Directory -Path $iconsFolder | Out-Null
+        }
     }
 
     foreach ($line in $lines) {
-        if ($line -match '.*raw_data\s*=.*') {
+        if ($line -match 'raw_data\s*=\s*"([^"]+)"') {
             $rawDataValue = $matches[1]
             $iconBytes = [System.Convert]::FromBase64String($rawDataValue)
             $iconFileName = "$iconsFolder\app_icon_$iconCounter.ico"
@@ -798,12 +778,34 @@ function ExtractAndSaveApplicationIcons {
             $iconCounter++
             # Replace raw_data value with icon file path using filebase64 to encode a file's content in base64 format
             $line = 'raw_data = filebase64("' + $iconFileName + '")'
+            $filteredOutput += $line
         }
-        $filteredOutput += $line
+        elseif ($line -match "application_id") {
+            $filteredOutput += $line
+            $filteredOutput += 'application_secret = "<input application_secret value>"'
+        }
+        elseif ($line -match "service_account_id") {
+            $filteredOutput += $line
+            $filteredOutput += 'service_account_credentials = "<input service_account_credentials value>"'
+        }
+        elseif ($line -match "api_key") {
+            $filteredOutput += $line
+            $filteredOutput += 'secret_key = "<input secret_key value>"'
+        }
+        elseif ($line -match "username") {
+            $filteredOutput += $line
+            $filteredOutput += 'password = "<input password value>"'
+        }
+        elseif ($line -match "domain_ou") {
+            $filteredOutput += $line
+            $filteredOutput += 'service_account = "<input service_account value>"'
+            $filteredOutput += 'service_account_password = "<input service_account_password value>"'
+        }
+        else {
+            $filteredOutput += $line
+        }
     }
-
     $content = $filteredOutput -join "`n"
-    Write-Verbose "Extracted and saved $iconCounter application icons."
     return $content
 }
 
@@ -854,9 +856,6 @@ function PostProcessTerraformOutput {
     # Inject placeholder for sensitive values in tf
     $content = InjectPlaceHolderSensitiveValues -content $content
     
-    # Extract and save citrix application icons
-    $content = ExtractAndSaveApplicationIcons -content $content
-
     # Overwrite extracted terraform with processed value
     Set-Content -Path ".\resource.tf" -Value $content
 
