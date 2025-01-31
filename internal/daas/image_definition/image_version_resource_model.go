@@ -10,6 +10,7 @@ import (
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
+	"github.com/hashicorp/terraform-plugin-framework-validators/int32validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -35,7 +36,6 @@ type AzureImageSpecsModel struct {
 	// Optional Attributes
 	MachineProfile    types.Object `tfsdk:"machine_profile"`
 	DiskEncryptionSet types.Object `tfsdk:"disk_encryption_set"`
-	NetworkMapping    types.List   `tfsdk:"network_mapping"` // List[NetworkMappingModel]
 
 	// Master Image Attributes
 	ResourceGroup      types.String `tfsdk:"resource_group"`
@@ -82,14 +82,6 @@ func (AzureImageSpecsModel) GetSchema() schema.SingleNestedAttribute {
 			},
 			"machine_profile":     util.AzureMachineProfileModel{}.GetSchema(),
 			"disk_encryption_set": util.AzureDiskEncryptionSetModel{}.GetSchema(),
-			"network_mapping": schema.ListNestedAttribute{
-				Description:  "Specifies how the attached NICs are mapped to networks.",
-				Optional:     true,
-				NestedObject: util.NetworkMappingModel{}.GetSchema(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
-				},
-			},
 			"resource_group": schema.StringAttribute{
 				Description: "The Azure Resource Group where the managed disk / snapshot for creating machines is located.",
 				Required:    true,
@@ -114,11 +106,90 @@ func (AzureImageSpecsModel) GetSchema() schema.SingleNestedAttribute {
 		PlanModifiers: []planmodifier.Object{
 			objectplanmodifier.RequiresReplace(),
 		},
+		Validators: []validator.Object{
+			objectvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("vsphere_image_specs")),
+		},
 	}
 }
 
 func (AzureImageSpecsModel) GetAttributes() map[string]schema.Attribute {
 	return AzureImageSpecsModel{}.GetSchema().Attributes
+}
+
+type VsphereImageSpecsModel struct {
+	MasterImageVm  types.String `tfsdk:"master_image_vm"`
+	ImageSnapshot  types.String `tfsdk:"image_snapshot"`
+	CpuCount       types.Int32  `tfsdk:"cpu_count"`
+	MemoryMB       types.Int32  `tfsdk:"memory_mb"`
+	MachineProfile types.String `tfsdk:"machine_profile"`
+	DiskSize       types.Int32  `tfsdk:"disk_size"`
+}
+
+func (VsphereImageSpecsModel) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "Image configuration for vSphere image version.",
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			"master_image_vm": schema.StringAttribute{
+				Description: "The name of the virtual machine that will be used as master image. This property is case sensitive.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(util.NoPathRegex),
+						"must not contain any path.",
+					),
+				},
+			},
+			"image_snapshot": schema.StringAttribute{
+				Description: "The Snapshot of the virtual machine specified in `master_image_vm`. Specify the relative path of the snapshot. Eg: snaphost-1/snapshot-2/snapshot-3. This property is case sensitive.",
+				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"cpu_count": schema.Int32Attribute{
+				Description: "The number of processors that virtual machines created from the provisioning scheme should use.",
+				Required:    true,
+				Validators: []validator.Int32{
+					int32validator.AtLeast(1),
+				},
+			},
+			"memory_mb": schema.Int32Attribute{
+				Description: "The maximum amount of memory that virtual machines created from the provisioning scheme should use.",
+				Required:    true,
+				Validators: []validator.Int32{
+					int32validator.AtLeast(4),
+				},
+			},
+			"machine_profile": schema.StringAttribute{
+				Description: "The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics and host cache property of OS disk.",
+				Optional:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplaceIf(
+						func(_ context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+							resp.RequiresReplace = req.StateValue.IsNull() != req.ConfigValue.IsNull()
+						},
+						"Force replace when machine_profile is added or removed. Update is allowed only if previously set.",
+						"Force replace when machine_profile is added or removed. Update is allowed only if previously set.",
+					),
+				},
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"disk_size": schema.Int32Attribute{
+				Description: "The size of the disk in GB.",
+				Computed:    true,
+			},
+		},
+		PlanModifiers: []planmodifier.Object{
+			objectplanmodifier.RequiresReplace(),
+		},
+	}
+}
+
+func (VsphereImageSpecsModel) GetAttributes() map[string]schema.Attribute {
+	return VsphereImageSpecsModel{}.GetSchema().Attributes
 }
 
 type ImageVersionModel struct {
@@ -130,12 +201,14 @@ type ImageVersionModel struct {
 	ImageDefinition types.String `tfsdk:"image_definition"`
 	Hypervisor      types.String `tfsdk:"hypervisor"`
 	ResourcePool    types.String `tfsdk:"hypervisor_resource_pool"`
+	NetworkMapping  types.List   `tfsdk:"network_mapping"` // List[NetworkMappingModel]
 
 	// Optional Attributes
-	Description     types.String `tfsdk:"description"`
-	AzureImageSpecs types.Object `tfsdk:"azure_image_specs"`
-	SessionSupport  types.String `tfsdk:"session_support"`
-	OsType          types.String `tfsdk:"os_type"`
+	Description       types.String `tfsdk:"description"`
+	AzureImageSpecs   types.Object `tfsdk:"azure_image_specs"`
+	VsphereImageSpecs types.Object `tfsdk:"vsphere_image_specs"`
+	SessionSupport    types.String `tfsdk:"session_support"`
+	OsType            types.String `tfsdk:"os_type"`
 }
 
 func (ImageVersionModel) GetSchema() schema.Schema {
@@ -186,13 +259,22 @@ func (ImageVersionModel) GetSchema() schema.Schema {
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
+			"network_mapping": schema.ListNestedAttribute{
+				Description:  "Specifies how the attached NICs are mapped to networks.",
+				Required:     true,
+				NestedObject: util.NetworkMappingModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
 			"description": schema.StringAttribute{
 				Description: "Description of the image version.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(""),
 			},
-			"azure_image_specs": AzureImageSpecsModel{}.GetSchema(),
+			"azure_image_specs":   AzureImageSpecsModel{}.GetSchema(),
+			"vsphere_image_specs": VsphereImageSpecsModel{}.GetSchema(),
 			"session_support": schema.StringAttribute{
 				Description: "Session support for the image version.",
 				Computed:    true,
@@ -227,10 +309,17 @@ func (r ImageVersionModel) RefreshPropertyValues(ctx context.Context, diagnostic
 	r.OsType = types.StringValue(vdaOS.GetType())
 
 	masterImage := imageSpecs.GetMasterImage()
+	imageScheme := imageContext.GetImageScheme()
+	// Refresh NetworkMapping
+	networkMaps := imageScheme.GetNetworkMaps()
+	if len(networkMaps) > 0 && !r.NetworkMapping.IsNull() {
+		r.NetworkMapping = util.RefreshListValueProperties[util.NetworkMappingModel, citrixorchestration.NetworkMapResponseModel](ctx, diagnostics, r.NetworkMapping, networkMaps, util.GetOrchestrationNetworkMappingKey)
+	} else {
+		r.NetworkMapping = util.TypedArrayToObjectList[util.NetworkMappingModel](ctx, diagnostics, nil)
+	}
 
 	switch imageContext.GetPluginFactoryName() {
 	case util.AZURERM_FACTORY_NAME:
-		imageScheme := imageContext.GetImageScheme()
 		azureImageSpecs := util.ObjectValueToTypedObject[AzureImageSpecsModel](ctx, diagnostics, r.AzureImageSpecs)
 
 		azureImageSpecs.ServiceOffering = parseAzureImageVersionServiceOffering(imageScheme.GetServiceOffering())
@@ -248,16 +337,32 @@ func (r ImageVersionModel) RefreshPropertyValues(ctx context.Context, diagnostic
 			azureImageSpecs.MachineProfile = updatedMachineProfile
 		}
 
-		// Refresh NetworkMapping
-		networkMaps := imageScheme.GetNetworkMaps()
-		if len(networkMaps) > 0 && !azureImageSpecs.NetworkMapping.IsNull() {
-			azureImageSpecs.NetworkMapping = util.RefreshListValueProperties[util.NetworkMappingModel, citrixorchestration.NetworkMapResponseModel](ctx, diagnostics, azureImageSpecs.NetworkMapping, networkMaps, util.GetOrchestrationNetworkMappingKey)
-		} else {
-			azureImageSpecs.NetworkMapping = util.TypedArrayToObjectList[util.NetworkMappingModel](ctx, diagnostics, nil)
-		}
-
 		azureImageSpecs = ParseMasterImageToAzureImageModel(ctx, diagnostics, azureImageSpecs, masterImage)
 		r.AzureImageSpecs = util.TypedObjectToObjectValue(ctx, diagnostics, azureImageSpecs)
+	case util.VMWARE_FACTORY_NAME:
+		imageScheme := imageContext.GetImageScheme()
+		masterImageXdPath := masterImage.GetXDPath()
+		vsphereImageSpecs := util.ObjectValueToTypedObject[VsphereImageSpecsModel](ctx, diagnostics, r.VsphereImageSpecs)
+		masterImageVm, imageSnapshot := parseVsphereImageXdPath(masterImageXdPath)
+		vsphereImageSpecs.MasterImageVm = types.StringValue(masterImageVm)
+		vsphereImageSpecs.ImageSnapshot = types.StringValue(imageSnapshot)
+		vsphereImageSpecs.CpuCount = types.Int32Value(imageScheme.GetCpuCount())
+		vsphereImageSpecs.MemoryMB = types.Int32Value(imageScheme.GetMemoryMB())
+
+		if imageScheme.MachineProfile == nil {
+			vsphereImageSpecs.MachineProfile = types.StringNull()
+		} else {
+			machineProfile := imageScheme.GetMachineProfile()
+			vsphereImageSpecs.MachineProfile = types.StringValue(machineProfile.GetName())
+		}
+
+		if imageSpecs.DiskSize != nil {
+			vsphereImageSpecs.DiskSize = types.Int32Value(imageSpecs.GetDiskSize())
+		} else {
+			vsphereImageSpecs.DiskSize = types.Int32Null()
+		}
+
+		r.VsphereImageSpecs = util.TypedObjectToObjectValue(ctx, diagnostics, vsphereImageSpecs)
 	default:
 		diagnostics.AddError(
 			"Error refreshing Image Version",
@@ -293,6 +398,24 @@ func ParseMasterImageToAzureImageModel(ctx context.Context, diagnostics *diag.Di
 			util.ParseMasterImageToUpdateAzureImageSpecs(ctx, diagnostics, masterImageResourceType, masterImage, masterImageSegments, masterImageLastIndex)
 	}
 	return azureImageSpecs
+}
+
+func parseVsphereImageXdPath(masterImageXdPath string) (string, string) {
+	vmIndex := strings.Index(masterImageXdPath, ".vm")
+	if vmIndex == -1 {
+		return "", ""
+	}
+	// Extract the master image name and trim the ".vm"
+	masterImageVmPath := masterImageXdPath[:vmIndex]
+	masterImageVmArr := strings.Split(masterImageVmPath, "\\")
+	masterImageVm := masterImageVmArr[len(masterImageVmArr)-1]
+
+	// Extract the snapshot part of the path
+	snapshotPath := masterImageXdPath[vmIndex+len(".vm/"):]
+	imageSnapshot := strings.ReplaceAll(snapshotPath, ".snapshot", "")
+	imageSnapshot = strings.ReplaceAll(imageSnapshot, "\\", "/")
+
+	return masterImageVm, imageSnapshot
 }
 
 func (r ImageVersionModel) RefreshImageVersionBaseProperties(ctx context.Context, diagnostics *diag.Diagnostics, imageVersion *citrixorchestration.ImageVersionResponseModel) (ImageVersionModel, citrixorchestration.ImageVersionSpecResponseModel, bool) {

@@ -253,7 +253,7 @@ func TestAzureMcs(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_config.service_account_password"},
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_config.service_account_password", "delete_machine_accounts", "force_delete"},
 				SkipFunc:                skipForGitHubAction(isGitHubAction),
 			},
 			// ImportState testing - MCS HybridAAD
@@ -263,7 +263,7 @@ func TestAzureMcs(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_config.service_account_password"},
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_config.service_account_password", "delete_machine_accounts", "force_delete"},
 				SkipFunc:                skipForGitHubAction(isGitHubAction),
 			},
 			// ImportState testing - MCS AAD
@@ -273,7 +273,7 @@ func TestAzureMcs(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache"},
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache", "delete_machine_accounts", "force_delete"},
 				SkipFunc:                func() (bool, error) { return (isOnPremises || isGitHubAction), nil },
 			},
 			// ImportState testing
@@ -283,7 +283,7 @@ func TestAzureMcs(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache"},
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache", "delete_machine_accounts", "force_delete"},
 				SkipFunc:                func() (bool, error) { return (isOnPremises || isGitHubAction), nil },
 			},
 			// ImportState testing - Manual Power Managed
@@ -291,7 +291,7 @@ func TestAzureMcs(t *testing.T) {
 				ResourceName:            "citrix_machine_catalog.testMachineCatalogManualPowerManaged",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"machine_accounts", "is_remote_pc", "is_power_managed"},
+				ImportStateVerifyIgnore: []string{"machine_accounts", "is_remote_pc", "is_power_managed", "delete_machine_accounts", "force_delete"},
 			},
 
 			/****************** Delivery Group Test - Create ******************/
@@ -327,7 +327,7 @@ func TestAzureMcs(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"last_updated", "autoscale_settings", "associated_machine_catalogs", "reboot_schedules", "delivery_type"},
+				ImportStateVerifyIgnore: []string{"last_updated", "autoscale_settings", "associated_machine_catalogs", "reboot_schedules", "delivery_type", "delete_machine_accounts", "force_delete"},
 				SkipFunc:                skipForGitHubAction(isGitHubAction),
 			},
 

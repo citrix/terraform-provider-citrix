@@ -44,8 +44,10 @@ data "citrix_image_version" "example_image_version_by_version_number" {
 - `description` (String) Description of the image version.
 - `hypervisor` (String) Id of the hypervisor to use for creating this image version.
 - `hypervisor_resource_pool` (String) Id of the hypervisor resource pool to use for creating this image version.
+- `network_mapping` (Attributes List) Specifies how the attached NICs are mapped to networks. (see [below for nested schema](#nestedatt--network_mapping))
 - `os_type` (String) The OS type of the image version.
 - `session_support` (String) Session support for the image version.
+- `vsphere_image_specs` (Attributes) Image configuration for vSphere image version. (see [below for nested schema](#nestedatt--vsphere_image_specs))
 
 <a id="nestedatt--azure_image_specs"></a>
 ### Nested Schema for `azure_image_specs`
@@ -76,3 +78,26 @@ Read-Only:
 - `machine_profile_template_spec_name` (String) The name of the machine profile template spec.
 - `machine_profile_template_spec_version` (String) The version of the machine profile template spec.
 - `machine_profile_vm_name` (String) The name of the machine profile virtual machine.
+
+
+
+<a id="nestedatt--network_mapping"></a>
+### Nested Schema for `network_mapping`
+
+Required:
+
+- `network` (String) The name of the virtual network that the device should be attached to. This must be a subnet within a Virtual Private Cloud item in the resource pool to which the Machine Catalog is associated.<br />For AWS, please specify the network mask of the network you want to use within the VPC.
+- `network_device` (String) Name or Id of the network device.
+
+
+<a id="nestedatt--vsphere_image_specs"></a>
+### Nested Schema for `vsphere_image_specs`
+
+Read-Only:
+
+- `cpu_count` (Number) The number of processors that virtual machines created from the provisioning scheme should use.
+- `disk_size` (Number) The size of the disk in GB.
+- `image_snapshot` (String) The Snapshot of the virtual machine specified in `master_image_vm`. Specify the relative path of the snapshot. Eg: snaphost-1/snapshot-2/snapshot-3. This property is case sensitive.
+- `machine_profile` (String) The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics and host cache property of OS disk.
+- `master_image_vm` (String) The name of the virtual machine that will be used as master image. This property is case sensitive.
+- `memory_mb` (Number) The maximum amount of memory that virtual machines created from the provisioning scheme should use.

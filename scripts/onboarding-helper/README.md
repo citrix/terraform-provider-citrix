@@ -20,6 +20,7 @@ This automation script is designed to onboard an existing site to Terraform. It 
   terraform init
   ```
 3. Set up the Citrix Terraform provider locally. For instructions, refer to the [Citrix Provider Documentation](https://registry.terraform.io/providers/citrix/citrix/latest/docs).
+4. (Cloud only) create a [Citrix Cloud service principal](https://developer-docs.citrix.com/en-us/citrix-cloud/citrix-cloud-api-overview/get-started-with-citrix-cloud-apis#citrix-cloud-api-access-with-service-principals) with at least the `Read Only Administrator` role to the DDC. This will be used for the `ClientId` and `ClientSecret` in the next step.
 
 ## Onboarding Process
 
@@ -45,10 +46,10 @@ This automation script is designed to onboard an existing site to Terraform. It 
       - For Citrix Cloud customers **only** (Required): Your Citrix Cloud customer ID. This is only applicable for Citrix Cloud customers.
     - `ClientId`: Your client ID for Citrix DaaS service authentication.
       - For Citrix On-Premises customers: Use this to specify a DDC administrator username.
-      - For Citrix Cloud customers: Use this to specify Cloud API Key Client Id.
+      - For Citrix Cloud customers: Use this to specify a Citrix Cloud service principal ID.
     - `ClientSecret`: Your client secret for Citrix DaaS service authentication.
       - For Citrix on-premises customers: Use this to specify a DDC administrator password.
-      - For Citrix Cloud customers: Use this to specify Cloud API Key Client Secret.
+      - For Citrix Cloud customers: Use this to specify Citrix Cloud service principal secret.
     - `DomainFqdn`: Your client secret for Citrix DaaS service authentication.
       - For Citrix on-premises customers **only** (Required): Use this to specify Domain FQDN.
     - `HostName`: The host name or base URL of your Citrix DaaS service.

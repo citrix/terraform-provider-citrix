@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
@@ -75,10 +76,29 @@ func (r *ImageVersionResource) Create(ctx context.Context, req resource.CreateRe
 	var httpResp *http.Response
 
 	hypervisorId := plan.Hypervisor.ValueString()
+	hypervisor, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, hypervisorId)
+	if err != nil {
+		return
+	}
 	hypervisorResourcePool, err := util.GetHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, hypervisorId, plan.ResourcePool.ValueString())
 	if err != nil {
 		return
 	}
+
+	// Set NetworkMappings
+	if !plan.NetworkMapping.IsNull() {
+		networkMappingModel := util.ObjectListToTypedArray[util.NetworkMappingModel](ctx, &resp.Diagnostics, plan.NetworkMapping)
+		networkMapping, err := util.ParseNetworkMappingToClientModel(networkMappingModel, hypervisorResourcePool, hypervisor.GetPluginId())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating Image Version",
+				fmt.Sprintf("Failed to find hypervisor network, error: %s", err.Error()),
+			)
+			return
+		}
+		imageScheme.SetNetworkMapping(networkMapping)
+	}
+
 	if !plan.AzureImageSpecs.IsNull() {
 		azureImageSpecs := util.ObjectValueToTypedObject[AzureImageSpecsModel](ctx, &resp.Diagnostics, plan.AzureImageSpecs)
 		sharedSubscription := azureImageSpecs.SharedSubscription.ValueString()
@@ -113,20 +133,6 @@ func (r *ImageVersionResource) Create(ctx context.Context, req resource.CreateRe
 		}
 		imageScheme.SetServiceOfferingPath(serviceOfferingPath)
 
-		// Set NetworkMappings
-		if !azureImageSpecs.NetworkMapping.IsNull() {
-			networkMappingModel := util.ObjectListToTypedArray[util.NetworkMappingModel](ctx, &resp.Diagnostics, azureImageSpecs.NetworkMapping)
-			networkMapping, err := util.ParseNetworkMappingToClientModel(networkMappingModel, hypervisorResourcePool, util.AZURERM_FACTORY_NAME)
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error creating Image Version",
-					fmt.Sprintf("Failed to find hypervisor network, error: %s", err.Error()),
-				)
-				return
-			}
-			imageScheme.SetNetworkMapping(networkMapping)
-		}
-
 		// Set CustomProperties
 		customProperties := &[]citrixorchestration.NameValueStringPairModel{}
 		// Set Storage Type
@@ -150,6 +156,64 @@ func (r *ImageVersionResource) Create(ctx context.Context, req resource.CreateRe
 			util.AppendNameValueStringPair(customProperties, "DiskEncryptionSetId", des.GetId())
 		}
 		imageScheme.SetCustomProperties(*customProperties)
+	} else if !plan.VsphereImageSpecs.IsNull() {
+		vsphereImageSpecs := util.ObjectValueToTypedObject[VsphereImageSpecsModel](ctx, &resp.Diagnostics, plan.VsphereImageSpecs)
+		imageScheme.SetMemoryMB(vsphereImageSpecs.MemoryMB.ValueInt32())
+
+		imageVm := vsphereImageSpecs.MasterImageVm.ValueString()
+		snapshotPath := vsphereImageSpecs.ImageSnapshot.ValueString()
+		masterImagePath = fmt.Sprintf("XDHyp:\\HostingUnits\\%s\\%s.vm", hypervisorResourcePool.GetName(), imageVm)
+		for _, snapshot := range strings.Split(snapshotPath, "/") {
+			masterImagePath += fmt.Sprintf("\\%s.snapshot", snapshot)
+		}
+
+		imageScheme.SetCpuCount(vsphereImageSpecs.CpuCount.ValueInt32())
+		if !vsphereImageSpecs.MachineProfile.IsNull() {
+			// Set Machine Profile
+			machineProfileName := vsphereImageSpecs.MachineProfile.ValueString()
+			machineProfile, httpResp, err := util.GetSingleResourceFromHypervisor(ctx, r.client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", machineProfileName, util.TemplateResourceType, "")
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error creating Machine Catalog",
+					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+						fmt.Sprintf("\nFailed to locate machine profile %s on vSphere, error: %s", machineProfileName, err.Error()),
+				)
+				return
+			}
+
+			imageScheme.SetMachineProfile(machineProfile.GetXDPath())
+
+			// CPU count will inherit from machine profile
+			machineProfileAdditionalData := machineProfile.GetAdditionalData()
+			machineProfileCpuCountSpecified := false
+			for _, entry := range machineProfileAdditionalData {
+				if strings.EqualFold(entry.GetName(), util.CPU_COUNT_PROPERTY_NAME) {
+					machineProfileCpuCountSpecified = true
+					machineProfileCpuCount, err := strconv.ParseInt(entry.GetValue(), 10, 32)
+					if err != nil {
+						resp.Diagnostics.AddError(
+							"Error creating vSphere Image Version",
+							"Unable to parse the number of CPU(s) from the configuration of machine profile "+machineProfileName,
+						)
+						return
+					}
+					if int32(machineProfileCpuCount) != vsphereImageSpecs.CpuCount.ValueInt32() {
+						resp.Diagnostics.AddError(
+							"Error creating vSphere Image Version",
+							fmt.Sprintf("The specified `cpu_count` value %d does not match the number of CPU(s) %d of machine profile %s.", vsphereImageSpecs.CpuCount.ValueInt32(), machineProfileCpuCount, machineProfileName),
+						)
+						return
+					}
+				}
+			}
+			if !machineProfileCpuCountSpecified {
+				resp.Diagnostics.AddError(
+					"Error creating vSphere Image Version",
+					"Machine profile "+machineProfileName+" does not have the number of CPU(s) specified.",
+				)
+				return
+			}
+		}
 	} else {
 		resp.Diagnostics.AddError(
 			"Error creating Image Version",
@@ -421,6 +485,9 @@ func (r *ImageVersionResource) ModifyPlan(ctx context.Context, req resource.Modi
 	switch hypervisor.GetPluginId() {
 	case util.AZURERM_FACTORY_NAME:
 		// validate azure image specs
+		if plan.AzureImageSpecs.IsUnknown() {
+			return
+		}
 		if plan.AzureImageSpecs.IsNull() {
 			resp.Diagnostics.AddError(
 				"Error "+operation+" Image Version",
@@ -429,7 +496,7 @@ func (r *ImageVersionResource) ModifyPlan(ctx context.Context, req resource.Modi
 			return
 		}
 		azureImageSpecs := util.ObjectValueToTypedObject[AzureImageSpecsModel](ctx, &resp.Diagnostics, plan.AzureImageSpecs)
-		// Validate image ent;m machine profile usage consistency within the image definition
+		// Validate image version machine profile usage consistency within the image definition
 		imageVersionsInDefinition, err := getImageVersions(ctx, &resp.Diagnostics, r.client, plan.ImageDefinition.ValueString())
 		if err != nil {
 			return
@@ -470,6 +537,51 @@ func (r *ImageVersionResource) ModifyPlan(ctx context.Context, req resource.Modi
 					"`disk_encryption_set_resource_group` must be lowercase.",
 				)
 				return
+			}
+		}
+	case util.VMWARE_FACTORY_NAME:
+		if plan.VsphereImageSpecs.IsUnknown() {
+			return
+		}
+		if plan.VsphereImageSpecs.IsNull() {
+			resp.Diagnostics.AddError(
+				"Error "+operation+" Image Version",
+				"vsphere_image_specs is required when creating image version with an vSphere hypervisor connection.",
+			)
+			return
+		}
+
+		vsphereImageSpecs := util.ObjectValueToTypedObject[VsphereImageSpecsModel](ctx, &resp.Diagnostics, plan.VsphereImageSpecs)
+		// Validate image version machine profile usage consistency within the image definition
+		imageVersionsInDefinition, err := getImageVersions(ctx, &resp.Diagnostics, r.client, plan.ImageDefinition.ValueString())
+		if err != nil {
+			return
+		}
+
+		if vsphereImageSpecs.MemoryMB.ValueInt32()%4 != 0 {
+			resp.Diagnostics.AddError(
+				"Error "+operation+" Image Version",
+				"Attribute `vsphere_image_specs.memory_mb` must be a multiple of 4.",
+			)
+			return
+		}
+
+		if !vsphereImageSpecs.MachineProfile.IsUnknown() && !plan.Id.IsUnknown() {
+			machineProfileSpecified := !vsphereImageSpecs.MachineProfile.IsNull()
+			for _, imageVersion := range imageVersionsInDefinition {
+				for _, spec := range imageVersion.GetImageVersionSpecs() {
+					if spec.Context != nil {
+						imageContext := spec.GetContext()
+						if (imageContext.MachineProfileMetadata != nil) != machineProfileSpecified &&
+							!strings.EqualFold(imageVersion.GetId(), plan.Id.ValueString()) {
+							resp.Diagnostics.AddError(
+								"Error "+operation+" Image Version",
+								"All image versions within an image definition must consistently use or not use a machine profile.",
+							)
+							return
+						}
+					}
+				}
 			}
 		}
 	default:

@@ -12,7 +12,7 @@ import (
 )
 
 func TestAzureImageVersionPreCheck(t *testing.T) {
-	checkTestEnvironmentVariables(t, imageVersionTestVariables)
+	checkTestEnvironmentVariables(t, azureImageVersionTestVariables)
 }
 
 func TestAzureImageVersionResource(t *testing.T) {
@@ -39,11 +39,11 @@ func AzureImageVersionResourceTestHelper(t *testing.T, pre121 bool) {
 	desName := os.Getenv("TEST_AZURE_IMAGE_VERSION_DES_NAME")
 	desResourceGroup := os.Getenv("TEST_AZURE_IMAGE_VERSION_DES_RESOURCE_GROUP")
 
-	importStateVerifyIgnore := []string{"azure_image_specs.network_mapping"}
+	importStateVerifyIgnore := []string{"network_mapping"}
 
 	var imageDefinitionResource string
 	if pre121 {
-		imageDefinitionResource = BuildImageDefinitionTestResourcePre121(t)
+		imageDefinitionResource = BuildAzureImageDefinitionTestResourcePre121(t)
 	} else {
 		imageDefinitionResource = BuildAzureImageDefinitionTestResource(t)
 	}
@@ -289,7 +289,7 @@ func BuildAzureImageVersionBasicMasterImage(t *testing.T, updated bool) string {
 	resourceGroup := os.Getenv("TEST_AZURE_IMAGE_VERSION_RESOURCE_GROUP")
 	masterImage := os.Getenv("TEST_AZURE_IMAGE_VERSION_MASTER_IMAGE")
 
-	return fmt.Sprintf(azureImageVersionTestResource_basicMasterImage, hypervisor, resourcePool, description, serviceOffering, network, resourceGroup, masterImage)
+	return fmt.Sprintf(azureImageVersionTestResource_basicMasterImage, hypervisor, resourcePool, description, network, serviceOffering, resourceGroup, masterImage)
 }
 
 func BuildAzureImageVersionFullMasterImage(t *testing.T) string {
@@ -307,7 +307,7 @@ func BuildAzureImageVersionFullMasterImage(t *testing.T) string {
 	desName := os.Getenv("TEST_AZURE_IMAGE_VERSION_DES_NAME")
 	desResourceGroup := os.Getenv("TEST_AZURE_IMAGE_VERSION_DES_RESOURCE_GROUP")
 
-	return fmt.Sprintf(azureImageVersionTestResource_fullMasterImage, hypervisor, resourcePool, description, serviceOffering, network, resourceGroup, masterImage, machineProfileResourceGroup, machineProfileVmName, desName, desResourceGroup)
+	return fmt.Sprintf(azureImageVersionTestResource_fullMasterImage, hypervisor, resourcePool, description, network, serviceOffering, resourceGroup, masterImage, machineProfileResourceGroup, machineProfileVmName, desName, desResourceGroup)
 }
 
 func BuildAzureImageVersionBasicGalleryImage(t *testing.T, updated bool) string {
@@ -324,7 +324,7 @@ func BuildAzureImageVersionBasicGalleryImage(t *testing.T, updated bool) string 
 	galleryDefinition := os.Getenv("TEST_AZURE_IMAGE_VERSION_GALLERY_DEFINITION")
 	galleryVersion := os.Getenv("TEST_AZURE_IMAGE_VERSION_GALLERY_VERSION")
 
-	return fmt.Sprintf(azureImageVersionTestResource_basicGalleryImage, hypervisor, resourcePool, description, serviceOffering, network, resourceGroup, gallery, galleryDefinition, galleryVersion)
+	return fmt.Sprintf(azureImageVersionTestResource_basicGalleryImage, hypervisor, resourcePool, description, network, serviceOffering, resourceGroup, gallery, galleryDefinition, galleryVersion)
 }
 
 func BuildAzureImageVersionFullGalleryImage(t *testing.T) string {
@@ -344,11 +344,186 @@ func BuildAzureImageVersionFullGalleryImage(t *testing.T) string {
 	desName := os.Getenv("TEST_AZURE_IMAGE_VERSION_DES_NAME")
 	desResourceGroup := os.Getenv("TEST_AZURE_IMAGE_VERSION_DES_RESOURCE_GROUP")
 
-	return fmt.Sprintf(azureImageVersionTestResource_fullGalleryImage, hypervisor, resourcePool, description, serviceOffering, network, resourceGroup, gallery, galleryDefinition, galleryVersion, machineProfileResourceGroup, machineProfileVmName, desName, desResourceGroup)
+	return fmt.Sprintf(azureImageVersionTestResource_fullGalleryImage, hypervisor, resourcePool, description, network, serviceOffering, resourceGroup, gallery, galleryDefinition, galleryVersion, machineProfileResourceGroup, machineProfileVmName, desName, desResourceGroup)
+}
+
+func TestVSphereImageVersionPreCheck(t *testing.T) {
+	checkTestEnvironmentVariables(t, vSphereImageVersionTestVariables)
+}
+
+func TestVSphereImageVersionResource(t *testing.T) {
+	resourcePool := os.Getenv("TEST_VSPHERE_IMAGE_VERSION_RESOURCE_POOL")
+	description := os.Getenv("TEST_VSPHERE_IMAGE_VERSION_DESCRIPTION")
+	descriptionUpdated := description + "-updated"
+	masterImageVm := os.Getenv("TEST_VSPHERE_IMAGE_VERSION_MASTER_IMAGE_VM")
+	masterImageSnapshot := os.Getenv("TEST_VSPHERE_IMAGE_VERSION_MASTER_IMAGE_SNAPSHOT")
+	machine_profile := os.Getenv("TEST_VSPHERE_IMAGE_VERSION_MACHINE_PROFILE")
+
+	importStateVerifyIgnore := []string{"network_mapping"}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck: func() {
+			TestProviderPreCheck(t)
+			TestVSphereImageDefinitionResourcePreCheck(t)
+			TestVSphereImageVersionPreCheck(t)
+		},
+		Steps: []resource.TestStep{
+			// Create and Read testing with basic master image configuration
+			{
+				Config: composeTestResourceTf(
+					BuildVSphereImageDefinitionTestResource(t),
+					BuildVSphereImageVersionBasicMasterImage(t, false),
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify the resourcePool of the image version
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "hypervisor_resource_pool", resourcePool),
+					// Verify the description of the image version
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "description", description),
+					// Verify the cpu_count of the image version
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.cpu_count", "2"),
+					// Verify the memory_mb of base vSphere image
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.memory_mb", "4096"),
+					// Verify the master image VM of the image version
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.master_image_vm", masterImageVm),
+					// Verify the master image snapshot of the image version
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.image_snapshot", masterImageSnapshot),
+					// Verify machine_profile is not set
+					resource.TestCheckNoResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.machine_profile"),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:            "citrix_image_version.test_vsphere_image_version",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: importStateVerifyIgnore,
+				ImportStateIdFunc:       generateVSphereImageVersionImportStateId,
+			},
+			// Update and Read testing
+			{
+				Config: composeTestResourceTf(
+					BuildVSphereImageDefinitionTestResource(t),
+					BuildVSphereImageVersionBasicMasterImage(t, true),
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify the resourcePool of the image version
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "hypervisor_resource_pool", resourcePool),
+					// Verify the description of the image version
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "description", descriptionUpdated),
+					// Verify the cpu_count of the image version
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.cpu_count", "2"),
+					// Verify the memory_mb of base vSphere image
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.memory_mb", "4096"),
+					// Verify the master image VM of the image version
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.master_image_vm", masterImageVm),
+					// Verify the master image snapshot of the image version
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.image_snapshot", masterImageSnapshot),
+					// Verify machine_profile is not set
+					resource.TestCheckNoResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.machine_profile"),
+				),
+			},
+			// Update and Read testing with machine_profile
+			{
+				Config: composeTestResourceTf(
+					BuildVSphereImageDefinitionTestResource(t),
+					BuildVSphereImageVersionWithMachineProfile(t, false),
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify the resourcePool of the image version
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "hypervisor_resource_pool", resourcePool),
+					// Verify the description of the image version
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "description", description),
+					// Verify the cpu_count of the image version
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.cpu_count", "2"),
+					// Verify the memory_mb of base vSphere image
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.memory_mb", "4096"),
+					// Verify the master image VM of the image version
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.master_image_vm", masterImageVm),
+					// Verify the master image snapshot of the image version
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.image_snapshot", masterImageSnapshot),
+					// Verify machine_profile is not set
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.machine_profile", machine_profile),
+				),
+			},
+			// ImportState testing
+			{
+				ResourceName:            "citrix_image_version.test_vsphere_image_version",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: importStateVerifyIgnore,
+				ImportStateIdFunc:       generateVSphereImageVersionImportStateId,
+			},
+			{
+				Config: composeTestResourceTf(
+					BuildVSphereImageDefinitionTestResource(t),
+					BuildVSphereImageVersionWithMachineProfile(t, true),
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify the resourcePool of the image version
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "hypervisor_resource_pool", resourcePool),
+					// Verify the description of the image version
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "description", descriptionUpdated),
+					// Verify the cpu_count of the image version
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.cpu_count", "2"),
+					// Verify the memory_mb of base vSphere image
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.memory_mb", "4096"),
+					// Verify the master image VM of the image version
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.master_image_vm", masterImageVm),
+					// Verify the master image snapshot of the image version
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.image_snapshot", masterImageSnapshot),
+					// Verify machine_profile is not set
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.machine_profile", machine_profile),
+				),
+			},
+			// Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
+func generateVSphereImageVersionImportStateId(state *terraform.State) (string, error) {
+	resourceName := "citrix_image_version.test_vsphere_image_version"
+	var rawState map[string]string
+	for _, m := range state.Modules {
+		if len(m.Resources) > 0 {
+			if v, ok := m.Resources[resourceName]; ok {
+				rawState = v.Primary.Attributes
+			}
+		}
+	}
+
+	return fmt.Sprintf("%s,%s", rawState["image_definition"], rawState["id"]), nil
+}
+
+func BuildVSphereImageVersionBasicMasterImage(t *testing.T, updated bool) string {
+	resourcePool := os.Getenv("TEST_VSPHERE_IMAGE_VERSION_RESOURCE_POOL")
+	description := os.Getenv("TEST_VSPHERE_IMAGE_VERSION_DESCRIPTION")
+	if updated {
+		description += "-updated"
+	}
+	network := os.Getenv("TEST_VSPHERE_IMAGE_VERSION_NETWORK")
+	masterImageVm := os.Getenv("TEST_VSPHERE_IMAGE_VERSION_MASTER_IMAGE_VM")
+	masterImageSnapShot := os.Getenv("TEST_VSPHERE_IMAGE_VERSION_MASTER_IMAGE_SNAPSHOT")
+
+	return fmt.Sprintf(vSphereImageVersionTestResource_basicMasterImage, resourcePool, description, network, masterImageVm, masterImageSnapShot)
+}
+
+func BuildVSphereImageVersionWithMachineProfile(t *testing.T, updated bool) string {
+	resourcePool := os.Getenv("TEST_VSPHERE_IMAGE_VERSION_RESOURCE_POOL")
+	description := os.Getenv("TEST_VSPHERE_IMAGE_VERSION_DESCRIPTION")
+	if updated {
+		description += "-updated"
+	}
+	network := os.Getenv("TEST_VSPHERE_IMAGE_VERSION_NETWORK")
+	masterImageVm := os.Getenv("TEST_VSPHERE_IMAGE_VERSION_MASTER_IMAGE_VM")
+	masterImageSnapShot := os.Getenv("TEST_VSPHERE_IMAGE_VERSION_MASTER_IMAGE_SNAPSHOT")
+	masterImageMachineProfile := os.Getenv("TEST_VSPHERE_IMAGE_VERSION_MACHINE_PROFILE")
+
+	return fmt.Sprintf(vSphereImageVersionTestResource_machineProfile, resourcePool, description, network, masterImageVm, masterImageSnapShot, masterImageMachineProfile)
 }
 
 var (
-	imageVersionTestVariables = []string{
+	azureImageVersionTestVariables = []string{
 		"TEST_AZURE_IMAGE_VERSION_HYPERVISOR",
 		"TEST_AZURE_IMAGE_VERSION_RESOURCE_POOL",
 		"TEST_AZURE_IMAGE_VERSION_DESCRIPTION",
@@ -367,19 +542,19 @@ var (
 
 	azureImageVersionTestResource_basicMasterImage = `
 resource "citrix_image_version" "test_azure_image_version" {
-    image_definition = citrix_image_definition.test_image_definition.id
+    image_definition = citrix_image_definition.test_azure_image_definition.id
 	hypervisor = "%s"
 	hypervisor_resource_pool = "%s" 
 	description = "%s"
+	network_mapping = [
+	{
+			network_device = "0"
+			network 	   = "%s"
+		}
+	]
 	azure_image_specs = {
 		service_offering = "%s"
 		storage_type = "StandardSSD_LRS"
-		network_mapping = [
-			{
-				network_device = "0"
-				network 	   = "%s"
-			}
-		]
 		resource_group = "%s"
 		master_image = "%s"
 	}
@@ -388,19 +563,19 @@ resource "citrix_image_version" "test_azure_image_version" {
 
 	azureImageVersionTestResource_fullMasterImage = `
 resource "citrix_image_version" "test_azure_image_version" {
-    image_definition = citrix_image_definition.test_image_definition.id
+    image_definition = citrix_image_definition.test_azure_image_definition.id
 	hypervisor = "%s"
 	hypervisor_resource_pool = "%s" 
 	description = "%s"
+	network_mapping = [
+		{
+			network_device = "0"
+			network 	   = "%s"
+		}
+	]
 	azure_image_specs = {
 		service_offering = "%s"
 		storage_type = "StandardSSD_LRS"
-		network_mapping = [
-			{
-				network_device = "0"
-				network 	   = "%s"
-			}
-		]
 		resource_group = "%s"
 		master_image = "%s"
 		machine_profile = {
@@ -417,19 +592,19 @@ resource "citrix_image_version" "test_azure_image_version" {
 
 	azureImageVersionTestResource_basicGalleryImage = `
 resource "citrix_image_version" "test_azure_image_version" {
-    image_definition = citrix_image_definition.test_image_definition.id
+    image_definition = citrix_image_definition.test_azure_image_definition.id
 	hypervisor = "%s"
 	hypervisor_resource_pool = "%s" 
 	description = "%s"
+	network_mapping = [
+		{
+			network_device = "0"
+			network 	   = "%s"
+		}
+	]
 	azure_image_specs = {
 		service_offering = "%s"
 		storage_type = "StandardSSD_LRS"
-		network_mapping = [
-			{
-				network_device = "0"
-				network 	   = "%s"
-			}
-		]
 		resource_group = "%s"
 		gallery_image = {
         	gallery    = "%s"
@@ -442,19 +617,19 @@ resource "citrix_image_version" "test_azure_image_version" {
 
 	azureImageVersionTestResource_fullGalleryImage = `
 resource "citrix_image_version" "test_azure_image_version" {
-    image_definition = citrix_image_definition.test_image_definition.id
+    image_definition = citrix_image_definition.test_azure_image_definition.id
 	hypervisor = "%s"
 	hypervisor_resource_pool = "%s" 
 	description = "%s"
+	network_mapping = [
+		{
+			network_device = "0"
+			network 	   = "%s"
+		}
+	]
 	azure_image_specs = {
 		service_offering = "%s"
 		storage_type = "StandardSSD_LRS"
-		network_mapping = [
-			{
-				network_device = "0"
-				network 	   = "%s"
-			}
-		]
 		resource_group = "%s"
 		gallery_image = {
         	gallery    = "%s"
@@ -469,6 +644,58 @@ resource "citrix_image_version" "test_azure_image_version" {
             disk_encryption_set_name           = "%s"
             disk_encryption_set_resource_group = "%s"
         }
+	}
+}
+`
+
+	vSphereImageVersionTestVariables = []string{
+		"TEST_VSPHERE_IMAGE_VERSION_RESOURCE_POOL",
+		"TEST_VSPHERE_IMAGE_VERSION_DESCRIPTION",
+		"TEST_VSPHERE_IMAGE_VERSION_NETWORK",
+		"TEST_VSPHERE_IMAGE_VERSION_MASTER_IMAGE_VM",
+		"TEST_VSPHERE_IMAGE_VERSION_MASTER_IMAGE_SNAPSHOT",
+		"TEST_VSPHERE_IMAGE_VERSION_MACHINE_PROFILE",
+	}
+
+	vSphereImageVersionTestResource_basicMasterImage = `
+resource "citrix_image_version" "test_vsphere_image_version" {
+    image_definition = citrix_image_definition.test_vsphere_image_definition.id
+	hypervisor = citrix_image_definition.test_vsphere_image_definition.hypervisor
+	hypervisor_resource_pool = "%s" 
+	description = "%s"
+	network_mapping = [
+		{
+			network_device = "0"
+			network 	   = "%s"
+		}
+	]
+	vsphere_image_specs = {
+		master_image_vm = "%s"
+		image_snapshot = "%s"
+		cpu_count = 2
+		memory_mb = 4096
+	}
+}
+`
+
+	vSphereImageVersionTestResource_machineProfile = `
+resource "citrix_image_version" "test_vsphere_image_version" {
+    image_definition = citrix_image_definition.test_vsphere_image_definition.id
+	hypervisor = citrix_image_definition.test_vsphere_image_definition.hypervisor
+	hypervisor_resource_pool = "%s" 
+	description = "%s"
+	network_mapping = [
+		{
+			network_device = "0"
+			network 	   = "%s"
+		}
+	]
+	vsphere_image_specs = {
+		master_image_vm = "%s"
+		image_snapshot = "%s"
+		cpu_count = 2
+		memory_mb = 4096
+		machine_profile = "%s"
 	}
 }
 `

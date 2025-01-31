@@ -560,37 +560,7 @@ function Import-ResourcesToState {
             terraform import "citrix_$($resource).$($script:cvadResourcesMap[$resource][$id])" "$id" 
         }
     }
-}
-
-function InjectSecretValues {
-    param(
-        [parameter(Mandatory = $true)]
-        [string] $targetProperty,
-
-        [parameter(Mandatory = $true)]
-        [string] $newProperty,
-
-        [parameter(Mandatory = $true)]
-        [string] $content
-    )
-
-    $regex = "(\s+)$targetProperty(\s+)= (\S+)"
-    if ($content -match $regex) {
-        $target = $Matches[0]
-        $newContent = $target -replace $targetProperty, $newProperty
-        $newContent = $newContent -replace "`"\S+`"", "`"<input $($newProperty) value>`""
-        if ("username" -eq $targetProperty) {
-            # In this case, it would be on-premises hypervisor. We need to have password format.
-            $format = $target -replace $targetProperty, "password_format"
-            $format = $format -replace "`"\S+`"", "`"PlainText`""
-            $content = $content -replace $regex, "$($target)$($newContent)$($format)"
-        }
-        else {
-            $content = $content -replace $regex, "$($target)$($newContent)"
-        }
-    }
-
-    return $content
+    Write-Verbose "Successfully imported resources into state."
 }
 
 function PostProcessProviderConfig {
@@ -692,22 +662,6 @@ function RemoveComputedProperties {
     return $content
 }
 
-function RemoveNullAndEmptyStringValues {
-    param(
-        [parameter(Mandatory = $true)]
-        [string] $content
-    )
-
-    Write-Verbose "Removing null values and empty strings from terraform output."
-    # Remove null values and empty strings from terraform output
-    $lines = $content -split "`r?`n"
-    $filteredLines = $lines | Where-Object { $_ -notmatch '.*= null.*' -and $_ -notmatch '^\s*[^=]+\s*=\s*""' }
-    $content = $filteredLines -join "`n"
-    
-    Write-Verbose "Null values and empty strings removed successfully."
-    return $content
-}
-
 function ReplaceDependencyRelationships {
     param(
         [parameter(Mandatory = $true)]
@@ -779,6 +733,13 @@ function InjectPlaceHolderSensitiveValues {
             # Replace raw_data value with icon file path using filebase64 to encode a file's content in base64 format
             $line = 'raw_data = filebase64("' + $iconFileName + '")'
             $filteredOutput += $line
+        }elseif ($line -match '.*=\s*null') {
+            Write-Verbose "Ignoring lines with null values."
+            continue
+        }
+        elseif ($line -match '^\s*[^=]+\s*=\s*""') {
+            Write-Verbose "Ignoring lines with empty strings."
+            continue
         }
         elseif ($line -match "application_id") {
             $filteredOutput += $line
@@ -795,6 +756,7 @@ function InjectPlaceHolderSensitiveValues {
         elseif ($line -match "username") {
             $filteredOutput += $line
             $filteredOutput += 'password = "<input password value>"'
+            $filteredOutput += 'password_format = "PlainText"'
         }
         elseif ($line -match "domain_ou") {
             $filteredOutput += $line
@@ -843,9 +805,6 @@ function PostProcessTerraformOutput {
 
     # Post-process the terraform output
     $content = Get-Content -Path ".\resource.tf" -Raw
-
-    # Remove null values and empty strings
-    $content = RemoveNullAndEmptyStringValues -content $content
 
     # Remove computed properties
     $content = RemoveComputedProperties -content $content

@@ -219,6 +219,39 @@ resource "citrix_machine_catalog" "example-vsphere-mtsession" {
     }
 }
 
+resource "citrix_machine_catalog" "example-vsphere-prepared-image" {
+    name                        = "example-vsphere-prepared-image"
+    description                 = "Example multi-session catalog on vSphere hypervisor with prepared image"
+    zone                        = "<zone Id>"
+    allocation_type             = "Random"
+    session_support             = "MultiSession"
+    provisioning_type 			= "MCS"
+    provisioning_scheme         = {
+        hypervisor = citrix_vsphere_hypervisor.vsphere-hypervisor-1.id
+        hypervisor_resource_pool = citrix_vsphere_hypervisor_resource_pool.vsphere-hypervisor-rp-1.id
+        identity_type = "ActiveDirectory"
+        machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+        vsphere_machine_config = {
+            prepared_image = {
+                image_definition = citrix_image_definition.example_vsphere_image_definition.id
+                image_version    = citrix_image_version.example_vsphere_image_version.id
+            }
+            cpu_count = 2
+            memory_mb = 4096
+            machine_profile = "<machine profile template name>"
+        }
+        number_of_total_machines = 1
+        machine_account_creation_rules = {
+            naming_scheme = "catalog-##"
+            naming_scheme_type = "Numeric"
+        }
+    }
+}
+
 resource "citrix_machine_catalog" "example-xenserver-mtsession" {
     name                        = "example-xenserver-mtsession"
     description                 = "Example multi-session catalog on XenServer hypervisor"
@@ -491,6 +524,12 @@ resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
 
 ### Optional
 
+- `delete_machine_accounts` (String) String that indicates the action on machine accounts to be performed on `terraform destroy` action. Available values are `Delete`, `Disable`, and `None`. Defaults to `None`.
+
+~> **Please Note** The action is only performed when the `destroy` action is taken, not when setting the value of this parameter. Once this parameter is set, there must be a successful `terraform apply` run before a `destroy` to update this value in the resource state. Without a successful `terraform apply` after this parameter is set, this parameter will have no effect. If setting this field in the same operation that would require replacing the machine catalog or destroying the machine catalog, this parameter will not work. Additionally when importing a machine catalog, a successful `terraform apply` is required to set this value in state before it will take effect on a destroy operation.
+- `delete_virtual_machines` (Boolean) Boolean that indicates the machines within the machine catalog should be deleted on `terraform destroy` action. Defaults to `true` for MCS/PVS catalogs. For `Manual` catalogs, this parameter can either be unset or set to `false`. The virtual machines will not be deleted for `Manual` catalogs.
+
+~> **Please Note** The deletion only happens when the `destroy` action is performed, not when setting this parameter to `true`. Once this parameter is set to `true`, there must be a successful `terraform apply` run before a `destroy` to update this value in the resource state. Without a successful `terraform apply` after this parameter is set, this flag will have no effect. If setting this field in the same operation that would require replacing the machine catalog or destroying the machine catalog, this flag will not work. Additionally when importing a machine catalog, a successful `terraform apply` is required to set this value in state before it will take effect on a destroy operation.
 - `description` (String) Description of the machine catalog.
 - `is_power_managed` (Boolean) Specify if the machines in the machine catalog will be power managed.
 - `is_remote_pc` (Boolean) Specify if this catalog is for Remote PC access.
@@ -534,6 +573,9 @@ Optional:
 
 - `availability_zone` (String) **[AWS: Required]** The availability zone in which the machine resides. Required only if `is_power_managed = true`
 - `cluster` (String) **[vSphere: Optional]** The cluster in which the machine resides. To be used only if `is_power_managed = true`
+- `cluster_folder_path` (String) **[vSphere: Optional]** The folder path in which the cluster resides. If there are multiple folders in the path, they should be separated by `\` in between each of them. To be used only if `is_power_managed = true`
+
+~> **Please Note** Folder path should should only be specified for cluster folders. For VM folders, they can be ignored and the folder path should be omitted.
 - `datacenter` (String) **[vSphere: Required]** The datacenter in which the machine resides. Required only if `is_power_managed = true`
 - `host` (String) **[vSphere, SCVMM: Required]** For vSphere, this is the IP address or FQDN of the host in which the machine resides. For SCVMM, this is the name of the host in which the machine resides. Required only if `is_power_managed = true`
 - `machine_name` (String) The name of the machine. Required only if `is_power_managed = true`
@@ -942,7 +984,6 @@ Optional:
 Required:
 
 - `cpu_count` (Number) The number of processors that virtual machines created from the provisioning scheme should use.
-- `master_image_vm` (String) The name of the virtual machine that will be used as master image. This property is case sensitive.
 - `memory_mb` (Number) The maximum amount of memory that virtual machines created from the provisioning scheme should use.
 
 Optional:
@@ -951,7 +992,10 @@ Optional:
 - `image_update_reboot_options` (Attributes) The options for how rebooting is performed for image update. When omitted, image update on the VDAs will be performed on next shutdown. (see [below for nested schema](#nestedatt--provisioning_scheme--vsphere_machine_config--image_update_reboot_options))
 - `machine_profile` (String) The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics and host cache property of OS disk.
 - `master_image_note` (String) The note for the master image.
+- `master_image_vm` (String) The name of the virtual machine that will be used as master image. This property is case sensitive.
+- `prepared_image` (Attributes) Specifying the prepared master image to be used for machine catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--vsphere_machine_config--prepared_image))
 - `resource_pool_path` (String) The Resource Pool path under which the `master_image_vm` is located. This property is case sensitive.
+- `use_full_disk_clone_provisioning` (Boolean) Specify if virtual machines created from the provisioning scheme should be created using the dedicated full disk clone feature. Default is `false`.
 - `writeback_cache` (Attributes) Write-back Cache config. Leave this empty to disable Write-back Cache. (see [below for nested schema](#nestedatt--provisioning_scheme--vsphere_machine_config--writeback_cache))
 
 <a id="nestedatt--provisioning_scheme--vsphere_machine_config--image_update_reboot_options"></a>
@@ -966,6 +1010,15 @@ Optional:
 - `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.-> **Note** When `reboot_duration` is set to `-1`, if a warning message should be displayed, `warning_duration` has to be set to `-1` to show the warning message immediately.-> **Note** When `reboot_duration` is not set to `-1`, `warning_duration` cannot be set to `-1`.
 - `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot. The optional pattern '%m%' is replaced by the number of minutes until the reboot.
 - `warning_repeat_interval` (Number) Number of minutes to wait before showing the reboot warning message again.
+
+
+<a id="nestedatt--provisioning_scheme--vsphere_machine_config--prepared_image"></a>
+### Nested Schema for `provisioning_scheme.vsphere_machine_config.prepared_image`
+
+Required:
+
+- `image_definition` (String) ID of the image definition.
+- `image_version` (String) ID of the image version.
 
 
 <a id="nestedatt--provisioning_scheme--vsphere_machine_config--writeback_cache"></a>
