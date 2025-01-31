@@ -3,6 +3,7 @@ package image_definition
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -84,11 +85,20 @@ func (d *ImageVersionDataSource) Read(ctx context.Context, req datasource.ReadRe
 		if err != nil {
 			return
 		}
+		imageVersionExists := false
 		for _, imageVersionInRemote := range imageVersions {
 			if imageVersionInRemote.GetNumber() == imageVersionNumber {
 				imageVersion = &imageVersionInRemote
+				imageVersionExists = true
 				break
 			}
+		}
+		if !imageVersionExists {
+			resp.Diagnostics.AddError(
+				"Image Version not found",
+				fmt.Sprintf("Image Version with number %d not found for Image Definition with ID %s ", imageVersionNumber, imageDefinitionId),
+			)
+			return
 		}
 	}
 

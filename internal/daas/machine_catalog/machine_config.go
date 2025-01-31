@@ -281,15 +281,17 @@ func (GcpMachineConfigModel) GetAttributes() map[string]schema.Attribute {
 
 type VsphereMachineConfigModel struct {
 	/** vSphere Hypervisor **/
-	MasterImageVm            types.String `tfsdk:"master_image_vm"`
-	ResourcePoolPath         types.String `tfsdk:"resource_pool_path"`
-	ImageSnapshot            types.String `tfsdk:"image_snapshot"`
-	MasterImageNote          types.String `tfsdk:"master_image_note"`
-	ImageUpdateRebootOptions types.Object `tfsdk:"image_update_reboot_options"`
-	CpuCount                 types.Int64  `tfsdk:"cpu_count"`
-	MemoryMB                 types.Int64  `tfsdk:"memory_mb"`
-	WritebackCache           types.Object `tfsdk:"writeback_cache"` // VsphereAndSCVMMWritebackCacheModel
-	MachineProfile           types.String `tfsdk:"machine_profile"`
+	MasterImageVm                types.String `tfsdk:"master_image_vm"`
+	VspherePreparedImage         types.Object `tfsdk:"prepared_image"` // PreparedImageConfigModel
+	ResourcePoolPath             types.String `tfsdk:"resource_pool_path"`
+	ImageSnapshot                types.String `tfsdk:"image_snapshot"`
+	MasterImageNote              types.String `tfsdk:"master_image_note"`
+	ImageUpdateRebootOptions     types.Object `tfsdk:"image_update_reboot_options"`
+	CpuCount                     types.Int64  `tfsdk:"cpu_count"`
+	MemoryMB                     types.Int64  `tfsdk:"memory_mb"`
+	WritebackCache               types.Object `tfsdk:"writeback_cache"` // VsphereAndSCVMMWritebackCacheModel
+	MachineProfile               types.String `tfsdk:"machine_profile"`
+	UseFullDiskCloneProvisioning types.Bool   `tfsdk:"use_full_disk_clone_provisioning"`
 }
 
 func (VsphereMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
@@ -299,12 +301,13 @@ func (VsphereMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 		Attributes: map[string]schema.Attribute{
 			"master_image_vm": schema.StringAttribute{
 				Description: "The name of the virtual machine that will be used as master image. This property is case sensitive.",
-				Required:    true,
+				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(
 						regexp.MustCompile(util.NoPathRegex),
 						"must not contain any path.",
 					),
+					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("prepared_image")),
 				},
 			},
 			"resource_pool_path": schema.StringAttribute{
@@ -320,6 +323,9 @@ func (VsphereMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
+				Validators: []validator.String{
+					stringvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("prepared_image")),
+				},
 			},
 			"master_image_note": schema.StringAttribute{
 				Description: "The note for the master image.",
@@ -327,14 +333,30 @@ func (VsphereMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 				Computed:    true,
 				Default:     stringdefault.StaticString(""),
 			},
+			"prepared_image":              PreparedImageConfigModel{}.GetSchema(),
 			"image_update_reboot_options": ImageUpdateRebootOptionsModel{}.GetSchema(),
 			"cpu_count": schema.Int64Attribute{
 				Description: "The number of processors that virtual machines created from the provisioning scheme should use.",
 				Required:    true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(1),
+				},
 			},
 			"memory_mb": schema.Int64Attribute{
 				Description: "The maximum amount of memory that virtual machines created from the provisioning scheme should use.",
 				Required:    true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(4),
+				},
+			},
+			"use_full_disk_clone_provisioning": schema.BoolAttribute{
+				Description: "Specify if virtual machines created from the provisioning scheme should be created using the dedicated full disk clone feature. Default is `false`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.RequiresReplace(),
+				},
 			},
 			"writeback_cache": VsphereAndSCVMMWritebackCacheModel{}.GetSchema(),
 			"machine_profile": schema.StringAttribute{
@@ -1303,15 +1325,35 @@ func (mc *GcpMachineConfigModel) RefreshProperties(ctx context.Context, diagnost
 func (mc *VsphereMachineConfigModel) RefreshProperties(ctx context.Context, diagnostics *diag.Diagnostics, catalog citrixorchestration.MachineCatalogDetailResponseModel) {
 	provScheme := catalog.GetProvisioningScheme()
 
-	// Refresh Master Image
-	masterImage, imageSnapshot, resourcePoolPath := parseOnPremImagePath(catalog)
-	mc.MasterImageVm = types.StringValue(masterImage)
-	mc.ImageSnapshot = types.StringValue(imageSnapshot)
-	mc.ResourcePoolPath = types.StringValue(resourcePoolPath)
+	if provScheme.CurrentImageVersion != nil {
+		// refresh image version
+		currentImage := provScheme.GetCurrentImageVersion()
+		imageVersion := currentImage.GetImageVersion()
+		imageDefinition := imageVersion.GetImageDefinition()
+		preparedImageConfig := util.ObjectValueToTypedObject[PreparedImageConfigModel](ctx, diagnostics, mc.VspherePreparedImage)
+		preparedImageConfig.ImageDefinition = types.StringValue(imageDefinition.GetId())
+		preparedImageConfig.ImageVersion = types.StringValue(imageVersion.GetId())
+		mc.VspherePreparedImage = util.TypedObjectToObjectValue(ctx, diagnostics, preparedImageConfig)
+		// Set default/null values for other properties
+		mc.MasterImageVm = types.StringNull()
+		mc.ResourcePoolPath = types.StringValue("")
+		mc.ImageSnapshot = types.StringNull()
+	} else {
+		// Refresh Master Image
+		masterImage, imageSnapshot, resourcePoolPath := parseOnPremImagePath(catalog)
+		mc.MasterImageVm = types.StringValue(masterImage)
+		mc.ImageSnapshot = types.StringValue(imageSnapshot)
+		mc.ResourcePoolPath = types.StringValue(resourcePoolPath)
 
-	// Refresh Master Image Note
-	currentDiskImage := provScheme.GetCurrentDiskImage()
-	mc.MasterImageNote = types.StringValue(currentDiskImage.GetMasterImageNote())
+		// Refresh Master Image Note
+		currentDiskImage := provScheme.GetCurrentDiskImage()
+		mc.MasterImageNote = types.StringValue(currentDiskImage.GetMasterImageNote())
+		if attributesMap, err := util.ResourceAttributeMapFromObject(PreparedImageConfigModel{}); err == nil {
+			mc.VspherePreparedImage = types.ObjectNull(attributesMap)
+		} else {
+			diagnostics.AddWarning("Error when creating null PreparedImageConfigModel", err.Error())
+		}
+	}
 
 	// Refresh Memory
 	mc.MemoryMB = types.Int64Value(int64(provScheme.GetMemoryMB()))
@@ -1340,6 +1382,8 @@ func (mc *VsphereMachineConfigModel) RefreshProperties(ctx context.Context, diag
 		machineProfileTemplateName := strings.TrimSuffix(machineProfileName, ".template")
 		mc.MachineProfile = types.StringValue(machineProfileTemplateName)
 	}
+
+	mc.UseFullDiskCloneProvisioning = types.BoolValue(provScheme.GetUseFullDiskCloneProvisioning())
 }
 
 func (mc *XenserverMachineConfigModel) RefreshProperties(ctx context.Context, diagnostics *diag.Diagnostics, catalog citrixorchestration.MachineCatalogDetailResponseModel) {

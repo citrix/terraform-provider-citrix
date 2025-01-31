@@ -4,7 +4,6 @@ package machine_catalog
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/image_definition"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -60,7 +60,7 @@ func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ct
 		return nil, err
 	}
 	body.SetSessionSupport(*sessionSupport)
-	if !plan.PersistUserChanges.IsNull() {
+	if plan.PersistUserChanges.ValueString() != "" {
 		body.SetPersistUserChanges(citrixorchestration.PersistChanges(plan.PersistUserChanges.ValueString()))
 	} else {
 		persistChanges := citrixorchestration.PERSISTCHANGES_DISCARD
@@ -258,79 +258,13 @@ func readMachineCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaas
 }
 
 func deleteMachinesFromCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, provisioningSchemePlan ProvisioningSchemeModel, machinesToDelete []citrixorchestration.MachineResponseModel, catalogNameOrId string, isMcsOrPvsCatalog bool, machineADAccountsInPlan []MachineADAccountModel) error {
-	batchApiHeaders, httpResp, err := generateBatchApiHeaders(ctx, &resp.Diagnostics, client, provisioningSchemePlan, false)
-	txId := citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
+	err := setMachinesToMaintenanceMode(ctx, &resp.Diagnostics, client, catalogNameOrId, provisioningSchemePlan, machinesToDelete)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error updating Machine Catalog "+catalogNameOrId,
-			"TransactionId: "+txId+
-				"\nCould not put machine(s) into maintenance mode before deleting them, unexpected error: "+util.ReadClientError(err),
-		)
 		return err
 	}
-	batchRequestItems := []citrixorchestration.BatchRequestItemModel{}
 
-	for index, machineToDelete := range machinesToDelete {
-		if machineToDelete.DeliveryGroup == nil {
-			// if machine has no delivery group, there is no need to put it in maintenance mode
-			continue
-		}
-
-		isMachineInMaintenanceMode := machineToDelete.GetInMaintenanceMode()
-
-		if !isMachineInMaintenanceMode {
-			// machine is not in maintenance mode. Put machine in maintenance mode first before deleting
-			var updateMachineModel citrixorchestration.UpdateMachineRequestModel
-			updateMachineModel.SetInMaintenanceMode(true)
-			updateMachineStringBody, err := util.ConvertToString(updateMachineModel)
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error removing Machine(s) from Machine Catalog "+catalogNameOrId,
-					"An unexpected error occurred: "+err.Error(),
-				)
-				return err
-			}
-			relativeUrl := fmt.Sprintf("/Machines/%s", machineToDelete.GetId())
-
-			var batchRequestItem citrixorchestration.BatchRequestItemModel
-			batchRequestItem.SetReference(strconv.Itoa(index))
-			batchRequestItem.SetMethod(http.MethodPatch)
-			batchRequestItem.SetRelativeUrl(client.GetBatchRequestItemRelativeUrl(relativeUrl))
-			batchRequestItem.SetBody(updateMachineStringBody)
-			batchRequestItem.SetHeaders(batchApiHeaders)
-			batchRequestItems = append(batchRequestItems, batchRequestItem)
-		}
-	}
-
-	if len(batchRequestItems) > 0 {
-		// If there are any machines that need to be put in maintenance mode
-		var batchRequestModel citrixorchestration.BatchRequestModel
-		batchRequestModel.SetItems(batchRequestItems)
-		successfulJobs, txId, err := citrixdaasclient.PerformBatchOperation(ctx, client, batchRequestModel)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error deleting machine(s) from Machine Catalog "+catalogNameOrId,
-				"TransactionId: "+txId+
-					"\nError message: "+util.ReadClientError(err),
-			)
-			return err
-		}
-
-		if successfulJobs < len(batchRequestItems) {
-			errMsg := fmt.Sprintf("An error occurred while putting machine(s) into maintenance mode before deleting them. %d of %d machines were put in the maintenance mode.", successfulJobs, len(batchRequestItems))
-			err = fmt.Errorf(errMsg)
-			resp.Diagnostics.AddError(
-				"Error updating Machine Catalog "+catalogNameOrId,
-				"TransactionId: "+txId+
-					"\n"+errMsg,
-			)
-
-			return err
-		}
-	}
-
-	batchApiHeaders, httpResp, err = generateBatchApiHeaders(ctx, &resp.Diagnostics, client, provisioningSchemePlan, isMcsOrPvsCatalog)
-	txId = citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
+	batchApiHeaders, httpResp, err := generateBatchApiHeaders(ctx, &resp.Diagnostics, client, provisioningSchemePlan, isMcsOrPvsCatalog)
+	txId := citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating Machine Catalog "+catalogNameOrId,
@@ -340,7 +274,7 @@ func deleteMachinesFromCatalog(ctx context.Context, client *citrixdaasclient.Cit
 		return err
 	}
 
-	batchRequestItems = []citrixorchestration.BatchRequestItemModel{}
+	batchRequestItems := []citrixorchestration.BatchRequestItemModel{}
 	for index, machineToDelete := range machinesToDelete {
 		deleteAccountOption := "Leave"
 		if isMcsOrPvsCatalog && !slices.ContainsFunc(machineADAccountsInPlan, func(v MachineADAccountModel) bool {
@@ -523,13 +457,16 @@ func validateInUseMachineAccounts(ctx context.Context, diagnostics *diag.Diagnos
 	}
 	batchRequestItems := []citrixorchestration.BatchRequestItemModel{}
 
+	reqReferenceMachineAccountMap := map[string]string{}
 	for index, machineAccount := range machineAccountsToCheck {
 		machineAccountForUrl := strings.TrimSuffix(machineAccount.ADAccountName.ValueString(), "$")
 		machineAccountForUrl = strings.ReplaceAll(machineAccountForUrl, "\\", "|")
 		relativeUrl := fmt.Sprintf("/Machines/%s/MachineCatalog", machineAccountForUrl)
 
 		var batchRequestItem citrixorchestration.BatchRequestItemModel
-		batchRequestItem.SetReference(strconv.Itoa(index))
+		referenceValue := strconv.Itoa(index)
+		reqReferenceMachineAccountMap[referenceValue] = machineAccount.ADAccountName.ValueString()
+		batchRequestItem.SetReference(referenceValue)
 		batchRequestItem.SetMethod(http.MethodGet)
 		batchRequestItem.SetRelativeUrl(client.GetBatchRequestItemRelativeUrl(relativeUrl))
 		batchRequestItem.SetHeaders(batchApiHeaders)
@@ -540,10 +477,19 @@ func validateInUseMachineAccounts(ctx context.Context, diagnostics *diag.Diagnos
 		// If there are any machines that need to be put in maintenance mode
 		var batchRequestModel citrixorchestration.BatchRequestModel
 		batchRequestModel.SetItems(batchRequestItems)
-		successfulJobs, _, _ := citrixdaasclient.PerformBatchOperation(ctx, client, batchRequestModel)
+		successfulJobs, _, subJobs, _ := citrixdaasclient.PerformBatchOperationAndReturnSubJobResponses(ctx, client, batchRequestModel)
 
 		if successfulJobs > 0 {
-			err := errors.New("One or more machine accounts specified are in use by other Machine Catalogs.")
+			machineAccountsInUse := []string{}
+			for i := 0; i < len(subJobs); i++ {
+				subJob := subJobs[i]
+				if subJob.GetCode() == 200 {
+					machineAccountInUse := fmt.Sprintf("`%s`", reqReferenceMachineAccountMap[subJob.GetReference()])
+					machineAccountsInUse = append(machineAccountsInUse, machineAccountInUse)
+				}
+			}
+
+			err := fmt.Errorf("Machine account(s) [%s] are in use by other Machine Catalogs.", strings.Join(machineAccountsInUse, ", "))
 			diagnostics.AddError(
 				"Error validating machine accounts for Machine Catalog "+catalogName,
 				err.Error(),
@@ -552,4 +498,71 @@ func validateInUseMachineAccounts(ctx context.Context, diagnostics *diag.Diagnos
 		}
 	}
 	return nil
+}
+
+func validateImageVersion(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, plan MachineCatalogResourceModel, preparedImageConfig PreparedImageConfigModel, machineConfigAttributeName string) (citrixorchestration.ImageSchemeResponseModel, citrixorchestration.ImageVersionSpecResponseModel, error) {
+	isPreparedImageSupported := util.CheckProductVersion(client, diagnostics, 121, 118, 7, 41, "Error using Prepared Image in citrix_machine_catalog resource", "Prepared Image")
+	var imageScheme citrixorchestration.ImageSchemeResponseModel
+	var imageSpecs citrixorchestration.ImageVersionSpecResponseModel
+	if !isPreparedImageSupported {
+		err := fmt.Errorf("Prepared Image is not supported in this version of Citrix Virtual Apps and Desktops service.")
+		return imageScheme, imageSpecs, err
+	}
+	imageDefinition, err := image_definition.GetImageDefinition(ctx, client, diagnostics, preparedImageConfig.ImageDefinition.ValueString())
+	if err != nil {
+		return imageScheme, imageSpecs, err
+	}
+
+	imageVersion, err := image_definition.GetImageVersion(ctx, client, diagnostics, imageDefinition.GetId(), preparedImageConfig.ImageVersion.ValueString())
+	if err != nil {
+		return imageScheme, imageSpecs, err
+	}
+
+	imageVersionStatus := imageVersion.GetImageVersionStatus()
+	if imageVersionStatus != citrixorchestration.IMAGEVERSIONSTATUS_SUCCESS {
+		err := fmt.Errorf("Image version in state `%s` cannot be used to create machine catalog.", string(imageVersionStatus))
+		diagnostics.AddError(
+			"Error validating azure_machine_config",
+			err.Error(),
+		)
+		return imageScheme, imageSpecs, err
+	}
+
+	imageContextConfigured := false
+	for _, spec := range imageVersion.GetImageVersionSpecs() {
+		if spec.Context != nil {
+			context := spec.GetContext()
+			if context.ImageScheme == nil {
+				continue
+			}
+			imageContextConfigured = true
+			imageScheme = context.GetImageScheme()
+			imageSpecs = spec
+		}
+	}
+	imageRuntimeEnvironment := imageSpecs.GetImageRuntimeEnvironment()
+	if imageContextConfigured {
+		// Validate session support
+		if !plan.SessionSupport.IsUnknown() && imageRuntimeEnvironment.GetVDASessionSupport() != "" {
+			if !strings.EqualFold(plan.SessionSupport.ValueString(), imageRuntimeEnvironment.GetVDASessionSupport()) {
+				err := fmt.Errorf("session_support specified does not match the session support configured in the prepared image.")
+				diagnostics.AddError(
+					fmt.Sprintf("Error validating `%s`", machineConfigAttributeName),
+					err.Error(),
+				)
+				return imageScheme, imageSpecs, err
+			}
+		}
+	}
+	return imageScheme, imageSpecs, nil
+}
+
+func getMachineAccountDeleteOptionValue(v string) citrixorchestration.MachineAccountDeleteOption {
+	machineAccountDeleteOption, err := citrixorchestration.NewMachineAccountDeleteOptionFromValue(v)
+
+	if err != nil {
+		return citrixorchestration.MACHINEACCOUNTDELETEOPTION_UNKNOWN
+	}
+
+	return *machineAccountDeleteOption
 }

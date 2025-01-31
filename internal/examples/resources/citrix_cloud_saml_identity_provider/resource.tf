@@ -6,7 +6,7 @@ resource "citrix_cloud_saml_identity_provider" "example_saml_idp" {
     use_scoped_entity_id                = false
 
     single_sign_on_service_url          = var.saml_sso_url
-    sign_auth_request                   = true
+    sign_auth_request                   = "Yes"
     single_sign_on_service_binding      = "HttpPost"
     saml_response                       = "SignEitherResponseOrAssertion"
     cert_file_path                      = var.cert_file_path
@@ -14,7 +14,7 @@ resource "citrix_cloud_saml_identity_provider" "example_saml_idp" {
     authentication_context_comparison   = "Exact"
 
     logout_url                          = var.saml_logout_url
-    sign_logout_request                 = true
+    sign_logout_request                 = "Yes"
     logout_binding                      = "HttpPost"
 
     attribute_names = {

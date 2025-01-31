@@ -28,6 +28,7 @@ type SCVMMHypervisorResourcePoolResourceModel struct {
 	Metadata   types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
 	/**** Resource Pool Details ****/
 	Host                   types.String `tfsdk:"host"`
+	HostGroup              types.String `tfsdk:"host_group"`
 	Networks               types.List   `tfsdk:"networks"`          // List[string]
 	Storage                types.List   `tfsdk:"storage"`           // List[HypervisorStorageModel]
 	TemporaryStorage       types.List   `tfsdk:"temporary_storage"` // List[HypervisorStorageModel]
@@ -65,6 +66,10 @@ func (SCVMMHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
+			},
+			"host_group": schema.StringAttribute{
+				Description: "The name of the host group.",
+				Optional:    true,
 			},
 			"networks": schema.ListAttribute{
 				ElementType: types.StringType,
@@ -118,6 +123,16 @@ func (r SCVMMHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx cont
 
 	rootPath := resourcePool.GetRootPath()
 	hostName := rootPath.GetName()
+	segments := strings.Split(hostName, "\\")
+	if len(segments) > 1 {
+		// If host name contains two segments, the host is under a host group
+		hostGroupSegments := strings.Split(segments[0], ".")
+		if !strings.EqualFold(r.HostGroup.ValueString(), hostGroupSegments[0]) {
+			r.HostGroup = types.StringValue(hostGroupSegments[0])
+		}
+		hostName = segments[1]
+	}
+
 	if !strings.EqualFold(r.Host.ValueString(), hostName) {
 		r.Host = types.StringValue(hostName)
 	}

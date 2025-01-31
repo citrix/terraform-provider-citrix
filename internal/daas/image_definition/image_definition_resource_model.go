@@ -152,6 +152,24 @@ func (r ImageDefinitionModel) RefreshPropertyValues(ctx context.Context, diagnos
 	r.SessionSupport = types.StringValue(util.SessionSupportEnumToString(imageDefinition.GetVDASessionSupport()))
 
 	connections := imageDefinition.GetHypervisorConnections()
+	var azureImgDefAttrMap map[string]attr.Type
+	var err error
+
+	// Set AzureImageDefinitionModel to default null value
+	if isResource {
+		azureImgDefAttrMap, err = util.ResourceAttributeMapFromObject(AzureImageDefinitionModel{})
+	} else {
+		azureImgDefAttrMap, err = util.DataSourceAttributeMapFromObject(AzureImageDefinitionModel{})
+	}
+	if err != nil {
+		diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
+		return r
+	}
+	r.AzureImageDefinitionModel = types.ObjectNull(azureImgDefAttrMap)
+
+	// Set Hypervisor to default null value
+	r.Hypervisor = types.StringNull()
+
 	if len(connections) > 0 {
 		connection := connections[0]
 		customProperties := connection.GetCustomProperties()
@@ -171,22 +189,11 @@ func (r ImageDefinitionModel) RefreshPropertyValues(ctx context.Context, diagnos
 					model.ImageGalleryName = types.StringValue(property.GetValue())
 				}
 			}
+			// Override default null value for AzureImageDefinitionModel
 			r.AzureImageDefinitionModel = util.TypedObjectToObjectValue(ctx, diagnostics, model)
-			r.Hypervisor = types.StringValue(connection.GetId())
 		}
-	} else {
-		var azureImgDefAttrMap map[string]attr.Type
-		var err error
-		if isResource {
-			azureImgDefAttrMap, err = util.ResourceAttributeMapFromObject(AzureImageDefinitionModel{})
-		} else {
-			azureImgDefAttrMap, err = util.DataSourceAttributeMapFromObject(AzureImageDefinitionModel{})
-		}
-		if err != nil {
-			diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
-			return r
-		}
-		r.AzureImageDefinitionModel = types.ObjectNull(azureImgDefAttrMap)
+		// Override default null value for Hypervisor
+		r.Hypervisor = types.StringValue(connection.GetId())
 	}
 
 	r.LatestVersion = types.Int64Value(int64(imageDefinition.GetLatestVersion()))

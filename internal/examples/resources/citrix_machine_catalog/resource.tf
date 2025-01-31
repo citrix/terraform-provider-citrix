@@ -201,6 +201,39 @@ resource "citrix_machine_catalog" "example-vsphere-mtsession" {
     }
 }
 
+resource "citrix_machine_catalog" "example-vsphere-prepared-image" {
+    name                        = "example-vsphere-prepared-image"
+    description                 = "Example multi-session catalog on vSphere hypervisor with prepared image"
+    zone                        = "<zone Id>"
+    allocation_type             = "Random"
+    session_support             = "MultiSession"
+    provisioning_type 			= "MCS"
+    provisioning_scheme         = {
+        hypervisor = citrix_vsphere_hypervisor.vsphere-hypervisor-1.id
+        hypervisor_resource_pool = citrix_vsphere_hypervisor_resource_pool.vsphere-hypervisor-rp-1.id
+        identity_type = "ActiveDirectory"
+        machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+        vsphere_machine_config = {
+            prepared_image = {
+                image_definition = citrix_image_definition.example_vsphere_image_definition.id
+                image_version    = citrix_image_version.example_vsphere_image_version.id
+            }
+            cpu_count = 2
+            memory_mb = 4096
+            machine_profile = "<machine profile template name>"
+        }
+        number_of_total_machines = 1
+        machine_account_creation_rules = {
+            naming_scheme = "catalog-##"
+            naming_scheme_type = "Numeric"
+        }
+    }
+}
+
 resource "citrix_machine_catalog" "example-xenserver-mtsession" {
     name                        = "example-xenserver-mtsession"
     description                 = "Example multi-session catalog on XenServer hypervisor"
