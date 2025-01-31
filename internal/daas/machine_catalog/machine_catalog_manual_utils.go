@@ -112,6 +112,13 @@ func getMachinesForManualCatalogs(ctx context.Context, diagnostics *diag.Diagnos
 
 				folderPath = datacenter.GetXDPath()
 
+				if !machine.ClusterFolderPath.IsNull() {
+					folders := strings.Split(machine.ClusterFolderPath.ValueString(), "\\")
+					for _, folder := range folders {
+						folderPath = fmt.Sprintf("%s\\%s.folder", folderPath, folder)
+					}
+				}
+
 				if !machine.Cluster.IsNull() {
 					cluster, httpResp, err := util.GetSingleHypervisorResource(ctx, client, diagnostics, hypervisorId, folderPath, machine.Cluster.ValueString(), "cluster", "", hypervisor)
 					if err != nil {

@@ -446,7 +446,7 @@ func addRemoveMachinesFromDeliveryGroup(ctx context.Context, client *citrixdaasc
 
 func validatePowerTimeSchemes(ctx context.Context, diagnostics *diag.Diagnostics, powerTimeSchemes []DeliveryGroupPowerTimeScheme) {
 	for _, powerTimeScheme := range powerTimeSchemes {
-		if powerTimeScheme.PoolSizeSchedule.IsNull() {
+		if powerTimeScheme.PoolSizeSchedules.IsNull() {
 			continue
 		}
 
@@ -456,7 +456,7 @@ func validatePowerTimeSchemes(ctx context.Context, diagnostics *diag.Diagnostics
 		hoursPoolSizeArray := make([]int, 24)
 		minutesPoolSizeArray := make([]int, 24)
 
-		for _, schedule := range util.ObjectListToTypedArray[PowerTimeSchemePoolSizeScheduleRequestModel](ctx, diagnostics, powerTimeScheme.PoolSizeSchedule) {
+		for _, schedule := range util.ObjectListToTypedArray[PowerTimeSchemePoolSizeScheduleRequestModel](ctx, diagnostics, powerTimeScheme.PoolSizeSchedules) {
 			if schedule.TimeRange.IsNull() {
 				continue
 			}
@@ -1125,8 +1125,8 @@ func parsePowerTimeSchemesPluginToClientModel(ctx context.Context, diags *diag.D
 			daysOfWeek = append(daysOfWeek, timeSchemeDay)
 		}
 
-		var poolSizeScheduleRequests []citrixorchestration.PoolSizeScheduleRequestModel
-		for _, poolSizeSchedule := range util.ObjectListToTypedArray[PowerTimeSchemePoolSizeScheduleRequestModel](ctx, diags, powerTimeScheme.PoolSizeSchedule) {
+		poolSizeScheduleRequests := []citrixorchestration.PoolSizeScheduleRequestModel{}
+		for _, poolSizeSchedule := range util.ObjectListToTypedArray[PowerTimeSchemePoolSizeScheduleRequestModel](ctx, diags, powerTimeScheme.PoolSizeSchedules) {
 			var poolSizeScheduleRequest citrixorchestration.PoolSizeScheduleRequestModel
 			poolSizeScheduleRequest.SetTimeRange(poolSizeSchedule.TimeRange.ValueString())
 			poolSizeScheduleRequest.SetPoolSize(int32(poolSizeSchedule.PoolSize.ValueInt64()))
@@ -1173,7 +1173,7 @@ func parsePowerTimeSchemesClientToPluginModel(ctx context.Context, diags *diag.D
 		deliveryGroupPowerTimeScheme.PeakTimeRanges = util.StringArrayToStringSet(ctx, diags, powerTimeSchemeResponse.GetPeakTimeRanges())
 		deliveryGroupPowerTimeScheme.PoolUsingPercentage = types.BoolValue(powerTimeSchemeResponse.GetPoolUsingPercentage())
 		deliveryGroupPowerTimeScheme.DaysOfWeek = util.StringArrayToStringSet(ctx, diags, daysOfWeek)
-		deliveryGroupPowerTimeScheme.PoolSizeSchedule = util.TypedArrayToObjectList[PowerTimeSchemePoolSizeScheduleRequestModel](ctx, diags, poolSizeScheduleRequests)
+		deliveryGroupPowerTimeScheme.PoolSizeSchedules = util.TypedArrayToObjectList[PowerTimeSchemePoolSizeScheduleRequestModel](ctx, diags, poolSizeScheduleRequests)
 
 		res = append(res, deliveryGroupPowerTimeScheme)
 	}
@@ -1830,9 +1830,9 @@ func preserveOrderInPowerTimeSchemes(ctx context.Context, diags *diag.Diagnostic
 			powerTimeSchemeInPlan = append(powerTimeSchemeInPlan, powerTimeScheme)
 		} else {
 			updatedPoolSizeSchedule := preserveOrderInPoolSizeSchedule(
-				util.ObjectListToTypedArray[PowerTimeSchemePoolSizeScheduleRequestModel](ctx, diags, powerTimeSchemeInPlan[index].PoolSizeSchedule),
-				util.ObjectListToTypedArray[PowerTimeSchemePoolSizeScheduleRequestModel](ctx, diags, powerTimeScheme.PoolSizeSchedule))
-			powerTimeSchemeInPlan[index].PoolSizeSchedule = util.TypedArrayToObjectList[PowerTimeSchemePoolSizeScheduleRequestModel](ctx, diags, updatedPoolSizeSchedule)
+				util.ObjectListToTypedArray[PowerTimeSchemePoolSizeScheduleRequestModel](ctx, diags, powerTimeSchemeInPlan[index].PoolSizeSchedules),
+				util.ObjectListToTypedArray[PowerTimeSchemePoolSizeScheduleRequestModel](ctx, diags, powerTimeScheme.PoolSizeSchedules))
+			powerTimeSchemeInPlan[index].PoolSizeSchedules = util.TypedArrayToObjectList[PowerTimeSchemePoolSizeScheduleRequestModel](ctx, diags, updatedPoolSizeSchedule)
 		}
 		planPowerTimeSchemesMap[powerTimeScheme.DisplayName.ValueString()] = -1
 	}

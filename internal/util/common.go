@@ -209,6 +209,7 @@ const StorageResourceType string = "Storage"
 const NetworkResourceType string = "Network"
 const SecurityGroupResourceType = "SecurityGroup"
 const HostResourceType = "Host"
+const HostGroupResourceType = "HostGroup"
 
 // Azure Storage Types
 const StandardLRS = "Standard_LRS"

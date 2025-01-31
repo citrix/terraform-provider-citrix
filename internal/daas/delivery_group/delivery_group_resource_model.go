@@ -100,7 +100,7 @@ type DeliveryGroupPowerTimeScheme struct {
 	DaysOfWeek          types.Set    `tfsdk:"days_of_week"` //Set[string]
 	DisplayName         types.String `tfsdk:"display_name"`
 	PeakTimeRanges      types.Set    `tfsdk:"peak_time_ranges"`    //Set[string]
-	PoolSizeSchedule    types.List   `tfsdk:"pool_size_schedules"` //List[PowerTimeSchemePoolSizeScheduleRequestModel]
+	PoolSizeSchedules   types.List   `tfsdk:"pool_size_schedules"` //List[PowerTimeSchemePoolSizeScheduleRequestModel]
 	PoolUsingPercentage types.Bool   `tfsdk:"pool_using_percentage"`
 }
 
@@ -1032,6 +1032,7 @@ type DeliveryGroupResourceModel struct {
 	Metadata                    types.List   `tfsdk:"metadata"` // List[NameValueStringPairmodel]
 	Tags                        types.Set    `tfsdk:"tags"`     // Set[string]
 	DefaultDesktopIcon          types.String `tfsdk:"default_desktop_icon"`
+	ForceDelete                 types.Bool   `tfsdk:"force_delete"`
 }
 
 func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
@@ -1248,6 +1249,13 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 				Optional: true,
 				Computed: true,
 				Default:  stringdefault.StaticString("1"),
+			},
+			"force_delete": schema.BoolAttribute{
+				Description: "Boolean that indicates the delivery group object should be force deleted on `terraform destroy` action. Defaults to `false`." +
+					"\n\n~> **Please Note** The force deletion only happens when the `destroy` action is performed, not when setting this parameter to `true`. Once this parameter is set to `true`, there must be a successful `terraform apply` run before a `destroy` to update this value in the resource state. Without a successful `terraform apply` after this parameter is set, this flag will have no effect. If setting this field in the same operation that would require replacing the delivery group or destroying the delivery group, this flag will not work. Additionally when importing a delivery group, a successful `terraform apply` is required to set this value in state before it will take effect on a destroy operation.",
+				Optional: true,
+				Computed: true,
+				Default:  booldefault.StaticBool(false),
 			},
 		},
 	}

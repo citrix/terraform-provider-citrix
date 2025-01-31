@@ -16,6 +16,7 @@ Citrix has developed a custom Terraform provider for automating Citrix product d
   - [Using the Plugin for Terraform Provider for Citrix DaaS™](#using-the-plugin-for-terraform-provider-for-citrix-daas)
     - [Install Terraform](#install-terraform)
     - [(On-Premises Only) Enable Web Studio](#on-premises-only-enable-web-studio)
+    - [(Cloud Only) Create a Citrix Cloud Service Principal](#cloud-only-create-a-citrix-cloud-service-principal)
     - [Configure your Plugin for Terraform Provider for Citrix DaaS™](#configure-your-plugin-for-terraform-provider-for-citrix-daas)
     - [Start writing Terraform for managing your Citrix DaaS site](#start-writing-terraform-for-managing-your-citrix-daas-site)
     - [Create a Zone in Citrix DaaS as the first step](#create-a-zone-in-citrix-daas-as-the-first-step)
@@ -44,6 +45,7 @@ Please refer to [Citrix Tech Zone](https://community.citrix.com/tech-zone/automa
 - [Installing and configuring the provider](https://community.citrix.com/tech-zone/automation/terraform-install-and-config/)
 - [Daily administrative operations](https://community.citrix.com/tech-zone/automation/terraform-daily-administration/)
 - [AWS EC2](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-aws/) via MCS
+- [AWS WorkSpaces Core](https://community.citrix.com/tech-zone/learn/poc-guides/daas-and-awc-terraform)
 - [Azure](https://community.citrix.com/tech-zone/build/deployment-guides/citrix-daas-terraform-azure/) via MCS
 - [GCP](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-gcp/) via MCS
 - [vSphere](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-vsphere8/) via MCS
@@ -101,13 +103,13 @@ You can use environment variables as stated in the comments above. When running 
 
 Below is a table to show the difference between on-premises and Cloud provider configuration:
 
-|              | Cloud                             | On-Premises                           |
-|--------------|-----------------------------------|---------------------------------------|
-| environment  | `Production`, `Japan`, `Gov`      | N/A                                   |
-| customerId   | Cloud Customer Id                 | N/A                                   |
-| hostname     | (Optional) Cloud DDC hostname     | On-Premises DDC Hostname / IP address |
-| clientId     | Citrix Cloud API Key clientId     | Domain Admin Username                 |
-| clientSecret | Citrix Cloud API Key clientSecret | Domain Admin Password                 |
+|              | Cloud                                 | On-Premises                           |
+|--------------|---------------------------------------|---------------------------------------|
+| environment  | `Production`, `Japan`, `Gov`          | N/A                                   |
+| customerId   | Cloud Customer Id                     | N/A                                   |
+| hostname     | (Optional) Cloud DDC hostname         | On-Premises DDC Hostname / IP address |
+| clientId     | Citrix Cloud service principal ID     | Domain Admin Username                 |
+| clientSecret | Citrix Cloud service principal secret | Domain Admin Password                 |
 
 ### Resource Configuration
 
@@ -142,9 +144,12 @@ Refer the [Hashicorp documentation](https://learn.hashicorp.com/tutorials/terraf
 
 For on-premises sites with version >= 2311 are supported. Web Studio needs to be [installed and configured](https://docs.citrix.com/en-us/citrix-virtual-apps-desktops/install-configure/install-core/install-web-studio.html#install-web-studio-1) for the provider to work.
 
+### (Cloud Only) Create a Citrix Cloud Service Principal
+A service principal is an API client which is not associated with an email. It can be given delegated permissions just like a regular administrator. Follow the [Citrix Cloud API Access with Service Principals](https://developer-docs.citrix.com/en-us/citrix-cloud/citrix-cloud-api-overview/get-started-with-citrix-cloud-apis#citrix-cloud-api-access-with-service-principals) guide to create a service principal for your cloud customer. When selecting the service principal's access choose an appropriate DaaS role.
+
 ### Configure your Plugin for Terraform Provider for Citrix DaaS™
 
-Refer section [Understanding Provider Configuration](#understanding-provider-configuration) or [Provider documentation](docs/index.md) to configure the provider for the Citrix DaaS site you want to manage with Terraform.
+Refer to section [Provider Configuration](#provider-configuration) to configure the provider for the Citrix DaaS site you want to manage with Terraform.
 
 ### Start writing Terraform for managing your Citrix DaaS site
 

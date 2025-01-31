@@ -133,6 +133,14 @@ func (r *adminRoleResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
+	if adminRole.IsBuiltIn {
+		resp.Diagnostics.AddError(
+			"Error reading Admin Role with Id: "+state.Id.ValueString(),
+			"Using resource block for built-in admin roles is not permitted. Please use admin role data source block to reference built-in admin roles.",
+		)
+		return
+	}
+
 	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, adminRole)
 
 	// Set refreshed state

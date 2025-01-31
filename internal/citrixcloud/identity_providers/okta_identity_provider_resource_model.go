@@ -88,7 +88,9 @@ func (r OktaIdentityProviderModel) RefreshPropertyValues(isResource bool, oktaId
 	// Overwrite Okta Identity Provider Resource with refreshed state
 	r.Id = types.StringValue(oktaIdp.GetIdpInstanceId())
 	r.Name = types.StringValue(oktaIdp.GetIdpNickname())
-	r.OktaClientId = types.StringValue(oktaIdp.GetClientId())
+	if oktaIdp.GetClientId() != "" {
+		r.OktaClientId = types.StringValue(oktaIdp.GetClientId())
+	}
 
 	additionalInfo := oktaIdp.GetAdditionalStatusInfo()
 	if additionalInfo != nil {
@@ -98,6 +100,7 @@ func (r OktaIdentityProviderModel) RefreshPropertyValues(isResource bool, oktaId
 	}
 
 	if !isResource {
+		r.OktaClientId = types.StringNull()
 		r.OktaClientSecret = types.StringNull()
 		r.OktaApiToken = types.StringNull()
 	}

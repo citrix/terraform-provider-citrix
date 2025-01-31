@@ -1,6 +1,6 @@
-resource "citrix_image_definition" "example_image_definition" {
-    name            = "Example Image Definition"
-    description     = "Example Image Definition Description"
+resource "citrix_image_definition" "example_azure_image_definition" {
+    name            = "Example Azure Image Definition"
+    description     = "Example Azure Image Definition Description"
     os_type         = "Windows"
     session_support = "MultiSession"
     hypervisor      = citrix_azure_hypervisor.example_azure_hypervisor.id
@@ -9,4 +9,12 @@ resource "citrix_image_definition" "example_image_definition" {
         use_image_gallery = true
         image_gallery_name = "ExampleImageGalleryName"
     }
+}
+
+resource "citrix_image_definition" "example_vsphere_image_definition" {
+    name            = "Example vSphere Image Definition"
+    description     = "Example vSphere Image Definition Description"
+    os_type         = "Windows"
+    session_support = "MultiSession"
+    hypervisor      = citrix_vsphere_hypervisor.example_vsphere_hypervisor.id
 }

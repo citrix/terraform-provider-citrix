@@ -28,6 +28,7 @@ Please refer to [Citrix Tech Zone](https://community.citrix.com/tech-zone/automa
 - [Installing and configuring the provider](https://community.citrix.com/tech-zone/automation/terraform-install-and-config/)
 - [Daily administrative operations](https://community.citrix.com/tech-zone/automation/terraform-daily-administration/)
 - [AWS EC2](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-aws/) via MCS
+- [AWS WorkSpaces Core](https://community.citrix.com/tech-zone/learn/poc-guides/daas-and-awc-terraform)
 - [Azure](https://community.citrix.com/tech-zone/build/deployment-guides/citrix-daas-terraform-azure/) via MCS
 - [GCP](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-gcp/) via MCS
 - [vSphere](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-vsphere8/) via MCS
@@ -41,6 +42,10 @@ https://www.youtube.com/watch?v=c33sMLaCVjY
 ### (On-Premises Only) Enable Web Studio
 
 For on-premises sites with version >= 2311 are supported. Web Studio needs to be [installed and configured](https://docs.citrix.com/en-us/citrix-virtual-apps-desktops/install-configure/install-core/install-web-studio.html#install-web-studio-1) for the provider to work.
+
+### (Cloud Only) Create a Citrix Cloud Service Principal
+
+A service principal is an API client which is not associated with an email. It can be given delegated permissions just like a regular administrator. Follow the [Citrix Cloud API Access with Service Principals](https://developer-docs.citrix.com/en-us/citrix-cloud/citrix-cloud-api-overview/get-started-with-citrix-cloud-apis#citrix-cloud-api-access-with-service-principals) guide to create a service principal for your cloud customer. When selecting the service principal's access choose an appropriate DaaS role.
 
 ## Frequently Asked Questions
 
@@ -61,5 +66,16 @@ For on-premises sites with version >= 2311 are supported. Web Studio needs to be
 
 {{ tffile "internal/examples/provider/provider.tf" }}
 {{- end }}
+
+### `cvad_config` options
+Below is a table to show the difference between on-premises and Cloud provider configuration:
+
+|              | Cloud                                 | On-Premises                           |
+|--------------|---------------------------------------|---------------------------------------|
+| environment  | `Production`, `Japan`, `Gov`          | N/A                                   |
+| customerId   | Cloud Customer Id                     | N/A                                   |
+| hostname     | (Optional) Cloud DDC hostname         | On-Premises DDC Hostname / IP address |
+| clientId     | Citrix Cloud service principal ID     | Domain Admin Username                 |
+| clientSecret | Citrix Cloud service principal secret | Domain Admin Password                 |
 
 {{ .SchemaMarkdown | trimspace }}
