@@ -67,6 +67,8 @@ func (r *MachinePropertiesResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
+	validateMachineAndMachineCatalogExistence(ctx, r.client, &resp.Diagnostics, plan)
+
 	machineName := strings.ReplaceAll(plan.Name.ValueString(), "\\", "|")
 	err := setMachineTags(ctx, r.client, &resp.Diagnostics, machineName, plan.Tags, "managing tags for")
 	if err != nil {
@@ -105,6 +107,8 @@ func (r *MachinePropertiesResource) Read(ctx context.Context, req resource.ReadR
 		return
 	}
 
+	validateMachineAndMachineCatalogExistence(ctx, r.client, &resp.Diagnostics, state)
+
 	machineName := strings.ReplaceAll(state.Name.ValueString(), "\\", "|")
 	// Get refreshed admin properties from Orchestration
 	machineProperties, err := readMachineProperties(ctx, r.client, resp, machineName)
@@ -137,6 +141,8 @@ func (r *MachinePropertiesResource) Update(ctx context.Context, req resource.Upd
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	validateMachineAndMachineCatalogExistence(ctx, r.client, &resp.Diagnostics, plan)
 
 	machineName := strings.ReplaceAll(plan.Name.ValueString(), "\\", "|")
 	err := setMachineTags(ctx, r.client, &resp.Diagnostics, machineName, plan.Tags, "updating tags for")
@@ -227,37 +233,6 @@ func (r *MachinePropertiesResource) ModifyPlan(ctx context.Context, req resource
 		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
 		return
 	}
-
-	if req.Plan.Raw.IsNull() {
-		return
-	}
-
-	var plan MachinePropertiesModel
-	diags := req.Plan.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	machineName := strings.ReplaceAll(plan.Name.ValueString(), "\\", "|")
-	getMachinePropertiesRequest := r.client.ApiClient.MachinesAPIsDAAS.MachinesGetMachine(ctx, machineName)
-	machineProperties, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.MachineDetailResponseModel](getMachinePropertiesRequest, r.client)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading the properties of Machine "+plan.Name.ValueString(),
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-		return
-	}
-	machineCatalog := machineProperties.GetMachineCatalog()
-	if !strings.EqualFold(machineCatalog.GetId(), plan.MachineCatalogId.ValueString()) {
-		resp.Diagnostics.AddError(
-			"Error reading the properties of Machine "+plan.Name.ValueString(),
-			"Machine catalog ID specified does not match the machine catalog ID of the machine",
-		)
-		return
-	}
 }
 
 func readMachineProperties(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, machineNameOrId string) (*citrixorchestration.MachineDetailResponseModel, error) {
@@ -308,6 +283,30 @@ func setMachineTags(ctx context.Context, client *citrixdaasclient.CitrixDaasClie
 			fmt.Sprintf("Error %s machine %s", tagOperation, strings.ReplaceAll(machineNameOrId, "|", "\\")),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
+		)
+		return err
+	}
+	return nil
+}
+
+func validateMachineAndMachineCatalogExistence(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, machinePropertiesModel MachinePropertiesModel) error {
+	machineName := strings.ReplaceAll(machinePropertiesModel.Name.ValueString(), "\\", "|")
+	getMachinePropertiesRequest := client.ApiClient.MachinesAPIsDAAS.MachinesGetMachine(ctx, machineName)
+	machineProperties, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.MachineDetailResponseModel](getMachinePropertiesRequest, client)
+	if err != nil {
+		diagnostics.AddError(
+			"Error reading the properties of Machine "+machinePropertiesModel.Name.ValueString(),
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		return err
+	}
+	machineCatalog := machineProperties.GetMachineCatalog()
+	if !strings.EqualFold(machineCatalog.GetId(), machinePropertiesModel.MachineCatalogId.ValueString()) {
+		err = fmt.Errorf("Machine catalog ID specified does not match the machine catalog ID of the machine")
+		diagnostics.AddError(
+			"Error reading the properties of Machine "+machinePropertiesModel.Name.ValueString(),
+			err.Error(),
 		)
 		return err
 	}

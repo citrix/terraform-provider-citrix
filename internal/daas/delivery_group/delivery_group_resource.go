@@ -452,9 +452,11 @@ func (r *deliveryGroupResource) Delete(ctx context.Context, req resource.DeleteR
 	}
 
 	// Delete existing delivery group
+	forceDelete := state.ForceDelete.ValueBool()
 	deliveryGroupId := state.Id.ValueString()
 	deliveryGroupName := state.Name.ValueString()
 	deleteDeliveryGroupRequest := r.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsDeleteDeliveryGroup(ctx, deliveryGroupId)
+	deleteDeliveryGroupRequest = deleteDeliveryGroupRequest.Force(forceDelete)
 	httpResp, err := citrixdaasclient.AddRequestData(deleteDeliveryGroupRequest, r.client).Execute()
 	if err != nil && httpResp.StatusCode != http.StatusNotFound {
 		resp.Diagnostics.AddError(
@@ -662,23 +664,10 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 		}
 	}
 
-	if !plan.Desktops.IsNull() {
-		sessionRoamingShouldBeSet := true
-		if !plan.SharingKind.IsNull() {
-			sharingKind := plan.SharingKind.ValueString()
-			if sharingKind == string(citrixorchestration.SHARINGKIND_PRIVATE) {
-				sessionRoamingShouldBeSet = false
-			}
-		}
-		desktops := util.ObjectListToTypedArray[DeliveryGroupDesktop](ctx, &resp.Diagnostics, plan.Desktops)
-		isValid, errMsg := validateSessionRoaming(desktops, sessionRoamingShouldBeSet)
-		if !isValid {
-			resp.Diagnostics.AddError(
-				"Error "+operation+" Delivery Group "+plan.Name.ValueString(),
-				"Error message: "+errMsg,
-			)
-			return
-		}
+	// Set the delivery group desktops
+	var desktops []DeliveryGroupDesktop
+	if !plan.Desktops.IsNull() && len(plan.Desktops.Elements()) > 0 {
+		desktops = util.ObjectListToTypedArray[DeliveryGroupDesktop](ctx, &resp.Diagnostics, plan.Desktops)
 	}
 
 	if plan.AssociatedMachineCatalogs.IsNull() {
@@ -696,6 +685,23 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 				"Autoscale settings can only be configured if associated machine catalogs are specified.",
 			)
 		}
+
+		if len(desktops) > 0 {
+			sessionRoamingShouldBeSet := true
+			sharingKind := plan.SharingKind.ValueString()
+			if sharingKind == string(citrixorchestration.SHARINGKIND_PRIVATE) {
+				sessionRoamingShouldBeSet = false
+			}
+			isValid, errMsg := validateSessionRoaming(desktops, sessionRoamingShouldBeSet)
+			if !isValid {
+				resp.Diagnostics.AddError(
+					"Error "+operation+" Delivery Group "+plan.Name.ValueString(),
+					"Error message: "+errMsg,
+				)
+				return
+			}
+		}
+
 		return
 	}
 
@@ -754,8 +760,7 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 		return
 	}
 
-	if associatedMachineCatalogProperties.IsRemotePcCatalog && plan.Desktops.IsNull() && len(plan.Desktops.Elements()) > 0 {
-		desktops := util.ObjectListToTypedArray[DeliveryGroupDesktop](ctx, &resp.Diagnostics, plan.Desktops)
+	if associatedMachineCatalogProperties.IsRemotePcCatalog && len(desktops) > 0 {
 		if desktops[0].EnableSessionRoaming.ValueBool() {
 			resp.Diagnostics.AddError(
 				"Error "+operation+" Delivery Group "+plan.Name.ValueString(),
@@ -785,9 +790,12 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 		return
 	}
 
-	if associatedMachineCatalogProperties.AllocationType == citrixorchestration.ALLOCATIONTYPE_STATIC && !plan.Desktops.IsNull() {
-		desktops := util.ObjectListToTypedArray[DeliveryGroupDesktop](ctx, &resp.Diagnostics, plan.Desktops)
-		isValid, errMsg := validateSessionRoaming(desktops, false)
+	if len(desktops) > 0 {
+		sessionRoamingShouldBeSet := true
+		if associatedMachineCatalogProperties.AllocationType == citrixorchestration.ALLOCATIONTYPE_STATIC {
+			sessionRoamingShouldBeSet = false
+		}
+		isValid, errMsg := validateSessionRoaming(desktops, sessionRoamingShouldBeSet)
 		if !isValid {
 			resp.Diagnostics.AddError(
 				"Error "+operation+" Delivery Group "+plan.Name.ValueString(),

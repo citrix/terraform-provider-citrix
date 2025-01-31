@@ -155,21 +155,34 @@ func (r *scvmmHypervisorResourcePoolResource) Create(ctx context.Context, req re
 		return
 	}
 
-	host, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, &resp.Diagnostics, hypervisorId, "", plan.Host.ValueString(), util.HostResourceType, "", hypervisor)
+	folderPath := ""
+	if plan.HostGroup.ValueString() != "" {
+		hostgroup, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, &resp.Diagnostics, hypervisorId, "", plan.HostGroup.ValueString(), util.HostGroupResourceType, "", hypervisor)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating Hypervisor Resource Pool for SCVMM",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					fmt.Sprintf("\nFailed to resolve host group %s, error: %s", plan.HostGroup.ValueString(), err.Error()),
+			)
+		}
+		folderPath = hostgroup.GetXDPath()
+	}
+
+	host, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, &resp.Diagnostics, hypervisorId, folderPath, plan.Host.ValueString(), util.HostResourceType, "", hypervisor)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor Resource Pool for SCVMM",
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				fmt.Sprintf("\nFailed to resolve resource %s, error: %s", plan.Host.ValueString(), err.Error()),
+				fmt.Sprintf("\nFailed to resolve host %s, error: %s", plan.Host.ValueString(), err.Error()),
 		)
 	}
 
 	resourcePoolDetails.SetName(plan.Name.ValueString())
 	resourcePoolDetails.SetConnectionType(hypervisorConnectionType)
-	resourcePoolDetails.SetRootPath(host.GetFullName())
+	resourcePoolDetails.SetRootPath(host.GetXDPath())
 
 	storages, tempStorages := plan.GetStorageList(ctx, r.client, &resp.Diagnostics, hypervisor, host.GetXDPath(), true, false)
-	networks := plan.GetNetworksList(ctx, r.client, &resp.Diagnostics, hypervisor, host.GetFullName(), true)
+	networks := plan.GetNetworksList(ctx, r.client, &resp.Diagnostics, hypervisor, host.GetXDPath(), true)
 
 	if len(storages) == 0 || len(tempStorages) == 0 || len(networks) == 0 {
 		// Error handled in helper function.
@@ -287,7 +300,20 @@ func (r *scvmmHypervisorResourcePoolResource) Update(ctx context.Context, req re
 	editHypervisorResourcePool.SetName(plan.Name.ValueString())
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM)
 
-	host, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, &resp.Diagnostics, hypervisorId, "", plan.Host.ValueString(), util.HostResourceType, "", hypervisor)
+	folderPath := ""
+	if plan.HostGroup.ValueString() != "" {
+		hostgroup, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, &resp.Diagnostics, hypervisorId, "", plan.HostGroup.ValueString(), util.HostGroupResourceType, "", hypervisor)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating Hypervisor Resource Pool for SCVMM",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					fmt.Sprintf("\nFailed to resolve host group %s, error: %s", plan.HostGroup.ValueString(), err.Error()),
+			)
+		}
+		folderPath = hostgroup.GetXDPath()
+	}
+
+	host, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, &resp.Diagnostics, hypervisorId, folderPath, plan.Host.ValueString(), util.HostResourceType, "", hypervisor)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor Resource Pool for SCVMM",
@@ -299,7 +325,7 @@ func (r *scvmmHypervisorResourcePoolResource) Update(ctx context.Context, req re
 
 	storagesToBeIncluded, tempStoragesToBeIncluded := plan.GetStorageList(ctx, r.client, &resp.Diagnostics, hypervisor, host.GetXDPath(), false, false)
 	storagesToBeSuperseded, tempStoragesToBeSuperseded := plan.GetStorageList(ctx, r.client, &resp.Diagnostics, hypervisor, host.GetXDPath(), false, true)
-	networks := plan.GetNetworksList(ctx, r.client, &resp.Diagnostics, hypervisor, host.GetFullName(), false)
+	networks := plan.GetNetworksList(ctx, r.client, &resp.Diagnostics, hypervisor, host.GetXDPath(), false)
 	if (len(storagesToBeIncluded) == 0 && len(storagesToBeSuperseded) == 0) || (len(tempStoragesToBeIncluded) == 0 && len(tempStoragesToBeSuperseded) == 0) || len(networks) == 0 {
 		// Error handled in helper function.
 		return
@@ -435,7 +461,7 @@ func (plan SCVMMHypervisorResourcePoolResourceModel) GetStorageList(ctx context.
 	return storages, tempStorages
 }
 
-func (plan SCVMMHypervisorResourcePoolResourceModel) GetNetworksList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diags *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel, hostFullName string, isCreate bool) []string {
+func (plan SCVMMHypervisorResourcePoolResourceModel) GetNetworksList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diags *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel, hostXdPath string, isCreate bool) []string {
 	hypervisorId := hypervisor.GetId()
 	hypervisorConnectionType := hypervisor.GetConnectionType()
 	action := "updating"
@@ -444,7 +470,7 @@ func (plan SCVMMHypervisorResourcePoolResourceModel) GetNetworksList(ctx context
 	}
 
 	networkNames := util.StringListToStringArray(ctx, diags, plan.Networks)
-	networks, err := util.GetFilteredResourcePathList(ctx, client, diags, hypervisorId, hostFullName, util.NetworkResourceType, networkNames, hypervisorConnectionType, hypervisor.GetPluginId())
+	networks, err := util.GetFilteredResourcePathList(ctx, client, diags, hypervisorId, hostXdPath, util.NetworkResourceType, networkNames, hypervisorConnectionType, hypervisor.GetPluginId())
 	if len(networks) == 0 {
 		errDetail := "No network found for the given network names"
 		if err != nil {

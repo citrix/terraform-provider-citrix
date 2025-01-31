@@ -14,6 +14,7 @@ import (
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"golang.org/x/exp/slices"
@@ -291,20 +292,33 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER:
 		vSphereMachineConfig := util.ObjectValueToTypedObject[VsphereMachineConfigModel](ctx, diag, provisioningSchemePlan.VsphereMachineConfig)
+
 		provisioningScheme.SetMemoryMB(int32(vSphereMachineConfig.MemoryMB.ValueInt64()))
 		provisioningScheme.SetCpuCount(int32(vSphereMachineConfig.CpuCount.ValueInt64()))
 
-		image := vSphereMachineConfig.MasterImageVm.ValueString()
-		snapshot := vSphereMachineConfig.ImageSnapshot.ValueString()
-		resourcePoolPath := vSphereMachineConfig.ResourcePoolPath.ValueString()
-		imagePath, err := getOnPremImagePath(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), image, snapshot, resourcePoolPath, "creating")
-		if err != nil {
-			return nil, err
-		}
-		provisioningScheme.SetMasterImagePath(imagePath)
+		if !vSphereMachineConfig.VspherePreparedImage.IsNull() {
+			// Add support for prepared image
+			provisioningScheme.SetPrepareImage(true)
+			preparedImageConfig := util.ObjectValueToTypedObject[PreparedImageConfigModel](ctx, diag, vSphereMachineConfig.VspherePreparedImage)
 
-		masterImageNote := vSphereMachineConfig.MasterImageNote.ValueString()
-		provisioningScheme.SetMasterImageNote(masterImageNote)
+			var assignImageVersionToProvScheme citrixorchestration.AssignImageVersionToProvisioningSchemeRequestModel
+			assignImageVersionToProvScheme.SetImageDefinition(preparedImageConfig.ImageDefinition.ValueString())
+			assignImageVersionToProvScheme.SetImageVersion(preparedImageConfig.ImageVersion.ValueString())
+			provisioningScheme.SetAssignImageVersionToProvisioningScheme(assignImageVersionToProvScheme)
+			provisioningScheme.SetResourcePool(hypervisorResourcePool.GetName()) // Override with name to adapt to image version workflow
+		} else {
+			image := vSphereMachineConfig.MasterImageVm.ValueString()
+			snapshot := vSphereMachineConfig.ImageSnapshot.ValueString()
+			resourcePoolPath := vSphereMachineConfig.ResourcePoolPath.ValueString()
+			imagePath, err := getOnPremImagePath(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), image, snapshot, resourcePoolPath, "creating")
+			if err != nil {
+				return nil, err
+			}
+			provisioningScheme.SetMasterImagePath(imagePath)
+
+			masterImageNote := vSphereMachineConfig.MasterImageNote.ValueString()
+			provisioningScheme.SetMasterImageNote(masterImageNote)
+		}
 
 		if !vSphereMachineConfig.WritebackCache.IsNull() {
 			provisioningScheme.SetUseWriteBackCache(true)
@@ -331,6 +345,7 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 
 			provisioningScheme.SetMachineProfilePath(machineProfile)
 		}
+		provisioningScheme.SetUseFullDiskCloneProvisioning(vSphereMachineConfig.UseFullDiskCloneProvisioning.ValueBool())
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER:
 		xenserverMachineConfig := util.ObjectValueToTypedObject[XenserverMachineConfigModel](ctx, diag, provisioningSchemePlan.XenserverMachineConfig)
 		provisioningScheme.SetCpuCount(int32(xenserverMachineConfig.CpuCount.ValueInt64()))
@@ -347,7 +362,7 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 		masterImageNote := xenserverMachineConfig.MasterImageNote.ValueString()
 		provisioningScheme.SetMasterImageNote(masterImageNote)
 
-		if xenserverMachineConfig.WritebackCache.IsNull() {
+		if !xenserverMachineConfig.WritebackCache.IsNull() {
 			provisioningScheme.SetUseWriteBackCache(true)
 			writeBackCacheModel := util.ObjectValueToTypedObject[XenserverWritebackCacheModel](ctx, diag, xenserverMachineConfig.WritebackCache)
 			provisioningScheme.SetWriteBackCacheDiskSizeGB(int32(writeBackCacheModel.WriteBackCacheDiskSizeGB.ValueInt64()))
@@ -1050,16 +1065,22 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER:
 		vSphereMachineConfig := util.ObjectValueToTypedObject[VsphereMachineConfigModel](ctx, &resp.Diagnostics, provisioningSchemePlan.VsphereMachineConfig)
-		newImage := vSphereMachineConfig.MasterImageVm.ValueString()
-		snapshot := vSphereMachineConfig.ImageSnapshot.ValueString()
-		resourcePoolPath := vSphereMachineConfig.ResourcePoolPath.ValueString()
-		imagePath, err = getOnPremImagePath(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), newImage, snapshot, resourcePoolPath, "updating")
-		if err != nil {
-			return err
+		if !vSphereMachineConfig.VspherePreparedImage.IsNull() {
+			usePreparedImage = true
+			preparedImageModel := util.ObjectValueToTypedObject[PreparedImageConfigModel](ctx, &resp.Diagnostics, vSphereMachineConfig.VspherePreparedImage)
+			imageDefinition = preparedImageModel.ImageDefinition.ValueString()
+			imageVersion = preparedImageModel.ImageVersion.ValueString()
+		} else {
+			newImage := vSphereMachineConfig.MasterImageVm.ValueString()
+			snapshot := vSphereMachineConfig.ImageSnapshot.ValueString()
+			resourcePoolPath := vSphereMachineConfig.ResourcePoolPath.ValueString()
+			imagePath, err = getOnPremImagePath(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), newImage, snapshot, resourcePoolPath, "updating")
+			if err != nil {
+				return err
+			}
+
+			masterImageNote = vSphereMachineConfig.MasterImageNote.ValueString()
 		}
-
-		masterImageNote = vSphereMachineConfig.MasterImageNote.ValueString()
-
 		// Set reboot options if configured
 		if !vSphereMachineConfig.ImageUpdateRebootOptions.IsNull() {
 			rebootOptionsPlan := util.ObjectValueToTypedObject[ImageUpdateRebootOptionsModel](ctx, &resp.Diagnostics, vSphereMachineConfig.ImageUpdateRebootOptions)
@@ -1660,4 +1681,117 @@ func constructAddMachineWithADAccountRequestBatchItem(diagnostics *diag.Diagnost
 	batchRequestItem.SetBody(addAdMachineStringBody)
 	batchRequestItem.SetHeaders(batchApiHeaders)
 	return batchRequestItem, nil
+}
+
+func setMachinesToMaintenanceMode(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, catalogId string, provSchemeModel ProvisioningSchemeModel, machines []citrixorchestration.MachineResponseModel) error {
+	batchApiHeaders, httpResp, err := generateBatchApiHeaders(ctx, diagnostics, client, provSchemeModel, false)
+	txId := citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
+	if err != nil {
+		diagnostics.AddError(
+			"Error setting Machine(s) to maintenance mode for Machine Catalog "+catalogId,
+			"TransactionId: "+txId+
+				"\nCould not put machine(s) into maintenance mode, unexpected error: "+util.ReadClientError(err),
+		)
+		return err
+	}
+	batchRequestItems := []citrixorchestration.BatchRequestItemModel{}
+
+	for index, machineAccountInCatalog := range machines {
+		if machineAccountInCatalog.DeliveryGroup == nil {
+			// if machine has no delivery group, there is no need to put it in maintenance mode
+			continue
+		}
+		isMachineInMaintenanceMode := machineAccountInCatalog.GetInMaintenanceMode()
+		if !isMachineInMaintenanceMode {
+			// machine is not in maintenance mode. Put machine in maintenance mode first before deleting
+			var updateMachineModel citrixorchestration.UpdateMachineRequestModel
+			updateMachineModel.SetInMaintenanceMode(true)
+			updateMachineStringBody, err := util.ConvertToString(updateMachineModel)
+			if err != nil {
+				diagnostics.AddError(
+					"Error setting Machine(s) to maintenance mode for Machine Catalog "+catalogId,
+					"An unexpected error occurred: "+err.Error(),
+				)
+				return err
+			}
+			relativeUrl := fmt.Sprintf("/Machines/%s", machineAccountInCatalog.GetId())
+
+			var batchRequestItem citrixorchestration.BatchRequestItemModel
+			batchRequestItem.SetReference(strconv.Itoa(index))
+			batchRequestItem.SetMethod(http.MethodPatch)
+			batchRequestItem.SetRelativeUrl(client.GetBatchRequestItemRelativeUrl(relativeUrl))
+			batchRequestItem.SetBody(updateMachineStringBody)
+			batchRequestItem.SetHeaders(batchApiHeaders)
+			batchRequestItems = append(batchRequestItems, batchRequestItem)
+		}
+	}
+
+	if len(batchRequestItems) > 0 {
+		// If there are any machines that need to be put in maintenance mode
+		var batchRequestModel citrixorchestration.BatchRequestModel
+		batchRequestModel.SetItems(batchRequestItems)
+		successfulJobs, txId, err := citrixdaasclient.PerformBatchOperation(ctx, client, batchRequestModel)
+		if err != nil {
+			diagnostics.AddError(
+				"Error setting Machine(s) to maintenance mode for Machine Catalog "+catalogId,
+				"TransactionId: "+txId+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return err
+		}
+
+		if successfulJobs < len(batchRequestItems) {
+			errMsg := fmt.Sprintf("An error occurred while putting machine(s) into maintenance mode. %d of %d machines were put in the maintenance mode.", successfulJobs, len(batchRequestItems))
+			err = fmt.Errorf(errMsg)
+			diagnostics.AddError(
+				"Error setting Machine(s) to maintenance mode for Machine Catalog "+catalogId,
+				"TransactionId: "+txId+
+					"\n"+errMsg,
+			)
+
+			return err
+		}
+	}
+	return nil
+}
+
+func validateMcsPvsMachineCatalogDeleteOptions(diagnostics *diag.Diagnostics, data MachineCatalogResourceModel) error {
+	deleteVirtualMachines := data.DeleteVirtualMachines.ValueBool()
+	if data.DeleteVirtualMachines.IsNull() {
+		deleteVirtualMachines = true
+	}
+	deleteMachineAccounts := data.DeleteMachineAccounts.ValueString()
+	if data.DeleteMachineAccounts.IsNull() {
+		deleteMachineAccounts = string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE)
+	}
+	persistUserChanges := data.PersistUserChanges.ValueString() == "OnLocal"
+	provisioningType := data.ProvisioningType.ValueString()
+
+	if provisioningType != string(citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING) &&
+		data.SessionSupport.ValueString() == string(citrixorchestration.SESSIONSUPPORT_SINGLE_SESSION) &&
+		data.AllocationType.ValueString() == string(citrixorchestration.ALLOCATIONTYPE_STATIC) {
+		persistUserChanges = true
+	}
+
+	if !persistUserChanges && !deleteVirtualMachines {
+		err := fmt.Errorf("`delete_virtual_machines` cannot be set to `false` when `persist_user_changes` is set to `Discard`")
+		diagnostics.AddAttributeError(
+			path.Root("delete_virtual_machines"),
+			"Incorrect Attribute Configuration",
+			err.Error(),
+		)
+		return err
+	}
+
+	if !deleteVirtualMachines && deleteMachineAccounts != string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE) {
+		err := fmt.Errorf("`delete_machine_accounts` can only be set to `%s` when `delete_virtual_machines` is set to `false`", string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE))
+		diagnostics.AddAttributeError(
+			path.Root("delete_machine_accounts"),
+			"Incorrect Attribute Configuration",
+			err.Error(),
+		)
+		return err
+	}
+
+	return nil
 }

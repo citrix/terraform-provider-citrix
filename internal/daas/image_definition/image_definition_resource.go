@@ -211,6 +211,11 @@ func (r *ImageDefinitionResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
+	imageDefinitionResponse, err = GetImageDefinition(ctx, r.client, &resp.Diagnostics, imageDefinitionResponse.GetId())
+	if err != nil {
+		return
+	}
+
 	// Update resource state with updated property values
 	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, true, imageDefinitionResponse)
 
@@ -307,22 +312,38 @@ func (r *ImageDefinitionResource) ModifyPlan(ctx context.Context, req resource.M
 		return
 	}
 
-	if r.client.ClientConfig.OrchestrationApiVersion >= 121 {
-		// At least one type of hypervisor image definition is required for Orchestration API version 121 and above
-		if plan.AzureImageDefinitionModel.IsNull() {
+	if !plan.Hypervisor.IsNull() && !plan.Hypervisor.IsUnknown() {
+		hypervisorId := plan.Hypervisor.ValueString()
+		hypervisor, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, hypervisorId)
+		if err != nil {
+			return
+		}
+		if hypervisor.GetConnectionType() == citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM {
+			if r.client.ClientConfig.OrchestrationApiVersion >= 121 {
+				// At least one type of hypervisor image definition is required for Orchestration API version 121 and above
+				if plan.AzureImageDefinitionModel.IsNull() {
+					resp.Diagnostics.AddError(
+						"Error validating Image Definition configuration",
+						"`azure_image_definition` is required.",
+					)
+					return
+				}
+			} else if !plan.AzureImageDefinitionModel.IsNull() && !plan.AzureImageDefinitionModel.IsUnknown() {
+				// `azure_image_definition` cannot be specified with Orchestration Service version 120 or earlier
+				resp.Diagnostics.AddError(
+					"Error validating Image Definition configuration",
+					fmt.Sprintf("`azure_image_definition` cannot be specified with the current Orchestration Service version %d.", r.client.ClientConfig.OrchestrationApiVersion),
+				)
+				return
+			}
+		} else if !plan.AzureImageDefinitionModel.IsNull() && !plan.AzureImageDefinitionModel.IsUnknown() {
+			// `azure_image_definition` cannot be specified with hypervisor types other than AzureRM
 			resp.Diagnostics.AddError(
 				"Error validating Image Definition configuration",
-				"`azure_image_definition` is required.",
+				fmt.Sprintf("`azure_image_definition` cannot be specified with the current hypervisor %s.", string(hypervisor.GetConnectionType())),
 			)
 			return
 		}
-	} else if !plan.AzureImageDefinitionModel.IsNull() && !plan.AzureImageDefinitionModel.IsUnknown() {
-		// `azure_image_definition` cannot be specified with Orchestration Service version 120 or earlier
-		resp.Diagnostics.AddError(
-			"Error validating Image Definition configuration",
-			fmt.Sprintf("`azure_image_definition` cannot be specified with the current Orchestration Service version %d.", r.client.ClientConfig.OrchestrationApiVersion),
-		)
-		return
 	}
 
 	if !plan.AzureImageDefinitionModel.IsUnknown() && !plan.AzureImageDefinitionModel.IsNull() {
@@ -371,7 +392,7 @@ func readImageDefinition(ctx context.Context, client *citrixdaasclient.CitrixDaa
 func buildAssignedHypervisorConnectionRequest(ctx context.Context, diagnostics *diag.Diagnostics, plan ImageDefinitionModel, hypervisor *citrixorchestration.HypervisorDetailResponseModel) citrixorchestration.AssignHypervisorConnectionToImageDefinitionRequestModel {
 	assignedHypervisorConnection := citrixorchestration.AssignHypervisorConnectionToImageDefinitionRequestModel{}
 	assignedHypervisorConnection.SetHypervisorConnection(hypervisor.GetName())
-	if !plan.AzureImageDefinitionModel.IsNull() {
+	if !plan.AzureImageDefinitionModel.IsNull() && hypervisor.GetConnectionType() == citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM {
 		azureImageDefinition := util.ObjectValueToTypedObject[AzureImageDefinitionModel](ctx, diagnostics, plan.AzureImageDefinitionModel)
 		azureImageDefinitions := []citrixorchestration.NameValueStringPairModel{}
 

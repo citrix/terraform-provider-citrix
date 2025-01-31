@@ -55,6 +55,52 @@ func (AzureImageSpecsDataSourceModel) GetDataSourceAttributes() map[string]schem
 	return AzureImageSpecsDataSourceModel{}.GetDataSourceSchema().Attributes
 }
 
+type VsphereImageSpecsDataSourceModel struct {
+	MasterImageVm  types.String `tfsdk:"master_image_vm"`
+	ImageSnapshot  types.String `tfsdk:"image_snapshot"`
+	CpuCount       types.Int32  `tfsdk:"cpu_count"`
+	MemoryMB       types.Int32  `tfsdk:"memory_mb"`
+	MachineProfile types.String `tfsdk:"machine_profile"`
+	DiskSize       types.Int32  `tfsdk:"disk_size"`
+}
+
+func (VsphereImageSpecsDataSourceModel) GetDataSourceSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "Image configuration for vSphere image version.",
+		Computed:    true,
+		Attributes: map[string]schema.Attribute{
+			"master_image_vm": schema.StringAttribute{
+				Description: "The name of the virtual machine that will be used as master image. This property is case sensitive.",
+				Computed:    true,
+			},
+			"image_snapshot": schema.StringAttribute{
+				Description: "The Snapshot of the virtual machine specified in `master_image_vm`. Specify the relative path of the snapshot. Eg: snaphost-1/snapshot-2/snapshot-3. This property is case sensitive.",
+				Computed:    true,
+			},
+			"cpu_count": schema.Int32Attribute{
+				Description: "The number of processors that virtual machines created from the provisioning scheme should use.",
+				Computed:    true,
+			},
+			"memory_mb": schema.Int32Attribute{
+				Description: "The maximum amount of memory that virtual machines created from the provisioning scheme should use.",
+				Computed:    true,
+			},
+			"machine_profile": schema.StringAttribute{
+				Description: "The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics and host cache property of OS disk.",
+				Computed:    true,
+			},
+			"disk_size": schema.Int32Attribute{
+				Description: "The size of the disk in GB.",
+				Computed:    true,
+			},
+		},
+	}
+}
+
+func (VsphereImageSpecsDataSourceModel) GetDataSourceAttributes() map[string]schema.Attribute {
+	return VsphereImageSpecsDataSourceModel{}.GetDataSourceSchema().Attributes
+}
+
 func (ImageVersionModel) GetDataSourceSchema() schema.Schema {
 	return schema.Schema{
 		Description: "CVAD --- Data source an image version. **Note that this feature is in Tech Preview.**",
@@ -86,11 +132,17 @@ func (ImageVersionModel) GetDataSourceSchema() schema.Schema {
 				Description: "Id of the hypervisor resource pool to use for creating this image version.",
 				Computed:    true,
 			},
+			"network_mapping": schema.ListNestedAttribute{
+				Description:  "Specifies how the attached NICs are mapped to networks.",
+				Computed:     true,
+				NestedObject: util.NetworkMappingModel{}.GetDataSourceSchema(),
+			},
 			"description": schema.StringAttribute{
 				Description: "Description of the image version.",
 				Computed:    true,
 			},
-			"azure_image_specs": AzureImageSpecsDataSourceModel{}.GetDataSourceSchema(),
+			"azure_image_specs":   AzureImageSpecsDataSourceModel{}.GetDataSourceSchema(),
+			"vsphere_image_specs": VsphereImageSpecsDataSourceModel{}.GetDataSourceSchema(),
 			"session_support": schema.StringAttribute{
 				Description: "Session support for the image version.",
 				Computed:    true,
@@ -114,9 +166,18 @@ func (r ImageVersionModel) RefreshDataSourcePropertyValues(ctx context.Context, 
 	}
 
 	imageContext := imageSpecs.GetContext()
+	masterImage := imageSpecs.GetMasterImage()
+	imageScheme := imageContext.GetImageScheme()
+	// Refresh NetworkMapping
+	networkMaps := imageScheme.GetNetworkMaps()
+	if len(networkMaps) > 0 && !r.NetworkMapping.IsNull() {
+		r.NetworkMapping = util.RefreshListValueProperties[util.NetworkMappingModel, citrixorchestration.NetworkMapResponseModel](ctx, diagnostics, r.NetworkMapping, networkMaps, util.GetOrchestrationNetworkMappingKey)
+	} else {
+		r.NetworkMapping = util.TypedArrayToObjectList[util.NetworkMappingModel](ctx, diagnostics, nil)
+	}
+
 	switch imageContext.GetPluginFactoryName() {
 	case util.AZURERM_FACTORY_NAME:
-		imageScheme := imageContext.GetImageScheme()
 		azureImageSpecs := AzureImageSpecsDataSourceModel{}
 
 		azureImageSpecs.ServiceOffering = parseAzureImageVersionServiceOffering(imageScheme.GetServiceOffering())
@@ -135,6 +196,30 @@ func (r ImageVersionModel) RefreshDataSourcePropertyValues(ctx context.Context, 
 		}
 
 		r.AzureImageSpecs = util.DataSourceTypedObjectToObjectValue(ctx, diagnostics, azureImageSpecs)
+	case util.VMWARE_FACTORY_NAME:
+		vsphereImageSpecs := VsphereImageSpecsDataSourceModel{}
+
+		masterImageXdPath := masterImage.GetXDPath()
+		masterImageVm, imageSnapshot := parseVsphereImageXdPath(masterImageXdPath)
+		vsphereImageSpecs.MasterImageVm = types.StringValue(masterImageVm)
+		vsphereImageSpecs.ImageSnapshot = types.StringValue(imageSnapshot)
+		vsphereImageSpecs.CpuCount = types.Int32Value(imageScheme.GetCpuCount())
+		vsphereImageSpecs.MemoryMB = types.Int32Value(imageScheme.GetMemoryMB())
+
+		if imageScheme.MachineProfile == nil {
+			vsphereImageSpecs.MachineProfile = types.StringNull()
+		} else {
+			machineProfile := imageScheme.GetMachineProfile()
+			vsphereImageSpecs.MachineProfile = types.StringValue(machineProfile.GetName())
+		}
+
+		if imageSpecs.DiskSize != nil {
+			vsphereImageSpecs.DiskSize = types.Int32Value(imageSpecs.GetDiskSize())
+		} else {
+			vsphereImageSpecs.DiskSize = types.Int32Null()
+		}
+
+		r.VsphereImageSpecs = util.DataSourceTypedObjectToObjectValue(ctx, diagnostics, vsphereImageSpecs)
 	default:
 		diagnostics.AddError(
 			"Error refreshing Image Version data source",

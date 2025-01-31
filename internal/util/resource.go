@@ -14,7 +14,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 )
 
+// Plugin Factory Names
 const AZURERM_FACTORY_NAME string = "AzureRmFactory"
+const VMWARE_FACTORY_NAME string = "VmwareFactory"
 const NUTANIX_PLUGIN_ID string = "AcropolisFactory"
 
 // Gets the hypervisor and logs any errors

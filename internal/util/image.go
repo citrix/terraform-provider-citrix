@@ -23,6 +23,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+// vSphere Additional Data Constants
+const CPU_COUNT_PROPERTY_NAME string = "CpuCount"
+
 type GalleryImageModel struct {
 	Gallery    types.String `tfsdk:"gallery"`
 	Definition types.String `tfsdk:"definition"`
@@ -176,8 +179,38 @@ func (NetworkMappingModel) GetSchema() schema.NestedAttributeObject {
 	}
 }
 
+func (NetworkMappingModel) GetDataSourceSchema() dataSourceSchema.NestedAttributeObject {
+	return dataSourceSchema.NestedAttributeObject{
+		Attributes: map[string]dataSourceSchema.Attribute{
+			"network_device": dataSourceSchema.StringAttribute{
+				Description: "Name or Id of the network device.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("network"),
+					}...),
+				},
+			},
+			"network": dataSourceSchema.StringAttribute{
+				Description: "The name of the virtual network that the device should be attached to. This must be a subnet within a Virtual Private Cloud item in the resource pool to which the Machine Catalog is associated." + "<br />" +
+					"For AWS, please specify the network mask of the network you want to use within the VPC.",
+				Required: true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("network_device"),
+					}...),
+				},
+			},
+		},
+	}
+}
+
 func (NetworkMappingModel) GetAttributes() map[string]schema.Attribute {
 	return NetworkMappingModel{}.GetSchema().Attributes
+}
+
+func (NetworkMappingModel) GetDataSourceAttributes() map[string]dataSourceSchema.Attribute {
+	return NetworkMappingModel{}.GetDataSourceSchema().Attributes
 }
 
 func (networkMapping NetworkMappingModel) RefreshListItem(_ context.Context, _ *diag.Diagnostics, nic citrixorchestration.NetworkMapResponseModel) ResourceModelWithAttributes {

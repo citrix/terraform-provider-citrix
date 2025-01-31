@@ -4,6 +4,7 @@ package machine_catalog
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -56,6 +57,8 @@ type MachineCatalogResourceModel struct {
 	Tenants                  types.Set    `tfsdk:"tenants"`  // Set[String]
 	Metadata                 types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
 	Tags                     types.Set    `tfsdk:"tags"`     // Set[String]
+	DeleteVirtualMachines    types.Bool   `tfsdk:"delete_virtual_machines"`
+	DeleteMachineAccounts    types.String `tfsdk:"delete_machine_accounts"`
 }
 
 type MachineAccountsModel struct {
@@ -94,6 +97,7 @@ type MachineCatalogMachineModel struct {
 	ProjectName       types.String `tfsdk:"project_name"`
 	AvailabilityZone  types.String `tfsdk:"availability_zone"`
 	Datacenter        types.String `tfsdk:"datacenter"`
+	ClusterFolderPath types.String `tfsdk:"cluster_folder_path"`
 	Cluster           types.String `tfsdk:"cluster"`
 	Host              types.String `tfsdk:"host"`
 }
@@ -131,6 +135,15 @@ func (MachineCatalogMachineModel) GetSchema() schema.NestedAttributeObject {
 			"datacenter": schema.StringAttribute{
 				Description: "**[vSphere: Required]** The datacenter in which the machine resides. Required only if `is_power_managed = true`",
 				Optional:    true,
+			},
+			"cluster_folder_path": schema.StringAttribute{
+				Description: "**[vSphere: Optional]** The folder path in which the cluster resides. If there are multiple folders in the path, they should be separated by `\\` in between each of them. To be used only if `is_power_managed = true`" +
+					"\n\n~> **Please Note** Folder path should should only be specified for cluster folders. For VM folders, they can be ignored and the folder path should be omitted.",
+				Optional: true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathWithBackslashRegex), "Folder Path must not start or end with a backslash"),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathSpecialCharactersRegex), "Folder Path must not contain any of the following special characters: / ; : # . * ? = < > | [ ] ( ) { } \" ' ` ~ "),
+				},
 			},
 			"cluster": schema.StringAttribute{
 				Description: "**[vSphere: Optional]** The cluster in which the machine resides. To be used only if `is_power_managed = true`",
@@ -533,6 +546,7 @@ func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 			"persist_user_changes": schema.StringAttribute{
 				Description: "Specify if user changes are persisted on the machines in the machine catalog. Choose between `Discard` and `OnLocal`. Defaults to OnLocal for manual or non-PVS single session static catalogs, Discard otherwise. ",
 				Optional:    true,
+				Computed:    true,
 				Validators: []validator.String{
 					stringvalidator.OneOf(
 						"Discard",
@@ -541,6 +555,7 @@ func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"is_power_managed": schema.BoolAttribute{
@@ -685,6 +700,24 @@ func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 					),
 				},
 			},
+			"delete_virtual_machines": schema.BoolAttribute{
+				Description: "Boolean that indicates the machines within the machine catalog should be deleted on `terraform destroy` action. Defaults to `true` for MCS/PVS catalogs. For `Manual` catalogs, this parameter can either be unset or set to `false`. The virtual machines will not be deleted for `Manual` catalogs." +
+					"\n\n~> **Please Note** The deletion only happens when the `destroy` action is performed, not when setting this parameter to `true`. Once this parameter is set to `true`, there must be a successful `terraform apply` run before a `destroy` to update this value in the resource state. Without a successful `terraform apply` after this parameter is set, this flag will have no effect. If setting this field in the same operation that would require replacing the machine catalog or destroying the machine catalog, this flag will not work. Additionally when importing a machine catalog, a successful `terraform apply` is required to set this value in state before it will take effect on a destroy operation.",
+				Optional: true,
+			},
+			"delete_machine_accounts": schema.StringAttribute{
+				Description: fmt.Sprintf("String that indicates the action on machine accounts to be performed on `terraform destroy` action. Available values are `%s`, `%s`, and `%s`. Defaults to `%s`."+"\n\n~> **Please Note** The action is only performed when the `destroy` action is taken, not when setting the value of this parameter. Once this parameter is set, there must be a successful `terraform apply` run before a `destroy` to update this value in the resource state. Without a successful `terraform apply` after this parameter is set, this parameter will have no effect. If setting this field in the same operation that would require replacing the machine catalog or destroying the machine catalog, this parameter will not work. Additionally when importing a machine catalog, a successful `terraform apply` is required to set this value in state before it will take effect on a destroy operation.", string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_DELETE), string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_DISABLE), string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE), string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE)),
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE)),
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_DELETE),
+						string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_DISABLE),
+						string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE),
+					),
+				},
+			},
 		},
 	}
 }
@@ -703,11 +736,7 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 	sessionSupport := catalog.GetSessionSupport()
 	r.SessionSupport = types.StringValue(string(sessionSupport))
 
-	if r.PersistUserChanges.IsNull() {
-		r.PersistUserChanges = types.StringNull()
-	} else {
-		r.PersistUserChanges = types.StringValue(string(catalog.GetPersistChanges()))
-	}
+	r.PersistUserChanges = types.StringValue(string(catalog.GetPersistChanges()))
 
 	minimumFunctionalLevel := catalog.GetMinimumFunctionalLevel()
 	r.MinimumFunctionalLevel = types.StringValue(string(minimumFunctionalLevel))

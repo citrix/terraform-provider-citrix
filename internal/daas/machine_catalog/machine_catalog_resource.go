@@ -12,7 +12,6 @@ import (
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
-	"github.com/citrix/terraform-provider-citrix/internal/daas/image_definition"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -642,11 +641,49 @@ func (r *machineCatalogResource) Delete(ctx context.Context, req resource.Delete
 		return
 	}
 
+	// TODO: Revisit this block that's causing Tests to Fail - https://github.com/citrix/terraform-provider-citrix/issues/176
+	/*
+		// Set machines to maintenance mode before deletion
+		machinesInCatalog, err := util.GetMachineCatalogMachines(ctx, r.client, &resp.Diagnostics, catalogId)
+		if err != nil {
+			return
+		}
+		machinesNeedToSetToMaintenanceMode := []citrixorchestration.MachineResponseModel{}
+		for _, machine := range machinesInCatalog {
+			if machine.DeliveryGroup == nil {
+				// if machine has no delivery group, there is no need to put it in maintenance mode
+				continue
+			}
+			isMachineInMaintenanceMode := machine.GetInMaintenanceMode()
+			if !isMachineInMaintenanceMode {
+				machinesNeedToSetToMaintenanceMode = append(machinesNeedToSetToMaintenanceMode, machine)
+			}
+		}
+		if len(machinesNeedToSetToMaintenanceMode) > 0 {
+			resp.Diagnostics.AddError(
+				"Error deleting Machine Catalog "+catalog.GetName(),
+				fmt.Sprintf("Machine catalog %s has %d machine(s) associated with delivery group(s) and need to be put in maintenance mode before deletion.", catalog.GetName(), len(machinesNeedToSetToMaintenanceMode)),
+			)
+			return
+		}
+	*/
+
 	// Delete existing order
 	catalogName := state.Name.ValueString()
 	deleteMachineCatalogRequest := r.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsDeleteMachineCatalog(ctx, catalogId)
-	deleteAccountOption := citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE
-	deleteVmOption := false
+	deleteAccountOption := getMachineAccountDeleteOptionValue(state.DeleteMachineAccounts.ValueString())
+	// Set default delete VM option to true for MCS and PVS Streaming
+	deleteVmOption := true
+	// Set delete VM option to false for manual provisioning type
+	if catalog.GetProvisioningType() == citrixorchestration.PROVISIONINGTYPE_MANUAL {
+		deleteVmOption = false
+	}
+
+	// Override delete VM option with user specified value
+	if !state.DeleteVirtualMachines.IsNull() {
+		deleteVmOption = state.DeleteVirtualMachines.ValueBool()
+	}
+
 	if catalog.GetProvisioningType() == citrixorchestration.PROVISIONINGTYPE_MCS || catalog.GetProvisioningType() == citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING {
 		provScheme := catalog.GetProvisioningScheme()
 		identityType := provScheme.GetIdentityType()
@@ -660,11 +697,7 @@ func (r *machineCatalogResource) Delete(ctx context.Context, req resource.Delete
 				header := generateAdminCredentialHeader(util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemeModel.MachineDomainIdentity))
 				deleteMachineCatalogRequest = deleteMachineCatalogRequest.XAdminCredential(header)
 			}
-
-			deleteAccountOption = citrixorchestration.MACHINEACCOUNTDELETEOPTION_DELETE
 		}
-
-		deleteVmOption = true
 	}
 
 	deleteMachineCatalogRequest = deleteMachineCatalogRequest.DeleteVm(deleteVmOption).DeleteAccount(deleteAccountOption).Async(true)
@@ -736,6 +769,11 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 	azureAD := string(citrixorchestration.IDENTITYTYPE_AZURE_AD)
 
 	if data.ProvisioningType.ValueString() == provisioningTypeMcs {
+		err := validateMcsPvsMachineCatalogDeleteOptions(&resp.Diagnostics, data)
+		if err != nil {
+			return
+		}
+
 		if !data.ProvisioningScheme.IsUnknown() && data.ProvisioningScheme.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("provisioning_scheme"),
@@ -955,6 +993,11 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 		data.IsPowerManaged = types.BoolValue(true) // set power managed to true for MCS catalog
 	} else if data.ProvisioningType.ValueString() == provisioningTypePvsStreaming {
 		// Add checks for PVSStreaming catalogs
+		err := validateMcsPvsMachineCatalogDeleteOptions(&resp.Diagnostics, data)
+		if err != nil {
+			return
+		}
+
 		if !data.ProvisioningScheme.IsUnknown() && data.ProvisioningScheme.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("provisioning_scheme"),
@@ -1176,6 +1219,33 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 			}
 		}
 	}
+
+	deleteVirtualMachines := data.DeleteVirtualMachines.ValueBool()
+	if data.DeleteVirtualMachines.IsNull() && data.ProvisioningType.ValueString() != string(citrixorchestration.PROVISIONINGTYPE_MANUAL) {
+		deleteVirtualMachines = true
+	}
+
+	if deleteVirtualMachines && data.ProvisioningType.ValueString() == string(citrixorchestration.PROVISIONINGTYPE_MANUAL) {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("delete_virtual_machines"),
+			"Incorrect Attribute Configuration",
+			fmt.Sprintf("`delete_virtual_machines` cannot be set to `true` when `provisioning_type` is set to `%s`.", provisioningTypeManual),
+		)
+		return
+	}
+
+	deleteMachineAccounts := data.DeleteMachineAccounts.ValueString()
+	if data.DeleteMachineAccounts.IsNull() {
+		deleteMachineAccounts = string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE)
+	}
+	if deleteMachineAccounts != string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE) && data.ProvisioningType.ValueString() == string(citrixorchestration.PROVISIONINGTYPE_MANUAL) {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("delete_machine_accounts"),
+			"Incorrect Attribute Configuration",
+			fmt.Sprintf("`delete_machine_accounts` can only be set to `%s` when `provisioning_type` is set to `%s`.", string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE), provisioningTypeManual),
+		)
+		return
+	}
 }
 
 func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
@@ -1195,6 +1265,17 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	if !plan.DeleteVirtualMachines.IsUnknown() && !plan.DeleteVirtualMachines.IsNull() &&
+		!plan.DeleteMachineAccounts.IsUnknown() && !plan.DeleteMachineAccounts.IsNull() {
+		if !plan.DeleteVirtualMachines.ValueBool() && plan.DeleteMachineAccounts.ValueString() != string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE) {
+			resp.Diagnostics.AddError(
+				"Error validating `delete_machine_accounts`",
+				fmt.Sprintf("`delete_machine_accounts` can only be set to `%s` when `delete_virtual_machines` is set to `false`.", string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE)),
+			)
+			return
+		}
 	}
 
 	if !plan.ProvisioningScheme.IsUnknown() && !plan.ProvisioningScheme.IsNull() {
@@ -1240,118 +1321,133 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 		if !provSchemePlan.AzureMachineConfig.IsUnknown() && !provSchemePlan.AzureMachineConfig.IsNull() {
 			azureMachineConfig := util.ObjectValueToTypedObject[AzureMachineConfigModel](ctx, &resp.Diagnostics, provSchemePlan.AzureMachineConfig)
 			if !azureMachineConfig.AzurePreparedImage.IsUnknown() && !azureMachineConfig.AzurePreparedImage.IsNull() {
-				isPreparedImageSupported := util.CheckProductVersion(r.client, &resp.Diagnostics, 121, 118, 7, 41, "Error using Prepared Image in citrix_machine_catalog resource", "Prepared Image")
-				if !isPreparedImageSupported {
+				azurePreparedImage := util.ObjectValueToTypedObject[PreparedImageConfigModel](ctx, &resp.Diagnostics, azureMachineConfig.AzurePreparedImage)
+				imageScheme, imageSpecs, err := validateImageVersion(ctx, &resp.Diagnostics, r.client, plan, azurePreparedImage, "azure_machine_config")
+				if err != nil {
 					return
 				}
+
 				if !azureMachineConfig.UseManagedDisks.IsUnknown() && !azureMachineConfig.UseManagedDisks.IsNull() {
 					if !azureMachineConfig.UseManagedDisks.ValueBool() {
 						resp.Diagnostics.AddError(
-							"Error validating azure_machine_config",
+							"Error validating `azure_machine_config`",
 							"use_managed_disks must be set to true when using prepared image.",
 						)
 						return
 					}
 				}
-				azurePreparedImage := util.ObjectValueToTypedObject[PreparedImageConfigModel](ctx, &resp.Diagnostics, azureMachineConfig.AzurePreparedImage)
-				imageDefinition, err := image_definition.GetImageDefinition(ctx, r.client, &resp.Diagnostics, azurePreparedImage.ImageDefinition.ValueString())
-				if err != nil {
-					return
-				}
 
-				imageVersion, err := image_definition.GetImageVersion(ctx, r.client, &resp.Diagnostics, imageDefinition.GetId(), azurePreparedImage.ImageVersion.ValueString())
-				if err != nil {
-					return
-				}
-
-				imageVersionStatus := imageVersion.GetImageVersionStatus()
-				if imageVersionStatus != citrixorchestration.IMAGEVERSIONSTATUS_SUCCESS {
+				// Validate machine profile
+				if imageScheme.MachineProfile != nil && azureMachineConfig.MachineProfile.IsNull() {
 					resp.Diagnostics.AddError(
-						"Error validating azure_machine_config",
-						fmt.Sprintf("Image version in state `%s` cannot be used to create machine catalog.", string(imageVersionStatus)),
+						"Error validating `azure_machine_config`",
+						"machine_profile needs to be specified when using prepared image configrued with machine profile.",
+					)
+					return
+				}
+				if imageScheme.MachineProfile == nil && !azureMachineConfig.MachineProfile.IsNull() && !azureMachineConfig.MachineProfile.IsUnknown() {
+					resp.Diagnostics.AddError(
+						"Error validating `azure_machine_config`",
+						"machine_profile cannot be specified when using prepared image without a machine profile.",
 					)
 					return
 				}
 
-				imageContextConfigured := false
-				var imageScheme citrixorchestration.ImageSchemeResponseModel
-				var imageSpecs citrixorchestration.ImageVersionSpecResponseModel
-				for _, spec := range imageVersion.GetImageVersionSpecs() {
-					if spec.Context != nil {
-						context := spec.GetContext()
-						if context.ImageScheme == nil {
-							continue
-						}
-						imageContextConfigured = true
-						imageScheme = context.GetImageScheme()
-						imageSpecs = spec
-					}
-				}
-				imageRuntimeEnvironment := imageSpecs.GetImageRuntimeEnvironment()
-				if imageContextConfigured {
-					// Validate session support
-					if !plan.SessionSupport.IsUnknown() && imageRuntimeEnvironment.GetVDASessionSupport() != "" {
-						if !strings.EqualFold(plan.SessionSupport.ValueString(), imageRuntimeEnvironment.GetVDASessionSupport()) {
+				// Validate disk encryption set
+				for _, customerProperty := range imageScheme.GetCustomProperties() {
+					if strings.EqualFold(customerProperty.GetName(), "DiskEncryptionSetId") && customerProperty.GetValue() != "" {
+						desName, desResourceGroup := util.ParseDiskEncryptionSetIdToNameAndResourceGroup(customerProperty.GetValue())
+						if azureMachineConfig.DiskEncryptionSet.IsNull() {
 							resp.Diagnostics.AddError(
-								"Error validating azure_machine_config",
-								"session_support specified does not match the session support configured in the prepared image.",
+								"Error validating `azure_machine_config`",
+								"disk_encryption_set needs to be specified with the same disk encryption set configuration used for the prepared image.",
 							)
 							return
-						}
-					}
-
-					// Validate machine profile
-					if imageScheme.MachineProfile != nil && azureMachineConfig.MachineProfile.IsNull() {
-						resp.Diagnostics.AddError(
-							"Error validating azure_machine_config",
-							"machine_profile needs to be specified when using prepared image configrued with machine profile.",
-						)
-						return
-					}
-					if imageScheme.MachineProfile == nil && !azureMachineConfig.MachineProfile.IsNull() && !azureMachineConfig.MachineProfile.IsUnknown() {
-						resp.Diagnostics.AddError(
-							"Error validating azure_machine_config",
-							"machine_profile cannot be specified when using prepared image without a machine profile.",
-						)
-						return
-					}
-
-					// Validate disk encryption set
-					for _, customerProperty := range imageScheme.GetCustomProperties() {
-						if strings.EqualFold(customerProperty.GetName(), "DiskEncryptionSetId") && customerProperty.GetValue() != "" {
-							desName, desResourceGroup := util.ParseDiskEncryptionSetIdToNameAndResourceGroup(customerProperty.GetValue())
-							if azureMachineConfig.DiskEncryptionSet.IsNull() {
+						} else if !azureMachineConfig.DiskEncryptionSet.IsUnknown() {
+							diskEncryptionSet := util.ObjectValueToTypedObject[util.AzureDiskEncryptionSetModel](ctx, &resp.Diagnostics, azureMachineConfig.DiskEncryptionSet)
+							if diskEncryptionSet.DiskEncryptionSetName.ValueString() != desName || diskEncryptionSet.DiskEncryptionSetResourceGroup.ValueString() != desResourceGroup {
 								resp.Diagnostics.AddError(
-									"Error validating azure_machine_config",
-									"disk_encryption_set needs to be specified with the same disk encryption set configuration used for the prepared image.",
+									"Error validating `azure_machine_config`",
+									"disk_encryption_set specified does not match the disk encryption set configured in the prepared image.",
 								)
 								return
-							} else if !azureMachineConfig.DiskEncryptionSet.IsUnknown() {
-								diskEncryptionSet := util.ObjectValueToTypedObject[util.AzureDiskEncryptionSetModel](ctx, &resp.Diagnostics, azureMachineConfig.DiskEncryptionSet)
-								if diskEncryptionSet.DiskEncryptionSetName.ValueString() != desName || diskEncryptionSet.DiskEncryptionSetResourceGroup.ValueString() != desResourceGroup {
-									resp.Diagnostics.AddError(
-										"Error validating azure_machine_config",
-										"disk_encryption_set specified does not match the disk encryption set configured in the prepared image.",
-									)
-									return
-								}
 							}
 						}
 					}
+				}
 
-					if !provSchemePlan.HypervisorResourcePool.IsUnknown() && !provSchemePlan.HypervisorResourcePool.IsNull() {
-						imageVersionResourcePool := imageSpecs.GetResourcePool()
-						if imageVersionResourcePool.GetId() != provSchemePlan.HypervisorResourcePool.ValueString() {
-							resp.Diagnostics.AddError(
-								"Error validating azure_machine_config",
-								"resource pool specified in the prepared image does not match the resource pool configured in the provisioning scheme.",
-							)
-							return
-						}
+				if !provSchemePlan.HypervisorResourcePool.IsUnknown() && !provSchemePlan.HypervisorResourcePool.IsNull() {
+					imageVersionResourcePool := imageSpecs.GetResourcePool()
+					if imageVersionResourcePool.GetId() != provSchemePlan.HypervisorResourcePool.ValueString() {
+						resp.Diagnostics.AddError(
+							"Error validating `azure_machine_config`",
+							"resource pool specified in the prepared image does not match the resource pool configured in the provisioning scheme.",
+						)
+						return
 					}
 				}
 			}
 		}
+
+		if !provSchemePlan.VsphereMachineConfig.IsUnknown() && !provSchemePlan.VsphereMachineConfig.IsNull() {
+			vsphereMachineConfig := util.ObjectValueToTypedObject[VsphereMachineConfigModel](ctx, &resp.Diagnostics, provSchemePlan.VsphereMachineConfig)
+			if !vsphereMachineConfig.VspherePreparedImage.IsUnknown() && !vsphereMachineConfig.VspherePreparedImage.IsNull() {
+				vspherePreparedImage := util.ObjectValueToTypedObject[PreparedImageConfigModel](ctx, &resp.Diagnostics, vsphereMachineConfig.VspherePreparedImage)
+
+				imageScheme, imageSpecs, err := validateImageVersion(ctx, &resp.Diagnostics, r.client, plan, vspherePreparedImage, "vsphere_machine_config")
+				if err != nil {
+					return
+				}
+
+				// Validate machine profile
+				if imageScheme.MachineProfile != nil && vsphereMachineConfig.MachineProfile.IsNull() {
+					resp.Diagnostics.AddError(
+						"Error validating `vsphere_machine_config`",
+						"machine_profile needs to be specified when using prepared image configrued with machine profile.",
+					)
+					return
+				}
+				if imageScheme.MachineProfile == nil && !vsphereMachineConfig.MachineProfile.IsNull() && !vsphereMachineConfig.MachineProfile.IsUnknown() {
+					resp.Diagnostics.AddError(
+						"Error validating `vsphere_machine_config`",
+						"machine_profile cannot be specified when using prepared image without a machine profile.",
+					)
+					return
+				}
+
+				if !provSchemePlan.HypervisorResourcePool.IsUnknown() && !provSchemePlan.HypervisorResourcePool.IsNull() {
+					imageVersionResourcePool := imageSpecs.GetResourcePool()
+					if imageVersionResourcePool.GetId() != provSchemePlan.HypervisorResourcePool.ValueString() {
+						resp.Diagnostics.AddError(
+							"Error validating `vsphere_machine_config`",
+							"resource pool specified in the prepared image does not match the resource pool configured in the provisioning scheme.",
+						)
+						return
+					}
+				}
+			}
+		}
+	}
+
+	if !plan.PersistUserChanges.IsUnknown() && plan.PersistUserChanges.IsNull() &&
+		!plan.ProvisioningType.IsUnknown() && !plan.ProvisioningType.IsNull() &&
+		!plan.SessionSupport.IsUnknown() && !plan.SessionSupport.IsNull() &&
+		!plan.AllocationType.IsUnknown() && !plan.AllocationType.IsNull() {
+
+		provisioningType := plan.ProvisioningType.ValueString()
+		persistChanges := citrixorchestration.PERSISTCHANGES_DISCARD
+		if provisioningType == string(citrixorchestration.PROVISIONINGTYPE_MANUAL) ||
+			(provisioningType != string(citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING) &&
+				plan.SessionSupport.ValueString() == string(citrixorchestration.SESSIONSUPPORT_SINGLE_SESSION) &&
+				plan.AllocationType.ValueString() == string(citrixorchestration.ALLOCATIONTYPE_STATIC)) {
+			persistChanges = citrixorchestration.PERSISTCHANGES_ON_LOCAL
+		}
+		paths, diags := resp.Plan.PathMatches(ctx, path.MatchRoot("persist_user_changes"))
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		resp.Plan.SetAttribute(ctx, paths[0], string(persistChanges))
 	}
 
 	if req.State.Raw.IsNull() {
