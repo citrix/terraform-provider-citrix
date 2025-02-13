@@ -68,12 +68,11 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 	// Get machine catalogs and verify all of them have the same session support
 	associatedMachineCatalogs := util.ObjectSetToTypedArray[DeliveryGroupMachineCatalogModel](ctx, &resp.Diagnostics, plan.AssociatedMachineCatalogs)
 	associatedMachineCatalogProperties, err := validateAndReturnMachineCatalogSessionSupport(ctx, *r.client, &resp.Diagnostics, associatedMachineCatalogs, true)
-
 	if err != nil {
 		return
 	}
 
-	if !plan.AutoscaleSettings.IsNull() && !associatedMachineCatalogProperties.IsPowerManaged {
+	if !plan.AutoscaleSettings.IsNull() && len(associatedMachineCatalogs) > 0 && !associatedMachineCatalogProperties.IsPowerManaged {
 		resp.Diagnostics.AddError(
 			"Error creating Delivery Group "+plan.Name.ValueString(),
 			"Autoscale settings can only be configured if associated machine catalogs are power managed.",
@@ -644,23 +643,25 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 		associatedMachineCatalogs := util.ObjectSetToTypedArray[DeliveryGroupMachineCatalogModel](ctx, &resp.Diagnostics, plan.AssociatedMachineCatalogs)
 		associatedMachineCatalogProperties, err := validateAndReturnMachineCatalogSessionSupport(ctx, *r.client, &resp.Diagnostics, associatedMachineCatalogs, !create)
 		if err != nil || associatedMachineCatalogProperties.SessionSupport == "" {
-			return
+			return // all machine catalogs are in an unknown state
 		}
 
-		if plan.SharingKind.ValueString() == string(citrixorchestration.SHARINGKIND_PRIVATE) && associatedMachineCatalogProperties.AllocationType != citrixorchestration.ALLOCATIONTYPE_STATIC {
-			resp.Diagnostics.AddError(
-				fmt.Sprintf("Error %s Delivery Group", operation),
-				"When `sharing_kind` is `Private`, the associated machine catalogs must have `Static` allocation type.",
-			)
-			return
-		}
+		if len(associatedMachineCatalogs) > 0 {
+			if plan.SharingKind.ValueString() == string(citrixorchestration.SHARINGKIND_PRIVATE) && associatedMachineCatalogProperties.AllocationType != citrixorchestration.ALLOCATIONTYPE_STATIC {
+				resp.Diagnostics.AddError(
+					fmt.Sprintf("Error %s Delivery Group", operation),
+					"When `sharing_kind` is `Private`, the associated machine catalogs must have `Static` allocation type.",
+				)
+				return
+			}
 
-		if plan.SharingKind.ValueString() == string(citrixorchestration.SHARINGKIND_SHARED) && associatedMachineCatalogProperties.AllocationType != citrixorchestration.ALLOCATIONTYPE_RANDOM {
-			resp.Diagnostics.AddError(
-				fmt.Sprintf("Error %s Delivery Group", operation),
-				"When `sharing_kind` is `Shared`, the associated machine catalogs must have `Random` allocation type.",
-			)
-			return
+			if plan.SharingKind.ValueString() == string(citrixorchestration.SHARINGKIND_SHARED) && associatedMachineCatalogProperties.AllocationType != citrixorchestration.ALLOCATIONTYPE_RANDOM {
+				resp.Diagnostics.AddError(
+					fmt.Sprintf("Error %s Delivery Group", operation),
+					"When `sharing_kind` is `Shared`, the associated machine catalogs must have `Random` allocation type.",
+				)
+				return
+			}
 		}
 	}
 
@@ -670,20 +671,19 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 		desktops = util.ObjectListToTypedArray[DeliveryGroupDesktop](ctx, &resp.Diagnostics, plan.Desktops)
 	}
 
-	if plan.AssociatedMachineCatalogs.IsNull() {
+	associatedMachineCatalogs := util.ObjectSetToTypedArray[DeliveryGroupMachineCatalogModel](ctx, &resp.Diagnostics, plan.AssociatedMachineCatalogs)
+	associatedMachineCatalogProperties, err := validateAndReturnMachineCatalogSessionSupport(ctx, *r.client, &resp.Diagnostics, associatedMachineCatalogs, !create)
+	if err != nil {
+		return
+	}
+
+	if plan.AssociatedMachineCatalogs.IsNull() || len(associatedMachineCatalogs) == 0 {
 		errorSummary := fmt.Sprintf("Error %s Delivery Group", operation)
 		feature := "Delivery Groups without associated machine catalogs"
 		isFeatureSupportedForCurrentDDC := util.CheckProductVersion(r.client, &resp.Diagnostics, 118, 118, 7, 42, errorSummary, feature)
 
 		if !isFeatureSupportedForCurrentDDC {
 			return
-		}
-
-		if !plan.AutoscaleSettings.IsNull() && !plan.AutoscaleSettings.IsUnknown() {
-			resp.Diagnostics.AddError(
-				fmt.Sprintf("Error %s Delivery Group", operation),
-				"Autoscale settings can only be configured if associated machine catalogs are specified.",
-			)
 		}
 
 		if len(desktops) > 0 {
@@ -702,13 +702,11 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 			}
 		}
 
-		return
+		return // no machine catalogs, skip the rest of the checks
 	}
 
-	associatedMachineCatalogs := util.ObjectSetToTypedArray[DeliveryGroupMachineCatalogModel](ctx, &resp.Diagnostics, plan.AssociatedMachineCatalogs)
-	associatedMachineCatalogProperties, err := validateAndReturnMachineCatalogSessionSupport(ctx, *r.client, &resp.Diagnostics, associatedMachineCatalogs, !create)
-	if err != nil || associatedMachineCatalogProperties.SessionSupport == "" {
-		return
+	if associatedMachineCatalogProperties.SessionSupport == "" {
+		return // no associated machine catalogs, or all machine catalogs are in an unknown state
 	}
 
 	// Validate Delivery Type
@@ -744,7 +742,7 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 		return
 	}
 
-	if !plan.AutoscaleSettings.IsNull() && !associatedMachineCatalogProperties.IsPowerManaged {
+	if !plan.AutoscaleSettings.IsNull() && len(associatedMachineCatalogs) > 0 && !associatedMachineCatalogProperties.IsPowerManaged {
 		resp.Diagnostics.AddError(
 			"Error "+operation+" Delivery Group "+plan.Name.ValueString(),
 			"Autoscale settings can only be configured if associated machine catalogs are power managed.",
