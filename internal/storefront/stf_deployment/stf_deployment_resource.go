@@ -498,28 +498,19 @@ func getRoamingGateway(ctx context.Context, client *citrixdaasclient.CitrixDaasC
 		return nil, err
 	}
 
-	roamingGateways := util.ObjectListToTypedArray[RoamingGateway](ctx, diagnostics, plan.RoamingGateway)
 	getRoamingServiceBody.SetSiteId(siteIdInt)
-	var gateways []citrixstorefront.STFRoamingGatewayResponseModel
-	for _, roamingGateway := range roamingGateways {
-		// Retrieve values from response
-		var getRoamingGatewayBody citrixstorefront.GetSTFRoamingGatewayRequestModel
 
-		getRoamingGatewayBody.SetName(roamingGateway.Name.ValueString())
-
-		// Get STF Roaming Gateway details
-		getRoamingGatewayRequest := client.StorefrontClient.RoamingSF.STFRoamingGatewayGet(ctx, getRoamingGatewayBody, getRoamingServiceBody)
-		remoteRoamingGateway, err := getRoamingGatewayRequest.Execute()
-		if err != nil {
-			diagnostics.AddError(
-				"Error getting StoreFront Roaming Gateway details ",
-				"Error message: "+err.Error(),
-			)
-			return nil, err
-		}
-		gateways = append(gateways, remoteRoamingGateway)
+	// Get STF Roaming Gateway details
+	getRoamingGatewayRequest := client.StorefrontClient.RoamingSF.STFRoamingGatewayGet(ctx, getRoamingServiceBody)
+	remoteRoamingGateway, err := getRoamingGatewayRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error getting StoreFront Roaming Gateway details ",
+			"Error message: "+err.Error(),
+		)
+		return nil, err
 	}
-	return gateways, err
+	return remoteRoamingGateway, err
 }
 
 func getRoamingBeaconInternal(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, plan STFDeploymentResourceModel) (*citrixstorefront.GetSTFRoamingInternalBeaconResponseModel, error) {

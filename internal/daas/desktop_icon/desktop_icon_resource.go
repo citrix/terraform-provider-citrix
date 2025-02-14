@@ -12,6 +12,7 @@ import (
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/application"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -66,6 +67,10 @@ func (r *desktopIconResource) Create(ctx context.Context, req resource.CreateReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	icons, iconErr := application.GetAllExistingIcons(ctx, r.client, &resp.Diagnostics)
+	if iconErr != nil {
+		return
+	}
 
 	// Generate API request body from plan
 	var createDesktopIconRequest citrixorchestration.AddIconRequestModel
@@ -107,6 +112,16 @@ func (r *desktopIconResource) Create(ctx context.Context, req resource.CreateReq
 				"\nError message: "+util.ReadClientError(err),
 		)
 		return
+	}
+
+	for _, item := range icons {
+		if item.Id == desktopIcon.Id {
+			resp.Diagnostics.AddError(
+				"Icon already exists.",
+				"\nIcon ID: "+desktopIcon.Id,
+			)
+			return
+		}
 	}
 
 	// Map response body to schema and populate Computed attribute values

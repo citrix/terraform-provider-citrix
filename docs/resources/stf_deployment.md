@@ -49,11 +49,11 @@ resource "citrix_stf_deployment" "example-stf-deployment" {
 
 Required:
 
-- `internal_address` (String) Internal IP address of the beacon. It can either be the hostname or the IP address of the beacon. The Internal IP must be either in `http(s)://<ip_address>/` OR `http(s)://<hostname>/`.
+- `internal_address` (String) Internal IP address of the beacon. It can either be the hostname or the IP address of the beacon. The Internal IP must be either in `http(s)://<ip_address>/` OR `http(s)://<hostname>/` format.
 
 Optional:
 
-- `external_addresses` (List of String) External IP addresses of the beacon. It can either be the gateway url or the IP addresses of the beacon. If the user removes it from terraform, then the previously persisted values will be retained. Each External IP must be either in `http(s)://<ip_address>/` OR `http(s)://<hostname>/`.
+- `external_addresses` (List of String) External IP addresses of the beacon. It can either be the gateway url or the IP addresses of the beacon. If the user removes it from terraform, then the previously persisted values will be retained. When omitted, StoreFront server will use default value of `http://ping.citrix.com` and the gateway url. Each External IP must be either in `http(s)://<ip_address>/` OR `http(s)://<hostname>/` format.
 
 
 <a id="nestedatt--roaming_gateway"></a>
@@ -69,7 +69,7 @@ Required:
 Optional:
 
 - `callback_url` (String) The Gateway authentication NetScaler call-back url. Must end with `/CitrixAuthService/AuthService.asmx`
-- `gslb_url` (String) An optional URL which corresponds to the Global Server Load Balancing domain used by multiple gateways. Defaults to an empty string.
+- `gslb_url` (String) An optional URL which corresponds to the Global Server Load Balancing domain used by multiple gateways.
 - `is_cloud_gateway` (Boolean) Whether the Gateway is an instance of Citrix Gateway Service in the cloud. Defaults to `false`.
 - `request_ticket_from_two_stas` (Boolean) Request STA tickets from two STA servers (Requires two STA servers). Defaults to `false`.
 - `secure_ticket_authority_urls` (Attributes List) The Secure Ticket Authority (STA) URLs. The STA servers validate the tickets that are issued by the StoreFront server. The STA servers must be reachable from the StoreFront server. (see [below for nested schema](#nestedatt--roaming_gateway--secure_ticket_authority_urls))
@@ -90,10 +90,6 @@ Optional:
 
 - `sta_validation_enabled` (Boolean) Whether Secure Ticket Authority (STA) validation is enabled. Defaults to `false`.
 - `sta_validation_secret` (String, Sensitive) The Secure Ticket Authority (STA) validation secret.
-
-Read-Only:
-
-- `authority_id` (String) The ID of the Secure Ticket Authority (STA) server.
 
 ## Import
 

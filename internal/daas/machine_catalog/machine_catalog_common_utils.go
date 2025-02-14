@@ -207,8 +207,7 @@ func getRequestModelForUpdateMachineCatalog(plan MachineCatalogResourceModel, st
 }
 
 func checkIfProvSchemeIsCloudOnly(ctx context.Context, diagnostics *diag.Diagnostics, provisoningScheme ProvisioningSchemeModel, isOnPremises bool) bool {
-	if provisoningScheme.IdentityType.ValueString() == string(citrixorchestration.IDENTITYTYPE_AZURE_AD) ||
-		provisoningScheme.IdentityType.ValueString() == string(citrixorchestration.IDENTITYTYPE_WORKGROUP) {
+	if provisoningScheme.IdentityType.ValueString() == string(citrixorchestration.IDENTITYTYPE_AZURE_AD) {
 		if isOnPremises {
 			diagnostics.AddAttributeError(
 				path.Root("identity_type"),
@@ -474,7 +473,7 @@ func validateInUseMachineAccounts(ctx context.Context, diagnostics *diag.Diagnos
 	}
 
 	if len(batchRequestItems) > 0 {
-		// If there are any machines that need to be put in maintenance mode
+		// If there are any machines that are in use by other machine catalogs
 		var batchRequestModel citrixorchestration.BatchRequestModel
 		batchRequestModel.SetItems(batchRequestItems)
 		successfulJobs, _, subJobs, _ := citrixdaasclient.PerformBatchOperationAndReturnSubJobResponses(ctx, client, batchRequestModel)

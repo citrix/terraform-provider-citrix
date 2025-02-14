@@ -847,17 +847,40 @@ func PanicHandler(diagnostics *diag.Diagnostics) {
 // <summary>
 // Helper function to get the allowed functional level values for setting the minimum functional level for machine catalog and deliver group.
 // </summary>
-func GetAllowedFunctionalLevelValues() []string {
+func GetAllowedFunctionalLevelValues(filter string) []string {
 	res := []string{}
+	filterFound := filter == "" // If no filter is provided, include all values
+
+	// Iterate over the allowed functional level values
 	for _, v := range citrixorchestration.AllowedFunctionalLevelEnumValues {
 		if v != citrixorchestration.FUNCTIONALLEVEL_UNKNOWN &&
 			v != citrixorchestration.FUNCTIONALLEVEL_LMIN &&
 			v != citrixorchestration.FUNCTIONALLEVEL_LMAX {
-			res = append(res, string(v))
+			// If filter is found or no filter is provided, start including values
+			if filterFound || string(v) == filter {
+				filterFound = true
+				res = append(res, string(v))
+			}
 		}
 	}
 
 	return res
+}
+
+// <summary>
+// Helper function to check the functional level requirement for Catalog.
+// </summary>
+func CheckFunctionalLevelValues(client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, currentFunctionalLevel string, errorSummary, feature string) bool {
+	cleanedFunctionalLevel := strings.Trim(currentFunctionalLevel, "\" ")
+	if !slices.Contains(GetAllowedFunctionalLevelValues("L7_20"), cleanedFunctionalLevel) {
+		diagnostics.AddError(
+			errorSummary,
+			fmt.Sprintf("%s is not supported for current catalog functional level %s. Please upgrade your catalog functional level to a supported level.", feature, cleanedFunctionalLevel),
+		)
+		return false
+	}
+
+	return true
 }
 
 // <summary>

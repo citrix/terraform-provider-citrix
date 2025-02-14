@@ -347,7 +347,7 @@ func createExistingCatalogsAndMachinesMap(deliveryGroupMachines []citrixorchestr
 	return catalogAndMachinesMap
 }
 
-func addMachinesToDeliveryGroup(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string, catalogId string, numOfMachines int) (*citrixorchestration.DeliveryGroupDetailResponseModel, error) {
+func addMachinesToDeliveryGroup(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string, catalogId string, numOfMachines int) error {
 	var deliveryGroupMachineCatalogs citrixorchestration.DeliveryGroupAddMachinesRequestModel
 	var deliveryGroupAssignMachinesToUsers []citrixorchestration.AssignMachineToUserRequestModel
 	deliveryGroupMachineCatalogs.SetMachineCatalog(catalogId)
@@ -356,7 +356,7 @@ func addMachinesToDeliveryGroup(ctx context.Context, client *citrixdaasclient.Ci
 
 	updateDeliveryGroupRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsDoAddMachines(ctx, deliveryGroupId)
 	updateDeliveryGroupRequest = updateDeliveryGroupRequest.DeliveryGroupAddMachinesRequestModel(deliveryGroupMachineCatalogs)
-	updatedDeliveryGroup, httpResp, err := citrixdaasclient.AddRequestData(updateDeliveryGroupRequest, client).Execute()
+	_, httpResp, err := citrixdaasclient.AddRequestData(updateDeliveryGroupRequest, client).Async(true).Execute()
 	if err != nil {
 		diagnostics.AddError(
 			"Error adding machine(s) to Delivery Group "+deliveryGroupId,
@@ -365,13 +365,18 @@ func addMachinesToDeliveryGroup(ctx context.Context, client *citrixdaasclient.Ci
 		)
 	}
 
-	return updatedDeliveryGroup, err
+	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error adding machine(s) to Delivery Group "+deliveryGroupId, diagnostics, 5, true)
+	if err != nil {
+		return err
+	}
+
+	return err
 }
 
 func removeMachinesFromDeliveryGroup(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string, machinesToRemove []string) error {
 	for _, machineToRemove := range machinesToRemove {
 		updateDeliveryGroupRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsDoRemoveMachines(ctx, deliveryGroupId, machineToRemove)
-		httpResp, err := citrixdaasclient.AddRequestData(updateDeliveryGroupRequest, client).Execute()
+		httpResp, err := citrixdaasclient.AddRequestData(updateDeliveryGroupRequest, client).Async(true).Execute()
 		if err != nil {
 			diagnostics.AddError(
 				"Error removing machine from Delivery Group "+deliveryGroupId,
@@ -379,6 +384,11 @@ func removeMachinesFromDeliveryGroup(ctx context.Context, client *citrixdaasclie
 					"\nError message: "+util.ReadClientError(err),
 			)
 
+			return err
+		}
+
+		err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error removing machine from Delivery Group "+deliveryGroupId, diagnostics, 5, true)
+		if err != nil {
 			return err
 		}
 	}
@@ -408,7 +418,7 @@ func addRemoveMachinesFromDeliveryGroup(ctx context.Context, client *citrixdaasc
 		if requestedCount > existingCount {
 			// add machines
 			machineCount := (requestedCount - existingCount)
-			_, err := addMachinesToDeliveryGroup(ctx, client, diagnostics, deliveryGroupId, associatedMachineCatalogId, machineCount)
+			err := addMachinesToDeliveryGroup(ctx, client, diagnostics, deliveryGroupId, associatedMachineCatalogId, machineCount)
 			if err != nil {
 				return err
 			}

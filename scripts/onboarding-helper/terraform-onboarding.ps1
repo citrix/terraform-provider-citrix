@@ -395,6 +395,26 @@ function Get-ResourceList {
         if ($requestPath -eq "AdminFolders") {
             $pathMap[$item.Id] = $item.Path
         }
+
+        # Store icons as files
+        if ($requestPath -eq "icons") {
+            $iconsFolder = Join-Path -Path $PSScriptRoot -ChildPath "icons"
+            # Create the icons folder
+            if (-not (Test-Path -Path $iconsFolder)) {
+                New-Item -ItemType Directory -Path $iconsFolder | Out-Null
+            }
+            
+            $iconBytes = [System.Convert]::FromBase64String($item.RawData)
+            $iconFileName = "$iconsFolder\app_icon_$($item.Id).ico"
+
+            try {
+                [System.IO.File]::WriteAllBytes($iconFileName, $iconBytes)
+            }
+            catch {
+                Write-Error "Failed to write icon file: $_"
+                continue
+            }
+        }
     }
     return $resourceList, $pathMap
 }
@@ -700,36 +720,17 @@ function InjectPlaceHolderSensitiveValues {
 
     $filteredOutput = @()
     $lines = $content -split "`r?`n"
-    $iconCounter = 0
     $iconsFolder = Join-Path -Path $PSScriptRoot -ChildPath "icons"
-    
-    # Check if application icon exists; if not, then exit
-    if ($content -match 'citrix_application_icon') {
-    
-        # Create the icons folder
-        if (-not (Test-Path -Path $iconsFolder)) {
-            New-Item -ItemType Directory -Path $iconsFolder | Out-Null
-        }
-    }
 
+    $previousLine = ""
     foreach ($line in $lines) {
-        if ($line -match 'raw_data\s*=\s*"([^"]+)"') {
-            $rawDataValue = $matches[1]
-            $iconBytes = [System.Convert]::FromBase64String($rawDataValue)
-            $iconFileName = "$iconsFolder\app_icon_$iconCounter.ico"
-
-            try {
-                [System.IO.File]::WriteAllBytes($iconFileName, $iconBytes)
-            }
-            catch {
-                Write-Error "Failed to write icon file: $_"
-                continue
-            }
+        if ($line -match 'raw_data' -and $previousLine -match 'id\s*=\s*"(.*)"') {
+            $iconId = $matches[1]
+            $iconFileName = "$iconsFolder\app_icon_$iconId.ico"
 
             # Replace backslashes with double backslashes for terraform
             $iconFileName = $iconFileName -replace '\\', '\\'
 
-            $iconCounter++
             # Replace raw_data value with icon file path using filebase64 to encode a file's content in base64 format
             $line = 'raw_data = filebase64("' + $iconFileName + '")'
             $filteredOutput += $line
@@ -766,6 +767,7 @@ function InjectPlaceHolderSensitiveValues {
         else {
             $filteredOutput += $line
         }
+        $previousLine = $line
     }
     $content = $filteredOutput -join "`n"
     return $content
@@ -806,14 +808,14 @@ function PostProcessTerraformOutput {
     # Post-process the terraform output
     $content = Get-Content -Path ".\resource.tf" -Raw
 
-    # Remove computed properties
-    $content = RemoveComputedProperties -content $content
+    # Inject placeholder for sensitive values in tf
+    $content = InjectPlaceHolderSensitiveValues -content $content
 
     # Set dependency relationships
     $content = ReplaceDependencyRelationships -content $content
 
-    # Inject placeholder for sensitive values in tf
-    $content = InjectPlaceHolderSensitiveValues -content $content
+    # Remove computed properties
+    $content = RemoveComputedProperties -content $content
     
     # Overwrite extracted terraform with processed value
     Set-Content -Path ".\resource.tf" -Value $content

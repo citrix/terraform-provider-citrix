@@ -22,7 +22,7 @@ type DesktopIconResourceModel struct {
 
 func (DesktopIconResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "CVAD --- Resource for managing desktop icons.",
+		Description: "CVAD --- Resource for managing desktop icons. \n\n-> **Note** Please use just one icon resource per icon. Having multiple icon resources with the same icon data will result in inconsistencies.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the desktop icon.",
@@ -34,6 +34,7 @@ func (DesktopIconResourceModel) GetSchema() schema.Schema {
 			"raw_data": schema.StringAttribute{
 				Description: "Prepare an icon in ICO format and convert its binary raw data to base64 encoding. Use the base64 encoded string as the value of this attribute. Exactly one of `raw_data` and `file_path` is required.",
 				Optional:    true,
+				Sensitive:   true,
 				Validators: []validator.String{
 					stringvalidator.ExactlyOneOf(
 						path.MatchRoot("file_path"),

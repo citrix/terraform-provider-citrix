@@ -301,13 +301,18 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 
 	updateMachineCatalogRequest := r.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsUpdateMachineCatalog(ctx, catalogId)
 	updateMachineCatalogRequest = updateMachineCatalogRequest.UpdateMachineCatalogRequestModel(*body)
-	_, httpResp, err := citrixdaasclient.AddRequestData(updateMachineCatalogRequest, r.client).Execute()
+	_, httpResp, err := citrixdaasclient.AddRequestData(updateMachineCatalogRequest, r.client).Async(true).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating Machine Catalog "+catalogName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Machine Catalog "+catalogName, &resp.Diagnostics, 10, true)
+	if err != nil {
 		return
 	}
 
@@ -641,32 +646,29 @@ func (r *machineCatalogResource) Delete(ctx context.Context, req resource.Delete
 		return
 	}
 
-	// TODO: Revisit this block that's causing Tests to Fail - https://github.com/citrix/terraform-provider-citrix/issues/176
-	/*
-		// Set machines to maintenance mode before deletion
-		machinesInCatalog, err := util.GetMachineCatalogMachines(ctx, r.client, &resp.Diagnostics, catalogId)
-		if err != nil {
-			return
+	// Set machines to maintenance mode before deletion
+	machinesInCatalog, err := util.GetMachineCatalogMachines(ctx, r.client, &resp.Diagnostics, catalogId)
+	if err != nil {
+		return
+	}
+	machinesNeedToSetToMaintenanceMode := []citrixorchestration.MachineResponseModel{}
+	for _, machine := range machinesInCatalog {
+		if machine.DeliveryGroup == nil {
+			// if machine has no delivery group, there is no need to put it in maintenance mode
+			continue
 		}
-		machinesNeedToSetToMaintenanceMode := []citrixorchestration.MachineResponseModel{}
-		for _, machine := range machinesInCatalog {
-			if machine.DeliveryGroup == nil {
-				// if machine has no delivery group, there is no need to put it in maintenance mode
-				continue
-			}
-			isMachineInMaintenanceMode := machine.GetInMaintenanceMode()
-			if !isMachineInMaintenanceMode {
-				machinesNeedToSetToMaintenanceMode = append(machinesNeedToSetToMaintenanceMode, machine)
-			}
+		isMachineInMaintenanceMode := machine.GetInMaintenanceMode()
+		if !isMachineInMaintenanceMode {
+			machinesNeedToSetToMaintenanceMode = append(machinesNeedToSetToMaintenanceMode, machine)
 		}
-		if len(machinesNeedToSetToMaintenanceMode) > 0 {
-			resp.Diagnostics.AddError(
-				"Error deleting Machine Catalog "+catalog.GetName(),
-				fmt.Sprintf("Machine catalog %s has %d machine(s) associated with delivery group(s) and need to be put in maintenance mode before deletion.", catalog.GetName(), len(machinesNeedToSetToMaintenanceMode)),
-			)
-			return
-		}
-	*/
+	}
+	if len(machinesNeedToSetToMaintenanceMode) > 0 {
+		resp.Diagnostics.AddError(
+			"Error deleting Machine Catalog "+catalog.GetName(),
+			fmt.Sprintf("Machine catalog %s has %d machine(s) associated with delivery group(s) and need to be put in maintenance mode before deletion.", catalog.GetName(), len(machinesNeedToSetToMaintenanceMode)),
+		)
+		return
+	}
 
 	// Delete existing order
 	catalogName := state.Name.ValueString()
@@ -1280,6 +1282,11 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 
 	if !plan.ProvisioningScheme.IsUnknown() && !plan.ProvisioningScheme.IsNull() {
 		provSchemePlan := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
+
+		if provSchemePlan.IdentityType.ValueString() == string(citrixorchestration.IDENTITYTYPE_WORKGROUP) {
+			util.CheckProductVersion(r.client, &resp.Diagnostics, 118, 118, 7, 43, "Unsupported Machine Catalog Configuration", "Identity type Workgroup")
+			util.CheckFunctionalLevelValues(r.client, &resp.Diagnostics, plan.MinimumFunctionalLevel.String(), "Unsupported Machine Catalog Configuration", "Identity type Workgroup")
+		}
 
 		if !provSchemePlan.MachineADAccounts.IsUnknown() && !provSchemePlan.MachineADAccounts.IsNull() {
 			machineAccountsInPlan := util.ObjectListToTypedArray[MachineADAccountModel](ctx, &resp.Diagnostics, provSchemePlan.MachineADAccounts)
