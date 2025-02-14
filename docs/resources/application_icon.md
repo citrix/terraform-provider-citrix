@@ -4,11 +4,14 @@ page_title: "citrix_application_icon Resource - citrix"
 subcategory: "CVAD"
 description: |-
   Resource for managing application icons.
+  -> Note Please use just one icon resource per icon. Having multiple icon resources with the same icon data will result in inconsistencies.
 ---
 
 # citrix_application_icon (Resource)
 
-Resource for managing application icons.
+Resource for managing application icons. 
+
+-> **Note** Please use just one icon resource per icon. Having multiple icon resources with the same icon data will result in inconsistencies.
 
 ## Example Usage
 
@@ -25,7 +28,7 @@ resource "citrix_application_icon" "example-application-icon" {
 ### Optional
 
 - `file_path` (String) Path to the icon file. Exactly one of `raw_data` and `file_path` is required.
-- `raw_data` (String) Prepare an icon in ICO format and convert its binary raw data to base64 encoding. Use the base64 encoded string as the value of this attribute. Exactly one of `raw_data` and `file_path` is required.
+- `raw_data` (String, Sensitive) Prepare an icon in ICO format and convert its binary raw data to base64 encoding. Use the base64 encoded string as the value of this attribute. Exactly one of `raw_data` and `file_path` is required.
 
 ### Read-Only
 

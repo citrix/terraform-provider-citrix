@@ -76,13 +76,18 @@ func (r *adminScopeResource) Create(ctx context.Context, req resource.CreateRequ
 	createAdminScopeRequest = createAdminScopeRequest.CreateAdminScopeRequestModel(body)
 
 	// Create new admin scope
-	httpResp, err := citrixdaasclient.AddRequestData(createAdminScopeRequest, r.client).Execute()
+	httpResp, err := citrixdaasclient.AddRequestData(createAdminScopeRequest, r.client).Async(true).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Admin Scope: "+plan.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Admin Scope: "+plan.Name.ValueString(), &resp.Diagnostics, 5, true)
+	if err != nil {
 		return
 	}
 
@@ -155,13 +160,20 @@ func (r *adminScopeResource) Update(ctx context.Context, req resource.UpdateRequ
 	updateAdminScopeRequest := r.client.ApiClient.AdminAPIsDAAS.AdminUpdateAdminScope(ctx, adminScopeId)
 	updateAdminScopeRequest = updateAdminScopeRequest.EditAdminScopeRequestModel(body)
 
-	httpResp, err := citrixdaasclient.AddRequestData(updateAdminScopeRequest, r.client).Execute()
+	httpResp, err := citrixdaasclient.AddRequestData(updateAdminScopeRequest, r.client).Async(true).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating Admin Scope: "+adminScopeName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+
+		return
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Admin Scope: "+adminScopeName, &resp.Diagnostics, 5, true)
+	if err != nil {
+		return
 	}
 
 	// Fetch updated admin scope using orchestration.
@@ -196,13 +208,18 @@ func (r *adminScopeResource) Delete(ctx context.Context, req resource.DeleteRequ
 	adminScopeId := state.Id.ValueString()
 	adminScopeName := state.Name.ValueString()
 	deleteAdminScopeRequest := r.client.ApiClient.AdminAPIsDAAS.AdminDeleteAdminScope(ctx, adminScopeId)
-	httpResp, err := citrixdaasclient.AddRequestData(deleteAdminScopeRequest, r.client).Execute()
+	httpResp, err := citrixdaasclient.AddRequestData(deleteAdminScopeRequest, r.client).Async(true).Execute()
 	if err != nil && httpResp.StatusCode != http.StatusNotFound {
 		resp.Diagnostics.AddError(
 			"Error deleting Admin Scope: "+adminScopeName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Admin Scope: "+adminScopeName, &resp.Diagnostics, 5, true)
+	if err != nil {
 		return
 	}
 }

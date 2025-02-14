@@ -13,6 +13,7 @@ import (
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -66,6 +67,10 @@ func (r *applicationIconResource) Create(ctx context.Context, req resource.Creat
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	icons, iconErr := GetAllExistingIcons(ctx, r.client, &resp.Diagnostics)
+	if iconErr != nil {
+		return
+	}
 
 	// Generate API request body from plan
 	var createApplicationIconRequest citrixorchestration.AddIconRequestModel
@@ -107,6 +112,16 @@ func (r *applicationIconResource) Create(ctx context.Context, req resource.Creat
 				"\nError message: "+util.ReadClientError(err),
 		)
 		return
+	}
+
+	for _, item := range icons {
+		if item.Id == applicationIcon.Id {
+			resp.Diagnostics.AddError(
+				"Icon already exists.",
+				"\nIcon ID: "+applicationIcon.Id,
+			)
+			return
+		}
 	}
 
 	// Map response body to schema and populate Computed attribute values
@@ -193,6 +208,31 @@ func readApplicationIcon(ctx context.Context, client *citrixdaasclient.CitrixDaa
 	getApplicationIconRequest := client.ApiClient.IconsAPIsDAAS.IconsGetIcon(ctx, applicationIconId)
 	applicationIcon, _, err := util.ReadResource[*citrixorchestration.IconResponseModel](getApplicationIconRequest, ctx, client, resp, "Application Icon", applicationIconId)
 	return applicationIcon, err
+}
+
+func GetAllExistingIcons(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) ([]citrixorchestration.IconResponseModel, error) {
+	req := client.ApiClient.IconsAPIsDAAS.IconsGetIcons(ctx)
+
+	responses := []citrixorchestration.IconResponseModel{}
+	continuationToken := ""
+	for {
+		req = req.ContinuationToken(continuationToken)
+		responseModel, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.IconResponseModelCollection](req, client)
+		if err != nil {
+			diagnostics.AddError(
+				"Error getting all the existing icons",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return responses, err
+		}
+		responses = append(responses, responseModel.GetItems()...)
+		if responseModel.GetContinuationToken() == "" {
+			return responses, nil
+		}
+		continuationToken = responseModel.GetContinuationToken()
+	}
+
 }
 
 func (r *applicationIconResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {

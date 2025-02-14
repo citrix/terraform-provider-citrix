@@ -85,7 +85,7 @@ func (r *adminUserResource) Create(ctx context.Context, req resource.CreateReque
 	createAdminUserRequest = createAdminUserRequest.CreateAdminAdministratorRequestModel(body)
 
 	// Create new admin user
-	httpResp, err := citrixdaasclient.AddRequestData(createAdminUserRequest, r.client).Execute()
+	httpResp, err := citrixdaasclient.AddRequestData(createAdminUserRequest, r.client).Async(true).Execute()
 
 	//In case of error, add it to diagnostics so that the resource gets marked as tainted
 	if err != nil {
@@ -94,6 +94,11 @@ func (r *adminUserResource) Create(ctx context.Context, req resource.CreateReque
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Admin "+plan.DomainName.ValueString()+"\\"+plan.Name.ValueString(), &resp.Diagnostics, 5, true)
+	if err != nil {
+		// Error has been added to diagnostics. Do not return since we need to mark the resource as tainted in the state
 	}
 
 	// Try getting the new admin user from remote
@@ -174,13 +179,19 @@ func (r *adminUserResource) Update(ctx context.Context, req resource.UpdateReque
 	updateAdminUserRequest := r.client.ApiClient.AdminAPIsDAAS.AdminUpdateAdminAdministrator(ctx, adminUserId)
 	updateAdminUserRequest = updateAdminUserRequest.UpdateAdminAdministratorRequestModel(body)
 
-	httpResp, err := citrixdaasclient.AddRequestData(updateAdminUserRequest, r.client).Execute()
+	httpResp, err := citrixdaasclient.AddRequestData(updateAdminUserRequest, r.client).Async(true).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating Admin User: "+adminUserName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Admin User: "+adminUserName, &resp.Diagnostics, 5, true)
+	if err != nil {
+		return
 	}
 
 	// Fetch updated admin user using orchestration.
@@ -215,13 +226,18 @@ func (r *adminUserResource) Delete(ctx context.Context, req resource.DeleteReque
 	adminUserId := state.Id.ValueString()
 	adminUserName := state.Name.ValueString()
 	deleteAdminUserRequest := r.client.ApiClient.AdminAPIsDAAS.AdminDeleteAdminAdministrator(ctx, adminUserId)
-	httpResp, err := citrixdaasclient.AddRequestData(deleteAdminUserRequest, r.client).Execute()
+	httpResp, err := citrixdaasclient.AddRequestData(deleteAdminUserRequest, r.client).Async(true).Execute()
 	if err != nil && httpResp.StatusCode != http.StatusNotFound {
 		resp.Diagnostics.AddError(
 			"Error deleting Admin User: "+adminUserName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Admin User: "+adminUserName, &resp.Diagnostics, 5, true)
+	if err != nil {
 		return
 	}
 }

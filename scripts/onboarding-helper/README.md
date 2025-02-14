@@ -5,7 +5,7 @@ This automation script is designed to onboard an existing site to Terraform. It 
 ## Environment Requirements
 
 - PowerShell version `5.0` or higher
-- Citrix Provider version `1.0.9`
+- Citrix Provider version `1.0.10`
 - For On-Premises Customers: CVAD DDC `version 2311` or newer.
 
 ## Workflow:
@@ -35,7 +35,7 @@ This automation script is designed to onboard an existing site to Terraform. It 
 6. Run the script with the following command:
   - For Citrix Cloud customers
     ```powershell
-    .\terraform-onboarding.ps1 -CustomerId "{CustomerId}" -ClientId "{ClientId}" -ClientSecret "{ClientSecret}" -HostName "{HostName}" -Environment "{Environment}"
+    .\terraform-onboarding.ps1 -CustomerId "{CustomerId}" -ClientId "{ClientId}" -ClientSecret "{ClientSecret}" -Environment "{Environment}"
     ```
   - For Citrix on-premises customers
     ```powershell
@@ -63,7 +63,11 @@ This automation script is designed to onboard an existing site to Terraform. It 
 
 7. Wait for the script to complete. The execution time will depend on the complexity of the onboarding process and the resources being imported.
 
-8. Once the script has finished running, check the `resource.tf` file for the output. The Terraform state file should also be updated with the site terraform resources.
+8. Once the script has finished running, check the `.tf` files for the output. The Terraform state file should also be updated with the site terraform resources.
+9. Please note that the onboarding script masks out values for all sensitive attributes present in the generated terraform files. Please update these placeholders with the appropriate values.
+10. At this point if you run `terraform plan`, you should **only** see the sensitive attributes from step 9 being updated.
+11. Run `terraform apply`. This will synchronize the state file with the values of the sensitive attributes updated in step 9.
+12. If you run `terraform plan` again, you should see the following message: `No changes. Your infrastructure matches the configuration.`. This indicates that all the Citrix resources have been successfully onboarded.
 
 
 ## Known Issues/Debugging:

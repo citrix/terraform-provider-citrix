@@ -111,13 +111,24 @@ func (r *applicationGroupResource) Create(ctx context.Context, req resource.Crea
 	addApplicationsGroupRequest = addApplicationsGroupRequest.CreateApplicationGroupRequestModel(createApplicationGroupRequest)
 
 	// Create new application group
-	addAppGroupResp, httpResp, err := citrixdaasclient.AddRequestData(addApplicationsGroupRequest, r.client).Execute()
+	_, httpResp, err := citrixdaasclient.AddRequestData(addApplicationsGroupRequest, r.client).Async(true).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Application Group "+plan.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Application Group "+plan.Name.ValueString(), &resp.Diagnostics, 5, true)
+	if err != nil {
+		return
+	}
+
+	// Get created application group
+	addAppGroupResp, err := getApplicationGroup(ctx, r.client, &resp.Diagnostics, plan.Name.ValueString())
+	if err != nil {
 		return
 	}
 
@@ -130,13 +141,18 @@ func (r *applicationGroupResource) Create(ctx context.Context, req resource.Crea
 		editApplicationGroupRequestBody.SetEnabled(plan.Enabled.ValueBool())
 		editApplicationRequest := r.client.ApiClient.ApplicationGroupsAPIsDAAS.ApplicationGroupsUpdateApplicationGroup(ctx, applicationGroupId)
 		editApplicationRequest = editApplicationRequest.EditApplicationGroupRequestModel(*editApplicationGroupRequestBody)
-		httpResp, err = citrixdaasclient.AddRequestData(editApplicationRequest, r.client).Execute()
+		httpResp, err = citrixdaasclient.AddRequestData(editApplicationRequest, r.client).Async(true).Execute()
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error disabling Application Group "+plan.Name.ValueString(),
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadClientError(err),
 			)
+		}
+
+		err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error disabling Application Group "+plan.Name.ValueString(), &resp.Diagnostics, 5, true)
+		if err != nil {
+			return
 		}
 	}
 	// Update application group tags
@@ -271,13 +287,19 @@ func (r *applicationGroupResource) Update(ctx context.Context, req resource.Upda
 	// Update Application
 	editApplicationRequest := r.client.ApiClient.ApplicationGroupsAPIsDAAS.ApplicationGroupsUpdateApplicationGroup(ctx, applicationGroupId)
 	editApplicationRequest = editApplicationRequest.EditApplicationGroupRequestModel(*editApplicationGroupRequestBody)
-	httpResp, err := citrixdaasclient.AddRequestData(editApplicationRequest, r.client).Execute()
+	httpResp, err := citrixdaasclient.AddRequestData(editApplicationRequest, r.client).Async(true).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error updating Application "+applicationGroupName,
+			"Error updating Application Group"+applicationGroupName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Application Group "+applicationGroupName, &resp.Diagnostics, 5, true)
+	if err != nil {
+		return
 	}
 
 	// Update application group tags
@@ -323,13 +345,18 @@ func (r *applicationGroupResource) Delete(ctx context.Context, req resource.Dele
 	applicationGroupId := state.Id.ValueString()
 	applicationGroupName := state.Name.ValueString()
 	deleteApplicationRequest := r.client.ApiClient.ApplicationGroupsAPIsDAAS.ApplicationGroupsDeleteApplicationGroup(ctx, applicationGroupId)
-	httpResp, err := citrixdaasclient.AddRequestData(deleteApplicationRequest, r.client).Execute()
+	httpResp, err := citrixdaasclient.AddRequestData(deleteApplicationRequest, r.client).Async(true).Execute()
 	if err != nil && httpResp.StatusCode != http.StatusNotFound {
 		resp.Diagnostics.AddError(
 			"Error deleting Application Group "+applicationGroupName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Application Group "+applicationGroupName, &resp.Diagnostics, 5, true)
+	if err != nil {
 		return
 	}
 }
@@ -345,12 +372,12 @@ func readApplicationGroup(ctx context.Context, client *citrixdaasclient.CitrixDa
 	return applicationGroupResource, err
 }
 
-func getApplicationGroup(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, applicationGroupId string) (*citrixorchestration.ApplicationGroupDetailResponseModel, error) {
-	getApplicationRequest := client.ApiClient.ApplicationGroupsAPIsDAAS.ApplicationGroupsGetApplicationGroup(ctx, applicationGroupId)
+func getApplicationGroup(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, applicationGroupNameOrId string) (*citrixorchestration.ApplicationGroupDetailResponseModel, error) {
+	getApplicationRequest := client.ApiClient.ApplicationGroupsAPIsDAAS.ApplicationGroupsGetApplicationGroup(ctx, applicationGroupNameOrId)
 	applicationGroup, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ApplicationGroupDetailResponseModel](getApplicationRequest, client)
 	if err != nil {
 		diagnostics.AddError(
-			"Error Reading Application Group "+applicationGroupId,
+			"Error Reading Application Group "+applicationGroupNameOrId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)

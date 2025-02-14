@@ -249,13 +249,18 @@ func (r *gcpHypervisorResourcePoolResource) Delete(ctx context.Context, req reso
 	// Delete resource pool
 	hypervisorId := state.Hypervisor.ValueString()
 	deleteHypervisorResourcePoolRequest := r.client.ApiClient.HypervisorsAPIsDAAS.HypervisorsDeleteHypervisorResourcePool(ctx, hypervisorId, state.Id.ValueString())
-	httpResp, err := citrixdaasclient.AddRequestData(deleteHypervisorResourcePoolRequest, r.client).Execute()
+	httpResp, err := citrixdaasclient.AddRequestData(deleteHypervisorResourcePoolRequest, r.client).Async(true).Execute()
 	if err != nil && httpResp.StatusCode != http.StatusNotFound {
 		resp.Diagnostics.AddError(
 			"Error deleting Resource Pool for Hypervisor "+hypervisorId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Resource Pool for Hypervisor "+hypervisorId, &resp.Diagnostics, 5, true)
+	if err != nil {
 		return
 	}
 }

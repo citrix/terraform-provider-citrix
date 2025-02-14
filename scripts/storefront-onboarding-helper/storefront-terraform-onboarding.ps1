@@ -31,7 +31,7 @@ Param (
     [Parameter(Mandatory = $true)]
     [string] $ADAdminPassword,
 
-    [switch] $DisableSSLValidation
+    [switch] $DisableSSLVerification
 )
 
 ### Helper Functions ###
@@ -105,14 +105,14 @@ function New-RequiredFiles {
         New-Item -path ".\" -name "citrix.tf" -type "file" -Force
         Write-Verbose "Created new file for terraform citrix provider configuration."
     }
-    $disableSSL = if ($DisableSSLValidation) { "true" } else { "false" }
+    $disableSSL = if ($DisableSSLVerification) { "true" } else { "false" }
     $config = @"
 provider "citrix" {
     storefront_remote_host = {
         computer_name                = "$script:computerName"
         ad_admin_username            = "$script:processedadUsername"
         ad_admin_password            = "$script:adPassword"
-        disable_ssl_validation       =  $disableSSL
+        disable_ssl_verification       =  $disableSSL
     }
 }
 "@
@@ -360,7 +360,7 @@ function PostProcessProviderConfig {
 $script:computerName = $StorefrontHostname
 $script:adUsername = $ADAdminUsername
 $script:adPassword = $ADAdminPassword
-$script:disableSSL = $DisableSSLValidation
+$script:disableSSL = $DisableSSLVerification
 
 # Set environment variables for client secret
 $env:CITRIX_CLIENT_SECRET = $ClientSecret
@@ -378,7 +378,7 @@ try {
     Import-ResourcesToState
 
     # Export terraform resources
-    terraform show >> ".\resource.tf"
+    terraform show -no-color >> ".\resource.tf"
 
     # Post-process citrix.tf output
     PostProcessProviderConfig

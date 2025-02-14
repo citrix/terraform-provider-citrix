@@ -141,13 +141,18 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 	createZoneRequest = createZoneRequest.CreateZoneRequestModel(body)
 
 	// Create new zone
-	httpResp, err := citrixdaasclient.AddRequestData(createZoneRequest, r.client).Execute()
+	httpResp, err := citrixdaasclient.AddRequestData(createZoneRequest, r.client).Async(true).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Zone",
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating zone "+plan.Name.ValueString(), &resp.Diagnostics, 5, true)
+	if err != nil {
 		return
 	}
 
@@ -231,13 +236,19 @@ func (r *zoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	// Update zone
 	editZoneRequest := r.client.ApiClient.ZonesAPIsDAAS.ZonesEditZone(ctx, state.Id.ValueString())
 	editZoneRequest = editZoneRequest.EditZoneRequestModel(*editZoneRequestBody)
-	httpResp, err := citrixdaasclient.AddRequestData(editZoneRequest, r.client).Execute()
+	httpResp, err := citrixdaasclient.AddRequestData(editZoneRequest, r.client).Async(true).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating Zone "+state.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating zone "+plan.Name.ValueString(), &resp.Diagnostics, 5, true)
+	if err != nil {
+		return
 	}
 
 	// Fetch updated zone from GetZone.
@@ -277,13 +288,18 @@ func (r *zoneResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	zoneId := state.Id.ValueString()
 	zoneName := state.Name.ValueString()
 	deleteZoneRequest := r.client.ApiClient.ZonesAPIsDAAS.ZonesDeleteZone(ctx, zoneId)
-	httpResp, err := citrixdaasclient.AddRequestData(deleteZoneRequest, r.client).Execute()
+	httpResp, err := citrixdaasclient.AddRequestData(deleteZoneRequest, r.client).Async(true).Execute()
 	if err != nil && httpResp.StatusCode != http.StatusNotFound {
 		resp.Diagnostics.AddError(
 			"Error deleting Zone "+zoneName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting zone "+state.Name.ValueString(), &resp.Diagnostics, 5, true)
+	if err != nil {
 		return
 	}
 }
@@ -403,13 +419,18 @@ func (r ZoneResourceModel) updateZoneAfterCreate(ctx context.Context, client *ci
 	// Update zone
 	editZoneRequest := client.ApiClient.ZonesAPIsDAAS.ZonesEditZone(ctx, zoneId)
 	editZoneRequest = editZoneRequest.EditZoneRequestModel(editZoneRequestBody)
-	httpResp, err := citrixdaasclient.AddRequestData(editZoneRequest, client).Execute()
+	httpResp, err := citrixdaasclient.AddRequestData(editZoneRequest, client).Async(true).Execute()
 	if err != nil {
 		diagnostics.AddError(
 			"Error updating Zone "+zoneName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return nil, err
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating zone "+zoneName, diagnostics, 5, true)
+	if err != nil {
 		return nil, err
 	}
 

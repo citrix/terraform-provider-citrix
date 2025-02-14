@@ -1089,26 +1089,19 @@ func (plan STFStoreServiceResourceModel) getStoreFarms(ctx context.Context, clie
 		)
 		return nil, err
 	}
-	farms := util.ObjectListToTypedArray[StoreFarm](ctx, diagnostics, plan.StoreFarm)
 	getStoreBody := citrixstorefront.GetSTFStoreRequestModel{}
 	getStoreBody.SetSiteId(siteId)
 	getStoreBody.SetVirtualPath(plan.VirtualPath.ValueString())
 
-	var storeFarms []citrixstorefront.StoreFarmModel
-	for _, farm := range farms {
-		var storeFarmGetBody citrixstorefront.GetSTFStoreFarmRequestModel
-		storeFarmGetBody.SetFarmName(farm.FarmName.ValueString())
-		getStoreFarmRequest := client.StorefrontClient.StoreSF.STFStoreGetStoreFarm(ctx, storeFarmGetBody, getStoreBody)
-		farm, err := getStoreFarmRequest.Execute()
-		if err != nil {
-			diagnostics.AddError(
-				"Error fetching Store Farm",
-				"Error message: "+err.Error(),
-			)
-			return nil, err
-		}
-		storeFarms = append(storeFarms, farm)
+	getStoreFarmRequest := client.StorefrontClient.StoreSF.STFStoreGetStoreFarm(ctx, getStoreBody)
+	farmWithoutFarmName, err := getStoreFarmRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error fetching Store Farm",
+			"Error message: "+err.Error(),
+		)
+		return nil, err
 	}
+	return farmWithoutFarmName, err
 
-	return storeFarms, err
 }

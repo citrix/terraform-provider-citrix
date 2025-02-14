@@ -125,13 +125,18 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 	}
 
 	// Create new application
-	httpResp, err := citrixdaasclient.AddRequestData(addApplicationsRequest, r.client).Execute()
+	httpResp, err := citrixdaasclient.AddRequestData(addApplicationsRequest, r.client).Async(true).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Application",
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Application "+plan.Name.ValueString(), &resp.Diagnostics, 5, true)
+	if err != nil {
 		return
 	}
 
@@ -268,13 +273,18 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 	// Update Application
 	editApplicationRequest := r.client.ApiClient.ApplicationsAPIsDAAS.ApplicationsPatchApplication(ctx, applicationId)
 	editApplicationRequest = editApplicationRequest.EditApplicationRequestModel(*editApplicationRequestBody)
-	httpResp, err := citrixdaasclient.AddRequestData(editApplicationRequest, r.client).Execute()
+	httpResp, err := citrixdaasclient.AddRequestData(editApplicationRequest, r.client).Async(true).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating Application "+applicationName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Application "+applicationName, &resp.Diagnostics, 5, true)
+	if err != nil {
+		return
 	}
 
 	// Get updated application from GetApplication
@@ -316,13 +326,18 @@ func (r *applicationResource) Delete(ctx context.Context, req resource.DeleteReq
 	applicationId := state.Id.ValueString()
 	applicationName := state.Name.ValueString()
 	deleteApplicationRequest := r.client.ApiClient.ApplicationsAPIsDAAS.ApplicationsDeleteApplication(ctx, applicationId)
-	httpResp, err := citrixdaasclient.AddRequestData(deleteApplicationRequest, r.client).Execute()
+	httpResp, err := citrixdaasclient.AddRequestData(deleteApplicationRequest, r.client).Async(true).Execute()
 	if err != nil && httpResp.StatusCode != http.StatusNotFound {
 		resp.Diagnostics.AddError(
 			"Error deleting Application "+applicationName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Application "+applicationName, &resp.Diagnostics, 5, true)
+	if err != nil {
 		return
 	}
 }

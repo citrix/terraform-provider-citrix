@@ -150,7 +150,7 @@ func TestActiveDirectoryMachineCatalogResourceAzure(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_config.service_account_password"},
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_config.service_account_password", "delete_machine_accounts", "force_delete"},
 			},
 			//Update description, master image and add machine test
 			{
@@ -236,7 +236,7 @@ func TestHybridAzureADMachineCatalogResourceAzure(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_config.service_account_password"},
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_config.service_account_password", "delete_machine_accounts", "force_delete"},
 			},
 			// Update description, master image and add machine test
 			{
@@ -336,7 +336,7 @@ func TestAzureADMachineCatalogResourceAzure(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache"},
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache", "delete_machine_accounts", "force_delete"},
 			},
 			// Update description, master image and add machine test
 			{
@@ -425,7 +425,7 @@ func TestWorkgroupMachineCatalogResourceAzure(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache"},
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache", "delete_machine_accounts", "force_delete"},
 			},
 			// Update description, master image and add machine test
 			{
@@ -526,7 +526,7 @@ func TestMachineCatalogResourceGCP(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache", "provisioning_scheme.availability_zones", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_domain_identity.service_account_password"},
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.azure_machine_config.writeback_cache", "provisioning_scheme.availability_zones", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_domain_identity.service_account_password", "delete_machine_accounts", "force_delete"},
 			},
 			//Update description, master image and add machine test
 			{
@@ -613,7 +613,7 @@ func TestMachineCatalogResourceVsphere(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"provisioning_scheme.vsphere_machine_config.master_image", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_domain_identity.service_account_password"},
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.vsphere_machine_config.master_image", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_domain_identity.service_account_password", "delete_machine_accounts", "force_delete"},
 			},
 			//Update description, master image and add machine test
 			{
@@ -700,7 +700,7 @@ func TestMachineCatalogResourceXenserver(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"provisioning_scheme.xenserver_machine_config.master_image", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_domain_identity.service_account_password"},
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.xenserver_machine_config.master_image", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_domain_identity.service_account_password", "delete_machine_accounts", "force_delete"},
 			},
 			//Update description, master image and add machine test
 			{
@@ -793,7 +793,7 @@ func TestMachineCatalogResourceNutanix(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_domain_identity.service_account_password"},
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_domain_identity.service_account_password", "delete_machine_accounts", "force_delete"},
 			},
 			//Update description, master image and add machine test
 			{
@@ -889,7 +889,7 @@ func TestMachineCatalogResourceSCVMM(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_domain_identity.service_account_password"},
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_domain_identity.service_account_password", "delete_machine_accounts", "force_delete"},
 			},
 			//Update description, master image and add machine test
 			{
@@ -983,7 +983,7 @@ func TestMachineCatalogResourceAwsEc2(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.aws_machine_config.image_ami", "provisioning_scheme.aws_machine_config.service_offering", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_domain_identity.service_account_password"},
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.aws_machine_config.image_ami", "provisioning_scheme.aws_machine_config.service_offering", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_domain_identity.service_account_password", "delete_machine_accounts", "force_delete"},
 			},
 			//Update description, master image and add machine test
 			{
@@ -1064,7 +1064,7 @@ func TestMachineCatalogResource_Manual_Power_Managed_Azure(t *testing.T) {
 				ResourceName:            "citrix_machine_catalog.testMachineCatalogManualPowerManaged",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"machine_accounts", "is_remote_pc", "is_power_managed"},
+				ImportStateVerifyIgnore: []string{"machine_accounts", "is_remote_pc", "is_power_managed", "delete_machine_accounts", "force_delete"},
 			},
 			//Delete testing automatically occurs in TestCase
 		},
@@ -1128,7 +1128,7 @@ func TestMachineCatalogResource_Manual_Power_Managed_GCP(t *testing.T) {
 				ResourceName:            "citrix_machine_catalog.testMachineCatalogManualPowerManaged",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"machine_accounts", "is_remote_pc", "is_power_managed"},
+				ImportStateVerifyIgnore: []string{"machine_accounts", "is_remote_pc", "is_power_managed", "delete_machine_accounts", "force_delete"},
 			},
 			//Delete testing automatically occurs in TestCase
 		},
@@ -1192,7 +1192,7 @@ func TestMachineCatalogResource_Manual_Power_Managed_Vsphere(t *testing.T) {
 				ResourceName:            "citrix_machine_catalog.testMachineCatalogManualPowerManaged",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"machine_accounts", "is_remote_pc", "is_power_managed"},
+				ImportStateVerifyIgnore: []string{"machine_accounts", "is_remote_pc", "is_power_managed", "delete_machine_accounts", "force_delete"},
 			},
 			//Delete testing automatically occurs in TestCase
 		},
@@ -1250,7 +1250,7 @@ func TestMachineCatalogResource_Manual_Power_Managed_Xenserver(t *testing.T) {
 				ResourceName:            "citrix_machine_catalog.testMachineCatalogManualPowerManaged",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"machine_accounts", "is_remote_pc", "is_power_managed"},
+				ImportStateVerifyIgnore: []string{"machine_accounts", "is_remote_pc", "is_power_managed", "delete_machine_accounts", "force_delete"},
 			},
 			//Delete testing automatically occurs in TestCase
 		},
@@ -1308,7 +1308,7 @@ func TestMachineCatalogResource_Manual_Power_Managed_Nutanix(t *testing.T) {
 				ResourceName:            "citrix_machine_catalog.testMachineCatalogManualPowerManaged",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"machine_accounts", "is_remote_pc", "is_power_managed"},
+				ImportStateVerifyIgnore: []string{"machine_accounts", "is_remote_pc", "is_power_managed", "delete_machine_accounts", "force_delete"},
 			},
 			//Delete testing automatically occurs in TestCase
 		},
@@ -1369,7 +1369,7 @@ func TestMachineCatalogResource_Manual_Power_Managed_SCVMM(t *testing.T) {
 				ResourceName:            "citrix_machine_catalog.testMachineCatalogManualPowerManaged",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"machine_accounts", "is_remote_pc", "is_power_managed"},
+				ImportStateVerifyIgnore: []string{"machine_accounts", "is_remote_pc", "is_power_managed", "delete_machine_accounts", "force_delete"},
 			},
 			//Delete testing automatically occurs in TestCase
 		},
@@ -1430,7 +1430,7 @@ func TestMachineCatalogResource_Manual_Power_Managed_Aws_Ec2(t *testing.T) {
 				ResourceName:            "citrix_machine_catalog.testMachineCatalogManualPowerManaged",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"machine_accounts", "is_remote_pc", "is_power_managed"},
+				ImportStateVerifyIgnore: []string{"machine_accounts", "is_remote_pc", "is_power_managed", "delete_machine_accounts", "force_delete"},
 			},
 			//Delete testing automatically occurs in TestCase
 		},
@@ -1486,7 +1486,7 @@ func TestMachineCatalogResource_Manual_Non_Power_Managed(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"machine_accounts", "is_remote_pc", "is_power_managed"},
+				ImportStateVerifyIgnore: []string{"machine_accounts", "is_remote_pc", "is_power_managed", "delete_machine_accounts", "force_delete"},
 			},
 			//Delete testing automatically occurs in TestCase
 		},
@@ -1541,7 +1541,7 @@ func TestMachineCatalogResource_RemotePC(t *testing.T) {
 				ResourceName:            "citrix_machine_catalog.testMachineCatalog",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"machine_accounts", "is_remote_pc", "is_power_managed"},
+				ImportStateVerifyIgnore: []string{"machine_accounts", "is_remote_pc", "is_power_managed", "delete_machine_accounts", "force_delete"},
 			},
 			//Delete testing automatically occurs in TestCase
 		},
@@ -1574,10 +1574,10 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 				container 			 = "%s"
 				master_image		 = "%s"
 			}
-			storage_type = "Standard_LRS"
+			storage_type = "StandardSSD_LRS"
 			use_managed_disks = true
 			writeback_cache = {
-				wbc_disk_storage_type = "Standard_LRS"
+				wbc_disk_storage_type = "StandardSSD_LRS"
 				persist_wbc = true
 				persist_os_disk = true
 				persist_vm = true
@@ -1627,10 +1627,10 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 					container 			 = "%s"
 					master_image		 = "%s"
 				}
-				storage_type = "Standard_LRS"
+				storage_type = "StandardSSD_LRS"
 				use_managed_disks = true
 				writeback_cache = {
-					wbc_disk_storage_type = "Standard_LRS"
+					wbc_disk_storage_type = "StandardSSD_LRS"
 					persist_wbc = true
 					persist_os_disk = true
 					persist_vm = true
@@ -1680,11 +1680,11 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 					container 			 = "%s"
 					master_image		 = "%s"
 				}
-				storage_type = "Standard_LRS"
+				storage_type = "StandardSSD_LRS"
 				use_managed_disks = true
 				
 				writeback_cache = {
-					wbc_disk_storage_type = "Standard_LRS"
+					wbc_disk_storage_type = "StandardSSD_LRS"
 					persist_wbc = true
 					persist_os_disk = true
 					persist_vm = true
@@ -1732,10 +1732,10 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 					machine_profile_vm_name = "%s"
 					machine_profile_resource_group = "%s"
 				}
-				storage_type = "Standard_LRS"
+				storage_type = "StandardSSD_LRS"
 				use_managed_disks = true
 				writeback_cache = {
-					wbc_disk_storage_type = "Standard_LRS"
+					wbc_disk_storage_type = "StandardSSD_LRS"
 					persist_wbc = true
 					persist_os_disk = true
 					persist_vm = true
@@ -1783,10 +1783,10 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 					machine_profile_vm_name = "%s"
 					machine_profile_resource_group = "%s"
 				}
-				storage_type = "Standard_LRS"
+				storage_type = "StandardSSD_LRS"
 				use_managed_disks = true
 				writeback_cache = {
-					wbc_disk_storage_type = "Standard_LRS"
+					wbc_disk_storage_type = "StandardSSD_LRS"
 					persist_wbc = true
 					persist_os_disk = true
 					persist_vm = true
@@ -1831,10 +1831,10 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 					container 			 = "%s"
 					master_image		 = "%s"
 				}
-				storage_type = "Standard_LRS"
+				storage_type = "StandardSSD_LRS"
 				use_managed_disks = true
 				writeback_cache = {
-					wbc_disk_storage_type = "Standard_LRS"
+					wbc_disk_storage_type = "StandardSSD_LRS"
 					persist_wbc = true
 					persist_os_disk = true
 					persist_vm = true
@@ -1872,10 +1872,10 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 					container 			 = "%s"
 					master_image		 = "%s"
 				}
-				storage_type = "Standard_LRS"
+				storage_type = "StandardSSD_LRS"
 				use_managed_disks = true
 				writeback_cache = {
-					wbc_disk_storage_type = "Standard_LRS"
+					wbc_disk_storage_type = "StandardSSD_LRS"
 					persist_wbc = true
 					persist_os_disk = true
 					persist_vm = true

@@ -84,12 +84,12 @@ resource "citrix_image_version" "example_vsphere_image_version" {
 - `hypervisor` (String) Id of the hypervisor to use for creating this image version.
 - `hypervisor_resource_pool` (String) Id of the hypervisor resource pool to use for creating this image version.
 - `image_definition` (String) Id of the image definition to associate this image version with.
-- `network_mapping` (Attributes List) Specifies how the attached NICs are mapped to networks. (see [below for nested schema](#nestedatt--network_mapping))
 
 ### Optional
 
 - `azure_image_specs` (Attributes) Image configuration for Azure image version. (see [below for nested schema](#nestedatt--azure_image_specs))
 - `description` (String) Description of the image version.
+- `network_mapping` (Attributes List) Specifies how the attached NICs are mapped to networks. (see [below for nested schema](#nestedatt--network_mapping))
 - `vsphere_image_specs` (Attributes) Image configuration for vSphere image version. (see [below for nested schema](#nestedatt--vsphere_image_specs))
 
 ### Read-Only
@@ -98,15 +98,6 @@ resource "citrix_image_version" "example_vsphere_image_version" {
 - `os_type` (String) The OS type of the image version.
 - `session_support` (String) Session support for the image version.
 - `version_number` (Number) The version number of the image version.
-
-<a id="nestedatt--network_mapping"></a>
-### Nested Schema for `network_mapping`
-
-Required:
-
-- `network` (String) The name of the virtual network that the device should be attached to. This must be a subnet within a Virtual Private Cloud item in the resource pool to which the Machine Catalog is associated.<br />For AWS, please specify the network mask of the network you want to use within the VPC.
-- `network_device` (String) Name or Id of the network device.
-
 
 <a id="nestedatt--azure_image_specs"></a>
 ### Nested Schema for `azure_image_specs`
@@ -158,6 +149,15 @@ Optional:
 - `machine_profile_template_spec_version` (String) The version of the machine profile template spec.
 - `machine_profile_vm_name` (String) The name of the machine profile virtual machine.
 
+
+
+<a id="nestedatt--network_mapping"></a>
+### Nested Schema for `network_mapping`
+
+Required:
+
+- `network` (String) The name of the virtual network that the device should be attached to. This must be a subnet within a Virtual Private Cloud item in the resource pool to which the Machine Catalog is associated.<br />For AWS, please specify the network mask of the network you want to use within the VPC.
+- `network_device` (String) Name or Id of the network device.
 
 
 <a id="nestedatt--vsphere_image_specs"></a>

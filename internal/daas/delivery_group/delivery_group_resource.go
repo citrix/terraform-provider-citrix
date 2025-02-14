@@ -68,12 +68,11 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 	// Get machine catalogs and verify all of them have the same session support
 	associatedMachineCatalogs := util.ObjectSetToTypedArray[DeliveryGroupMachineCatalogModel](ctx, &resp.Diagnostics, plan.AssociatedMachineCatalogs)
 	associatedMachineCatalogProperties, err := validateAndReturnMachineCatalogSessionSupport(ctx, *r.client, &resp.Diagnostics, associatedMachineCatalogs, true)
-
 	if err != nil {
 		return
 	}
 
-	if !plan.AutoscaleSettings.IsNull() && !associatedMachineCatalogProperties.IsPowerManaged {
+	if !plan.AutoscaleSettings.IsNull() && len(associatedMachineCatalogs) > 0 && !associatedMachineCatalogProperties.IsPowerManaged {
 		resp.Diagnostics.AddError(
 			"Error creating Delivery Group "+plan.Name.ValueString(),
 			"Autoscale settings can only be configured if associated machine catalogs are power managed.",
@@ -117,13 +116,24 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 	createDeliveryGroupRequest = createDeliveryGroupRequest.CreateDeliveryGroupRequestModel(body)
 
 	// Create new delivery group
-	deliveryGroup, httpResp, err := citrixdaasclient.AddRequestData(createDeliveryGroupRequest, r.client).Execute()
+	_, httpResp, err := citrixdaasclient.AddRequestData(createDeliveryGroupRequest, r.client).Async(true).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Delivery Group",
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Delivery Group "+plan.Name.ValueString(), &resp.Diagnostics, 5, true)
+	if err != nil {
+		return
+	}
+
+	// Get the delivery group after creation
+	deliveryGroup, err := getDeliveryGroup(ctx, r.client, &resp.Diagnostics, plan.Name.ValueString())
+	if err != nil {
 		return
 	}
 
@@ -212,13 +222,18 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 
 	updateDeliveryGroupRequest := r.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsPatchDeliveryGroup(ctx, deliveryGroupId)
 	updateDeliveryGroupRequest = updateDeliveryGroupRequest.EditDeliveryGroupRequestModel(editbody)
-	httpResp, err = citrixdaasclient.AddRequestData(updateDeliveryGroupRequest, r.client).Execute()
+	httpResp, err = citrixdaasclient.AddRequestData(updateDeliveryGroupRequest, r.client).Async(true).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error creating reboot schedule for Delivery Group",
+			"Error occurred while setting some properties for Delivery Group",
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error occurred while setting some properties for Delivery Group "+deliveryGroup.GetName(), &resp.Diagnostics, 5, true)
+	if err != nil {
+		return
 	}
 
 	setDeliveryGroupTags(ctx, &resp.Diagnostics, r.client, deliveryGroupId, plan.Tags)
@@ -369,13 +384,18 @@ func (r *deliveryGroupResource) Update(ctx context.Context, req resource.UpdateR
 
 	updateDeliveryGroupRequest := r.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsPatchDeliveryGroup(ctx, deliveryGroupId)
 	updateDeliveryGroupRequest = updateDeliveryGroupRequest.EditDeliveryGroupRequestModel(editDeliveryGroupRequestBody)
-	httpResp, err := citrixdaasclient.AddRequestData(updateDeliveryGroupRequest, r.client).Execute()
+	httpResp, err := citrixdaasclient.AddRequestData(updateDeliveryGroupRequest, r.client).Async(true).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating Delivery Group "+deliveryGroupName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Delivery Group "+deliveryGroupName, &resp.Diagnostics, 5, true)
+	if err != nil {
 		return
 	}
 
@@ -457,13 +477,18 @@ func (r *deliveryGroupResource) Delete(ctx context.Context, req resource.DeleteR
 	deliveryGroupName := state.Name.ValueString()
 	deleteDeliveryGroupRequest := r.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsDeleteDeliveryGroup(ctx, deliveryGroupId)
 	deleteDeliveryGroupRequest = deleteDeliveryGroupRequest.Force(forceDelete)
-	httpResp, err := citrixdaasclient.AddRequestData(deleteDeliveryGroupRequest, r.client).Execute()
+	httpResp, err := citrixdaasclient.AddRequestData(deleteDeliveryGroupRequest, r.client).Async(true).Execute()
 	if err != nil && httpResp.StatusCode != http.StatusNotFound {
 		resp.Diagnostics.AddError(
 			"Error deleting Delivery Group "+deliveryGroupName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Delivery Group "+deliveryGroupName, &resp.Diagnostics, 5, true)
+	if err != nil {
 		return
 	}
 }
@@ -644,23 +669,25 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 		associatedMachineCatalogs := util.ObjectSetToTypedArray[DeliveryGroupMachineCatalogModel](ctx, &resp.Diagnostics, plan.AssociatedMachineCatalogs)
 		associatedMachineCatalogProperties, err := validateAndReturnMachineCatalogSessionSupport(ctx, *r.client, &resp.Diagnostics, associatedMachineCatalogs, !create)
 		if err != nil || associatedMachineCatalogProperties.SessionSupport == "" {
-			return
+			return // all machine catalogs are in an unknown state
 		}
 
-		if plan.SharingKind.ValueString() == string(citrixorchestration.SHARINGKIND_PRIVATE) && associatedMachineCatalogProperties.AllocationType != citrixorchestration.ALLOCATIONTYPE_STATIC {
-			resp.Diagnostics.AddError(
-				fmt.Sprintf("Error %s Delivery Group", operation),
-				"When `sharing_kind` is `Private`, the associated machine catalogs must have `Static` allocation type.",
-			)
-			return
-		}
+		if len(associatedMachineCatalogs) > 0 {
+			if plan.SharingKind.ValueString() == string(citrixorchestration.SHARINGKIND_PRIVATE) && associatedMachineCatalogProperties.AllocationType != citrixorchestration.ALLOCATIONTYPE_STATIC {
+				resp.Diagnostics.AddError(
+					fmt.Sprintf("Error %s Delivery Group", operation),
+					"When `sharing_kind` is `Private`, the associated machine catalogs must have `Static` allocation type.",
+				)
+				return
+			}
 
-		if plan.SharingKind.ValueString() == string(citrixorchestration.SHARINGKIND_SHARED) && associatedMachineCatalogProperties.AllocationType != citrixorchestration.ALLOCATIONTYPE_RANDOM {
-			resp.Diagnostics.AddError(
-				fmt.Sprintf("Error %s Delivery Group", operation),
-				"When `sharing_kind` is `Shared`, the associated machine catalogs must have `Random` allocation type.",
-			)
-			return
+			if plan.SharingKind.ValueString() == string(citrixorchestration.SHARINGKIND_SHARED) && associatedMachineCatalogProperties.AllocationType != citrixorchestration.ALLOCATIONTYPE_RANDOM {
+				resp.Diagnostics.AddError(
+					fmt.Sprintf("Error %s Delivery Group", operation),
+					"When `sharing_kind` is `Shared`, the associated machine catalogs must have `Random` allocation type.",
+				)
+				return
+			}
 		}
 	}
 
@@ -670,20 +697,19 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 		desktops = util.ObjectListToTypedArray[DeliveryGroupDesktop](ctx, &resp.Diagnostics, plan.Desktops)
 	}
 
-	if plan.AssociatedMachineCatalogs.IsNull() {
+	associatedMachineCatalogs := util.ObjectSetToTypedArray[DeliveryGroupMachineCatalogModel](ctx, &resp.Diagnostics, plan.AssociatedMachineCatalogs)
+	associatedMachineCatalogProperties, err := validateAndReturnMachineCatalogSessionSupport(ctx, *r.client, &resp.Diagnostics, associatedMachineCatalogs, !create)
+	if err != nil {
+		return
+	}
+
+	if plan.AssociatedMachineCatalogs.IsNull() || len(associatedMachineCatalogs) == 0 {
 		errorSummary := fmt.Sprintf("Error %s Delivery Group", operation)
 		feature := "Delivery Groups without associated machine catalogs"
 		isFeatureSupportedForCurrentDDC := util.CheckProductVersion(r.client, &resp.Diagnostics, 118, 118, 7, 42, errorSummary, feature)
 
 		if !isFeatureSupportedForCurrentDDC {
 			return
-		}
-
-		if !plan.AutoscaleSettings.IsNull() && !plan.AutoscaleSettings.IsUnknown() {
-			resp.Diagnostics.AddError(
-				fmt.Sprintf("Error %s Delivery Group", operation),
-				"Autoscale settings can only be configured if associated machine catalogs are specified.",
-			)
 		}
 
 		if len(desktops) > 0 {
@@ -702,13 +728,11 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 			}
 		}
 
-		return
+		return // no machine catalogs, skip the rest of the checks
 	}
 
-	associatedMachineCatalogs := util.ObjectSetToTypedArray[DeliveryGroupMachineCatalogModel](ctx, &resp.Diagnostics, plan.AssociatedMachineCatalogs)
-	associatedMachineCatalogProperties, err := validateAndReturnMachineCatalogSessionSupport(ctx, *r.client, &resp.Diagnostics, associatedMachineCatalogs, !create)
-	if err != nil || associatedMachineCatalogProperties.SessionSupport == "" {
-		return
+	if associatedMachineCatalogProperties.SessionSupport == "" {
+		return // no associated machine catalogs, or all machine catalogs are in an unknown state
 	}
 
 	// Validate Delivery Type
@@ -744,7 +768,7 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 		return
 	}
 
-	if !plan.AutoscaleSettings.IsNull() && !associatedMachineCatalogProperties.IsPowerManaged {
+	if !plan.AutoscaleSettings.IsNull() && len(associatedMachineCatalogs) > 0 && !associatedMachineCatalogProperties.IsPowerManaged {
 		resp.Diagnostics.AddError(
 			"Error "+operation+" Delivery Group "+plan.Name.ValueString(),
 			"Autoscale settings can only be configured if associated machine catalogs are power managed.",
@@ -761,20 +785,22 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 	}
 
 	if associatedMachineCatalogProperties.IsRemotePcCatalog && len(desktops) > 0 {
-		if desktops[0].EnableSessionRoaming.ValueBool() {
-			resp.Diagnostics.AddError(
-				"Error "+operation+" Delivery Group "+plan.Name.ValueString(),
-				"enable_session_roaming cannot be set to true for Remote PC Delivery Group.",
-			)
-			return
-		}
+		for _, desktop := range desktops {
+			if desktop.EnableSessionRoaming.ValueBool() {
+				resp.Diagnostics.AddError(
+					"Error "+operation+" Delivery Group "+plan.Name.ValueString(),
+					"enable_session_roaming cannot be set to true for Remote PC Delivery Group with desktop:"+desktop.PublishedName.ValueString(),
+				)
+				return
+			}
 
-		if !desktops[0].RestrictedAccessUsers.IsNull() {
-			resp.Diagnostics.AddError(
-				"Error "+operation+" Delivery Group "+plan.Name.ValueString(),
-				"restricted_access_users needs to be set for Remote PC Delivery Group.",
-			)
-			return
+			if desktop.RestrictedAccessUsers.IsNull() {
+				resp.Diagnostics.AddError(
+					"Error "+operation+" Delivery Group "+plan.Name.ValueString(),
+					"restricted_access_users needs to be set for Remote PC Delivery Group with desktop:"+desktop.PublishedName.ValueString(),
+				)
+				return
+			}
 		}
 	}
 

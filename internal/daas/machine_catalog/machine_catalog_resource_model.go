@@ -642,7 +642,7 @@ func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 				Computed:    true,
 				Default:     stringdefault.StaticString("L7_20"),
 				Validators: []validator.String{
-					stringvalidator.OneOfCaseInsensitive(util.GetAllowedFunctionalLevelValues()...),
+					stringvalidator.OneOfCaseInsensitive(util.GetAllowedFunctionalLevelValues("")...),
 				},
 			},
 			"scopes": schema.SetAttribute{

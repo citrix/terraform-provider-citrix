@@ -261,7 +261,7 @@ func (ImageVersionModel) GetSchema() schema.Schema {
 			},
 			"network_mapping": schema.ListNestedAttribute{
 				Description:  "Specifies how the attached NICs are mapped to networks.",
-				Required:     true,
+				Optional:     true,
 				NestedObject: util.NetworkMappingModel{}.GetSchema(),
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),

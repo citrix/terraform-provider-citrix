@@ -98,7 +98,7 @@ func TestDeliveryGroupResourceAzureRM(t *testing.T) {
 				ImportStateVerify: true,
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
-				ImportStateVerifyIgnore: []string{"last_updated", "autoscale_settings", "associated_machine_catalogs", "reboot_schedules", "delivery_type"},
+				ImportStateVerifyIgnore: []string{"last_updated", "autoscale_settings", "associated_machine_catalogs", "reboot_schedules", "delivery_type", "force_delete"},
 			},
 
 			// Update name, description and add machine testing

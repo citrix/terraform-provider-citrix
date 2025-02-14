@@ -712,7 +712,7 @@ func (r *STFWebReceiverResourceModel) RefreshPropertyValues(ctx context.Context,
 	r.VirtualPath = types.StringValue(*webreceiver.VirtualPath.Get())
 	r.SiteId = types.StringValue(strconv.Itoa(*webreceiver.SiteId.Get()))
 	r.FriendlyName = types.StringValue(*webreceiver.FriendlyName.Get())
-
+	r.StoreServiceVirtualPath = types.StringValue(*webreceiver.StoreServiceVirtualPath.Get())
 	if !r.ApplicationShortcuts.IsNull() {
 		r.ApplicationShortcuts = r.RefreshApplicationShortcuts(ctx, diagnostics, appShortcuts)
 	}

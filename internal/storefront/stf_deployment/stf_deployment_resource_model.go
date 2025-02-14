@@ -33,7 +33,7 @@ func (RoamingBeacon) GetSchema() schema.SingleNestedAttribute {
 		Optional:    true,
 		Attributes: map[string]schema.Attribute{
 			"internal_address": schema.StringAttribute{
-				Description: "Internal IP address of the beacon. It can either be the hostname or the IP address of the beacon. The Internal IP must be either in `http(s)://<ip_address>/` OR `http(s)://<hostname>/`.",
+				Description: "Internal IP address of the beacon. It can either be the hostname or the IP address of the beacon. The Internal IP must be either in `http(s)://<ip_address>/` OR `http(s)://<hostname>/` format.",
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(util.UrlValidator), "must be a valid URI format starting with http:// or https:// and ending with /."),
@@ -41,7 +41,7 @@ func (RoamingBeacon) GetSchema() schema.SingleNestedAttribute {
 			},
 			"external_addresses": schema.ListAttribute{
 				ElementType: types.StringType,
-				Description: "External IP addresses of the beacon. It can either be the gateway url or the IP addresses of the beacon. If the user removes it from terraform, then the previously persisted values will be retained. Each External IP must be either in `http(s)://<ip_address>/` OR `http(s)://<hostname>/`.",
+				Description: "External IP addresses of the beacon. It can either be the gateway url or the IP addresses of the beacon. If the user removes it from terraform, then the previously persisted values will be retained. When omitted, StoreFront server will use default value of `http://ping.citrix.com` and the gateway url. Each External IP must be either in `http(s)://<ip_address>/` OR `http(s)://<hostname>/` format.",
 				Optional:    true,
 				Computed:    true,
 				Validators: []validator.List{
@@ -60,7 +60,6 @@ func (RoamingBeacon) GetAttributes() map[string]schema.Attribute {
 }
 
 type STFSecureTicketAuthority struct {
-	AuthorityId          types.String `tfsdk:"authority_id"`
 	StaUrl               types.String `tfsdk:"sta_url"`
 	StaValidationEnabled types.Bool   `tfsdk:"sta_validation_enabled"`
 	StaValidationSecret  types.String `tfsdk:"sta_validation_secret"`
@@ -71,7 +70,6 @@ func (r STFSecureTicketAuthority) GetKey() string {
 }
 
 func (r STFSecureTicketAuthority) RefreshListItem(_ context.Context, _ *diag.Diagnostics, sta citrixstorefront.STFSTAUrlModel) util.ResourceModelWithAttributes {
-	r.AuthorityId = types.StringValue(*sta.AuthorityId.Get())
 	r.StaUrl = types.StringValue(*sta.StaUrl.Get())
 	r.StaValidationEnabled = types.BoolValue(*sta.StaValidationEnabled.Get())
 	if !sta.StaValidationEnabled.IsSet() || !*sta.StaValidationEnabled.Get() {
@@ -85,13 +83,6 @@ func (r STFSecureTicketAuthority) RefreshListItem(_ context.Context, _ *diag.Dia
 func (STFSecureTicketAuthority) GetSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
-			"authority_id": schema.StringAttribute{
-				Description: "The ID of the Secure Ticket Authority (STA) server.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
 			"sta_url": schema.StringAttribute{
 				Description: "The URL of the Secure Ticket Authority (STA) server.",
 				Required:    true,
@@ -220,8 +211,6 @@ func (RoamingGateway) GetSchema() schema.NestedAttributeObject {
 			"callback_url": schema.StringAttribute{
 				Description: "The Gateway authentication NetScaler call-back url. Must end with `/CitrixAuthService/AuthService.asmx`",
 				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString(""),
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(`^.*\/CitrixAuthService\/AuthService.asmx$`), "must be a valid URL end with `/CitrixAuthService/AuthService.asmx`."),
 				},
@@ -299,10 +288,8 @@ func (RoamingGateway) GetSchema() schema.NestedAttributeObject {
 				},
 			},
 			"gslb_url": schema.StringAttribute{
-				Description: "An optional URL which corresponds to the Global Server Load Balancing domain used by multiple gateways. Defaults to an empty string.",
+				Description: "An optional URL which corresponds to the Global Server Load Balancing domain used by multiple gateways.",
 				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString(""),
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(util.UrlValidator), "must be a valid URI format starting with http:// or https://, and ending with /."),
 				},
@@ -339,11 +326,9 @@ func (r *STFDeploymentResourceModel) RefreshPropertyValues(ctx context.Context, 
 		r.RoamingGateway = util.TypedArrayToObjectList[RoamingGateway](ctx, diagnostics, nil)
 	} else {
 		r.RoamingGateway = util.RefreshListValueProperties[RoamingGateway, citrixstorefront.STFRoamingGatewayResponseModel](ctx, diagnostics, r.RoamingGateway, roamingGateway, util.GetSTFRoamingGatewayKey)
-	}
-
-	// Roaming Beacon
-	if roamInt != nil {
-		r.RefreshRoamingBeacon(ctx, diagnostics, roamInt, roamExt)
+		if roamInt != nil && roamInt.Internal != "" {
+			r.RefreshRoamingBeacon(ctx, diagnostics, roamInt, roamExt)
+		}
 	}
 }
 
@@ -383,8 +368,19 @@ func (STFDeploymentResourceModel) GetAttributes() map[string]schema.Attribute {
 
 func (r *STFDeploymentResourceModel) RefreshRoamingBeacon(ctx context.Context, diagnostics *diag.Diagnostics, roamInt *citrixstorefront.GetSTFRoamingInternalBeaconResponseModel, roamExt *citrixstorefront.GetSTFRoamingExternalBeaconResponseModel) {
 	refreshedRoamingBeacon := util.ObjectValueToTypedObject[RoamingBeacon](ctx, diagnostics, r.RoamingBeacon)
+	if roamInt.Internal[len(roamInt.Internal)-1:] != "/" {
+		roamInt.Internal += "/"
+	}
 	refreshedRoamingBeacon.Internal = types.StringValue(roamInt.Internal)
-	refreshedRoamingBeacon.External = util.RefreshListValues(ctx, diagnostics, refreshedRoamingBeacon.External, roamExt.External)
+	if roamExt != nil && roamExt.External[0] != "" {
+		for ext := 0; ext < len(roamExt.External); ext++ {
+			if roamExt.External[ext][len(roamExt.External[ext])-1:] != "/" {
+				roamExt.External[ext] += "/"
+			}
+		}
+		refreshedRoamingBeacon.External = util.RefreshListValues(ctx, diagnostics, refreshedRoamingBeacon.External, roamExt.External)
+	}
+
 	refreshedRoamingBeaconObject := util.TypedObjectToObjectValue(ctx, diagnostics, refreshedRoamingBeacon)
 	r.RoamingBeacon = refreshedRoamingBeaconObject
 }

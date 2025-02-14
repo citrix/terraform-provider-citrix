@@ -582,6 +582,9 @@ func (r *STFStoreServiceResourceModel) RefreshPropertyValues(ctx context.Context
 	if storeService.FriendlyName.IsSet() {
 		r.FriendlyName = types.StringValue(*storeService.FriendlyName.Get())
 	}
+	if storeService.AuthenticationServiceVirtualPath.IsSet() {
+		r.AuthenticationService = types.StringValue(*storeService.AuthenticationServiceVirtualPath.Get())
+	}
 	var farmList []StoreFarm
 	for _, farm := range farms {
 		storefarm := StoreFarm{
