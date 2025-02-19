@@ -397,7 +397,7 @@ function Get-ResourceList {
         }
 
         # Store icons as files
-        if ($requestPath -eq "icons") {
+        if ($requestPath -like "Icons*") {
             $iconsFolder = Join-Path -Path $PSScriptRoot -ChildPath "icons"
             # Create the icons folder
             if (-not (Test-Path -Path $iconsFolder)) {
@@ -531,7 +531,7 @@ function Get-ExistingCVADResources {
             "resourceProviderName" = "application_group"
         }
         "application_icon"     = @{
-            "resourceApi"          = "Icons"
+            "resourceApi"          = "Icons?builtIn=false"
             "resourceProviderName" = "application_icon"
         }
     }
