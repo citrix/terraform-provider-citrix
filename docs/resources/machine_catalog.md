@@ -675,7 +675,9 @@ Optional:
 - `machine_profile` (Attributes) The name of the virtual machine or template spec that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone.<br />Required when provisioning_type is set to PVSStreaming or when identity_type is set to `AzureAD` (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--machine_profile))
 - `master_image_note` (String) The note for the master image.
 - `prepared_image` (Attributes) Specifying the prepared master image to be used for machine catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--prepared_image))
-- `use_azure_compute_gallery` (Attributes) Use this to place prepared image in Azure Compute Gallery. Required when `storage_type = Azure_Ephemeral_OS_Disk`. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--use_azure_compute_gallery))
+- `use_azure_compute_gallery` (Attributes) Use this to place prepared image in Azure Compute Gallery. Required when `storage_type = Azure_Ephemeral_OS_Disk`.
+
+~> **Please Note** `use_azure_compute_gallery` cannot be specified when the prepared image is using a shared image gallery. The machine catalog will inherit the azure compute gallery settings of the prepared image. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--use_azure_compute_gallery))
 - `use_managed_disks` (Boolean) Indicate whether to use Azure managed disks for the provisioned virtual machine.
 - `vda_resource_group` (String) Designated resource group where the VDA VMs will be located on Azure.
 - `writeback_cache` (Attributes) Write-back Cache config. Leave this empty to disable Write-back Cache. Write-back Cache requires Machine image with Write-back Cache plugin installed. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--writeback_cache))

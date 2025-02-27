@@ -12,11 +12,9 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int32validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int32planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
@@ -26,95 +24,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
-
-type AzureImageSpecsModel struct {
-	// Required Attributes
-	ServiceOffering types.String `tfsdk:"service_offering"`
-	LicenseType     types.String `tfsdk:"license_type"`
-	StorageType     types.String `tfsdk:"storage_type"`
-
-	// Optional Attributes
-	MachineProfile    types.Object `tfsdk:"machine_profile"`
-	DiskEncryptionSet types.Object `tfsdk:"disk_encryption_set"`
-
-	// Master Image Attributes
-	ResourceGroup      types.String `tfsdk:"resource_group"`
-	SharedSubscription types.String `tfsdk:"shared_subscription"`
-	MasterImage        types.String `tfsdk:"master_image"`
-	GalleryImage       types.Object `tfsdk:"gallery_image"`
-}
-
-func (AzureImageSpecsModel) GetSchema() schema.SingleNestedAttribute {
-	galleryImageSchema := util.GalleryImageModel{}.GetSchema()
-	galleryImageSchema.Validators = []validator.Object{
-		objectvalidator.AlsoRequires(path.Expressions{
-			path.MatchRelative().AtParent().AtName("resource_group"),
-		}...),
-	}
-	return schema.SingleNestedAttribute{
-		Description: "Image configuration for Azure image version.",
-		Optional:    true,
-		Attributes: map[string]schema.Attribute{
-			"service_offering": schema.StringAttribute{
-				Description: "The Azure VM Sku to use when creating machines.",
-				Required:    true,
-			},
-			"license_type": schema.StringAttribute{
-				Description: "Windows license type used to provision virtual machines in Azure at the base compute rate. License types include: `Windows_Client` and `Windows_Server`.",
-				Optional:    true,
-				Validators: []validator.String{
-					stringvalidator.OneOf(
-						util.WindowsClientLicenseType,
-						util.WindowsServerLicenseType,
-					),
-				},
-			},
-			"storage_type": schema.StringAttribute{
-				Description: "Storage account type used for provisioned virtual machine disks on Azure. Storage types include: `Standard_LRS`, `StandardSSD_LRS` and `Premium_LRS`.",
-				Required:    true,
-				Validators: []validator.String{
-					stringvalidator.OneOf(
-						util.StandardLRS,
-						util.StandardSSDLRS,
-						util.Premium_LRS,
-					),
-				},
-			},
-			"machine_profile":     util.AzureMachineProfileModel{}.GetSchema(),
-			"disk_encryption_set": util.AzureDiskEncryptionSetModel{}.GetSchema(),
-			"resource_group": schema.StringAttribute{
-				Description: "The Azure Resource Group where the managed disk / snapshot for creating machines is located.",
-				Required:    true,
-			},
-			"shared_subscription": schema.StringAttribute{
-				Description: "The Azure Subscription ID where the managed disk / snapshot for creating machines is located. Only required if the image is not in the same subscription of the hypervisor.",
-				Optional:    true,
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-			},
-			"master_image": schema.StringAttribute{
-				Description: "The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors. Omit this field if you want to use gallery_image.",
-				Optional:    true,
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("gallery_image")),
-				},
-			},
-			"gallery_image": galleryImageSchema,
-		},
-		PlanModifiers: []planmodifier.Object{
-			objectplanmodifier.RequiresReplace(),
-		},
-		Validators: []validator.Object{
-			objectvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("vsphere_image_specs")),
-		},
-	}
-}
-
-func (AzureImageSpecsModel) GetAttributes() map[string]schema.Attribute {
-	return AzureImageSpecsModel{}.GetSchema().Attributes
-}
 
 type VsphereImageSpecsModel struct {
 	MasterImageVm  types.String `tfsdk:"master_image_vm"`
@@ -273,7 +182,7 @@ func (ImageVersionModel) GetSchema() schema.Schema {
 				Computed:    true,
 				Default:     stringdefault.StaticString(""),
 			},
-			"azure_image_specs":   AzureImageSpecsModel{}.GetSchema(),
+			"azure_image_specs":   util.AzureImageSpecsModel{}.GetSchema(),
 			"vsphere_image_specs": VsphereImageSpecsModel{}.GetSchema(),
 			"session_support": schema.StringAttribute{
 				Description: "Session support for the image version.",
@@ -320,7 +229,7 @@ func (r ImageVersionModel) RefreshPropertyValues(ctx context.Context, diagnostic
 
 	switch imageContext.GetPluginFactoryName() {
 	case util.AZURERM_FACTORY_NAME:
-		azureImageSpecs := util.ObjectValueToTypedObject[AzureImageSpecsModel](ctx, diagnostics, r.AzureImageSpecs)
+		azureImageSpecs := util.ObjectValueToTypedObject[util.AzureImageSpecsModel](ctx, diagnostics, r.AzureImageSpecs)
 
 		azureImageSpecs.ServiceOffering = parseAzureImageVersionServiceOffering(imageScheme.GetServiceOffering())
 
@@ -337,7 +246,7 @@ func (r ImageVersionModel) RefreshPropertyValues(ctx context.Context, diagnostic
 			azureImageSpecs.MachineProfile = updatedMachineProfile
 		}
 
-		azureImageSpecs = ParseMasterImageToAzureImageModel(ctx, diagnostics, azureImageSpecs, masterImage)
+		azureImageSpecs = util.ParseMasterImageToAzureImageModel(ctx, diagnostics, azureImageSpecs, masterImage)
 		r.AzureImageSpecs = util.TypedObjectToObjectValue(ctx, diagnostics, azureImageSpecs)
 	case util.VMWARE_FACTORY_NAME:
 		imageScheme := imageContext.GetImageScheme()
@@ -371,33 +280,6 @@ func (r ImageVersionModel) RefreshPropertyValues(ctx context.Context, diagnostic
 	}
 
 	return r
-}
-
-func ParseMasterImageToAzureImageModel(ctx context.Context, diagnostics *diag.Diagnostics, azureImageSpecs AzureImageSpecsModel, masterImage citrixorchestration.HypervisorResourceRefResponseModel) AzureImageSpecsModel {
-	masterImageXdPath := masterImage.GetXDPath()
-	masterImageSegments := strings.Split(masterImageXdPath, "\\")
-	masterImageLastIndex := len(masterImageSegments)
-	masterImageResourceTag := strings.Split(masterImageSegments[masterImageLastIndex-1], ".")
-	masterImageResourceType := masterImageResourceTag[len(masterImageResourceTag)-1]
-	if strings.EqualFold(masterImageResourceType, util.ImageVersionResourceType) {
-		azureImageSpecs.GalleryImage,
-			azureImageSpecs.ResourceGroup,
-			azureImageSpecs.SharedSubscription =
-			util.ParseMasterImageToUpdateGalleryImageModel(ctx, diagnostics, azureImageSpecs.GalleryImage, masterImage, masterImageSegments, masterImageLastIndex)
-
-		// Clear other master image details
-		azureImageSpecs.MasterImage = types.StringNull()
-	} else {
-		// Snapshot or Managed Disk
-		azureImageSpecs.MasterImage,
-			azureImageSpecs.ResourceGroup,
-			azureImageSpecs.SharedSubscription,
-			azureImageSpecs.GalleryImage,
-			_,
-			_ =
-			util.ParseMasterImageToUpdateAzureImageSpecs(ctx, diagnostics, masterImageResourceType, masterImage, masterImageSegments, masterImageLastIndex)
-	}
-	return azureImageSpecs
 }
 
 func parseVsphereImageXdPath(masterImageXdPath string) (string, string) {

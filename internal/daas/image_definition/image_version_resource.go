@@ -100,7 +100,7 @@ func (r *ImageVersionResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	if !plan.AzureImageSpecs.IsNull() {
-		azureImageSpecs := util.ObjectValueToTypedObject[AzureImageSpecsModel](ctx, &resp.Diagnostics, plan.AzureImageSpecs)
+		azureImageSpecs := util.ObjectValueToTypedObject[util.AzureImageSpecsModel](ctx, &resp.Diagnostics, plan.AzureImageSpecs)
 		sharedSubscription := azureImageSpecs.SharedSubscription.ValueString()
 		resourceGroup := azureImageSpecs.ResourceGroup.ValueString()
 		masterImage := azureImageSpecs.MasterImage.ValueString()
@@ -495,7 +495,7 @@ func (r *ImageVersionResource) ModifyPlan(ctx context.Context, req resource.Modi
 			)
 			return
 		}
-		azureImageSpecs := util.ObjectValueToTypedObject[AzureImageSpecsModel](ctx, &resp.Diagnostics, plan.AzureImageSpecs)
+		azureImageSpecs := util.ObjectValueToTypedObject[util.AzureImageSpecsModel](ctx, &resp.Diagnostics, plan.AzureImageSpecs)
 		// Validate image version machine profile usage consistency within the image definition
 		imageVersionsInDefinition, err := getImageVersions(ctx, &resp.Diagnostics, r.client, plan.ImageDefinition.ValueString())
 		if err != nil {

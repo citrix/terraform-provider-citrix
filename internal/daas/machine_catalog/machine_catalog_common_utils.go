@@ -499,22 +499,23 @@ func validateInUseMachineAccounts(ctx context.Context, diagnostics *diag.Diagnos
 	return nil
 }
 
-func validateImageVersion(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, plan MachineCatalogResourceModel, preparedImageConfig PreparedImageConfigModel, machineConfigAttributeName string) (citrixorchestration.ImageSchemeResponseModel, citrixorchestration.ImageVersionSpecResponseModel, error) {
+func validateImageVersion(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, plan MachineCatalogResourceModel, preparedImageConfig PreparedImageConfigModel, machineConfigAttributeName string) (*citrixorchestration.ImageDefinitionResponseModel, citrixorchestration.ImageSchemeResponseModel, citrixorchestration.ImageVersionSpecResponseModel, error) {
 	isPreparedImageSupported := util.CheckProductVersion(client, diagnostics, 121, 118, 7, 41, "Error using Prepared Image in citrix_machine_catalog resource", "Prepared Image")
 	var imageScheme citrixorchestration.ImageSchemeResponseModel
 	var imageSpecs citrixorchestration.ImageVersionSpecResponseModel
+	var imageDefinition *citrixorchestration.ImageDefinitionResponseModel
 	if !isPreparedImageSupported {
 		err := fmt.Errorf("Prepared Image is not supported in this version of Citrix Virtual Apps and Desktops service.")
-		return imageScheme, imageSpecs, err
+		return nil, imageScheme, imageSpecs, err
 	}
 	imageDefinition, err := image_definition.GetImageDefinition(ctx, client, diagnostics, preparedImageConfig.ImageDefinition.ValueString())
 	if err != nil {
-		return imageScheme, imageSpecs, err
+		return imageDefinition, imageScheme, imageSpecs, err
 	}
 
 	imageVersion, err := image_definition.GetImageVersion(ctx, client, diagnostics, imageDefinition.GetId(), preparedImageConfig.ImageVersion.ValueString())
 	if err != nil {
-		return imageScheme, imageSpecs, err
+		return imageDefinition, imageScheme, imageSpecs, err
 	}
 
 	imageVersionStatus := imageVersion.GetImageVersionStatus()
@@ -524,7 +525,7 @@ func validateImageVersion(ctx context.Context, diagnostics *diag.Diagnostics, cl
 			"Error validating azure_machine_config",
 			err.Error(),
 		)
-		return imageScheme, imageSpecs, err
+		return imageDefinition, imageScheme, imageSpecs, err
 	}
 
 	imageContextConfigured := false
@@ -549,11 +550,12 @@ func validateImageVersion(ctx context.Context, diagnostics *diag.Diagnostics, cl
 					fmt.Sprintf("Error validating `%s`", machineConfigAttributeName),
 					err.Error(),
 				)
-				return imageScheme, imageSpecs, err
+				return imageDefinition, imageScheme, imageSpecs, err
 			}
 		}
 	}
-	return imageScheme, imageSpecs, nil
+
+	return imageDefinition, imageScheme, imageSpecs, nil
 }
 
 func getMachineAccountDeleteOptionValue(v string) citrixorchestration.MachineAccountDeleteOption {
@@ -564,4 +566,18 @@ func getMachineAccountDeleteOptionValue(v string) citrixorchestration.MachineAcc
 	}
 
 	return *machineAccountDeleteOption
+}
+
+func IsAzureImageDefinitionUsingSharedImageGallery(imageDefinitionResp *citrixorchestration.ImageDefinitionResponseModel) bool {
+	preparedImageUseSharedGallery := false
+	imgDefinitionConn := imageDefinitionResp.GetHypervisorConnections()
+	if len(imgDefinitionConn) > 0 {
+		customProperties := imgDefinitionConn[0].GetCustomProperties()
+		for _, property := range customProperties {
+			if property.GetName() == "UseSharedImageGallery" {
+				preparedImageUseSharedGallery, _ = strconv.ParseBool(property.GetValue())
+			}
+		}
+	}
+	return preparedImageUseSharedGallery
 }

@@ -382,13 +382,13 @@ func (VsphereMachineConfigModel) GetAttributes() map[string]schema.Attribute {
 
 type XenserverMachineConfigModel struct {
 	/** XenServer Hypervisor **/
-	MasterImageVm            types.String `tfsdk:"master_image_vm"`
-	ImageSnapshot            types.String `tfsdk:"image_snapshot"`
-	MasterImageNote          types.String `tfsdk:"master_image_note"`
-	ImageUpdateRebootOptions types.Object `tfsdk:"image_update_reboot_options"`
-	CpuCount                 types.Int64  `tfsdk:"cpu_count"`
-	MemoryMB                 types.Int64  `tfsdk:"memory_mb"`
-	WritebackCache           types.Object `tfsdk:"writeback_cache"` // XenserverWritebackCacheModel
+	MasterImageVm                types.String `tfsdk:"master_image_vm"`
+	ImageSnapshot                types.String `tfsdk:"image_snapshot"`
+	MasterImageNote              types.String `tfsdk:"master_image_note"`
+	ImageUpdateRebootOptions     types.Object `tfsdk:"image_update_reboot_options"`
+	CpuCount                     types.Int64  `tfsdk:"cpu_count"`
+	MemoryMB                     types.Int64  `tfsdk:"memory_mb"`
+	WritebackCache               types.Object `tfsdk:"writeback_cache"` // XenserverWritebackCacheModel
 }
 
 func (XenserverMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
@@ -775,8 +775,9 @@ type AzureComputeGallerySettings struct {
 
 func (AzureComputeGallerySettings) GetSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
-		Description: "Use this to place prepared image in Azure Compute Gallery. Required when `storage_type = Azure_Ephemeral_OS_Disk`.",
-		Optional:    true,
+		Description: "Use this to place prepared image in Azure Compute Gallery. Required when `storage_type = Azure_Ephemeral_OS_Disk`." +
+			"\n\n~> **Please Note** `use_azure_compute_gallery` cannot be specified when the prepared image is using a shared image gallery. The machine catalog will inherit the azure compute gallery settings of the prepared image.",
+		Optional: true,
 		Attributes: map[string]schema.Attribute{
 			"replica_ratio": schema.Int64Attribute{
 				Description: "The ratio of virtual machines to image replicas that you want Azure to keep.",
@@ -1410,8 +1411,8 @@ func (mc *XenserverMachineConfigModel) RefreshProperties(ctx context.Context, di
 			writebackCache.WriteBackCacheMemorySizeMB = types.Int64Value(int64(provScheme.GetWriteBackCacheMemorySizeMB()))
 		}
 	}
-	mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, writebackCache)
-}
+		mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, writebackCache)
+	}
 
 func (mc *NutanixMachineConfigModel) RefreshProperties(catalog citrixorchestration.MachineCatalogDetailResponseModel) {
 	provScheme := catalog.GetProvisioningScheme()

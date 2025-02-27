@@ -1329,7 +1329,7 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 			azureMachineConfig := util.ObjectValueToTypedObject[AzureMachineConfigModel](ctx, &resp.Diagnostics, provSchemePlan.AzureMachineConfig)
 			if !azureMachineConfig.AzurePreparedImage.IsUnknown() && !azureMachineConfig.AzurePreparedImage.IsNull() {
 				azurePreparedImage := util.ObjectValueToTypedObject[PreparedImageConfigModel](ctx, &resp.Diagnostics, azureMachineConfig.AzurePreparedImage)
-				imageScheme, imageSpecs, err := validateImageVersion(ctx, &resp.Diagnostics, r.client, plan, azurePreparedImage, "azure_machine_config")
+				imageDefinition, imageScheme, imageSpecs, err := validateImageVersion(ctx, &resp.Diagnostics, r.client, plan, azurePreparedImage, "azure_machine_config")
 				if err != nil {
 					return
 				}
@@ -1358,6 +1358,26 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 						"machine_profile cannot be specified when using prepared image without a machine profile.",
 					)
 					return
+				}
+
+				// Validate the usage of shared gallery image
+				imgDefinitionConn := imageDefinition.GetHypervisorConnections()
+				if len(imgDefinitionConn) > 0 {
+					preparedImageUseSharedGallery := false
+					customProperties := imgDefinitionConn[0].GetCustomProperties()
+					for _, property := range customProperties {
+						if property.GetName() == "UseSharedImageGallery" {
+							preparedImageUseSharedGallery, _ = strconv.ParseBool(property.GetValue())
+						}
+					}
+					if preparedImageUseSharedGallery && !azureMachineConfig.UseAzureComputeGallery.IsUnknown() && !azureMachineConfig.UseAzureComputeGallery.IsNull() {
+						resp.Diagnostics.AddAttributeError(
+							path.Root("use_azure_compute_gallery"),
+							"Incorrect Attribute Value",
+							"`use_azure_compute_gallery` cannot be specified when the prepared image is using a shared image gallery. The machine catalog will inherit the azure compute gallery settings of the prepared image.",
+						)
+						return
+					}
 				}
 
 				// Validate disk encryption set
@@ -1401,7 +1421,7 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 			if !vsphereMachineConfig.VspherePreparedImage.IsUnknown() && !vsphereMachineConfig.VspherePreparedImage.IsNull() {
 				vspherePreparedImage := util.ObjectValueToTypedObject[PreparedImageConfigModel](ctx, &resp.Diagnostics, vsphereMachineConfig.VspherePreparedImage)
 
-				imageScheme, imageSpecs, err := validateImageVersion(ctx, &resp.Diagnostics, r.client, plan, vspherePreparedImage, "vsphere_machine_config")
+				_, imageScheme, imageSpecs, err := validateImageVersion(ctx, &resp.Diagnostics, r.client, plan, vspherePreparedImage, "vsphere_machine_config")
 				if err != nil {
 					return
 				}
