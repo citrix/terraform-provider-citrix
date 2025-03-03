@@ -106,23 +106,14 @@ func (r *policySetResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 	}
 
 	userSettings := []string{}
-	getSettingDefinitionsRequest := r.client.ApiClient.GpoDAAS.GpoGetSettingDefinitions(ctx)
-	getSettingDefinitionsRequest = getSettingDefinitionsRequest.IsLean(true)
-	getSettingDefinitionsRequest = getSettingDefinitionsRequest.Limit(-1)
-	getSettingDefinitionsRequest = getSettingDefinitionsRequest.IsUserSetting(true)
-	getSettingDefinitionsRequest.Execute()
-	userSettingsResp, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.SettingDefinitionEnvelope](getSettingDefinitionsRequest, r.client)
+	settingDefinitions, err := getGpoUserSettingDefinitions(ctx, &resp.Diagnostics, r.client)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Unable to fetch user setting definitions",
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
 		return
 	}
-
-	for _, setting := range userSettingsResp.GetItems() {
-		userSettings = append(userSettings, setting.GetSettingName())
+	for _, setting := range settingDefinitions {
+		if setting.GetIsUserSetting() {
+			userSettings = append(userSettings, setting.GetSettingName())
+		}
 	}
 
 	plannedPolicies := util.ObjectListToTypedArray[PolicyModel](ctx, &resp.Diagnostics, plan.Policies)
@@ -281,9 +272,13 @@ func (r *policySetResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
+	defaultBoolSettingValueMap, err := getGpoBooleanSettingDefaultValueMap(ctx, &resp.Diagnostics, r.client)
+	if err != nil {
+		return
+	}
 	plannedPolicies := util.ObjectListToTypedArray[PolicyModel](ctx, &resp.Diagnostics, plan.Policies)
 	// Create new policies
-	batchRequestModel, err := constructCreatePolicyBatchRequestModel(ctx, &resp.Diagnostics, r.client, plannedPolicies, policySetResponse.GetPolicySetGuid(), policySetResponse.GetName())
+	batchRequestModel, err := constructCreatePolicyBatchRequestModel(ctx, &resp.Diagnostics, r.client, plannedPolicies, policySetResponse.GetPolicySetGuid(), policySetResponse.GetName(), defaultBoolSettingValueMap)
 	if err != nil {
 		return
 	}
@@ -607,9 +602,14 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 		}
 	}
 
+	defaultBoolSettingValueMap, err := getGpoBooleanSettingDefaultValueMap(ctx, &resp.Diagnostics, r.client)
+	if err != nil {
+		return
+	}
+
 	if len(policiesToCreate) > 0 {
 		// Create new policies
-		batchRequestModel, err := constructCreatePolicyBatchRequestModel(ctx, &resp.Diagnostics, r.client, policiesToCreate, policySetId, policySetName)
+		batchRequestModel, err := constructCreatePolicyBatchRequestModel(ctx, &resp.Diagnostics, r.client, policiesToCreate, policySetId, policySetName, defaultBoolSettingValueMap)
 		if err != nil {
 			return
 		}
@@ -661,7 +661,7 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 			// Perform policy setting updates
 			policySettingsInPlan := util.ObjectSetToTypedArray[PolicySettingModel](ctx, &resp.Diagnostics, policy.PolicySettings)
 			policySettingsInState := util.ObjectSetToTypedArray[PolicySettingModel](ctx, &resp.Diagnostics, policyInState.PolicySettings)
-			err = updatePolicySettings(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), policySettingsInPlan, policySettingsInState)
+			err = updatePolicySettings(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), policySettingsInPlan, policySettingsInState, defaultBoolSettingValueMap)
 			if err != nil {
 				return
 			}

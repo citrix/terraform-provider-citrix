@@ -1002,6 +1002,73 @@ func (DeliveryGroupAccessPolicyCriteriaTagsModel) GetAttributes() map[string]sch
 	return DeliveryGroupAccessPolicyCriteriaTagsModel{}.GetSchema().Attributes
 }
 
+type DeliveryGroupAssignMachinesToUsersModel struct {
+	MachineName types.String `tfsdk:"machine_name"`
+	Users       types.Set    `tfsdk:"users"` //List[string]
+}
+
+func (r DeliveryGroupAssignMachinesToUsersModel) GetKey() string {
+	return r.MachineName.ValueString()
+}
+
+func (DeliveryGroupAssignMachinesToUsersModel) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"machine_name": schema.StringAttribute{
+				Description: "The name of the machine. For domain-joined machines, the name must be in the format <domain>\\<machine>, all in lowercase. For non domain-joined machines, use the machine name, all in lowercase.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.LowerCaseRegex), "must be in lowercase"),
+				},
+			},
+			"users": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "The list of users to assign to the machine. \n\n-> **Note** Users must be in `DOMAIN\\UserName` or `user@domain.com` format.",
+				Required:    true,
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
+					setvalidator.ValueStringsAre(
+						validator.String(
+							stringvalidator.RegexMatches(regexp.MustCompile(util.SamAndUpnRegex), "must be in `DOMAIN\\UserName` or `user@domain.com` format"),
+						),
+					),
+				},
+			},
+		},
+	}
+}
+
+func (DeliveryGroupAssignMachinesToUsersModel) GetAttributes() map[string]schema.Attribute {
+	return DeliveryGroupAssignMachinesToUsersModel{}.GetSchema().Attributes
+}
+
+var _ util.RefreshableListItemWithAttributes[citrixorchestration.MachineResponseModel] = DeliveryGroupAssignMachinesToUsersModel{}
+
+func (r DeliveryGroupResourceModel) updatePlanWithAssignMachinesToUsers(ctx context.Context, diagnostics *diag.Diagnostics, dgMachines []citrixorchestration.MachineResponseModel) DeliveryGroupResourceModel {
+	if !r.AssignMachinesToUsers.IsNull() { // Only update if specified in plan. For import, this will be skipped and an apply will be needed if specified in plan.
+		assignMachinesToUsers := util.ObjectListToTypedArray[DeliveryGroupAssignMachinesToUsersModel](ctx, diagnostics, r.AssignMachinesToUsers)
+		assignMachinesToUsersMap := map[string]bool{}
+
+		for _, assignMachinesToUser := range assignMachinesToUsers {
+			machineName := assignMachinesToUser.MachineName.ValueString()
+			assignMachinesToUsersMap[strings.ToLower(machineName)] = true
+		}
+
+		trimmedDgMachines := []citrixorchestration.MachineResponseModel{}
+
+		// From remote, only get machines that are specified in plan
+		for _, dgMachine := range dgMachines {
+			machineName := dgMachine.GetName()
+			if _, ok := assignMachinesToUsersMap[strings.ToLower(machineName)]; ok {
+				trimmedDgMachines = append(trimmedDgMachines, dgMachine)
+			}
+		}
+
+		r.AssignMachinesToUsers = util.RefreshListValueProperties[DeliveryGroupAssignMachinesToUsersModel, citrixorchestration.MachineResponseModel](ctx, diagnostics, r.AssignMachinesToUsers, trimmedDgMachines, util.GetAssignMachineToUserKey)
+	}
+	return r
+}
+
 // DeliveryGroupResourceModel maps the resource schema data.
 type DeliveryGroupResourceModel struct {
 	Id                          types.String `tfsdk:"id"`
@@ -1033,6 +1100,7 @@ type DeliveryGroupResourceModel struct {
 	Tags                        types.Set    `tfsdk:"tags"`     // Set[string]
 	DefaultDesktopIcon          types.String `tfsdk:"default_desktop_icon"`
 	ForceDelete                 types.Bool   `tfsdk:"force_delete"`
+	AssignMachinesToUsers       types.List   `tfsdk:"assign_machines_to_users"` // List[DeliveryGroupAssignMachinesToUsersModel]
 }
 
 func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
@@ -1257,6 +1325,15 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 				Computed: true,
 				Default:  booldefault.StaticBool(false),
 			},
+			"assign_machines_to_users": schema.ListNestedAttribute{
+				Description: "Assign machines in the delivery group to users." +
+					"\n\n~> **Please Note** Adding or removing values from this property will not add or remove machines. Adding an object will assign (or reassign if already assigned) the machine to user(s). Removing an object will unassign the corresponding machine.",
+				Optional:     true,
+				NestedObject: DeliveryGroupAssignMachinesToUsersModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
 		},
 	}
 }
@@ -1315,6 +1392,7 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 	r = r.updatePlanWithAutoscaleSettings(ctx, diagnostics, deliveryGroup, dgPowerTimeSchemes)
 	r = r.updatePlanWithRebootSchedule(ctx, diagnostics, dgRebootSchedule)
 	r = r.updatePlanWithAppProtection(ctx, diagnostics, deliveryGroup)
+	r = r.updatePlanWithAssignMachinesToUsers(ctx, diagnostics, dgMachines)
 
 	var defaultAccessPolicies []citrixorchestration.AdvancedAccessPolicyResponseModel
 	var customAccessPolicies []citrixorchestration.AdvancedAccessPolicyResponseModel

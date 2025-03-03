@@ -109,7 +109,7 @@ func (MachineCatalogMachineModel) GetSchema() schema.NestedAttributeObject {
 				Description: "For domain-joined machines, the Active Directory (AD) account must be in the format <domain>\\<machine>, all in lowercase. For non-domain-joined the computer name, all in lowercase.",
 				Required:    true,
 				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.LowerCaseRegex), "must be in lowercase"),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.LowerCaseRegex), "must be all in lowercase"),
 				},
 			},
 			"machine_name": schema.StringAttribute{
@@ -211,8 +211,9 @@ func (ProvisioningSchemeModel) GetSchema() schema.SingleNestedAttribute {
 			"scvmm_machine_config":     SCVMMMachineConfigModel{}.GetSchema(),
 			"machine_domain_identity":  MachineDomainIdentityModel{}.GetSchema(),
 			"number_of_total_machines": schema.Int64Attribute{
-				Description: "Number of VDA machines allocated in the catalog.",
-				Required:    true,
+				Description: "Number of VDA machines allocated in the catalog." +
+					"\n\n~> **Please Note** When deleting machines, ensure machines that need to be deleted have no active sessions. For machines with `Static` allocation type, also ensure there are no assigned users. If machines that qualify for deletion are more than the requested number of machines to delete, machines are chosen arbitrarily.",
+				Required: true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(0),
 				},
@@ -437,7 +438,7 @@ func (MachineADAccountModel) GetSchema() schema.NestedAttributeObject {
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(util.ComputerAccountRegex), "must be in the format domain\\machine$"),
-					stringvalidator.RegexMatches(regexp.MustCompile(util.LowerCaseRegex), "must be in lowercase"),
+					stringvalidator.RegexMatches(regexp.MustCompile(util.LowerCaseRegex), "must be all in lowercase"),
 				},
 			},
 			"password_format": schema.StringAttribute{

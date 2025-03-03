@@ -69,6 +69,11 @@ func (r *ImageVersionResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
+	err := validateImageVersionConfigs(ctx, r.client, &resp.Diagnostics, plan, "creating")
+	if err != nil {
+		return
+	}
+
 	// Construct image scheme
 	var imageScheme citrixorchestration.CreateImageSchemeRequestModel
 	// Fetch master image path
@@ -100,7 +105,7 @@ func (r *ImageVersionResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	if !plan.AzureImageSpecs.IsNull() {
-		azureImageSpecs := util.ObjectValueToTypedObject[AzureImageSpecsModel](ctx, &resp.Diagnostics, plan.AzureImageSpecs)
+		azureImageSpecs := util.ObjectValueToTypedObject[util.AzureImageSpecsModel](ctx, &resp.Diagnostics, plan.AzureImageSpecs)
 		sharedSubscription := azureImageSpecs.SharedSubscription.ValueString()
 		resourceGroup := azureImageSpecs.ResourceGroup.ValueString()
 		masterImage := azureImageSpecs.MasterImage.ValueString()
@@ -335,6 +340,11 @@ func (r *ImageVersionResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
+	err := validateImageVersionConfigs(ctx, r.client, &resp.Diagnostics, plan, "updating")
+	if err != nil {
+		return
+	}
+
 	updateImageVersionRequestModel := citrixorchestration.UpdateImageVersionRequestModel{}
 	updateImageVersionRequestModel.SetDescription(plan.Description.ValueString())
 	updateImageVersionRequest := r.client.ApiClient.ImageVersionsAPIsDAAS.ImageVersionsUpdateImageVersion(ctx, state.Id.ValueString())
@@ -444,151 +454,11 @@ func (r *ImageVersionResource) ModifyPlan(ctx context.Context, req resource.Modi
 		return
 	}
 
-	create := req.State.Raw.IsNull()
-	operation := "updating"
-	if create {
-		operation = "creating"
-	}
-
 	var plan ImageVersionModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
-	}
-
-	if plan.ImageDefinition.IsUnknown() || plan.ResourcePool.IsUnknown() {
-		return
-	}
-
-	imageDefinition, err := GetImageDefinition(ctx, r.client, &resp.Diagnostics, plan.ImageDefinition.ValueString())
-	if err != nil {
-		return
-	}
-	if len(imageDefinition.GetHypervisorConnections()) > 0 {
-		imgDefHypervisor := imageDefinition.GetHypervisorConnections()[0]
-		if !strings.EqualFold(imgDefHypervisor.GetId(), plan.Hypervisor.ValueString()) {
-			resp.Diagnostics.AddError(
-				"Error "+operation+" Image Version",
-				"Image Definition is associated with a different hypervisor connection.",
-			)
-			return
-		}
-	}
-
-	// Validate image definition
-	hypervisor, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, plan.Hypervisor.ValueString())
-	if err != nil {
-		return
-	}
-
-	switch hypervisor.GetPluginId() {
-	case util.AZURERM_FACTORY_NAME:
-		// validate azure image specs
-		if plan.AzureImageSpecs.IsUnknown() {
-			return
-		}
-		if plan.AzureImageSpecs.IsNull() {
-			resp.Diagnostics.AddError(
-				"Error "+operation+" Image Version",
-				"azure_image_specs is required when creating image version with an Azure hypervisor connection.",
-			)
-			return
-		}
-		azureImageSpecs := util.ObjectValueToTypedObject[AzureImageSpecsModel](ctx, &resp.Diagnostics, plan.AzureImageSpecs)
-		// Validate image version machine profile usage consistency within the image definition
-		imageVersionsInDefinition, err := getImageVersions(ctx, &resp.Diagnostics, r.client, plan.ImageDefinition.ValueString())
-		if err != nil {
-			return
-		}
-
-		if !azureImageSpecs.MachineProfile.IsUnknown() && !plan.Id.IsUnknown() {
-			machineProfileSpecified := !azureImageSpecs.MachineProfile.IsNull()
-			for _, imageVersion := range imageVersionsInDefinition {
-				for _, spec := range imageVersion.GetImageVersionSpecs() {
-					if spec.Context != nil {
-						imageContext := spec.GetContext()
-						if (imageContext.MachineProfileMetadata != nil) != machineProfileSpecified &&
-							!strings.EqualFold(imageVersion.GetId(), plan.Id.ValueString()) {
-							resp.Diagnostics.AddError(
-								"Error "+operation+" Image Version",
-								"All image versions within an image definition must consistently use or not use a machine profile.",
-							)
-							return
-						}
-					}
-				}
-			}
-		}
-
-		if !azureImageSpecs.DiskEncryptionSet.IsNull() && !azureImageSpecs.DiskEncryptionSet.IsUnknown() {
-			des := util.ObjectValueToTypedObject[util.AzureDiskEncryptionSetModel](ctx, &resp.Diagnostics, azureImageSpecs.DiskEncryptionSet)
-			if strings.ToLower(des.DiskEncryptionSetName.ValueString()) != des.DiskEncryptionSetName.ValueString() {
-				resp.Diagnostics.AddError(
-					"Error "+operation+" Image Version",
-					"`disk_encryption_set_name` must be lowercase.",
-				)
-				return
-			}
-
-			if strings.ToLower(des.DiskEncryptionSetResourceGroup.ValueString()) != des.DiskEncryptionSetResourceGroup.ValueString() {
-				resp.Diagnostics.AddError(
-					"Error "+operation+" Image Version",
-					"`disk_encryption_set_resource_group` must be lowercase.",
-				)
-				return
-			}
-		}
-	case util.VMWARE_FACTORY_NAME:
-		if plan.VsphereImageSpecs.IsUnknown() {
-			return
-		}
-		if plan.VsphereImageSpecs.IsNull() {
-			resp.Diagnostics.AddError(
-				"Error "+operation+" Image Version",
-				"vsphere_image_specs is required when creating image version with an vSphere hypervisor connection.",
-			)
-			return
-		}
-
-		vsphereImageSpecs := util.ObjectValueToTypedObject[VsphereImageSpecsModel](ctx, &resp.Diagnostics, plan.VsphereImageSpecs)
-		// Validate image version machine profile usage consistency within the image definition
-		imageVersionsInDefinition, err := getImageVersions(ctx, &resp.Diagnostics, r.client, plan.ImageDefinition.ValueString())
-		if err != nil {
-			return
-		}
-
-		if vsphereImageSpecs.MemoryMB.ValueInt32()%4 != 0 {
-			resp.Diagnostics.AddError(
-				"Error "+operation+" Image Version",
-				"Attribute `vsphere_image_specs.memory_mb` must be a multiple of 4.",
-			)
-			return
-		}
-
-		if !vsphereImageSpecs.MachineProfile.IsUnknown() && !plan.Id.IsUnknown() {
-			machineProfileSpecified := !vsphereImageSpecs.MachineProfile.IsNull()
-			for _, imageVersion := range imageVersionsInDefinition {
-				for _, spec := range imageVersion.GetImageVersionSpecs() {
-					if spec.Context != nil {
-						imageContext := spec.GetContext()
-						if (imageContext.MachineProfileMetadata != nil) != machineProfileSpecified &&
-							!strings.EqualFold(imageVersion.GetId(), plan.Id.ValueString()) {
-							resp.Diagnostics.AddError(
-								"Error "+operation+" Image Version",
-								"All image versions within an image definition must consistently use or not use a machine profile.",
-							)
-							return
-						}
-					}
-				}
-			}
-		}
-	default:
-		resp.Diagnostics.AddError(
-			"Error "+operation+" Image Version",
-			"Unsupported hypervisor connection type: "+hypervisor.GetPluginId(),
-		)
 	}
 }
 
@@ -610,4 +480,114 @@ func GetImageVersion(ctx context.Context, client *citrixdaasclient.CitrixDaasCli
 		return nil, err
 	}
 	return imageVersionResource, nil
+}
+
+func validateImageVersionConfigs(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, plan ImageVersionModel, operation string) error {
+	imageDefinition, err := GetImageDefinition(ctx, client, diagnostics, plan.ImageDefinition.ValueString())
+	if err != nil {
+		return err
+	}
+	if len(imageDefinition.GetHypervisorConnections()) > 0 {
+		imgDefHypervisor := imageDefinition.GetHypervisorConnections()[0]
+		if !strings.EqualFold(imgDefHypervisor.GetId(), plan.Hypervisor.ValueString()) {
+			err := fmt.Errorf("Image Definition is associated with a different hypervisor connection")
+			diagnostics.AddError(
+				"Error "+operation+" Image Version",
+				err.Error(),
+			)
+			return err
+		}
+	}
+
+	// Validate image definition
+	hypervisor, err := util.GetHypervisor(ctx, client, diagnostics, plan.Hypervisor.ValueString())
+	if err != nil {
+		return err
+	}
+
+	switch hypervisor.GetPluginId() {
+	case util.AZURERM_FACTORY_NAME:
+		// validate azure image specs
+		if plan.AzureImageSpecs.IsNull() {
+			err := fmt.Errorf("azure_image_specs is required when creating image version with an Azure hypervisor connection")
+			diagnostics.AddError(
+				"Error "+operation+" Image Version",
+				err.Error(),
+			)
+			return err
+		}
+		azureImageSpecs := util.ObjectValueToTypedObject[util.AzureImageSpecsModel](ctx, diagnostics, plan.AzureImageSpecs)
+		// Validate image version machine profile usage consistency within the image definition
+		imageVersionsInDefinition, err := getImageVersions(ctx, diagnostics, client, plan.ImageDefinition.ValueString())
+		if err != nil {
+			return err
+		}
+
+		machineProfileSpecified := !azureImageSpecs.MachineProfile.IsNull()
+		err = validateImageVersionMachineProfileConfigs(diagnostics, plan.Id.ValueString(), imageVersionsInDefinition, machineProfileSpecified, operation)
+		if err != nil {
+			return err
+		}
+	case util.VMWARE_FACTORY_NAME:
+		if plan.VsphereImageSpecs.IsNull() {
+			err := fmt.Errorf("vsphere_image_specs is required when creating image version with an vSphere hypervisor connection")
+			diagnostics.AddError(
+				"Error "+operation+" Image Version",
+				err.Error(),
+			)
+			return err
+		}
+
+		vsphereImageSpecs := util.ObjectValueToTypedObject[VsphereImageSpecsModel](ctx, diagnostics, plan.VsphereImageSpecs)
+		// Validate image version machine profile usage consistency within the image definition
+		imageVersionsInDefinition, err := getImageVersions(ctx, diagnostics, client, plan.ImageDefinition.ValueString())
+		if err != nil {
+			return err
+		}
+
+		if vsphereImageSpecs.MemoryMB.ValueInt32()%4 != 0 {
+			err := fmt.Errorf("Attribute `vsphere_image_specs.memory_mb` must be a multiple of 4")
+			diagnostics.AddError(
+				"Error "+operation+" Image Version",
+				err.Error(),
+			)
+			return err
+		}
+
+		machineProfileSpecified := !vsphereImageSpecs.MachineProfile.IsNull()
+		err = validateImageVersionMachineProfileConfigs(diagnostics, plan.Id.ValueString(), imageVersionsInDefinition, machineProfileSpecified, operation)
+		if err != nil {
+			return err
+		}
+	default:
+		err := fmt.Errorf("Unsupported hypervisor connection type: %s", hypervisor.GetPluginId())
+		diagnostics.AddError(
+			"Error "+operation+" Image Version",
+			err.Error(),
+		)
+	}
+	return nil
+}
+
+func validateImageVersionMachineProfileConfigs(diagnostics *diag.Diagnostics, id string, imageVersionsInDefinition []citrixorchestration.ImageVersionResponseModel, machineProfileSpecified bool, operation string) error {
+	for _, imageVersion := range imageVersionsInDefinition {
+		for _, spec := range imageVersion.GetImageVersionSpecs() {
+			if spec.Context != nil {
+				imageContext := spec.GetContext()
+				if imageContext.ImageScheme == nil {
+					continue
+				}
+				if (imageContext.MachineProfileMetadata != nil) != machineProfileSpecified &&
+					!strings.EqualFold(imageVersion.GetId(), id) {
+					err := fmt.Errorf("all image versions within an image definition must consistently use or not use a machine profile")
+					diagnostics.AddError(
+						"Error "+operation+" Image Version",
+						err.Error(),
+					)
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }

@@ -14,10 +14,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -109,6 +111,7 @@ type ApplicationResourceModel struct {
 	PublishedName           types.String `tfsdk:"published_name"`
 	Description             types.String `tfsdk:"description"`
 	InstalledAppProperties  types.Object `tfsdk:"installed_app_properties"` // InstalledAppResponseModel
+	ApplicationGroups       types.List   `tfsdk:"application_groups"`       // List[string]
 	DeliveryGroups          types.List   `tfsdk:"delivery_groups"`          // List[string]
 	DeliveryGroupsPriority  types.Set    `tfsdk:"delivery_groups_priority"` // List[DeliveryGroupPriorityModel]
 	ApplicationFolderPath   types.String `tfsdk:"application_folder_path"`
@@ -147,6 +150,20 @@ func (ApplicationResourceModel) GetSchema() schema.Schema {
 				Default:     stringdefault.StaticString(""),
 			},
 			"installed_app_properties": InstalledAppResponseModel{}.GetSchema(),
+			"application_groups": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "The application group IDs to which the application should be added.",
+				Optional:    true,
+				Computed:    true,
+				Default:     listdefault.StaticValue(types.ListValueMust(types.StringType, []attr.Value{})),
+				Validators: []validator.List{
+					listvalidator.ValueStringsAre(
+						validator.String(
+							stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
+						),
+					),
+				},
+			},
 			"delivery_groups": schema.ListAttribute{
 				ElementType: types.StringType,
 				Description: "The delivery group IDs to which the application should be added." +
@@ -232,7 +249,7 @@ func (ApplicationResourceModel) GetAttributes() map[string]schema.Attribute {
 	return ApplicationResourceModel{}.GetSchema().Attributes
 }
 
-func (r ApplicationResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, application *citrixorchestration.ApplicationDetailResponseModel, applicationDeliveryGroup *citrixorchestration.ApplicationDeliveryGroupResponseModelCollection, tags []string) ApplicationResourceModel {
+func (r ApplicationResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, application *citrixorchestration.ApplicationDetailResponseModel, applicationGroups *citrixorchestration.ApplicationGroupResponseModelCollection, applicationDeliveryGroups *citrixorchestration.ApplicationDeliveryGroupResponseModelCollection, tags []string) ApplicationResourceModel {
 	// Overwrite application with refreshed state
 	r.Id = types.StringValue(application.GetId())
 	r.Name = types.StringValue(application.GetName())
@@ -258,8 +275,14 @@ func (r ApplicationResourceModel) RefreshPropertyValues(ctx context.Context, dia
 		r.LimitVisibilityToUsers = types.SetNull(types.StringType)
 	}
 
-	if applicationDeliveryGroup != nil && len(applicationDeliveryGroup.GetItems()) > 0 {
-		deliveryGroups := applicationDeliveryGroup.GetItems()
+	appGroups := []string{}
+	for _, appGroup := range applicationGroups.GetItems() {
+		appGroups = append(appGroups, appGroup.GetId())
+	}
+	r.ApplicationGroups = util.RefreshListValues(ctx, diagnostics, r.ApplicationGroups, appGroups)
+
+	if applicationDeliveryGroups != nil && len(applicationDeliveryGroups.GetItems()) > 0 {
+		deliveryGroups := applicationDeliveryGroups.GetItems()
 		if !r.DeliveryGroups.IsNull() {
 			deliveryGroupsWithPriority := []string{}
 			sort.Slice(deliveryGroups, func(i, j int) bool {

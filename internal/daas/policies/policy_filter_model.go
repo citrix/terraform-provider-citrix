@@ -8,6 +8,7 @@ import (
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
+	"github.com/citrix/terraform-provider-citrix/internal/validators"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -185,7 +186,7 @@ func (ClientIPFilterModel) GetSchema() schema.NestedAttributeObject {
 				Description: "IP Address of the client to be filtered.",
 				Required:    true,
 				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.IPv4Regex), "must be a valid IPv4 address without protocol (http:// or https://) and port number"),
+					validators.ValidateIPFilter(),
 				},
 			},
 		},

@@ -115,6 +115,8 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 	var body citrixorchestration.AddApplicationsRequestModel
 	body.SetNewApplications(newApplicationRequest)
 	body.SetDeliveryGroups(deliveryGroups)
+	applicationGroups := util.StringListToStringArray(ctx, &resp.Diagnostics, plan.ApplicationGroups)
+	body.SetApplicationGroups(applicationGroups)
 
 	addApplicationsRequest := r.client.ApiClient.ApplicationsAPIsDAAS.ApplicationsAddApplications(ctx)
 	addApplicationsRequest = addApplicationsRequest.AddApplicationsRequestModel(body)
@@ -147,7 +149,10 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 	if err != nil {
 		return
 	}
-
+	getApplicationGroups, err := getApplicationGroupsForApplication(ctx, r.client, &resp.Diagnostics, applicationPath)
+	if err != nil {
+		return
+	}
 	applicationDeliveryGroups, err := getApplicationDeliveryGroups(ctx, r.client, &resp.Diagnostics, applicationPath)
 	if err != nil {
 		return
@@ -156,7 +161,7 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 	tags := getApplicationTags(ctx, &resp.Diagnostics, r.client, applicationPath)
 
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, application, applicationDeliveryGroups, tags)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, application, getApplicationGroups, applicationDeliveryGroups, tags)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -183,7 +188,10 @@ func (r *applicationResource) Read(ctx context.Context, req resource.ReadRequest
 	if err != nil {
 		return
 	}
-
+	applicationGroups, err := getApplicationGroupsForApplication(ctx, r.client, &resp.Diagnostics, state.Id.ValueString())
+	if err != nil {
+		return
+	}
 	applicationDeliveryGroups, err := getApplicationDeliveryGroups(ctx, r.client, &resp.Diagnostics, state.Id.ValueString())
 	if err != nil {
 		return
@@ -191,7 +199,7 @@ func (r *applicationResource) Read(ctx context.Context, req resource.ReadRequest
 
 	tags := getApplicationTags(ctx, &resp.Diagnostics, r.client, state.Id.ValueString())
 
-	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, application, applicationDeliveryGroups, tags)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, application, applicationGroups, applicationDeliveryGroups, tags)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -251,6 +259,10 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 		editApplicationRequestBody.SetIncludedUsers(limitVisibilityToUserIds)
 		editApplicationRequestBody.SetIncludedUserFilterEnabled(true)
 	}
+
+	applicationGroups := util.StringListToStringArray(ctx, &resp.Diagnostics, plan.ApplicationGroups)
+	editApplicationRequestBody.SetApplicationGroups(applicationGroups)
+
 	var editInstalledAppRequest citrixorchestration.EditInstalledAppRequestModel
 	var installedAppProperties = util.ObjectValueToTypedObject[InstalledAppResponseModel](ctx, &resp.Diagnostics, plan.InstalledAppProperties)
 	editInstalledAppRequest.SetCommandLineArguments(installedAppProperties.CommandLineArguments.ValueString())
@@ -298,10 +310,15 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
+	getApplicationGroups, err := getApplicationGroupsForApplication(ctx, r.client, &resp.Diagnostics, applicationId)
+	if err != nil {
+		return
+	}
+
 	tags := getApplicationTags(ctx, &resp.Diagnostics, r.client, applicationId)
 
 	// Update resource state with updated property values
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, application, applicationDeliveryGroups, tags)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, application, getApplicationGroups, applicationDeliveryGroups, tags)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -412,6 +429,9 @@ func (r *applicationResource) ModifyPlan(ctx context.Context, req resource.Modif
 			return
 		}
 		for _, deliveryGroupIdToCheck := range deliveryGroupIdsToBeChecked {
+			if deliveryGroupIdToCheck == "" {
+				continue
+			}
 			index := slices.IndexFunc(allDeliveryGroups, func(dg citrixorchestration.DeliveryGroupResponseModel) bool {
 				return strings.EqualFold(dg.GetId(), deliveryGroupIdToCheck)
 			})
@@ -456,18 +476,32 @@ func getApplication(ctx context.Context, client *citrixdaasclient.CitrixDaasClie
 	return application, err
 }
 
-func getApplicationDeliveryGroups(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, applicationNameOrId string) (*citrixorchestration.ApplicationDeliveryGroupResponseModelCollection, error) {
-	getApplicationDeliveryGroupsRequest := client.ApiClient.ApplicationsAPIsDAAS.ApplicationsGetApplicationDeliveryGroups(ctx, applicationNameOrId)
+func getApplicationDeliveryGroups(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, applicationPathOrId string) (*citrixorchestration.ApplicationDeliveryGroupResponseModelCollection, error) {
+	getApplicationDeliveryGroupsRequest := client.ApiClient.ApplicationsAPIsDAAS.ApplicationsGetApplicationDeliveryGroups(ctx, applicationPathOrId)
 	applicationDeliveryGroups, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ApplicationDeliveryGroupResponseModelCollection](getApplicationDeliveryGroupsRequest, client)
 	if err != nil {
 		diagnostics.AddError(
-			"Error Reading Delivery Groups associated with Application "+applicationNameOrId,
+			"Error Reading Delivery Groups associated with Application "+applicationPathOrId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 	}
 
 	return applicationDeliveryGroups, err
+}
+
+func getApplicationGroupsForApplication(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, applicationPathOrId string) (*citrixorchestration.ApplicationGroupResponseModelCollection, error) {
+	getApplicationGroupsRequest := client.ApiClient.ApplicationsAPIsDAAS.ApplicationsGetApplicationApplicationGroups(ctx, applicationPathOrId)
+	applicationGroups, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ApplicationGroupResponseModelCollection](getApplicationGroupsRequest, client)
+	if err != nil {
+		diagnostics.AddError(
+			"Error Reading Application Groups associated with Application "+applicationPathOrId,
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+	}
+
+	return applicationGroups, err
 }
 
 // checkIfApplicationFolderPathExist checks if the application folder path exists.

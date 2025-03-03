@@ -47,6 +47,13 @@ For on-premises sites with version >= 2311 are supported. Web Studio needs to be
 
 A service principal is an API client which is not associated with an email. It can be given delegated permissions just like a regular administrator. Follow the [Citrix Cloud API Access with Service Principals](https://developer-docs.citrix.com/en-us/citrix-cloud/citrix-cloud-api-overview/get-started-with-citrix-cloud-apis#citrix-cloud-api-access-with-service-principals) guide to create a service principal for your cloud customer. When selecting the service principal's access choose an appropriate DaaS role.
 
+## Related Citrix Automation Repositories
+|            Title            |            Details            |
+|-----------------------------|-------------------------------|
+| [Packer Image Management Module for Citrix® Virtual Apps and Desktops](https://github.com/citrix/citrix-packer-tools) | Use Packer to create golden images with the Citrix VDA installed and using Citrix best practices. |
+| [Citrix Ansible Tools](https://github.com/citrix/citrix-ansible-tools) | Playbooks to install Citrix components using automation such as the VDA. |
+| [Site Deployment Module for Citrix® Virtual Apps and Desktops](https://github.com/citrix/citrix-cvad-site-deployment-module) | Uses PowerShell to drive Terraform files to create a fully functional CVAD site. |
+
 ## Frequently Asked Questions
 
 ### What resource is supported for different connection types?

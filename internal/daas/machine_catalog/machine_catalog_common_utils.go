@@ -11,7 +11,6 @@ import (
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
-	"github.com/citrix/terraform-provider-citrix/internal/daas/image_definition"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -96,6 +95,10 @@ func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ct
 	}
 
 	if *provisioningType == citrixorchestration.PROVISIONINGTYPE_MCS || *provisioningType == citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING {
+		err := validateImageVersion(ctx, diagnostics, client, plan)
+		if err != nil {
+			return nil, err
+		}
 		provisioningScheme, err := getProvSchemeForCatalog(plan, ctx, client, diagnostics, isOnPremises, provisioningType)
 		if err != nil {
 			return nil, err
@@ -193,6 +196,11 @@ func getRequestModelForUpdateMachineCatalog(plan MachineCatalogResourceModel, st
 	provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
 	if !checkIfProvSchemeIsCloudOnly(ctx, &resp.Diagnostics, provSchemeModel, isOnPremises) {
 		return nil, fmt.Errorf("identity type %s is not supported in OnPremises environment. ", provSchemeModel.IdentityType.ValueString())
+	}
+
+	err = validateImageVersion(ctx, &resp.Diagnostics, client, plan)
+	if err != nil {
+		return nil, err
 	}
 
 	body, err = setProvSchemePropertiesForUpdateCatalog(provSchemeModel, body, ctx, client, &resp.Diagnostics, provisioningType)
@@ -488,7 +496,7 @@ func validateInUseMachineAccounts(ctx context.Context, diagnostics *diag.Diagnos
 				}
 			}
 
-			err := fmt.Errorf("Machine account(s) [%s] are in use by other Machine Catalogs.", strings.Join(machineAccountsInUse, ", "))
+			err := fmt.Errorf("Machine account(s) [%s] are in use by other Machine Catalogs", strings.Join(machineAccountsInUse, ", "))
 			diagnostics.AddError(
 				"Error validating machine accounts for Machine Catalog "+catalogName,
 				err.Error(),
@@ -499,63 +507,6 @@ func validateInUseMachineAccounts(ctx context.Context, diagnostics *diag.Diagnos
 	return nil
 }
 
-func validateImageVersion(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, plan MachineCatalogResourceModel, preparedImageConfig PreparedImageConfigModel, machineConfigAttributeName string) (citrixorchestration.ImageSchemeResponseModel, citrixorchestration.ImageVersionSpecResponseModel, error) {
-	isPreparedImageSupported := util.CheckProductVersion(client, diagnostics, 121, 118, 7, 41, "Error using Prepared Image in citrix_machine_catalog resource", "Prepared Image")
-	var imageScheme citrixorchestration.ImageSchemeResponseModel
-	var imageSpecs citrixorchestration.ImageVersionSpecResponseModel
-	if !isPreparedImageSupported {
-		err := fmt.Errorf("Prepared Image is not supported in this version of Citrix Virtual Apps and Desktops service.")
-		return imageScheme, imageSpecs, err
-	}
-	imageDefinition, err := image_definition.GetImageDefinition(ctx, client, diagnostics, preparedImageConfig.ImageDefinition.ValueString())
-	if err != nil {
-		return imageScheme, imageSpecs, err
-	}
-
-	imageVersion, err := image_definition.GetImageVersion(ctx, client, diagnostics, imageDefinition.GetId(), preparedImageConfig.ImageVersion.ValueString())
-	if err != nil {
-		return imageScheme, imageSpecs, err
-	}
-
-	imageVersionStatus := imageVersion.GetImageVersionStatus()
-	if imageVersionStatus != citrixorchestration.IMAGEVERSIONSTATUS_SUCCESS {
-		err := fmt.Errorf("Image version in state `%s` cannot be used to create machine catalog.", string(imageVersionStatus))
-		diagnostics.AddError(
-			"Error validating azure_machine_config",
-			err.Error(),
-		)
-		return imageScheme, imageSpecs, err
-	}
-
-	imageContextConfigured := false
-	for _, spec := range imageVersion.GetImageVersionSpecs() {
-		if spec.Context != nil {
-			context := spec.GetContext()
-			if context.ImageScheme == nil {
-				continue
-			}
-			imageContextConfigured = true
-			imageScheme = context.GetImageScheme()
-			imageSpecs = spec
-		}
-	}
-	imageRuntimeEnvironment := imageSpecs.GetImageRuntimeEnvironment()
-	if imageContextConfigured {
-		// Validate session support
-		if !plan.SessionSupport.IsUnknown() && imageRuntimeEnvironment.GetVDASessionSupport() != "" {
-			if !strings.EqualFold(plan.SessionSupport.ValueString(), imageRuntimeEnvironment.GetVDASessionSupport()) {
-				err := fmt.Errorf("session_support specified does not match the session support configured in the prepared image.")
-				diagnostics.AddError(
-					fmt.Sprintf("Error validating `%s`", machineConfigAttributeName),
-					err.Error(),
-				)
-				return imageScheme, imageSpecs, err
-			}
-		}
-	}
-	return imageScheme, imageSpecs, nil
-}
-
 func getMachineAccountDeleteOptionValue(v string) citrixorchestration.MachineAccountDeleteOption {
 	machineAccountDeleteOption, err := citrixorchestration.NewMachineAccountDeleteOptionFromValue(v)
 
@@ -564,4 +515,18 @@ func getMachineAccountDeleteOptionValue(v string) citrixorchestration.MachineAcc
 	}
 
 	return *machineAccountDeleteOption
+}
+
+func IsAzureImageDefinitionUsingSharedImageGallery(imageDefinitionResp *citrixorchestration.ImageDefinitionResponseModel) bool {
+	preparedImageUseSharedGallery := false
+	imgDefinitionConn := imageDefinitionResp.GetHypervisorConnections()
+	if len(imgDefinitionConn) > 0 {
+		customProperties := imgDefinitionConn[0].GetCustomProperties()
+		for _, property := range customProperties {
+			if property.GetName() == "UseSharedImageGallery" {
+				preparedImageUseSharedGallery, _ = strconv.ParseBool(property.GetValue())
+			}
+		}
+	}
+	return preparedImageUseSharedGallery
 }

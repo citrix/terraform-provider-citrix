@@ -121,13 +121,7 @@ func (r *applicationGroupResource) Create(ctx context.Context, req resource.Crea
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Application Group "+plan.Name.ValueString(), &resp.Diagnostics, 5, true)
-	if err != nil {
-		return
-	}
-
-	// Get created application group
-	addAppGroupResp, err := getApplicationGroup(ctx, r.client, &resp.Diagnostics, plan.Name.ValueString())
+	addAppGroupResp, err := util.GetAsyncJobResult[*citrixorchestration.ApplicationGroupDetailResponseModel](ctx, r.client, httpResp, "Error creating Application Group "+plan.Name.ValueString(), &resp.Diagnostics, 5, true)
 	if err != nil {
 		return
 	}
@@ -152,9 +146,10 @@ func (r *applicationGroupResource) Create(ctx context.Context, req resource.Crea
 
 		err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error disabling Application Group "+plan.Name.ValueString(), &resp.Diagnostics, 5, true)
 		if err != nil {
-			return
+			// We have the errors logged. Continue so that the resource is marked as tainted.
 		}
 	}
+
 	// Update application group tags
 	setApplicationGroupTags(ctx, &resp.Diagnostics, r.client, applicationGroupId, plan.Tags)
 

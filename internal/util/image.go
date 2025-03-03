@@ -87,10 +87,22 @@ func (AzureDiskEncryptionSetModel) GetSchema() schema.SingleNestedAttribute {
 			"disk_encryption_set_name": schema.StringAttribute{
 				Description: "The name of the disk encryption set.",
 				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(LowerCaseRegex),
+						"must be all in lowercase",
+					),
+				},
 			},
 			"disk_encryption_set_resource_group": schema.StringAttribute{
 				Description: "The name of the resource group in which the disk encryption set resides.",
 				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(LowerCaseRegex),
+						"must be all in lowercase",
+					),
+				},
 			},
 		},
 	}
@@ -319,6 +331,95 @@ func (AzureMachineProfileModel) GetAttributes() map[string]schema.Attribute {
 
 func (AzureMachineProfileModel) GetDataSourceAttributes() map[string]dataSourceSchema.Attribute {
 	return AzureMachineProfileModel{}.GetDataSourceSchema().Attributes
+}
+
+type AzureImageSpecsModel struct {
+	// Required Attributes
+	ServiceOffering types.String `tfsdk:"service_offering"`
+	LicenseType     types.String `tfsdk:"license_type"`
+	StorageType     types.String `tfsdk:"storage_type"`
+
+	// Optional Attributes
+	MachineProfile    types.Object `tfsdk:"machine_profile"`
+	DiskEncryptionSet types.Object `tfsdk:"disk_encryption_set"`
+
+	// Master Image Attributes
+	ResourceGroup      types.String `tfsdk:"resource_group"`
+	SharedSubscription types.String `tfsdk:"shared_subscription"`
+	MasterImage        types.String `tfsdk:"master_image"`
+	GalleryImage       types.Object `tfsdk:"gallery_image"`
+}
+
+func (AzureImageSpecsModel) GetSchema() schema.SingleNestedAttribute {
+	galleryImageSchema := GalleryImageModel{}.GetSchema()
+	galleryImageSchema.Validators = []validator.Object{
+		objectvalidator.AlsoRequires(path.Expressions{
+			path.MatchRelative().AtParent().AtName("resource_group"),
+		}...),
+	}
+	return schema.SingleNestedAttribute{
+		Description: "Image configuration for Azure image version.",
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			"service_offering": schema.StringAttribute{
+				Description: "The Azure VM Sku to use when creating machines.",
+				Required:    true,
+			},
+			"license_type": schema.StringAttribute{
+				Description: "Windows license type used to provision virtual machines in Azure at the base compute rate. License types include: `Windows_Client` and `Windows_Server`.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						WindowsClientLicenseType,
+						WindowsServerLicenseType,
+					),
+				},
+			},
+			"storage_type": schema.StringAttribute{
+				Description: "Storage account type used for provisioned virtual machine disks on Azure. Storage types include: `Standard_LRS`, `StandardSSD_LRS` and `Premium_LRS`.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						StandardLRS,
+						StandardSSDLRS,
+						Premium_LRS,
+					),
+				},
+			},
+			"machine_profile":     AzureMachineProfileModel{}.GetSchema(),
+			"disk_encryption_set": AzureDiskEncryptionSetModel{}.GetSchema(),
+			"resource_group": schema.StringAttribute{
+				Description: "The Azure Resource Group where the managed disk / snapshot for creating machines is located.",
+				Required:    true,
+			},
+			"shared_subscription": schema.StringAttribute{
+				Description: "The Azure Subscription ID where the managed disk / snapshot for creating machines is located. Only required if the image is not in the same subscription of the hypervisor.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"master_image": schema.StringAttribute{
+				Description: "The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors. Omit this field if you want to use gallery_image.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+					stringvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("gallery_image")),
+				},
+			},
+			"gallery_image": galleryImageSchema,
+		},
+		PlanModifiers: []planmodifier.Object{
+			objectplanmodifier.RequiresReplace(),
+		},
+		Validators: []validator.Object{
+			objectvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("vsphere_image_specs")),
+		},
+	}
+}
+
+func (AzureImageSpecsModel) GetAttributes() map[string]schema.Attribute {
+	return AzureImageSpecsModel{}.GetSchema().Attributes
 }
 
 func HandleMachineProfileForAzureMcsPvsCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diag *diag.Diagnostics, hypervisorName string, resourcePoolName string, machineProfile AzureMachineProfileModel, errorTitle string) (string, error) {
@@ -580,4 +681,31 @@ func ParseMasterImageToUpdateAzureImageSpecs(ctx context.Context, diagnostics *d
 	}
 
 	return masterImageToReturn, resourceGroupToReturn, sharedSubscriptionToReturn, galleryImageToReturn, storageAccountToReturn, containerToReturn
+}
+
+func ParseMasterImageToAzureImageModel(ctx context.Context, diagnostics *diag.Diagnostics, azureImageSpecs AzureImageSpecsModel, masterImage citrixorchestration.HypervisorResourceRefResponseModel) AzureImageSpecsModel {
+	masterImageXdPath := masterImage.GetXDPath()
+	masterImageSegments := strings.Split(masterImageXdPath, "\\")
+	masterImageLastIndex := len(masterImageSegments)
+	masterImageResourceTag := strings.Split(masterImageSegments[masterImageLastIndex-1], ".")
+	masterImageResourceType := masterImageResourceTag[len(masterImageResourceTag)-1]
+	if strings.EqualFold(masterImageResourceType, ImageVersionResourceType) {
+		azureImageSpecs.GalleryImage,
+			azureImageSpecs.ResourceGroup,
+			azureImageSpecs.SharedSubscription =
+			ParseMasterImageToUpdateGalleryImageModel(ctx, diagnostics, azureImageSpecs.GalleryImage, masterImage, masterImageSegments, masterImageLastIndex)
+
+		// Clear other master image details
+		azureImageSpecs.MasterImage = types.StringNull()
+	} else {
+		// Snapshot or Managed Disk
+		azureImageSpecs.MasterImage,
+			azureImageSpecs.ResourceGroup,
+			azureImageSpecs.SharedSubscription,
+			azureImageSpecs.GalleryImage,
+			_,
+			_ =
+			ParseMasterImageToUpdateAzureImageSpecs(ctx, diagnostics, masterImageResourceType, masterImage, masterImageSegments, masterImageLastIndex)
+	}
+	return azureImageSpecs
 }

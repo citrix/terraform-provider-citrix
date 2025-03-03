@@ -12,6 +12,7 @@ import (
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/image_definition"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -108,7 +109,10 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 	provisioningScheme.SetResourcePool(provisioningSchemePlan.HypervisorResourcePool.ValueString())
 
 	if hypervisor.GetConnectionType() != citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM || hypervisor.GetPluginId() != util.NUTANIX_PLUGIN_ID {
-		customProperties := parseCustomPropertiesToClientModel(ctx, diag, provisioningSchemePlan, hypervisor.ConnectionType, provisioningType, false)
+		customProperties, err := parseCustomPropertiesToClientModel(ctx, diag, client, provisioningSchemePlan, hypervisor.ConnectionType, provisioningType, false)
+		if err != nil {
+			return nil, err
+		}
 		provisioningScheme.SetCustomProperties(customProperties)
 	}
 
@@ -370,6 +374,7 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 				provisioningScheme.SetWriteBackCacheMemorySizeMB(int32(writeBackCacheModel.WriteBackCacheMemorySizeMB.ValueInt64()))
 			}
 		}
+		provisioningScheme.SetUseFullDiskCloneProvisioning(xenserverMachineConfig.UseFullDiskCloneProvisioning.ValueBool())
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM:
 		scvmmMachineConfig := util.ObjectValueToTypedObject[SCVMMMachineConfigModel](ctx, diag, provisioningSchemePlan.SCVMMMachineConfigModel)
 		provisioningScheme.SetMemoryMB(int32(scvmmMachineConfig.MemoryMB.ValueInt64()))
@@ -617,7 +622,10 @@ func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan Provisioning
 		body.SetNetworkMapping(networkMapping)
 	}
 
-	customProperties := parseCustomPropertiesToClientModel(ctx, diagnostics, provisioningSchemePlan, hypervisor.ConnectionType, provisioningType, true)
+	customProperties, err := parseCustomPropertiesToClientModel(ctx, diagnostics, client, provisioningSchemePlan, hypervisor.ConnectionType, provisioningType, true)
+	if err != nil {
+		return body, err
+	}
 	body.SetCustomProperties(customProperties)
 
 	return body, nil
@@ -639,14 +647,6 @@ func deleteMachinesFromMcsPvsCatalog(ctx context.Context, client *citrixdaasclie
 	catalogId := catalog.GetId()
 	catalogName := catalog.GetName()
 
-	if catalog.GetAllocationType() != citrixorchestration.ALLOCATIONTYPE_RANDOM {
-		resp.Diagnostics.AddError(
-			"Error updating Machine Catalog "+catalogName,
-			"Deleting machine(s) is supported for machine catalogs with Random allocation type only.",
-		)
-		return fmt.Errorf("deleting machine(s) is supported for machine catalogs with Random allocation type only")
-	}
-
 	getMachinesResponses, err := util.GetMachineCatalogMachines(ctx, client, &resp.Diagnostics, catalogId)
 	if err != nil {
 		return err
@@ -656,6 +656,11 @@ func deleteMachinesFromMcsPvsCatalog(ctx context.Context, client *citrixdaasclie
 	machinesToDelete := []citrixorchestration.MachineResponseModel{}
 
 	for _, machine := range getMachinesResponses {
+
+		if machine.GetAllocationType() == citrixorchestration.ALLOCATIONTYPE_STATIC && len(machine.GetAssignedUsers()) > 0 {
+			continue
+		}
+
 		if !machine.GetDeliveryGroup().Id.IsSet() || machine.GetSessionCount() == 0 {
 			machinesToDelete = append(machinesToDelete, machine)
 		}
@@ -672,7 +677,7 @@ func deleteMachinesFromMcsPvsCatalog(ctx context.Context, client *citrixdaasclie
 
 		resp.Diagnostics.AddError(
 			"Error deleting machine(s) from Machine Catalog "+catalogName,
-			errorString+" Ensure machine that needs to be deleted has no active sessions.",
+			errorString+" Ensure machines that need to be deleted have no active sessions. For machines with `Static` allocation type, also ensure there are no assigned users.",
 		)
 
 		return err
@@ -832,6 +837,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 	currentDiskImage := provScheme.GetCurrentDiskImage()
 	machineProfile := provScheme.GetMachineProfile()
 	customProps := provScheme.GetCustomProperties()
+	currentImageDetails := provScheme.GetCurrentImageVersion()
 
 	provisioningSchemePlan := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
 
@@ -852,6 +858,9 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 	usePreparedImage := false
 	imageDefinition := ""
 	imageVersion := ""
+	currentImageDefinition := ""
+	currentImageVersion := ""
+	preparedImageUseSharedGallery := false
 	var err error
 	var httpResp *http.Response
 	updateCustomProperties := []citrixorchestration.NameValueStringPairModel{}
@@ -939,8 +948,17 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 				// Handle prepared image
 				usePreparedImage = true
 				preparedImageModel := util.ObjectValueToTypedObject[PreparedImageConfigModel](ctx, &resp.Diagnostics, azureMachineConfigModel.AzurePreparedImage)
+				currentImageVersionDetails := currentImageDetails.GetImageVersion()
+				currentImageDefinitionDetails := currentImageVersionDetails.GetImageDefinition()
 				imageDefinition = preparedImageModel.ImageDefinition.ValueString()
 				imageVersion = preparedImageModel.ImageVersion.ValueString()
+				currentImageVersion = currentImageVersionDetails.GetId()
+				currentImageDefinition = currentImageDefinitionDetails.GetId()
+				imageDefinitionResp, err := image_definition.GetImageDefinition(ctx, client, &resp.Diagnostics, imageDefinition)
+				if err != nil {
+					return err
+				}
+				preparedImageUseSharedGallery = IsAzureImageDefinitionUsingSharedImageGallery(imageDefinitionResp)
 			}
 
 			// Set reboot options if configured
@@ -958,16 +976,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 				}
 			}
 
-			if !azureMachineConfigModel.UseAzureComputeGallery.IsNull() {
-				azureComputeGalleryModel := util.ObjectValueToTypedObject[AzureComputeGallerySettings](ctx, &resp.Diagnostics, azureMachineConfigModel.UseAzureComputeGallery)
-				util.AppendNameValueStringPair(&updateCustomProperties, "UseSharedImageGallery", "true")
-				util.AppendNameValueStringPair(&updateCustomProperties, "SharedImageGalleryReplicaRatio", strconv.Itoa(int(azureComputeGalleryModel.ReplicaRatio.ValueInt64())))
-				util.AppendNameValueStringPair(&updateCustomProperties, "SharedImageGalleryReplicaMaximum", strconv.Itoa(int(azureComputeGalleryModel.ReplicaMaximum.ValueInt64())))
-			} else {
-				util.AppendNameValueStringPair(&updateCustomProperties, "UseSharedImageGallery", "false")
-				util.AppendNameValueStringPair(&updateCustomProperties, "SharedImageGalleryReplicaRatio", "")
-				util.AppendNameValueStringPair(&updateCustomProperties, "SharedImageGalleryReplicaMaximum", "")
-			}
+			updateCustomProperties = appendUseAzureComputeGalleryCustomProperties(ctx, &resp.Diagnostics, updateCustomProperties, azureMachineConfigModel, preparedImageUseSharedGallery)
 		}
 
 		// For both MCS and PVS
@@ -1068,8 +1077,12 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 		if !vSphereMachineConfig.VspherePreparedImage.IsNull() {
 			usePreparedImage = true
 			preparedImageModel := util.ObjectValueToTypedObject[PreparedImageConfigModel](ctx, &resp.Diagnostics, vSphereMachineConfig.VspherePreparedImage)
+			currentImageVersionDetails := currentImageDetails.GetImageVersion()
+			currentImageDefinitionDetails := currentImageVersionDetails.GetImageDefinition()
 			imageDefinition = preparedImageModel.ImageDefinition.ValueString()
 			imageVersion = preparedImageModel.ImageVersion.ValueString()
+			currentImageVersion = currentImageVersionDetails.GetId()
+			currentImageDefinition = currentImageDefinitionDetails.GetId()
 		} else {
 			newImage := vSphereMachineConfig.MasterImageVm.ValueString()
 			snapshot := vSphereMachineConfig.ImageSnapshot.ValueString()
@@ -1192,7 +1205,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 
 		updateReplicaRatio, updateReplicaMaximum, updateUseSharedGallery := setComputeGalleryValues(updateCustomProperties)
 
-		if masterImage.GetXDPath() == imagePath && currentDiskImage.GetMasterImageNote() == masterImageNote && updateReplicaRatio == replicaRatio && updateReplicaMaximum == replicaMaximum && updateUseSharedGallery == useSharedGallery {
+		if masterImage.GetXDPath() == imagePath && currentDiskImage.GetMasterImageNote() == masterImageNote && updateReplicaRatio == replicaRatio && updateReplicaMaximum == replicaMaximum && updateUseSharedGallery == useSharedGallery && currentImageDefinition == imageDefinition && currentImageVersion == imageVersion {
 			return nil
 		}
 
@@ -1442,7 +1455,7 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Con
 	return r
 }
 
-func parseCustomPropertiesToClientModel(ctx context.Context, diagnostics *diag.Diagnostics, provisioningScheme ProvisioningSchemeModel, connectionType citrixorchestration.HypervisorConnectionType, provisioningType *citrixorchestration.ProvisioningType, isUpdateOperation bool) []citrixorchestration.NameValueStringPairModel {
+func parseCustomPropertiesToClientModel(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, provisioningScheme ProvisioningSchemeModel, connectionType citrixorchestration.HypervisorConnectionType, provisioningType *citrixorchestration.ProvisioningType, isUpdateOperation bool) ([]citrixorchestration.NameValueStringPairModel, error) {
 	var res = &[]citrixorchestration.NameValueStringPairModel{}
 	var isPvsStreamingCatalog = *provisioningType == citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING
 	switch connectionType {
@@ -1489,16 +1502,20 @@ func parseCustomPropertiesToClientModel(ctx context.Context, diagnostics *diag.D
 				}
 			}
 			if !isPvsStreamingCatalog {
-				if !azureMachineConfigModel.UseAzureComputeGallery.IsNull() {
-					azureComputeGalleryModel := util.ObjectValueToTypedObject[AzureComputeGallerySettings](ctx, diagnostics, azureMachineConfigModel.UseAzureComputeGallery)
-					util.AppendNameValueStringPair(res, "UseSharedImageGallery", "true")
-					util.AppendNameValueStringPair(res, "SharedImageGalleryReplicaRatio", strconv.Itoa(int(azureComputeGalleryModel.ReplicaRatio.ValueInt64())))
-					util.AppendNameValueStringPair(res, "SharedImageGalleryReplicaMaximum", strconv.Itoa(int(azureComputeGalleryModel.ReplicaMaximum.ValueInt64())))
-				} else {
-					util.AppendNameValueStringPair(res, "UseSharedImageGallery", "false")
-					util.AppendNameValueStringPair(res, "SharedImageGalleryReplicaRatio", "")
-					util.AppendNameValueStringPair(res, "SharedImageGalleryReplicaMaximum", "")
+				preparedImageUseSharedGallery := false
+				if !azureMachineConfigModel.AzurePreparedImage.IsNull() {
+					// Handle prepared image
+					preparedImageModel := util.ObjectValueToTypedObject[PreparedImageConfigModel](ctx, diagnostics, azureMachineConfigModel.AzurePreparedImage)
+					imageDefinition := preparedImageModel.ImageDefinition.ValueString()
+
+					imageDefinitionResp, err := image_definition.GetImageDefinition(ctx, client, diagnostics, imageDefinition)
+					if err != nil {
+						return nil, err
+					}
+					preparedImageUseSharedGallery = IsAzureImageDefinitionUsingSharedImageGallery(imageDefinitionResp)
 				}
+
+				*res = appendUseAzureComputeGalleryCustomProperties(ctx, diagnostics, *res, azureMachineConfigModel, preparedImageUseSharedGallery)
 			}
 		}
 
@@ -1535,14 +1552,14 @@ func parseCustomPropertiesToClientModel(ctx context.Context, diagnostics *diag.D
 			}
 		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER:
-		return nil
+		return nil, nil
 	}
 
 	if len(*res) == 0 {
-		return nil
+		return nil, nil
 	}
 
-	return *res
+	return *res, nil
 }
 
 func getOnPremImage(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diags *diag.Diagnostics, hypervisorName, resourcePoolName, image, snapshot, resourcePoolPath, action string) (*citrixorchestration.HypervisorResourceResponseModel, error) {
@@ -1794,4 +1811,21 @@ func validateMcsPvsMachineCatalogDeleteOptions(diagnostics *diag.Diagnostics, da
 	}
 
 	return nil
+}
+
+func appendUseAzureComputeGalleryCustomProperties(ctx context.Context, diagnostics *diag.Diagnostics, updateCustomProperties []citrixorchestration.NameValueStringPairModel, azureMachineConfigModel AzureMachineConfigModel, preparedImageUseSharedGallery bool) []citrixorchestration.NameValueStringPairModel {
+	if !azureMachineConfigModel.UseAzureComputeGallery.IsNull() && !preparedImageUseSharedGallery {
+		azureComputeGalleryModel := util.ObjectValueToTypedObject[AzureComputeGallerySettings](ctx, diagnostics, azureMachineConfigModel.UseAzureComputeGallery)
+		util.AppendNameValueStringPair(&updateCustomProperties, "UseSharedImageGallery", "true")
+		util.AppendNameValueStringPair(&updateCustomProperties, "SharedImageGalleryReplicaRatio", strconv.Itoa(int(azureComputeGalleryModel.ReplicaRatio.ValueInt64())))
+		util.AppendNameValueStringPair(&updateCustomProperties, "SharedImageGalleryReplicaMaximum", strconv.Itoa(int(azureComputeGalleryModel.ReplicaMaximum.ValueInt64())))
+	} else if preparedImageUseSharedGallery {
+		util.AppendNameValueStringPair(&updateCustomProperties, "UseSharedImageGallery", "true")
+	} else {
+		util.AppendNameValueStringPair(&updateCustomProperties, "UseSharedImageGallery", "false")
+		util.AppendNameValueStringPair(&updateCustomProperties, "SharedImageGalleryReplicaRatio", "")
+		util.AppendNameValueStringPair(&updateCustomProperties, "SharedImageGalleryReplicaMaximum", "")
+	}
+
+	return updateCustomProperties
 }

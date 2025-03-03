@@ -604,6 +604,8 @@ Required:
 - `identity_type` (String) The identity type of the machines to be created. Supported values are`ActiveDirectory`, `AzureAD`, and `HybridAzureAD`.
 - `number_of_total_machines` (Number) Number of VDA machines allocated in the catalog.
 
+~> **Please Note** When deleting machines, ensure machines that need to be deleted have no active sessions. For machines with `Static` allocation type, also ensure there are no assigned users. If machines that qualify for deletion are more than the requested number of machines to delete, machines are chosen arbitrarily.
+
 Optional:
 
 - `availability_zones` (List of String) The Availability Zones for provisioning virtual machines.
@@ -675,7 +677,9 @@ Optional:
 - `machine_profile` (Attributes) The name of the virtual machine or template spec that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone.<br />Required when provisioning_type is set to PVSStreaming or when identity_type is set to `AzureAD` (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--machine_profile))
 - `master_image_note` (String) The note for the master image.
 - `prepared_image` (Attributes) Specifying the prepared master image to be used for machine catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--prepared_image))
-- `use_azure_compute_gallery` (Attributes) Use this to place prepared image in Azure Compute Gallery. Required when `storage_type = Azure_Ephemeral_OS_Disk`. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--use_azure_compute_gallery))
+- `use_azure_compute_gallery` (Attributes) Use this to place prepared image in Azure Compute Gallery. Required when `storage_type = Azure_Ephemeral_OS_Disk`.
+
+~> **Please Note** `use_azure_compute_gallery` cannot be specified when the prepared image is using a shared image gallery. The machine catalog will inherit the azure compute gallery settings of the prepared image. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--use_azure_compute_gallery))
 - `use_managed_disks` (Boolean) Indicate whether to use Azure managed disks for the provisioned virtual machine.
 - `vda_resource_group` (String) Designated resource group where the VDA VMs will be located on Azure.
 - `writeback_cache` (Attributes) Write-back Cache config. Leave this empty to disable Write-back Cache. Write-back Cache requires Machine image with Write-back Cache plugin installed. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--writeback_cache))
@@ -1049,6 +1053,7 @@ Optional:
 - `image_snapshot` (String) The Snapshot of the virtual machine specified in `master_image_vm`. Specify the relative path of the snapshot. Eg: snaphost-1/snapshot-2/snapshot-3. This property is case sensitive.
 - `image_update_reboot_options` (Attributes) The options for how rebooting is performed for image update. When omitted, image update on the VDAs will be performed on next shutdown. (see [below for nested schema](#nestedatt--provisioning_scheme--xenserver_machine_config--image_update_reboot_options))
 - `master_image_note` (String) The note for the master image.
+- `use_full_disk_clone_provisioning` (Boolean) Specify if virtual machines created from the provisioning scheme should be created using the dedicated full disk clone feature. Default is `false`.
 - `writeback_cache` (Attributes) Write-back Cache config. Leave this empty to disable Write-back Cache. (see [below for nested schema](#nestedatt--provisioning_scheme--xenserver_machine_config--writeback_cache))
 
 <a id="nestedatt--provisioning_scheme--xenserver_machine_config--image_update_reboot_options"></a>

@@ -118,7 +118,7 @@ func generateBatchApiHeaders(client *citrixdaasclient.CitrixDaasClient) ([]citri
 	return headers, httpResp, err
 }
 
-func constructCreatePolicyBatchRequestModel(ctx context.Context, diags *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, policiesToCreate []PolicyModel, policySetGuid string, policySetName string) (citrixorchestration.BatchRequestModel, error) {
+func constructCreatePolicyBatchRequestModel(ctx context.Context, diags *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, policiesToCreate []PolicyModel, policySetGuid string, policySetName string, defaultSettingValueMap map[string]string) (citrixorchestration.BatchRequestModel, error) {
 	batchRequestItems := []citrixorchestration.BatchRequestItemModel{}
 	var batchRequestModel citrixorchestration.BatchRequestModel
 
@@ -141,7 +141,10 @@ func constructCreatePolicyBatchRequestModel(ctx context.Context, diags *diag.Dia
 		policySettings := []citrixorchestration.SettingRequest{}
 		policySettingsToCreate := util.ObjectSetToTypedArray[PolicySettingModel](ctx, diags, policyToCreate.PolicySettings)
 		for _, policySetting := range policySettingsToCreate {
-			settingRequest := constructSettingRequest(policySetting)
+			settingRequest, err := constructSettingRequest(policySetting, diags, policyToCreate.Name.ValueString(), defaultSettingValueMap)
+			if err != nil {
+				return batchRequestModel, err
+			}
 			policySettings = append(policySettings, settingRequest)
 		}
 		createPolicyRequest.SetSettings(policySettings)
@@ -292,25 +295,35 @@ func constructPolicyPriorityRequest(ctx context.Context, client *citrixdaasclien
 	return createPolicyPriorityRequest
 }
 
-func constructSettingRequest(policySetting PolicySettingModel) citrixorchestration.SettingRequest {
+func constructSettingRequest(policySetting PolicySettingModel, diagnostics *diag.Diagnostics, policyName string, defaultBoolSettingValueMap map[string]string) (citrixorchestration.SettingRequest, error) {
 	settingRequest := citrixorchestration.SettingRequest{}
-	settingRequest.SetSettingName(policySetting.Name.ValueString())
+	settingName := policySetting.Name.ValueString()
+	settingRequest.SetSettingName(settingName)
 	settingRequest.SetUseDefault(policySetting.UseDefault.ValueBool())
 	if policySetting.UseDefault.ValueBool() {
-		return settingRequest
-	} else if policySetting.Value.ValueString() != "" {
+		if defaultBoolSettingValueMap[settingName] != "" {
+			settingRequest.SetSettingValue(defaultBoolSettingValueMap[settingName])
+		}
+	} else if !policySetting.Value.IsNull() {
 		settingRequest.SetSettingValue(policySetting.Value.ValueString())
-	} else {
+	} else if !policySetting.Enabled.IsNull() {
 		if policySetting.Enabled.ValueBool() {
 			settingRequest.SetSettingValue("1")
 		} else {
 			settingRequest.SetSettingValue("0")
 		}
+	} else {
+		err := fmt.Errorf("Policy setting %s has `use_default` set to `false`, but does not have `value` or `enabled` field specified", policySetting.Name.ValueString())
+		diagnostics.AddError(
+			fmt.Sprintf("Error adding policy setting %s to policy %s", settingName, policyName),
+			err.Error(),
+		)
+		return settingRequest, err
 	}
-	return settingRequest
+	return settingRequest, nil
 }
 
-func updatePolicySettings(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policyId string, policyName string, policySettingsInPlan []PolicySettingModel, policySettingsInState []PolicySettingModel) error {
+func updatePolicySettings(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policyId string, policyName string, policySettingsInPlan []PolicySettingModel, policySettingsInState []PolicySettingModel, defaultBoolSettingValueMap map[string]string) error {
 	// Detect deleted settings
 	policySettingsToDelete := []PolicySettingModel{}
 	for _, policySetting := range policySettingsInState {
@@ -324,6 +337,15 @@ func updatePolicySettings(ctx context.Context, client *citrixdaasclient.CitrixDa
 	policySettingsToCreate := []PolicySettingModel{}
 	policySettingsToUpdate := []PolicySettingModel{}
 	for _, policySetting := range policySettingsInPlan {
+		if !policySetting.UseDefault.ValueBool() && policySetting.Value.IsNull() && policySetting.Enabled.IsNull() {
+			settingName := policySetting.Name.ValueString()
+			err := fmt.Errorf("Policy setting %s has `use_default` set to `false`, but does not have `value` or `enabled` field specified", settingName)
+			diagnostics.AddError(
+				fmt.Sprintf("Error adding policy setting %s to policy %s", settingName, policyName),
+				err.Error(),
+			)
+			return err
+		}
 		policyInStateIndex := slices.IndexFunc(policySettingsInState, func(policySettingInState PolicySettingModel) bool {
 			return strings.EqualFold(policySetting.Name.ValueString(), policySettingInState.Name.ValueString())
 		})
@@ -349,7 +371,7 @@ func updatePolicySettings(ctx context.Context, client *citrixdaasclient.CitrixDa
 
 	// Create policy settings
 	if len(policySettingsToCreate) > 0 {
-		err := createPolicySettings(ctx, client, diagnostics, policyId, policyName, policySettingsToCreate)
+		err := createPolicySettings(ctx, client, diagnostics, policyId, policyName, policySettingsToCreate, defaultBoolSettingValueMap)
 		if err != nil {
 			return err
 		}
@@ -357,7 +379,7 @@ func updatePolicySettings(ctx context.Context, client *citrixdaasclient.CitrixDa
 
 	// Update policy settings
 	if len(policySettingsToUpdate) > 0 {
-		err := updatePolicySettingDetails(ctx, client, diagnostics, policyId, policyName, policySettingsToUpdate)
+		err := updatePolicySettingDetails(ctx, client, diagnostics, policyId, policyName, policySettingsToUpdate, defaultBoolSettingValueMap)
 		if err != nil {
 			return err
 		}
@@ -366,7 +388,7 @@ func updatePolicySettings(ctx context.Context, client *citrixdaasclient.CitrixDa
 	return nil
 }
 
-func createPolicySettings(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policyId string, policyName string, policySettingsToCreate []PolicySettingModel) error {
+func createPolicySettings(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policyId string, policyName string, policySettingsToCreate []PolicySettingModel, defaultBoolSettingValueMap map[string]string) error {
 	// Batch create new policy settings
 	addPolicySettingBatchRequestItems := []citrixorchestration.BatchRequestItemModel{}
 	batchApiHeaders, httpResp, err := generateBatchApiHeaders(client)
@@ -381,7 +403,10 @@ func createPolicySettings(ctx context.Context, client *citrixdaasclient.CitrixDa
 	for index, policySetting := range policySettingsToCreate {
 		relativeUrl := fmt.Sprintf("/gpo/settings?policyGuid=%s", policyId)
 
-		settingRequest := constructSettingRequest(policySetting)
+		settingRequest, err := constructSettingRequest(policySetting, diagnostics, policyName, defaultBoolSettingValueMap)
+		if err != nil {
+			return err
+		}
 		settingRequestStringBody, err := util.ConvertToString(settingRequest)
 		if err != nil {
 			diagnostics.AddError(
@@ -424,7 +449,7 @@ func createPolicySettings(ctx context.Context, client *citrixdaasclient.CitrixDa
 	return nil
 }
 
-func updatePolicySettingDetails(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policyId string, policyName string, policySettingsToUpdate []PolicySettingModel) error {
+func updatePolicySettingDetails(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policyId string, policyName string, policySettingsToUpdate []PolicySettingModel, defaultBoolSettingValueMap map[string]string) error {
 	// Batch create new policy settings
 	updatePolicySettingBatchRequestItems := []citrixorchestration.BatchRequestItemModel{}
 	batchApiHeaders, httpResp, err := generateBatchApiHeaders(client)
@@ -457,7 +482,10 @@ func updatePolicySettingDetails(ctx context.Context, client *citrixdaasclient.Ci
 	for id, policySetting := range policySettingIdMap {
 		relativeUrl := fmt.Sprintf("/gpo/settings/%s", id)
 
-		settingRequest := constructSettingRequest(policySetting)
+		settingRequest, err := constructSettingRequest(policySetting, diagnostics, policyName, defaultBoolSettingValueMap)
+		if err != nil {
+			return err
+		}
 		settingRequestStringBody, err := util.ConvertToString(settingRequest)
 		if err != nil {
 			diagnostics.AddError(
@@ -828,4 +856,46 @@ func updateDeliveryGroupsWithPolicySet(ctx context.Context, diagnostics *diag.Di
 		return err
 	}
 	return nil
+}
+
+func getGpoUserSettingDefinitions(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient) ([]citrixorchestration.SettingDefinition, error) {
+	getSettingDefinitionsRequest := client.ApiClient.GpoDAAS.GpoGetSettingDefinitions(ctx)
+	getSettingDefinitionsRequest = getSettingDefinitionsRequest.IsLean(true)
+	getSettingDefinitionsRequest = getSettingDefinitionsRequest.Limit(-1)
+	getSettingDefinitionsRequest = getSettingDefinitionsRequest.IsUserSetting(true)
+	getSettingDefinitionsRequest.Execute()
+	settingResp, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.SettingDefinitionEnvelope](getSettingDefinitionsRequest, client)
+	if err != nil {
+		diagnostics.AddError(
+			"Unable to fetch user setting definitions",
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		return []citrixorchestration.SettingDefinition{}, err
+	}
+	return settingResp.GetItems(), nil
+}
+
+func getGpoBooleanSettingDefaultValueMap(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient) (map[string]string, error) {
+	defaultValueMap := map[string]string{}
+	getSettingDefinitionsRequest := client.ApiClient.GpoDAAS.GpoGetSettingDefinitions(ctx)
+	getSettingDefinitionsRequest = getSettingDefinitionsRequest.IsLean(true)
+	getSettingDefinitionsRequest = getSettingDefinitionsRequest.Limit(-1)
+	getSettingDefinitionsRequest.Execute()
+	settingResp, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.SettingDefinitionEnvelope](getSettingDefinitionsRequest, client)
+	if err != nil {
+		diagnostics.AddError(
+			"Unable to fetch boolean setting definitions",
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		return defaultValueMap, err
+	}
+	for _, setting := range settingResp.GetItems() {
+		if setting.GetValueType() == "State" || setting.GetValueType() == "StateAllowed" {
+			defaultValueMap[setting.GetSettingName()] = setting.GetDefaultValue()
+		}
+	}
+
+	return defaultValueMap, nil
 }

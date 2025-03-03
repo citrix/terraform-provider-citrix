@@ -86,7 +86,7 @@ const IPv4Regex string = `^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$`
 const IPv4RegexWithProtocol string = `^(http|https)://((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$`
 
 // AWS Network Name
-const AwsNetworkNameRegex string = `^(\d{1,3}\.){3}\d{1,3}` + "`" + `/\d{1,3}\s\(vpc-.+\)\.network$`
+const AwsNetworkNameRegex string = `^(\d{1,3}\.){3}\d{1,3}` + "`" + `/\d{1,3}\s\(vpc-.+\)$`
 
 // Date YYYY-MM-DD
 const DateRegex string = `^\d{4}-\d{2}-\d{2}$`
@@ -288,7 +288,7 @@ func ReadClientError(err error) string {
 	if msg != nil {
 		var msgObj citrixorchestration.ErrorData
 		unmarshalError := json.Unmarshal(msg, &msgObj)
-		if unmarshalError != nil {
+		if unmarshalError != nil || msgObj.GetErrorMessage() == "" {
 			return err.Error()
 		}
 		return msgObj.GetErrorMessage()
@@ -1438,4 +1438,8 @@ func ProcessTagsResponseCollection(diagnostics *diag.Diagnostics, tagsResp *citr
 
 func GetMachineAdAccountKey(r citrixorchestration.ProvisioningSchemeMachineAccountResponseModel) string {
 	return strings.ToLower(r.GetSamName())
+}
+
+func GetAssignMachineToUserKey(r citrixorchestration.MachineResponseModel) string {
+	return strings.ToLower(r.GetName())
 }

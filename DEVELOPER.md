@@ -160,7 +160,7 @@ This project uses [terraform-plugin-docs](https://github.com/hashicorp/terraform
 Before running the tests, you need to provide values for environment variables required by the test files. 
 The environment parameters that need to be specified can be found in the following template files:
 1. To Run Tests for the Cloud Environment: `settings.cloud.example.json`
-2. To Run Tests for the On-Premise environment: `setings.onprem.example.json`
+2. To Run Tests for the On-Premise environment: `settings.onprem.example.json`
 
 Copy the environment parameters from the appropriate template file and paste them in the GO `settings.json` file.
 To navigate to `settings.json` file, follow the steps below:
@@ -176,7 +176,7 @@ To navigate to `settings.json` file, follow the steps below:
 ```powershell
 ➥ cd {Root of repo}/terraform-provider-citrix
 ➥ $env:TF_ACC = 1
-➥ go test -count=1 -run='{name of resource to test}' -v ./internal/test
+➥ go test -count=1 -run='<function name of resource to test (eg TestZoneResource)>' -v ./internal/test
 ```
 
 ## Commonly faced errors
