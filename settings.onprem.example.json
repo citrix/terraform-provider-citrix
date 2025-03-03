@@ -301,6 +301,7 @@
         "TEST_POLICY_SET_DATA_SOURCE_EXPECTED_POLICY_COUNT" : "{Policy Set Data Source Policy Count}",
 
         // Image Definition Resource Go Tests
+        // Azure
         "TEST_IMAGE_DEFINITION_NAME": "{image_definition_name}",
         "TEST_IMAGE_DEFINITION_DESCRIPTION": "{image_definition_description}",
         "TEST_IMAGE_DEFINITION_OS_TYPE": "{image_definition_os_type}",
@@ -311,6 +312,17 @@
         "TEST_IMAGE_DEFINITION_OS_TYPE_UPDATED": "{image_definition_updated_os_type}",
         "TEST_IMAGE_DEFINITION_SESSION_SUPPORT_UPDATED": "{image_definition_updated_session_support}",
 
+        // vSphere
+        "TEST_VSPHERE_IMAGE_DEFINITION_NAME": "{image_definition_name}",
+        "TEST_VSPHERE_IMAGE_DEFINITION_DESCRIPTION": "{image_definition_description}",
+        "TEST_VSPHERE_IMAGE_DEFINITION_OS_TYPE": "{image_definition_os_type}",
+        "TEST_VSPHERE_IMAGE_DEFINITION_SESSION_SUPPORT": "{image_definition_session_support}",
+        "TEST_VSPHERE_IMAGE_DEFINITION_HYPERVISOR_ID": "{hypervisor_id}",
+
+        "TEST_VSPHERE_IMAGE_DEFINITION_OS_TYPE_UPDATED": "{image_definition_updated_os_type}",
+        "TEST_VSPHERE_IMAGE_DEFINITION_SESSION_SUPPORT_UPDATED": "{image_definition_updated_session_support}",
+        "TEST_VSPHERE_IMAGE_DEFINITION_HYPERVISOR_ID_UPDATED": "{hypervisor_id_updated}",
+
         // Image Definition Data Source Go Tests
         "TEST_IMAGE_DEFINITION_DATA_SOURCE_ID": "{image_definition_guid}",
         "TEST_IMAGE_DEFINITION_DATA_SOURCE_NAME": "{image_definition_name}",
@@ -319,6 +331,7 @@
         "TEST_IMAGE_DEFINITION_DATA_SOURCE_SESSION_SUPPORT": "{image_definition_session_support}",
 
         // Image Version Resource Go Tests
+        // Azure
         "TEST_AZURE_IMAGE_VERSION_RESOURCE_POOL":"{image_version_resource_pool_id}",
         "TEST_AZURE_IMAGE_VERSION_DESCRIPTION":"{image_version_description}",
         "TEST_AZURE_IMAGE_VERSION_SERVICE_OFFERING":"{image_version_service_offering}",
@@ -332,6 +345,14 @@
         "TEST_AZURE_IMAGE_VERSION_MACHINE_PROFILE_VM_NAME":"{image_version_machine_profile_vm_name}",
         "TEST_AZURE_IMAGE_VERSION_DES_NAME":"{image_version_disk_encryption_set_name}",
         "TEST_AZURE_IMAGE_VERSION_DES_RESOURCE_GROUP":"{image_version_disk_encryption_set_resource_group}",
+
+        // vSphere
+        "TEST_VSPHERE_IMAGE_VERSION_RESOURCE_POOL": "{vsphere_image_version_resource_pool_id}",
+        "TEST_VSPHERE_IMAGE_VERSION_DESCRIPTION": "{vsphere_image_version_description}",
+        "TEST_VSPHERE_IMAGE_VERSION_NETWORK": "{vsphere_image_version_network}",
+        "TEST_VSPHERE_IMAGE_VERSION_MASTER_IMAGE_VM": "{vsphere_image_version_master_image_vm}",
+        "TEST_VSPHERE_IMAGE_VERSION_MASTER_IMAGE_SNAPSHOT": "{vsphere_image_version_master_image_snapshot}",
+        "TEST_VSPHERE_IMAGE_VERSION_MACHINE_PROFILE": "{vsphere_image_version_machine_profile}",
 
         // Image Version Data Source Go Tests
         "TEST_IMAGE_VERSION_DATA_SOURCE_ID":"{image_version_id}",

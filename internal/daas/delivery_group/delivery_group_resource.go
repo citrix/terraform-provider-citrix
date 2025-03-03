@@ -126,13 +126,7 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Delivery Group "+plan.Name.ValueString(), &resp.Diagnostics, 5, true)
-	if err != nil {
-		return
-	}
-
-	// Get the delivery group after creation
-	deliveryGroup, err := getDeliveryGroup(ctx, r.client, &resp.Diagnostics, plan.Name.ValueString())
+	deliveryGroup, err := util.GetAsyncJobResult[*citrixorchestration.DeliveryGroupDetailResponseModel](ctx, r.client, httpResp, "Error creating Delivery Group "+plan.Name.ValueString(), &resp.Diagnostics, 5, true)
 	if err != nil {
 		return
 	}
@@ -161,6 +155,7 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 		for _, defaultAccessPolicy := range defaultAccessPolicies {
 			advancedAccessPolicyRequest, err := getAdvancedAccessPolicyRequestForDefaultPolicy(ctx, &resp.Diagnostics, defaultAccessPolicy, existingAdvancedAccessPolicies)
 			if err != nil {
+				r.updateDeliveryGroupState(ctx, resp, plan, deliveryGroupId)
 				return
 			}
 			advancedAccessPolicyRequest.SetIncludedUserFilterEnabled(simpleAccessPolicy.GetIncludedUserFilterEnabled())
@@ -194,6 +189,7 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 		for _, accessPolicy := range accessPolicies {
 			accessPolicyRequest, err := getAdvancedAccessPolicyRequest(ctx, &resp.Diagnostics, accessPolicy)
 			if err != nil {
+				r.updateDeliveryGroupState(ctx, resp, plan, deliveryGroupId)
 				return
 			}
 			accessPolicyRequest.SetIncludedUserFilterEnabled(simpleAccessPolicy.GetIncludedUserFilterEnabled())
@@ -211,6 +207,7 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 				for _, applyContextually := range appProtectionApplyContextually {
 					advancedAccessPoliciesRequest, err = setAppProtectionOnAdvancedAccessPolicies(&resp.Diagnostics, applyContextually, advancedAccessPoliciesRequest, deliveryGroup.GetName())
 					if err != nil {
+						r.updateDeliveryGroupState(ctx, resp, plan, deliveryGroupId)
 						return
 					}
 				}
@@ -218,6 +215,37 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 		}
 
 		editbody.SetAdvancedAccessPolicy(advancedAccessPoliciesRequest)
+	}
+
+	// Assign users to machines
+	if !plan.AssignMachinesToUsers.IsNull() {
+
+		// Validate to make sure there are no duplicates
+		assignMachinesToUsersMap := map[string][]string{}
+		assignMachinesToUsers := util.ObjectListToTypedArray[DeliveryGroupAssignMachinesToUsersModel](ctx, &resp.Diagnostics, plan.AssignMachinesToUsers)
+
+		for _, assignMachineToUsers := range assignMachinesToUsers {
+			machineName := assignMachineToUsers.MachineName.ValueString()
+			if _, exists := assignMachinesToUsersMap[strings.ToLower(machineName)]; exists {
+				resp.Diagnostics.AddError(
+					"Error assigning machine to users",
+					"Machine "+machineName+" has a duplicate entry.",
+				)
+				r.updateDeliveryGroupState(ctx, resp, plan, deliveryGroupId)
+				return
+			}
+
+			users := util.StringSetToStringArray(ctx, &resp.Diagnostics, assignMachineToUsers.Users)
+			assignMachinesToUsersMap[strings.ToLower(machineName)] = users
+		}
+
+		// Get rthe request model
+		assignMachinesToUsersRequests, err := getAssignUsersToMachinesRequestModel(ctx, r.client, &resp.Diagnostics, deliveryGroupId, assignMachinesToUsersMap)
+		if err != nil {
+			r.updateDeliveryGroupState(ctx, resp, plan, deliveryGroupId)
+			return
+		}
+		editbody.SetAssignMachinesToUsers(assignMachinesToUsersRequests)
 	}
 
 	updateDeliveryGroupRequest := r.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsPatchDeliveryGroup(ctx, deliveryGroupId)
@@ -229,62 +257,19 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		r.updateDeliveryGroupState(ctx, resp, plan, deliveryGroupId)
+		return
 	}
 
 	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error occurred while setting some properties for Delivery Group "+deliveryGroup.GetName(), &resp.Diagnostics, 5, true)
 	if err != nil {
+		r.updateDeliveryGroupState(ctx, resp, plan, deliveryGroupId)
 		return
 	}
 
 	setDeliveryGroupTags(ctx, &resp.Diagnostics, r.client, deliveryGroupId, plan.Tags)
 
-	deliveryGroup, err = util.GetDeliveryGroup(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
-	if err != nil {
-		return
-	}
-
-	// Get desktops
-	deliveryGroupDesktops, err := getDeliveryGroupDesktops(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
-
-	if err != nil {
-		return
-	}
-
-	// Get power time schemes
-	deliveryGroupPowerTimeSchemes, err := getDeliveryGroupPowerTimeSchemes(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
-
-	if err != nil {
-		return
-	}
-
-	// Get machines
-	deliveryGroupMachines, err := util.GetDeliveryGroupMachines(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
-	if err != nil {
-		return
-	}
-
-	//Get reboot schedule
-	deliveryGroupRebootSchedule, err := getDeliveryGroupRebootSchedules(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
-	if err != nil {
-		return
-	}
-
-	if r.client.AuthConfig.OnPremises {
-		// DDC 2402 LTSR has a bug where UPN is not returned for AD users. Call Identity API to fetch details for users
-		deliveryGroup, deliveryGroupDesktops, _ = updateDeliveryGroupAndDesktopUsers(ctx, r.client, &resp.Diagnostics, deliveryGroup, deliveryGroupDesktops)
-		// Do not return if there is an error. We need to set the resource in the state so that tf knows about the resource and marks it tainted (diagnostics already has the error)
-	}
-
-	tags := getDeliveryGroupTags(ctx, &resp.Diagnostics, r.client, deliveryGroupId)
-
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, deliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule, tags)
-
-	// Set state to fully populated data
-	diags = resp.State.Set(ctx, plan)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	r.updateDeliveryGroupState(ctx, resp, plan, deliveryGroupId)
 }
 
 // Read refreshes the Terraform state with the latest data.
@@ -377,6 +362,13 @@ func (r *deliveryGroupResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
+	// Add or remove machines first
+	err = addRemoveMachinesFromDeliveryGroup(ctx, r.client, &resp.Diagnostics, deliveryGroupId, plan)
+
+	if err != nil {
+		return
+	}
+
 	editDeliveryGroupRequestBody, err := getRequestModelForDeliveryGroupUpdate(ctx, &resp.Diagnostics, r.client, plan, state, currentDeliveryGroup)
 	if err != nil {
 		return
@@ -395,13 +387,6 @@ func (r *deliveryGroupResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Delivery Group "+deliveryGroupName, &resp.Diagnostics, 5, true)
-	if err != nil {
-		return
-	}
-
-	// Add or remove machines
-	err = addRemoveMachinesFromDeliveryGroup(ctx, r.client, &resp.Diagnostics, deliveryGroupId, plan)
-
 	if err != nil {
 		return
 	}

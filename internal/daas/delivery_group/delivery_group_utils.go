@@ -29,20 +29,6 @@ type AssociatedMachineCatalogProperties struct {
 	AllocationType    citrixorchestration.AllocationType
 }
 
-func getDeliveryGroup(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string) (*citrixorchestration.DeliveryGroupDetailResponseModel, error) {
-	getDeliveryGroupRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroup(ctx, deliveryGroupId)
-	deliveryGroup, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.DeliveryGroupDetailResponseModel](getDeliveryGroupRequest, client)
-	if err != nil {
-		diagnostics.AddError(
-			"Error reading Delivery Group "+deliveryGroupId,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-	}
-
-	return deliveryGroup, err
-}
-
 func readDeliveryGroup(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, deliveryGroupId string) (*citrixorchestration.DeliveryGroupDetailResponseModel, error) {
 	getDeliveryGroupRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroup(ctx, deliveryGroupId)
 	deliveryGroup, _, err := util.ReadResource[*citrixorchestration.DeliveryGroupDetailResponseModel](getDeliveryGroupRequest, ctx, client, resp, "Delivery Group", deliveryGroupId)
@@ -1121,6 +1107,45 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 	metadata := util.GetUpdatedMetadataRequestModel(ctx, diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, state.Metadata), util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, plan.Metadata))
 	editDeliveryGroupRequestBody.SetMetadata(metadata)
 
+	// Assign machines to users
+	assignMachinesToUsersMap := map[string][]string{}
+	if !state.AssignMachinesToUsers.IsNull() {
+		stateAssignMachinesToUsers := util.ObjectListToTypedArray[DeliveryGroupAssignMachinesToUsersModel](ctx, diagnostics, state.AssignMachinesToUsers)
+		for _, assignMachinesToUser := range stateAssignMachinesToUsers {
+			machineName := assignMachinesToUser.MachineName.ValueString()
+			assignMachinesToUsersMap[strings.ToLower(machineName)] = []string{} // Mark the machine as unassigned. This will be overwritten with values in plan. If plan does not have the machine, it will be updated asunassigned.
+		}
+	}
+
+	if !plan.AssignMachinesToUsers.IsNull() {
+		planAssignMachinesToUsersMap := map[string]bool{} // map to check for duplicates
+
+		planAssignMachinesToUsers := util.ObjectListToTypedArray[DeliveryGroupAssignMachinesToUsersModel](ctx, diagnostics, plan.AssignMachinesToUsers)
+		for _, assignMachinesToUser := range planAssignMachinesToUsers {
+			machineName := assignMachinesToUser.MachineName.ValueString()
+			if _, exists := planAssignMachinesToUsersMap[strings.ToLower(machineName)]; exists {
+				diagnostics.AddError(
+					"Error updating Delivery Group",
+					fmt.Sprintf("Machine %s has a duplicate entry.", machineName),
+				)
+				return editDeliveryGroupRequestBody, fmt.Errorf("machine %s has a duplicate entry", machineName)
+			}
+
+			planAssignMachinesToUsersMap[strings.ToLower(machineName)] = true
+
+			users := util.StringSetToStringArray(ctx, diagnostics, assignMachinesToUser.Users)
+			assignMachinesToUsersMap[strings.ToLower(machineName)] = users
+		}
+	}
+
+	// Get the requst model
+	assignMachinesToUsersRequests, err := getAssignUsersToMachinesRequestModel(ctx, client, diagnostics, currentDeliveryGroup.GetId(), assignMachinesToUsersMap)
+	if err != nil {
+		return editDeliveryGroupRequestBody, err
+	}
+
+	editDeliveryGroupRequestBody.SetAssignMachinesToUsers(assignMachinesToUsersRequests)
+
 	return editDeliveryGroupRequestBody, nil
 }
 
@@ -1405,6 +1430,17 @@ func (dgAppProtectionApplyContextually DeliveryGroupAppProtectionApplyContextual
 	dgAppProtectionApplyContextually.EnableAntiScreenCapture = types.BoolValue(accessPolicy.GetAppProtectionScreenCaptureRequired())
 
 	return dgAppProtectionApplyContextually
+}
+
+func (dgAssignMachinesToUsers DeliveryGroupAssignMachinesToUsersModel) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, dgMachine citrixorchestration.MachineResponseModel) util.ResourceModelWithAttributes {
+	machineName := dgMachine.GetName()
+	if !strings.EqualFold(dgAssignMachinesToUsers.MachineName.ValueString(), machineName) {
+		dgAssignMachinesToUsers.MachineName = types.StringValue(machineName)
+	}
+
+	assignedUsers := dgMachine.GetAssignedUsers()
+	dgAssignMachinesToUsers.Users = util.RefreshUsersList(ctx, diagnostics, dgAssignMachinesToUsers.Users, assignedUsers)
+	return dgAssignMachinesToUsers
 }
 
 func getFrequencyActionValue(v string) citrixorchestration.RebootScheduleFrequency {
@@ -2204,4 +2240,95 @@ func getDeliveryGroupDeliveryType(diagnostics *diag.Diagnostics, deliveryType ty
 		deliveryKind = *deliveryKindParsed
 	}
 	return deliveryKind, nil
+}
+
+func getAssignUsersToMachinesRequestModel(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string, assignMachinesToUsersMap map[string][]string) ([]citrixorchestration.AssignMachineToUserRequestModel, error) {
+	dgMachines, err := util.GetDeliveryGroupMachines(ctx, client, diagnostics, deliveryGroupId)
+	if err != nil {
+		return nil, err
+	}
+
+	assignMachinesToUsersRequests := []citrixorchestration.AssignMachineToUserRequestModel{}
+	for machineName, users := range assignMachinesToUsersMap {
+		if !slices.ContainsFunc(dgMachines, func(machine citrixorchestration.MachineResponseModel) bool {
+			return strings.EqualFold(machine.GetName(), machineName)
+		}) {
+			diagnostics.AddError(
+				"Error assigning machine to users",
+				"Machine "+machineName+" does not exist in the Delivery Group "+deliveryGroupId,
+			)
+			return nil, fmt.Errorf("machine %s does not exist in the Delivery Group %s", machineName, deliveryGroupId)
+		}
+
+		assignMachinesToUsersRequestModel := citrixorchestration.AssignMachineToUserRequestModel{}
+		assignMachinesToUsersRequestModel.SetMachine(machineName)
+
+		if len(users) == 0 {
+			assignMachinesToUsersRequestModel.SetUsers(users)
+		} else {
+			userIds, httpResp, err := util.GetUserIdsUsingIdentity(ctx, client, users)
+			if err != nil {
+				diagnostics.AddError(
+					"Error assigning machine to users",
+					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+						"\nError message: "+util.ReadClientError(err),
+				)
+				return nil, err
+			}
+			assignMachinesToUsersRequestModel.SetUsers(userIds)
+		}
+		assignMachinesToUsersRequests = append(assignMachinesToUsersRequests, assignMachinesToUsersRequestModel)
+	}
+
+	return assignMachinesToUsersRequests, nil
+}
+
+func (r *deliveryGroupResource) updateDeliveryGroupState(ctx context.Context, resp *resource.CreateResponse, plan DeliveryGroupResourceModel, deliveryGroupId string) {
+	deliveryGroup, err := util.GetDeliveryGroup(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
+	if err != nil {
+		return
+	}
+
+	// Get desktops
+	deliveryGroupDesktops, err := getDeliveryGroupDesktops(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
+
+	if err != nil {
+		return
+	}
+
+	// Get power time schemes
+	deliveryGroupPowerTimeSchemes, err := getDeliveryGroupPowerTimeSchemes(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
+
+	if err != nil {
+		return
+	}
+
+	// Get machines
+	deliveryGroupMachines, err := util.GetDeliveryGroupMachines(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
+	if err != nil {
+		return
+	}
+
+	//Get reboot schedule
+	deliveryGroupRebootSchedule, err := getDeliveryGroupRebootSchedules(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
+	if err != nil {
+		return
+	}
+
+	if r.client.AuthConfig.OnPremises {
+		// DDC 2402 LTSR has a bug where UPN is not returned for AD users. Call Identity API to fetch details for users
+		deliveryGroup, deliveryGroupDesktops, _ = updateDeliveryGroupAndDesktopUsers(ctx, r.client, &resp.Diagnostics, deliveryGroup, deliveryGroupDesktops)
+		// Do not return if there is an error. We need to set the resource in the state so that tf knows about the resource and marks it tainted (diagnostics already has the error)
+	}
+
+	tags := getDeliveryGroupTags(ctx, &resp.Diagnostics, r.client, deliveryGroupId)
+
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, deliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule, tags)
+
+	// Set state to fully populated data
+	diags := resp.State.Set(ctx, plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 }

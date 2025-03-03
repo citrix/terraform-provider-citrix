@@ -229,16 +229,12 @@ func (PolicySetModel) GetSchema() schema.Schema {
 				Required:    true,
 			},
 			"type": schema.StringAttribute{
-				Description: "Type of the policy set. Type can be one of `SitePolicies`, `DeliveryGroupPolicies`, `SiteTemplates`, or `CustomTemplates`.",
+				Description: "Type of the policy set. Type can only be set to `DeliveryGroupPolicies`.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString("DeliveryGroupPolicies"),
 				Validators: []validator.String{
-					stringvalidator.OneOf([]string{
-						"SitePolicies",
-						"DeliveryGroupPolicies",
-						"SiteTemplates",
-						"CustomTemplates"}...),
+					stringvalidator.OneOf([]string{"DeliveryGroupPolicies"}...),
 				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -275,10 +271,11 @@ func (PolicySetModel) GetSchema() schema.Schema {
 			},
 			"delivery_groups": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "The IDs of the delivery groups for the policy set to apply on.",
-				Optional:    true,
-				Computed:    true,
-				Default:     setdefault.StaticValue(types.SetValueMust(types.StringType, []attr.Value{})),
+				Description: "The IDs of the delivery groups for the policy set to apply on." +
+					"\n\n~> **Please Note** If `delivery_groups` attribute is unset or configured as an empty set, the policy set will not be assigned to any delivery group. None of the policies in the policy set will be applied.",
+				Optional: true,
+				Computed: true,
+				Default:  setdefault.StaticValue(types.SetValueMust(types.StringType, []attr.Value{})),
 				Validators: []validator.Set{
 					setvalidator.ValueStringsAre(
 						validator.String(

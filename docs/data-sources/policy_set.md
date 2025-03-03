@@ -40,7 +40,7 @@ data "citrix_policy_set" "example_policy_set_data_source_with_name" {
 
 -> **Note** The order of policies in the list determines the priority of the policies. (see [below for nested schema](#nestedatt--policies))
 - `scopes` (Set of String) The IDs of the scopes for the policy set to be a part of.
-- `type` (String) Type of the policy set. Type can be one of `SitePolicies`, `DeliveryGroupPolicies`, `SiteTemplates`, or `CustomTemplates`.
+- `type` (String) Type of the policy set.
 
 <a id="nestedatt--policies"></a>
 ### Nested Schema for `policies`

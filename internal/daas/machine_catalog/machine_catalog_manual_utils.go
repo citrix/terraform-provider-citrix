@@ -434,7 +434,12 @@ func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Conte
 							machineFromPlan.MachineName = types.StringValue(hostedMachineName)
 						}
 					}
-					// case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS: AvailabilityZone is not available from remote
+				case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
+					// hostedMachineId is the AWS EC2 Instance ID
+					// Only refresh machine name with Instance ID if it is not set
+					if hostedMachineId != "" && machineFromPlan.MachineName.IsNull() {
+						machineFromPlan.MachineName = types.StringValue(hostedMachineId)
+					}
 				}
 
 				delete(machineMapFromRemote, strings.ToLower(machineFromPlanName))
@@ -519,7 +524,11 @@ func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Conte
 				if hyp.GetPluginId() == util.NUTANIX_PLUGIN_ID && hostedMachineName != "" {
 					machineModel.MachineName = types.StringValue(hostedMachineName)
 				}
-				// case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS: AvailabilityZone is not available from remote
+			case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
+				// Refresh machine name with Instance ID for new machines
+				if hostedMachineId != "" {
+					machineModel.MachineName = types.StringValue(hostedMachineId)
+				}
 			}
 		}
 

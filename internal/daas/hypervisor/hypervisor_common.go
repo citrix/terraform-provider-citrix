@@ -39,14 +39,15 @@ func CreateHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 		return nil, err
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error creating Hypervisor", diagnostics, 10, true)
+	hypervisor, err := util.GetAsyncJobResult[*citrixorchestration.HypervisorDetailResponseModel](ctx, client, httpResp, "Error creating Hypervisor", diagnostics, 10, true)
 	if err != nil {
 		return nil, err
 	}
 
-	var hypervisor *citrixorchestration.HypervisorDetailResponseModel
+	hypervisorId := hypervisor.GetId()
+
 	for i := 1; i <= 6; i++ {
-		hypervisor, err = util.GetHypervisor(ctx, client, diagnostics, createHypervisorRequestBody.ConnectionDetails.GetName())
+		hypervisor, err = util.GetHypervisor(ctx, client, diagnostics, hypervisorId)
 
 		if err != nil {
 			return hypervisor, err

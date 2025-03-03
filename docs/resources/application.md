@@ -70,6 +70,7 @@ resource "citrix_application" "example-application" {
 
 - `application_category_path` (String) The application category path allows users to organize and view applications under specific categories in Citrix Workspace App.
 - `application_folder_path` (String) The application folder path in which the application should be created.
+- `application_groups` (List of String) The application group IDs to which the application should be added.
 - `delivery_groups` (List of String) The delivery group IDs to which the application should be added.
 
 -> **Note** The order of delivery group in the `delivery_groups` list determines the priority of the delivery group. Alternatively, you can use the `delivery_groups_priority` attribute to selectively set the priority of delivery groups.

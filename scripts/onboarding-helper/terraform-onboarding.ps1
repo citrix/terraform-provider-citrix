@@ -759,7 +759,7 @@ function InjectPlaceHolderSensitiveValues {
             $filteredOutput += 'password = "<input password value>"'
             $filteredOutput += 'password_format = "PlainText"'
         }
-        elseif ($line -match "domain_ou") {
+        elseif ($line -match "domain") {
             $filteredOutput += $line
             $filteredOutput += 'service_account = "<input service_account value>"'
             $filteredOutput += 'service_account_password = "<input service_account_password value>"'

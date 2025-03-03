@@ -859,6 +859,18 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 							"persist_wbc for writeback_cache under azure_machine_config must be enabled to enable storage_cost_saving.",
 						)
 					}
+
+					if !azureWbcModel.StorageCostSaving.IsUnknown() && !azureWbcModel.StorageCostSaving.IsNull() {
+						if azureWbcModel.StorageCostSaving.ValueBool() &&
+							(strings.EqualFold(azureWbcModel.WBCDiskStorageType.ValueString(), util.StandardLRS) ||
+								strings.EqualFold(azureMachineConfigModel.StorageType.ValueString(), util.StandardLRS)) {
+							resp.Diagnostics.AddAttributeError(
+								path.Root("storage_cost_saving"),
+								"Incorrect Attribute Configuration",
+								fmt.Sprintf("storage_cost_saving cannot be set to `true` when storage_type is set to `%s` or wbc_disk_storage_type is set to `%s`.", util.StandardLRS, util.StandardLRS),
+							)
+						}
+					}
 				}
 
 				// Validate Azure Intune Enrollment
@@ -1322,116 +1334,6 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 					)
 				}
 				return
-			}
-		}
-
-		if !provSchemePlan.AzureMachineConfig.IsUnknown() && !provSchemePlan.AzureMachineConfig.IsNull() {
-			azureMachineConfig := util.ObjectValueToTypedObject[AzureMachineConfigModel](ctx, &resp.Diagnostics, provSchemePlan.AzureMachineConfig)
-			if !azureMachineConfig.AzurePreparedImage.IsUnknown() && !azureMachineConfig.AzurePreparedImage.IsNull() {
-				azurePreparedImage := util.ObjectValueToTypedObject[PreparedImageConfigModel](ctx, &resp.Diagnostics, azureMachineConfig.AzurePreparedImage)
-				imageScheme, imageSpecs, err := validateImageVersion(ctx, &resp.Diagnostics, r.client, plan, azurePreparedImage, "azure_machine_config")
-				if err != nil {
-					return
-				}
-
-				if !azureMachineConfig.UseManagedDisks.IsUnknown() && !azureMachineConfig.UseManagedDisks.IsNull() {
-					if !azureMachineConfig.UseManagedDisks.ValueBool() {
-						resp.Diagnostics.AddError(
-							"Error validating `azure_machine_config`",
-							"use_managed_disks must be set to true when using prepared image.",
-						)
-						return
-					}
-				}
-
-				// Validate machine profile
-				if imageScheme.MachineProfile != nil && azureMachineConfig.MachineProfile.IsNull() {
-					resp.Diagnostics.AddError(
-						"Error validating `azure_machine_config`",
-						"machine_profile needs to be specified when using prepared image configrued with machine profile.",
-					)
-					return
-				}
-				if imageScheme.MachineProfile == nil && !azureMachineConfig.MachineProfile.IsNull() && !azureMachineConfig.MachineProfile.IsUnknown() {
-					resp.Diagnostics.AddError(
-						"Error validating `azure_machine_config`",
-						"machine_profile cannot be specified when using prepared image without a machine profile.",
-					)
-					return
-				}
-
-				// Validate disk encryption set
-				for _, customerProperty := range imageScheme.GetCustomProperties() {
-					if strings.EqualFold(customerProperty.GetName(), "DiskEncryptionSetId") && customerProperty.GetValue() != "" {
-						desName, desResourceGroup := util.ParseDiskEncryptionSetIdToNameAndResourceGroup(customerProperty.GetValue())
-						if azureMachineConfig.DiskEncryptionSet.IsNull() {
-							resp.Diagnostics.AddError(
-								"Error validating `azure_machine_config`",
-								"disk_encryption_set needs to be specified with the same disk encryption set configuration used for the prepared image.",
-							)
-							return
-						} else if !azureMachineConfig.DiskEncryptionSet.IsUnknown() {
-							diskEncryptionSet := util.ObjectValueToTypedObject[util.AzureDiskEncryptionSetModel](ctx, &resp.Diagnostics, azureMachineConfig.DiskEncryptionSet)
-							if diskEncryptionSet.DiskEncryptionSetName.ValueString() != desName || diskEncryptionSet.DiskEncryptionSetResourceGroup.ValueString() != desResourceGroup {
-								resp.Diagnostics.AddError(
-									"Error validating `azure_machine_config`",
-									"disk_encryption_set specified does not match the disk encryption set configured in the prepared image.",
-								)
-								return
-							}
-						}
-					}
-				}
-
-				if !provSchemePlan.HypervisorResourcePool.IsUnknown() && !provSchemePlan.HypervisorResourcePool.IsNull() {
-					imageVersionResourcePool := imageSpecs.GetResourcePool()
-					if imageVersionResourcePool.GetId() != provSchemePlan.HypervisorResourcePool.ValueString() {
-						resp.Diagnostics.AddError(
-							"Error validating `azure_machine_config`",
-							"resource pool specified in the prepared image does not match the resource pool configured in the provisioning scheme.",
-						)
-						return
-					}
-				}
-			}
-		}
-
-		if !provSchemePlan.VsphereMachineConfig.IsUnknown() && !provSchemePlan.VsphereMachineConfig.IsNull() {
-			vsphereMachineConfig := util.ObjectValueToTypedObject[VsphereMachineConfigModel](ctx, &resp.Diagnostics, provSchemePlan.VsphereMachineConfig)
-			if !vsphereMachineConfig.VspherePreparedImage.IsUnknown() && !vsphereMachineConfig.VspherePreparedImage.IsNull() {
-				vspherePreparedImage := util.ObjectValueToTypedObject[PreparedImageConfigModel](ctx, &resp.Diagnostics, vsphereMachineConfig.VspherePreparedImage)
-
-				imageScheme, imageSpecs, err := validateImageVersion(ctx, &resp.Diagnostics, r.client, plan, vspherePreparedImage, "vsphere_machine_config")
-				if err != nil {
-					return
-				}
-
-				// Validate machine profile
-				if imageScheme.MachineProfile != nil && vsphereMachineConfig.MachineProfile.IsNull() {
-					resp.Diagnostics.AddError(
-						"Error validating `vsphere_machine_config`",
-						"machine_profile needs to be specified when using prepared image configrued with machine profile.",
-					)
-					return
-				}
-				if imageScheme.MachineProfile == nil && !vsphereMachineConfig.MachineProfile.IsNull() && !vsphereMachineConfig.MachineProfile.IsUnknown() {
-					resp.Diagnostics.AddError(
-						"Error validating `vsphere_machine_config`",
-						"machine_profile cannot be specified when using prepared image without a machine profile.",
-					)
-					return
-				}
-
-				if !provSchemePlan.HypervisorResourcePool.IsUnknown() && !provSchemePlan.HypervisorResourcePool.IsNull() {
-					imageVersionResourcePool := imageSpecs.GetResourcePool()
-					if imageVersionResourcePool.GetId() != provSchemePlan.HypervisorResourcePool.ValueString() {
-						resp.Diagnostics.AddError(
-							"Error validating `vsphere_machine_config`",
-							"resource pool specified in the prepared image does not match the resource pool configured in the provisioning scheme.",
-						)
-						return
-					}
-				}
 			}
 		}
 	}

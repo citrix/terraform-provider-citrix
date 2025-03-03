@@ -175,7 +175,7 @@ func GetApplicationGroupIdWithPath(ctx context.Context, client *citrixdaasclient
 }
 
 func GetMachineCatalogMachines(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, machineCatalogId string) ([]citrixorchestration.MachineResponseModel, error) {
-	req := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogMachines(ctx, machineCatalogId).Fields("Id,Name,Hosting,DeliveryGroup")
+	req := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogMachines(ctx, machineCatalogId).Fields("Id,Name,Hosting,DeliveryGroup,AssignedUsers,AssociatedUsers,AllocationType")
 	req = req.Limit(250)
 
 	responses := []citrixorchestration.MachineResponseModel{}

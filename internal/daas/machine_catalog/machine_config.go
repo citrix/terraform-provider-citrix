@@ -382,13 +382,14 @@ func (VsphereMachineConfigModel) GetAttributes() map[string]schema.Attribute {
 
 type XenserverMachineConfigModel struct {
 	/** XenServer Hypervisor **/
-	MasterImageVm            types.String `tfsdk:"master_image_vm"`
-	ImageSnapshot            types.String `tfsdk:"image_snapshot"`
-	MasterImageNote          types.String `tfsdk:"master_image_note"`
-	ImageUpdateRebootOptions types.Object `tfsdk:"image_update_reboot_options"`
-	CpuCount                 types.Int64  `tfsdk:"cpu_count"`
-	MemoryMB                 types.Int64  `tfsdk:"memory_mb"`
-	WritebackCache           types.Object `tfsdk:"writeback_cache"` // XenserverWritebackCacheModel
+	MasterImageVm                types.String `tfsdk:"master_image_vm"`
+	ImageSnapshot                types.String `tfsdk:"image_snapshot"`
+	MasterImageNote              types.String `tfsdk:"master_image_note"`
+	ImageUpdateRebootOptions     types.Object `tfsdk:"image_update_reboot_options"`
+	CpuCount                     types.Int64  `tfsdk:"cpu_count"`
+	MemoryMB                     types.Int64  `tfsdk:"memory_mb"`
+	WritebackCache               types.Object `tfsdk:"writeback_cache"` // XenserverWritebackCacheModel
+	UseFullDiskCloneProvisioning types.Bool   `tfsdk:"use_full_disk_clone_provisioning"`
 }
 
 func (XenserverMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
@@ -430,6 +431,15 @@ func (XenserverMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 				Required:    true,
 			},
 			"writeback_cache": XenserverWritebackCacheModel{}.GetSchema(),
+			"use_full_disk_clone_provisioning": schema.BoolAttribute{
+				Description: "Specify if virtual machines created from the provisioning scheme should be created using the dedicated full disk clone feature. Default is `false`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.RequiresReplace(),
+				},
+			},
 		},
 	}
 }
@@ -692,9 +702,9 @@ func (AzureWritebackCacheModel) GetSchema() schema.SingleNestedAttribute {
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.OneOf(
-						"StandardSSD_LRS",
-						"Standard_LRS",
-						"Premium_LRS",
+						util.StandardSSDLRS,
+						util.StandardLRS,
+						util.Premium_LRS,
 					),
 				},
 				PlanModifiers: []planmodifier.String{
@@ -703,7 +713,7 @@ func (AzureWritebackCacheModel) GetSchema() schema.SingleNestedAttribute {
 							resp.RequiresReplace = !checkIfCatalogAttributeCanBeUpdated(ctx, req.State) && req.StateValue.ValueString() != req.PlanValue.ValueString()
 						},
 						"Updating wbc_disk_storage_type is not allowed for catalogs with PVS Streaming provisioning type.",
-						"Updating wbc_disk_storage_typ is not allowed for catalogs with PVS Streaming provisioning type.",
+						"Updating wbc_disk_storage_type is not allowed for catalogs with PVS Streaming provisioning type.",
 					),
 				},
 			},
@@ -775,8 +785,9 @@ type AzureComputeGallerySettings struct {
 
 func (AzureComputeGallerySettings) GetSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
-		Description: "Use this to place prepared image in Azure Compute Gallery. Required when `storage_type = Azure_Ephemeral_OS_Disk`.",
-		Optional:    true,
+		Description: "Use this to place prepared image in Azure Compute Gallery. Required when `storage_type = Azure_Ephemeral_OS_Disk`." +
+			"\n\n~> **Please Note** `use_azure_compute_gallery` cannot be specified when the prepared image is using a shared image gallery. The machine catalog will inherit the azure compute gallery settings of the prepared image.",
+		Optional: true,
 		Attributes: map[string]schema.Attribute{
 			"replica_ratio": schema.Int64Attribute{
 				Description: "The ratio of virtual machines to image replicas that you want Azure to keep.",
@@ -1409,8 +1420,10 @@ func (mc *XenserverMachineConfigModel) RefreshProperties(ctx context.Context, di
 		if wbcMemorySize != 0 {
 			writebackCache.WriteBackCacheMemorySizeMB = types.Int64Value(int64(provScheme.GetWriteBackCacheMemorySizeMB()))
 		}
+		mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, writebackCache)
 	}
-	mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, writebackCache)
+
+	mc.UseFullDiskCloneProvisioning = types.BoolValue(provScheme.GetUseFullDiskCloneProvisioning())
 }
 
 func (mc *NutanixMachineConfigModel) RefreshProperties(catalog citrixorchestration.MachineCatalogDetailResponseModel) {

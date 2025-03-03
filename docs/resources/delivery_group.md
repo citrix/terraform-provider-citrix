@@ -190,6 +190,9 @@ resource "citrix_delivery_group" "example-delivery-group" {
 - `app_protection` (Attributes) App Protection, an add-on feature for the Citrix Workspace app, provides enhanced security for Citrix published apps and desktops. The feature provides anti-keylogging and anti-screen capture capabilities for client sessions, helping protect data from keyloggers and screen scrapers.
 
 ~> **Please Note** Before using the feature, make sure that these [requirements](https://docs.citrix.com/en-us/citrix-workspace-app/app-protection.html#system-requirements) are met. (see [below for nested schema](#nestedatt--app_protection))
+- `assign_machines_to_users` (Attributes List) Assign machines in the delivery group to users.
+
+~> **Please Note** Adding or removing values from this property will not add or remove machines. Adding an object will assign (or reassign if already assigned) the machine to user(s). Removing an object will unassign the corresponding machine. (see [below for nested schema](#nestedatt--assign_machines_to_users))
 - `associated_machine_catalogs` (Attributes Set) Machine catalogs from which to assign machines to the newly created delivery group. (see [below for nested schema](#nestedatt--associated_machine_catalogs))
 - `autoscale_settings` (Attributes) The power management settings governing the machine(s) in the delivery group. (see [below for nested schema](#nestedatt--autoscale_settings))
 - `custom_access_policies` (Attributes List) Custom Access Policies for the delivery group. To manage built-in access policies use the `default_access_policies` instead. (see [below for nested schema](#nestedatt--custom_access_policies))
@@ -258,6 +261,17 @@ Required:
 
 -> **Note** To refer to default policies, use `Citrix Gateway connections` as the name for the default policy that is Via Access Gateway and `Non-Citrix Gateway connections` as the name for the default policy that is Not Via Access Gateway.
 
+
+
+<a id="nestedatt--assign_machines_to_users"></a>
+### Nested Schema for `assign_machines_to_users`
+
+Required:
+
+- `machine_name` (String) The name of the machine. For domain-joined machines, the name must be in the format <domain>\<machine>, all in lowercase. For non domain-joined machines, use the machine name, all in lowercase.
+- `users` (Set of String) The list of users to assign to the machine. 
+
+-> **Note** Users must be in `DOMAIN\UserName` or `user@domain.com` format.
 
 
 <a id="nestedatt--associated_machine_catalogs"></a>

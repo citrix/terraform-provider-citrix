@@ -133,7 +133,7 @@ func (PolicySetModel) GetDataSourceSchema() schema.Schema {
 				},
 			},
 			"type": schema.StringAttribute{
-				Description: "Type of the policy set. Type can be one of `SitePolicies`, `DeliveryGroupPolicies`, `SiteTemplates`, or `CustomTemplates`.",
+				Description: "Type of the policy set.",
 				Computed:    true,
 			},
 			"description": schema.StringAttribute{

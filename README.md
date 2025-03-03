@@ -9,6 +9,7 @@ Citrix has developed a custom Terraform provider for automating Citrix product d
   - [Examples](#examples)
     - [Deployment guides](#deployment-guides)
     - [Demo video](#demo-video)
+  - [Related Citrix Automation Repositories](#related-citrix-automation-repositories)
   - [Plugin for Terraform Provider for Citrix® Documentation](#plugin-for-terraform-provider-for-citrix-documentation)
     - [Navigating the repository](#navigating-the-repository)
     - [Provider Configuration](#provider-configuration)
@@ -56,6 +57,14 @@ Please refer to [Citrix Tech Zone](https://community.citrix.com/tech-zone/automa
 [![alt text](images/techzone-youtube-thumbnail.png)](https://www.youtube.com/watch?v=c33sMLaCVjY)
 
 https://www.youtube.com/watch?v=c33sMLaCVjY
+
+## Related Citrix Automation Repositories
+|            Title            |            Details            |
+|-----------------------------|-------------------------------|
+<!-- | [Plugin for Terraform Provider for Citrix®](https://github.com/citrix/terraform-provider-citrix) | Terraform provider plugin to manage Citrix products including CVAD, DaaS, StoreFront, and WEM via Terraform IaC. | -->
+| [Packer Image Management Module for Citrix® Virtual Apps and Desktops](https://github.com/citrix/citrix-packer-tools) | Use Packer to create golden images with the Citrix VDA installed and using Citrix best practices. |
+| [Citrix Ansible Tools](https://github.com/citrix/citrix-ansible-tools) | Playbooks to install Citrix components using automation such as the VDA. |
+| [Site Deployment Module for Citrix® Virtual Apps and Desktops](https://github.com/citrix/citrix-cvad-site-deployment-module) | Uses PowerShell to drive Terraform files to create a fully functional CVAD site. |
 
 ## Plugin for Terraform Provider for Citrix® Documentation
 
@@ -214,4 +223,4 @@ This project is Licensed under the Apache License, Version 2.0 (the "License"); 
 
 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 
-<sub>Copyright © 2024. Citrix Systems, Inc.</sub>
+<sub>Copyright © 2025. Citrix Systems, Inc.</sub>
