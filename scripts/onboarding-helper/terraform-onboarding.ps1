@@ -374,6 +374,13 @@ function Get-ResourceList {
             continue
         }
 
+        # Handle special case for Policy Sets
+        if($requestPath -eq "gpo/policySets" -and $item.name -eq "DefaultSitePolicies")
+        {
+            # Skip processing for the default site policies
+            continue
+        }
+
         #Handle special case for Built-in Admin Roles
         if($requestPath -eq "Admin/Roles"){
             if($item.IsBuiltIn){
@@ -515,7 +522,7 @@ function Get-ExistingCVADResources {
             "resourceProviderName" = "admin_role"
         }
         "policy_set"           = @{
-            "resourceApi"          = "/gpo/policySets"
+            "resourceApi"          = "gpo/policySets"
             "resourceProviderName" = "policy_set"
         }
         "application"          = @{
@@ -659,10 +666,12 @@ function RemoveComputedProperties {
     $deliveryGroupsPriorityPattern = "(\s*)delivery_groups_priority\s*=\s*\[[\s\S]*?\]"
     $deliveryGroupsPriorityMatches = [regex]::Matches($content, $deliveryGroupsPriorityPattern, [System.Text.RegularExpressions.RegexOptions]::Singleline)
 
-    # Extract the delivery_groups_priority block and replace it with a placeholder
+    # Extract the delivery_groups_priority block and replace it with a unique placeholder
+    $index = 0
     foreach ($match in $deliveryGroupsPriorityMatches) {
         $deliveryGroupsPriorityBlock = $match.Value
-        $content = $content -replace [regex]::Escape($deliveryGroupsPriorityBlock), "PLACEHOLDER_DELIVERY_GROUPS_PRIORITY"
+        $content = $content -replace [regex]::Escape($deliveryGroupsPriorityBlock), "PLACEHOLDER_DELIVERY_GROUPS_PRIORITY_$index"
+        $index++
     }
 
     # Loop through each regex pattern and replace matches in the content
@@ -670,9 +679,11 @@ function RemoveComputedProperties {
         $content = $content -replace $pattern, ""
     }
 
-    # Restore the delivery_groups_priority block
+    # Restore the delivery_groups_priority block using unique placeholders
+    $index = 0
     foreach ($match in $deliveryGroupsPriorityMatches) {
-        $content = $content -replace "PLACEHOLDER_DELIVERY_GROUPS_PRIORITY", $match.Value
+        $content = $content -replace "PLACEHOLDER_DELIVERY_GROUPS_PRIORITY_$index", $match.Value
+        $index++
     }
 
     # Remove contents for zone resource
@@ -759,7 +770,7 @@ function InjectPlaceHolderSensitiveValues {
             $filteredOutput += 'password = "<input password value>"'
             $filteredOutput += 'password_format = "PlainText"'
         }
-        elseif ($line -match "domain") {
+        elseif ($line -match "^\s*domain\s*=\s*.*$") {
             $filteredOutput += $line
             $filteredOutput += 'service_account = "<input service_account value>"'
             $filteredOutput += 'service_account_password = "<input service_account_password value>"'
