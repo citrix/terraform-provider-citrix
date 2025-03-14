@@ -252,9 +252,7 @@ type LaunchOptions struct {
 	OverlayAutoLoginCredentialsWithTicket  types.Bool   `tfsdk:"overlay_auto_login_credentials_with_ticket"`
 	IgnoreClientProvidedClientAddress      types.Bool   `tfsdk:"ignore_client_provided_client_address"`
 	SetNoLoadBiasFlag                      types.Bool   `tfsdk:"set_no_load_bias_flag"`
-	RDPOnly                                types.Bool   `tfsdk:"rdp_only"`
 	VdaLogonDataProvider                   types.String `tfsdk:"vda_logon_data_provider"`
-	IcaTemplateName                        types.String `tfsdk:"ica_template_name"`
 	FederatedAuthenticationServiceFailover types.Bool   `tfsdk:"federated_authentication_service_failover"`
 }
 
@@ -337,20 +335,8 @@ func (LaunchOptions) GetSchema() schema.SingleNestedAttribute {
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
 			},
-			"rdp_only": schema.BoolAttribute{
-				Description: "Configure the Store to only launch use the RDP protocol. Default is false.",
-				Optional:    true,
-				Computed:    true,
-				Default:     booldefault.StaticBool(false),
-			},
 			"vda_logon_data_provider": schema.StringAttribute{
 				Description: "The Vda logon data provider to use during launch. Default is empty string.",
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString(""), // Default is empty string
-			},
-			"ica_template_name": schema.StringAttribute{
-				Description: "Ica template to use when launching an application or desktop. Default is empty string.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(""), // Default is empty string
@@ -490,10 +476,8 @@ func (EnumerationOptions) GetSchema() schema.SingleNestedAttribute {
 			},
 			"filter_by_types_include": schema.ListAttribute{
 				ElementType: types.StringType,
-				Description: "Inclusive resource filter by type (Applications, Desktops or Documents). Default is empty list.",
+				Description: "Inclusive resource filter by type (Applications, Desktops or Documents).",
 				Optional:    true,
-				Computed:    true,
-				Default:     listdefault.StaticValue(types.ListValueMust(types.StringType, []attr.Value{})),
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
 					listvalidator.ValueStringsAre(stringvalidator.NoneOf("")),
@@ -501,10 +485,8 @@ func (EnumerationOptions) GetSchema() schema.SingleNestedAttribute {
 			},
 			"filter_by_keywords_include": schema.ListAttribute{
 				ElementType: types.StringType,
-				Description: "Only include applications and desktops that match the keywords. Default is empty list.",
+				Description: "Only include applications and desktops that match the keywords.",
 				Optional:    true,
-				Computed:    true,
-				Default:     listdefault.StaticValue(types.ListValueMust(types.StringType, []attr.Value{})),
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
 					listvalidator.ValueStringsAre(stringvalidator.NoneOf("")),
@@ -512,10 +494,8 @@ func (EnumerationOptions) GetSchema() schema.SingleNestedAttribute {
 			},
 			"filter_by_keywords_exclude": schema.ListAttribute{
 				ElementType: types.StringType,
-				Description: "Exclude applications and desktops that match the keywords. Default is empty list.",
+				Description: "Exclude applications and desktops that match the keywords.",
 				Optional:    true,
-				Computed:    true,
-				Default:     listdefault.StaticValue(types.ListValueMust(types.StringType, []attr.Value{})),
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
 					listvalidator.ValueStringsAre(stringvalidator.NoneOf("")),

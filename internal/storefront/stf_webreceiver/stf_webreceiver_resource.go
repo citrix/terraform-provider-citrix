@@ -143,7 +143,8 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 		)
 		return
 	}
-
+	// Map response body to schema and populate Computed attribute values
+	plan.RefreshPropertyValues(ctx, &resp.Diagnostics, &WebReceiverDetail)
 	var getWebReceiverRequestBody citrixstorefront.GetSTFWebReceiverRequestModel
 	getWebReceiverRequestBody.SetVirtualPath(plan.VirtualPath.ValueString())
 	if plan.SiteId.ValueString() != "" {
@@ -239,67 +240,63 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 		plan.RefreshPlugInAssistant(ctx, &resp.Diagnostics, &assistant)
 	}
 
-	var appShortcutsResponse citrixstorefront.GetWebReceiverApplicationShortcutsResponseModel
 	if !plan.ApplicationShortcuts.IsNull() {
-		appShortcutsResponse, err = setAndGetSTFWebReceiverApplicationShortcuts(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.ApplicationShortcuts)
+		appShortcutsResponse, err := setAndGetSTFWebReceiverApplicationShortcuts(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.ApplicationShortcuts)
 		if err != nil {
 			return
 		}
+		plan.RefreshApplicationShortcuts(ctx, &resp.Diagnostics, &appShortcutsResponse)
 	}
 
-	var communicationResponse citrixstorefront.GetWebReceiverCommunicationResponseModel
 	if !plan.Communication.IsNull() {
-		communicationResponse, err = setAndGetSTFWebReceiverCommunication(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.Communication)
+		communicationResponse, err := setAndGetSTFWebReceiverCommunication(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.Communication)
 		if err != nil {
 			return
 		}
+		plan.RefreshCommunication(ctx, &resp.Diagnostics, &communicationResponse)
 	}
 
-	var stsResponse citrixstorefront.GetWebReceiverStrictTransportSecurityResponseModel
 	if !plan.StrictTransportSecurity.IsNull() {
-		stsResponse, err = setAndGetSTFWebReceiverStrictTransportSecurity(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.StrictTransportSecurity)
+		stsResponse, err := setAndGetSTFWebReceiverStrictTransportSecurity(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.StrictTransportSecurity)
 		if err != nil {
 			return
 		}
+		plan.RefreshStrictTransportSecurity(ctx, &resp.Diagnostics, &stsResponse)
 	}
 
-	var authManagerResponse citrixstorefront.GetWebReceiverAuthenticationManagerResponseModel
 	if !plan.AuthenticationManager.IsNull() {
-		authManagerResponse, err = setAndGetSTFWebReceiverAuthenticationManager(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.AuthenticationManager)
+		authManagerResponse, err := setAndGetSTFWebReceiverAuthenticationManager(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.AuthenticationManager)
 		if err != nil {
 			return
 		}
+		plan.RefreshAuthenticationManager(ctx, &resp.Diagnostics, &authManagerResponse)
 	}
 
 	// WebReceiverUserInterface config
-	var uiResponse citrixstorefront.GetSTFWebReceiverUserInterfaceResponseModel
 	if !plan.UserInterface.IsNull() {
-		uiResponse, err = setAndGetSTFWebReceiverUserInterface(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.UserInterface)
+		uiResponse, err := setAndGetSTFWebReceiverUserInterface(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.UserInterface)
 		if err != nil {
 			return
 		}
+		plan.RefreshUserInterface(ctx, &resp.Diagnostics, &uiResponse)
 	}
 
 	//  Resources Service settings Config
-	var resourcesServiceResponse citrixstorefront.GetSTFWebReceiverResourcesServiceResponseModel
 	if !plan.ResourcesService.IsNull() {
-		resourcesServiceResponse, err = setAndGetSTFWebReceiverResourcesService(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.ResourcesService)
+		resourcesServiceResponse, err := setAndGetSTFWebReceiverResourcesService(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.ResourcesService)
 		if err != nil {
 			return
 		}
+		plan.RefreshResourcesService(ctx, &resp.Diagnostics, &resourcesServiceResponse)
 	}
 
-	var sitestyle citrixstorefront.STFWebReceiverSiteStyleResponseModel
 	if !plan.WebReceiverSiteStyle.IsNull() {
-		sitestyle, err = setAndGetSTFWebReceiverSiteStyle(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.WebReceiverSiteStyle)
+		sitestyle, err := setAndGetSTFWebReceiverSiteStyle(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.WebReceiverSiteStyle)
 		if err != nil {
 			return
 		}
-
+		plan.RefreshWebReceiverSiteStyle(ctx, &resp.Diagnostics, &sitestyle)
 	}
-
-	// Map response body to schema and populate Computed attribute values
-	plan.RefreshPropertyValues(ctx, &resp.Diagnostics, &WebReceiverDetail, &appShortcutsResponse, &communicationResponse, &stsResponse, &authManagerResponse, &uiResponse, &resourcesServiceResponse, &sitestyle)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -335,6 +332,8 @@ func (r *stfWebReceiverResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 
+	state.RefreshPropertyValues(ctx, &resp.Diagnostics, STFWebReceiver)
+
 	var getWebReceiverRequestBody citrixstorefront.GetSTFWebReceiverRequestModel
 	getWebReceiverRequestBody.SetVirtualPath(state.VirtualPath.ValueString())
 	if state.SiteId.ValueString() != "" {
@@ -350,79 +349,61 @@ func (r *stfWebReceiverResource) Read(ctx context.Context, req resource.ReadRequ
 	}
 
 	//Refresh Plugin Assistant
-	if !state.PluginAssistant.IsNull() {
-		getPlugInAssistantRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverPluginAssistantGet(ctx, getWebReceiverRequestBody)
-		assistant, err := getPlugInAssistantRequest.Execute()
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error fetching StoreFront WebReceiver Plugin Assistant",
-				"Error message: "+err.Error(),
-			)
-			return
-		}
-		state.RefreshPlugInAssistant(ctx, &resp.Diagnostics, &assistant)
+	getPlugInAssistantRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverPluginAssistantGet(ctx, getWebReceiverRequestBody)
+	assistant, err := getPlugInAssistantRequest.Execute()
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error fetching StoreFront WebReceiver Plugin Assistant",
+			"Error message: "+err.Error(),
+		)
+		return
 	}
+	state.RefreshPlugInAssistant(ctx, &resp.Diagnostics, &assistant)
 
-	var appShortcutsResponse citrixstorefront.GetWebReceiverApplicationShortcutsResponseModel
-	if !state.ApplicationShortcuts.IsNull() {
-		appShortcutsResponse, err = getSTFWebReceiverApplicationShortcuts(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
-		if err != nil {
-			return
-		}
+	appShortcuts, err := getSTFWebReceiverApplicationShortcuts(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
+	if err != nil {
+		return
 	}
+	state.RefreshApplicationShortcuts(ctx, &resp.Diagnostics, &appShortcuts)
 
-	var communicationResponse citrixstorefront.GetWebReceiverCommunicationResponseModel
-	if !state.Communication.IsNull() {
-		communicationResponse, err = getSTFWebReceiverCommunication(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
-		if err != nil {
-			return
-		}
+	communication, err := getSTFWebReceiverCommunication(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
+	if err != nil {
+		return
 	}
+	state.RefreshCommunication(ctx, &resp.Diagnostics, &communication)
 
-	var stsResponse citrixstorefront.GetWebReceiverStrictTransportSecurityResponseModel
-	if !state.StrictTransportSecurity.IsNull() {
-		stsResponse, err = getSTFWebReceiverStrictTransportSecurity(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
-		if err != nil {
-			return
-		}
+	sts, err := getSTFWebReceiverStrictTransportSecurity(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
+	if err != nil {
+		return
 	}
+	state.RefreshStrictTransportSecurity(ctx, &resp.Diagnostics, &sts)
 
-	var authManagerResponse citrixstorefront.GetWebReceiverAuthenticationManagerResponseModel
-	if !state.AuthenticationManager.IsNull() {
-		authManagerResponse, err = getSTFWebReceiverAuthenticationManager(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
-		if err != nil {
-			return
-		}
+	authManager, err := getSTFWebReceiverAuthenticationManager(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
+	if err != nil {
+		return
 	}
+	state.RefreshAuthenticationManager(ctx, &resp.Diagnostics, &authManager)
 
 	// WebReceiverUserInterface config
-	var uiResponse citrixstorefront.GetSTFWebReceiverUserInterfaceResponseModel
-	if !state.UserInterface.IsNull() {
-		uiResponse, err = getSTFWebReceiverUserInterface(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
-		if err != nil {
-			return
-		}
+	ui, err := getSTFWebReceiverUserInterface(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
+	if err != nil {
+		return
 	}
+	state.RefreshUserInterface(ctx, &resp.Diagnostics, &ui)
 
 	//  Resources Service settings Config
-	var resourcesServiceResponse citrixstorefront.GetSTFWebReceiverResourcesServiceResponseModel
-	if !state.ResourcesService.IsNull() {
-		resourcesServiceResponse, err = getSTFWebReceiverResourcesService(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
-		if err != nil {
-			return
-		}
+	resourcesService, err := getSTFWebReceiverResourcesService(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
+	if err != nil {
+		return
 	}
+	state.RefreshResourcesService(ctx, &resp.Diagnostics, &resourcesService)
 
 	// Refresh Site Style
-	var sitestyle citrixstorefront.STFWebReceiverSiteStyleResponseModel
-	if !state.WebReceiverSiteStyle.IsNull() {
-		sitestyle, err = getSTFWebReceiverSiteStyle(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
-		if err != nil {
-			return
-		}
+	siteStyle, err := getSTFWebReceiverSiteStyle(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
+	if err != nil {
+		return
 	}
-
-	state.RefreshPropertyValues(ctx, &resp.Diagnostics, STFWebReceiver, &appShortcutsResponse, &communicationResponse, &stsResponse, &authManagerResponse, &uiResponse, &resourcesServiceResponse, &sitestyle)
+	state.RefreshWebReceiverSiteStyle(ctx, &resp.Diagnostics, &siteStyle)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -514,7 +495,7 @@ func (r *stfWebReceiverResource) Update(ctx context.Context, req resource.Update
 			return
 		}
 
-		plan.ApplicationShortcuts = plan.RefreshApplicationShortcuts(ctx, &resp.Diagnostics, &appShortcutsResponse)
+		plan.RefreshApplicationShortcuts(ctx, &resp.Diagnostics, &appShortcutsResponse)
 	}
 
 	if !plan.Communication.IsNull() {
@@ -523,7 +504,7 @@ func (r *stfWebReceiverResource) Update(ctx context.Context, req resource.Update
 			return
 		}
 
-		plan.Communication = plan.RefreshCommunication(ctx, &resp.Diagnostics, &communicationResponse)
+		plan.RefreshCommunication(ctx, &resp.Diagnostics, &communicationResponse)
 	}
 
 	if !plan.StrictTransportSecurity.IsNull() {
@@ -531,7 +512,7 @@ func (r *stfWebReceiverResource) Update(ctx context.Context, req resource.Update
 		if err != nil {
 			return
 		}
-		plan.StrictTransportSecurity = plan.RefreshStrictTransportSecurity(ctx, &resp.Diagnostics, &stsResponse)
+		plan.RefreshStrictTransportSecurity(ctx, &resp.Diagnostics, &stsResponse)
 	}
 
 	if !plan.AuthenticationManager.IsNull() {
@@ -539,7 +520,7 @@ func (r *stfWebReceiverResource) Update(ctx context.Context, req resource.Update
 		if err != nil {
 			return
 		}
-		plan.AuthenticationManager = plan.RefreshAuthenticationManager(ctx, &resp.Diagnostics, &authManagerResponse)
+		plan.RefreshAuthenticationManager(ctx, &resp.Diagnostics, &authManagerResponse)
 	}
 
 	// WebReceiverUserInterface config
@@ -548,7 +529,7 @@ func (r *stfWebReceiverResource) Update(ctx context.Context, req resource.Update
 		if err != nil {
 			return
 		}
-		plan.UserInterface = plan.RefreshUserInterface(ctx, &resp.Diagnostics, &uiResponse)
+		plan.RefreshUserInterface(ctx, &resp.Diagnostics, &uiResponse)
 	}
 
 	//  Resources Service settings Config
@@ -557,7 +538,7 @@ func (r *stfWebReceiverResource) Update(ctx context.Context, req resource.Update
 		if err != nil {
 			return
 		}
-		plan.ResourcesService = plan.RefreshResourcesService(ctx, &resp.Diagnostics, &resourcesServiceResponse)
+		plan.RefreshResourcesService(ctx, &resp.Diagnostics, &resourcesServiceResponse)
 	}
 
 	if !plan.WebReceiverSiteStyle.IsNull() {
@@ -566,7 +547,7 @@ func (r *stfWebReceiverResource) Update(ctx context.Context, req resource.Update
 			return
 		}
 
-		plan.WebReceiverSiteStyle = plan.RefreshWebReceiverSiteStyle(ctx, &resp.Diagnostics, &sitestyle)
+		plan.RefreshWebReceiverSiteStyle(ctx, &resp.Diagnostics, &sitestyle)
 	}
 
 	diags = resp.State.Set(ctx, plan)

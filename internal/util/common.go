@@ -148,6 +148,9 @@ const NoPathRegex = `^[^\\/]*$`
 // GAC Category Name
 const GacCategoryNameRegex string = `^(root|[A-Z][a-z ]*)$`
 
+// CORS URL regex of in Site Settings
+const CorsSiteSettingUrlRegex string = `^(https?:\/\/)([^/?#:]+)(:\d+)?([^/\\])$`
+
 // NOT_EXIST error code
 const NOT_EXIST string = "NOT_EXIST"
 
@@ -251,6 +254,10 @@ const SharedGallery = "UseSharedImageGallery"
 const AdminUserMonitorAccessPolicySuffix = " - Access to 'Monitor' tab only"
 
 var PlatformSettingsAssignedTo = []string{"AllUsersNoAuthentication"}
+
+// Service Account
+const ServiceAccountAzureADDeviceManagementCapability = "AzureADDeviceManagement"
+const ServiceAccountIntuneEnrolledDeviceManagementCapability = "IntuneDeviceManagement"
 
 // <summary>
 // Helper function to validate if a string is a valid UUID or null
@@ -1059,9 +1066,7 @@ func RefreshUsersList(ctx context.Context, diags *diag.Diagnostics, usersSet typ
 // Helper function to fetch scope ids from scope names
 // </summary>
 func FetchScopeIdsByNames(ctx context.Context, diagnostics diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, scopeNames []string) ([]string, error) {
-	getAdminScopesRequest := client.ApiClient.AdminAPIsDAAS.AdminGetAdminScopes(ctx)
-	// get all the scopes
-	getScopesResponse, httpResp, err := citrixdaasclient.AddRequestData(getAdminScopesRequest, client).Execute()
+	getScopesResponse, httpResp, err := FetchScopes(ctx, client)
 	if err != nil || getScopesResponse == nil {
 		diagnostics.AddError(
 			"Error fetch scope ids from names",
@@ -1088,9 +1093,7 @@ func FetchScopeIdsByNames(ctx context.Context, diagnostics diag.Diagnostics, cli
 // Helper function to fetch scope names from scope ids
 // </summary>
 func FetchScopeNamesByIds(ctx context.Context, diagnostics diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, scopeIds []string) ([]string, error) {
-	getAdminScopesRequest := client.ApiClient.AdminAPIsDAAS.AdminGetAdminScopes(ctx)
-	// Create new Policy Set
-	getScopesResponse, httpResp, err := citrixdaasclient.AddRequestData(getAdminScopesRequest, client).Execute()
+	getScopesResponse, httpResp, err := FetchScopes(ctx, client)
 	if err != nil || getScopesResponse == nil {
 		diagnostics.AddError(
 			"Error fetch scope names from ids",
@@ -1111,6 +1114,12 @@ func FetchScopeNamesByIds(ctx context.Context, diagnostics diag.Diagnostics, cli
 	}
 
 	return scopeNames, nil
+}
+
+func FetchScopes(ctx context.Context, client *citrixdaasclient.CitrixDaasClient) (*citrixorchestration.ScopeResponseModelCollection, *http.Response, error) {
+	getAdminScopesRequest := client.ApiClient.AdminAPIsDAAS.AdminGetAdminScopes(ctx)
+	getScopesResponse, httpResp, err := citrixdaasclient.AddRequestData(getAdminScopesRequest, client).Execute()
+	return getScopesResponse, httpResp, err
 }
 
 func GetUsersUsingIdentity(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, users []string) ([]citrixorchestration.IdentityUserResponseModel, *http.Response, error) {
@@ -1442,4 +1451,42 @@ func GetMachineAdAccountKey(r citrixorchestration.ProvisioningSchemeMachineAccou
 
 func GetAssignMachineToUserKey(r citrixorchestration.MachineResponseModel) string {
 	return strings.ToLower(r.GetName())
+}
+
+func PollZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, zoneName string, isZoneBeingDeleted bool) (*citrixorchestration.ZoneDetailResponseModel, error) {
+	// default polling to every 10 seconds
+	pollInterval := 10
+	startTime := time.Now()
+	getZoneRequest := client.ApiClient.ZonesAPIsDAAS.ZonesGetZone(ctx, zoneName)
+
+	var zone *citrixorchestration.ZoneDetailResponseModel
+	var err error
+	for {
+		// Zone sync should be completed within 8 minutes
+		if time.Since(startTime) > time.Minute*time.Duration(8) {
+			break
+		}
+
+		zone, httpResp, err := citrixdaasclient.AddRequestData(getZoneRequest, client).Execute()
+		if isZoneBeingDeleted {
+			if httpResp.StatusCode == http.StatusNotFound {
+				// Zone deletion completed. Return nil
+				return nil, nil
+			}
+		} else {
+			if err == nil {
+				// Zone sync completed. Return the zone
+				return zone, nil
+			}
+		}
+		if err != nil && httpResp.StatusCode != http.StatusNotFound {
+			// GET Zone call failed with an error other than 404. Return the error
+			return zone, err
+		}
+
+		time.Sleep(time.Second * time.Duration(pollInterval))
+		continue
+	}
+
+	return zone, err
 }

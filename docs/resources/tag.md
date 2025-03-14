@@ -32,7 +32,7 @@ resource "citrix_tag" "example_tag" {
 ### Optional
 
 - `description` (String) Description of the tag.
-- `scopes` (Set of String) The set of IDs of the scopes applied on the tag.
+- `scopes` (Set of String) The set of IDs of the scopes applied on the tag. Please note that the ALL scope will be applied to the tag by default.
 
 ### Read-Only
 

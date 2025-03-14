@@ -91,5 +91,5 @@ Import is supported using the following syntax:
 
 ```shell
 # StoreFront UserFarmMapping can be imported with the Store Virtual Path and UserFarmMapping Name
-terraform import citrix_stf_store_service.example-stf-store-service "/Citrix/Store","Example UserFarmMapping"
+terraform import citrix_stf_user_farm_mapping.example-stf-user-farm-mapping "/Citrix/Store","Example UserFarmMapping"
 ```

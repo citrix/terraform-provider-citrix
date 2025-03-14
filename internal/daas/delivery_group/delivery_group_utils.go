@@ -691,6 +691,7 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 	var body citrixorchestration.CreateDeliveryGroupRequestModel
 	body.SetName(plan.Name.ValueString())
 	body.SetDescription(plan.Description.ValueString())
+	body.SetInMaintenanceMode(plan.InMaintenanceMode.ValueBool())
 	//we are not setting the enabled value here as it is not respected by the API, we are invoking it in the update function
 	//body.SetEnabled(plan.Enabled.ValueBool())
 	body.SetRebootSchedules(deliveryGroupRebootScheduleArray)
@@ -849,6 +850,8 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 	metadata := util.GetMetadataRequestModel(ctx, diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, plan.Metadata))
 	body.SetMetadata(metadata)
 
+	body.SetSecureIcaRequired(plan.SecureIcaRequired.ValueBool())
+
 	return body, nil
 }
 
@@ -984,6 +987,7 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 	editDeliveryGroupRequestBody.SetName(plan.Name.ValueString())
 	editDeliveryGroupRequestBody.SetDescription(plan.Description.ValueString())
 	editDeliveryGroupRequestBody.SetEnabled(plan.Enabled.ValueBool())
+	editDeliveryGroupRequestBody.SetInMaintenanceMode(plan.InMaintenanceMode.ValueBool())
 
 	if !plan.DeliveryType.IsNull() {
 		deliveryKind, err := citrixorchestration.NewDeliveryKindFromValue(plan.DeliveryType.ValueString())
@@ -1145,6 +1149,8 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 	}
 
 	editDeliveryGroupRequestBody.SetAssignMachinesToUsers(assignMachinesToUsersRequests)
+
+	editDeliveryGroupRequestBody.SetSecureIcaEnabled(plan.SecureIcaRequired.ValueBool())
 
 	return editDeliveryGroupRequestBody, nil
 }

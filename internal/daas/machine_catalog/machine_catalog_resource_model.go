@@ -23,7 +23,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
@@ -184,6 +183,8 @@ type ProvisioningSchemeModel struct {
 }
 
 func (ProvisioningSchemeModel) GetSchema() schema.SingleNestedAttribute {
+	provSchemeMetadataSchema := util.GetMetadataListSchema("Provisioning Scheme")
+	provSchemeMetadataSchema.Description += "\n\n **Please Note** In-Place update of metadata is only supported for Cloud environments and On-Premises DDC version 2505 or later."
 	return schema.SingleNestedAttribute{
 		Description: "Machine catalog provisioning scheme. Required when `provisioning_type = MCS` or `provisioning_type = PVS_STREAMING`.",
 		Optional:    true,
@@ -290,18 +291,7 @@ func (ProvisioningSchemeModel) GetSchema() schema.SingleNestedAttribute {
 					listvalidator.SizeAtLeast(1),
 				},
 			},
-			"metadata": schema.ListNestedAttribute{
-				Description: "Metadata for the Provisioning Scheme" +
-					"\n\n~> **Please Note** Metadata for Provisioning Scheme once set cannot be updated or removed.",
-				Optional:     true,
-				NestedObject: util.NameValueStringPairModel{}.GetSchema(),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
-				},
-				PlanModifiers: []planmodifier.List{
-					listplanmodifier.RequiresReplace(),
-				},
-			},
+			"metadata": provSchemeMetadataSchema,
 		},
 	}
 }
@@ -340,6 +330,7 @@ type MachineDomainIdentityModel struct {
 	ServiceAccountDomain   types.String `tfsdk:"service_account_domain"`
 	ServiceAccount         types.String `tfsdk:"service_account"`
 	ServiceAccountPassword types.String `tfsdk:"service_account_password"`
+	ServiceAccountId       types.String `tfsdk:"service_account_id"`
 }
 
 func (MachineDomainIdentityModel) GetSchema() schema.SingleNestedAttribute {
@@ -350,7 +341,7 @@ func (MachineDomainIdentityModel) GetSchema() schema.SingleNestedAttribute {
 		Attributes: map[string]schema.Attribute{
 			"domain": schema.StringAttribute{
 				Description: "The AD domain where machine accounts will be created. Specify this in FQDN format; for example, MyDomain.com.",
-				Required:    true,
+				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(util.DomainFqdnRegex), "must be in FQDN format"),
 				},
@@ -371,16 +362,36 @@ func (MachineDomainIdentityModel) GetSchema() schema.SingleNestedAttribute {
 				Optional: true,
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(util.DomainFqdnRegex), "must be in FQDN format"),
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("service_account"),
+					}...),
 				},
 			},
 			"service_account": schema.StringAttribute{
 				Description: "Service account for the domain. Only the username is required; do not include the domain name.",
-				Required:    true,
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("service_account_password"),
+					}...),
+					stringvalidator.ExactlyOneOf(path.Expressions{
+						path.MatchRelative().AtParent().AtName("service_account_id"),
+					}...),
+				},
 			},
 			"service_account_password": schema.StringAttribute{
 				Description: "Service account password for the domain.",
-				Required:    true,
+				Optional:    true,
 				Sensitive:   true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("service_account"),
+					}...),
+				},
+			},
+			"service_account_id": schema.StringAttribute{
+				Description: "The service account Id to be used for managing the machine accounts.",
+				Optional:    true,
 			},
 		},
 	}
@@ -707,7 +718,7 @@ func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 				Optional: true,
 			},
 			"delete_machine_accounts": schema.StringAttribute{
-				Description: fmt.Sprintf("String that indicates the action on machine accounts to be performed on `terraform destroy` action. Available values are `%s`, `%s`, and `%s`. Defaults to `%s`."+"\n\n~> **Please Note** The action is only performed when the `destroy` action is taken, not when setting the value of this parameter. Once this parameter is set, there must be a successful `terraform apply` run before a `destroy` to update this value in the resource state. Without a successful `terraform apply` after this parameter is set, this parameter will have no effect. If setting this field in the same operation that would require replacing the machine catalog or destroying the machine catalog, this parameter will not work. Additionally when importing a machine catalog, a successful `terraform apply` is required to set this value in state before it will take effect on a destroy operation.", string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_DELETE), string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_DISABLE), string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE), string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE)),
+				Description: fmt.Sprintf("String that indicates the action on machine accounts to be performed on `terraform destroy` action. Available values are `%s`, `%s`, and `%s`. Defaults to `%s`."+"\n\n~> **Please Note** The action is only performed when the `destroy` action is taken, not when setting the value of this parameter. Once this parameter is set, there must be a successful `terraform apply` run before a `destroy` to update this value in the resource state. Without a successful `terraform apply` after this parameter is set, this parameter will have no effect. If setting this field in the same operation that would require replacing the machine catalog or destroying the machine catalog, this parameter will not work. Additionally when importing a machine catalog, a successful `terraform apply` is required to set the intended value in state before it will take effect on a destroy operation. If `terraform apply` after an import requires the resource to be destroyed, the default value will be used.", string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_DELETE), string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_DISABLE), string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE), string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE)),
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE)),
@@ -816,6 +827,11 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 			diagnostics.AddWarning("Error when creating null ProvisioningSchemeModel", err.Error())
 		}
 		return r
+	}
+
+	if r.DeleteMachineAccounts.IsNull() {
+		// delete_machine_accounts has a default value so it should be set. If it is not, it is probably because the catalog is being imported. Set it to the default value.
+		r.DeleteMachineAccounts = types.StringValue(string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE))
 	}
 
 	// Provisioning Scheme Properties

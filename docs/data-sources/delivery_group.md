@@ -36,6 +36,8 @@ data "citrix_delivery_group" "example_delivery_group" {
 ### Read-Only
 
 - `delivery_type` (String) The delivery type of the delivery group.
+- `in_maintenance_mode` (Boolean) Indicates whether the delivery group is in maintenance mode.
+- `secure_ica_required` (Boolean) Indicates whether secure ICA is required for the delivery group.
 - `tags` (Set of String) A set of identifiers of tags to associate with the delivery group.
 - `tenants` (Set of String) A set of identifiers of tenants to associate with the delivery group.
 - `vdas` (Attributes List) The VDAs associated with the delivery group. (see [below for nested schema](#nestedatt--vdas))

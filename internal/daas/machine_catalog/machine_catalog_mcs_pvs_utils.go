@@ -467,6 +467,13 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 	metadata := util.GetMetadataRequestModel(ctx, diag, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diag, provisioningSchemePlan.Metadata))
 	provisioningScheme.SetMetadata(metadata)
 
+	if !provisioningSchemePlan.MachineDomainIdentity.IsNull() {
+		machineDomainIdentityModel := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, diag, provisioningSchemePlan.MachineDomainIdentity)
+		if !machineDomainIdentityModel.ServiceAccountId.IsNull() {
+			provisioningScheme.SetServiceAccountUid([]string{machineDomainIdentityModel.ServiceAccountId.ValueString()})
+		}
+	}
+
 	return &provisioningScheme, nil
 }
 
@@ -620,6 +627,17 @@ func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan Provisioning
 			return body, err
 		}
 		body.SetNetworkMapping(networkMapping)
+	}
+
+	if !provisioningSchemePlan.MachineDomainIdentity.IsNull() {
+		machineDomainIdentityModel := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, diagnostics, provisioningSchemePlan.MachineDomainIdentity)
+		if !machineDomainIdentityModel.ServiceAccountId.IsNull() {
+			body.SetServiceAccountUid([]string{machineDomainIdentityModel.ServiceAccountId.ValueString()})
+		} else {
+			body.SetServiceAccountUid([]string{})
+		}
+	} else if provisioningSchemePlan.IdentityType.ValueString() == string(citrixorchestration.IDENTITYTYPE_AZURE_AD) {
+		body.SetServiceAccountUid([]string{})
 	}
 
 	customProperties, err := parseCustomPropertiesToClientModel(ctx, diagnostics, client, provisioningSchemePlan, hypervisor.ConnectionType, provisioningType, true)
@@ -1423,14 +1441,29 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Con
 		provSchemeModel.MachineADAccounts = types.ListNull(types.ObjectType{AttrTypes: attrMap})
 	}
 
+	// Set service account uid
+	machineDomainIdentityModel := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, diagnostics, provSchemeModel.MachineDomainIdentity)
+
+	serviceAccountIds := provScheme.GetServiceAccountUid()
+	if len(serviceAccountIds) > 0 {
+		machineDomainIdentityModel.ServiceAccountId = types.StringValue(serviceAccountIds[0])
+		provSchemeModel.MachineDomainIdentity = util.TypedObjectToObjectValue(ctx, diagnostics, machineDomainIdentityModel)
+	} else if provScheme.GetIdentityType() == citrixorchestration.IDENTITYTYPE_HYBRID_AZURE_AD || provScheme.GetIdentityType() == citrixorchestration.IDENTITYTYPE_ACTIVE_DIRECTORY {
+		machineDomainIdentityModel.ServiceAccountId = types.StringNull()
+	} else {
+		if attributes, err := util.ResourceAttributeMapFromObject(MachineDomainIdentityModel{}); err == nil {
+			provSchemeModel.MachineDomainIdentity = types.ObjectNull(attributes)
+		} else {
+			diagnostics.AddWarning("Error when creating null MachineDomainIdentityModel", err.Error())
+		}
+	}
+
 	// Domain Identity Properties
 	if provScheme.GetIdentityType() == citrixorchestration.IDENTITYTYPE_AZURE_AD ||
 		provScheme.GetIdentityType() == citrixorchestration.IDENTITYTYPE_WORKGROUP {
 		r.ProvisioningScheme = util.TypedObjectToObjectValue(ctx, diagnostics, provSchemeModel)
 		return r
 	}
-
-	machineDomainIdentityModel := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, diagnostics, provSchemeModel.MachineDomainIdentity)
 
 	if domain.GetName() != "" && !strings.EqualFold(domain.GetName(), machineDomainIdentityModel.Domain.ValueString()) {
 		machineDomainIdentityModel.Domain = types.StringValue(domain.GetName())

@@ -64,7 +64,6 @@ Required:
 - `gateway_url` (String) The URL of the StoreFront gateway.
 - `logon_type` (String) The login type required and supported by the Gateway. Possible values are `UsedForHDXOnly`, `Domain`, `RSA`, `DomainAndRSA`, `SMS`, `GatewayKnows`, `SmartCard`, and `None`.
 - `name` (String) The name of the StoreFront roaming gateway.
-- `subnet_ip_address` (String) The subnet IP address of the StoreFront gateway.
 
 Optional:
 
@@ -77,6 +76,7 @@ Optional:
 - `smart_card_fallback_logon_type` (String) The login type to use when SmartCard fails. Possible values are `UsedForHDXOnly`, `Domain`, `RSA`, `DomainAndRSA`, `SMS`, `GatewayKnows`, `SmartCard`, and `None`. Defaults to `None`.
 - `stas_bypass_duration` (String) Time before retrying a failed STA server in `dd.hh:mm:ss` format with 0's trimmed. Defaults to `0.1:0:0`
 - `stas_use_load_balancing` (Boolean) Use load balancing for the Secure Ticket Authority (STA) servers. Defaults to `false`.
+- `subnet_ip_address` (String) The subnet IP address of the StoreFront gateway.
 - `version` (String) The Citrix NetScaler Gateway version. Possible values are `Version10_0_69_4` and `Version9x`. Defaults to `Version10_0_69_4`.
 
 <a id="nestedatt--roaming_gateway--secure_ticket_authority_urls"></a>

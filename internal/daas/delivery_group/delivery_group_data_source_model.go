@@ -24,9 +24,11 @@ type DeliveryGroupDataSourceModel struct {
 	Name                    types.String   `tfsdk:"name"`
 	DeliveryType            types.String   `tfsdk:"delivery_type"`
 	DeliveryGroupFolderPath types.String   `tfsdk:"delivery_group_folder_path"`
+	InMaintenanceMode       types.Bool     `tfsdk:"in_maintenance_mode"`
 	Vdas                    []vda.VdaModel `tfsdk:"vdas"`    // List[VdaModel]
 	Tenants                 types.Set      `tfsdk:"tenants"` // Set[string]
 	Tags                    types.Set      `tfsdk:"tags"`    // Set[string]
+	SecureIcaRequired       types.Bool     `tfsdk:"secure_ica_required"`
 }
 
 func (DeliveryGroupDataSourceModel) GetSchema() schema.Schema {
@@ -61,6 +63,10 @@ func (DeliveryGroupDataSourceModel) GetSchema() schema.Schema {
 					stringvalidator.AlsoRequires(path.MatchRoot("name")),
 				},
 			},
+			"in_maintenance_mode": schema.BoolAttribute{
+				Description: "Indicates whether the delivery group is in maintenance mode.",
+				Computed:    true,
+			},
 			"vdas": schema.ListNestedAttribute{
 				Description:  "The VDAs associated with the delivery group.",
 				Computed:     true,
@@ -74,6 +80,10 @@ func (DeliveryGroupDataSourceModel) GetSchema() schema.Schema {
 			"tags": schema.SetAttribute{
 				ElementType: types.StringType,
 				Description: "A set of identifiers of tags to associate with the delivery group.",
+				Computed:    true,
+			},
+			"secure_ica_required": schema.BoolAttribute{
+				Description: "Indicates whether secure ICA is required for the delivery group.",
 				Computed:    true,
 			},
 		},
@@ -94,6 +104,7 @@ func (r DeliveryGroupDataSourceModel) RefreshPropertyValues(ctx context.Context,
 
 	deliveryType := string(deliveryGroup.GetDeliveryType())
 	r.DeliveryType = types.StringValue(deliveryType)
+	r.InMaintenanceMode = types.BoolValue(deliveryGroup.GetInMaintenanceMode())
 
 	res := []vda.VdaModel{}
 	for _, model := range vdas {
@@ -118,6 +129,8 @@ func (r DeliveryGroupDataSourceModel) RefreshPropertyValues(ctx context.Context,
 
 	r.Tenants = util.RefreshTenantSet(ctx, diagnostics, deliveryGroup.GetTenants())
 	r.Tags = util.RefreshTagSet(ctx, diagnostics, tags)
+
+	r.SecureIcaRequired = types.BoolValue(deliveryGroup.GetSecureIcaRequired())
 
 	return r
 }

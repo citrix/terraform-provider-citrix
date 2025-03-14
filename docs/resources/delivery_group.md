@@ -212,6 +212,7 @@ resource "citrix_delivery_group" "example-delivery-group" {
 - `force_delete` (Boolean) Boolean that indicates the delivery group object should be force deleted on `terraform destroy` action. Defaults to `false`.
 
 ~> **Please Note** The force deletion only happens when the `destroy` action is performed, not when setting this parameter to `true`. Once this parameter is set to `true`, there must be a successful `terraform apply` run before a `destroy` to update this value in the resource state. Without a successful `terraform apply` after this parameter is set, this flag will have no effect. If setting this field in the same operation that would require replacing the delivery group or destroying the delivery group, this flag will not work. Additionally when importing a delivery group, a successful `terraform apply` is required to set this value in state before it will take effect on a destroy operation.
+- `in_maintenance_mode` (Boolean) Indicates whether the delivery group is in maintenance mode. Defaults to `false`.
 - `make_resources_available_in_lhc` (Boolean) In the event of a service disruption or loss of connectivity, select if you want Local Host Cache to keep resources in the delivery group available to launch new sessions. Existing sessions are not impacted. 
 
 ~> **Please Note** This setting only impacts Single Session OS Random (pooled) desktops which are power managed. LHC is always enabled for Single Session OS static and Multi Session OS desktops.
@@ -224,6 +225,7 @@ resource "citrix_delivery_group" "example-delivery-group" {
 
 ~> **Please Note** If `restricted_access_users` attribute is omitted or set to `null`, all authenticated users will have access to this Delivery Group. If attribute is specified as an empty object i.e. `{}`, then no user will have access to the delivery group because `allow_list` and `block_list` will be set as empty sets by default. (see [below for nested schema](#nestedatt--restricted_access_users))
 - `scopes` (Set of String) The IDs of the scopes for the delivery group to be a part of.
+- `secure_ica_required` (Boolean) When set to `true`, the SecureICA protocol is required for connections to the delivery group. Defaults to `false`.
 - `session_support` (String) The session support for the delivery group. Can only be set to `SingleSession` or `MultiSession`. Specify only if you want to create a Delivery Group without any `associated_machine_catalogs`. Ensure session support is same as that of the prospective Machine Catalogs you will associate this Delivery Group with.
 - `sharing_kind` (String) The sharing kind for the delivery group. Can only be set to `Shared` or `Private`. Specify only if you want to create a Delivery Group wthout any `associated_machine_catalogs`.
 - `storefront_servers` (Set of String) A list of GUID identifiers of StoreFront Servers to associate with the delivery group.

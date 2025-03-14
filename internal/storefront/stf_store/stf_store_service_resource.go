@@ -294,71 +294,64 @@ func (r *stfStoreServiceResource) Read(ctx context.Context, req resource.ReadReq
 	}
 	state.RefreshPropertyValues(ctx, &resp.Diagnostics, STFStoreService, farms)
 	// Refresh StoreFarmConfiguration
-	if !state.FarmSettings.IsNull() {
-		// Get updated STFStoreFarmConfiguration Settings
-		getResponse, err := getFarmSettingsGetRequest(ctx, r.client, siteIdInt, state.VirtualPath.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error fetching STF StoreFarmConfigurations in Read",
-				"Error message: "+err.Error(),
-			)
-			return
-		}
-		state.RefreshFarmSettings(ctx, &resp.Diagnostics, getResponse)
+
+	// Get updated STFStoreFarmConfiguration Settings
+	getFarmResponse, err := getFarmSettingsGetRequest(ctx, r.client, siteIdInt, state.VirtualPath.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error fetching STF StoreFarmConfigurations in Read",
+			"Error message: "+err.Error(),
+		)
+		return
 	}
+	state.RefreshFarmSettings(ctx, &resp.Diagnostics, getFarmResponse)
+
 	//Refresh Storefront StoreService Enumerations
-	if !state.EnumerationOptions.IsNull() {
-		// Get STFStoreService Enumeration Options
-		getResponse, err := getSTFStoreEnumerationOptions(ctx, r.client, siteIdInt, state.VirtualPath.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error fetching StoreFront Store Enumeration Options",
-				"Error message: "+err.Error(),
-			)
-			return
-		}
-		state.RefreshEnumerationOptions(ctx, &resp.Diagnostics, getResponse)
+	// Get STFStoreService Enumeration Options
+	getEnumResponse, err := getSTFStoreEnumerationOptions(ctx, r.client, siteIdInt, state.VirtualPath.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error fetching StoreFront Store Enumeration Options",
+			"Error message: "+err.Error(),
+		)
+		return
 	}
+	state.RefreshEnumerationOptions(ctx, &resp.Diagnostics, getEnumResponse)
 
 	//Refresh Storefront StoreService Launch Options
-	if !state.LaunchOptions.IsNull() {
-		// Get STFStoreService Launch Options
-		getResponse, err := getSTFStoreLaunchOptions(ctx, r.client, siteIdInt, state.VirtualPath.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error fetching StoreFront Store Launch Options",
-				"Error message: "+err.Error(),
-			)
-			return
-		}
-		state.RefreshLaunchOptions(ctx, &resp.Diagnostics, getResponse)
+
+	// Get STFStoreService Launch Options
+	getStoreLaunchResponse, err := getSTFStoreLaunchOptions(ctx, r.client, siteIdInt, state.VirtualPath.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error fetching StoreFront Store Launch Options",
+			"Error message: "+err.Error(),
+		)
+		return
 	}
+	state.RefreshLaunchOptions(ctx, &resp.Diagnostics, getStoreLaunchResponse)
 
 	// Fetch Pna
-	if !state.PNA.IsNull() {
-		updatedPna, err := getSTFStorePNA(ctx, r.client, &resp.Diagnostics, siteIdInt, state.VirtualPath.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error fetching PNA for StoreFront StoreService",
-				"Error message: "+err.Error(),
-			)
-		}
-		state.RefreshPnaValues(ctx, &resp.Diagnostics, updatedPna)
+	updatedPna, err := getSTFStorePNA(ctx, r.client, &resp.Diagnostics, siteIdInt, state.VirtualPath.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error fetching PNA for StoreFront StoreService",
+			"Error message: "+err.Error(),
+		)
 	}
+	state.RefreshPnaValues(ctx, &resp.Diagnostics, updatedPna)
 
 	// Fetch Roaming Account
-	if !state.RoamingAccount.IsNull() {
-		// Get updated STFStoreFarmConfiguration Settings
-		getResponse, err := getSTFRoamingAccount(ctx, r.client, siteIdInt, state.VirtualPath.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error fetching STF Roaming Account",
-				"Error message: "+err.Error(),
-			)
-			return
-		}
-		state.RefreshRoamingAccount(ctx, &resp.Diagnostics, getResponse)
+	// Get updated STFStoreFarmConfiguration Settings
+	getRoamingAccResponse, err := getSTFRoamingAccount(ctx, r.client, siteIdInt, state.VirtualPath.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error fetching STF Roaming Account",
+			"Error message: "+err.Error(),
+		)
+		return
 	}
+	state.RefreshRoamingAccount(ctx, &resp.Diagnostics, getRoamingAccResponse)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -817,9 +810,7 @@ func setSTFStoreLaunchOptions(ctx context.Context, client *citrixdaasclient.Citr
 	if !launchOptions.FederatedAuthenticationServiceFailover.IsNull() {
 		launchOptionsBody.SetFederatedAuthenticationServiceFailover(launchOptions.FederatedAuthenticationServiceFailover.ValueBool())
 	}
-	if !launchOptions.IcaTemplateName.IsNull() {
-		launchOptionsBody.SetIcaTemplateName(launchOptions.IcaTemplateName.ValueString())
-	}
+
 	if !launchOptions.IgnoreClientProvidedClientAddress.IsNull() {
 		launchOptionsBody.SetIgnoreClientProvidedClientAddress(launchOptions.IgnoreClientProvidedClientAddress.ValueBool())
 	}
@@ -828,9 +819,6 @@ func setSTFStoreLaunchOptions(ctx context.Context, client *citrixdaasclient.Citr
 	}
 	if !launchOptions.OverrideIcaClientName.IsNull() {
 		launchOptionsBody.SetOverrideIcaClientName(launchOptions.OverrideIcaClientName.ValueBool())
-	}
-	if !launchOptions.RDPOnly.IsNull() {
-		launchOptionsBody.SetRDPOnly(launchOptions.RDPOnly.ValueBool())
 	}
 	if !launchOptions.RequestIcaClientSecureChannel.IsNull() {
 		launchOptionsBody.SetRequestICAClientSecureChannel(launchOptions.RequestIcaClientSecureChannel.ValueString())

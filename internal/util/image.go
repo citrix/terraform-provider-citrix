@@ -138,7 +138,7 @@ func ParseDiskEncryptionSetIdToNameAndResourceGroup(desId string) (string, strin
 	desName := desArray[len(desArray)-1]
 	resourceGroupsIndex := slices.Index(desArray, "resourceGroups")
 	resourceGroupName := desArray[resourceGroupsIndex+1]
-	return desName, resourceGroupName
+	return strings.ToLower(desName), strings.ToLower(resourceGroupName)
 }
 
 func RefreshDiskEncryptionSetModel(diskEncryptionSetModelToRefresh AzureDiskEncryptionSetModel, desId string) AzureDiskEncryptionSetModel {

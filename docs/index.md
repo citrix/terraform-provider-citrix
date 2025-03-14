@@ -68,6 +68,33 @@ A service principal is an API client which is not associated with an email. It c
 | Nutanix          |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
 | SCVMM            |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
 
+### What URLs should be whitelisted in order to use the Citrix Terraform provider?
+- URLs of the Citrix admin consoles: please visit [this documentation](https://docs.citrix.com/en-us/citrix-cloud/overview/requirements/internet-connectivity-requirements.html) for more information.
+- URL of the HashiCorp Terraform registry: https://registry.terraform.io or a private registry.
+
+#### DaaS, Citrix Cloud, and DaaS Quick Deploy resources
+- https://api.cloud.com
+- Or for Japan environment: https://api.citrixcloud.jp
+- Or for Gov environment: https://[customerId].xendesktop.us and https://*.citrixworkspacesapi.us
+
+##### Citrix Cloud Identity Providers resources
+- https://cws.citrixworkspacesapi.net
+- Or for Japan environment: https://cws.citrixworkspacesapi.jp
+- Or for Gov environment: https://cws.citrixworkspacesapi.us
+ 
+#### CVAD (On-premises) resources
+- Hostname of the DDC
+
+#### StoreFront resources
+- Hostname of the StoreFront Server
+- Hostname of the DDC
+
+#### WEM resources
+- US environment: https://api.wem.cloud.com
+- EU environment: https://eu-api.wem.cloud.com
+- APS environment: https://aps-api.wem.cloud.com
+- Japan environment: https://jp-api.wem.citrixcloud.jp
+
 ## Example Usage
 
 ```terraform

@@ -4,6 +4,7 @@ package stf_multi_site
 import (
 	"context"
 	"regexp"
+	"strings"
 
 	citrixstorefront "github.com/citrix/citrix-daas-rest-go/citrixstorefront/models"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
@@ -107,9 +108,6 @@ func (EquivalentFarmSet) GetSchema() schema.NestedAttributeObject {
 				Optional:    true,
 				Computed:    true,
 				Default:     listdefault.StaticValue(types.ListValueMust(types.StringType, []attr.Value{})),
-				Validators: []validator.List{
-					listvalidator.SizeAtLeast(1),
-				},
 			},
 			"load_balance_mode": schema.StringAttribute{
 				Description: "The load balance mode, either `Failover` or `LoadBalanced`.",
@@ -175,11 +173,16 @@ func (r *STFUserFarmMappingResourceModel) RefreshPropertyValues(ctx context.Cont
 	r.Name = types.StringValue(*result.Name.Get())
 	r.VirtualPath = types.StringValue(*result.VirtualPath.Get())
 
-	updatedGroupMembers := util.TypedArrayToObjectList[UserFarmMappingGroup](ctx, diagnostics, []UserFarmMappingGroup{})
-	if result.GroupMembers != nil && len(result.GroupMembers) > 0 {
-		updatedGroupMembers = util.RefreshListValueProperties[UserFarmMappingGroup, citrixstorefront.STFGroupMemberResponseModel](ctx, diagnostics, r.GroupMembers, result.GroupMembers, util.GetSTFGroupMemberKey)
+	if result.GroupMembers != nil && len(result.GroupMembers) > 0 && strings.ToLower(*result.GroupMembers[0].GroupName.Get()) != "everyone" && strings.ToLower(*result.GroupMembers[0].AccountSid.Get()) != "everyone" {
+		updatedGroupMembers := util.RefreshListValueProperties[UserFarmMappingGroup, citrixstorefront.STFGroupMemberResponseModel](ctx, diagnostics, r.GroupMembers, result.GroupMembers, util.GetSTFGroupMemberKey)
+		r.GroupMembers = updatedGroupMembers
+	} else {
+		if attributeMap, err := util.ResourceAttributeMapFromObject(UserFarmMappingGroup{}); err == nil {
+			r.GroupMembers = types.ListNull(types.ObjectType{AttrTypes: attributeMap})
+		} else {
+			diagnostics.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
+		}
 	}
-	r.GroupMembers = updatedGroupMembers
 
 	updatedEquivalentFarmSets := util.TypedArrayToObjectList[EquivalentFarmSet](ctx, diagnostics, []EquivalentFarmSet{})
 	if result.FarmSets != nil && len(result.FarmSets) > 0 {
