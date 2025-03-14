@@ -31,6 +31,7 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/daas/cvad_site"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/desktop_icon"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/image_definition"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/service_account"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/storefront_server"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/tags"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/vda"
@@ -935,6 +936,7 @@ func (p *citrixProvider) DataSources(_ context.Context) []func() datasource.Data
 		machine_catalog.NewPvsDataSource,
 		bearer_token.NewBearerTokenDataSource,
 		cvad_site.NewSiteDataSource,
+		cvad_site.NewSiteSettingsDataSource,
 		tags.NewTagDataSource,
 		policies.NewPolicySetDataSource,
 		storefront_server.NewStoreFrontServerDataSource,
@@ -997,6 +999,8 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		tags.NewTagResource,
 		image_definition.NewImageDefinitionResource,
 		image_definition.NewImageVersionResource,
+		service_account.NewServiceAccountResource,
+		cvad_site.NewSiteSettingsResource,
 		// StoreFront Resources
 		stf_deployment.NewSTFDeploymentResource,
 		stf_authentication.NewSTFAuthenticationServiceResource,

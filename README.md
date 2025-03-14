@@ -31,7 +31,13 @@ Citrix has developed a custom Terraform provider for automating Citrix product d
     - [Managing StoreFront resources](#managing-storefront-resources)
     - [Managing DaaS Quick Deploy resources](#managing-daas-quick-deploy-resources)
   - [Frequently Asked Questions](#frequently-asked-questions)
-      - [What resource is supported for different connection types?](#what-resource-is-supported-for-different-connection-types)
+    - [What resource is supported for different connection types?](#what-resource-is-supported-for-different-connection-types)
+    - [What URLs should be whitelisted in order to use the Citrix Terraform provider?](#what-urls-should-be-whitelisted-in-order-to-use-the-citrix-terraform-provider)
+      - [DaaS, Citrix Cloud, and DaaS Quick Deploy resources](#daas-citrix-cloud-and-daas-quick-deploy-resources)
+        - [Citrix Cloud Identity Providers resources](#citrix-cloud-identity-providers-resources)
+      - [CVAD (On-premises) resources](#cvad-on-premises-resources)
+      - [StoreFront resources](#storefront-resources)
+      - [WEM resources](#wem-resources)
   - [Attributions](#attributions)
   - [License](#license)
 
@@ -61,7 +67,6 @@ https://www.youtube.com/watch?v=c33sMLaCVjY
 ## Related Citrix Automation Repositories
 |            Title            |            Details            |
 |-----------------------------|-------------------------------|
-<!-- | [Plugin for Terraform Provider for Citrix®](https://github.com/citrix/terraform-provider-citrix) | Terraform provider plugin to manage Citrix products including CVAD, DaaS, StoreFront, and WEM via Terraform IaC. | -->
 | [Packer Image Management Module for Citrix® Virtual Apps and Desktops](https://github.com/citrix/citrix-packer-tools) | Use Packer to create golden images with the Citrix VDA installed and using Citrix best practices. |
 | [Citrix Ansible Tools](https://github.com/citrix/citrix-ansible-tools) | Playbooks to install Citrix components using automation such as the VDA. |
 | [Site Deployment Module for Citrix® Virtual Apps and Desktops](https://github.com/citrix/citrix-cvad-site-deployment-module) | Uses PowerShell to drive Terraform files to create a fully functional CVAD site. |
@@ -201,7 +206,7 @@ QuickCreate service allows customers to create and manage Amazon WorkSpaces Core
 
 ## Frequently Asked Questions
 
-#### What resource is supported for different connection types?
+### What resource is supported for different connection types?
 
 | Connection Type  |   Hypervisor       |   Resource Pool    |  MCS Power Managed   | MCS Provisioning     |          PVS             | Manual/Remote PC     |
 |------------------|--------------------|--------------------|----------------------|----------------------|--------------------------|----------------------|
@@ -213,6 +218,33 @@ QuickCreate service allows customers to create and manage Amazon WorkSpaces Core
 | Nutanix          |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
 | SCVMM            |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
 
+### What URLs should be whitelisted in order to use the Citrix Terraform provider?
+- URLs of the Citrix admin consoles: please visit [this documentation](https://docs.citrix.com/en-us/citrix-cloud/overview/requirements/internet-connectivity-requirements.html) for more information.
+- URL of the HashiCorp Terraform registry: https://registry.terraform.io or a private registry.
+
+#### DaaS, Citrix Cloud, and DaaS Quick Deploy resources
+- https://api.cloud.com
+- Or for Japan environment: https://api.citrixcloud.jp
+- Or for Gov environment: `https://[customerId].xendesktop.us` and `https://*.citrixworkspacesapi.us`
+
+##### Citrix Cloud Identity Providers resources
+- https://cws.citrixworkspacesapi.net
+- Or for Japan environment: https://cws.citrixworkspacesapi.jp
+- Or for Gov environment: https://cws.citrixworkspacesapi.us
+ 
+#### CVAD (On-premises) resources
+- Hostname of the DDC
+
+#### StoreFront resources
+- Hostname of the StoreFront Server
+- Hostname of the DDC
+
+#### WEM resources
+- US environment: https://api.wem.cloud.com
+- EU environment: https://eu-api.wem.cloud.com
+- APS environment: https://aps-api.wem.cloud.com
+- Japan environment: https://jp-api.wem.citrixcloud.jp
+  
 ## Attributions
 The code in this repository makes use of the following packages:
 -	Hashicorp Terraform Plugin Framework (https://github.com/hashicorp/terraform-plugin-framework)

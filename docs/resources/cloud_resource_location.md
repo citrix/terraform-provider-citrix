@@ -4,11 +4,14 @@ page_title: "citrix_cloud_resource_location Resource - citrix"
 subcategory: "Citrix Cloud"
 description: |-
   Manages a Citrix Cloud resource location.
+  ~> Please Note For Citrix Cloud Customer, DaaS Zone permissions are required to manage Citrix Cloud Resource Location.
 ---
 
 # citrix_cloud_resource_location (Resource)
 
 Manages a Citrix Cloud resource location.
+
+~> **Please Note** For Citrix Cloud Customer, DaaS Zone permissions are required to manage Citrix Cloud Resource Location.
 
 ## Example Usage
 

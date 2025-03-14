@@ -3,12 +3,14 @@ package tags
 
 import (
 	"context"
+	"regexp"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -53,9 +55,19 @@ func (TagResourceModel) GetSchema() schema.Schema {
 			},
 			"scopes": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "The set of IDs of the scopes applied on the tag.",
+				Description: "The set of IDs of the scopes applied on the tag. Please note that the ALL scope will be applied to the tag by default.",
 				Optional:    true,
 				Validators: []validator.Set{
+					setvalidator.ValueStringsAre(
+						validator.String(
+							stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
+						),
+						validator.String(
+							stringvalidator.NoneOf(
+								string(util.AllScopeId),
+							),
+						),
+					),
 					setvalidator.SizeAtLeast(1),
 				},
 			},

@@ -147,8 +147,6 @@ func (PluginAssistant) GetSchema() schema.SingleNestedAttribute {
 			"html5_enabled": schema.StringAttribute{
 				Description: "Method of deploying and using the Html5 Receiver.",
 				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString("Off"),
 			},
 			"html5_platforms": schema.StringAttribute{
 				Description: "The supported Html5 platforms.",
@@ -169,8 +167,6 @@ func (PluginAssistant) GetSchema() schema.SingleNestedAttribute {
 			"protocol_handler_enabled": schema.BoolAttribute{
 				Description: "Enable the Receiver Protocol Handler.",
 				Optional:    true,
-				Computed:    true,
-				Default:     booldefault.StaticBool(true),
 			},
 			"protocol_handler_platforms": schema.StringAttribute{
 				Description: "The supported Protocol Handler platforms.",
@@ -707,42 +703,15 @@ func (ResourcesService) GetAttributes() map[string]schema.Attribute {
 	return ResourcesService{}.GetSchema().Attributes
 }
 
-func (r *STFWebReceiverResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, webreceiver *citrixstorefront.STFWebReceiverDetailModel, appShortcuts *citrixstorefront.GetWebReceiverApplicationShortcutsResponseModel, communication *citrixstorefront.GetWebReceiverCommunicationResponseModel, sts *citrixstorefront.GetWebReceiverStrictTransportSecurityResponseModel, authManager *citrixstorefront.GetWebReceiverAuthenticationManagerResponseModel, ui *citrixstorefront.GetSTFWebReceiverUserInterfaceResponseModel, resourcesService *citrixstorefront.GetSTFWebReceiverResourcesServiceResponseModel, siteStyle *citrixstorefront.STFWebReceiverSiteStyleResponseModel) {
+func (r *STFWebReceiverResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, webreceiver *citrixstorefront.STFWebReceiverDetailModel) {
 	// Overwrite SFWebReceiverResourceModel with refreshed state
 	r.VirtualPath = types.StringValue(*webreceiver.VirtualPath.Get())
 	r.SiteId = types.StringValue(strconv.Itoa(*webreceiver.SiteId.Get()))
 	r.FriendlyName = types.StringValue(*webreceiver.FriendlyName.Get())
 	r.StoreServiceVirtualPath = types.StringValue(*webreceiver.StoreServiceVirtualPath.Get())
-	if !r.ApplicationShortcuts.IsNull() {
-		r.ApplicationShortcuts = r.RefreshApplicationShortcuts(ctx, diagnostics, appShortcuts)
-	}
-
-	if !r.Communication.IsNull() {
-		r.Communication = r.RefreshCommunication(ctx, diagnostics, communication)
-	}
-
-	if !r.StrictTransportSecurity.IsNull() {
-		r.StrictTransportSecurity = r.RefreshStrictTransportSecurity(ctx, diagnostics, sts)
-	}
-
-	if !r.AuthenticationManager.IsNull() {
-		r.AuthenticationManager = r.RefreshAuthenticationManager(ctx, diagnostics, authManager)
-	}
-
-	if !r.UserInterface.IsNull() {
-		r.UserInterface = r.RefreshUserInterface(ctx, diagnostics, ui)
-	}
-
-	if !r.ResourcesService.IsNull() {
-		r.ResourcesService = r.RefreshResourcesService(ctx, diagnostics, resourcesService)
-	}
-
-	if !r.WebReceiverSiteStyle.IsNull() {
-		r.WebReceiverSiteStyle = r.RefreshWebReceiverSiteStyle(ctx, diagnostics, siteStyle)
-	}
 }
 
-func (r *STFWebReceiverResourceModel) RefreshApplicationShortcuts(ctx context.Context, diagnostics *diag.Diagnostics, appShortcuts *citrixstorefront.GetWebReceiverApplicationShortcutsResponseModel) types.Object {
+func (r *STFWebReceiverResourceModel) RefreshApplicationShortcuts(ctx context.Context, diagnostics *diag.Diagnostics, appShortcuts *citrixstorefront.GetWebReceiverApplicationShortcutsResponseModel) {
 	refreshedApplicationShortcuts := ApplicationShortcuts{}
 	refreshedApplicationShortcuts.PromptForUntrustedShortcuts = types.BoolValue(*appShortcuts.PromptForUntrustedShortcuts.Get())
 	if len(appShortcuts.GetTrustedUrls()) > 0 {
@@ -758,10 +727,10 @@ func (r *STFWebReceiverResourceModel) RefreshApplicationShortcuts(ctx context.Co
 	}
 	refreshedApplicationShortcutsObject := util.TypedObjectToObjectValue(ctx, diagnostics, refreshedApplicationShortcuts)
 
-	return refreshedApplicationShortcutsObject
+	r.ApplicationShortcuts = refreshedApplicationShortcutsObject
 }
 
-func (r *STFWebReceiverResourceModel) RefreshResourcesService(ctx context.Context, diagnostics *diag.Diagnostics, resourcesService *citrixstorefront.GetSTFWebReceiverResourcesServiceResponseModel) types.Object {
+func (r *STFWebReceiverResourceModel) RefreshResourcesService(ctx context.Context, diagnostics *diag.Diagnostics, resourcesService *citrixstorefront.GetSTFWebReceiverResourcesServiceResponseModel) {
 	refreshedResourcesService := ResourcesService{}
 	refreshedResourcesService.PersistentIconCacheEnabled = types.BoolValue(*resourcesService.PersistentIconCacheEnabled.Get())
 	refreshedResourcesService.IcaFileCacheExpiry = types.Int64Value(int64(*resourcesService.IcaFileCacheExpiry.Get()))
@@ -769,10 +738,10 @@ func (r *STFWebReceiverResourceModel) RefreshResourcesService(ctx context.Contex
 	refreshedResourcesService.ShowDesktopViewer = types.BoolValue(*resourcesService.ShowDesktopViewer.Get())
 	refreshedResourcesServiceObject := util.TypedObjectToObjectValue(ctx, diagnostics, refreshedResourcesService)
 
-	return refreshedResourcesServiceObject
+	r.ResourcesService = refreshedResourcesServiceObject
 }
 
-func (r *STFWebReceiverResourceModel) RefreshCommunication(ctx context.Context, diagnostics *diag.Diagnostics, communication *citrixstorefront.GetWebReceiverCommunicationResponseModel) types.Object {
+func (r *STFWebReceiverResourceModel) RefreshCommunication(ctx context.Context, diagnostics *diag.Diagnostics, communication *citrixstorefront.GetWebReceiverCommunicationResponseModel) {
 	refreshedCommunication := Communication{}
 	refreshedCommunication.Attempts = types.Int64Value(int64(*communication.Attempts.Get()))
 	refreshedCommunication.Timeout = types.StringValue(communication.Timeout)
@@ -783,11 +752,11 @@ func (r *STFWebReceiverResourceModel) RefreshCommunication(ctx context.Context, 
 	refreshedCommunication.ProxyProcessName = types.StringValue(*communication.Proxy.ProcessName.Get())
 	refreshedCommunicationObject := util.TypedObjectToObjectValue(ctx, diagnostics, refreshedCommunication)
 
-	return refreshedCommunicationObject
+	r.Communication = refreshedCommunicationObject
 
 }
 
-func (r *STFWebReceiverResourceModel) RefreshWebReceiverSiteStyle(ctx context.Context, diagnostics *diag.Diagnostics, ss *citrixstorefront.STFWebReceiverSiteStyleResponseModel) types.Object {
+func (r *STFWebReceiverResourceModel) RefreshWebReceiverSiteStyle(ctx context.Context, diagnostics *diag.Diagnostics, ss *citrixstorefront.STFWebReceiverSiteStyleResponseModel) {
 	refreshedSiteStyle := WebReceiverSiteStyle{}
 	refreshedSiteStyle.HeaderBackgroundColor = types.StringValue(*ss.HeaderBackgroundColor.Get())
 	refreshedSiteStyle.HeaderForegroundColor = types.StringValue(*ss.HeaderForegroundColor.Get())
@@ -795,19 +764,19 @@ func (r *STFWebReceiverResourceModel) RefreshWebReceiverSiteStyle(ctx context.Co
 	refreshedSiteStyle.LogonLogoPath = types.StringValue(*ss.LogonLogoPath.Get())
 	refreshedSiteStyle.LinkColor = types.StringValue(*ss.LinkColor.Get())
 	refreshedSiteStyleObject := util.TypedObjectToObjectValue(ctx, diagnostics, refreshedSiteStyle)
-	return refreshedSiteStyleObject
+	r.WebReceiverSiteStyle = refreshedSiteStyleObject
 }
 
-func (r *STFWebReceiverResourceModel) RefreshStrictTransportSecurity(ctx context.Context, diagnostics *diag.Diagnostics, sts *citrixstorefront.GetWebReceiverStrictTransportSecurityResponseModel) types.Object {
+func (r *STFWebReceiverResourceModel) RefreshStrictTransportSecurity(ctx context.Context, diagnostics *diag.Diagnostics, sts *citrixstorefront.GetWebReceiverStrictTransportSecurityResponseModel) {
 	refreshedSts := StrictTransportSecurity{}
 	refreshedSts.Enabled = types.BoolValue(sts.Enabled)
 	refreshedSts.PolicyDuration = types.StringValue(sts.PolicyDuration)
 	refreshedStsObject := util.TypedObjectToObjectValue(ctx, diagnostics, refreshedSts)
 
-	return refreshedStsObject
+	r.StrictTransportSecurity = refreshedStsObject
 }
 
-func (r *STFWebReceiverResourceModel) RefreshAuthenticationManager(ctx context.Context, diagnostics *diag.Diagnostics, authManager *citrixstorefront.GetWebReceiverAuthenticationManagerResponseModel) types.Object {
+func (r *STFWebReceiverResourceModel) RefreshAuthenticationManager(ctx context.Context, diagnostics *diag.Diagnostics, authManager *citrixstorefront.GetWebReceiverAuthenticationManagerResponseModel) {
 	refreshedAuthManager := AuthenticationManager{}
 	if authManager.LoginFormTimeout.IsSet() {
 		refreshedAuthManager.LoginFormTimeout = types.Int64Value(int64(*authManager.LoginFormTimeout.Get()))
@@ -823,7 +792,7 @@ func (r *STFWebReceiverResourceModel) RefreshAuthenticationManager(ctx context.C
 	}
 	refreshedAuthManagerObject := util.TypedObjectToObjectValue(ctx, diagnostics, refreshedAuthManager)
 
-	return refreshedAuthManagerObject
+	r.AuthenticationManager = refreshedAuthManagerObject
 }
 
 func (r *STFWebReceiverResourceModel) RefreshPlugInAssistant(ctx context.Context, diagnostics *diag.Diagnostics, assistant *citrixstorefront.WebReceiverPluginAssistantModel) {
@@ -875,7 +844,7 @@ func (r *STFWebReceiverResourceModel) RefreshPlugInAssistant(ctx context.Context
 	r.PluginAssistant = refreshedPluginAssistantObject
 }
 
-func (r *STFWebReceiverResourceModel) RefreshUserInterface(ctx context.Context, diagnostics *diag.Diagnostics, ui *citrixstorefront.GetSTFWebReceiverUserInterfaceResponseModel) types.Object {
+func (r *STFWebReceiverResourceModel) RefreshUserInterface(ctx context.Context, diagnostics *diag.Diagnostics, ui *citrixstorefront.GetSTFWebReceiverUserInterfaceResponseModel) {
 	refreshedUserInterface := util.ObjectValueToTypedObject[UserInterface](ctx, diagnostics, r.UserInterface)
 	if ui.AutoLaunchDesktop.IsSet() {
 		refreshedUserInterface.AutoLaunchDesktop = types.BoolValue(*ui.AutoLaunchDesktop.Get())
@@ -944,7 +913,6 @@ func (r *STFWebReceiverResourceModel) RefreshUserInterface(ctx context.Context, 
 		if ui.ReceiverConfiguration.DownloadUrl.IsSet() {
 			refreshedReceiverConfiguration.DownloadUrl = types.StringValue(*ui.ReceiverConfiguration.DownloadUrl.Get())
 		}
-
 		refreshedUserInterface.ReceiverConfiguration = util.TypedObjectToObjectValue(ctx, diagnostics, refreshedReceiverConfiguration)
 	}
 
@@ -989,8 +957,7 @@ func (r *STFWebReceiverResourceModel) RefreshUserInterface(ctx context.Context, 
 	}
 
 	refreshedUserInterfaceObject := util.TypedObjectToObjectValue(ctx, diagnostics, refreshedUserInterface)
-
-	return refreshedUserInterfaceObject
+	r.UserInterface = refreshedUserInterfaceObject
 }
 
 func (STFWebReceiverResourceModel) GetSchema() schema.Schema {

@@ -526,7 +526,7 @@ resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
 
 - `delete_machine_accounts` (String) String that indicates the action on machine accounts to be performed on `terraform destroy` action. Available values are `Delete`, `Disable`, and `None`. Defaults to `None`.
 
-~> **Please Note** The action is only performed when the `destroy` action is taken, not when setting the value of this parameter. Once this parameter is set, there must be a successful `terraform apply` run before a `destroy` to update this value in the resource state. Without a successful `terraform apply` after this parameter is set, this parameter will have no effect. If setting this field in the same operation that would require replacing the machine catalog or destroying the machine catalog, this parameter will not work. Additionally when importing a machine catalog, a successful `terraform apply` is required to set this value in state before it will take effect on a destroy operation.
+~> **Please Note** The action is only performed when the `destroy` action is taken, not when setting the value of this parameter. Once this parameter is set, there must be a successful `terraform apply` run before a `destroy` to update this value in the resource state. Without a successful `terraform apply` after this parameter is set, this parameter will have no effect. If setting this field in the same operation that would require replacing the machine catalog or destroying the machine catalog, this parameter will not work. Additionally when importing a machine catalog, a successful `terraform apply` is required to set the intended value in state before it will take effect on a destroy operation. If `terraform apply` after an import requires the resource to be destroyed, the default value will be used.
 - `delete_virtual_machines` (Boolean) Boolean that indicates the machines within the machine catalog should be deleted on `terraform destroy` action. Defaults to `true` for MCS/PVS catalogs. For `Manual` catalogs, this parameter can either be unset or set to `false`. The virtual machines will not be deleted for `Manual` catalogs.
 
 ~> **Please Note** The deletion only happens when the `destroy` action is performed, not when setting this parameter to `true`. Once this parameter is set to `true`, there must be a successful `terraform apply` run before a `destroy` to update this value in the resource state. Without a successful `terraform apply` after this parameter is set, this flag will have no effect. If setting this field in the same operation that would require replacing the machine catalog or destroying the machine catalog, this flag will not work. Additionally when importing a machine catalog, a successful `terraform apply` is required to set this value in state before it will take effect on a destroy operation.
@@ -618,9 +618,9 @@ Optional:
 
 -> **Note** During machine catalog creation, if `machine_ad_accounts` is specified, the machine_account_creation_rules will not be applied. During update, machine accounts will be used first for new machines. If there is insufficient amount of machine accounts, then the machine account creation rules will be applied to create new machine accounts in the directory. (see [below for nested schema](#nestedatt--provisioning_scheme--machine_ad_accounts))
 - `machine_domain_identity` (Attributes) The domain identity for machines in the machine catalog.<br />Required when identity_type is set to `ActiveDirectory` (see [below for nested schema](#nestedatt--provisioning_scheme--machine_domain_identity))
-- `metadata` (Attributes List) Metadata for the Provisioning Scheme
+- `metadata` (Attributes List) Metadata for the Provisioning Scheme.
 
-~> **Please Note** Metadata for Provisioning Scheme once set cannot be updated or removed. (see [below for nested schema](#nestedatt--provisioning_scheme--metadata))
+ **Please Note** In-Place update of metadata is only supported for Cloud environments and On-Premises DDC version 2505 or later. (see [below for nested schema](#nestedatt--provisioning_scheme--metadata))
 - `network_mapping` (Attributes List) Specifies how the attached NICs are mapped to networks. If this parameter is omitted, provisioned VMs are created with a single NIC, which is mapped to the default network in the hypervisor resource pool. If this parameter is supplied, machines are created with the number of NICs specified in the map, and each NIC is attached to the specified network.<br />Required when `provisioning_scheme.identity_type` is `AzureAD`. (see [below for nested schema](#nestedatt--provisioning_scheme--network_mapping))
 - `nutanix_machine_config` (Attributes) Machine Configuration For Nutanix MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--nutanix_machine_config))
 - `scvmm_machine_config` (Attributes) Machine Configuration for SCVMM MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--scvmm_machine_config))
@@ -874,18 +874,16 @@ Read-Only:
 <a id="nestedatt--provisioning_scheme--machine_domain_identity"></a>
 ### Nested Schema for `provisioning_scheme.machine_domain_identity`
 
-Required:
-
-- `domain` (String) The AD domain where machine accounts will be created. Specify this in FQDN format; for example, MyDomain.com.
-- `service_account` (String) Service account for the domain. Only the username is required; do not include the domain name.
-- `service_account_password` (String, Sensitive) Service account password for the domain.
-
 Optional:
 
+- `domain` (String) The AD domain where machine accounts will be created. Specify this in FQDN format; for example, MyDomain.com.
 - `domain_ou` (String) The organization unit that computer accounts will be created into.
+- `service_account` (String) Service account for the domain. Only the username is required; do not include the domain name.
 - `service_account_domain` (String) The domain name of the service account. Specify this in FQDN format; for example, MyServiceDomain.com.
 
 ~> **Please Note** Use this property if domain of the service account which is used to create the machine accounts resides in a domain different from what's specified in property `domain` where the machine accounts are created.
+- `service_account_id` (String) The service account Id to be used for managing the machine accounts.
+- `service_account_password` (String, Sensitive) Service account password for the domain.
 
 
 <a id="nestedatt--provisioning_scheme--metadata"></a>

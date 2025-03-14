@@ -152,7 +152,7 @@ func (r RoamingGateway) RefreshListItem(ctx context.Context, diagnostics *diag.D
 	if roamingGateway.RequestTicketTwoSTAs.IsSet() {
 		r.RequestTicketTwoSTAs = types.BoolValue(*roamingGateway.RequestTicketTwoSTAs.Get())
 	}
-	if roamingGateway.SubnetIPAddress.IsSet() {
+	if roamingGateway.SubnetIPAddress.IsSet() && *roamingGateway.SubnetIPAddress.Get() != "" {
 		r.SubnetIPAddress = types.StringValue(*roamingGateway.SubnetIPAddress.Get())
 	}
 	if roamingGateway.StasUseLoadBalancing.IsSet() {
@@ -256,9 +256,9 @@ func (RoamingGateway) GetSchema() schema.NestedAttributeObject {
 			},
 			"subnet_ip_address": schema.StringAttribute{
 				Description: "The subnet IP address of the StoreFront gateway.",
-				Required:    true,
+				Optional:    true,
 				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(8),
+					stringvalidator.LengthAtLeast(7),
 					stringvalidator.RegexMatches(regexp.MustCompile(`^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$`),
 						"must be in the format xxx.xxx.xxx.xxx where each segment is 1 to 3 digits",
 					),

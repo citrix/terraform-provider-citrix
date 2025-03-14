@@ -247,11 +247,14 @@ func generateBatchApiHeaders(ctx context.Context, diagnostics *diag.Diagnostics,
 	}
 
 	if generateCredentialHeader && !provisioningSchemePlan.MachineDomainIdentity.IsNull() {
-		adminCredentialHeader := generateAdminCredentialHeader(util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, diagnostics, provisioningSchemePlan.MachineDomainIdentity))
-		var header citrixorchestration.NameValueStringPairModel
-		header.SetName("X-AdminCredential")
-		header.SetValue(adminCredentialHeader)
-		headers = append(headers, header)
+		machineDomainIdentityModel := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, diagnostics, provisioningSchemePlan.MachineDomainIdentity)
+		if !machineDomainIdentityModel.ServiceAccount.IsNull() { // // If service account is not provided, no need to create X-AdminCredential header since ServiceAccountId is being used
+			adminCredentialHeader := generateAdminCredentialHeader(machineDomainIdentityModel)
+			var header citrixorchestration.NameValueStringPairModel
+			header.SetName("X-AdminCredential")
+			header.SetValue(adminCredentialHeader)
+			headers = append(headers, header)
+		}
 	}
 
 	return headers, httpResp, err

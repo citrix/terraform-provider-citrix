@@ -290,6 +290,17 @@ function RemoveComputedProperties {
         [string] $content
     )
 
+    $regexPatterns = @(
+        "(\s+)change_credentials_url(\s+)= (\S+)",
+        '(\s+)get_user_name_url\s*=\s*"(.*?)"',
+        "(\s+)logoff_url(\s+)= (\S+)",
+        "(\s+)download_url(\s+)= (\S+)"
+    )
+    # Loop through each regex pattern and replace matches in the content
+    foreach ($pattern in $regexPatterns) {
+        $content = $content -replace $pattern, ""
+    }
+     Write-Verbose "Computed properties removed successfully."
     return $content
 }
 

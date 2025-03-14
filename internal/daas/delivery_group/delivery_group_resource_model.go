@@ -1075,6 +1075,7 @@ type DeliveryGroupResourceModel struct {
 	Enabled                     types.Bool   `tfsdk:"enabled"`
 	Name                        types.String `tfsdk:"name"`
 	Description                 types.String `tfsdk:"description"`
+	InMaintenanceMode           types.Bool   `tfsdk:"in_maintenance_mode"`
 	DeliveryType                types.String `tfsdk:"delivery_type"`
 	SessionSupport              types.String `tfsdk:"session_support"`
 	SharingKind                 types.String `tfsdk:"sharing_kind"`
@@ -1101,6 +1102,7 @@ type DeliveryGroupResourceModel struct {
 	DefaultDesktopIcon          types.String `tfsdk:"default_desktop_icon"`
 	ForceDelete                 types.Bool   `tfsdk:"force_delete"`
 	AssignMachinesToUsers       types.List   `tfsdk:"assign_machines_to_users"` // List[DeliveryGroupAssignMachinesToUsersModel]
+	SecureIcaRequired           types.Bool   `tfsdk:"secure_ica_required"`
 }
 
 func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
@@ -1129,6 +1131,12 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(""),
+			},
+			"in_maintenance_mode": schema.BoolAttribute{
+				Description: "Indicates whether the delivery group is in maintenance mode. Defaults to `false`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
 			},
 			"delivery_type": schema.StringAttribute{
 				Description: "Delivery type of the delivery group. Available values are `DesktopsOnly`, `AppsOnly`, and `DesktopsAndApps`. Defaults to `DesktopsOnly` for Delivery Groups with associated Machine Catalogs that have `allocation_type` set to `Static` and for Delivery Groups that have `sharing_kind` set to `private`. Otherwise defaults to `DesktopsAndApps",
@@ -1334,6 +1342,12 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 					listvalidator.SizeAtLeast(1),
 				},
 			},
+			"secure_ica_required": schema.BoolAttribute{
+				Description: "When set to `true`, the SecureICA protocol is required for connections to the delivery group. Defaults to `false`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
 		},
 	}
 }
@@ -1352,6 +1366,7 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 
 	// Set optional values
 	r.Enabled = types.BoolValue(deliveryGroup.GetEnabled())
+	r.InMaintenanceMode = types.BoolValue(deliveryGroup.GetInMaintenanceMode())
 	if !r.DeliveryType.IsNull() {
 		r.DeliveryType = types.StringValue(string(deliveryGroup.GetDeliveryType()))
 	} else {
@@ -1437,6 +1452,8 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 	}
 
 	r.Tags = util.RefreshTagSet(ctx, diagnostics, tags)
+
+	r.SecureIcaRequired = types.BoolValue(deliveryGroup.GetSecureIcaRequired())
 
 	return r
 }

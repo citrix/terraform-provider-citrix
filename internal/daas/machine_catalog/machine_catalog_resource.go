@@ -94,8 +94,11 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 
 	// Add domain credential header
 	if (plan.ProvisioningType.ValueString() == string(citrixorchestration.PROVISIONINGTYPE_MCS) || plan.ProvisioningType.ValueString() == string(citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING)) && !provSchemeModel.MachineDomainIdentity.IsNull() {
-		header := generateAdminCredentialHeader(util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemeModel.MachineDomainIdentity))
-		createMachineCatalogRequest = createMachineCatalogRequest.XAdminCredential(header)
+		machineDomainIdentityModel := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemeModel.MachineDomainIdentity)
+		if !machineDomainIdentityModel.ServiceAccount.IsNull() { // If service account is not provided, no need to create X-AdminCredential header since ServiceAccountId is being used
+			header := generateAdminCredentialHeader(machineDomainIdentityModel)
+			createMachineCatalogRequest = createMachineCatalogRequest.XAdminCredential(header)
+		}
 	}
 
 	// Add request body
@@ -570,6 +573,34 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 
 	setMachineCatalogTags(ctx, &resp.Diagnostics, r.client, catalogId, plan.Tags)
 
+	// Update Machine Catalog Provisioning Scheme Metadata
+	if !plan.ProvisioningScheme.IsNull() && !state.ProvisioningScheme.IsNull() {
+		provSchemePlan := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
+		provSchemeState := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, state.ProvisioningScheme)
+		if !provSchemePlan.Metadata.Equal(provSchemeState.Metadata) {
+			metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, provSchemePlan.Metadata))
+			updateProvSchemeReqBody := citrixorchestration.UpdateMachineCatalogProvisioningSchemeRequestModel{}
+			updateProvSchemeReqBody.SetMetadata(metadata)
+
+			updateProvSchemeMetadataReq := r.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsUpdateMachineCatalogProvisioningScheme(ctx, catalogId)
+			updateProvSchemeMetadataReq = updateProvSchemeMetadataReq.UpdateMachineCatalogProvisioningSchemeRequestModel(updateProvSchemeReqBody)
+			_, httpResp, err := citrixdaasclient.AddRequestData(updateProvSchemeMetadataReq, r.client).Async(true).Execute()
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error updating Machine Catalog "+catalogName,
+					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+						"\nError message: "+util.ReadClientError(err),
+				)
+				return
+			}
+
+			err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Machine Catalog "+catalogName, &resp.Diagnostics, 10, true)
+			if err != nil {
+				return
+			}
+		}
+	}
+
 	// Fetch updated machine catalog from GetMachineCatalog.
 	catalog, err = util.GetMachineCatalog(ctx, r.client, &resp.Diagnostics, catalogId, true)
 	if err != nil {
@@ -696,8 +727,11 @@ func (r *machineCatalogResource) Delete(ctx context.Context, req resource.Delete
 			if !state.ProvisioningScheme.IsNull() {
 				// Add domain credential header
 				provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, state.ProvisioningScheme)
-				header := generateAdminCredentialHeader(util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemeModel.MachineDomainIdentity))
-				deleteMachineCatalogRequest = deleteMachineCatalogRequest.XAdminCredential(header)
+				machineDomainIdentityModel := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemeModel.MachineDomainIdentity)
+				if !machineDomainIdentityModel.ServiceAccount.IsNull() { // If service account is not provided, no need to create X-AdminCredential header since ServiceAccountId is being used
+					header := generateAdminCredentialHeader(machineDomainIdentityModel)
+					deleteMachineCatalogRequest = deleteMachineCatalogRequest.XAdminCredential(header)
+				}
 			}
 		}
 	}
@@ -909,11 +943,13 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 						)
 					}
 
-					if !azureMachineConfigModel.UseAzureComputeGallery.IsUnknown() && azureMachineConfigModel.UseAzureComputeGallery.IsNull() {
+					// Exactly one of UseAzureComputeGallery or PreparedImage should be configured when the storage_type is set to AzureEphemeralOSDisk
+					if !azureMachineConfigModel.UseAzureComputeGallery.IsUnknown() && azureMachineConfigModel.UseAzureComputeGallery.IsNull() &&
+						!azureMachineConfigModel.AzurePreparedImage.IsUnknown() && azureMachineConfigModel.AzurePreparedImage.IsNull() {
 						resp.Diagnostics.AddAttributeError(
-							path.Root("use_azure_compute_gallery"),
+							path.Root("storage_type"),
 							"Missing Attribute Configuration",
-							fmt.Sprintf("use_azure_compute_gallery must be set when storage_type is %s.", util.AzureEphemeralOSDisk),
+							fmt.Sprintf("exactly one of use_azure_compute_gallery or prepared_image should be set when storage_type is %s.", util.AzureEphemeralOSDisk),
 						)
 					}
 				}
@@ -976,6 +1012,18 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 					// Validate Image Update Reboot Options
 					rebootOptions := util.ObjectValueToTypedObject[ImageUpdateRebootOptionsModel](ctx, &resp.Diagnostics, scvmmMachineConfigModel.ImageUpdateRebootOptions)
 					rebootOptions.ValidateConfig(&resp.Diagnostics)
+				}
+			}
+
+			if !provSchemeModel.MachineDomainIdentity.IsNull() && provSchemeModel.IdentityType.ValueString() == string(citrixorchestration.IDENTITYTYPE_ACTIVE_DIRECTORY) {
+				machineDomainIdentityModel := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemeModel.MachineDomainIdentity)
+				if machineDomainIdentityModel.Domain.IsNull() {
+					resp.Diagnostics.AddAttributeError(
+						path.Root("domain"),
+						"Missing Attribute Configuration",
+						"Expected domain to be configured when identity_type is Active Directory.",
+					)
+					return
 				}
 			}
 		}
@@ -1424,6 +1472,36 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 				resp.Diagnostics.AddError(
 					"Error updating Machine Catalog "+state.Name.ValueString(),
 					"machine_account_creation_rules can only be updated when adding machines.",
+				)
+				return
+			}
+		}
+		// Validate metadata
+		if !provSchemePlan.Metadata.IsUnknown() && !provSchemeState.Metadata.IsUnknown() {
+			requireReplaceForMetadataChange := false
+			if r.client.AuthConfig.OnPremises {
+				majorVersion, minorVersion, err := util.GetProductMajorAndMinorVersion(r.client)
+				if err != nil {
+					requireReplaceForMetadataChange = true
+				}
+				if majorVersion < 7 || (majorVersion == 7 && minorVersion < 45) {
+					requireReplaceForMetadataChange = true
+				}
+			} else {
+				if r.client.ClientConfig.OrchestrationApiVersion < 123 {
+					requireReplaceForMetadataChange = true
+				}
+			}
+			if !provSchemePlan.Metadata.Equal(provSchemeState.Metadata) && requireReplaceForMetadataChange {
+				resp.RequiresReplace = append(resp.RequiresReplace, path.Root("provisioning_scheme").AtName("metadata"))
+			}
+		}
+
+		if provSchemePlan.IdentityType.ValueString() == string(citrixorchestration.IDENTITYTYPE_AZURE_AD) {
+			if provSchemePlan.MachineDomainIdentity.IsNull() && !provSchemeState.MachineDomainIdentity.IsNull() {
+				resp.Diagnostics.AddError(
+					"Error updating Machine Catalog "+state.Name.ValueString(),
+					"Service Account cannot be removed when identity type is Azure AD.",
 				)
 				return
 			}

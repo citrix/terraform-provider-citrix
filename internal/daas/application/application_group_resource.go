@@ -4,6 +4,7 @@ package application
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
@@ -93,11 +94,9 @@ func (r *applicationGroupResource) Create(ctx context.Context, req resource.Crea
 		createApplicationGroupRequest.SetScopes(util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes))
 	}
 
-	var deliveryGroups []citrixorchestration.PriorityRefRequestModel
-	for _, value := range util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.DeliveryGroups) {
-		var deliveryGroupRequestModel citrixorchestration.PriorityRefRequestModel
-		deliveryGroupRequestModel.SetItem(value)
-		deliveryGroups = append(deliveryGroups, deliveryGroupRequestModel)
+	deliveryGroups, err := validateAndReturnDeliveryGroups(ctx, r.client, &resp.Diagnostics, plan)
+	if err != nil {
+		return
 	}
 
 	createApplicationGroupRequest.SetDeliveryGroups(deliveryGroups)
@@ -265,11 +264,9 @@ func (r *applicationGroupResource) Update(ctx context.Context, req resource.Upda
 		editApplicationGroupRequestBody.SetScopes(util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes))
 	}
 
-	var deliveryGroups []citrixorchestration.PriorityRefRequestModel
-	for _, value := range util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.DeliveryGroups) {
-		var deliveryGroupRequestModel citrixorchestration.PriorityRefRequestModel
-		deliveryGroupRequestModel.SetItem(value)
-		deliveryGroups = append(deliveryGroups, deliveryGroupRequestModel)
+	deliveryGroups, err := validateAndReturnDeliveryGroups(ctx, r.client, &resp.Diagnostics, plan)
+	if err != nil {
+		return
 	}
 
 	editApplicationGroupRequestBody.SetDeliveryGroups(deliveryGroups)
@@ -424,6 +421,21 @@ func (r *applicationGroupResource) ModifyPlan(ctx context.Context, req resource.
 		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
 		return
 	}
+
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var plan ApplicationGroupResourceModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if !plan.DeliveryGroups.IsUnknown() {
+		validateAndReturnDeliveryGroups(ctx, r.client, &resp.Diagnostics, plan)
+	}
 }
 
 func setApplicationGroupTags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, appGroupId string, tagSet types.Set) {
@@ -448,4 +460,38 @@ func getApplicationGroupTags(ctx context.Context, diagnostics *diag.Diagnostics,
 	getTagsRequest = getTagsRequest.Fields("Id,Name,Description")
 	tagsResp, httpResp, err := citrixdaasclient.AddRequestData(getTagsRequest, client).Execute()
 	return util.ProcessTagsResponseCollection(diagnostics, tagsResp, httpResp, err, "Application Group", applicationGroupId)
+}
+
+func validateAndReturnDeliveryGroups(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, plan ApplicationGroupResourceModel) ([]citrixorchestration.PriorityRefRequestModel, error) {
+	var deliveryGroups []citrixorchestration.PriorityRefRequestModel
+	for _, value := range util.StringSetToStringArray(ctx, diagnostics, plan.DeliveryGroups) {
+
+		if value == "" {
+			continue
+		}
+
+		deliveryGroup, err := util.GetDeliveryGroup(ctx, client, diagnostics, value)
+		if err != nil {
+			diagnostics.AddError(
+				"Error creating Application Group "+plan.Name.ValueString(),
+				"Error fetching delivery group "+value+": "+err.Error(),
+			)
+			return deliveryGroups, err
+		}
+
+		if deliveryGroup.GetSharingKind() != citrixorchestration.SHARINGKIND_SHARED {
+			err = fmt.Errorf("Delivery group " + value + " is incompatible. Delivery Group containing static assigned machines cannot be assigned to application groups.")
+			diagnostics.AddError(
+				"Error creating Application Group "+plan.Name.ValueString(),
+				err.Error(),
+			)
+			return deliveryGroups, err
+		}
+
+		var deliveryGroupRequestModel citrixorchestration.PriorityRefRequestModel
+		deliveryGroupRequestModel.SetItem(value)
+		deliveryGroups = append(deliveryGroups, deliveryGroupRequestModel)
+	}
+
+	return deliveryGroups, nil
 }

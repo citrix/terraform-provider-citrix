@@ -5,7 +5,6 @@ package zone
 import (
 	"context"
 	"net/http"
-	"time"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -106,7 +105,7 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 		zoneName := resourceLocation.GetName()
 
-		zone, err := pollZone(ctx, r.client, zoneName)
+		zone, err := util.PollZone(ctx, r.client, zoneName, false)
 		if err == nil && zone != nil {
 			// zone exists. run an update on zone so that the description and metadata are updated
 			zone, err = plan.updateZoneAfterCreate(ctx, r.client, &resp.Diagnostics, zone.GetId(), zoneName)
@@ -376,36 +375,6 @@ func getZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, dia
 func readZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, zoneId string) (*citrixorchestration.ZoneDetailResponseModel, error) {
 	getZoneRequest := client.ApiClient.ZonesAPIsDAAS.ZonesGetZone(ctx, zoneId)
 	zone, _, err := util.ReadResource[*citrixorchestration.ZoneDetailResponseModel](getZoneRequest, ctx, client, resp, "Zone", zoneId)
-	return zone, err
-}
-
-func pollZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, zoneName string) (*citrixorchestration.ZoneDetailResponseModel, error) {
-	// default polling to every 10 seconds
-	pollInterval := 10
-	startTime := time.Now()
-	getZoneRequest := client.ApiClient.ZonesAPIsDAAS.ZonesGetZone(ctx, zoneName)
-
-	var zone *citrixorchestration.ZoneDetailResponseModel
-	var err error
-	for {
-		// Zone sync should be completed within 8 minutes
-		if time.Since(startTime) > time.Minute*time.Duration(8) {
-			break
-		}
-
-		zone, httpResp, err := citrixdaasclient.AddRequestData(getZoneRequest, client).Execute()
-		if err == nil {
-			// Zone sync completed. Return the zone
-			return zone, nil
-		} else if httpResp.StatusCode != http.StatusNotFound {
-			// GET Zone call failed with an error other than 404. Return the error
-			return zone, err
-		}
-
-		time.Sleep(time.Second * time.Duration(pollInterval))
-		continue
-	}
-
 	return zone, err
 }
 

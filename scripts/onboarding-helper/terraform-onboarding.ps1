@@ -388,6 +388,20 @@ function Get-ResourceList {
             }
         }
 
+        # Handle special case for Built-in Admin Scopes
+        if ($requestPath -eq "Admin/Scopes") {
+            if ($item.IsBuiltIn) {
+                continue
+            }
+        }
+
+        # Handle special case for Icons
+        if ($requestPath -like "Icons*") {
+            if ($item.Id -eq "0" -or $item.Id -eq "1") {
+                continue
+            }
+        }
+
         # Handle special case for Policies
         if ($item.policySetGuid -and $item.policySetType -like "*Policies*") {
             $resourceList += $item.policySetGuid

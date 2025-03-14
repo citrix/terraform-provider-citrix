@@ -128,9 +128,9 @@ Optional:
 Optional:
 
 - `enhanced_enumeration` (Boolean) Enable enhanced enumeration. Enumerate multiple farms in parallel to reduce operation time. Default is true.
-- `filter_by_keywords_exclude` (List of String) Exclude applications and desktops that match the keywords. Default is empty list.
-- `filter_by_keywords_include` (List of String) Only include applications and desktops that match the keywords. Default is empty list.
-- `filter_by_types_include` (List of String) Inclusive resource filter by type (Applications, Desktops or Documents). Default is empty list.
+- `filter_by_keywords_exclude` (List of String) Exclude applications and desktops that match the keywords.
+- `filter_by_keywords_include` (List of String) Only include applications and desktops that match the keywords.
+- `filter_by_types_include` (List of String) Inclusive resource filter by type (Applications, Desktops or Documents).
 - `maximum_concurrent_enumerations` (Number) Maximum farms enumerated in parallel. Default is 0.
 - `minimum_farms_required_for_concurrent_enumeration` (Number) Minimum farms required for concurrent enumeration. Default is 3.
 
@@ -162,11 +162,9 @@ Optional:
 - `allow_font_smoothing` (Boolean) Specifies whether or not font smoothing is permitted for ICA sessions. Default is true.
 - `allow_special_folder_redirection` (Boolean) Redirect special folders such as Documents, Computer and the Desktop. Default is false.
 - `federated_authentication_service_failover` (Boolean) Specifies whether to failover to launch without the Federated Auth Service (FAS) should it become uncontactable. Default is false.
-- `ica_template_name` (String) Ica template to use when launching an application or desktop. Default is empty string.
 - `ignore_client_provided_client_address` (Boolean) Specifies whether or not to ignore the address provided by the Citrix client. Default is false.
 - `overlay_auto_login_credentials_with_ticket` (Boolean) Specifies whether a logon ticket must be duplicated in a logon ticket entry or placed in a separate .ica launch file ticket entry only. Default is false.
 - `override_ica_client_name` (Boolean) Specifies whether or not a Web Interface-generated ID must be passed in the client name entry of an .ica launch file. Default is false.
-- `rdp_only` (Boolean) Configure the Store to only launch use the RDP protocol. Default is false.
 - `request_ica_client_secure_channel` (String) Specifies TLS settings(SSLAnyCiphers, TLSGovCipers, DetectAnyCiphers). Default is DetectAnyCipher.
 - `require_launch_reference` (Boolean) Specifies whether or not the use of launch references is enforced. Default is true.
 - `set_no_load_bias_flag` (Boolean) Specifies whether XenApp load bias should be used. Default is false.
