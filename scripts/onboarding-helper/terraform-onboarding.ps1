@@ -470,7 +470,7 @@ function Get-ImportMap {
         }
         
         if ($resourceApi -eq "AdminFolders" -and $pathMap.Count -gt 0) {
-            $applicationFolderPathMap[$pathMap.$id] = $resourceName
+            $script:applicationFolderPathMap[$pathMap.$id.TrimEnd('\')] = $resourceName
         }
         
         $resourceMap[$resourceMapKey] = $resourceName
@@ -724,14 +724,24 @@ function ReplaceDependencyRelationships {
             continue
         }
         foreach ($id in $script:cvadResourcesMap[$resource].Keys) {
-            $content = $content -replace "`"$id`"", "citrix_$($resource).$($script:cvadResourcesMap[$resource][$id]).id"
+            if($resource -like "*_resource_pool") {
+                $idArray = $id -split ","
+                if($idArray.Count -gt 1) {
+                    $resource_pool_id = $idArray[1]
+                    Write-Verbose "Replacing ID: $resource_pool_id with citrix_$($resource).$($script:cvadResourcesMap[$resource][$id]).id"
+                    $content = $content -replace "`"$resource_pool_id`"", "citrix_$($resource).$($script:cvadResourcesMap[$resource][$id]).id"
+                }
+            }else{
+                Write-Verbose "Replacing ID: $id with citrix_$($resource).$($script:cvadResourcesMap[$resource][$id]).id"
+                $content = $content -replace "`"$id`"", "citrix_$($resource).$($script:cvadResourcesMap[$resource][$id]).id"
+            }
         }
     }
 
     # Create dependency relationships between resources with path references
     foreach ( $applicationFolderPath in $script:applicationFolderPathMap.Keys) {
         $path = $applicationFolderPath.replace("\", "\\\\")
-        $content = $content -replace "`"$path`"", "citrix_admin_folder.$($script:applicationFolderPathMap[$applicationFolderPath]).path"
+        $content = $content -replace "(\s(parent_path|application_folder_path|application_group_folder_path|delivery_group_folder_path|machine_catalog_folder_path)\s+= )(`"$path`")", "`${1}citrix_admin_folder.$($script:applicationFolderPathMap[$applicationFolderPath]).path"
     }
 
     return $content
