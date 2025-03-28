@@ -118,10 +118,6 @@ func (ClientNameFilterModel) GetDataSourceAttributes() map[string]schema.Attribu
 func (DeliveryGroupFilterModel) GetDataSourceSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "Id of the delivery group policy filter.",
-				Computed:    true,
-			},
 			"enabled": schema.BoolAttribute{
 				Description: "Indicate whether the filter is being enabled.",
 				Computed:    true,

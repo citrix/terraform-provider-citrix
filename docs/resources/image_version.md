@@ -18,12 +18,7 @@ resource "citrix_image_version" "example_azure_image_version" {
 	hypervisor = citrix_azure_hypervisor.example_azure_hypervisor.id   
 	hypervisor_resource_pool = citrix_azure_hypervisor_resource_pool.example_azure_resource_pool.id   
 	description = "example description"
-	network_mapping = [
-		{
-			network_device = "0"
-			network 	   = "example_subnet"
-		}
-    ]
+
 	azure_image_specs = {
 		service_offering = "Standard_B2als_v2"
 		storage_type = "StandardSSD_LRS"
@@ -59,12 +54,7 @@ resource "citrix_image_version" "example_vsphere_image_version" {
 	hypervisor = citrix_vsphere_hypervisor.example_vsphere_hypervisor.id   
 	hypervisor_resource_pool = citrix_vsphere_hypervisor_resource_pool.example_vsphere_resource_pool.id   
 	description = "example vSphere image version description"
-	network_mapping = [
-		{
-			network_device = "0"
-			network 	   = "example_network"
-		}
-    ]
+
 	vsphere_image_specs = {
         master_image_vm = "example_master_image_vm"
         image_snapshot = "snaphost-1/snapshot-2/snapshot-3"
@@ -90,6 +80,7 @@ resource "citrix_image_version" "example_vsphere_image_version" {
 - `azure_image_specs` (Attributes) Image configuration for Azure image version. (see [below for nested schema](#nestedatt--azure_image_specs))
 - `description` (String) Description of the image version.
 - `network_mapping` (Attributes List) Specifies how the attached NICs are mapped to networks. (see [below for nested schema](#nestedatt--network_mapping))
+- `timeout` (Attributes) Timeout in minutes for the long-running jobs in image version resource's create, delete operation(s). (see [below for nested schema](#nestedatt--timeout))
 - `vsphere_image_specs` (Attributes) Image configuration for vSphere image version. (see [below for nested schema](#nestedatt--vsphere_image_specs))
 
 ### Read-Only
@@ -158,6 +149,15 @@ Required:
 
 - `network` (String) The name of the virtual network that the device should be attached to. This must be a subnet within a Virtual Private Cloud item in the resource pool to which the Machine Catalog is associated.<br />For AWS, please specify the network mask of the network you want to use within the VPC.
 - `network_device` (String) Name or Id of the network device.
+
+
+<a id="nestedatt--timeout"></a>
+### Nested Schema for `timeout`
+
+Optional:
+
+- `create` (Number) Timeout in minutes for the long-running jobs in create operation. Defaults to 30. Minimum value is 5.
+- `delete` (Number) Timeout in minutes for the long-running jobs in delete operation. Defaults to 10. Minimum value is 5.
 
 
 <a id="nestedatt--vsphere_image_specs"></a>

@@ -38,6 +38,7 @@ resource "citrix_aws_hypervisor_resource_pool" "example-aws-hypervisor-resource-
 ### Optional
 
 - `metadata` (Attributes List) Metadata for the Hypervosor Resource Pool. (see [below for nested schema](#nestedatt--metadata))
+- `vm_tagging` (Boolean) Indicates whether VMs created by provisioning operations should be tagged. Default is `true`.
 
 ### Read-Only
 

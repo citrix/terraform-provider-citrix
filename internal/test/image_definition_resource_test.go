@@ -88,9 +88,10 @@ func BuildAzureImageDefinitionTestResource(t *testing.T) string {
 	imageDefinitionOsType := os.Getenv("TEST_IMAGE_DEFINITION_OS_TYPE")
 	imageDefinitionSessionSupport := os.Getenv("TEST_IMAGE_DEFINITION_SESSION_SUPPORT")
 	imageDefinitionHypervisorId := os.Getenv("TEST_IMAGE_DEFINITION_HYPERVISOR_ID")
+	imageDefinitionHypervisorPoolId := os.Getenv("TEST_IMAGE_DEFINITION_HYPERVISOR_POOL_ID")
 	imageDefinitionResourceGroup := os.Getenv("TEST_IMAGE_DEFINITION_RESOURCE_GROUP")
 
-	return fmt.Sprintf(azureImageDefinitionTestResource, imageDefinitionName, imageDefinitionDescription, imageDefinitionOsType, imageDefinitionSessionSupport, imageDefinitionHypervisorId, imageDefinitionResourceGroup)
+	return fmt.Sprintf(azureImageDefinitionTestResource, imageDefinitionName, imageDefinitionDescription, imageDefinitionOsType, imageDefinitionSessionSupport, imageDefinitionHypervisorId, imageDefinitionHypervisorPoolId, imageDefinitionResourceGroup)
 }
 
 func BuildAzureImageDefinitionUpdatedTestResource(t *testing.T) string {
@@ -99,9 +100,10 @@ func BuildAzureImageDefinitionUpdatedTestResource(t *testing.T) string {
 	imageDefinitionOsType := os.Getenv("TEST_IMAGE_DEFINITION_OS_TYPE_UPDATED")
 	imageDefinitionSessionSupport := os.Getenv("TEST_IMAGE_DEFINITION_SESSION_SUPPORT_UPDATED")
 	imageDefinitionHypervisorId := os.Getenv("TEST_IMAGE_DEFINITION_HYPERVISOR_ID_UPDATED")
+	imageDefinitionHypervisorPoolId := os.Getenv("TEST_IMAGE_DEFINITION_HYPERVISOR_POOL_ID")
 	imageDefinitionResourceGroup := os.Getenv("TEST_IMAGE_DEFINITION_RESOURCE_GROUP_UPDATED")
 
-	return fmt.Sprintf(azureImageDefinitionTestResource, imageDefinitionName, imageDefinitionDescription, imageDefinitionOsType, imageDefinitionSessionSupport, imageDefinitionHypervisorId, imageDefinitionResourceGroup)
+	return fmt.Sprintf(azureImageDefinitionTestResource, imageDefinitionName, imageDefinitionDescription, imageDefinitionOsType, imageDefinitionSessionSupport, imageDefinitionHypervisorId, imageDefinitionHypervisorPoolId, imageDefinitionResourceGroup)
 }
 
 func BuildAzureImageDefinitionTestResourcePre121(t *testing.T) string {
@@ -109,9 +111,10 @@ func BuildAzureImageDefinitionTestResourcePre121(t *testing.T) string {
 	imageDefinitionDescription := os.Getenv("TEST_IMAGE_DEFINITION_DESCRIPTION")
 	imageDefinitionOsType := os.Getenv("TEST_IMAGE_DEFINITION_OS_TYPE")
 	imageDefinitionSessionSupport := os.Getenv("TEST_IMAGE_DEFINITION_SESSION_SUPPORT")
+	imageDefinitionHypervisorPoolId := os.Getenv("TEST_IMAGE_DEFINITION_HYPERVISOR_POOL_ID")
 	imageDefinitionHypervisorId := os.Getenv("TEST_IMAGE_DEFINITION_HYPERVISOR_ID")
 
-	return fmt.Sprintf(azureImageDefinitionTestResourcePre121, imageDefinitionName, imageDefinitionDescription, imageDefinitionOsType, imageDefinitionSessionSupport, imageDefinitionHypervisorId)
+	return fmt.Sprintf(azureImageDefinitionTestResourcePre121, imageDefinitionName, imageDefinitionDescription, imageDefinitionOsType, imageDefinitionSessionSupport, imageDefinitionHypervisorId, imageDefinitionHypervisorPoolId)
 }
 
 func BuildAzureImageDefinitionUpdatedTestResourcePre121(t *testing.T) string {
@@ -119,9 +122,10 @@ func BuildAzureImageDefinitionUpdatedTestResourcePre121(t *testing.T) string {
 	imageDefinitionDescription := os.Getenv("TEST_IMAGE_DEFINITION_DESCRIPTION_UPDATED")
 	imageDefinitionOsType := os.Getenv("TEST_IMAGE_DEFINITION_OS_TYPE_UPDATED")
 	imageDefinitionSessionSupport := os.Getenv("TEST_IMAGE_DEFINITION_SESSION_SUPPORT_UPDATED")
+	imageDefinitionHypervisorPoolId := os.Getenv("TEST_IMAGE_DEFINITION_HYPERVISOR_POOL_ID")
 	imageDefinitionHypervisorId := os.Getenv("TEST_IMAGE_DEFINITION_HYPERVISOR_ID_UPDATED")
 
-	return fmt.Sprintf(azureImageDefinitionTestResourcePre121, imageDefinitionName, imageDefinitionDescription, imageDefinitionOsType, imageDefinitionSessionSupport, imageDefinitionHypervisorId)
+	return fmt.Sprintf(azureImageDefinitionTestResourcePre121, imageDefinitionName, imageDefinitionDescription, imageDefinitionOsType, imageDefinitionSessionSupport, imageDefinitionHypervisorId, imageDefinitionHypervisorPoolId)
 }
 
 func TestVSphereImageDefinitionResourcePreCheck(t *testing.T) {
@@ -181,8 +185,9 @@ func BuildVSphereImageDefinitionTestResource(t *testing.T) string {
 	imageDefinitionOsType := os.Getenv("TEST_VSPHERE_IMAGE_DEFINITION_OS_TYPE")
 	imageDefinitionSessionSupport := os.Getenv("TEST_VSPHERE_IMAGE_DEFINITION_SESSION_SUPPORT")
 	imageDefinitionHypervisorId := os.Getenv("TEST_VSPHERE_IMAGE_DEFINITION_HYPERVISOR_ID")
+	imageDefinitionHypervisorPoolId := os.Getenv("TEST_VSPHERE_IMAGE_DEFINITION_HYPERVISOR_POOL_ID")
 
-	return fmt.Sprintf(vsphereImageDefinitionTestResource, imageDefinitionName, imageDefinitionDescription, imageDefinitionOsType, imageDefinitionSessionSupport, imageDefinitionHypervisorId)
+	return fmt.Sprintf(vsphereImageDefinitionTestResource, imageDefinitionName, imageDefinitionDescription, imageDefinitionOsType, imageDefinitionSessionSupport, imageDefinitionHypervisorId, imageDefinitionHypervisorPoolId)
 }
 
 func BuildVSphereImageDefinitionUpdatedTestResource(t *testing.T) string {
@@ -191,8 +196,9 @@ func BuildVSphereImageDefinitionUpdatedTestResource(t *testing.T) string {
 	imageDefinitionOsType := os.Getenv("TEST_VSPHERE_IMAGE_DEFINITION_OS_TYPE_UPDATED")
 	imageDefinitionSessionSupport := os.Getenv("TEST_VSPHERE_IMAGE_DEFINITION_SESSION_SUPPORT_UPDATED")
 	imageDefinitionHypervisorId := os.Getenv("TEST_VSPHERE_IMAGE_DEFINITION_HYPERVISOR_ID_UPDATED")
+	imageDefinitionHypervisorPoolId := os.Getenv("TEST_IMAGE_DEFINITION_HYPERVISOR_POOL_ID")
 
-	return fmt.Sprintf(vsphereImageDefinitionTestResource, imageDefinitionName, imageDefinitionDescription, imageDefinitionOsType, imageDefinitionSessionSupport, imageDefinitionHypervisorId)
+	return fmt.Sprintf(vsphereImageDefinitionTestResource, imageDefinitionName, imageDefinitionDescription, imageDefinitionOsType, imageDefinitionSessionSupport, imageDefinitionHypervisorId, imageDefinitionHypervisorPoolId)
 }
 
 var (
@@ -218,6 +224,7 @@ resource "citrix_image_definition" "test_azure_image_definition" {
 	os_type 		= "%s"
 	session_support = "%s"
 	hypervisor      = "%s"
+	hypervisor_resource_pool = "%s"
     azure_image_definition = {
 		resource_group = "%s"
         use_image_gallery = false
@@ -232,6 +239,7 @@ resource "citrix_image_definition" "test_azure_image_definition" {
 	os_type 		= "%s"
 	session_support = "%s"
 	hypervisor      = "%s"
+	hypervisor_resource_pool = "%s"
 }
 `
 
@@ -253,5 +261,6 @@ resource "citrix_image_definition" "test_vsphere_image_definition" {
 	os_type 		= "%s"
 	session_support = "%s"
 	hypervisor      = "%s"
+	hypervisor_resource_pool = "%s"
 }`
 )

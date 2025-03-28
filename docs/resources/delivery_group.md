@@ -172,6 +172,7 @@ resource "citrix_delivery_group" "example-delivery-group" {
             ]
         }
     ]
+    color_depth = "TwentyFourBit"
 }
 ```
 
@@ -195,6 +196,7 @@ resource "citrix_delivery_group" "example-delivery-group" {
 ~> **Please Note** Adding or removing values from this property will not add or remove machines. Adding an object will assign (or reassign if already assigned) the machine to user(s). Removing an object will unassign the corresponding machine. (see [below for nested schema](#nestedatt--assign_machines_to_users))
 - `associated_machine_catalogs` (Attributes Set) Machine catalogs from which to assign machines to the newly created delivery group. (see [below for nested schema](#nestedatt--associated_machine_catalogs))
 - `autoscale_settings` (Attributes) The power management settings governing the machine(s) in the delivery group. (see [below for nested schema](#nestedatt--autoscale_settings))
+- `color_depth` (String) Specifies the color depth for the delivery group. Available values are `FourBit`, `EightBit`, `SixteenBit`, and `TwentyFourBit`. Defaults to `TwentyFourBit`.
 - `custom_access_policies` (Attributes List) Custom Access Policies for the delivery group. To manage built-in access policies use the `default_access_policies` instead. (see [below for nested schema](#nestedatt--custom_access_policies))
 - `default_access_policies` (Attributes List) Manage built-in Access Policies for the delivery group. These are the Citrix Gateway Connections (via Access Gateway) and Non-Citrix Gateway Connections (not via Access Gateway) access policies.
 
@@ -213,6 +215,7 @@ resource "citrix_delivery_group" "example-delivery-group" {
 
 ~> **Please Note** The force deletion only happens when the `destroy` action is performed, not when setting this parameter to `true`. Once this parameter is set to `true`, there must be a successful `terraform apply` run before a `destroy` to update this value in the resource state. Without a successful `terraform apply` after this parameter is set, this flag will have no effect. If setting this field in the same operation that would require replacing the delivery group or destroying the delivery group, this flag will not work. Additionally when importing a delivery group, a successful `terraform apply` is required to set this value in state before it will take effect on a destroy operation.
 - `in_maintenance_mode` (Boolean) Indicates whether the delivery group is in maintenance mode. Defaults to `false`.
+- `load_balancing_type` (String) Specifies the load balancing type for the delivery group. Supported values are `None`, `Horizontal`, and `Vertical`. Defaults to `None`.
 - `make_resources_available_in_lhc` (Boolean) In the event of a service disruption or loss of connectivity, select if you want Local Host Cache to keep resources in the delivery group available to launch new sessions. Existing sessions are not impacted. 
 
 ~> **Please Note** This setting only impacts Single Session OS Random (pooled) desktops which are power managed. LHC is always enabled for Single Session OS static and Multi Session OS desktops.

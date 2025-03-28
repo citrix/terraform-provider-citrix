@@ -41,6 +41,7 @@ resource "citrix_gcp_hypervisor_resource_pool" "example-gcp-hypervisor-resource-
 
 - `metadata` (Attributes List) Metadata for the Hypervisor Resource Pool. (see [below for nested schema](#nestedatt--metadata))
 - `shared_vpc` (Boolean) Indicate whether the GCP Virtual Private Cloud is a shared VPC.
+- `vm_tagging` (Boolean) Indicates whether VMs created by provisioning operations should be tagged. Default is `true`.
 
 ### Read-Only
 

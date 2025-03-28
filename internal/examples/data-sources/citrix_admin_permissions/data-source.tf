@@ -7,10 +7,10 @@ data "citrix_admin_permissions" "all-permissions" { }
 
 # Example using the data source to create a new custom role
 data "citrix_admin_role" "desktop_group_admin_role" {
-    name = "Desktop Group Custom Admin Role"
+    name = "Delivery Group Custom Admin Role"
     description = "Role for managing delivery groups"
     permissions = [
-        // all permissions from the data source that start with "DesktopGroup_"
+        // all permissions from the data source that start with "DesktopGroup_", the old name for delivery groups
         for permission in data.citrix_admin_permissions.all-permissions.permissions :
         permission.id if startswith(permission.id, "DesktopGroup_")
     ]

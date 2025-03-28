@@ -31,15 +31,26 @@ data "citrix_image_definition" "example_image_definition_by_name" {
 
 - `id` (String) The GUID identifier of the image definition.
 - `name` (String) Name of the image definition.
+- `timeout` (Attributes) Timeout in minutes for the long-running jobs in image definition resource's create, delete operation(s). (see [below for nested schema](#nestedatt--timeout))
 
 ### Read-Only
 
 - `azure_image_definition` (Attributes) Details of the Azure Image Definition. (see [below for nested schema](#nestedatt--azure_image_definition))
 - `description` (String) Description of the image definition.
 - `hypervisor` (String) ID of the hypervisor connection to be used for image definition.
+- `hypervisor_resource_pool` (String) ID of the hypervisor resource pool to be used for image definition.
 - `latest_version` (Number) Latest version of the image definition.
 - `os_type` (String) Operating system type of the image definition.
 - `session_support` (String) Session support of the image definition.
+
+<a id="nestedatt--timeout"></a>
+### Nested Schema for `timeout`
+
+Optional:
+
+- `create` (Number) Timeout in minutes for the long-running jobs in create operation. Defaults to 10. Minimum value is 5.
+- `delete` (Number) Timeout in minutes for the long-running jobs in delete operation. Defaults to 10. Minimum value is 5.
+
 
 <a id="nestedatt--azure_image_definition"></a>
 ### Nested Schema for `azure_image_definition`

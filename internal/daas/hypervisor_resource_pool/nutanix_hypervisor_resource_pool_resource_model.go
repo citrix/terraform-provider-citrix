@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -23,6 +24,7 @@ type NutanixHypervisorResourcePoolResourceModel struct {
 	Name       types.String `tfsdk:"name"`
 	Hypervisor types.String `tfsdk:"hypervisor"`
 	Metadata   types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
+	VmTagging  types.Bool   `tfsdk:"vm_tagging"`
 	/**** Resource Pool Details ****/
 	Networks types.List `tfsdk:"networks"` // List[string]
 }
@@ -61,6 +63,12 @@ func (NutanixHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"metadata": util.GetMetadataListSchema("Hypervisor Resource Pool"),
+			"vm_tagging": schema.BoolAttribute{
+				Description: "Indicates whether VMs created by provisioning operations should be tagged. Default is `true`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
+			},
 		},
 	}
 }
@@ -76,6 +84,7 @@ func (r NutanixHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx co
 
 	hypervisorConnection := resourcePool.GetHypervisorConnection()
 	r.Hypervisor = types.StringValue(hypervisorConnection.GetId())
+	r.VmTagging = types.BoolValue(resourcePool.GetVMTaggingEnabled())
 
 	remoteNetwork := []string{}
 	for _, network := range resourcePool.GetNetworks() {

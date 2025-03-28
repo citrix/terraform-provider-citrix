@@ -29,15 +29,30 @@ Please refer to [Citrix Tech Zone](https://community.citrix.com/tech-zone/automa
 - [Daily administrative operations](https://community.citrix.com/tech-zone/automation/terraform-daily-administration/)
 - [AWS EC2](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-aws/) via MCS
 - [AWS WorkSpaces Core](https://community.citrix.com/tech-zone/learn/poc-guides/daas-and-awc-terraform)
-- [Azure](https://community.citrix.com/tech-zone/build/deployment-guides/citrix-daas-terraform-azure/) via MCS
+- [Azure](https://community.citrix.com/tech-zone/build/deployment-guides/daas-azure-iac) via MCS
 - [GCP](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-gcp/) via MCS
 - [vSphere](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-vsphere8/) via MCS
 - [XenServer](https://community.citrix.com/tech-zone/automation/citrix-terraform-xenserver) via MCS
 - [Citrix policies](https://community.citrix.com/tech-zone/automation/cvad-terraform-policies/)
 
+### Basic Examples
+Basic example templates for getting started can be found in our [GitHub repository](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/README.md).
+
 ### Demo video
 [![alt text](https://raw.githubusercontent.com/citrix/terraform-provider-citrix/refs/heads/main/images/techzone-youtube-thumbnail.png)](https://www.youtube.com/watch?v=c33sMLaCVjY)
 https://www.youtube.com/watch?v=c33sMLaCVjY
+
+### Roadmap Proposal for a Smoother Onboarding Experience
+To streamline your onboarding experience with the Citrix Terraform Provider, we recommend starting with the core resources essential for a Citrix deployment:
+
+- Resource Location (for Citrix Cloud customers only)
+- Zone
+- Hypervisor
+- Hypervisor Resource Pool
+
+These resources are straightforward to configure and can be created or removed quickly. Begin your Terraform journey with these resources to build confidence in managing your Citrix deployment via Terraform.
+
+Once these resources are properly configured, the next step is to set up your [machine catalog](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/machine_catalog) with Terraform. Managing the machine catalog with Terraform will provide a solid foundation for designing a pipeline that meets your specific use case.
 
 ### (On-Premises Only) Enable Web Studio
 
@@ -71,6 +86,62 @@ A service principal is an API client which is not associated with an email. It c
 ### What URLs should be whitelisted in order to use the Citrix Terraform provider?
 - URLs of the Citrix admin consoles: please visit [this documentation](https://docs.citrix.com/en-us/citrix-cloud/overview/requirements/internet-connectivity-requirements.html) for more information.
 - URL of the HashiCorp Terraform registry: https://registry.terraform.io or a private registry.
+
+### How do I get the ID to import a DaaS resource?
+The [Onboarding Script](https://github.com/citrix/terraform-provider-citrix/blob/main/scripts/onboarding-helper/) will discover all resource IDs and import them into a local terraform state file. You can then run `terraform state show` to inspect the state and discover the IDs.
+
+Alternatively the IDs can be found in Web Studio by looking at the network traces. Open your browser developer tools (usually F12) and navigate to the `Network` tab. Refresh Web Studio and click on the resource you want to find the ID for. There should be 2 corresponding network calls (`OPTIONS` then `GET`) for the resource which includes the ID as the last path in the url before the `?` query.
+
+For example in this network call the delivery group ID is `9e451353-d41c-40d5-80da-37177680364b`:
+```
+OPTIONS https://customerId.xendesktop.net/citrix/orchestration/api/customerId/e4c48b1c-0c2c-4ede-b9a2-ec34998ab118/DeliveryGroups/9e451353-d41c-40d5-80da-37177680364b?fields=SimpleAccessPolicy%2C...
+```
+
+### Are my secrets safe in the Terraform state file?
+When you use Terraform, any secret in the resource configuration will be stored in the state file. Terraform has guidance to handle the state file itself as sensitive: https://developer.hashicorp.com/terraform/language/state/sensitive-data. This can be mitigated by using a remote state file with encryption enabled. 
+
+It is still best to avoid putting secrets in the state file, and DaaS has a few options to avoid storing secrets in the state:
+#### Azure Hypervisor 
+MCS offers the option to use the managed identity of the Citrix Cloud Connector to call Azure APIs instead of the application ID + secret. See the [Citrix docs](https://docs.citrix.com/en-us/citrix-daas/install-configure/connections/connection-azure-resource-manager.html#create-a-host-connection-using-azure-managed-identity) for this feature and the [provider docs](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/service_account#authentication_mode-1)
+```
+resource "citrix_azure_hypervisor" "example-azure-hypervisor" {
+    name                = "example-azure-hypervisor"
+    zone                = "<Zone Id>"
+    active_directory_id = "<Azure Tenant Id>"
+    subscription_id     = "<Azure Subscription Id>"
+    authentication_mode = "SystemAssignedManagedIdentity" // or "UserAssignedManagedIdentities"
+    proxy_hypervisor_traffic_through_connector = true
+}
+```
+
+#### Domain Password
+A domain user is required for the `citrix_machine_catalog` resource to create and manage AD machine accounts for the VDAs. This can be pre-created as a Service Account in Web Studio and then imported into Terraform. The machine catalog will then use the credentials stored on the DDC to communicate with AD. See the [citrix_service_account](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/service_account) and [citrix_machine_catalog](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/machine_catalog#service_account_id-1) docs.
+```
+resource citrix_service_account "example-service-account" {
+    // These values should match what was entered in Web Studio to ensure the import is successful
+    display_name = "example-ad-service-account"
+    identity_provider_type = "ActiveDirectory"
+    identity_provider_identifier = "<DomainFQDN>"
+    account_id = "<Domain>\\<Admin Username>"
+    account_secret_format = "PlainText"
+
+    // the actual secret is already in remote, putting a dummy value here and setting to ignore changes because this argument is required
+    account_secret = "dummy secret for import" 
+    lifecycle {
+        ignore_changes = [account_secret]
+    }
+}
+
+// terraform import citrix_service_account.example-service-account <service account ID>
+
+resource "citrix_machine_catalog" "dj-test" {
+    provisioning_scheme = {
+        machine_domain_identity = {
+            domain             = "<DomainFQDN>"
+            // use the imported service account when creating this catalog
+            service_account_id = citrix_service_account.cmdlab-service-account.id
+    ...
+```
 
 #### DaaS, Citrix Cloud, and DaaS Quick Deploy resources
 - https://api.cloud.com

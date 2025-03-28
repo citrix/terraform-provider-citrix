@@ -800,7 +800,7 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 	userAgent := "citrix-terraform-provider/" + version + " (https://github.com/citrix/terraform-provider-citrix)"
 
 	// Setup the Citrix API Client
-	token, httpResp, err := client.SetupCitrixClientsContext(ctx, authUrl, ccUrl, hostname, customerId, clientId, clientSecret, onPremises, apiGateway, isGov, disableSslVerification, &userAgent, middleware.MiddlewareAuthFunc, middleware.MiddlewareAuthWithCustomerIdHeaderFunc)
+	token, httpResp, err := client.SetupCitrixClientsContext(ctx, authUrl, ccUrl, hostname, customerId, clientId, clientSecret, onPremises, apiGateway, isGov, disableSslVerification, &userAgent, environment, middleware.MiddlewareAuthFunc, middleware.MiddlewareAuthWithCustomerIdHeaderFunc)
 	if err != nil {
 		if httpResp != nil && httpResp.StatusCode == 401 {
 			resp.Diagnostics.AddError(

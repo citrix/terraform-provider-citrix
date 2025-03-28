@@ -30,19 +30,21 @@ resource "citrix_azure_hypervisor" "example-azure-hypervisor" {
 ### Required
 
 - `active_directory_id` (String) Azure Active Directory ID.
-- `application_id` (String) Application ID of the service principal used to access the Azure APIs.
-- `application_secret` (String, Sensitive) The Application Secret of the service principal used to access the Azure APIs.
 - `name` (String) Name of the hypervisor.
 - `subscription_id` (String) Azure Subscription ID.
 - `zone` (String) Id of the zone the hypervisor is associated with.
 
 ### Optional
 
+- `application_id` (String) The Application ID of the service principal used to access the Azure APIs. If the authentication_mode is set to `UserAssignedManagedIdentity`, use the Client ID of the managed identity.
+- `application_secret` (String, Sensitive) The Application Secret of the service principal used to access the Azure APIs.
 - `application_secret_expiration_date` (String) The expiration date of the application secret of the service principal used to access the Azure APIs. 
 
 -> **Note** Expiration date format is `YYYY-MM-DD`.
+- `authentication_mode` (String) Provides different options for managing service access to Azure resources. Possible values are `AppClientSecret`, `UserAssignedManagedIdentities`, and `SystemAssignedManagedIdentity`. Defaults to `AppClientSecret`.
 - `enable_azure_ad_device_management` (Boolean) Enable Azure AD device management. Default is false.
 - `metadata` (Attributes List) Metadata for the Hypervisor. (see [below for nested schema](#nestedatt--metadata))
+- `proxy_hypervisor_traffic_through_connector` (Boolean) Enables the routing of hypervisor traffic through a Citrix Cloud Connector. Should be enabled if the `AuthenticationMode` is set to either `UserAssignedManagedIdentity` or `SystemAssignedManagedIdentity`. Defaults to `false`.
 - `scopes` (Set of String) The IDs of the scopes for the hypervisor to be a part of.
 
 ### Read-Only

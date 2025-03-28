@@ -75,11 +75,16 @@ func (ImageDefinitionModel) GetDataSourceSchema() schema.Schema {
 				Description: "ID of the hypervisor connection to be used for image definition.",
 				Computed:    true,
 			},
+			"hypervisor_resource_pool": schema.StringAttribute{
+				Description: "ID of the hypervisor resource pool to be used for image definition.",
+				Computed:    true,
+			},
 			"azure_image_definition": AzureImageDefinitionModel{}.GetDataSourceSchema(),
 			"latest_version": schema.Int64Attribute{
 				Description: "Latest version of the image definition.",
 				Computed:    true,
 			},
+			"timeout": ImageDefinitionTimeout{}.GetSchema(),
 		},
 	}
 }

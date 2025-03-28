@@ -28,6 +28,8 @@ resource "citrix_application" "example-application" {
   icon            = citrix_application_icon.example-application-icon.id
   limit_visibility_to_users = ["example\\user1"]
   application_category_path = "ApplicationCategory\\SubCategory"
+  shortcut_added_to_desktop = true
+  shortcut_added_to_start_menu = false
 }
 
 # Application resource with priorities of delivery groups specified with the `delivery_groups_priority` set attribute.
@@ -71,6 +73,7 @@ resource "citrix_application" "example-application" {
 - `application_category_path` (String) The application category path allows users to organize and view applications under specific categories in Citrix Workspace App.
 - `application_folder_path` (String) The application folder path in which the application should be created.
 - `application_groups` (List of String) The application group IDs to which the application should be added.
+- `browser_name` (String) The browser name for the application. When omitted, the application name will be used as the browser name.
 - `delivery_groups` (List of String) The delivery group IDs to which the application should be added.
 
 -> **Note** The order of delivery group in the `delivery_groups` list determines the priority of the delivery group. Alternatively, you can use the `delivery_groups_priority` attribute to selectively set the priority of delivery groups.
@@ -78,11 +81,16 @@ resource "citrix_application" "example-application" {
 - `description` (String) Description of the application.
 - `enabled` (Boolean) Indicates whether the application is enabled or disabled. Default is `true`.
 - `icon` (String) The Id of the icon to be associated with the application.
+- `limit_to_one_instance_per_user` (Boolean) Specifies if the use of the application should be limited to only one instance per user. Default is `false`.
 - `limit_visibility_to_users` (Set of String) By default, the application is visible to all users within a delivery group. However, you can restrict its visibility to only certain users by specifying them in the `limit_visibility_to_users` list.
 
 -> **Note** Users must be in `DOMAIN\UserOrGroupName` or `user@domain.com` format
+- `max_total_instances` (Number) Control the use of this application by limiting the number of instances running at the same time. If set to 0, it allows unlimited use.
 - `metadata` (Attributes List) Metadata for the Application. (see [below for nested schema](#nestedatt--metadata))
+- `shortcut_added_to_desktop` (Boolean) Indicates whether a shortcut to the application is added to the desktop. Default is `false`.
+- `shortcut_added_to_start_menu` (Boolean) Indicates whether a shortcut to the application is added to the start menu. Default is `false`.
 - `tags` (Set of String) A set of identifiers of tags to associate with the application.
+- `visible` (Boolean) Specifies whether or not this application is visible to users. Note that it’s possible for an application to be disabled and still visible. Default is `true`.
 
 ### Read-Only
 

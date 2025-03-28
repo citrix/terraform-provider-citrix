@@ -17,12 +17,12 @@ resource citrix_service_account "example-azuread-service-account" {
     display_name = "example-azuread-service-account"
     description = "created with terraform"
     identity_provider_type = "AzureAD"
-    identity_provider_identifier = "<Azure AD tenant ID>"
-    account_id = "<Application ID>"
-    account_secret = "<Application secret>"
+    identity_provider_identifier = "<Azure-Tenant-ID>"
+    account_id = "<Application-ID>"
+    account_secret = "<Application-Secret>"
     account_secret_format = "PlainText"
     enable_intune_enrolled_device_management = true
-    secret_expiry_time = "2034-12-13"
+    secret_expiry_time = "2099-12-31"
 }
 
 resource citrix_service_account "example-ad-service-account" {
@@ -43,7 +43,7 @@ resource citrix_service_account "example-ad-service-account" {
 
 - `account_id` (String) The account ID of the service account.
 
- -> **Note** For Active Directory, this is the username. Username should be in `Domain\UserName` format. For AzureAD, this is the application ID.
+ -> **Note** For Active Directory, this is the username. Username should be in `Domain\UserName` format. For AzureAD, this is the application ID. The account ID must be in lowercase.
 - `account_secret` (String, Sensitive) The password for the service account.
 
  -> **Note** For Active Directory, this is the password. For AzureAD, this is the client secret.

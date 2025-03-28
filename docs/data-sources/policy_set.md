@@ -35,6 +35,9 @@ data "citrix_policy_set" "example_policy_set_data_source_with_name" {
 ### Read-Only
 
 - `assigned` (Boolean) Indicate whether the policy set is being assigned to delivery groups.
+- `delivery_groups` (Set of String) The IDs of the delivery groups for the policy set to apply on.
+
+~> **Please Note** If `delivery_groups` attribute is unset or configured as an empty set, the policy set will not be assigned to any delivery group. None of the policies in the policy set will be applied.
 - `description` (String) Description of the policy set.
 - `policies` (Attributes List) Ordered list of policies. 
 
@@ -117,7 +120,6 @@ Read-Only:
 - `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
 - `delivery_group_id` (String) Id of the delivery group to be filtered.
 - `enabled` (Boolean) Indicate whether the filter is being enabled.
-- `id` (String) Id of the delivery group policy filter.
 
 
 <a id="nestedatt--policies--delivery_group_type_filters"></a>

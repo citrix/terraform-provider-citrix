@@ -182,10 +182,6 @@ Required:
 - `enabled` (Boolean) Indicate whether the filter is being enabled.
 - `gateway` (String) Gateway for the policy filter.
 
-Read-Only:
-
-- `id` (String) Id of the policy filter.
-
 
 <a id="nestedatt--policies--branch_repeater_filter"></a>
 ### Nested Schema for `policies.branch_repeater_filter`
@@ -193,10 +189,6 @@ Read-Only:
 Required:
 
 - `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
-
-Read-Only:
-
-- `id` (String) Id of the branch repeater policy filter.
 
 
 <a id="nestedatt--policies--client_ip_filters"></a>
@@ -208,10 +200,6 @@ Required:
 - `enabled` (Boolean) Indicate whether the filter is being enabled.
 - `ip_address` (String) IP Address of the client to be filtered.
 
-Read-Only:
-
-- `id` (String) Id of the client ip policy filter.
-
 
 <a id="nestedatt--policies--client_name_filters"></a>
 ### Nested Schema for `policies.client_name_filters`
@@ -221,10 +209,6 @@ Required:
 - `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
 - `client_name` (String) Name of the client to be filtered.
 - `enabled` (Boolean) Indicate whether the filter is being enabled.
-
-Read-Only:
-
-- `id` (String) Id of the client name policy filter.
 
 
 <a id="nestedatt--policies--delivery_group_filters"></a>
@@ -236,10 +220,6 @@ Required:
 - `delivery_group_id` (String) Id of the delivery group to be filtered.
 - `enabled` (Boolean) Indicate whether the filter is being enabled.
 
-Read-Only:
-
-- `id` (String) Id of the delivery group policy filter.
-
 
 <a id="nestedatt--policies--delivery_group_type_filters"></a>
 ### Nested Schema for `policies.delivery_group_type_filters`
@@ -249,10 +229,6 @@ Required:
 - `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
 - `delivery_group_type` (String) Type of the delivery groups to be filtered.
 - `enabled` (Boolean) Indicate whether the filter is being enabled.
-
-Read-Only:
-
-- `id` (String) Id of the delivery group type policy filter.
 
 
 <a id="nestedatt--policies--ou_filters"></a>
@@ -264,10 +240,6 @@ Required:
 - `enabled` (Boolean) Indicate whether the filter is being enabled.
 - `ou` (String) Organizational Unit to be filtered.
 
-Read-Only:
-
-- `id` (String) Id of the organizational unit policy filter.
-
 
 <a id="nestedatt--policies--tag_filters"></a>
 ### Nested Schema for `policies.tag_filters`
@@ -278,10 +250,6 @@ Required:
 - `enabled` (Boolean) Indicate whether the filter is being enabled.
 - `tag` (String) Tag to be filtered.
 
-Read-Only:
-
-- `id` (String) Id of the tag policy filter.
-
 
 <a id="nestedatt--policies--user_filters"></a>
 ### Nested Schema for `policies.user_filters`
@@ -291,10 +259,6 @@ Required:
 - `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
 - `enabled` (Boolean) Indicate whether the filter is being enabled.
 - `sid` (String) SID of the user or user group to be filtered.
-
-Read-Only:
-
-- `id` (String) Id of the user policy filter.
 
 ## Import
 

@@ -1075,6 +1075,7 @@ type DeliveryGroupResourceModel struct {
 	Enabled                     types.Bool   `tfsdk:"enabled"`
 	Name                        types.String `tfsdk:"name"`
 	Description                 types.String `tfsdk:"description"`
+	ColorDepth                  types.String `tfsdk:"color_depth"`
 	InMaintenanceMode           types.Bool   `tfsdk:"in_maintenance_mode"`
 	DeliveryType                types.String `tfsdk:"delivery_type"`
 	SessionSupport              types.String `tfsdk:"session_support"`
@@ -1103,6 +1104,7 @@ type DeliveryGroupResourceModel struct {
 	ForceDelete                 types.Bool   `tfsdk:"force_delete"`
 	AssignMachinesToUsers       types.List   `tfsdk:"assign_machines_to_users"` // List[DeliveryGroupAssignMachinesToUsersModel]
 	SecureIcaRequired           types.Bool   `tfsdk:"secure_ica_required"`
+	LoadBalancingType           types.String `tfsdk:"load_balancing_type"`
 }
 
 func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
@@ -1131,6 +1133,23 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(""),
+			},
+			"color_depth": schema.StringAttribute{
+				Description: "Specifies the color depth for the delivery group. Available values are `FourBit`, `EightBit`, `SixteenBit`, and `TwentyFourBit`. Defaults to `TwentyFourBit`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("TwentyFourBit"),
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						string(citrixorchestration.COLORDEPTH_FOUR_BIT),
+						string(citrixorchestration.COLORDEPTH_EIGHT_BIT),
+						string(citrixorchestration.COLORDEPTH_SIXTEEN_BIT),
+						string(citrixorchestration.COLORDEPTH_TWENTY_FOUR_BIT),
+					),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"in_maintenance_mode": schema.BoolAttribute{
 				Description: "Indicates whether the delivery group is in maintenance mode. Defaults to `false`.",
@@ -1348,6 +1367,15 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
 			},
+			"load_balancing_type": schema.StringAttribute{
+				Description: "Specifies the load balancing type for the delivery group. Supported values are `None`, `Horizontal`, and `Vertical`. Defaults to `None`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(string(citrixorchestration.LOADBALANCETYPE_NONE)),
+				Validators: []validator.String{
+					util.GetValidatorFromEnum(citrixorchestration.AllowedLoadBalanceTypeEnumValues),
+				},
+			},
 		},
 	}
 }
@@ -1363,6 +1391,7 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 	r.Name = types.StringValue(deliveryGroup.GetName())
 	r.TotalMachines = types.Int64Value(int64(deliveryGroup.GetTotalMachines()))
 	r.Description = types.StringValue(deliveryGroup.GetDescription())
+	r.ColorDepth = types.StringValue(string(deliveryGroup.GetColorDepth()))
 
 	// Set optional values
 	r.Enabled = types.BoolValue(deliveryGroup.GetEnabled())
@@ -1454,6 +1483,7 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 	r.Tags = util.RefreshTagSet(ctx, diagnostics, tags)
 
 	r.SecureIcaRequired = types.BoolValue(deliveryGroup.GetSecureIcaRequired())
+	r.LoadBalancingType = types.StringValue(string(deliveryGroup.GetLoadBalanceType()))
 
 	return r
 }

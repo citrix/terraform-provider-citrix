@@ -292,6 +292,7 @@
         "TEST_IMAGE_DEFINITION_OS_TYPE": "{image_definition_os_type}",
         "TEST_IMAGE_DEFINITION_SESSION_SUPPORT": "{image_definition_session_support}",
         "TEST_IMAGE_DEFINITION_HYPERVISOR_ID": "{hypervisor_id}",
+        "TEST_IMAGE_DEFINITION_HYPERVISOR_POOL_ID": "{hypervisor_pool_id}",
         "TEST_IMAGE_DEFINITION_RESOURCE_GROUP": "{resource_group_name}",
 
         "TEST_IMAGE_DEFINITION_NAME_UPDATED": "{image_definition_updated_name}",
@@ -307,6 +308,7 @@
         "TEST_VSPHERE_IMAGE_DEFINITION_OS_TYPE": "{image_definition_os_type}",
         "TEST_VSPHERE_IMAGE_DEFINITION_SESSION_SUPPORT": "{image_definition_session_support}",
         "TEST_VSPHERE_IMAGE_DEFINITION_HYPERVISOR_ID": "{hypervisor_id}",
+        "TEST_VSPHERE_IMAGE_DEFINITION_HYPERVISOR_POOL_ID": "{hypervisor_pool_id}",
 
         "TEST_VSPHERE_IMAGE_DEFINITION_OS_TYPE_UPDATED": "{image_definition_updated_os_type}",
         "TEST_VSPHERE_IMAGE_DEFINITION_SESSION_SUPPORT_UPDATED": "{image_definition_updated_session_support}",
@@ -502,6 +504,12 @@
         // Site Data Source Go Tests Env Variables
         "TEST_SITE_DATA_SOURCE_EXPECTED_SITE_ID": "{Expected Site ID}",
 
+        // Site Settings Resource Go Tests Env Variables
+        "TEST_SITE_SETTINGS_RESOURCE_EXPECTED_SITE_ID": "{Expected Site ID}",
+        // Site Settings Data Source Go Tests Env Variables
+        "TEST_SITE_SETTINGS_DATA_SOURCE_EXPECTED_SITE_ID": "{Expected Site ID}",
+        "TEST_SITE_SETTINGS_DATA_SOURCE_EXPECTED_POLICY_SET_ENABLED": "{Expected Policy Set Enabled}",
+
         // Citrix Cloud Identity Provider Go Tests Env Variables
         // Okta Identity Provider Resource Go Tests Env Variables
         "TEST_CC_OKTA_IDP_NAME": "{Name of the Okta Identity Provider}",
@@ -577,7 +585,19 @@
         "TEST_WEM_SITE_DATA_SOURCE_DESCRIPTION": "{Description of the WEM Configuration Set}",
 
         // Desktop Icon Go Tests
-        "TEST_DESKTOP_ICON_RAW_DATA": "{Desktop Icon Raw Data}"
+        "TEST_DESKTOP_ICON_RAW_DATA": "{Desktop Icon Raw Data}",
+
+        //SERVICE_ACCOUNT
+        "TEST_SERVICE_ACCOUNT_DISPLAY_NAME": "{Name of the Service Account}",
+        "TEST_SERVICE_ACCOUNT_AD_DOMAIN_NAME": "{Domain Name of the Service Account}",
+        "TEST_SERVICE_ACCOUNT_AD_ACCOUNT_ID": "{Service Account in SAM Format}",
+        "TEST_SERVICE_ACCOUNT_AD_ACCOUNT_SECRET": "{Service Account Password}",
+        "TEST_SERVICE_ACCOUNT_AD_ACCOUNT_ID_UPDATED": "{Service Account in SAM Format}",
+        "TEST_SERVICE_ACCOUNT_AD_ACCOUNT_SECRET_UPDATED": "{Service Account Password}",
+
+        "TEST_SERVICE_ACCOUNT_AAD_TENANT_ID": "{Azure AD Tenant ID}",
+        "TEST_SERVICE_ACCOUNT_AAD_APP_ID": "{Application Id of the Service Principal}",
+        "TEST_SERVICE_ACCOUNT_AAD_APP_SECRET": "{Application Secret of the Service Principal}"
     },
     "go.testTimeout": "120m"
 }

@@ -130,6 +130,12 @@ jobs:
           echo "TEST_ADMIN_SCOPE_NAME=${{vars.TEST_ADMIN_SCOPE_NAME}}" >> $GITHUB_ENV
           echo "TEST_ADMIN_USER_NAME=${{secrets.TEST_ADMIN_USER_NAME}}" >> $GITHUB_ENV
           echo "TEST_ADMIN_USER_DOMAIN=${{secrets.TEST_ADMIN_USER_DOMAIN}}" >> $GITHUB_ENV
+          echo "TEST_SERVICE_ACCOUNT_DISPLAY_NAME=${{vars.TEST_SERVICE_ACCOUNT_DISPLAY_NAME}}" >> $GITHUB_ENV
+          echo "TEST_SERVICE_ACCOUNT_AD_DOMAIN_NAME=${{vars.TEST_SERVICE_ACCOUNT_AD_DOMAIN_NAME}}" >> $GITHUB_ENV
+          echo "TEST_SERVICE_ACCOUNT_AD_ACCOUNT_ID=${{secrets.TEST_SERVICE_ACCOUNT_AD_ACCOUNT_ID}}" >> $GITHUB_ENV
+          echo "TEST_SERVICE_ACCOUNT_AD_ACCOUNT_SECRET=${{secrets.TEST_SERVICE_ACCOUNT_AD_ACCOUNT_SECRET}}" >> $GITHUB_ENV
+          echo "TEST_SERVICE_ACCOUNT_AD_ACCOUNT_ID_UPDATED=${{secrets.TEST_SERVICE_ACCOUNT_AD_ACCOUNT_ID_UPDATED}}" >> $GITHUB_ENV
+          echo "TEST_SERVICE_ACCOUNT_AD_ACCOUNT_SECRET_UPDATED=${{secrets.TEST_SERVICE_ACCOUNT_AD_ACCOUNT_SECRET_UPDATED}}" >> $GITHUB_ENV
 
       # Test PreCheck
       - name: Test Precheck
@@ -142,4 +148,4 @@ jobs:
       # Sweep
       - name: Sweep
         if: always()
-        run: go test -v ./internal/test -run "^TestAzureMcs$" -timeout 1h -sweep-run "citrix_zone,citrix_zone,citrix_admin_folder,citrix_admin_role,citrix_admin_scope" -sweep="azure"
+        run: go test -v ./internal/test -run "^TestAzureMcs$" -timeout 1h -sweep-run "citrix_zone,citrix_service_account,citrix_admin_folder,citrix_admin_role,citrix_admin_scope" -sweep="azure"

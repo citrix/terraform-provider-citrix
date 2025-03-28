@@ -69,11 +69,11 @@ variable "azure_tenant_id" {
 }
 
 
-# machine_catalogs.tf variables
-variable "machine_catalog_name" {
-  description = "Name of the Machine Catalog to create"
+# images.tf varaiables
+variable "image_definition_name" {
+  description = "Name of the Image Definition to create"
   type        = string
-  default     = "example-azure-catalog"
+  default     = "example-image-definition"
 }
 
 variable "azure_service_offering" {
@@ -120,6 +120,14 @@ variable "azure_master_image" {
 #   type        = string
 #   default     = "1.0.0"
 # }
+
+
+# machine_catalogs.tf variables
+variable "machine_catalog_name" {
+  description = "Name of the Machine Catalog to create"
+  type        = string
+  default     = "example-azure-catalog"
+}
 
 variable "machine_catalog_naming_scheme" {
   description = "Machine Catalog naming scheme"

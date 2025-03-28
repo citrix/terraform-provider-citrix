@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -25,6 +26,7 @@ type AzureHypervisorResourcePoolResourceModel struct {
 	Name       types.String `tfsdk:"name"`
 	Hypervisor types.String `tfsdk:"hypervisor"`
 	Metadata   types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
+	VmTagging  types.Bool   `tfsdk:"vm_tagging"`
 	/**** Resource Pool Details ****/
 	Region         types.String `tfsdk:"region"`
 	VirtualNetwork types.String `tfsdk:"virtual_network"`
@@ -64,6 +66,12 @@ func (AzureHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
+			},
+			"vm_tagging": schema.BoolAttribute{
+				Description: "Indicates whether VMs created by provisioning operations should be tagged. Default is `true`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
 			},
 			"virtual_network": schema.StringAttribute{
 				Description: "Name of the cloud virtual network.",
@@ -119,6 +127,7 @@ func (r AzureHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx cont
 	resourceGroupName := getResourceGroupNameFromVnetId(virtualNetwork.GetId())
 	r.VirtualNetworkResourceGroup = types.StringValue(resourceGroupName)
 	r.VirtualNetwork = types.StringValue(virtualNetwork.GetName())
+	r.VmTagging = types.BoolValue(resourcePool.GetVMTaggingEnabled())
 	var res []string
 	for _, model := range resourcePool.GetSubnets() {
 		res = append(res, model.GetName())

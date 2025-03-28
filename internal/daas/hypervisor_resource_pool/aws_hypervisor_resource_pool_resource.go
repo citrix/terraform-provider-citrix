@@ -81,6 +81,7 @@ func (r *awsHypervisorResourcePoolResource) Create(ctx context.Context, req reso
 	}
 
 	resourcePoolDetails.SetName(plan.Name.ValueString())
+	resourcePoolDetails.SetVmTagging(plan.VmTagging.ValueBool())
 	resourcePoolDetails.SetConnectionType(hypervisorConnectionType)
 
 	if plan.AvailabilityZone.IsNull() {
@@ -174,6 +175,7 @@ func (r *awsHypervisorResourcePoolResource) Update(ctx context.Context, req reso
 	var editHypervisorResourcePool citrixorchestration.EditHypervisorResourcePoolRequestModel
 	editHypervisorResourcePool.SetName(plan.Name.ValueString())
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS)
+	editHypervisorResourcePool.SetVmTagging(plan.VmTagging.ValueBool())
 
 	planSubnet := util.StringListToStringArray(ctx, &diags, plan.Subnets)
 	availabilityZonePath := fmt.Sprintf("%s.virtualprivatecloud/%s.availabilityzone", plan.Vpc.ValueString(), plan.AvailabilityZone.ValueString())

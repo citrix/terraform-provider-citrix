@@ -51,6 +51,7 @@ resource "citrix_xenserver_hypervisor_resource_pool" "example-xenserver-hypervis
 
 - `metadata` (Attributes List) Metadata for the Hypervisor Resource Pool. (see [below for nested schema](#nestedatt--metadata))
 - `use_local_storage_caching` (Boolean) Indicates whether intellicache is enabled to reduce load on the shared storage device. Will only be effective when shared storage is used. Default value is `false`.
+- `vm_tagging` (Boolean) Indicates whether VMs created by provisioning operations should be tagged. Default is `true`.
 
 ### Read-Only
 

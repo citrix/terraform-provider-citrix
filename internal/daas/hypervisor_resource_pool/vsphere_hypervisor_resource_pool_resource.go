@@ -125,7 +125,7 @@ func (r *vsphereHypervisorResourcePoolResource) Create(ctx context.Context, req 
 	var relativePath string
 
 	cluster := util.ObjectValueToTypedObject[VsphereHypervisorClusterModel](ctx, &resp.Diagnostics, plan.Cluster)
-	resource, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, &resp.Diagnostics, hypervisorId, folderPath, cluster.Datacenter.ValueString(), "datacenter", "", hypervisor)
+	resource, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, r.client, &resp.Diagnostics, hypervisorId, folderPath, cluster.Datacenter.ValueString(), "datacenter", "", hypervisor)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor Resource Pool for vSphere",
@@ -138,7 +138,7 @@ func (r *vsphereHypervisorResourcePoolResource) Create(ctx context.Context, req 
 	relativePath = resource.GetRelativePath()
 
 	if !cluster.ClusterName.IsNull() {
-		resource, httpResp, err = util.GetSingleHypervisorResource(ctx, r.client, &resp.Diagnostics, hypervisorId, folderPath, cluster.ClusterName.ValueString(), "cluster", "", hypervisor)
+		resource, httpResp, err = util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, r.client, &resp.Diagnostics, hypervisorId, folderPath, cluster.ClusterName.ValueString(), "cluster", "", hypervisor)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating Hypervisor Resource Pool for vSphere",
@@ -152,7 +152,7 @@ func (r *vsphereHypervisorResourcePoolResource) Create(ctx context.Context, req 
 	}
 
 	if !cluster.Host.IsNull() {
-		resource, httpResp, err = util.GetSingleHypervisorResource(ctx, r.client, &resp.Diagnostics, hypervisorId, folderPath, cluster.Host.ValueString(), "computeresource", "", hypervisor)
+		resource, httpResp, err = util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, r.client, &resp.Diagnostics, hypervisorId, folderPath, cluster.Host.ValueString(), "computeresource", "", hypervisor)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating Hypervisor Resource Pool for vSphere",
@@ -178,6 +178,7 @@ func (r *vsphereHypervisorResourcePoolResource) Create(ctx context.Context, req 
 	resourcePoolDetails.SetName(plan.Name.ValueString())
 	resourcePoolDetails.SetConnectionType(hypervisorConnectionType)
 	resourcePoolDetails.SetRootPath(relativePath)
+	resourcePoolDetails.SetVmTagging(plan.VmTagging.ValueBool())
 	storages, tempStorages := plan.GetStorageList(ctx, r.client, &resp.Diagnostics, hypervisor, true, false)
 	networks := plan.GetNetworksList(ctx, r.client, &resp.Diagnostics, hypervisor, true)
 	if len(storages) == 0 || len(tempStorages) == 0 || len(networks) == 0 {
@@ -275,6 +276,7 @@ func (r *vsphereHypervisorResourcePoolResource) Update(ctx context.Context, req 
 	var editHypervisorResourcePool citrixorchestration.EditHypervisorResourcePoolRequestModel
 	editHypervisorResourcePool.SetName(plan.Name.ValueString())
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER)
+	editHypervisorResourcePool.SetVmTagging(plan.VmTagging.ValueBool())
 
 	storagesToBeIncluded, tempStoragesToBeIncluded := plan.GetStorageList(ctx, r.client, &resp.Diagnostics, hypervisor, false, false)
 	storagesToBeSuperseded, tempStoragesToBeSuperseded := plan.GetStorageList(ctx, r.client, &resp.Diagnostics, hypervisor, false, true)
@@ -407,7 +409,7 @@ func (plan VsphereHypervisorResourcePoolResourceModel) GetStorageList(ctx contex
 	if !cluster.Host.IsNull() {
 		folderPath = fmt.Sprintf("%s\\%s.computeresource", folderPath, cluster.Host.ValueString())
 	}
-	storages, err := util.GetFilteredResourcePathList(ctx, client, diags, hypervisorId, folderPath, util.StorageResourceType, storageNames, hypervisorConnectionType, hypervisor.GetPluginId())
+	storages, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, folderPath, util.StorageResourceType, storageNames, hypervisorConnectionType, hypervisor.GetPluginId())
 
 	if len(storage) > 0 && len(storages) == 0 {
 		errDetail := "No storage found for the given storage names"
@@ -429,7 +431,7 @@ func (plan VsphereHypervisorResourcePoolResourceModel) GetStorageList(ctx contex
 		}
 	}
 	tempStorageNames := util.ConvertBaseStringArrayToPrimitiveStringArray(tempStorage)
-	tempStorages, err := util.GetFilteredResourcePathList(ctx, client, diags, hypervisorId, folderPath, util.StorageResourceType, tempStorageNames, hypervisorConnectionType, hypervisor.GetPluginId())
+	tempStorages, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, folderPath, util.StorageResourceType, tempStorageNames, hypervisorConnectionType, hypervisor.GetPluginId())
 	if len(tempStorage) > 0 && len(tempStorages) == 0 {
 		errDetail := "No storage found for the given temporary storage names"
 		if err != nil {
@@ -464,7 +466,7 @@ func (plan VsphereHypervisorResourcePoolResourceModel) GetNetworksList(ctx conte
 	}
 
 	networkNames := util.StringListToStringArray(ctx, diags, plan.Networks)
-	networks, err := util.GetFilteredResourcePathList(ctx, client, diags, hypervisorId, folderPath, util.NetworkResourceType, networkNames, hypervisorConnectionType, hypervisor.GetPluginId())
+	networks, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, folderPath, util.NetworkResourceType, networkNames, hypervisorConnectionType, hypervisor.GetPluginId())
 	if len(networks) == 0 {
 		errDetail := "No network found for the given network names"
 		if err != nil {

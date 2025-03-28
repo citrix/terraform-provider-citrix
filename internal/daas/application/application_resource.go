@@ -85,6 +85,14 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 	createApplicationRequest.SetIcon(plan.Icon.ValueString())
 	createApplicationRequest.SetClientFolder(plan.ApplicationCategoryPath.ValueString())
 	createApplicationRequest.SetEnabled(plan.Enabled.ValueBool())
+	createApplicationRequest.SetMaxTotalInstances(plan.MaxTotalInstances.ValueInt32())
+	createApplicationRequest.SetShortcutAddedToDesktop(plan.ShortcutAddedToDesktop.ValueBool())
+	createApplicationRequest.SetShortcutAddedToStartMenu(plan.ShortcutAddedToStartMenu.ValueBool())
+	createApplicationRequest.SetVisible(plan.Visible.ValueBool())
+
+	if plan.BrowserName.ValueString() != "" {
+		createApplicationRequest.SetBrowserName(plan.BrowserName.ValueString())
+	}
 
 	if plan.LimitVisibilityToUsers.IsNull() {
 		createApplicationRequest.SetIncludedUserFilterEnabled(false)
@@ -102,6 +110,12 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 		}
 		createApplicationRequest.SetIncludedUsers(limitVisibilityToUserIds)
 		createApplicationRequest.SetIncludedUserFilterEnabled(true)
+	}
+
+	if plan.LimitToOneInstancePerUser.ValueBool() {
+		createApplicationRequest.SetMaxPerUserInstances(1)
+	} else {
+		createApplicationRequest.SetMaxPerUserInstances(0)
 	}
 
 	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
@@ -241,6 +255,14 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 	editApplicationRequestBody.SetIcon(plan.Icon.ValueString())
 	editApplicationRequestBody.SetClientFolder(plan.ApplicationCategoryPath.ValueString())
 	editApplicationRequestBody.SetEnabled(plan.Enabled.ValueBool())
+	editApplicationRequestBody.SetMaxTotalInstances(plan.MaxTotalInstances.ValueInt32())
+	editApplicationRequestBody.SetShortcutAddedToDesktop(plan.ShortcutAddedToDesktop.ValueBool())
+	editApplicationRequestBody.SetShortcutAddedToStartMenu(plan.ShortcutAddedToStartMenu.ValueBool())
+	editApplicationRequestBody.SetVisible(plan.Visible.ValueBool())
+
+	if plan.BrowserName.ValueString() != "" {
+		editApplicationRequestBody.SetBrowserName(plan.BrowserName.ValueString())
+	}
 
 	if plan.LimitVisibilityToUsers.IsNull() {
 		editApplicationRequestBody.SetIncludedUserFilterEnabled(false)
@@ -258,6 +280,12 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 		}
 		editApplicationRequestBody.SetIncludedUsers(limitVisibilityToUserIds)
 		editApplicationRequestBody.SetIncludedUserFilterEnabled(true)
+	}
+
+	if plan.LimitToOneInstancePerUser.ValueBool() {
+		editApplicationRequestBody.SetMaxPerUserInstances(1)
+	} else {
+		editApplicationRequestBody.SetMaxPerUserInstances(0)
 	}
 
 	applicationGroups := util.StringListToStringArray(ctx, &resp.Diagnostics, plan.ApplicationGroups)
@@ -454,6 +482,7 @@ func (r *applicationResource) ModifyPlan(ctx context.Context, req resource.Modif
 			}
 		}
 	}
+
 }
 
 func readApplication(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, applicationId string) (*citrixorchestration.ApplicationDetailResponseModel, error) {
@@ -529,7 +558,7 @@ func checkIfApplicationFolderPathExist(ctx context.Context, client *citrixdaascl
 }
 
 func buildDeliveryGroupsPriorityRequestModel(ctx context.Context, diagnostics *diag.Diagnostics, plan ApplicationResourceModel) []citrixorchestration.PriorityRefRequestModel {
-	var deliveryGroups []citrixorchestration.PriorityRefRequestModel
+	deliveryGroups := make([]citrixorchestration.PriorityRefRequestModel, 0)
 	if !plan.DeliveryGroups.IsNull() {
 		for index, deliveryGroup := range util.StringListToStringArray(ctx, diagnostics, plan.DeliveryGroups) {
 			var deliveryGroupRequestModel citrixorchestration.PriorityRefRequestModel

@@ -83,8 +83,12 @@ func (ServiceAccountModel) GetSchema() schema.Schema {
 			},
 			"account_id": schema.StringAttribute{
 				Description: "The account ID of the service account." +
-					"\n\n -> **Note** For Active Directory, this is the username. Username should be in `Domain\\UserName` format. For AzureAD, this is the application ID.",
+					"\n\n -> **Note** For Active Directory, this is the username. Username should be in `Domain\\UserName` format. For AzureAD, this is the application ID. The account ID must be in lowercase.",
 				Required: true,
+				Validators: []validator.String{
+					// case sensitive
+					stringvalidator.RegexMatches(regexp.MustCompile(util.LowerCaseRegex), "the account_id must be all lowercase"),
+				},
 			},
 			"account_secret": schema.StringAttribute{
 				Description: "The password for the service account." +
@@ -148,7 +152,7 @@ func (r ServiceAccountModel) RefreshPropertyValues(ctx context.Context, diagnost
 		r.IdentityProviderIdentifier = types.StringValue(serviceAccountModel.GetIdentityProviderIdentifier())
 	}
 	if !strings.EqualFold(r.AccountId.ValueString(), serviceAccountModel.GetAccountId()) {
-		r.AccountId = types.StringValue(serviceAccountModel.GetAccountId())
+		r.AccountId = types.StringValue(strings.ToLower(serviceAccountModel.GetAccountId()))
 	}
 
 	expiryDateTime, err := time.Parse(time.RFC3339, serviceAccountModel.GetSecretExpiryTime())

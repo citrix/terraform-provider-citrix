@@ -151,6 +151,7 @@ func (ImageVersionModel) GetDataSourceSchema() schema.Schema {
 				Description: "The OS type of the image version.",
 				Computed:    true,
 			},
+			"timeout": ImageDefinitionTimeout{}.GetSchema(),
 		},
 	}
 }

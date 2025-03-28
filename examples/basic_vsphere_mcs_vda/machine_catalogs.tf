@@ -16,7 +16,10 @@ resource "citrix_machine_catalog" "example-catalog" {
             service_account_password = var.domain_service_account_password
         }
         vsphere_machine_config = {
-            master_image_vm = var.vsphere_master_image_vm
+            prepared_image  = {
+                image_definition  = citrix_image_definition.example-image-definition.id
+                image_version     = citrix_image_version.example-image-version.id
+            }
             cpu_count = var.vsphere_cpu_count
             memory_mb = var.vsphere_memory_size
         }

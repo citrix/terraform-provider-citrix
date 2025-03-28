@@ -436,7 +436,7 @@ func HandleMachineProfileForAzureMcsPvsCatalog(ctx context.Context, client *citr
 		resourceType = ""
 		errorMessage = fmt.Sprintf("Failed to locate machine profile template spec %s with version %s on Azure", machineProfile.MachineProfileTemplateSpecName.ValueString(), machineProfile.MachineProfileTemplateSpecVersion.ValueString())
 	}
-	machineProfileResource, httpResp, err := GetSingleResourceFromHypervisor(ctx, client, diag, hypervisorName, resourcePoolName, queryPath, machineProfileVmOrTemplateSpecVersion, resourceType, "")
+	machineProfileResource, httpResp, err := GetSingleResourceFromHypervisorWithNoCacheRetry(ctx, client, diag, hypervisorName, resourcePoolName, queryPath, machineProfileVmOrTemplateSpecVersion, resourceType, "")
 	if err != nil {
 		diag.AddError(
 			errorTitle,
@@ -558,7 +558,7 @@ func BuildAzureMasterImagePath(ctx context.Context, client *citrixdaasclient.Cit
 				resourceGroup,
 				storageAccount,
 				storageContainer)
-			imagePath, httpResp, err = GetSingleResourcePathFromHypervisor(ctx, client, diagnostics, hypervisor, hypervisorResourcePool, queryPath, masterImage, "", "")
+			imagePath, httpResp, err = GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx, client, diagnostics, hypervisor, hypervisorResourcePool, queryPath, masterImage, "", "")
 			if err != nil {
 				diagnostics.AddError(
 					errorTitle,
@@ -572,7 +572,7 @@ func BuildAzureMasterImagePath(ctx context.Context, client *citrixdaasclient.Cit
 				"%s\\%s.resourcegroup",
 				imageBasePath,
 				resourceGroup)
-			imagePath, httpResp, err = GetSingleResourcePathFromHypervisor(ctx, client, diagnostics, hypervisor, hypervisorResourcePool, queryPath, masterImage, "", "")
+			imagePath, httpResp, err = GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx, client, diagnostics, hypervisor, hypervisorResourcePool, queryPath, masterImage, "", "")
 			if err != nil {
 				diagnostics.AddError(
 					errorTitle,
@@ -594,7 +594,7 @@ func BuildAzureMasterImagePath(ctx context.Context, client *citrixdaasclient.Cit
 				resourceGroup,
 				gallery,
 				definition)
-			imagePath, httpResp, err = GetSingleResourcePathFromHypervisor(ctx, client, diagnostics, hypervisor, hypervisorResourcePool, queryPath, version, "", "")
+			imagePath, httpResp, err = GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx, client, diagnostics, hypervisor, hypervisorResourcePool, queryPath, version, "", "")
 			if err != nil {
 				diagnostics.AddError(
 					"Error creating Machine Catalog",

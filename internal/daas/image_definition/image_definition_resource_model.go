@@ -70,8 +70,10 @@ type ImageDefinitionModel struct {
 	OsType                    types.String `tfsdk:"os_type"`
 	SessionSupport            types.String `tfsdk:"session_support"`
 	Hypervisor                types.String `tfsdk:"hypervisor"`
+	HypervisorResourcePool    types.String `tfsdk:"hypervisor_resource_pool"`
 	AzureImageDefinitionModel types.Object `tfsdk:"azure_image_definition"`
 	LatestVersion             types.Int64  `tfsdk:"latest_version"`
+	Timeout                   types.Object `tfsdk:"timeout"`
 }
 
 func (ImageDefinitionModel) GetSchema() schema.Schema {
@@ -131,17 +133,52 @@ func (ImageDefinitionModel) GetSchema() schema.Schema {
 					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
 				},
 			},
+			// The resource pool isn't actually used by the image definition, but the definition internally will use any of the pools.
+			// This attribute ensures there is at least 1 pool as required by the API.
+			"hypervisor_resource_pool": schema.StringAttribute{
+				Description: "ID of the hypervisor resource pool to be used for image definition.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
+				},
+			},
 			"azure_image_definition": AzureImageDefinitionModel{}.GetSchema(),
 			"latest_version": schema.Int64Attribute{
 				Description: "Latest version of the image definition.",
 				Computed:    true,
 			},
+			"timeout": ImageDefinitionTimeout{}.GetSchema(),
 		},
 	}
 }
 
 func (ImageDefinitionModel) GetAttributes() map[string]schema.Attribute {
 	return ImageDefinitionModel{}.GetSchema().Attributes
+}
+
+type ImageDefinitionTimeout struct {
+	Create types.Int32 `tfsdk:"create"`
+	Delete types.Int32 `tfsdk:"delete"`
+}
+
+func getImageDefinitionTimeoutConfigs() util.TimeoutConfigs {
+	return util.TimeoutConfigs{
+		Create:        true,
+		CreateDefault: 10,
+		CreateMin:     5,
+
+		Delete:        true,
+		DeleteDefault: 10,
+		DeleteMin:     5,
+	}
+}
+
+func (ImageDefinitionTimeout) GetSchema() schema.SingleNestedAttribute {
+	return util.GetTimeoutSchema("image definition", getImageDefinitionTimeoutConfigs())
+}
+
+func (ImageDefinitionTimeout) GetAttributes() map[string]schema.Attribute {
+	return ImageDefinitionTimeout{}.GetSchema().Attributes
 }
 
 func (r ImageDefinitionModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, isResource bool, imageDefinition *citrixorchestration.ImageDefinitionResponseModel) ImageDefinitionModel {
@@ -169,6 +206,7 @@ func (r ImageDefinitionModel) RefreshPropertyValues(ctx context.Context, diagnos
 
 	// Set Hypervisor to default null value
 	r.Hypervisor = types.StringNull()
+	// r.HypervisorResourcePool is not updated, it is only used to create a dependency relationship.
 
 	if len(connections) > 0 {
 		connection := connections[0]

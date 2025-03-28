@@ -318,6 +318,7 @@
         "TEST_VSPHERE_IMAGE_DEFINITION_OS_TYPE": "{image_definition_os_type}",
         "TEST_VSPHERE_IMAGE_DEFINITION_SESSION_SUPPORT": "{image_definition_session_support}",
         "TEST_VSPHERE_IMAGE_DEFINITION_HYPERVISOR_ID": "{hypervisor_id}",
+        "TEST_VSPHERE_IMAGE_DEFINITION_HYPERVISOR_POOL_ID": "{hypervisor_pool_id}",
 
         "TEST_VSPHERE_IMAGE_DEFINITION_OS_TYPE_UPDATED": "{image_definition_updated_os_type}",
         "TEST_VSPHERE_IMAGE_DEFINITION_SESSION_SUPPORT_UPDATED": "{image_definition_updated_session_support}",
@@ -447,7 +448,19 @@
         "TEST_TAG_RESOURCE_DESCRIPTION": "{Description of the tag resource}",
 
         // Desktop Icon Go Tests
-        "TEST_DESKTOP_ICON_RAW_DATA": "{Desktop Icon Raw Data}"
+        "TEST_DESKTOP_ICON_RAW_DATA": "{Desktop Icon Raw Data}",
+
+        //SERVICE_ACCOUNT
+        "TEST_SERVICE_ACCOUNT_DISPLAY_NAME": "{Name of the Service Account}",
+        "TEST_SERVICE_ACCOUNT_AD_DOMAIN_NAME": "{Domain Name of the Service Account}",
+        "TEST_SERVICE_ACCOUNT_AD_ACCOUNT_ID": "{Service Account in SAM Format}",
+        "TEST_SERVICE_ACCOUNT_AD_ACCOUNT_SECRET": "{Service Account Password}",
+        "TEST_SERVICE_ACCOUNT_AD_ACCOUNT_ID_UPDATED": "{Service Account in SAM Format}",
+        "TEST_SERVICE_ACCOUNT_AD_ACCOUNT_SECRET_UPDATED": "{Service Account Password}",
+
+        "TEST_SERVICE_ACCOUNT_AAD_TENANT_ID": "{Azure AD Tenant ID}",
+        "TEST_SERVICE_ACCOUNT_AAD_APP_ID": "{Application Id of the Service Principal}",
+        "TEST_SERVICE_ACCOUNT_AAD_APP_SECRET": "{Application Secret of the Service Principal}"
     },
     "go.testTimeout": "30m"
 }

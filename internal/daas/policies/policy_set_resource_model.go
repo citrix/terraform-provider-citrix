@@ -395,7 +395,6 @@ func (r PolicySetModel) RefreshPropertyValues(ctx context.Context, diags *diag.D
 					switch filterType {
 					case "AccessControl":
 						accessControlFilters = append(accessControlFilters, AccessControlFilterModel{
-							Id:         types.StringValue(filter.GetFilterGuid()),
 							Allowed:    types.BoolValue(filter.GetIsAllowed()),
 							Enabled:    types.BoolValue(filter.GetIsEnabled()),
 							Connection: types.StringValue(gatewayFilterData.Connection),
@@ -404,54 +403,46 @@ func (r PolicySetModel) RefreshPropertyValues(ctx context.Context, diags *diag.D
 						})
 					case "BranchRepeater":
 						policyModel.BranchRepeaterFilter = util.TypedObjectToObjectValue(ctx, diags, BranchRepeaterFilterModel{
-							Id:      types.StringValue(filter.GetFilterGuid()),
 							Allowed: types.BoolValue(filter.GetIsAllowed()),
 						})
 					case "ClientIP":
 						clientIpFilters = append(clientIpFilters, ClientIPFilterModel{
-							Id:        types.StringValue(filter.GetFilterGuid()),
 							Allowed:   types.BoolValue(filter.GetIsAllowed()),
 							Enabled:   types.BoolValue(filter.GetIsEnabled()),
 							IpAddress: types.StringValue(filter.GetFilterData()),
 						})
 					case "ClientName":
 						clientNameFilters = append(clientNameFilters, ClientNameFilterModel{
-							Id:         types.StringValue(filter.GetFilterGuid()),
 							Allowed:    types.BoolValue(filter.GetIsAllowed()),
 							Enabled:    types.BoolValue(filter.GetIsEnabled()),
 							ClientName: types.StringValue(filter.GetFilterData()),
 						})
 					case "DesktopGroup":
 						desktopGroupFilters = append(desktopGroupFilters, DeliveryGroupFilterModel{
-							Id:              types.StringValue(filter.GetFilterGuid()),
 							Allowed:         types.BoolValue(filter.GetIsAllowed()),
 							Enabled:         types.BoolValue(filter.GetIsEnabled()),
 							DeliveryGroupId: types.StringValue(uuidFilterData.Uuid),
 						})
 					case "DesktopKind":
 						desktopKindFilters = append(desktopKindFilters, DeliveryGroupTypeFilterModel{
-							Id:                types.StringValue(filter.GetFilterGuid()),
 							Allowed:           types.BoolValue(filter.GetIsAllowed()),
 							Enabled:           types.BoolValue(filter.GetIsEnabled()),
 							DeliveryGroupType: types.StringValue(filter.GetFilterData()),
 						})
 					case "DesktopTag":
 						desktopTagFilters = append(desktopTagFilters, TagFilterModel{
-							Id:      types.StringValue(filter.GetFilterGuid()),
 							Allowed: types.BoolValue(filter.GetIsAllowed()),
 							Enabled: types.BoolValue(filter.GetIsEnabled()),
 							Tag:     types.StringValue(uuidFilterData.Uuid),
 						})
 					case "OU":
 						ouFilters = append(ouFilters, OuFilterModel{
-							Id:      types.StringValue(filter.GetFilterGuid()),
 							Allowed: types.BoolValue(filter.GetIsAllowed()),
 							Enabled: types.BoolValue(filter.GetIsEnabled()),
 							Ou:      types.StringValue(filter.GetFilterData()),
 						})
 					case "User":
 						userFilters = append(userFilters, UserFilterModel{
-							Id:      types.StringValue(filter.GetFilterGuid()),
 							Allowed: types.BoolValue(filter.GetIsAllowed()),
 							Enabled: types.BoolValue(filter.GetIsEnabled()),
 							UserSid: types.StringValue(filter.GetFilterData()),

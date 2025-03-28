@@ -542,6 +542,7 @@ resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
 - `remote_pc_ous` (Attributes List) Organizational Units to be included in the Remote PC machine catalog. Only to be used when `is_remote_pc = true`. For adding machines, use `machine_accounts`. (see [below for nested schema](#nestedatt--remote_pc_ous))
 - `scopes` (Set of String) The IDs of the scopes for the machine catalog to be a part of.
 - `tags` (Set of String) A set of identifiers of tags to associate with the machine catalog.
+- `timeout` (Attributes) Timeout in minutes for the long-running jobs in machine catalog resource's create, update, delete operation(s). (see [below for nested schema](#nestedatt--timeout))
 - `vda_upgrade_type` (String) Type of Vda Upgrade. Choose between LTSR and CR. When omitted, Vda Upgrade is disabled.
 
 ### Read-Only
@@ -601,7 +602,7 @@ Required:
 
 - `hypervisor` (String) Id of the hypervisor for creating the machines. Required only if using power managed machines.
 - `hypervisor_resource_pool` (String) Id of the hypervisor resource pool that will be used for provisioning operations.
-- `identity_type` (String) The identity type of the machines to be created. Supported values are`ActiveDirectory`, `AzureAD`, and `HybridAzureAD`.
+- `identity_type` (String) The identity type of the machines to be created. Supported values are `ActiveDirectory`, `AzureAD`, and `HybridAzureAD`.
 - `number_of_total_machines` (Number) Number of VDA machines allocated in the catalog.
 
 ~> **Please Note** When deleting machines, ensure machines that need to be deleted have no active sessions. For machines with `Static` allocation type, also ensure there are no assigned users. If machines that qualify for deletion are more than the requested number of machines to delete, machines are chosen arbitrarily.
@@ -1086,6 +1087,16 @@ Required:
 
 - `include_subfolders` (Boolean) Specify if subfolders should be included.
 - `ou_name` (String) Name of the OU.
+
+
+<a id="nestedatt--timeout"></a>
+### Nested Schema for `timeout`
+
+Optional:
+
+- `create` (Number) Timeout in minutes for the long-running jobs in create operation. Defaults to 120. Minimum value is 5.
+- `delete` (Number) Timeout in minutes for the long-running jobs in delete operation. Defaults to 60. Minimum value is 5.
+- `update` (Number) Timeout in minutes for the long-running jobs in update operation. Defaults to 60. Minimum value is 5.
 
 ## Import
 

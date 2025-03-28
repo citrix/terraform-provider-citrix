@@ -183,12 +183,7 @@ func constructCreatePolicyBatchRequestModel(ctx context.Context, diags *diag.Dia
 func constructPolicyFilterRequests(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, policy PolicyModel) ([]citrixorchestration.FilterRequest, error) {
 	filterRequests := []citrixorchestration.FilterRequest{}
 
-	serverValue := ""
-	if client.AuthConfig.OnPremises || !client.AuthConfig.ApiGateway {
-		serverValue = client.ApiClient.GetConfig().Host
-	} else {
-		serverValue = fmt.Sprintf("%s.xendesktop.net", client.ClientConfig.CustomerId)
-	}
+	serverValue := getServerValue(client)
 
 	if !policy.AccessControlFilters.IsNull() && len(policy.AccessControlFilters.Elements()) > 0 {
 		accessControlFilters := util.ObjectSetToTypedArray[AccessControlFilterModel](ctx, diagnostics, policy.AccessControlFilters)
@@ -594,79 +589,27 @@ func deletePolicySettings(ctx context.Context, client *citrixdaasclient.CitrixDa
 	return nil
 }
 
-func updatePolicyFilters(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policyId string, policyName string, policyFiltersInPlan []PolicyFilterInterface, policyFiltersInState []PolicyFilterInterface) error {
-	policyFilterIdsInPlan := []string{}
-	policyFiltersToCreate := []PolicyFilterInterface{}
-	policyFiltersToUpdate := []PolicyFilterInterface{}
-	for _, policyFilter := range policyFiltersInPlan {
-		if policyFilter.GetId() == "" {
-			policyFiltersToCreate = append(policyFiltersToCreate, policyFilter)
-		} else {
-			policyFilterIdsInPlan = append(policyFilterIdsInPlan, policyFilter.GetId())
-			policyFiltersToUpdate = append(policyFiltersToUpdate, policyFilter)
+func clearPolicyFilters(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policyId string, policyName string) error {
+	readFiltersRequest := client.ApiClient.GpoDAAS.GpoReadGpoFilters(ctx)
+	readFiltersRequest = readFiltersRequest.PolicyGuid(policyId)
+
+	filtersResponse, httpResp, err := citrixdaasclient.AddRequestData(readFiltersRequest, client).Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error updating Policy Filters for Policy "+policyId,
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		return err
+	}
+	if filtersResponse != nil {
+		policyFilterIdsToDelete := []string{}
+		for _, policyFilter := range filtersResponse.GetItems() {
+			policyFilterIdsToDelete = append(policyFilterIdsToDelete, policyFilter.GetFilterGuid())
 		}
-	}
-
-	policyFilterIdsInState := []string{}
-	policyFilterIdMapFromState := map[string]PolicyFilterInterface{}
-	for _, policyFilter := range policyFiltersInState {
-		policyFilterIdMapFromState[strings.ToLower(policyFilter.GetId())] = policyFilter
-		policyFilterIdsInState = append(policyFilterIdsInState, policyFilter.GetId())
-	}
-
-	policyFilterIdsToDelete := []string{}
-	// Check if any policy settings are to be deleted
-	for _, policyFilterId := range policyFilterIdsInState {
-		if !slices.ContainsFunc(policyFilterIdsInPlan, func(policyFilterIdInPlan string) bool {
-			return strings.EqualFold(policyFilterId, policyFilterIdInPlan)
-		}) {
-			policyFilterIdsToDelete = append(policyFilterIdsToDelete, policyFilterId)
-		}
-	}
-
-	// Delete policy filters
-	if len(policyFilterIdsToDelete) > 0 {
 		err := deletePolicyFilters(ctx, client, diagnostics, policyName, policyFilterIdsToDelete)
 		if err != nil {
 			return err
-		}
-	}
-
-	serverValue := ""
-	if client.AuthConfig.OnPremises || !client.AuthConfig.ApiGateway {
-		serverValue = client.ApiClient.GetConfig().Host
-	} else {
-		serverValue = fmt.Sprintf("%s.xendesktop.net", client.ClientConfig.CustomerId)
-	}
-
-	// Create policy filters
-	if len(policyFiltersToCreate) > 0 {
-		err := createPolicyFilters(ctx, client, diagnostics, policyId, policyName, serverValue, policyFiltersToCreate)
-		if err != nil {
-			return err
-		}
-	}
-
-	// Update each policy filter
-	if len(policyFiltersToUpdate) > 0 {
-		for _, policyFilter := range policyFiltersToUpdate {
-			filterRequest, err := policyFilter.GetFilterRequest(diagnostics, serverValue)
-			if err != nil {
-				return err
-			}
-			editPolicyFilterRequest := client.ApiClient.GpoDAAS.GpoUpdateGpoFilter(ctx, policyFilter.GetId())
-			editPolicyFilterRequest = editPolicyFilterRequest.FilterRequest(filterRequest)
-
-			// Update policy setting
-			httpResp, err := citrixdaasclient.AddRequestData(editPolicyFilterRequest, client).Execute()
-			if err != nil {
-				diagnostics.AddError(
-					"Error Updating Policy Filter "+policyFilter.GetId(),
-					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-						"\nError message: "+util.ReadClientError(err),
-				)
-				return err
-			}
 		}
 	}
 
@@ -735,6 +678,10 @@ func createPolicyFilters(ctx context.Context, client *citrixdaasclient.CitrixDaa
 }
 
 func deletePolicyFilters(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policyName string, policyFilterIdsToDelete []string) error {
+	if len(policyFilterIdsToDelete) == 0 {
+		return nil
+	}
+
 	// Setup batch requests
 	deletePolicyFilterBatchRequestItems := []citrixorchestration.BatchRequestItemModel{}
 	batchApiHeaders, httpResp, err := generateBatchApiHeaders(client)
@@ -898,4 +845,25 @@ func getGpoBooleanSettingDefaultValueMap(ctx context.Context, diagnostics *diag.
 	}
 
 	return defaultValueMap, nil
+}
+
+func getServerValue(client *citrixdaasclient.CitrixDaasClient) string {
+	if client.AuthConfig.OnPremises || !client.AuthConfig.ApiGateway {
+		return client.ApiClient.GetConfig().Host
+	} else {
+		switch client.AuthConfig.Environment {
+		case "Staging":
+			return fmt.Sprintf("%s.xdstaging.net", client.ClientConfig.CustomerId)
+		case "Japan":
+			return fmt.Sprintf("%s.xendesktop.jp", client.ClientConfig.CustomerId)
+		case "JapanStaging":
+			return fmt.Sprintf("%s.xdstaging.jp", client.ClientConfig.CustomerId)
+		case "Gov":
+			return fmt.Sprintf("%s.xendesktop.us", client.ClientConfig.CustomerId)
+		case "GovStaging":
+			return fmt.Sprintf("%s.xdstaging.us", client.ClientConfig.CustomerId)
+		default:
+			return fmt.Sprintf("%s.xendesktop.net", client.ClientConfig.CustomerId)
+		}
+	}
 }

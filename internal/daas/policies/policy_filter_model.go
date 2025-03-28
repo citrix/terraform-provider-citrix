@@ -12,8 +12,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -31,12 +29,10 @@ var (
 )
 
 type PolicyFilterInterface interface {
-	GetId() string
 	GetFilterRequest(diagnostics *diag.Diagnostics, serverValue string) (citrixorchestration.FilterRequest, error)
 }
 
 type AccessControlFilterModel struct {
-	Id         types.String `tfsdk:"id"`
 	Allowed    types.Bool   `tfsdk:"allowed"`
 	Enabled    types.Bool   `tfsdk:"enabled"`
 	Connection types.String `tfsdk:"connection"`
@@ -47,13 +43,6 @@ type AccessControlFilterModel struct {
 func (AccessControlFilterModel) GetSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "Id of the policy filter.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
 			"enabled": schema.BoolAttribute{
 				Description: "Indicate whether the filter is being enabled.",
 				Required:    true,
@@ -87,10 +76,6 @@ func (AccessControlFilterModel) GetAttributes() map[string]schema.Attribute {
 	return AccessControlFilterModel{}.GetSchema().Attributes
 }
 
-func (filter AccessControlFilterModel) GetId() string {
-	return filter.Id.ValueString()
-}
-
 func (filter AccessControlFilterModel) GetFilterRequest(diagnostics *diag.Diagnostics, serverValue string) (citrixorchestration.FilterRequest, error) {
 	filterRequest := citrixorchestration.FilterRequest{}
 	filterRequest.SetFilterType("AccessControl")
@@ -116,8 +101,7 @@ func (filter AccessControlFilterModel) GetFilterRequest(diagnostics *diag.Diagno
 }
 
 type BranchRepeaterFilterModel struct {
-	Id      types.String `tfsdk:"id"`
-	Allowed types.Bool   `tfsdk:"allowed"`
+	Allowed types.Bool `tfsdk:"allowed"`
 }
 
 func (BranchRepeaterFilterModel) GetSchema() schema.SingleNestedAttribute {
@@ -125,13 +109,6 @@ func (BranchRepeaterFilterModel) GetSchema() schema.SingleNestedAttribute {
 		Description: "Definition of branch repeater policy filter.",
 		Optional:    true,
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "Id of the branch repeater policy filter.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
 			"allowed": schema.BoolAttribute{
 				Description: "Indicate the filtered policy is allowed or denied if the filter condition is met.",
 				Required:    true,
@@ -144,10 +121,6 @@ func (BranchRepeaterFilterModel) GetAttributes() map[string]schema.Attribute {
 	return BranchRepeaterFilterModel{}.GetSchema().Attributes
 }
 
-func (filter BranchRepeaterFilterModel) GetId() string {
-	return filter.Id.ValueString()
-}
-
 func (filter BranchRepeaterFilterModel) GetFilterRequest(diagnostics *diag.Diagnostics, serverValue string) (citrixorchestration.FilterRequest, error) {
 	branchRepeaterFilterRequest := citrixorchestration.FilterRequest{}
 	branchRepeaterFilterRequest.SetFilterType("BranchRepeater")
@@ -158,7 +131,6 @@ func (filter BranchRepeaterFilterModel) GetFilterRequest(diagnostics *diag.Diagn
 }
 
 type ClientIPFilterModel struct {
-	Id        types.String `tfsdk:"id"`
 	Allowed   types.Bool   `tfsdk:"allowed"`
 	Enabled   types.Bool   `tfsdk:"enabled"`
 	IpAddress types.String `tfsdk:"ip_address"`
@@ -167,13 +139,6 @@ type ClientIPFilterModel struct {
 func (ClientIPFilterModel) GetSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "Id of the client ip policy filter.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
 			"enabled": schema.BoolAttribute{
 				Description: "Indicate whether the filter is being enabled.",
 				Required:    true,
@@ -197,10 +162,6 @@ func (ClientIPFilterModel) GetAttributes() map[string]schema.Attribute {
 	return ClientIPFilterModel{}.GetSchema().Attributes
 }
 
-func (filter ClientIPFilterModel) GetId() string {
-	return filter.Id.ValueString()
-}
-
 func (filter ClientIPFilterModel) GetFilterRequest(diagnostics *diag.Diagnostics, serverValue string) (citrixorchestration.FilterRequest, error) {
 	filterRequest := citrixorchestration.FilterRequest{}
 	filterRequest.SetFilterType("ClientIP")
@@ -212,7 +173,6 @@ func (filter ClientIPFilterModel) GetFilterRequest(diagnostics *diag.Diagnostics
 }
 
 type ClientNameFilterModel struct {
-	Id         types.String `tfsdk:"id"`
 	Allowed    types.Bool   `tfsdk:"allowed"`
 	Enabled    types.Bool   `tfsdk:"enabled"`
 	ClientName types.String `tfsdk:"client_name"`
@@ -221,13 +181,6 @@ type ClientNameFilterModel struct {
 func (ClientNameFilterModel) GetSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "Id of the client name policy filter.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
 			"enabled": schema.BoolAttribute{
 				Description: "Indicate whether the filter is being enabled.",
 				Required:    true,
@@ -248,10 +201,6 @@ func (ClientNameFilterModel) GetAttributes() map[string]schema.Attribute {
 	return ClientNameFilterModel{}.GetSchema().Attributes
 }
 
-func (filter ClientNameFilterModel) GetId() string {
-	return filter.Id.ValueString()
-}
-
 func (filter ClientNameFilterModel) GetFilterRequest(diagnostics *diag.Diagnostics, serverValue string) (citrixorchestration.FilterRequest, error) {
 	filterRequest := citrixorchestration.FilterRequest{}
 	filterRequest.SetFilterType("ClientName")
@@ -263,7 +212,6 @@ func (filter ClientNameFilterModel) GetFilterRequest(diagnostics *diag.Diagnosti
 }
 
 type DeliveryGroupFilterModel struct {
-	Id              types.String `tfsdk:"id"`
 	Allowed         types.Bool   `tfsdk:"allowed"`
 	Enabled         types.Bool   `tfsdk:"enabled"`
 	DeliveryGroupId types.String `tfsdk:"delivery_group_id"`
@@ -272,13 +220,6 @@ type DeliveryGroupFilterModel struct {
 func (DeliveryGroupFilterModel) GetSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "Id of the delivery group policy filter.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
 			"enabled": schema.BoolAttribute{
 				Description: "Indicate whether the filter is being enabled.",
 				Required:    true,
@@ -300,10 +241,6 @@ func (DeliveryGroupFilterModel) GetSchema() schema.NestedAttributeObject {
 
 func (DeliveryGroupFilterModel) GetAttributes() map[string]schema.Attribute {
 	return DeliveryGroupFilterModel{}.GetSchema().Attributes
-}
-
-func (filter DeliveryGroupFilterModel) GetId() string {
-	return filter.Id.ValueString()
 }
 
 func (filter DeliveryGroupFilterModel) GetFilterRequest(diagnostics *diag.Diagnostics, serverValue string) (citrixorchestration.FilterRequest, error) {
@@ -331,7 +268,6 @@ func (filter DeliveryGroupFilterModel) GetFilterRequest(diagnostics *diag.Diagno
 }
 
 type DeliveryGroupTypeFilterModel struct {
-	Id                types.String `tfsdk:"id"`
 	Allowed           types.Bool   `tfsdk:"allowed"`
 	Enabled           types.Bool   `tfsdk:"enabled"`
 	DeliveryGroupType types.String `tfsdk:"delivery_group_type"`
@@ -340,13 +276,6 @@ type DeliveryGroupTypeFilterModel struct {
 func (DeliveryGroupTypeFilterModel) GetSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "Id of the delivery group type policy filter.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
 			"enabled": schema.BoolAttribute{
 				Description: "Indicate whether the filter is being enabled.",
 				Required:    true,
@@ -374,10 +303,6 @@ func (DeliveryGroupTypeFilterModel) GetAttributes() map[string]schema.Attribute 
 	return DeliveryGroupTypeFilterModel{}.GetSchema().Attributes
 }
 
-func (filter DeliveryGroupTypeFilterModel) GetId() string {
-	return filter.Id.ValueString()
-}
-
 func (filter DeliveryGroupTypeFilterModel) GetFilterRequest(diagnostics *diag.Diagnostics, serverValue string) (citrixorchestration.FilterRequest, error) {
 	filterRequest := citrixorchestration.FilterRequest{}
 	filterRequest.SetFilterType("DesktopKind")
@@ -389,7 +314,6 @@ func (filter DeliveryGroupTypeFilterModel) GetFilterRequest(diagnostics *diag.Di
 }
 
 type OuFilterModel struct {
-	Id      types.String `tfsdk:"id"`
 	Allowed types.Bool   `tfsdk:"allowed"`
 	Enabled types.Bool   `tfsdk:"enabled"`
 	Ou      types.String `tfsdk:"ou"`
@@ -398,13 +322,6 @@ type OuFilterModel struct {
 func (OuFilterModel) GetSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "Id of the organizational unit policy filter.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
 			"enabled": schema.BoolAttribute{
 				Description: "Indicate whether the filter is being enabled.",
 				Required:    true,
@@ -425,10 +342,6 @@ func (OuFilterModel) GetAttributes() map[string]schema.Attribute {
 	return OuFilterModel{}.GetSchema().Attributes
 }
 
-func (filter OuFilterModel) GetId() string {
-	return filter.Id.ValueString()
-}
-
 func (filter OuFilterModel) GetFilterRequest(diagnostics *diag.Diagnostics, serverValue string) (citrixorchestration.FilterRequest, error) {
 	filterRequest := citrixorchestration.FilterRequest{}
 	filterRequest.SetFilterType("OU")
@@ -440,7 +353,6 @@ func (filter OuFilterModel) GetFilterRequest(diagnostics *diag.Diagnostics, serv
 }
 
 type UserFilterModel struct {
-	Id      types.String `tfsdk:"id"`
 	Allowed types.Bool   `tfsdk:"allowed"`
 	Enabled types.Bool   `tfsdk:"enabled"`
 	UserSid types.String `tfsdk:"sid"`
@@ -449,13 +361,6 @@ type UserFilterModel struct {
 func (UserFilterModel) GetSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "Id of the user policy filter.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
 			"enabled": schema.BoolAttribute{
 				Description: "Indicate whether the filter is being enabled.",
 				Required:    true,
@@ -476,10 +381,6 @@ func (UserFilterModel) GetAttributes() map[string]schema.Attribute {
 	return UserFilterModel{}.GetSchema().Attributes
 }
 
-func (filter UserFilterModel) GetId() string {
-	return filter.Id.ValueString()
-}
-
 func (filter UserFilterModel) GetFilterRequest(diagnostics *diag.Diagnostics, serverValue string) (citrixorchestration.FilterRequest, error) {
 	filterRequest := citrixorchestration.FilterRequest{}
 	filterRequest.SetFilterType("User")
@@ -491,7 +392,6 @@ func (filter UserFilterModel) GetFilterRequest(diagnostics *diag.Diagnostics, se
 }
 
 type TagFilterModel struct {
-	Id      types.String `tfsdk:"id"`
 	Allowed types.Bool   `tfsdk:"allowed"`
 	Enabled types.Bool   `tfsdk:"enabled"`
 	Tag     types.String `tfsdk:"tag"`
@@ -500,13 +400,6 @@ type TagFilterModel struct {
 func (TagFilterModel) GetSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "Id of the tag policy filter.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
 			"enabled": schema.BoolAttribute{
 				Description: "Indicate whether the filter is being enabled.",
 				Required:    true,
@@ -525,10 +418,6 @@ func (TagFilterModel) GetSchema() schema.NestedAttributeObject {
 
 func (TagFilterModel) GetAttributes() map[string]schema.Attribute {
 	return TagFilterModel{}.GetSchema().Attributes
-}
-
-func (filter TagFilterModel) GetId() string {
-	return filter.Id.ValueString()
 }
 
 func (filter TagFilterModel) GetFilterRequest(diagnostics *diag.Diagnostics, serverValue string) (citrixorchestration.FilterRequest, error) {

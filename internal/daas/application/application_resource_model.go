@@ -19,6 +19,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int32default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
@@ -106,21 +107,27 @@ func (InstalledAppResponseModel) GetAttributes() map[string]schema.Attribute {
 
 // ApplicationResourceModel maps the resource schema data.
 type ApplicationResourceModel struct {
-	Id                      types.String `tfsdk:"id"`
-	Name                    types.String `tfsdk:"name"`
-	PublishedName           types.String `tfsdk:"published_name"`
-	Description             types.String `tfsdk:"description"`
-	InstalledAppProperties  types.Object `tfsdk:"installed_app_properties"` // InstalledAppResponseModel
-	ApplicationGroups       types.List   `tfsdk:"application_groups"`       // List[string]
-	DeliveryGroups          types.List   `tfsdk:"delivery_groups"`          // List[string]
-	DeliveryGroupsPriority  types.Set    `tfsdk:"delivery_groups_priority"` // List[DeliveryGroupPriorityModel]
-	ApplicationFolderPath   types.String `tfsdk:"application_folder_path"`
-	Icon                    types.String `tfsdk:"icon"`
-	LimitVisibilityToUsers  types.Set    `tfsdk:"limit_visibility_to_users"` // Set[string]
-	ApplicationCategoryPath types.String `tfsdk:"application_category_path"`
-	Metadata                types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
-	Tags                    types.Set    `tfsdk:"tags"`     // Set[string]
-	Enabled                 types.Bool   `tfsdk:"enabled"`
+	Id                        types.String `tfsdk:"id"`
+	Name                      types.String `tfsdk:"name"`
+	PublishedName             types.String `tfsdk:"published_name"`
+	Description               types.String `tfsdk:"description"`
+	InstalledAppProperties    types.Object `tfsdk:"installed_app_properties"` // InstalledAppResponseModel
+	ApplicationGroups         types.List   `tfsdk:"application_groups"`       // List[string]
+	DeliveryGroups            types.List   `tfsdk:"delivery_groups"`          // List[string]
+	DeliveryGroupsPriority    types.Set    `tfsdk:"delivery_groups_priority"` // List[DeliveryGroupPriorityModel]
+	ApplicationFolderPath     types.String `tfsdk:"application_folder_path"`
+	Icon                      types.String `tfsdk:"icon"`
+	LimitVisibilityToUsers    types.Set    `tfsdk:"limit_visibility_to_users"` // Set[string]
+	ApplicationCategoryPath   types.String `tfsdk:"application_category_path"`
+	Metadata                  types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
+	Tags                      types.Set    `tfsdk:"tags"`     // Set[string]
+	Enabled                   types.Bool   `tfsdk:"enabled"`
+	MaxTotalInstances         types.Int32  `tfsdk:"max_total_instances"`
+	ShortcutAddedToDesktop    types.Bool   `tfsdk:"shortcut_added_to_desktop"`
+	ShortcutAddedToStartMenu  types.Bool   `tfsdk:"shortcut_added_to_start_menu"`
+	LimitToOneInstancePerUser types.Bool   `tfsdk:"limit_to_one_instance_per_user"`
+	Visible                   types.Bool   `tfsdk:"visible"`
+	BrowserName               types.String `tfsdk:"browser_name"`
 }
 
 // Schema defines the schema for the data source.
@@ -175,7 +182,14 @@ func (ApplicationResourceModel) GetSchema() schema.Schema {
 							stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
 						),
 					),
-					listvalidator.ExactlyOneOf(path.MatchRoot("delivery_groups_priority")),
+					listvalidator.AtLeastOneOf(
+						path.MatchRoot("application_groups"),
+						path.MatchRoot("delivery_groups"),
+						path.MatchRoot("delivery_groups_priority"),
+					),
+					listvalidator.ConflictsWith(
+						path.MatchRoot("delivery_groups_priority"),
+					),
 				},
 			},
 			"delivery_groups_priority": schema.SetNestedAttribute{
@@ -241,6 +255,44 @@ func (ApplicationResourceModel) GetSchema() schema.Schema {
 				Computed:    true,
 				Default:     booldefault.StaticBool(true),
 			},
+			"limit_to_one_instance_per_user": schema.BoolAttribute{
+				Description: "Specifies if the use of the application should be limited to only one instance per user. Default is `false`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+			"max_total_instances": schema.Int32Attribute{
+				Description: "Control the use of this application by limiting the number of instances running at the same time. If set to 0, it allows unlimited use.",
+				Optional:    true,
+				Computed:    true,
+				Default:     int32default.StaticInt32(0),
+			},
+			"shortcut_added_to_desktop": schema.BoolAttribute{
+				Description: "Indicates whether a shortcut to the application is added to the desktop. Default is `false`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+			"shortcut_added_to_start_menu": schema.BoolAttribute{
+				Description: "Indicates whether a shortcut to the application is added to the start menu. Default is `false`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+			"visible": schema.BoolAttribute{
+				Description: "Specifies whether or not this application is visible to users. Note that it’s possible for an application to be disabled and still visible. Default is `true`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
+			},
+			"browser_name": schema.StringAttribute{
+				Description: "The browser name for the application. When omitted, the application name will be used as the browser name.",
+				Optional:    true,
+				Computed:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
 		},
 	}
 }
@@ -258,6 +310,12 @@ func (r ApplicationResourceModel) RefreshPropertyValues(ctx context.Context, dia
 	r.Icon = types.StringValue(application.GetIconId())
 	r.ApplicationCategoryPath = types.StringValue(application.GetClientFolder())
 	r.Enabled = types.BoolValue(application.GetEnabled())
+	r.LimitToOneInstancePerUser = types.BoolValue(application.GetMaxPerUserInstances() == 1)
+	r.MaxTotalInstances = types.Int32Value(application.GetMaxTotalInstances())
+	r.ShortcutAddedToDesktop = types.BoolValue(application.GetShortcutAddedToDesktop())
+	r.ShortcutAddedToStartMenu = types.BoolValue(application.GetShortcutAddedToStartMenu())
+	r.Visible = types.BoolValue(application.GetVisible())
+	r.BrowserName = types.StringValue(application.GetBrowserName())
 
 	// Set optional values
 	adminFolder := application.GetApplicationFolder()

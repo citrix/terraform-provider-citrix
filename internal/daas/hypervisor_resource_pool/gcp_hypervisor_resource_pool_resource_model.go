@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -26,6 +27,7 @@ type GcpHypervisorResourcePoolResourceModel struct {
 	Name       types.String `tfsdk:"name"`
 	Hypervisor types.String `tfsdk:"hypervisor"`
 	Metadata   types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
+	VmTagging  types.Bool   `tfsdk:"vm_tagging"`
 	/**** Resource Pool Details ****/
 	Region  types.String `tfsdk:"region"`
 	Vpc     types.String `tfsdk:"vpc"`
@@ -104,6 +106,12 @@ func (GcpHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"metadata": util.GetMetadataListSchema("Hypervisor Resource Pool"),
+			"vm_tagging": schema.BoolAttribute{
+				Description: "Indicates whether VMs created by provisioning operations should be tagged. Default is `true`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
+			},
 		},
 	}
 }
@@ -119,6 +127,7 @@ func (r GcpHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx contex
 
 	hypervisorConnection := resourcePool.GetHypervisorConnection()
 	r.Hypervisor = types.StringValue(hypervisorConnection.GetId())
+	r.VmTagging = types.BoolValue(resourcePool.GetVMTaggingEnabled())
 
 	region := resourcePool.GetRegion()
 	if r.shouldSetRegion(region) {

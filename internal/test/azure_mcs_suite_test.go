@@ -25,6 +25,7 @@ func TestAzureMcsSuitePreCheck(t *testing.T) {
 	TestProviderPreCheck(t)
 	TestHypervisorPreCheck_Azure(t)
 	TestHypervisorResourcePoolPreCheck_Azure(t)
+	TestServiceAccountPreCheck_AD(t)
 	TestMachineCatalogPreCheck_Azure(t)
 	TestMachineCatalogPreCheck_Manual_Power_Managed_Azure(t)
 	TestDesktopIconPreCheck(t)
@@ -88,6 +89,7 @@ func TestAzureMcs(t *testing.T) {
 			TestProviderPreCheck(t)
 			TestHypervisorPreCheck_Azure(t)
 			TestHypervisorResourcePoolPreCheck_Azure(t)
+			TestServiceAccountPreCheck_AD(t)
 			TestMachineCatalogPreCheck_Azure(t)
 			TestMachineCatalogPreCheck_Manual_Power_Managed_Azure(t)
 			TestDesktopIconPreCheck(t)
@@ -205,6 +207,36 @@ func TestAzureMcs(t *testing.T) {
 				),
 			},
 
+			/*******************Service Account Test*******************/
+			// Create and Read testing
+			{
+				Config: composeTestResourceTf(
+					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD),
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify name of hypervisor
+					resource.TestCheckResourceAttr("citrix_service_account.testServiceAccountAD", "display_name", os.Getenv("TEST_SERVICE_ACCOUNT_DISPLAY_NAME")),
+					resource.TestCheckResourceAttr("citrix_service_account.testServiceAccountAD", "identity_provider_identifier", os.Getenv("TEST_SERVICE_ACCOUNT_AD_DOMAIN_NAME")),
+				),
+			},
+			// Import testing
+			{
+				ResourceName:      "citrix_service_account.testServiceAccountAD",
+				ImportState:       true,
+				ImportStateVerify: true,
+				// The last_updated attribute does not exist in the Orchestration
+				// API, therefore there is no value for it during import.
+				ImportStateVerifyIgnore: []string{"account_secret", "account_secret_format"},
+			},
+			// Update and Read
+			{
+				Config: composeTestResourceTf(BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify name of hypervisor
+					resource.TestCheckResourceAttr("citrix_service_account.testServiceAccountAD", "display_name", fmt.Sprintf("%s-updated", os.Getenv("TEST_SERVICE_ACCOUNT_DISPLAY_NAME"))),
+				),
+			},
+
 			/****************** Machine Catalog Test - MCS AD / AAD / HybridAAD - Manual Power Managed ******************/
 			// Create and Read testing
 			{
@@ -215,8 +247,6 @@ func TestAzureMcs(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", machineCatalogName),
 					// Verify domain FQDN
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "session_support", "MultiSession"),
-					// Verify domain admin username
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.machine_domain_identity.service_account", os.Getenv("TEST_MC_SERVICE_ACCOUNT")),
 					// Verify machine catalog identity type
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.identity_type", "ActiveDirectory"),
 					// Verify nic network
@@ -229,8 +259,6 @@ func TestAzureMcs(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "session_support", "MultiSession"),
 					// Verify machine catalog identity type
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "provisioning_scheme.identity_type", "HybridAzureAD"),
-					// Verify domain admin username
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "provisioning_scheme.machine_domain_identity.service_account", os.Getenv("TEST_MC_SERVICE_ACCOUNT")),
 					// Verify nic network
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "provisioning_scheme.network_mapping.0.network", os.Getenv("TEST_MC_SUBNET")),
 
@@ -244,6 +272,12 @@ func TestAzureMcs(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogManualPowerManaged", "session_support", os.Getenv("TEST_MC_SESSION_SUPPORT_MANUAL_POWER_MANAGED")),
 					// Verify total number of machines
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogManualPowerManaged", "machine_accounts.#", "1"),
+
+					/***Verify Machine Catalog with Zero Machine Count***/
+					// Verify name of catalog
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogMachines", "name", "ZeroMachinesCatalog"),
+					// Verify total number of machines
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogMachines", "provisioning_scheme.number_of_total_machines", "0"),
 				),
 			},
 			// ImportState testing - MCS AD
@@ -298,8 +332,10 @@ func TestAzureMcs(t *testing.T) {
 			// Create and Read testing
 			{
 				Config: composeTestResourceTf(
+					BuildDeliveryGroupResourceWithZeroCatalogs(t, testDeliveryGroupWithZeroCatalogs),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "", "ActiveDirectory"),
+					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
 					BuildZoneResource(t, zoneInput, true),
@@ -336,8 +372,11 @@ func TestAzureMcs(t *testing.T) {
 			// Delivery Group: Update name, description and add machine testing
 			{
 				Config: composeTestResourceTf(
+					BuildDeliveryGroupResourceWithZeroCatalogs(t, testDeliveryGroupWithZeroCatalogsUpdated),
+					BuildMachineCatalogWithZeroMachines(t, machinecatalog_testResources_zeroMachines_azureUpdated),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updated, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
+					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
 					BuildZoneResource(t, zoneInput, true),
@@ -350,6 +389,8 @@ func TestAzureMcs(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "description", "updatedCatalog"),
 					// Verify updated image
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.azure_machine_config.azure_master_image.master_image", os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")),
+					// Verify domain admin username
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.machine_domain_identity.service_account", os.Getenv("TEST_MC_SERVICE_ACCOUNT")),
 					// Verify machine catalog identity type
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.identity_type", "ActiveDirectory"),
 					// Verify total number of machines
@@ -370,6 +411,20 @@ func TestAzureMcs(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "reboot_schedules.0.ignore_maintenance_mode", "false"),
 					// Verify total number of machines in delivery group
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "total_machines", "2"),
+
+					/*** Verify Machine Catalog with Updated Machine Count ***/
+					// Verify name of catalog
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogMachines", "name", "UpdatedOneMachineCatalog"),
+					// Verify total number of machines
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogMachines", "provisioning_scheme.number_of_total_machines", "1"),
+
+					/*** Verify Delivery Group with Updated Machine Count ***/
+					// Verify name of delivery group
+					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroupZeroCatalogs", "name", "DeliveryGroupWithAssociatedCatalogs"),
+					// Verify the presence of an associated machine catalog
+					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroupZeroCatalogs", "associated_machine_catalogs.#", "1"),
+					// Verify machine count in the associated machine catalog
+					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroupZeroCatalogs", "associated_machine_catalogs.0.machine_count", "1"),
 				),
 			},
 
@@ -380,6 +435,7 @@ func TestAzureMcs(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
+					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
 					BuildZoneResource(t, zoneInput, true),
@@ -403,6 +459,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildAdminFolderResource(t, testAdminFolderResource, "ContainsApplications"),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
+					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
 					BuildZoneResource(t, zoneInput, true),
@@ -435,6 +492,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildAdminFolderResource(t, testAdminFolderResource, "ContainsApplicationGroups"),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
+					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
 					BuildZoneResource(t, zoneInput, true),
@@ -461,6 +519,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildAdminFolderResource(t, testAdminFolderResource_nameAndParentPathUpdated1, "ContainsApplications"),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
+					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
 					BuildZoneResource(t, zoneInput, true),
@@ -487,6 +546,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildAdminFolderResource(t, testAdminFolderResource_parentPathRemoved, "ContainsApplications"),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
+					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
 					BuildZoneResource(t, zoneInput, true),
@@ -511,6 +571,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
+					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
 					BuildZoneResource(t, zoneInput, true),
@@ -543,6 +604,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
+					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
 					BuildZoneResource(t, zoneInput, true),
@@ -660,6 +722,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
+					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
 					BuildZoneResource(t, zoneInput, true),
@@ -722,6 +785,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildAdminScopeResource(t, adminScopeTestResource_updated),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
+					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
 					BuildZoneResource(t, zoneInput, true),
@@ -758,6 +822,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildAdminScopeResource(t, adminScopeTestResource_updated),
 					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
 					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
+					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
 					BuildZoneResource(t, zoneInput, true),
@@ -787,20 +852,24 @@ func composeAzureMachineCatalogTestResourceTf(t *testing.T, isOnPremises bool) s
 
 	if isOnPremises {
 		return composeTestResourceTf(
+			BuildMachineCatalogWithZeroMachines(t, machinecatalog_testResources_zeroMachines_azure),
 			BuildMachineCatalogResourceManualPowerManagedAzure(t, machinecatalog_testResources_manual_power_managed_azure),
 			BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "-HybAAD", "HybridAzureAD"),
 			BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "", "ActiveDirectory"),
+			BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
 			BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 			BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
 			BuildZoneResource(t, zoneInput, true),
 		)
 	}
 	return composeTestResourceTf(
+		BuildMachineCatalogWithZeroMachines(t, machinecatalog_testResources_zeroMachines_azure),
 		BuildMachineCatalogResourceManualPowerManagedAzure(t, machinecatalog_testResources_manual_power_managed_azure),
 		BuildMachineCatalogResourceWorkgroup(t, machinecatalog_testResources_workgroup),
 		BuildMachineCatalogResourceAzureAd(t, machinecatalog_testResources_azure_ad),
 		BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "-HybAAD", "HybridAzureAD"),
 		BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "", "ActiveDirectory"),
+		BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
 		BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 		BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
 		BuildZoneResource(t, zoneInput, true),

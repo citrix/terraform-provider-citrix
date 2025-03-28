@@ -19,7 +19,9 @@ import (
 )
 
 const (
-	EnableAzureADDeviceManagement_CustomProperty = "AzureAdDeviceManagement"
+	EnableAzureADDeviceManagement_CustomProperty          = "AzureAdDeviceManagement"
+	ProxyHypervisorTrafficThroughConnector_CustomProperty = "ProxyHypervisorTrafficThroughConnector"
+	AuthenticationMode_CustomProperty                     = "AuthenticationMode"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -77,15 +79,19 @@ func (r *azureHypervisorResource) Create(ctx context.Context, req resource.Creat
 	connectionDetails.SetZone(plan.Zone.ValueString())
 	connectionDetails.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM)
 
-	if plan.ApplicationId.IsNull() || plan.ApplicationSecret.IsNull() || plan.SubscriptionId.IsNull() || plan.ActiveDirectoryId.IsNull() {
+	if plan.SubscriptionId.IsNull() || plan.ActiveDirectoryId.IsNull() {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor for AzureRM",
-			"ApplicationId/ApplicationSecret/SubscriptionId/ActiveDirectoryId is missing.",
+			"SubscriptionId/ActiveDirectoryId is missing.",
 		)
 		return
 	}
-	connectionDetails.SetApplicationId(plan.ApplicationId.ValueString())
-	connectionDetails.SetApplicationSecret(plan.ApplicationSecret.ValueString())
+	if !plan.ApplicationId.IsNull() {
+		connectionDetails.SetApplicationId(plan.ApplicationId.ValueString())
+	}
+	if !plan.ApplicationSecret.IsNull() {
+		connectionDetails.SetApplicationSecret(plan.ApplicationSecret.ValueString())
+	}
 	metadata := getMetadataForAzureRmHypervisor(plan)
 	additionalMetadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
 	metadata = append(metadata, additionalMetadata...)
@@ -101,6 +107,17 @@ func (r *azureHypervisorResource) Create(ctx context.Context, req resource.Creat
 	enableAADDeviceManagementProperty.SetName(EnableAzureADDeviceManagement_CustomProperty)
 	enableAADDeviceManagementProperty.SetValue(strconv.FormatBool(plan.EnableAzureADDeviceManagement.ValueBool()))
 	customProperties = append(customProperties, enableAADDeviceManagementProperty)
+
+	enableProxyHypervisorTraffic := citrixorchestration.NameValueStringPairModel{}
+	enableProxyHypervisorTraffic.SetName(ProxyHypervisorTrafficThroughConnector_CustomProperty)
+	enableProxyHypervisorTraffic.SetValue(strconv.FormatBool(plan.ProxyHypervisorTrafficThroughConnector.ValueBool()))
+	customProperties = append(customProperties, enableProxyHypervisorTraffic)
+
+	enableAuthenticationMode := citrixorchestration.NameValueStringPairModel{}
+	enableAuthenticationMode.SetName(AuthenticationMode_CustomProperty)
+	enableAuthenticationMode.SetValue(plan.AuthenticationMode.ValueString())
+	customProperties = append(customProperties, enableAuthenticationMode)
+
 	customPropertyString, _ := json.Marshal(customProperties)
 	connectionDetails.SetCustomProperties(string(customPropertyString))
 
@@ -187,8 +204,13 @@ func (r *azureHypervisorResource) Update(ctx context.Context, req resource.Updat
 	var editHypervisorRequestBody citrixorchestration.EditHypervisorConnectionRequestModel
 	editHypervisorRequestBody.SetName(plan.Name.ValueString())
 	editHypervisorRequestBody.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM)
+
 	editHypervisorRequestBody.SetApplicationId(plan.ApplicationId.ValueString())
-	editHypervisorRequestBody.SetApplicationSecret(plan.ApplicationSecret.ValueString())
+
+	if !plan.ApplicationSecret.IsNull() {
+		editHypervisorRequestBody.SetApplicationSecret(plan.ApplicationSecret.ValueString())
+	}
+
 	metadata := getMetadataForAzureRmHypervisor(plan)
 	additionalMetadata := util.GetUpdatedMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, state.Metadata), util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
 	metadata = append(metadata, additionalMetadata...)
@@ -207,6 +229,7 @@ func (r *azureHypervisorResource) Update(ctx context.Context, req resource.Updat
 	// Modify custom properties
 	customPropertiesString := hypervisor.GetCustomProperties()
 	var customProperties []citrixorchestration.NameValueStringPairModel
+
 	err = json.Unmarshal([]byte(customPropertiesString), &customProperties)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -216,13 +239,47 @@ func (r *azureHypervisorResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
+	isEnableAADeviceManagement := false
+	isEnableProxyHyp := false
+	isEnableAuthMode := false
+
 	updatedCustomProperties := []*citrixorchestration.NameValueStringPairModel{}
 	for _, customProperty := range customProperties {
 		currentProperty := customProperty
 		if currentProperty.GetName() == EnableAzureADDeviceManagement_CustomProperty {
 			currentProperty.SetValue(strconv.FormatBool(plan.EnableAzureADDeviceManagement.ValueBool()))
+			isEnableAADeviceManagement = true
+		}
+		if currentProperty.GetName() == ProxyHypervisorTrafficThroughConnector_CustomProperty {
+			currentProperty.SetValue(strconv.FormatBool(plan.ProxyHypervisorTrafficThroughConnector.ValueBool()))
+			isEnableProxyHyp = true
+		}
+		if currentProperty.GetName() == AuthenticationMode_CustomProperty {
+			currentProperty.SetValue(plan.AuthenticationMode.ValueString())
+			isEnableAuthMode = true
 		}
 		updatedCustomProperties = append(updatedCustomProperties, &currentProperty)
+	}
+
+	if !isEnableAADeviceManagement {
+		enableAADDeviceManagementProperty := citrixorchestration.NameValueStringPairModel{}
+		enableAADDeviceManagementProperty.SetName(EnableAzureADDeviceManagement_CustomProperty)
+		enableAADDeviceManagementProperty.SetValue(strconv.FormatBool(plan.EnableAzureADDeviceManagement.ValueBool()))
+		updatedCustomProperties = append(updatedCustomProperties, &enableAADDeviceManagementProperty)
+	}
+
+	if !isEnableProxyHyp {
+		enableProxyHypervisorTraffic := citrixorchestration.NameValueStringPairModel{}
+		enableProxyHypervisorTraffic.SetName(ProxyHypervisorTrafficThroughConnector_CustomProperty)
+		enableProxyHypervisorTraffic.SetValue(strconv.FormatBool(plan.ProxyHypervisorTrafficThroughConnector.ValueBool()))
+		updatedCustomProperties = append(updatedCustomProperties, &enableProxyHypervisorTraffic)
+	}
+
+	if !isEnableAuthMode {
+		enableAuthenticationMode := citrixorchestration.NameValueStringPairModel{}
+		enableAuthenticationMode.SetName(AuthenticationMode_CustomProperty)
+		enableAuthenticationMode.SetValue(plan.AuthenticationMode.ValueString())
+		updatedCustomProperties = append(updatedCustomProperties, &enableAuthenticationMode)
 	}
 
 	customPropertiesByte, _ := json.Marshal(updatedCustomProperties)
@@ -308,6 +365,56 @@ func (r *azureHypervisorResource) ValidateConfig(ctx context.Context, req resour
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	if !data.AuthenticationMode.IsNull() && (data.AuthenticationMode.ValueString() == util.UserAssignedManagedIdentity || data.AuthenticationMode.ValueString() == util.SystemAssignedManagedIdentity) {
+		if !data.ProxyHypervisorTrafficThroughConnector.ValueBool() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("proxy_hypervisor_traffic_through_connector"),
+				"proxy_hypervisor_traffic_through_connector Configuration Error.",
+				"proxy_hypervisor_traffic_through_connector should be set to true if the authentication_mode is set to either UserAssignedManagedIdentity or SystemAssignedManagedIdentity.",
+			)
+		}
+		if data.EnableAzureADDeviceManagement.ValueBool() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("enable_azure_ad_device_management"),
+				"enable_azure_ad_device_management Configuration Error.",
+				"enable_azure_ad_device_management should either not be set or should be set to false if the authentication_mode is set to either UserAssignedManagedIdentity or SystemAssignedManagedIdentity.",
+			)
+		}
+		if !data.ApplicationSecret.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("application_secret"),
+				"application_secret Configuration Error.",
+				"application_secret should not be set if the authentication_mode is set to either UserAssignedManagedIdentity or SystemAssignedManagedIdentity.",
+			)
+		}
+	} else {
+		if data.ApplicationSecret.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("application_secret"),
+				"application_secret Configuration Error",
+				"application_secret should be set if the authentication_mode is either not set or set to AppClientSecret.",
+			)
+		}
+	}
+
+	if !data.AuthenticationMode.IsNull() && data.AuthenticationMode.ValueString() == util.SystemAssignedManagedIdentity {
+		if !data.ApplicationId.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("application_id"),
+				"application_id Configuration Error.",
+				"application_id should not be set if the authentication_mode is set to SystemAssignedManagedIdentity.",
+			)
+		}
+	} else {
+		if data.ApplicationId.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("application_id"),
+				"application_id Configuration Error.",
+				"application_id should be set if the authentication_mode is either not set or is set to one of AppClientSecret or UserAssignedManagedIdentity.",
+			)
+		}
 	}
 
 	if !data.Metadata.IsNull() {
