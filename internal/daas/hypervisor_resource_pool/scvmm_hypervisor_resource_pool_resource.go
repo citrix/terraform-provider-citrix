@@ -157,7 +157,7 @@ func (r *scvmmHypervisorResourcePoolResource) Create(ctx context.Context, req re
 
 	folderPath := ""
 	if plan.HostGroup.ValueString() != "" {
-		hostgroup, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, &resp.Diagnostics, hypervisorId, "", plan.HostGroup.ValueString(), util.HostGroupResourceType, "", hypervisor)
+		hostgroup, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, r.client, &resp.Diagnostics, hypervisorId, "", plan.HostGroup.ValueString(), util.HostGroupResourceType, "", hypervisor)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating Hypervisor Resource Pool for SCVMM",
@@ -168,7 +168,7 @@ func (r *scvmmHypervisorResourcePoolResource) Create(ctx context.Context, req re
 		folderPath = hostgroup.GetXDPath()
 	}
 
-	host, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, &resp.Diagnostics, hypervisorId, folderPath, plan.Host.ValueString(), util.HostResourceType, "", hypervisor)
+	host, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, r.client, &resp.Diagnostics, hypervisorId, folderPath, plan.Host.ValueString(), util.HostResourceType, "", hypervisor)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor Resource Pool for SCVMM",
@@ -180,6 +180,7 @@ func (r *scvmmHypervisorResourcePoolResource) Create(ctx context.Context, req re
 	resourcePoolDetails.SetName(plan.Name.ValueString())
 	resourcePoolDetails.SetConnectionType(hypervisorConnectionType)
 	resourcePoolDetails.SetRootPath(host.GetXDPath())
+	resourcePoolDetails.SetVmTagging(plan.VmTagging.ValueBool())
 
 	storages, tempStorages := plan.GetStorageList(ctx, r.client, &resp.Diagnostics, hypervisor, host.GetXDPath(), true, false)
 	networks := plan.GetNetworksList(ctx, r.client, &resp.Diagnostics, hypervisor, host.GetXDPath(), true)
@@ -299,10 +300,11 @@ func (r *scvmmHypervisorResourcePoolResource) Update(ctx context.Context, req re
 	var editHypervisorResourcePool citrixorchestration.EditHypervisorResourcePoolRequestModel
 	editHypervisorResourcePool.SetName(plan.Name.ValueString())
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM)
+	editHypervisorResourcePool.SetVmTagging(plan.VmTagging.ValueBool())
 
 	folderPath := ""
 	if plan.HostGroup.ValueString() != "" {
-		hostgroup, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, &resp.Diagnostics, hypervisorId, "", plan.HostGroup.ValueString(), util.HostGroupResourceType, "", hypervisor)
+		hostgroup, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, r.client, &resp.Diagnostics, hypervisorId, "", plan.HostGroup.ValueString(), util.HostGroupResourceType, "", hypervisor)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating Hypervisor Resource Pool for SCVMM",
@@ -313,7 +315,7 @@ func (r *scvmmHypervisorResourcePoolResource) Update(ctx context.Context, req re
 		folderPath = hostgroup.GetXDPath()
 	}
 
-	host, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, &resp.Diagnostics, hypervisorId, folderPath, plan.Host.ValueString(), util.HostResourceType, "", hypervisor)
+	host, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, r.client, &resp.Diagnostics, hypervisorId, folderPath, plan.Host.ValueString(), util.HostResourceType, "", hypervisor)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor Resource Pool for SCVMM",
@@ -427,7 +429,7 @@ func (plan SCVMMHypervisorResourcePoolResourceModel) GetStorageList(ctx context.
 		}
 	}
 	storageNames := util.ConvertBaseStringArrayToPrimitiveStringArray(storage)
-	storages, err := util.GetFilteredResourcePathList(ctx, client, diags, hypervisorId, hostXdPath, util.StorageResourceType, storageNames, hypervisor.GetConnectionType(), hypervisor.GetPluginId())
+	storages, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, hostXdPath, util.StorageResourceType, storageNames, hypervisor.GetConnectionType(), hypervisor.GetPluginId())
 
 	if len(storage) > 0 && len(storages) == 0 {
 		errDetail := "No storage found for the given storage names"
@@ -449,7 +451,7 @@ func (plan SCVMMHypervisorResourcePoolResourceModel) GetStorageList(ctx context.
 		}
 	}
 	tempStorageNames := util.ConvertBaseStringArrayToPrimitiveStringArray(tempStorage)
-	tempStorages, err := util.GetFilteredResourcePathList(ctx, client, diags, hypervisorId, hostXdPath, util.StorageResourceType, tempStorageNames, hypervisor.GetConnectionType(), hypervisor.GetPluginId())
+	tempStorages, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, hostXdPath, util.StorageResourceType, tempStorageNames, hypervisor.GetConnectionType(), hypervisor.GetPluginId())
 
 	if len(tempStorage) > 0 && len(tempStorages) == 0 {
 		errDetail := "No storage found for the given temporary storage names"
@@ -475,7 +477,7 @@ func (plan SCVMMHypervisorResourcePoolResourceModel) GetNetworksList(ctx context
 	}
 
 	networkNames := util.StringListToStringArray(ctx, diags, plan.Networks)
-	networks, err := util.GetFilteredResourcePathList(ctx, client, diags, hypervisorId, hostXdPath, util.NetworkResourceType, networkNames, hypervisorConnectionType, hypervisor.GetPluginId())
+	networks, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, hostXdPath, util.NetworkResourceType, networkNames, hypervisorConnectionType, hypervisor.GetPluginId())
 	if len(networks) == 0 {
 		errDetail := "No network found for the given network names"
 		if err != nil {

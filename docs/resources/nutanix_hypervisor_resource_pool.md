@@ -35,6 +35,7 @@ resource "citrix_nutanix_hypervisor_resource_pool" "example-nutanix-hypervisor-r
 ### Optional
 
 - `metadata` (Attributes List) Metadata for the Hypervisor Resource Pool. (see [below for nested schema](#nestedatt--metadata))
+- `vm_tagging` (Boolean) Indicates whether VMs created by provisioning operations should be tagged. Default is `true`.
 
 ### Read-Only
 

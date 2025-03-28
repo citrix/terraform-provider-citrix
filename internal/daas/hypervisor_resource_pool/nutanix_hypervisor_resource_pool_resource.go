@@ -82,6 +82,7 @@ func (r *nutanixHypervisorResourcePoolResource) Create(ctx context.Context, req 
 	resourcePoolDetails.SetName(plan.Name.ValueString())
 	resourcePoolDetails.SetConnectionType(hypervisorConnectionType)
 	resourcePoolDetails.SetRootPath("")
+	resourcePoolDetails.SetVmTagging(plan.VmTagging.ValueBool())
 	networks := plan.GetNetworksList(ctx, r.client, &resp.Diagnostics, hypervisor, true)
 	if len(networks) == 0 {
 		// Error handled in helper function.
@@ -178,6 +179,7 @@ func (r *nutanixHypervisorResourcePoolResource) Update(ctx context.Context, req 
 	var editHypervisorResourcePool citrixorchestration.EditHypervisorResourcePoolRequestModel
 	editHypervisorResourcePool.SetName(plan.Name.ValueString())
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM)
+	editHypervisorResourcePool.SetVmTagging(plan.VmTagging.ValueBool())
 
 	networks := plan.GetNetworksList(ctx, r.client, &resp.Diagnostics, hypervisor, false)
 	editHypervisorResourcePool.SetNetworks(networks)
@@ -262,7 +264,7 @@ func (plan NutanixHypervisorResourcePoolResourceModel) GetNetworksList(ctx conte
 	}
 
 	networkNames := util.StringListToStringArray(ctx, diags, plan.Networks)
-	networks, err := util.GetFilteredResourcePathList(ctx, client, diags, hypervisorId, "", util.NetworkResourceType, networkNames, hypervisorConnectionType, pluginId)
+	networks, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, "", util.NetworkResourceType, networkNames, hypervisorConnectionType, pluginId)
 	if len(networks) == 0 {
 		errDetail := "No network found for the given network names"
 		if err != nil {

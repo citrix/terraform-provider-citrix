@@ -36,6 +36,7 @@ data "citrix_image_version" "example_image_version_by_version_number" {
 ### Optional
 
 - `id` (String) The id of the image version.
+- `timeout` (Attributes) Timeout in minutes for the long-running jobs in image definition resource's create, delete operation(s). (see [below for nested schema](#nestedatt--timeout))
 - `version_number` (Number) The version number of the image version.
 
 ### Read-Only
@@ -48,6 +49,15 @@ data "citrix_image_version" "example_image_version_by_version_number" {
 - `os_type` (String) The OS type of the image version.
 - `session_support` (String) Session support for the image version.
 - `vsphere_image_specs` (Attributes) Image configuration for vSphere image version. (see [below for nested schema](#nestedatt--vsphere_image_specs))
+
+<a id="nestedatt--timeout"></a>
+### Nested Schema for `timeout`
+
+Optional:
+
+- `create` (Number) Timeout in minutes for the long-running jobs in create operation. Defaults to 10. Minimum value is 5.
+- `delete` (Number) Timeout in minutes for the long-running jobs in delete operation. Defaults to 10. Minimum value is 5.
+
 
 <a id="nestedatt--azure_image_specs"></a>
 ### Nested Schema for `azure_image_specs`

@@ -86,6 +86,8 @@ func TestApplicationResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_application.testApplication", "installed_app_properties.command_line_executable", "test.exe"),
 					// Verify the application category path
 					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_category_path", "Main Apps\\Test App"),
+					// Verify the visibility of the application
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "visible", "true"),
 				),
 			},
 			// ImportState testing
@@ -121,6 +123,8 @@ func TestApplicationResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_folder_path", updated_folder_name),
 					// Verify the application category path
 					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_category_path", ""),
+					// Verify the visibility of the application
+					resource.TestCheckResourceAttr("citrix_application.testApplication", "visible", "false"),
 				),
 			},
 			// Update and Read testing
@@ -196,6 +200,7 @@ resource "citrix_application" "testApplication" {
 	}
 	delivery_groups = [citrix_delivery_group.testDeliveryGroup.id]
 	application_category_path = "Main Apps\\Test App"
+	visible = true
 }`
 	testApplicationResource_updated = `
 resource "citrix_application" "testApplication" {
@@ -209,6 +214,7 @@ resource "citrix_application" "testApplication" {
 	}
 	delivery_groups = [citrix_delivery_group.testDeliveryGroup.id]
 	application_folder_path = citrix_admin_folder.testAdminFolder2.path
+	visible = false
 }`
 
 	testApplicationResource_withPriorityModel = `

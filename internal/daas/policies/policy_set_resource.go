@@ -667,16 +667,19 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 			}
 
 			// Perform policy filter updates
+			// Clear the policy filters
+			err = clearPolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString())
+			if err != nil {
+				return
+			}
+
+			serverValue := getServerValue(r.client)
 			// Update Access Control Filters
 			accessControlFilterInterfaceInPlan := []PolicyFilterInterface{}
 			for _, filter := range util.ObjectSetToTypedArray[AccessControlFilterModel](ctx, &resp.Diagnostics, policy.AccessControlFilters) {
 				accessControlFilterInterfaceInPlan = append(accessControlFilterInterfaceInPlan, filter)
 			}
-			accessControlFilterInterfaceInState := []PolicyFilterInterface{}
-			for _, filter := range util.ObjectSetToTypedArray[AccessControlFilterModel](ctx, &resp.Diagnostics, policyInState.AccessControlFilters) {
-				accessControlFilterInterfaceInState = append(accessControlFilterInterfaceInState, filter)
-			}
-			err = updatePolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), accessControlFilterInterfaceInPlan, accessControlFilterInterfaceInState)
+			err = createPolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), serverValue, accessControlFilterInterfaceInPlan)
 			if err != nil {
 				return
 			}
@@ -687,12 +690,7 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 				filter := util.ObjectValueToTypedObject[BranchRepeaterFilterModel](ctx, &resp.Diagnostics, policy.BranchRepeaterFilter)
 				branchRepeaterFilterInterfaceInPlan = append(branchRepeaterFilterInterfaceInPlan, filter)
 			}
-			branchRepeaterFilterInterfaceInState := []PolicyFilterInterface{}
-			if !policyInState.BranchRepeaterFilter.IsNull() {
-				filter := util.ObjectValueToTypedObject[BranchRepeaterFilterModel](ctx, &resp.Diagnostics, policyInState.BranchRepeaterFilter)
-				branchRepeaterFilterInterfaceInState = append(branchRepeaterFilterInterfaceInState, filter)
-			}
-			err = updatePolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), branchRepeaterFilterInterfaceInPlan, branchRepeaterFilterInterfaceInState)
+			err = createPolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), serverValue, branchRepeaterFilterInterfaceInPlan)
 			if err != nil {
 				return
 			}
@@ -702,11 +700,7 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 			for _, filter := range util.ObjectSetToTypedArray[ClientIPFilterModel](ctx, &resp.Diagnostics, policy.ClientIPFilters) {
 				clientIpFilterInterfaceInPlan = append(clientIpFilterInterfaceInPlan, filter)
 			}
-			clientIpFilterInterfaceInState := []PolicyFilterInterface{}
-			for _, filter := range util.ObjectSetToTypedArray[ClientIPFilterModel](ctx, &resp.Diagnostics, policyInState.ClientIPFilters) {
-				clientIpFilterInterfaceInState = append(clientIpFilterInterfaceInState, filter)
-			}
-			err = updatePolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), clientIpFilterInterfaceInPlan, clientIpFilterInterfaceInState)
+			err = createPolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), serverValue, clientIpFilterInterfaceInPlan)
 			if err != nil {
 				return
 			}
@@ -716,11 +710,7 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 			for _, filter := range util.ObjectSetToTypedArray[ClientNameFilterModel](ctx, &resp.Diagnostics, policy.ClientNameFilters) {
 				clientNameFilterInterfaceInPlan = append(clientNameFilterInterfaceInPlan, filter)
 			}
-			clientNameFilterInterfaceInState := []PolicyFilterInterface{}
-			for _, filter := range util.ObjectSetToTypedArray[ClientNameFilterModel](ctx, &resp.Diagnostics, policyInState.ClientNameFilters) {
-				clientNameFilterInterfaceInState = append(clientNameFilterInterfaceInState, filter)
-			}
-			err = updatePolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), clientNameFilterInterfaceInPlan, clientNameFilterInterfaceInState)
+			err = createPolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), serverValue, clientNameFilterInterfaceInPlan)
 			if err != nil {
 				return
 			}
@@ -730,11 +720,7 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 			for _, filter := range util.ObjectSetToTypedArray[DeliveryGroupFilterModel](ctx, &resp.Diagnostics, policy.DeliveryGroupFilters) {
 				deliveryGroupFilterInterfaceInPlan = append(deliveryGroupFilterInterfaceInPlan, filter)
 			}
-			deliveryGroupFilterInterfaceInState := []PolicyFilterInterface{}
-			for _, filter := range util.ObjectSetToTypedArray[DeliveryGroupFilterModel](ctx, &resp.Diagnostics, policyInState.DeliveryGroupFilters) {
-				deliveryGroupFilterInterfaceInState = append(deliveryGroupFilterInterfaceInState, filter)
-			}
-			err = updatePolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), deliveryGroupFilterInterfaceInPlan, deliveryGroupFilterInterfaceInState)
+			err = createPolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), serverValue, deliveryGroupFilterInterfaceInPlan)
 			if err != nil {
 				return
 			}
@@ -744,11 +730,7 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 			for _, filter := range util.ObjectSetToTypedArray[DeliveryGroupTypeFilterModel](ctx, &resp.Diagnostics, policy.DeliveryGroupTypeFilters) {
 				deliveryGroupTypeFilterInterfaceInPlan = append(deliveryGroupTypeFilterInterfaceInPlan, filter)
 			}
-			deliveryGroupTypeFilterInterfaceInState := []PolicyFilterInterface{}
-			for _, filter := range util.ObjectSetToTypedArray[DeliveryGroupTypeFilterModel](ctx, &resp.Diagnostics, policyInState.DeliveryGroupTypeFilters) {
-				deliveryGroupTypeFilterInterfaceInState = append(deliveryGroupTypeFilterInterfaceInState, filter)
-			}
-			err = updatePolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), deliveryGroupTypeFilterInterfaceInPlan, deliveryGroupTypeFilterInterfaceInState)
+			err = createPolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), serverValue, deliveryGroupTypeFilterInterfaceInPlan)
 			if err != nil {
 				return
 			}
@@ -758,11 +740,7 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 			for _, filter := range util.ObjectSetToTypedArray[TagFilterModel](ctx, &resp.Diagnostics, policy.TagFilters) {
 				tagFilterInterfaceInPlan = append(tagFilterInterfaceInPlan, filter)
 			}
-			tagFilterInterfaceInState := []PolicyFilterInterface{}
-			for _, filter := range util.ObjectSetToTypedArray[TagFilterModel](ctx, &resp.Diagnostics, policyInState.TagFilters) {
-				tagFilterInterfaceInState = append(tagFilterInterfaceInState, filter)
-			}
-			err = updatePolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), tagFilterInterfaceInPlan, tagFilterInterfaceInState)
+			err = createPolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), serverValue, tagFilterInterfaceInPlan)
 			if err != nil {
 				return
 			}
@@ -772,11 +750,7 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 			for _, filter := range util.ObjectSetToTypedArray[OuFilterModel](ctx, &resp.Diagnostics, policy.OuFilters) {
 				tagFilterInterfaceInPlan = append(tagFilterInterfaceInPlan, filter)
 			}
-			ouFilterInterfaceInState := []PolicyFilterInterface{}
-			for _, filter := range util.ObjectSetToTypedArray[OuFilterModel](ctx, &resp.Diagnostics, policyInState.OuFilters) {
-				ouFilterInterfaceInState = append(ouFilterInterfaceInState, filter)
-			}
-			err = updatePolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), ouFilterInterfaceInPlan, ouFilterInterfaceInState)
+			err = createPolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), serverValue, ouFilterInterfaceInPlan)
 			if err != nil {
 				return
 			}
@@ -786,11 +760,7 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 			for _, filter := range util.ObjectSetToTypedArray[UserFilterModel](ctx, &resp.Diagnostics, policy.UserFilters) {
 				userFilterInterfaceInPlan = append(userFilterInterfaceInPlan, filter)
 			}
-			userFilterInterfaceInState := []PolicyFilterInterface{}
-			for _, filter := range util.ObjectSetToTypedArray[UserFilterModel](ctx, &resp.Diagnostics, policyInState.UserFilters) {
-				userFilterInterfaceInState = append(userFilterInterfaceInState, filter)
-			}
-			err = updatePolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), userFilterInterfaceInPlan, userFilterInterfaceInState)
+			err = createPolicyFilters(ctx, r.client, &resp.Diagnostics, policy.Id.ValueString(), policy.Name.ValueString(), serverValue, userFilterInterfaceInPlan)
 			if err != nil {
 				return
 			}

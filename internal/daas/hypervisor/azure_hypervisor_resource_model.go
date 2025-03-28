@@ -19,6 +19,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setdefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -33,13 +34,16 @@ type AzureHypervisorResourceModel struct {
 	Scopes   types.Set    `tfsdk:"scopes"`   // Set[string]
 	Metadata types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
 	Tenants  types.Set    `tfsdk:"tenants"`  // Set[string]
+
 	/** Azure Connection **/
-	ApplicationId                   types.String `tfsdk:"application_id"`
-	ApplicationSecret               types.String `tfsdk:"application_secret"`
-	ApplicationSecretExpirationDate types.String `tfsdk:"application_secret_expiration_date"`
-	SubscriptionId                  types.String `tfsdk:"subscription_id"`
-	ActiveDirectoryId               types.String `tfsdk:"active_directory_id"`
-	EnableAzureADDeviceManagement   types.Bool   `tfsdk:"enable_azure_ad_device_management"`
+	ApplicationId                          types.String `tfsdk:"application_id"`
+	ApplicationSecret                      types.String `tfsdk:"application_secret"`
+	ApplicationSecretExpirationDate        types.String `tfsdk:"application_secret_expiration_date"`
+	SubscriptionId                         types.String `tfsdk:"subscription_id"`
+	ActiveDirectoryId                      types.String `tfsdk:"active_directory_id"`
+	EnableAzureADDeviceManagement          types.Bool   `tfsdk:"enable_azure_ad_device_management"`
+	AuthenticationMode                     types.String `tfsdk:"authentication_mode"`
+	ProxyHypervisorTrafficThroughConnector types.Bool   `tfsdk:"proxy_hypervisor_traffic_through_connector"`
 }
 
 func (AzureHypervisorResourceModel) GetSchema() schema.Schema {
@@ -68,12 +72,12 @@ func (AzureHypervisorResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"application_id": schema.StringAttribute{
-				Description: "Application ID of the service principal used to access the Azure APIs.",
-				Required:    true,
+				Description: "The Application ID of the service principal used to access the Azure APIs. If the authentication_mode is set to `UserAssignedManagedIdentity`, use the Client ID of the managed identity.",
+				Optional:    true,
 			},
 			"application_secret": schema.StringAttribute{
 				Description: "The Application Secret of the service principal used to access the Azure APIs.",
-				Required:    true,
+				Optional:    true,
 				Sensitive:   true,
 			},
 			"application_secret_expiration_date": schema.StringAttribute{
@@ -124,6 +128,21 @@ func (AzureHypervisorResourceModel) GetSchema() schema.Schema {
 				Description: "A set of identifiers of tenants to associate with the hypervisor connection.",
 				Computed:    true,
 			},
+			"authentication_mode": schema.StringAttribute{
+				Description: "Provides different options for managing service access to Azure resources. Possible values are `AppClientSecret`, `UserAssignedManagedIdentities`, and `SystemAssignedManagedIdentity`. Defaults to `AppClientSecret`.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf(util.AppClientSecret, util.UserAssignedManagedIdentity, util.SystemAssignedManagedIdentity),
+				},
+				Computed: true,
+				Default:  stringdefault.StaticString(util.AppClientSecret),
+			},
+			"proxy_hypervisor_traffic_through_connector": schema.BoolAttribute{
+				Description: "Enables the routing of hypervisor traffic through a Citrix Cloud Connector. Should be enabled if the `AuthenticationMode` is set to either `UserAssignedManagedIdentity` or `SystemAssignedManagedIdentity`. Defaults to `false`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
 		},
 	}
 }
@@ -137,7 +156,12 @@ func (r AzureHypervisorResourceModel) RefreshPropertyValues(ctx context.Context,
 	r.Name = types.StringValue(hypervisor.GetName())
 	hypZone := hypervisor.GetZone()
 	r.Zone = types.StringValue(hypZone.GetId())
-	r.ApplicationId = types.StringValue(hypervisor.GetApplicationId())
+	if hypervisor.GetApplicationId() != "" {
+		r.ApplicationId = types.StringValue(hypervisor.GetApplicationId())
+	} else {
+		r.ApplicationId = types.StringNull()
+	}
+
 	r.SubscriptionId = types.StringValue(hypervisor.GetSubscriptionId())
 	r.ActiveDirectoryId = types.StringValue(hypervisor.GetActiveDirectoryId())
 	scopeIdsInState := util.StringSetToStringArray(ctx, diagnostics, r.Scopes)
@@ -154,6 +178,10 @@ func (r AzureHypervisorResourceModel) RefreshPropertyValues(ctx context.Context,
 
 	r.Tenants = util.RefreshTenantSet(ctx, diagnostics, hypervisor.GetTenants())
 
+	r.AuthenticationMode = types.StringValue(util.AppClientSecret)
+	r.ProxyHypervisorTrafficThroughConnector = types.BoolValue(false)
+	r.EnableAzureADDeviceManagement = types.BoolValue(false)
+
 	customPropertiesString := hypervisor.GetCustomProperties()
 	var customProperties []citrixorchestration.NameValueStringPairModel
 	err := json.Unmarshal([]byte(customPropertiesString), &customProperties)
@@ -163,9 +191,17 @@ func (r AzureHypervisorResourceModel) RefreshPropertyValues(ctx context.Context,
 	}
 
 	for _, customProperty := range customProperties {
-		if customProperty.GetName() == "AzureAdDeviceManagement" {
+		if customProperty.GetName() == EnableAzureADDeviceManagement_CustomProperty {
 			enabled, _ := strconv.ParseBool(customProperty.GetValue())
 			r.EnableAzureADDeviceManagement = types.BoolValue(enabled)
+		}
+		if customProperty.GetName() == ProxyHypervisorTrafficThroughConnector_CustomProperty {
+			proxy, _ := strconv.ParseBool(customProperty.GetValue())
+			r.ProxyHypervisorTrafficThroughConnector = types.BoolValue(proxy)
+		}
+		if customProperty.GetName() == AuthenticationMode_CustomProperty {
+			auth := (customProperty.GetValue())
+			r.AuthenticationMode = types.StringValue(auth)
 		}
 	}
 

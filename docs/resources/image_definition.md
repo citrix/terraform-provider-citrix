@@ -19,6 +19,7 @@ resource "citrix_image_definition" "example_azure_image_definition" {
     os_type         = "Windows"
     session_support = "MultiSession"
     hypervisor      = citrix_azure_hypervisor.example_azure_hypervisor.id
+    hypervisor_resource_pool = citrix_azure_hypervisor_resource_pool.example_azure_hypervisor_resource_pool.id
     azure_image_definition = {
         resource_group = "ExampleResourceGroup"
         use_image_gallery = true
@@ -32,6 +33,7 @@ resource "citrix_image_definition" "example_vsphere_image_definition" {
     os_type         = "Windows"
     session_support = "MultiSession"
     hypervisor      = citrix_vsphere_hypervisor.example_vsphere_hypervisor.id
+    hypervisor_resource_pool = citrix_vsphere_hypervisor_resource_pool.example_vsphere_hypervisor_resource_pool.id
 }
 ```
 
@@ -41,6 +43,7 @@ resource "citrix_image_definition" "example_vsphere_image_definition" {
 ### Required
 
 - `hypervisor` (String) ID of the hypervisor connection to be used for image definition.
+- `hypervisor_resource_pool` (String) ID of the hypervisor resource pool to be used for image definition.
 - `name` (String) Name of the image definition.
 - `os_type` (String) Operating system type of the image definition. Valid values are `Windows` and `Linux`.
 - `session_support` (String) Session support of the image definition. Valid values are `MultiSession` and `SingleSession`.
@@ -49,6 +52,7 @@ resource "citrix_image_definition" "example_vsphere_image_definition" {
 
 - `azure_image_definition` (Attributes) Details of the Azure Image Definition. (see [below for nested schema](#nestedatt--azure_image_definition))
 - `description` (String) Description of the image definition.
+- `timeout` (Attributes) Timeout in minutes for the long-running jobs in image definition resource's create, delete operation(s). (see [below for nested schema](#nestedatt--timeout))
 
 ### Read-Only
 
@@ -63,6 +67,15 @@ Optional:
 - `image_gallery_name` (String) Name of the existing image gallery. If not specified and `use_image_gallery` is `true`, a new image gallery will be created.
 - `resource_group` (String) Existing resource group to store the image definition. If not specified, a new resource group will be created.
 - `use_image_gallery` (Boolean) Whether image gallery is used to store the image definition. Defaults to `false`.
+
+
+<a id="nestedatt--timeout"></a>
+### Nested Schema for `timeout`
+
+Optional:
+
+- `create` (Number) Timeout in minutes for the long-running jobs in create operation. Defaults to 10. Minimum value is 5.
+- `delete` (Number) Timeout in minutes for the long-running jobs in delete operation. Defaults to 10. Minimum value is 5.
 
 ## Import
 

@@ -61,12 +61,12 @@ func getMachinesForManualCatalogs(ctx context.Context, diagnostics *diag.Diagnos
 				if machine.Region.IsNull() || machine.ResourceGroupName.IsNull() {
 					return nil, nil, fmt.Errorf("region and resource_group_name are required for Azure")
 				}
-				region, httpResp, err := util.GetSingleHypervisorResource(ctx, client, diagnostics, hypervisorId, "", machine.Region.ValueString(), "Region", "", hypervisor)
+				region, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, "", machine.Region.ValueString(), "Region", "", hypervisor)
 				if err != nil {
 					return nil, httpResp, err
 				}
 				regionPath := region.GetXDPath()
-				vm, httpResp, err := util.GetSingleHypervisorResource(ctx, client, diagnostics, hypervisorId, fmt.Sprintf("%s\\vm.folder", regionPath), machineName, util.VirtualMachineResourceType, machine.ResourceGroupName.ValueString(), hypervisor)
+				vm, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, fmt.Sprintf("%s\\vm.folder", regionPath), machineName, util.VirtualMachineResourceType, machine.ResourceGroupName.ValueString(), hypervisor)
 				if err != nil {
 					return nil, httpResp, err
 				}
@@ -75,12 +75,12 @@ func getMachinesForManualCatalogs(ctx context.Context, diagnostics *diag.Diagnos
 				if machine.AvailabilityZone.IsNull() {
 					return nil, nil, fmt.Errorf("availability_zone is required for AWS")
 				}
-				availabilityZone, httpResp, err := util.GetSingleHypervisorResource(ctx, client, diagnostics, hypervisorId, "", machine.AvailabilityZone.ValueString(), "", "", hypervisor)
+				availabilityZone, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, "", machine.AvailabilityZone.ValueString(), "", "", hypervisor)
 				if err != nil {
 					return nil, httpResp, err
 				}
 				availabilityZonePath := availabilityZone.GetXDPath()
-				vm, httpResp, err := util.GetSingleHypervisorResource(ctx, client, diagnostics, hypervisorId, availabilityZonePath, machineName, util.VirtualMachineResourceType, "", hypervisor)
+				vm, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, availabilityZonePath, machineName, util.VirtualMachineResourceType, "", hypervisor)
 				if err != nil {
 					return nil, httpResp, err
 				}
@@ -89,12 +89,12 @@ func getMachinesForManualCatalogs(ctx context.Context, diagnostics *diag.Diagnos
 				if machine.Region.IsNull() || machine.ProjectName.IsNull() {
 					return nil, nil, fmt.Errorf("region and project_name are required for GCP")
 				}
-				projectName, httpResp, err := util.GetSingleHypervisorResource(ctx, client, diagnostics, hypervisorId, "", machine.ProjectName.ValueString(), "", "", hypervisor)
+				projectName, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, "", machine.ProjectName.ValueString(), "", "", hypervisor)
 				if err != nil {
 					return nil, httpResp, err
 				}
 				projectNamePath := projectName.GetXDPath()
-				vm, httpResp, err := util.GetSingleHypervisorResource(ctx, client, diagnostics, hypervisorId, fmt.Sprintf("%s\\%s.region", projectNamePath, machine.Region.ValueString()), machineName, util.VirtualMachineResourceType, "", hypervisor)
+				vm, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, fmt.Sprintf("%s\\%s.region", projectNamePath, machine.Region.ValueString()), machineName, util.VirtualMachineResourceType, "", hypervisor)
 				if err != nil {
 					return nil, httpResp, err
 				}
@@ -105,7 +105,7 @@ func getMachinesForManualCatalogs(ctx context.Context, diagnostics *diag.Diagnos
 				}
 
 				folderPath := hypervisor.GetXDPath()
-				datacenter, httpResp, err := util.GetSingleHypervisorResource(ctx, client, diagnostics, hypervisorId, folderPath, machine.Datacenter.ValueString(), "datacenter", "", hypervisor)
+				datacenter, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, folderPath, machine.Datacenter.ValueString(), "datacenter", "", hypervisor)
 				if err != nil {
 					return nil, httpResp, err
 				}
@@ -120,35 +120,35 @@ func getMachinesForManualCatalogs(ctx context.Context, diagnostics *diag.Diagnos
 				}
 
 				if !machine.Cluster.IsNull() {
-					cluster, httpResp, err := util.GetSingleHypervisorResource(ctx, client, diagnostics, hypervisorId, folderPath, machine.Cluster.ValueString(), "cluster", "", hypervisor)
+					cluster, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, folderPath, machine.Cluster.ValueString(), "cluster", "", hypervisor)
 					if err != nil {
 						return nil, httpResp, err
 					}
 					folderPath = cluster.GetXDPath()
 				}
 
-				host, httpResp, err := util.GetSingleHypervisorResource(ctx, client, diagnostics, hypervisorId, folderPath, machine.Host.ValueString(), "computeresource", "", hypervisor)
+				host, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, folderPath, machine.Host.ValueString(), "computeresource", "", hypervisor)
 				if err != nil {
 					return nil, httpResp, err
 				}
 				hostPath := host.GetXDPath()
-				vm, httpResp, err := util.GetSingleHypervisorResource(ctx, client, diagnostics, hypervisorId, hostPath, machineName, util.VirtualMachineResourceType, "", hypervisor)
+				vm, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, hostPath, machineName, util.VirtualMachineResourceType, "", hypervisor)
 				if err != nil {
 					return nil, httpResp, err
 				}
 				vmId = vm.GetId()
 			case citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER:
-				vm, httpResp, err := util.GetSingleHypervisorResource(ctx, client, diagnostics, hypervisorId, "", machineName, util.VirtualMachineResourceType, "", hypervisor)
+				vm, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, "", machineName, util.VirtualMachineResourceType, "", hypervisor)
 				if err != nil {
 					return nil, httpResp, err
 				}
 				vmId = vm.GetId()
 			case citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM:
-				host, httpResp, err := util.GetSingleHypervisorResource(ctx, client, diagnostics, hypervisorId, "", machine.Host.ValueString(), util.HostResourceType, "", hypervisor)
+				host, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, "", machine.Host.ValueString(), util.HostResourceType, "", hypervisor)
 				if err != nil {
 					return nil, httpResp, err
 				}
-				vm, httpResp, err := util.GetSingleHypervisorResource(ctx, client, diagnostics, hypervisorId, host.GetFullName(), machineName, util.VirtualMachineResourceType, "", hypervisor)
+				vm, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, host.GetFullName(), machineName, util.VirtualMachineResourceType, "", hypervisor)
 				if err != nil {
 					return nil, httpResp, err
 				}
@@ -156,7 +156,7 @@ func getMachinesForManualCatalogs(ctx context.Context, diagnostics *diag.Diagnos
 			case citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM:
 				if hypervisor.GetPluginId() == util.NUTANIX_PLUGIN_ID {
 					hypervisorXdPath := hypervisor.GetXDPath()
-					vm, httpResp, err := util.GetSingleHypervisorResource(ctx, client, diagnostics, hypervisorId, fmt.Sprintf("%s\\VirtualMachines.folder", hypervisorXdPath), machineName, util.VirtualMachineResourceType, "", hypervisor)
+					vm, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, fmt.Sprintf("%s\\VirtualMachines.folder", hypervisorXdPath), machineName, util.VirtualMachineResourceType, "", hypervisor)
 					if err != nil {
 						return nil, httpResp, err
 					}

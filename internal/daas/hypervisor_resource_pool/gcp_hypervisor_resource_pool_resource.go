@@ -82,6 +82,7 @@ func (r *gcpHypervisorResourcePoolResource) Create(ctx context.Context, req reso
 
 	resourcePoolDetails.SetName(plan.Name.ValueString())
 	resourcePoolDetails.SetConnectionType(hypervisorConnectionType)
+	resourcePoolDetails.SetVmTagging(plan.VmTagging.ValueBool())
 
 	if plan.Region.IsNull() {
 		resp.Diagnostics.AddError(
@@ -185,6 +186,7 @@ func (r *gcpHypervisorResourcePoolResource) Update(ctx context.Context, req reso
 	var editHypervisorResourcePool citrixorchestration.EditHypervisorResourcePoolRequestModel
 	editHypervisorResourcePool.SetName(plan.Name.ValueString())
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM)
+	editHypervisorResourcePool.SetVmTagging(plan.VmTagging.ValueBool())
 
 	planSubnet := util.StringListToStringArray(ctx, &diags, plan.Subnets)
 	regionPath := fmt.Sprintf("%s.project/%s.region", plan.ProjectName.ValueString(), plan.Region.ValueString())

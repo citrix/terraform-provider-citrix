@@ -58,6 +58,7 @@ type MachineCatalogResourceModel struct {
 	Tags                     types.Set    `tfsdk:"tags"`     // Set[String]
 	DeleteVirtualMachines    types.Bool   `tfsdk:"delete_virtual_machines"`
 	DeleteMachineAccounts    types.String `tfsdk:"delete_machine_accounts"`
+	Timeout                  types.Object `tfsdk:"timeout"` // MachineCatalogTimeout
 }
 
 type MachineAccountsModel struct {
@@ -237,7 +238,7 @@ func (ProvisioningSchemeModel) GetSchema() schema.SingleNestedAttribute {
 				},
 			},
 			"identity_type": schema.StringAttribute{
-				Description: "The identity type of the machines to be created. Supported values are`ActiveDirectory`, `AzureAD`, and `HybridAzureAD`.",
+				Description: "The identity type of the machines to be created. Supported values are `ActiveDirectory`, `AzureAD`, and `HybridAzureAD`.",
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.OneOf(
@@ -730,12 +731,43 @@ func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 					),
 				},
 			},
+			"timeout": MachineCatalogTimeout{}.GetSchema(),
 		},
 	}
 }
 
 func (MachineCatalogResourceModel) GetAttributes() map[string]schema.Attribute {
 	return MachineCatalogResourceModel{}.GetSchema().Attributes
+}
+
+type MachineCatalogTimeout struct {
+	Create types.Int32 `tfsdk:"create"`
+	Update types.Int32 `tfsdk:"update"`
+	Delete types.Int32 `tfsdk:"delete"`
+}
+
+func getMachineCatalogTimeoutConfigs() util.TimeoutConfigs {
+	return util.TimeoutConfigs{
+		Create:        true,
+		CreateDefault: 120,
+		CreateMin:     5,
+
+		Update:        true,
+		UpdateDefault: 60,
+		UpdateMin:     5,
+
+		Delete:        true,
+		DeleteDefault: 60,
+		DeleteMin:     5,
+	}
+}
+
+func (MachineCatalogTimeout) GetSchema() schema.SingleNestedAttribute {
+	return util.GetTimeoutSchema("machine catalog", getMachineCatalogTimeoutConfigs())
+}
+
+func (MachineCatalogTimeout) GetAttributes() map[string]schema.Attribute {
+	return MachineCatalogTimeout{}.GetSchema().Attributes
 }
 
 func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixclient.CitrixDaasClient, catalog *citrixorchestration.MachineCatalogDetailResponseModel, connectionType *citrixorchestration.HypervisorConnectionType, machines []citrixorchestration.MachineResponseModel, pluginId string, tags []string, machineAdAccounts []citrixorchestration.ProvisioningSchemeMachineAccountResponseModel) MachineCatalogResourceModel {

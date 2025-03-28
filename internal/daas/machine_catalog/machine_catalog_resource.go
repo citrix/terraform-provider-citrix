@@ -118,7 +118,12 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Machine Catalog", &resp.Diagnostics, 120, false)
+	timeoutConfigs := util.ObjectValueToTypedObject[MachineCatalogTimeout](ctx, &resp.Diagnostics, plan.Timeout)
+	createTimeout := timeoutConfigs.Create.ValueInt32()
+	if createTimeout == 0 {
+		createTimeout = getMachineCatalogTimeoutConfigs().CreateDefault
+	}
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Machine Catalog", &resp.Diagnostics, createTimeout, false)
 	if err != nil {
 		return
 	}
@@ -314,7 +319,12 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Machine Catalog "+catalogName, &resp.Diagnostics, 10, true)
+	timeoutConfigs := util.ObjectValueToTypedObject[MachineCatalogTimeout](ctx, &resp.Diagnostics, plan.Timeout)
+	updateTimeout := timeoutConfigs.Update.ValueInt32()
+	if updateTimeout == 0 {
+		updateTimeout = getMachineCatalogTimeoutConfigs().UpdateDefault
+	}
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Machine Catalog "+catalogName, &resp.Diagnostics, updateTimeout, true)
 	if err != nil {
 		return
 	}
@@ -338,7 +348,7 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 	} else {
 		provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
 		machineAccountsInPlan := util.ObjectListToTypedArray[MachineADAccountModel](ctx, &resp.Diagnostics, provSchemeModel.MachineADAccounts)
-		err = updateCatalogImageAndMachineProfile(ctx, r.client, resp, catalog, plan, provisioningType)
+		err = updateCatalogImageAndMachineProfile(ctx, r.client, resp, catalog, plan, provisioningType, updateTimeout)
 
 		if err != nil {
 			return
@@ -747,7 +757,12 @@ func (r *machineCatalogResource) Delete(ctx context.Context, req resource.Delete
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Machine Catalog "+catalogName, &resp.Diagnostics, 60, false)
+	timeoutConfigs := util.ObjectValueToTypedObject[MachineCatalogTimeout](ctx, &resp.Diagnostics, state.Timeout)
+	deleteTimeout := timeoutConfigs.Delete.ValueInt32()
+	if deleteTimeout == 0 {
+		deleteTimeout = getMachineCatalogTimeoutConfigs().DeleteDefault
+	}
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Machine Catalog "+catalogName, &resp.Diagnostics, deleteTimeout, false)
 	if err != nil {
 		return
 	}

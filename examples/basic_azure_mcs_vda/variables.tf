@@ -89,39 +89,23 @@ variable "azure_tenant_id" {
 }
 
 
-# machine_catalogs.tf variables
-variable "machine_catalog_name" {
-  description = "Name of the Machine Catalog to create"
+# images.tf varaiables
+variable "image_definition_name" {
+  description = "Name of the Image Definition to create"
   type        = string
-  default     = "example-azure-catalog"
-}
-
-variable "domain_fqdn" {
-  description = "Domain FQDN"
-  type        = string
-}
-
-variable "domain_ou" {
-  description = "Domain organizational unit"
-  type        = string
-  default     = null
-}
-
-variable "domain_service_account" {
-  description = "Domain service account with permissions to create machine accounts"
-  type        = string
-}
-
-variable "domain_service_account_password" {
-  description = "Domain service account password"
-  type        = string
-  sensitive   = true
+  default     = "example-image-definition"
 }
 
 variable "azure_service_offering" {
   description = "Azure VM service offering SKU"
   type        = string
   default     = "Standard_D2_v2"
+}
+
+variable "azure_storage_type" {
+  description = "Azure storage type"
+  type        = string
+  default     = "Standard_LRS"
 }
 
 # variable "azure_image_subscription" {
@@ -157,10 +141,34 @@ variable "azure_master_image" {
 #   default     = "1.0.0"
 # }
 
-variable "azure_storage_type" {
-  description = "Azure storage type"
+
+# machine_catalogs.tf variables
+variable "machine_catalog_name" {
+  description = "Name of the Machine Catalog to create"
   type        = string
-  default     = "Standard_LRS"
+  default     = "example-azure-catalog"
+}
+
+variable "domain_fqdn" {
+  description = "Domain FQDN"
+  type        = string
+}
+
+variable "domain_ou" {
+  description = "Domain organizational unit"
+  type        = string
+  default     = null
+}
+
+variable "domain_service_account" {
+  description = "Domain service account with permissions to create machine accounts"
+  type        = string
+}
+
+variable "domain_service_account_password" {
+  description = "Domain service account password"
+  type        = string
+  sensitive   = true
 }
 
 variable "machine_catalog_naming_scheme" {

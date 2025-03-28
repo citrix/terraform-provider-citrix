@@ -429,22 +429,33 @@ func setMachineCatalogTags(ctx context.Context, diagnostics *diag.Diagnostics, c
 }
 
 func getMachineCatalogMachineADAccounts(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, machineCatalogId string) ([]citrixorchestration.ProvisioningSchemeMachineAccountResponseModel, error) {
-	getADAccountsRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogMachineAccounts(ctx, machineCatalogId)
-	adAccountsResp, httpResp, err := citrixdaasclient.AddRequestData(getADAccountsRequest, client).Execute()
 	accounts := []citrixorchestration.ProvisioningSchemeMachineAccountResponseModel{}
-	if err != nil {
-		diagnostics.AddError(
-			fmt.Sprintf("Error getting machine AD accounts for Machine Catalog %s", machineCatalogId),
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-		// Continue without return in order to get other attributes refreshed in state
-		return accounts, err
+	errorMessage := fmt.Sprintf("Error getting machine AD accounts for Machine Catalog %s", machineCatalogId)
+	getADAccountsRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogMachineAccounts(ctx, machineCatalogId).Limit(100)
+
+	adAccountsResp := &citrixorchestration.ProvisioningSchemeMachineAccountResponseModelCollection{}
+	for ok := true; ok; ok = adAccountsResp.HasContinuationToken() {
+		getADAccountsRequest = getADAccountsRequest.ContinuationToken(adAccountsResp.GetContinuationToken())
+		_, httpResp, err := citrixdaasclient.AddRequestData(getADAccountsRequest, client).Async(true).Execute()
+
+		if err != nil {
+			diagnostics.AddError(
+				errorMessage,
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return []citrixorchestration.ProvisioningSchemeMachineAccountResponseModel{}, err
+		}
+
+		adAccountsResp, err = util.GetAsyncJobResult[*citrixorchestration.ProvisioningSchemeMachineAccountResponseModelCollection](ctx, client, httpResp, errorMessage, diagnostics, 5, true)
+
+		if err != nil {
+			return []citrixorchestration.ProvisioningSchemeMachineAccountResponseModel{}, err
+		}
+		accounts = append(accounts, adAccountsResp.GetItems()...)
 	}
-	if adAccountsResp == nil || len(adAccountsResp.GetItems()) == 0 {
-		return accounts, nil
-	}
-	return adAccountsResp.GetItems(), nil
+
+	return accounts, nil
 }
 
 func getMachineCatalogTags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, machineCatalogId string) []string {

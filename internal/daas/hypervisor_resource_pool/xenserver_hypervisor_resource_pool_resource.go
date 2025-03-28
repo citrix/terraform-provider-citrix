@@ -84,6 +84,7 @@ func (r *xenserverHypervisorResourcePoolResource) Create(ctx context.Context, re
 
 	resourcePoolDetails.SetName(plan.Name.ValueString())
 	resourcePoolDetails.SetConnectionType(hypervisorConnectionType)
+	resourcePoolDetails.SetVmTagging(plan.VmTagging.ValueBool())
 
 	// storages, tempStorages, networks := SetResourceList(ctx, r.client, &resp.Diagnostics, hypervisorId, hypervisorConnectionType, plan)
 
@@ -187,6 +188,7 @@ func (r *xenserverHypervisorResourcePoolResource) Update(ctx context.Context, re
 	var editHypervisorResourcePool citrixorchestration.EditHypervisorResourcePoolRequestModel
 	editHypervisorResourcePool.SetName(plan.Name.ValueString())
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER)
+	editHypervisorResourcePool.SetVmTagging(plan.VmTagging.ValueBool())
 
 	storagesToBeIncluded, tempStoragesToBeIncluded := plan.GetStorageList(ctx, r.client, &resp.Diagnostics, hypervisor, false, false)
 	storagesToBeSuperseded, tempStoragesToBeSuperseded := plan.GetStorageList(ctx, r.client, &resp.Diagnostics, hypervisor, false, true)
@@ -310,7 +312,7 @@ func (plan XenserverHypervisorResourcePoolResourceModel) GetStorageList(ctx cont
 	storageNames := util.ConvertBaseStringArrayToPrimitiveStringArray(storage)
 	hypervisorId := hypervisor.GetId()
 	hypervisorConnectionType := hypervisor.GetConnectionType()
-	storages, err := util.GetFilteredResourcePathList(ctx, client, diags, hypervisorId, "", util.StorageResourceType, storageNames, hypervisorConnectionType, hypervisor.GetPluginId())
+	storages, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, "", util.StorageResourceType, storageNames, hypervisorConnectionType, hypervisor.GetPluginId())
 
 	if len(storage) > 0 && len(storages) == 0 {
 		errDetail := "No storage found for the given storage names"
@@ -332,7 +334,7 @@ func (plan XenserverHypervisorResourcePoolResourceModel) GetStorageList(ctx cont
 		}
 	}
 	tempStorageNames := util.ConvertBaseStringArrayToPrimitiveStringArray(tempStorage)
-	tempStorages, err := util.GetFilteredResourcePathList(ctx, client, diags, hypervisorId, "", util.StorageResourceType, tempStorageNames, hypervisorConnectionType, hypervisor.GetPluginId())
+	tempStorages, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, "", util.StorageResourceType, tempStorageNames, hypervisorConnectionType, hypervisor.GetPluginId())
 	if len(tempStorage) > 0 && len(tempStorages) == 0 {
 		errDetail := "No storage found for the given temporary storage names"
 		if err != nil {
@@ -357,7 +359,7 @@ func (plan XenserverHypervisorResourcePoolResourceModel) GetNetworksList(ctx con
 	}
 
 	networkNames := util.StringListToStringArray(ctx, diags, plan.Networks)
-	networks, err := util.GetFilteredResourcePathList(ctx, client, diags, hypervisorId, "", util.NetworkResourceType, networkNames, hypervisorConnectionType, hypervisor.GetPluginId())
+	networks, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, "", util.NetworkResourceType, networkNames, hypervisorConnectionType, hypervisor.GetPluginId())
 	if len(networks) == 0 {
 		errDetail := "No network found for the given network names"
 		if err != nil {

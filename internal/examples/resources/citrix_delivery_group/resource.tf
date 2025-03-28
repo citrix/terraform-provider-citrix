@@ -157,4 +157,5 @@ resource "citrix_delivery_group" "example-delivery-group" {
             ]
         }
     ]
+    color_depth = "TwentyFourBit"
 }

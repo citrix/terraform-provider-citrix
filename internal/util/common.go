@@ -224,6 +224,12 @@ const AzureEphemeralOSDisk = "Azure_Ephemeral_OS_Disk"
 const WindowsClientLicenseType string = "Windows_Client"
 const WindowsServerLicenseType string = "Windows_Server"
 
+// Authentication Modes
+
+const UserAssignedManagedIdentity = "UserAssignedManagedIdentity"
+const AppClientSecret = "AppClientSecret"
+const SystemAssignedManagedIdentity = "SystemAssignedManagedIdentity"
+
 // GAC
 const AssignmentPriority = 0
 const GacAppName = "Workspace"
@@ -509,7 +515,7 @@ func ReadResource[ResponseType any](request any, ctx context.Context, client *ci
 }
 
 // <summary>
-// Helper function to process async job response. Takes async job response and polls for result.
+// Helper function to process async job response. Always add errors to diagnostics
 // </summary>
 // <param name="ctx">Context from caller</param>
 // <param name="client">Citrix DaaS client from provider context</param>
@@ -518,19 +524,36 @@ func ReadResource[ResponseType any](request any, ctx context.Context, client *ci
 // <param name="diagnostics">Terraform diagnostics from context</param>
 // <param name="maxTimeout">Maximum timeout threashold for job status polling</param>
 // <returns>Error if job polling failed or job itself ended in failed state</returns>
-func ProcessAsyncJobResponse(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int, returnJobError bool) (err error) {
+func ProcessAsyncJobResponse(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int32, returnJobError bool) (err error) {
+	return ProcessAsyncJobResponseWithAddToDiagsOption(ctx, client, jobResp, errContext, diagnostics, maxTimeout, returnJobError, true)
+}
+
+// <summary>
+// Helper function to process async job response. Takes async job response and polls for result.
+// </summary>
+// <param name="ctx">Context from caller</param>
+// <param name="client">Citrix DaaS client from provider context</param>
+// <param name="jobResp">Job response from async API call</param>
+// <param name="errContext">Context of the job to be use as Terraform diagnostic error message title</param>
+// <param name="diagnostics">Terraform diagnostics from context</param>
+// <param name="maxTimeout">Maximum timeout threashold for job status polling</param>
+// <param name="addToDiagnostics">Indicates whether error will be added to diagnostics</param>
+// <returns>Error if job polling failed or job itself ended in failed state</returns>
+func ProcessAsyncJobResponseWithAddToDiagsOption(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int32, returnJobError bool, addToDiagnostics bool) (err error) {
 	txId := citrixdaasclient.GetTransactionIdFromHttpResponse(jobResp)
 
 	jobId := citrixdaasclient.GetJobIdFromHttpResponse(*jobResp)
 	jobResponseModel, err := client.WaitForJob(ctx, jobId, maxTimeout)
 
 	if err != nil {
-		diagnostics.AddError(
-			errContext,
-			"TransactionId: "+txId+
-				"\nJobId: "+jobResponseModel.GetId()+
-				"\nError message: "+jobResponseModel.GetErrorString(),
-		)
+		if addToDiagnostics {
+			diagnostics.AddError(
+				errContext,
+				"TransactionId: "+txId+
+					"\nJobId: "+jobResponseModel.GetId()+
+					"\nError message: "+jobResponseModel.GetErrorString(),
+			)
+		}
 		return err
 	}
 
@@ -568,10 +591,12 @@ func ProcessAsyncJobResponse(ctx context.Context, client *citrixdaasclient.Citri
 			}
 		}
 
-		diagnostics.AddError(
-			errContext,
-			errorMessage,
-		)
+		if addToDiagnostics {
+			diagnostics.AddError(
+				errContext,
+				errorMessage,
+			)
+		}
 
 		if returnJobError {
 			return fmt.Errorf(errorMessage)
@@ -591,9 +616,23 @@ func ProcessAsyncJobResponse(ctx context.Context, client *citrixdaasclient.Citri
 // <param name="diagnostics">Terraform diagnostics from context</param>
 // <param name="maxTimeout">Maximum timeout threashold for job status polling</param>
 // <returns>Error if job polling failed or job itself ended in failed state</returns>
-func GetAsyncJobResult[ResponseType any](ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int, returnJobError bool) (ResponseType, error) {
+func GetAsyncJobResult[ResponseType any](ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int32, returnJobError bool) (ResponseType, error) {
+	return GetAsyncJobResultWithAddToDiagsOption[ResponseType](ctx, client, jobResp, errContext, diagnostics, maxTimeout, returnJobError, true)
+}
+
+// <summary>
+// Helper function to process async job response. Takes async job response and polls for result.
+// </summary>
+// <param name="ctx">Context from caller</param>
+// <param name="client">Citrix DaaS client from provider context</param>
+// <param name="jobResp">Job response from async API call</param>
+// <param name="errContext">Context of the job to be use as Terraform diagnostic error message title</param>
+// <param name="diagnostics">Terraform diagnostics from context</param>
+// <param name="maxTimeout">Maximum timeout threashold for job status polling</param>
+// <returns>Error if job polling failed or job itself ended in failed state</returns>
+func GetAsyncJobResultWithAddToDiagsOption[ResponseType any](ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int32, returnJobError bool, addToDiagnostics bool) (ResponseType, error) {
 	jobId := citrixdaasclient.GetJobIdFromHttpResponse(*jobResp)
-	err := ProcessAsyncJobResponse(ctx, client, jobResp, errContext, diagnostics, maxTimeout, returnJobError)
+	err := ProcessAsyncJobResponseWithAddToDiagsOption(ctx, client, jobResp, errContext, diagnostics, maxTimeout, returnJobError, addToDiagnostics)
 
 	var response ResponseType
 	if err != nil {

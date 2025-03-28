@@ -118,6 +118,7 @@ type ImageVersionModel struct {
 	VsphereImageSpecs types.Object `tfsdk:"vsphere_image_specs"`
 	SessionSupport    types.String `tfsdk:"session_support"`
 	OsType            types.String `tfsdk:"os_type"`
+	Timeout           types.Object `tfsdk:"timeout"`
 }
 
 func (ImageVersionModel) GetSchema() schema.Schema {
@@ -192,12 +193,38 @@ func (ImageVersionModel) GetSchema() schema.Schema {
 				Description: "The OS type of the image version.",
 				Computed:    true,
 			},
+			"timeout": ImageVersionTimeout{}.GetSchema(),
 		},
 	}
 }
 
 func (ImageVersionModel) GetAttributes() map[string]schema.Attribute {
 	return ImageVersionModel{}.GetSchema().Attributes
+}
+
+type ImageVersionTimeout struct {
+	Create types.Int32 `tfsdk:"create"`
+	Delete types.Int32 `tfsdk:"delete"`
+}
+
+func getImageVersionTimeoutConfigs() util.TimeoutConfigs {
+	return util.TimeoutConfigs{
+		Create:        true,
+		CreateDefault: 30,
+		CreateMin:     5,
+
+		Delete:        true,
+		DeleteDefault: 10,
+		DeleteMin:     5,
+	}
+}
+
+func (ImageVersionTimeout) GetSchema() schema.SingleNestedAttribute {
+	return util.GetTimeoutSchema("image version", getImageVersionTimeoutConfigs())
+}
+
+func (ImageVersionTimeout) GetAttributes() map[string]schema.Attribute {
+	return ImageVersionTimeout{}.GetSchema().Attributes
 }
 
 func (r ImageVersionModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, imageVersion *citrixorchestration.ImageVersionResponseModel) ImageVersionModel {

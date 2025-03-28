@@ -90,6 +90,36 @@ variable "vsphere_addresses" {
 }
 
 
+# images.tf varaiables
+variable "image_definition_name" {
+  description = "Name of the Image Definition to create"
+  type        = string
+  default     = "example-image-definition"
+}
+
+variable "vsphere_master_image_vm" {
+  description = "Name of the VM to be used as a master image"
+  type        = string
+}
+
+variable "vsphere_image_snapshot" {
+  description = "Name of the snapshot to use for the master image"
+  type        = string
+}
+
+variable "vsphere_cpu_count" {
+  description = "Number of CPUs per VM created"
+  type        = number
+  default     = 2
+}
+
+variable "vsphere_memory_size" {
+  description = "Amount of memory in MB per VM created"
+  type        = number
+  default     = 4096
+}
+
+
 # machine_catalogs.tf variables
 variable "machine_catalog_name" {
   description = "Name of the Machine Catalog to create"
@@ -117,23 +147,6 @@ variable "domain_service_account_password" {
   description = "Domain service account password"
   type        = string
   sensitive   = true
-}
-
-variable "vsphere_master_image_vm" {
-  description = "Name of the VM to be used as a master image"
-  type        = string
-}
-
-variable "vsphere_cpu_count" {
-  description = "Number of CPUs per VM created"
-  type        = number
-  default     = 2
-}
-
-variable "vsphere_memory_size" {
-  description = "Amount of memory in MB per VM created"
-  type        = number
-  default     = 4096
 }
 
 variable "machine_catalog_naming_scheme" {

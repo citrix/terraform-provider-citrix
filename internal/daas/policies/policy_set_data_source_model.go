@@ -154,6 +154,12 @@ func (PolicySetModel) GetDataSourceSchema() schema.Schema {
 				Description: "Indicate whether the policy set is being assigned to delivery groups.",
 				Computed:    true,
 			},
+			"delivery_groups": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "The IDs of the delivery groups for the policy set to apply on." +
+					"\n\n~> **Please Note** If `delivery_groups` attribute is unset or configured as an empty set, the policy set will not be assigned to any delivery group. None of the policies in the policy set will be applied.",
+				Computed: true,
+			},
 		},
 	}
 }

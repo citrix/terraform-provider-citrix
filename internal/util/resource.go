@@ -199,9 +199,21 @@ func GetMachineCatalogMachines(ctx context.Context, client *citrixdaasclient.Cit
 	}
 }
 
-func GetSingleResourceFromHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName string) (*citrixorchestration.HypervisorResourceResponseModel, *http.Response, error) {
+func GetSingleResourceFromHypervisorWithNoCacheRetry(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName string) (*citrixorchestration.HypervisorResourceResponseModel, *http.Response, error) {
+	resource, httpResp, err := getSingleResourceFromHypervisor(ctx, client, diagnostics, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName, false, false)
+	if err != nil {
+		resource, httpResp, err = getSingleResourceFromHypervisor(ctx, client, diagnostics, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName, true, true)
+		if err != nil {
+			return nil, httpResp, err
+		}
+	}
+	return resource, httpResp, nil
+}
+
+func getSingleResourceFromHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName string, addToDiagnostics bool, noCache bool) (*citrixorchestration.HypervisorResourceResponseModel, *http.Response, error) {
 	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorResourcePoolResources(ctx, hypervisorName, hypervisorPoolName)
 	req = req.Children(1)
+	req = req.NoCache(noCache)
 
 	if folderPath != "" {
 		req = req.Path(folderPath)
@@ -218,7 +230,7 @@ func GetSingleResourceFromHypervisor(ctx context.Context, client *citrixdaasclie
 		return nil, httpResp, err
 	}
 
-	resources, err := GetAsyncJobResult[citrixorchestration.HypervisorResourceResponseModel](ctx, client, httpResp, "Error getting Hypervisor resources", diagnostics, 5, false)
+	resources, err := GetAsyncJobResultWithAddToDiagsOption[citrixorchestration.HypervisorResourceResponseModel](ctx, client, httpResp, "Error getting Hypervisor resources", diagnostics, 5, false, addToDiagnostics)
 	if err != nil {
 		return nil, httpResp, err
 	}
@@ -254,8 +266,19 @@ func GetSingleResourceFromHypervisor(ctx context.Context, client *citrixdaasclie
 	return nil, httpResp, fmt.Errorf("could not find resource")
 }
 
-func GetSingleResourcePathFromHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName string) (string, *http.Response, error) {
-	resource, httpResp, err := GetSingleResourceFromHypervisor(ctx, client, diagnostics, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName)
+func GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName string) (string, *http.Response, error) {
+	path, httpResp, err := getSingleResourcePathFromHypervisor(ctx, client, diagnostics, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName, false, false)
+	if err != nil {
+		path, httpResp, err = getSingleResourcePathFromHypervisor(ctx, client, diagnostics, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName, true, true)
+		if err != nil {
+			return "", httpResp, err
+		}
+	}
+	return path, httpResp, nil
+}
+
+func getSingleResourcePathFromHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName string, addToDiagnostics bool, noCache bool) (string, *http.Response, error) {
+	resource, httpResp, err := getSingleResourceFromHypervisor(ctx, client, diagnostics, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName, addToDiagnostics, noCache)
 	if err != nil {
 		return "", httpResp, err
 	}
@@ -267,9 +290,22 @@ func GetSingleResourcePathFromHypervisor(ctx context.Context, client *citrixdaas
 	return resource.GetXDPath(), nil, nil
 }
 
-func GetSingleHypervisorResource(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId, folderPath, resourceName, resourceType, resourceGroupName string, hypervisor *citrixorchestration.HypervisorDetailResponseModel) (*citrixorchestration.HypervisorResourceResponseModel, *http.Response, error) {
+func GetSingleHypervisorResourceWithNoCacheRetry(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId, folderPath, resourceName, resourceType, resourceGroupName string, hypervisor *citrixorchestration.HypervisorDetailResponseModel) (*citrixorchestration.HypervisorResourceResponseModel, *http.Response, error) {
+	resource, httpResp, err := getSingleHypervisorResource(ctx, client, diagnostics, hypervisorId, folderPath, resourceName, resourceType, resourceGroupName, hypervisor, false, false)
+	if err != nil {
+		resource, httpResp, err = getSingleHypervisorResource(ctx, client, diagnostics, hypervisorId, folderPath, resourceName, resourceType, resourceGroupName, hypervisor, true, true)
+		if err != nil {
+			return nil, httpResp, err
+		}
+	}
+
+	return resource, httpResp, nil
+}
+
+func getSingleHypervisorResource(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId, folderPath, resourceName, resourceType, resourceGroupName string, hypervisor *citrixorchestration.HypervisorDetailResponseModel, addToDiagnostics bool, noCache bool) (*citrixorchestration.HypervisorResourceResponseModel, *http.Response, error) {
 	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorAllResources(ctx, hypervisorId)
 	req = req.Children(1)
+	req = req.NoCache(noCache)
 	if folderPath != "" {
 		req = req.Path(folderPath)
 	}
@@ -283,7 +319,7 @@ func GetSingleHypervisorResource(ctx context.Context, client *citrixdaasclient.C
 		return nil, httpResp, err
 	}
 
-	resources, err := GetAsyncJobResult[citrixorchestration.HypervisorResourceResponseModel](ctx, client, httpResp, "Error getting Hypervisor resources", diagnostics, 5, false)
+	resources, err := GetAsyncJobResultWithAddToDiagsOption[citrixorchestration.HypervisorResourceResponseModel](ctx, client, httpResp, "Error getting Hypervisor resources", diagnostics, 5, false, addToDiagnostics)
 	if err != nil {
 		return nil, httpResp, err
 	}
@@ -334,19 +370,20 @@ func GetSingleHypervisorResource(ctx context.Context, client *citrixdaasclient.C
 	return nil, httpResp, fmt.Errorf("could not find resource")
 }
 
-func GetAllResourcePathList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId, folderPath, resourceType string) []string {
+func GetAllResourcePathList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId, folderPath, resourceType string, addToDiagnostics bool, noCache bool) []string {
 	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorAllResources(ctx, hypervisorId)
 	req = req.Children(1)
 	req = req.Path(folderPath)
 	req = req.Type_([]string{resourceType})
 	req = req.Async(true)
+	req = req.NoCache(noCache)
 
 	_, httpResp, err := citrixdaasclient.AddRequestData(req, client).Execute()
 	if err != nil {
 		return []string{}
 	}
 
-	resources, err := GetAsyncJobResult[citrixorchestration.HypervisorResourceResponseModel](ctx, client, httpResp, "Error getting Hypervisor resources", diagnostics, 5, false)
+	resources, err := GetAsyncJobResultWithAddToDiagsOption[citrixorchestration.HypervisorResourceResponseModel](ctx, client, httpResp, "Error getting Hypervisor resources", diagnostics, 5, false, addToDiagnostics)
 	if err != nil {
 		return []string{}
 	}
@@ -359,10 +396,22 @@ func GetAllResourcePathList(ctx context.Context, client *citrixdaasclient.Citrix
 	return result
 }
 
-func GetFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId, folderPath, resourceType string, filter []string, connectionType citrixorchestration.HypervisorConnectionType, pluginId string) ([]string, error) {
+func GetFilteredResourcePathListWithNoCacheRetry(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId, folderPath, resourceType string, filter []string, connectionType citrixorchestration.HypervisorConnectionType, pluginId string) ([]string, error) {
+	resource, err := getFilteredResourcePathList(ctx, client, diagnostics, hypervisorId, folderPath, resourceType, filter, connectionType, pluginId, false, false)
+	if err != nil {
+		resource, err = getFilteredResourcePathList(ctx, client, diagnostics, hypervisorId, folderPath, resourceType, filter, connectionType, pluginId, true, true)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return resource, nil
+}
+
+func getFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId, folderPath, resourceType string, filter []string, connectionType citrixorchestration.HypervisorConnectionType, pluginId string, addToDiagnostics bool, noCache bool) ([]string, error) {
 	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorAllResources(ctx, hypervisorId)
 	req = req.Children(1)
 	req = req.Path(folderPath)
+	req = req.NoCache(noCache)
 	// Skip resource type filter for on-prem hypervisors to avoid server side filtering timeout
 	if connectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM &&
 		connectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER &&
@@ -378,7 +427,7 @@ func GetFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.C
 		return []string{}, err
 	}
 
-	resources, err := GetAsyncJobResult[citrixorchestration.HypervisorResourceResponseModel](ctx, client, httpResp, "Error getting Hypervisor resources", diagnostics, 5, false)
+	resources, err := GetAsyncJobResultWithAddToDiagsOption[citrixorchestration.HypervisorResourceResponseModel](ctx, client, httpResp, "Error getting Hypervisor resources", diagnostics, 5, false, addToDiagnostics)
 	if err != nil {
 		return []string{}, err
 	}

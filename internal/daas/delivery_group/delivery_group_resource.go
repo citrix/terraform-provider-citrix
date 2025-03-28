@@ -422,7 +422,6 @@ func (r *deliveryGroupResource) Update(ctx context.Context, req resource.UpdateR
 
 	// Fetch updated delivery group from GetDeliveryGroup.
 	updatedDeliveryGroup, err := util.GetDeliveryGroup(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
-
 	if err != nil {
 		return
 	}
@@ -538,6 +537,17 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 		}
 	}
 
+	if !data.MakeResourcesAvailableInLHC.IsUnknown() && !data.MakeResourcesAvailableInLHC.IsNull() {
+		if strings.EqualFold(data.SharingKind.ValueString(), string(citrixorchestration.SHARINGKIND_PRIVATE)) || strings.EqualFold(data.SessionSupport.ValueString(), string(citrixorchestration.SESSIONSUPPORT_MULTI_SESSION)) {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("make_resources_available_in_lhc"),
+				"Incorrect Attribute Configuration",
+				"make_resources_available_in_lhc can only be set for delivery groups with session_support set to SingleSession and sharing_kind set to Shared.",
+			)
+			return
+		}
+	}
+
 	if !data.CustomAccessPolicies.IsNull() {
 		accessPolicies := util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, &resp.Diagnostics, data.CustomAccessPolicies)
 		for index, accessPolicy := range accessPolicies {
@@ -550,8 +560,8 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 	}
 
 	if !data.AppProtection.IsNull() {
-		appPrtoection := util.ObjectValueToTypedObject[DeliveryGroupAppProtection](ctx, &resp.Diagnostics, data.AppProtection)
-		isValid := appPrtoection.ValidateConfig(ctx, &resp.Diagnostics)
+		appProtection := util.ObjectValueToTypedObject[DeliveryGroupAppProtection](ctx, &resp.Diagnostics, data.AppProtection)
+		isValid := appProtection.ValidateConfig(ctx, &resp.Diagnostics)
 
 		if !isValid {
 			return

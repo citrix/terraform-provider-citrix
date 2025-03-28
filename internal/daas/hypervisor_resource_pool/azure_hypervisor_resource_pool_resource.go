@@ -90,7 +90,7 @@ func (r *azureHypervisorResourcePoolResource) Create(ctx context.Context, req re
 		)
 		return
 	}
-	region, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, &resp.Diagnostics, hypervisorId, "", plan.Region.ValueString(), "Region", "", hypervisor)
+	region, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, r.client, &resp.Diagnostics, hypervisorId, "", plan.Region.ValueString(), "Region", "", hypervisor)
 	regionPath := region.GetRelativePath()
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -101,7 +101,7 @@ func (r *azureHypervisorResourcePoolResource) Create(ctx context.Context, req re
 		return
 	}
 	resourcePoolDetails.SetRegion(regionPath)
-	vnet, httpResp, err := util.GetSingleHypervisorResource(ctx, r.client, &resp.Diagnostics, hypervisorId, fmt.Sprintf("%s/virtualprivatecloud.folder", regionPath), plan.VirtualNetwork.ValueString(), util.VirtualPrivateCloudResourceType, plan.VirtualNetworkResourceGroup.ValueString(), hypervisor)
+	vnet, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, r.client, &resp.Diagnostics, hypervisorId, fmt.Sprintf("%s/virtualprivatecloud.folder", regionPath), plan.VirtualNetwork.ValueString(), util.VirtualPrivateCloudResourceType, plan.VirtualNetworkResourceGroup.ValueString(), hypervisor)
 	vnetPath := vnet.GetRelativePath()
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -112,6 +112,7 @@ func (r *azureHypervisorResourcePoolResource) Create(ctx context.Context, req re
 		return
 	}
 	resourcePoolDetails.SetVirtualNetwork(vnetPath)
+	resourcePoolDetails.SetVmTagging(plan.VmTagging.ValueBool())
 	//Checking the subnet
 	if plan.Subnets.IsNull() {
 		resp.Diagnostics.AddError(
@@ -200,6 +201,7 @@ func (r *azureHypervisorResourcePoolResource) Update(ctx context.Context, req re
 	var editHypervisorResourcePool citrixorchestration.EditHypervisorResourcePoolRequestModel
 	editHypervisorResourcePool.SetName(plan.Name.ValueString())
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM)
+	editHypervisorResourcePool.SetVmTagging(plan.VmTagging.ValueBool())
 
 	planSubnet := util.StringListToStringArray(ctx, &diags, plan.Subnets)
 	regionPath := fmt.Sprintf("%s.region", plan.Region.ValueString())

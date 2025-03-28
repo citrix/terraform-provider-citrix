@@ -127,7 +127,7 @@ func (r *ImageVersionResource) Create(ctx context.Context, req resource.CreateRe
 		// Set ServiceOfferingPath
 		serviceOffering := azureImageSpecs.ServiceOffering.ValueString()
 		serviceOfferingQueryPath := "serviceoffering.folder"
-		serviceOfferingPath, httpResp, err := util.GetSingleResourcePathFromHypervisor(ctx, r.client, &resp.Diagnostics, hypervisorId, hypervisorResourcePool.GetName(), serviceOfferingQueryPath, serviceOffering, util.ServiceOfferingResourceType, "")
+		serviceOfferingPath, httpResp, err := util.GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx, r.client, &resp.Diagnostics, hypervisorId, hypervisorResourcePool.GetName(), serviceOfferingQueryPath, serviceOffering, util.ServiceOfferingResourceType, "")
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating Image Version",
@@ -150,7 +150,7 @@ func (r *ImageVersionResource) Create(ctx context.Context, req resource.CreateRe
 			diskEncryptionSetModel := util.ObjectValueToTypedObject[util.AzureDiskEncryptionSetModel](ctx, &resp.Diagnostics, azureImageSpecs.DiskEncryptionSet)
 			diskEncryptionSet := diskEncryptionSetModel.DiskEncryptionSetName.ValueString()
 			diskEncryptionSetRg := diskEncryptionSetModel.DiskEncryptionSetResourceGroup.ValueString()
-			des, httpResp, err := util.GetSingleResourceFromHypervisor(ctx, r.client, &resp.Diagnostics, hypervisorId, plan.ResourcePool.ValueString(), fmt.Sprintf("%s\\diskencryptionset.folder", hypervisorResourcePool.GetXDPath()), diskEncryptionSet, "", diskEncryptionSetRg)
+			des, httpResp, err := util.GetSingleResourceFromHypervisorWithNoCacheRetry(ctx, r.client, &resp.Diagnostics, hypervisorId, plan.ResourcePool.ValueString(), fmt.Sprintf("%s\\diskencryptionset.folder", hypervisorResourcePool.GetXDPath()), diskEncryptionSet, "", diskEncryptionSetRg)
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating Image Version",
@@ -176,7 +176,7 @@ func (r *ImageVersionResource) Create(ctx context.Context, req resource.CreateRe
 		if !vsphereImageSpecs.MachineProfile.IsNull() {
 			// Set Machine Profile
 			machineProfileName := vsphereImageSpecs.MachineProfile.ValueString()
-			machineProfile, httpResp, err := util.GetSingleResourceFromHypervisor(ctx, r.client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", machineProfileName, util.TemplateResourceType, "")
+			machineProfile, httpResp, err := util.GetSingleResourceFromHypervisorWithNoCacheRetry(ctx, r.client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", machineProfileName, util.TemplateResourceType, "")
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error creating Machine Catalog",
@@ -236,7 +236,7 @@ func (r *ImageVersionResource) Create(ctx context.Context, req resource.CreateRe
 	createImageVersionRequest := r.client.ApiClient.ImageDefinitionsAPIsDAAS.ImageDefinitionsCreateImageVersion(ctx, plan.ImageDefinition.ValueString())
 	createImageVersionRequest = createImageVersionRequest.CreateImageVersionRequestModel(createImageVersionRequestBody).Async(true)
 
-	// Create new Image Definition
+	// Create new Image Version
 	imageVersion, httpResp, err := citrixdaasclient.AddRequestData(createImageVersionRequest, r.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -264,7 +264,12 @@ func (r *ImageVersionResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	imageVersion, err = util.GetAsyncJobResult[*citrixorchestration.ImageVersionResponseModel](ctx, r.client, httpResp, "Error creating Image Version", &resp.Diagnostics, 30, true)
+	timeoutConfigs := util.ObjectValueToTypedObject[ImageVersionTimeout](ctx, &resp.Diagnostics, plan.Timeout)
+	createTimeout := timeoutConfigs.Create.ValueInt32()
+	if createTimeout == 0 {
+		createTimeout = getImageVersionTimeoutConfigs().CreateDefault
+	}
+	imageVersion, err = util.GetAsyncJobResult[*citrixorchestration.ImageVersionResponseModel](ctx, r.client, httpResp, "Error creating Image Version", &resp.Diagnostics, createTimeout, true)
 	if err != nil {
 		return
 	}
@@ -402,7 +407,12 @@ func (r *ImageVersionResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Image Version", &resp.Diagnostics, 10, true)
+	timeoutConfigs := util.ObjectValueToTypedObject[ImageVersionTimeout](ctx, &resp.Diagnostics, state.Timeout)
+	deleteTimeout := timeoutConfigs.Delete.ValueInt32()
+	if deleteTimeout == 0 {
+		deleteTimeout = getImageVersionTimeoutConfigs().DeleteDefault
+	}
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Image Version", &resp.Diagnostics, deleteTimeout, true)
 	if err != nil {
 		return
 	}

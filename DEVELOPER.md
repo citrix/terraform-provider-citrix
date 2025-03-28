@@ -12,6 +12,7 @@ This documentation will guide you through the process of setting up your dev env
     - [Start Debugger](#start-debugger)
     - [Attach Local Provider to PowerShell](#attach-local-provider-to-powershell)
   - [Debugging with citrix-daas-rest-go client code in Visual Studio Code](#debugging-with-citrix-daas-rest-go-client-code-in-visual-studio-code)
+  - [Updating the examples](#updating-the-examples)
   - [Handling Terraform lists, sets, and nested objects](#handling-terraform-lists-sets-and-nested-objects)
     - [Converting to Go native types](#converting-to-go-native-types)
     - [Initalizing Terraform types](#initalizing-terraform-types)
@@ -95,6 +96,12 @@ Clone the Go client from <https://github.com/citrix/citrix-daas-rest-go>. Go to 
 Run [Debugging Provider code in Visual Studio Code](#debugging-provider-code-in-visual-studio-code) again and you will be able to step into the client functions.
 
 Set a breakpoint in `terraform-provider-citrix/internal/provider/provider.go::Configure`
+
+## Updating the examples
+When creating or modify the [examples](examples/), take the following steps:
+1. Each example should have a [citrix.tf](examples/basic_azure_mcs_vda/citrix.tf) which specifies both on-premises and cloud provider configurations if applicable.
+2. Run `terraform validate` on the example whenever it is changed. This can be run against your local debug provider if needed. You will have to comment out one of the provider configurations in `citrix.tf`, be sure to uncomment it before committing.
+3. Update the [examples/README](examples/README.md) when adding new examples.
 
 ## Handling Terraform lists, sets, and nested objects
 ### Converting to Go native types

@@ -25,6 +25,7 @@ type DeliveryGroupDataSourceModel struct {
 	DeliveryType            types.String   `tfsdk:"delivery_type"`
 	DeliveryGroupFolderPath types.String   `tfsdk:"delivery_group_folder_path"`
 	InMaintenanceMode       types.Bool     `tfsdk:"in_maintenance_mode"`
+	ColorDepth              types.String   `tfsdk:"color_depth"`
 	Vdas                    []vda.VdaModel `tfsdk:"vdas"`    // List[VdaModel]
 	Tenants                 types.Set      `tfsdk:"tenants"` // Set[string]
 	Tags                    types.Set      `tfsdk:"tags"`    // Set[string]
@@ -67,6 +68,10 @@ func (DeliveryGroupDataSourceModel) GetSchema() schema.Schema {
 				Description: "Indicates whether the delivery group is in maintenance mode.",
 				Computed:    true,
 			},
+			"color_depth": schema.StringAttribute{
+				Description: "Specifies the color depth for the delivery group. Available values are `FourBit`, `EightBit`, `SixteenBit`, and `TwentyFourBit`.",
+				Computed:    true,
+			},
 			"vdas": schema.ListNestedAttribute{
 				Description:  "The VDAs associated with the delivery group.",
 				Computed:     true,
@@ -105,6 +110,7 @@ func (r DeliveryGroupDataSourceModel) RefreshPropertyValues(ctx context.Context,
 	deliveryType := string(deliveryGroup.GetDeliveryType())
 	r.DeliveryType = types.StringValue(deliveryType)
 	r.InMaintenanceMode = types.BoolValue(deliveryGroup.GetInMaintenanceMode())
+	r.ColorDepth = types.StringValue(string(deliveryGroup.GetColorDepth()))
 
 	res := []vda.VdaModel{}
 	for _, model := range vdas {

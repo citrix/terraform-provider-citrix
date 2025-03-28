@@ -18,7 +18,7 @@ This folder contains examples of how to configure Citrix environments in various
 Complete steps from start to finish for a variety of senarios from [Citrix Tech Zone](https://community.citrix.com/tech-zone/automation/):
 - [Installing and configuring the provider](https://community.citrix.com/tech-zone/automation/terraform-install-and-config/)
 - [AWS EC2](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-aws/) via MCS
-- [Azure](https://community.citrix.com/tech-zone/build/deployment-guides/citrix-daas-terraform-azure/) via MCS
+- [Azure](https://community.citrix.com/tech-zone/build/deployment-guides/daas-azure-iac) via MCS
 - [GCP](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-gcp/) via MCS
 - [vSphere](https://community.citrix.com/tech-zone/build/deployment-guides/terraform-daas-vsphere8/) via MCS
 - [XenServer](https://community.citrix.com/tech-zone/automation/citrix-terraform-xenserver) via MCS

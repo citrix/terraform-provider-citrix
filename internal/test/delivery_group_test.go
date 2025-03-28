@@ -245,6 +245,27 @@ resource "citrix_delivery_group" "testDeliveryGroup" {
 	%s
 }
 `
+	testDeliveryGroupWithZeroCatalogs = `
+resource "citrix_delivery_group" "testDeliveryGroupZeroCatalogs" {
+	name        = "DeliveryGroupWithZeroCatalogs"
+	description = "Delivery Group for testing"
+	    session_support = "MultiSession"
+    sharing_kind = "Shared"
+}
+	`
+	testDeliveryGroupWithZeroCatalogsUpdated = `
+	resource "citrix_delivery_group" "testDeliveryGroupZeroCatalogs" {
+		name        = "DeliveryGroupWithAssociatedCatalogs"
+		description = "Delivery Group with a Machine Catalog"
+			session_support = "MultiSession"
+		sharing_kind = "Shared"
+		associated_machine_catalogs = [
+		 {
+             machine_catalog = citrix_machine_catalog.testMachineCatalogMachines.id
+             machine_count = 1
+         }]
+	}
+		`
 	testDeliveryGroupResources_updated = `
 resource "citrix_delivery_group" "testDeliveryGroup" {
     name        = "%s-updated"
@@ -332,6 +353,11 @@ func BuildDeliveryGroupResource(t *testing.T, deliveryGroup string, deliveryType
 	} else {
 		return BuildDesktopIconResource(t, testDesktopIconResource) + fmt.Sprintf(deliveryGroup, name, deliveryTypeString, "default_desktop_icon = citrix_desktop_icon.testDesktopIcon.id")
 	}
+
+}
+
+func BuildDeliveryGroupResourceWithZeroCatalogs(t *testing.T, deliveryGroup string) string {
+	return fmt.Sprintf(deliveryGroup)
 
 }
 

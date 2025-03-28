@@ -121,9 +121,14 @@ func (r *ImageDefinitionResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	if r.client.ClientConfig.OrchestrationApiVersion >= 121 {
-		err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Image Definition", &resp.Diagnostics, 10, true)
+		timeoutConfigs := util.ObjectValueToTypedObject[ImageDefinitionTimeout](ctx, &resp.Diagnostics, plan.Timeout)
+		createTimeout := timeoutConfigs.Create.ValueInt32()
+		if createTimeout == 0 {
+			createTimeout = getImageDefinitionTimeoutConfigs().CreateDefault
+		}
+		err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Image Definition", &resp.Diagnostics, createTimeout, true)
 		if err != nil {
-			return
+			// Error has been added to diagnostics. Do not return since we need to mark the resource as tainted in the state
 		}
 	}
 
@@ -266,7 +271,12 @@ func (r *ImageDefinitionResource) Delete(ctx context.Context, req resource.Delet
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Image Definition", &resp.Diagnostics, 10, true)
+	timeoutConfigs := util.ObjectValueToTypedObject[ImageDefinitionTimeout](ctx, &resp.Diagnostics, state.Timeout)
+	deleteTimeout := timeoutConfigs.Delete.ValueInt32()
+	if deleteTimeout == 0 {
+		deleteTimeout = getImageDefinitionTimeoutConfigs().DeleteDefault
+	}
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Image Definition", &resp.Diagnostics, deleteTimeout, true)
 	if err != nil {
 		return
 	}

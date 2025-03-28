@@ -35,6 +35,7 @@ data "citrix_delivery_group" "example_delivery_group" {
 
 ### Read-Only
 
+- `color_depth` (String) Specifies the color depth for the delivery group. Available values are `FourBit`, `EightBit`, `SixteenBit`, and `TwentyFourBit`.
 - `delivery_type` (String) The delivery type of the delivery group.
 - `in_maintenance_mode` (Boolean) Indicates whether the delivery group is in maintenance mode.
 - `secure_ica_required` (Boolean) Indicates whether secure ICA is required for the delivery group.

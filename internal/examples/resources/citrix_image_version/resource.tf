@@ -3,12 +3,7 @@ resource "citrix_image_version" "example_azure_image_version" {
 	hypervisor = citrix_azure_hypervisor.example_azure_hypervisor.id   
 	hypervisor_resource_pool = citrix_azure_hypervisor_resource_pool.example_azure_resource_pool.id   
 	description = "example description"
-	network_mapping = [
-		{
-			network_device = "0"
-			network 	   = "example_subnet"
-		}
-    ]
+
 	azure_image_specs = {
 		service_offering = "Standard_B2als_v2"
 		storage_type = "StandardSSD_LRS"
@@ -44,12 +39,7 @@ resource "citrix_image_version" "example_vsphere_image_version" {
 	hypervisor = citrix_vsphere_hypervisor.example_vsphere_hypervisor.id   
 	hypervisor_resource_pool = citrix_vsphere_hypervisor_resource_pool.example_vsphere_resource_pool.id   
 	description = "example vSphere image version description"
-	network_mapping = [
-		{
-			network_device = "0"
-			network 	   = "example_network"
-		}
-    ]
+
 	vsphere_image_specs = {
         master_image_vm = "example_master_image_vm"
         image_snapshot = "snaphost-1/snapshot-2/snapshot-3"

@@ -852,6 +852,26 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 
 	body.SetSecureIcaRequired(plan.SecureIcaRequired.ValueBool())
 
+	colorDepth, err := citrixorchestration.NewColorDepthFromValue(plan.ColorDepth.ValueString())
+	if err != nil {
+		diagnostics.AddError(
+			"Error setting Color Depth",
+			fmt.Sprintf("Unsupported color depth value: %s", plan.ColorDepth.ValueString()),
+		)
+		return body, err
+	}
+	body.SetColorDepth(*colorDepth)
+
+	loadBalanceType, err := citrixorchestration.NewLoadBalanceTypeFromValue(plan.LoadBalancingType.ValueString())
+	if err != nil {
+		diagnostics.AddError(
+			"Error creating Delivery Group",
+			fmt.Sprintf("Unsupported load balancing type %s.", plan.LoadBalancingType.ValueString()),
+		)
+		return body, err
+	}
+	body.SetLoadBalanceType(*loadBalanceType)
+
 	return body, nil
 }
 
@@ -888,6 +908,8 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 
 		includedUsersFilterEnabled = true
 		includedUsers := util.StringSetToStringArray(ctx, diagnostics, users.AllowList)
+
+		// Call identity to make sure users exist. Extract the Ids from the response
 		includedUserIds, httpResp, err = util.GetUserIdsUsingIdentity(ctx, client, includedUsers)
 		if err != nil {
 			diagnostics.AddError(
@@ -1151,6 +1173,26 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 	editDeliveryGroupRequestBody.SetAssignMachinesToUsers(assignMachinesToUsersRequests)
 
 	editDeliveryGroupRequestBody.SetSecureIcaEnabled(plan.SecureIcaRequired.ValueBool())
+
+	colorDepth, err := citrixorchestration.NewColorDepthFromValue(plan.ColorDepth.ValueString())
+	if err != nil {
+		diagnostics.AddError(
+			"Error setting Color Depth",
+			fmt.Sprintf("Unsupported color depth value: %s", plan.ColorDepth.ValueString()),
+		)
+		return editDeliveryGroupRequestBody, err
+	}
+	editDeliveryGroupRequestBody.SetColorDepth(*colorDepth)
+
+	loadBalanceType, err := citrixorchestration.NewLoadBalanceTypeFromValue(plan.LoadBalancingType.ValueString())
+	if err != nil {
+		diagnostics.AddError(
+			"Error updating Delivery Group",
+			fmt.Sprintf("Unsupported load balancing type %s.", plan.LoadBalancingType.ValueString()),
+		)
+		return editDeliveryGroupRequestBody, err
+	}
+	editDeliveryGroupRequestBody.SetLoadBalanceType(*loadBalanceType)
 
 	return editDeliveryGroupRequestBody, nil
 }

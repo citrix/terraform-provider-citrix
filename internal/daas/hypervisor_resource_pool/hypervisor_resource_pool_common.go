@@ -121,7 +121,7 @@ func ReadHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.Ci
 }
 
 func getHypervisorResourcePoolSubnets(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId, folderPath string, subnets []string, connectionType citrixorchestration.HypervisorConnectionType) ([]string, error) {
-	remoteSubnets, err := util.GetFilteredResourcePathList(ctx, client, diagnostics, hypervisorId, folderPath, util.NetworkResourceType, subnets, connectionType, "")
+	remoteSubnets, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, folderPath, util.NetworkResourceType, subnets, connectionType, "")
 	if err != nil {
 		diagnostics.AddError(
 			"Error creating Hypervisor Resource Pool for "+string(connectionType),

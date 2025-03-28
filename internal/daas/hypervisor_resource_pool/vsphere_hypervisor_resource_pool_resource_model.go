@@ -63,6 +63,7 @@ type VsphereHypervisorResourcePoolResourceModel struct {
 	Name       types.String `tfsdk:"name"`
 	Hypervisor types.String `tfsdk:"hypervisor"`
 	Metadata   types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
+	VmTagging  types.Bool   `tfsdk:"vm_tagging"`
 	/**** Resource Pool Details ****/
 	Cluster                types.Object `tfsdk:"cluster"`           //VsphereHypervisorClusterModel
 	Networks               types.List   `tfsdk:"networks"`          // List[string]
@@ -131,6 +132,12 @@ func (VsphereHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"metadata": util.GetMetadataListSchema("Hypervisor Resource Pool"),
+			"vm_tagging": schema.BoolAttribute{
+				Description: "Indicates whether VMs created by provisioning operations should be tagged. Default is `true`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
+			},
 		},
 	}
 }
@@ -146,6 +153,7 @@ func (r VsphereHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx co
 
 	hypervisorConnection := resourcePool.GetHypervisorConnection()
 	r.Hypervisor = types.StringValue(hypervisorConnection.GetId())
+	r.VmTagging = types.BoolValue(resourcePool.GetVMTaggingEnabled())
 
 	r.UseLocalStorageCaching = types.BoolValue(resourcePool.GetUseLocalStorageCaching())
 
