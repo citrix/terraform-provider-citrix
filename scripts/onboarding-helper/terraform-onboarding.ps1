@@ -411,7 +411,17 @@ function Get-ResourceList {
         if ($item.Id -and $item.Id -ne "0" -and $item.Id -ne "00000000-0000-0000-0000-000000000000") {
             $resourceList += $item.Id
         }
-        
+
+        # Check for ServiceAccountUid for Service Accounts
+        if ($resourceProviderName -eq "service_account" -and $item.ServiceAccountUid){
+            $resourceList += $item.ServiceAccountUid
+        }
+
+        # Check for Security Identifier for Admin Users
+        if ($resourceProviderName -eq "admin_user" -and $item.User -and $item.User.Sid){
+            $resourceList += $item.User.Sid
+        }
+ 
         # Create a path map for ApplicationFolder paths
         if ($requestPath -eq "AdminFolders") {
             $pathMap[$item.Id] = $item.Path
@@ -463,6 +473,11 @@ function Get-ImportMap {
         if ($parentId -ne "") {
             $resourceName = "$($resourceProviderName)_$($parentIndex)_$($index)"
             $resourceMapKey = "$($parentId),$($id)"
+            if (-not $script:parentChildMap.ContainsKey($parentId)) {
+                # Initialize as a new list if not already present
+                $script:parentChildMap[$parentId] = [System.Collections.Generic.List[string]]::new()
+            }
+            $script:parentChildMap[$parentId].Add($id)
         }
         else {
             $resourceName = "$($resourceProviderName)_$($index)"
@@ -555,6 +570,22 @@ function Get-ExistingCVADResources {
             "resourceApi"          = "Icons?builtIn=false"
             "resourceProviderName" = "application_icon"
         }
+        "service_account" = @{
+            "resourceApi"          = "Identity/ServiceAccounts"
+            "resourceProviderName" = "service_account"
+        }
+        "image_definition" = @{
+            "resourceApi"          = "ImageDefinitions"
+            "resourceProviderName" = "image_definition"
+        }
+        "storefront_server" = @{
+            "resourceApi"          = "StoreFrontServers"
+            "resourceProviderName" = "storefront_server"
+        }
+        "tag" = @{
+            "resourceApi"          = "Tags"
+            "resourceProviderName" = "tag"
+        }
     }
 
     # Add WEM resources for cloud customer environment
@@ -569,8 +600,13 @@ function Get-ExistingCVADResources {
                 "resourceProviderName" = "wem_directory_object"
             }
         }
-
         $resources += $wemResources
+    }else {
+    # If On-Prem add admin resource
+        $resources.Add("admin_user", @{
+            "resourceApi"          = "Admin/Administrators"
+            "resourceProviderName" = "admin_user"
+        })
     }
 
     $script:cvadResourcesMap = @{}
@@ -585,7 +621,16 @@ function Get-ExistingCVADResources {
             $index = 0
             foreach ($id in $script:cvadResourcesMap[$resource].Keys) {
                 $resourcePoolAPI = "hypervisors/$($id)/resourcePools"
-                $script:cvadResourcesMap["$($resource)_resource_pool"] = Get-ImportMap -resourceApi $resourcePoolAPI -resourceProviderName "$($resource)_resource_pool" -parentId $id -parentIndex $index
+                $script:cvadResourcesMap["$($resource)_resource_pool"] += Get-ImportMap -resourceApi $resourcePoolAPI -resourceProviderName "$($resource)_resource_pool" -parentId $id -parentIndex $index
+                $index += 1
+            }
+        }
+        # Create image_version map for all image_definitions
+        if ($resource -like "image_definition") {
+            $index = 0
+            foreach ($id in $script:cvadResourcesMap[$resource].Keys) {
+                $resourcePoolAPI = "ImageDefinitions/$($id)/ImageVersions"
+                $script:cvadResourcesMap["image_version"] += Get-ImportMap -resourceApi $resourcePoolAPI -resourceProviderName "image_version" -parentId $id -parentIndex $index
                 $index += 1
             }
         }
@@ -673,7 +718,17 @@ function RemoveComputedProperties {
         "(\s+)total_delivery_groups(\s+)= (\S+)",
         "(\s+)total_machine_catalogs(\s+)= (\S+)",
         "(\s+)total_machines(\s+)= (\S+)",
-        "(\s+)is_all_scope(\s+)= (\S+)"
+        "(\s+)is_all_scope(\s+)= (\S+)",
+        "(\s+)latest_version(\s+)= (\S+)",
+        "(\s+)version_number(\s+)= (\S+)",
+        "(\s+)associated_delivery_group_count(\s+)= (\S+)",
+        "(\s+)associated_machine_catalog_count(\s+)= (\S+)",
+        "(\s+)associated_machine_count(\s+)= (\S+)",
+        "(\s+)associated_application_group_count(\s+)= (\S+)",
+        "(\s+)associated_application_count(\s+)= (\S+)",
+        "(\s+)tenant_id(\s+)= (\S+)",
+        "(\s+)tenant_name(\s+)= (\S+)",
+        "(\s+)tenants\s*=\s*\[[\s\S]*?\]"
     )
 
     # Identify the delivery_groups_priority block
@@ -690,7 +745,7 @@ function RemoveComputedProperties {
 
     # Loop through each regex pattern and replace matches in the content
     foreach ($pattern in $regexPatterns) {
-        $content = $content -replace $pattern, ""
+        $content = [regex]::Replace($content, $pattern, "", [System.Text.RegularExpressions.RegexOptions]::Multiline)
     }
 
     # Restore the delivery_groups_priority block using unique placeholders
@@ -724,12 +779,12 @@ function ReplaceDependencyRelationships {
             continue
         }
         foreach ($id in $script:cvadResourcesMap[$resource].Keys) {
-            if($resource -like "*_resource_pool") {
+            if($resource -like "*_resource_pool" -or $resource -like "image_version") {
                 $idArray = $id -split ","
                 if($idArray.Count -gt 1) {
-                    $resource_pool_id = $idArray[1]
-                    Write-Verbose "Replacing ID: $resource_pool_id with citrix_$($resource).$($script:cvadResourcesMap[$resource][$id]).id"
-                    $content = $content -replace "`"$resource_pool_id`"", "citrix_$($resource).$($script:cvadResourcesMap[$resource][$id]).id"
+                    $resource_id = $idArray[1]
+                    Write-Verbose "Replacing ID: $resource_id with citrix_$($resource).$($script:cvadResourcesMap[$resource][$id]).id"
+                    $content = $content -replace "`"$resource_id`"", "citrix_$($resource).$($script:cvadResourcesMap[$resource][$id]).id"
                 }
             }else{
                 Write-Verbose "Replacing ID: $id with citrix_$($resource).$($script:cvadResourcesMap[$resource][$id]).id"
@@ -759,7 +814,34 @@ function InjectPlaceHolderSensitiveValues {
 
     $previousLine = ""
     foreach ($line in $lines) {
-        if ($line -match 'raw_data' -and $previousLine -match 'id\s*=\s*"(.*)"') {
+        if ($line -match '^\s*resource\s*"citrix_image_version"\s*') {
+            $insideCitrixImageVersion = $true
+        } elseif ($insideCitrixImageVersion -and $line -eq "}") {
+            $insideCitrixImageVersion = $false
+        }
+
+        if ($line -match '^\s*resource\s*"citrix_image_definition"\s*') {
+            $insideCitrixImageDefinition = $true
+        } elseif ($insideCitrixImageDefinition -and $line -eq "}") {
+            $insideCitrixImageDefinition = $false
+        }
+
+        # Skip os_type and session_support if inside citrix_image_version
+        if ($insideCitrixImageVersion -and ($line -match '^\s*os_type\s*=' -or $line -match '^\s*session_support\s*=')) {
+            Write-Verbose "Removing os_type or session_support from citrix_image_version."
+            continue
+        }
+
+        if ($insideCitrixImageDefinition -and $line -match '^\s*hypervisor\s*=\s*"(.*)"') {
+            $hypervisorId = $matches[1]
+            $resourcePoolId = if ($script:parentChildMap.ContainsKey($hypervisorId) -and $script:parentChildMap[$hypervisorId].Count -gt 0) {
+                $script:parentChildMap[$hypervisorId][0]
+            } else {
+                "<Enter hypervisor pool id>"
+            }
+            $filteredOutput += $line
+            $filteredOutput += "hypervisor_resource_pool  = `"$resourcePoolId`""
+        } elseif ($line -match 'raw_data' -and $previousLine -match 'id\s*=\s*"(.*)"') {
             $iconId = $matches[1]
             $iconFileName = "$iconsFolder\app_icon_$iconId.ico"
 
@@ -776,14 +858,14 @@ function InjectPlaceHolderSensitiveValues {
         elseif ($line -match '^\s*[^=]+\s*=\s*""') {
             Write-Verbose "Ignoring lines with empty strings."
             continue
+        }elseif($previousLine -match 'citrix_service_account' -and $line -match 'account_id'){
+            $filteredOutput += $line
+            $filteredOutput += 'account_secret = "<input application_secret value>"'
+            $filteredOutput += 'account_secret_format = "PlainText"'
         }
         elseif ($line -match "application_id") {
             $filteredOutput += $line
             $filteredOutput += 'application_secret = "<input application_secret value>"'
-        }
-        elseif ($line -match "service_account_id") {
-            $filteredOutput += $line
-            $filteredOutput += 'service_account_credentials = "<input service_account_credentials value>"'
         }
         elseif ($line -match "api_key") {
             $filteredOutput += $line
@@ -794,10 +876,10 @@ function InjectPlaceHolderSensitiveValues {
             $filteredOutput += 'password = "<input password value>"'
             $filteredOutput += 'password_format = "PlainText"'
         }
-        elseif ($line -match "^\s*domain\s*=\s*.*$") {
-            $filteredOutput += $line
+        elseif (($previousLine -match "^\s*domain\s*=\s*.*$" -or $previousLine -match "^\s*domain_ou\s*=") -and $line -match "^\s*}\s*$") {
             $filteredOutput += 'service_account = "<input service_account value>"'
             $filteredOutput += 'service_account_password = "<input service_account_password value>"'
+            $filteredOutput += $line
         }
         else {
             $filteredOutput += $line
@@ -893,6 +975,8 @@ $script:hypervisorResourceMap = @{
 }
 $NUTANIX_PLUGIN_ID = "AcropolisFactory"
 $script:applicationFolderPathMap = @{}
+$script:parentChildMap = @{} # Initialize the parent-child map for hypervisors and image_definitions
+
 $script:TokenExpiryTime = (Get-Date).AddMinutes(-1) # Initialize the expiry time of the refresh token to an earlier time
 
 # Set environment variables for client secret
