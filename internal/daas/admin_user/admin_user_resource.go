@@ -96,7 +96,7 @@ func (r *adminUserResource) Create(ctx context.Context, req resource.CreateReque
 		)
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Admin "+plan.DomainName.ValueString()+"\\"+plan.Name.ValueString(), &resp.Diagnostics, 5, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Admin "+plan.DomainName.ValueString()+"\\"+plan.Name.ValueString(), &resp.Diagnostics, 5)
 	if err != nil {
 		// Error has been added to diagnostics. Do not return since we need to mark the resource as tainted in the state
 	}
@@ -189,7 +189,7 @@ func (r *adminUserResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Admin User: "+adminUserName, &resp.Diagnostics, 5, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Admin User: "+adminUserName, &resp.Diagnostics, 5)
 	if err != nil {
 		return
 	}
@@ -236,7 +236,7 @@ func (r *adminUserResource) Delete(ctx context.Context, req resource.DeleteReque
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Admin User: "+adminUserName, &resp.Diagnostics, 5, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Admin User: "+adminUserName, &resp.Diagnostics, 5)
 	if err != nil {
 		return
 	}

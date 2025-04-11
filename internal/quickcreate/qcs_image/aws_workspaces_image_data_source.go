@@ -15,7 +15,8 @@ import (
 )
 
 var (
-	_ datasource.DataSource = &AwsWorkspacesImageDataSource{}
+	_ datasource.DataSource              = &AwsWorkspacesImageDataSource{}
+	_ datasource.DataSourceWithConfigure = &AwsWorkspacesImageDataSource{}
 )
 
 func NewAwsWorkspacesImageDataSource() datasource.DataSource {

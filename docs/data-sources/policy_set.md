@@ -57,6 +57,7 @@ Read-Only:
 - `access_control_filters` (Attributes Set) Set of Access control policy filters. (see [below for nested schema](#nestedatt--policies--access_control_filters))
 - `client_ip_filters` (Attributes Set) Set of Client ip policy filters. (see [below for nested schema](#nestedatt--policies--client_ip_filters))
 - `client_name_filters` (Attributes Set) Set of Client name policy filters. (see [below for nested schema](#nestedatt--policies--client_name_filters))
+- `client_platform_filters` (Attributes Set) Set of Client platform policy filters. (see [below for nested schema](#nestedatt--policies--client_platform_filters))
 - `delivery_group_filters` (Attributes Set) Set of Delivery group policy filters. (see [below for nested schema](#nestedatt--policies--delivery_group_filters))
 - `delivery_group_type_filters` (Attributes Set) Set of Delivery group type policy filters. (see [below for nested schema](#nestedatt--policies--delivery_group_type_filters))
 - `description` (String) Description of the policy.
@@ -74,7 +75,6 @@ Read-Only:
 Read-Only:
 
 - `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
-- `id` (String) Id of the branch repeater policy filter.
 
 
 <a id="nestedatt--policies--access_control_filters"></a>
@@ -87,7 +87,6 @@ Read-Only:
 - `connection` (String) Gateway connection for the policy filter.
 - `enabled` (Boolean) Indicate whether the filter is being enabled.
 - `gateway` (String) Gateway for the policy filter.
-- `id` (String) Id of the policy filter.
 
 
 <a id="nestedatt--policies--client_ip_filters"></a>
@@ -97,7 +96,6 @@ Read-Only:
 
 - `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
 - `enabled` (Boolean) Indicate whether the filter is being enabled.
-- `id` (String) Id of the client ip policy filter.
 - `ip_address` (String) IP Address of the client to be filtered.
 
 
@@ -109,7 +107,17 @@ Read-Only:
 - `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
 - `client_name` (String) Name of the client to be filtered.
 - `enabled` (Boolean) Indicate whether the filter is being enabled.
-- `id` (String) Id of the client name policy filter.
+
+
+<a id="nestedatt--policies--client_platform_filters"></a>
+### Nested Schema for `policies.client_platform_filters`
+
+Read-Only:
+
+- `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
+- `enabled` (Boolean) Indicate whether the filter is being enabled.
+- `id` (String) Id of the client platform policy filter.
+- `platform` (String) Name of the client platform to be filtered.
 
 
 <a id="nestedatt--policies--delivery_group_filters"></a>
@@ -130,7 +138,6 @@ Read-Only:
 - `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
 - `delivery_group_type` (String) Type of the delivery groups to be filtered.
 - `enabled` (Boolean) Indicate whether the filter is being enabled.
-- `id` (String) Id of the delivery group type policy filter.
 
 
 <a id="nestedatt--policies--ou_filters"></a>
@@ -140,7 +147,6 @@ Read-Only:
 
 - `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
 - `enabled` (Boolean) Indicate whether the filter is being enabled.
-- `id` (String) Id of the organizational unit policy filter.
 - `ou` (String) Organizational Unit to be filtered.
 
 
@@ -162,7 +168,6 @@ Read-Only:
 
 - `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
 - `enabled` (Boolean) Indicate whether the filter is being enabled.
-- `id` (String) Id of the tag policy filter.
 - `tag` (String) Tag to be filtered.
 
 
@@ -173,5 +178,4 @@ Read-Only:
 
 - `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
 - `enabled` (Boolean) Indicate whether the filter is being enabled.
-- `id` (String) Id of the user policy filter.
 - `sid` (String) SID of the user or user group to be filtered.

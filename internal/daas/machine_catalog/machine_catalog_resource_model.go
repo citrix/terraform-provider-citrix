@@ -406,6 +406,7 @@ func (MachineDomainIdentityModel) GetAttributes() map[string]schema.Attribute {
 type MachineAccountCreationRulesModel struct {
 	NamingScheme     types.String `tfsdk:"naming_scheme"`
 	NamingSchemeType types.String `tfsdk:"naming_scheme_type"`
+	StartsWith       types.String `tfsdk:"starts_with"`
 }
 
 func (MachineAccountCreationRulesModel) GetSchema() schema.SingleNestedAttribute {
@@ -418,11 +419,16 @@ func (MachineAccountCreationRulesModel) GetSchema() schema.SingleNestedAttribute
 				Required:    true,
 			},
 			"naming_scheme_type": schema.StringAttribute{
-				Description: "Type of naming scheme. This defines the format of the variable part of the AD account names that will be created. Choose between `Numeric`, `Alphabetic` and `Unicode`.",
+				Description: "Type of naming scheme. This defines the format of the variable part of the AD account names that will be created. Choose between `Numeric` and `Alphabetic`.",
 				Required:    true,
 				Validators: []validator.String{
 					util.GetValidatorFromEnum(citrixorchestration.AllowedAccountNamingSchemeTypeEnumValues),
 				},
+			},
+			"starts_with": schema.StringAttribute{
+				Description: "Specify numbers or letters, depending on the naming scheme type, for the account names to start with." +
+					"\n\n-> **Note** Letters should be in Uppercase only.",
+				Optional: true,
 			},
 		},
 	}

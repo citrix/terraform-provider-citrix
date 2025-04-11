@@ -10,7 +10,8 @@ import (
 )
 
 var (
-	_ datasource.DataSource = &AdminFolderDataSource{}
+	_ datasource.DataSource              = &AdminFolderDataSource{}
+	_ datasource.DataSourceWithConfigure = &AdminFolderDataSource{}
 )
 
 func NewAdminFolderDataSource() datasource.DataSource {

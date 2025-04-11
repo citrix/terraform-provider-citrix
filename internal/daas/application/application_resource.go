@@ -151,7 +151,7 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Application "+plan.Name.ValueString(), &resp.Diagnostics, 5, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Application "+plan.Name.ValueString(), &resp.Diagnostics, 5)
 	if err != nil {
 		return
 	}
@@ -322,7 +322,7 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 		)
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Application "+applicationName, &resp.Diagnostics, 5, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Application "+applicationName, &resp.Diagnostics, 5)
 	if err != nil {
 		return
 	}
@@ -381,7 +381,7 @@ func (r *applicationResource) Delete(ctx context.Context, req resource.DeleteReq
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Application "+applicationName, &resp.Diagnostics, 5, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Application "+applicationName, &resp.Diagnostics, 5)
 	if err != nil {
 		return
 	}

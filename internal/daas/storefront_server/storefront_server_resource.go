@@ -83,7 +83,7 @@ func (r *storeFrontServerResource) Create(ctx context.Context, req resource.Crea
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating StoreFront Server "+plan.Name.ValueString(), &resp.Diagnostics, 10, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating StoreFront Server "+plan.Name.ValueString(), &resp.Diagnostics, 10)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating StoreFront Server "+plan.Name.ValueString(),
@@ -182,7 +182,7 @@ func (r *storeFrontServerResource) Update(ctx context.Context, req resource.Upda
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating StoreFront Server "+sfServerName, &resp.Diagnostics, 10, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating StoreFront Server "+sfServerName, &resp.Diagnostics, 10)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating StoreFront Server "+sfServerName,

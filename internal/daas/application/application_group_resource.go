@@ -120,7 +120,7 @@ func (r *applicationGroupResource) Create(ctx context.Context, req resource.Crea
 		return
 	}
 
-	addAppGroupResp, err := util.GetAsyncJobResult[*citrixorchestration.ApplicationGroupDetailResponseModel](ctx, r.client, httpResp, "Error creating Application Group "+plan.Name.ValueString(), &resp.Diagnostics, 5, true)
+	addAppGroupResp, err := util.GetAsyncJobResult[*citrixorchestration.ApplicationGroupDetailResponseModel](ctx, r.client, httpResp, "Error creating Application Group "+plan.Name.ValueString(), &resp.Diagnostics, 5)
 	if err != nil {
 		return
 	}
@@ -143,7 +143,7 @@ func (r *applicationGroupResource) Create(ctx context.Context, req resource.Crea
 			)
 		}
 
-		err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error disabling Application Group "+plan.Name.ValueString(), &resp.Diagnostics, 5, true)
+		err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error disabling Application Group "+plan.Name.ValueString(), &resp.Diagnostics, 5)
 		if err != nil {
 			// We have the errors logged. Continue so that the resource is marked as tainted.
 		}
@@ -289,7 +289,7 @@ func (r *applicationGroupResource) Update(ctx context.Context, req resource.Upda
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Application Group "+applicationGroupName, &resp.Diagnostics, 5, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Application Group "+applicationGroupName, &resp.Diagnostics, 5)
 	if err != nil {
 		return
 	}
@@ -347,7 +347,7 @@ func (r *applicationGroupResource) Delete(ctx context.Context, req resource.Dele
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Application Group "+applicationGroupName, &resp.Diagnostics, 5, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Application Group "+applicationGroupName, &resp.Diagnostics, 5)
 	if err != nil {
 		return
 	}

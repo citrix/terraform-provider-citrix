@@ -11,7 +11,8 @@ import (
 )
 
 var (
-	_ datasource.DataSource = &SamlIdentityProviderDataSource{}
+	_ datasource.DataSource              = &SamlIdentityProviderDataSource{}
+	_ datasource.DataSourceWithConfigure = &SamlIdentityProviderDataSource{}
 )
 
 func NewSamlIdentityProviderDataSource() datasource.DataSource {

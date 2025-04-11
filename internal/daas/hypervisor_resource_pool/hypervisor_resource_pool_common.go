@@ -71,7 +71,7 @@ func CreateHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.
 		return nil, err
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error creating Resource Pool for Hypervisor "+hypervisor.GetName(), diagnostics, 10, true)
+	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error creating Resource Pool for Hypervisor "+hypervisor.GetName(), diagnostics, 10)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func UpdateHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.
 		return nil, err
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating Resource Pool "+resourcePoolId, diagnostics, 5, true)
+	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating Resource Pool "+resourcePoolId, diagnostics, 5)
 	if err != nil {
 		return nil, err
 	}

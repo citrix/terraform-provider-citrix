@@ -3,7 +3,6 @@
 package test
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
@@ -65,7 +64,7 @@ func TestDirectoryObject(t *testing.T) {
 }
 
 func BuildDirectoryObjectResource(t *testing.T, directoryResource string) string {
-	return fmt.Sprintf(directoryResource)
+	return directoryResource
 }
 
 var (

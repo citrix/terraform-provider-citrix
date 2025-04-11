@@ -12,7 +12,8 @@ import (
 )
 
 var (
-	_ datasource.DataSource = &AdminScopeDataSource{}
+	_ datasource.DataSource              = &AdminScopeDataSource{}
+	_ datasource.DataSourceWithConfigure = &AdminScopeDataSource{}
 )
 
 func NewAdminScopeDataSource() datasource.DataSource {

@@ -126,7 +126,7 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	deliveryGroup, err := util.GetAsyncJobResult[*citrixorchestration.DeliveryGroupDetailResponseModel](ctx, r.client, httpResp, "Error creating Delivery Group "+plan.Name.ValueString(), &resp.Diagnostics, 5, true)
+	deliveryGroup, err := util.GetAsyncJobResult[*citrixorchestration.DeliveryGroupDetailResponseModel](ctx, r.client, httpResp, "Error creating Delivery Group "+plan.Name.ValueString(), &resp.Diagnostics, 5)
 	if err != nil {
 		return
 	}
@@ -261,7 +261,7 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error occurred while setting some properties for Delivery Group "+deliveryGroup.GetName(), &resp.Diagnostics, 5, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error occurred while setting some properties for Delivery Group "+deliveryGroup.GetName(), &resp.Diagnostics, 5)
 	if err != nil {
 		r.updateDeliveryGroupState(ctx, resp, plan, deliveryGroupId)
 		return
@@ -312,7 +312,7 @@ func (r *deliveryGroupResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
-	if deliveryGroup.GetPolicySetGuid() == util.DefaultSitePolicySetId {
+	if deliveryGroup.GetPolicySetGuid() == util.DefaultSitePolicySetIdForDeliveryGroup {
 		deliveryGroup.SetPolicySetGuid("")
 	}
 
@@ -386,7 +386,7 @@ func (r *deliveryGroupResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Delivery Group "+deliveryGroupName, &resp.Diagnostics, 5, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Delivery Group "+deliveryGroupName, &resp.Diagnostics, 5)
 	if err != nil {
 		return
 	}
@@ -471,7 +471,7 @@ func (r *deliveryGroupResource) Delete(ctx context.Context, req resource.DeleteR
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Delivery Group "+deliveryGroupName, &resp.Diagnostics, 5, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Delivery Group "+deliveryGroupName, &resp.Diagnostics, 5)
 	if err != nil {
 		return
 	}

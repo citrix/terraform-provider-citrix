@@ -10,7 +10,8 @@ import (
 )
 
 var (
-	_ datasource.DataSource = &AdminRoleDataSource{}
+	_ datasource.DataSource              = &AdminRoleDataSource{}
+	_ datasource.DataSourceWithConfigure = &AdminRoleDataSource{}
 )
 
 func NewAdminRoleDataSource() datasource.DataSource {

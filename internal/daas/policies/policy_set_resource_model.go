@@ -85,6 +85,7 @@ type PolicyModel struct {
 	BranchRepeaterFilter     types.Object `tfsdk:"branch_repeater_filter"`      // BranchRepeaterFilterModel
 	ClientIPFilters          types.Set    `tfsdk:"client_ip_filters"`           // Set[ClientIPFilterModel]
 	ClientNameFilters        types.Set    `tfsdk:"client_name_filters"`         // Set[ClientNameFilterModel]
+	ClientPlatformFilters    types.Set    `tfsdk:"client_platform_filters"`     // Set[ClientPlatformFilterModel]
 	DeliveryGroupFilters     types.Set    `tfsdk:"delivery_group_filters"`      // Set[DeliveryGroupFilterModel]
 	DeliveryGroupTypeFilters types.Set    `tfsdk:"delivery_group_type_filters"` // Set[DeliveryGroupTypeFilterModel]
 	OuFilters                types.Set    `tfsdk:"ou_filters"`                  // Set[OuFilterModel]
@@ -145,6 +146,15 @@ func (PolicyModel) GetSchema() schema.NestedAttributeObject {
 				Optional:     true,
 				Computed:     true,
 				NestedObject: ClientNameFilterModel{}.GetSchema(),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
+				},
+			},
+			"client_platform_filters": schema.SetNestedAttribute{
+				Description:  "Set of Client platform policy filters.",
+				Optional:     true,
+				Computed:     true,
+				NestedObject: ClientPlatformFilterModel{}.GetSchema(),
 				Validators: []validator.Set{
 					setvalidator.SizeAtLeast(1),
 				},
@@ -365,8 +375,6 @@ func (r PolicySetModel) RefreshPropertyValues(ctx context.Context, diags *diag.D
 				policyModel.PolicySettings = util.DataSourceTypedArrayToObjectSet(ctx, diags, refreshedPolicySettings)
 			}
 
-			var accessControlFilters []AccessControlFilterModel
-
 			if isResource {
 				attributes, _ := util.ResourceAttributeMapFromObject(BranchRepeaterFilterModel{})
 				policyModel.BranchRepeaterFilter = types.ObjectNull(attributes)
@@ -375,85 +383,15 @@ func (r PolicySetModel) RefreshPropertyValues(ctx context.Context, diags *diag.D
 				policyModel.BranchRepeaterFilter = types.ObjectNull(attributes)
 			}
 
-			var clientIpFilters []ClientIPFilterModel
-			var clientNameFilters []ClientNameFilterModel
-			var desktopGroupFilters []DeliveryGroupFilterModel
-			var desktopKindFilters []DeliveryGroupTypeFilterModel
-			var desktopTagFilters []TagFilterModel
-			var ouFilters []OuFilterModel
-			var userFilters []UserFilterModel
-			if policy.GetFilters() != nil && len(policy.GetFilters()) != 0 {
-				for _, filter := range policy.GetFilters() {
-
-					var uuidFilterData PolicyFilterUuidDataClientModel
-					_ = json.Unmarshal([]byte(filter.GetFilterData()), &uuidFilterData)
-
-					var gatewayFilterData PolicyFilterGatewayDataClientModel
-					_ = json.Unmarshal([]byte(filter.GetFilterData()), &gatewayFilterData)
-
-					filterType := filter.GetFilterType()
-					switch filterType {
-					case "AccessControl":
-						accessControlFilters = append(accessControlFilters, AccessControlFilterModel{
-							Allowed:    types.BoolValue(filter.GetIsAllowed()),
-							Enabled:    types.BoolValue(filter.GetIsEnabled()),
-							Connection: types.StringValue(gatewayFilterData.Connection),
-							Condition:  types.StringValue(gatewayFilterData.Condition),
-							Gateway:    types.StringValue(gatewayFilterData.Gateway),
-						})
-					case "BranchRepeater":
-						policyModel.BranchRepeaterFilter = util.TypedObjectToObjectValue(ctx, diags, BranchRepeaterFilterModel{
-							Allowed: types.BoolValue(filter.GetIsAllowed()),
-						})
-					case "ClientIP":
-						clientIpFilters = append(clientIpFilters, ClientIPFilterModel{
-							Allowed:   types.BoolValue(filter.GetIsAllowed()),
-							Enabled:   types.BoolValue(filter.GetIsEnabled()),
-							IpAddress: types.StringValue(filter.GetFilterData()),
-						})
-					case "ClientName":
-						clientNameFilters = append(clientNameFilters, ClientNameFilterModel{
-							Allowed:    types.BoolValue(filter.GetIsAllowed()),
-							Enabled:    types.BoolValue(filter.GetIsEnabled()),
-							ClientName: types.StringValue(filter.GetFilterData()),
-						})
-					case "DesktopGroup":
-						desktopGroupFilters = append(desktopGroupFilters, DeliveryGroupFilterModel{
-							Allowed:         types.BoolValue(filter.GetIsAllowed()),
-							Enabled:         types.BoolValue(filter.GetIsEnabled()),
-							DeliveryGroupId: types.StringValue(uuidFilterData.Uuid),
-						})
-					case "DesktopKind":
-						desktopKindFilters = append(desktopKindFilters, DeliveryGroupTypeFilterModel{
-							Allowed:           types.BoolValue(filter.GetIsAllowed()),
-							Enabled:           types.BoolValue(filter.GetIsEnabled()),
-							DeliveryGroupType: types.StringValue(filter.GetFilterData()),
-						})
-					case "DesktopTag":
-						desktopTagFilters = append(desktopTagFilters, TagFilterModel{
-							Allowed: types.BoolValue(filter.GetIsAllowed()),
-							Enabled: types.BoolValue(filter.GetIsEnabled()),
-							Tag:     types.StringValue(uuidFilterData.Uuid),
-						})
-					case "OU":
-						ouFilters = append(ouFilters, OuFilterModel{
-							Allowed: types.BoolValue(filter.GetIsAllowed()),
-							Enabled: types.BoolValue(filter.GetIsEnabled()),
-							Ou:      types.StringValue(filter.GetFilterData()),
-						})
-					case "User":
-						userFilters = append(userFilters, UserFilterModel{
-							Allowed: types.BoolValue(filter.GetIsAllowed()),
-							Enabled: types.BoolValue(filter.GetIsEnabled()),
-							UserSid: types.StringValue(filter.GetFilterData()),
-						})
-					}
-				}
-			}
+			var accessControlFilters, branchRepeaterFilters, clientIpFilters, clientNameFilters, clientPlatformFilters, desktopGroupFilters, desktopKindFilters, desktopTagFilters, ouFilters, userFilters = ParsePolicyFilters(ctx, diags, policy)
 			if isResource {
 				policyModel.AccessControlFilters = util.TypedArrayToObjectSet(ctx, diags, accessControlFilters)
+				if len(branchRepeaterFilters) > 0 {
+					policyModel.BranchRepeaterFilter = util.TypedObjectToObjectValue(ctx, diags, branchRepeaterFilters[0])
+				}
 				policyModel.ClientIPFilters = util.TypedArrayToObjectSet(ctx, diags, clientIpFilters)
 				policyModel.ClientNameFilters = util.TypedArrayToObjectSet(ctx, diags, clientNameFilters)
+				policyModel.ClientPlatformFilters = util.TypedArrayToObjectSet(ctx, diags, clientPlatformFilters)
 				policyModel.DeliveryGroupFilters = util.TypedArrayToObjectSet(ctx, diags, desktopGroupFilters)
 				policyModel.DeliveryGroupTypeFilters = util.TypedArrayToObjectSet(ctx, diags, desktopKindFilters)
 				policyModel.TagFilters = util.TypedArrayToObjectSet(ctx, diags, desktopTagFilters)
@@ -461,6 +399,9 @@ func (r PolicySetModel) RefreshPropertyValues(ctx context.Context, diags *diag.D
 				policyModel.UserFilters = util.TypedArrayToObjectSet(ctx, diags, userFilters)
 			} else {
 				policyModel.AccessControlFilters = util.DataSourceTypedArrayToObjectSet(ctx, diags, accessControlFilters)
+				if len(branchRepeaterFilters) > 0 {
+					policyModel.BranchRepeaterFilter = util.DataSourceTypedObjectToObjectValue(ctx, diags, branchRepeaterFilters[0])
+				}
 				policyModel.ClientIPFilters = util.DataSourceTypedArrayToObjectSet(ctx, diags, clientIpFilters)
 				policyModel.ClientNameFilters = util.DataSourceTypedArrayToObjectSet(ctx, diags, clientNameFilters)
 				policyModel.DeliveryGroupFilters = util.DataSourceTypedArrayToObjectSet(ctx, diags, desktopGroupFilters)
@@ -499,4 +440,92 @@ func (r PolicySetModel) RefreshPropertyValues(ctx context.Context, diags *diag.D
 	r.IsAssigned = types.BoolValue(policySet.GetIsAssigned())
 
 	return r
+}
+
+func ParsePolicyFilters(ctx context.Context, diags *diag.Diagnostics, policy citrixorchestration.PolicyResponse) ([]AccessControlFilterModel, []BranchRepeaterFilterModel, []ClientIPFilterModel, []ClientNameFilterModel, []ClientPlatformFilterModel, []DeliveryGroupFilterModel, []DeliveryGroupTypeFilterModel, []TagFilterModel, []OuFilterModel, []UserFilterModel) {
+	var accessControlFilters []AccessControlFilterModel
+	var branchRepeaterFilters []BranchRepeaterFilterModel
+	var clientIpFilters []ClientIPFilterModel
+	var clientNameFilters []ClientNameFilterModel
+	var clientPlatformFilters []ClientPlatformFilterModel
+	var desktopGroupFilters []DeliveryGroupFilterModel
+	var desktopKindFilters []DeliveryGroupTypeFilterModel
+	var desktopTagFilters []TagFilterModel
+	var ouFilters []OuFilterModel
+	var userFilters []UserFilterModel
+	if policy.GetFilters() != nil && len(policy.GetFilters()) != 0 {
+		for _, filter := range policy.GetFilters() {
+
+			var uuidFilterData PolicyFilterUuidDataClientModel
+			_ = json.Unmarshal([]byte(filter.GetFilterData()), &uuidFilterData)
+
+			var gatewayFilterData PolicyFilterGatewayDataClientModel
+			_ = json.Unmarshal([]byte(filter.GetFilterData()), &gatewayFilterData)
+
+			filterType := filter.GetFilterType()
+			switch filterType {
+			case "AccessControl":
+				accessControlFilters = append(accessControlFilters, AccessControlFilterModel{
+					Allowed:    types.BoolValue(filter.GetIsAllowed()),
+					Enabled:    types.BoolValue(filter.GetIsEnabled()),
+					Connection: types.StringValue(gatewayFilterData.Connection),
+					Condition:  types.StringValue(gatewayFilterData.Condition),
+					Gateway:    types.StringValue(gatewayFilterData.Gateway),
+				})
+			case "BranchRepeater":
+				branchRepeaterFilters = append(branchRepeaterFilters, BranchRepeaterFilterModel{
+					Allowed: types.BoolValue(filter.GetIsAllowed()),
+				})
+			case "ClientIP":
+				clientIpFilters = append(clientIpFilters, ClientIPFilterModel{
+					Allowed:   types.BoolValue(filter.GetIsAllowed()),
+					Enabled:   types.BoolValue(filter.GetIsEnabled()),
+					IpAddress: types.StringValue(filter.GetFilterData()),
+				})
+			case "ClientName":
+				clientNameFilters = append(clientNameFilters, ClientNameFilterModel{
+					Allowed:    types.BoolValue(filter.GetIsAllowed()),
+					Enabled:    types.BoolValue(filter.GetIsEnabled()),
+					ClientName: types.StringValue(filter.GetFilterData()),
+				})
+			case "ClientPlatform":
+				clientPlatformFilters = append(clientPlatformFilters, ClientPlatformFilterModel{
+					Allowed:  types.BoolValue(filter.GetIsAllowed()),
+					Enabled:  types.BoolValue(filter.GetIsEnabled()),
+					Platform: types.StringValue(filter.GetFilterData()),
+				})
+			case "DesktopGroup":
+				desktopGroupFilters = append(desktopGroupFilters, DeliveryGroupFilterModel{
+					Allowed:         types.BoolValue(filter.GetIsAllowed()),
+					Enabled:         types.BoolValue(filter.GetIsEnabled()),
+					DeliveryGroupId: types.StringValue(uuidFilterData.Uuid),
+				})
+			case "DesktopKind":
+				desktopKindFilters = append(desktopKindFilters, DeliveryGroupTypeFilterModel{
+					Allowed:           types.BoolValue(filter.GetIsAllowed()),
+					Enabled:           types.BoolValue(filter.GetIsEnabled()),
+					DeliveryGroupType: types.StringValue(filter.GetFilterData()),
+				})
+			case "DesktopTag":
+				desktopTagFilters = append(desktopTagFilters, TagFilterModel{
+					Allowed: types.BoolValue(filter.GetIsAllowed()),
+					Enabled: types.BoolValue(filter.GetIsEnabled()),
+					Tag:     types.StringValue(uuidFilterData.Uuid),
+				})
+			case "OU":
+				ouFilters = append(ouFilters, OuFilterModel{
+					Allowed: types.BoolValue(filter.GetIsAllowed()),
+					Enabled: types.BoolValue(filter.GetIsEnabled()),
+					Ou:      types.StringValue(filter.GetFilterData()),
+				})
+			case "User":
+				userFilters = append(userFilters, UserFilterModel{
+					Allowed: types.BoolValue(filter.GetIsAllowed()),
+					Enabled: types.BoolValue(filter.GetIsEnabled()),
+					UserSid: types.StringValue(filter.GetFilterData()),
+				})
+			}
+		}
+	}
+	return accessControlFilters, branchRepeaterFilters, clientIpFilters, clientNameFilters, clientPlatformFilters, desktopGroupFilters, desktopKindFilters, desktopTagFilters, ouFilters, userFilters
 }

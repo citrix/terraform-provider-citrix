@@ -851,7 +851,13 @@ Required:
 Required:
 
 - `naming_scheme` (String) Defines the template name for AD accounts created in the identity pool.
-- `naming_scheme_type` (String) Type of naming scheme. This defines the format of the variable part of the AD account names that will be created. Choose between `Numeric`, `Alphabetic` and `Unicode`.
+- `naming_scheme_type` (String) Type of naming scheme. This defines the format of the variable part of the AD account names that will be created. Choose between `Numeric` and `Alphabetic`.
+
+Optional:
+
+- `starts_with` (String) Specify numbers or letters, depending on the naming scheme type, for the account names to start with.
+
+-> **Note** Letters should be in Uppercase only.
 
 
 <a id="nestedatt--provisioning_scheme--machine_ad_accounts"></a>

@@ -43,7 +43,7 @@ resource citrix_service_account "example-ad-service-account" {
 
 - `account_id` (String) The account ID of the service account.
 
- -> **Note** For Active Directory, this is the username. Username should be in `Domain\UserName` format. For AzureAD, this is the application ID. The account ID must be in lowercase.
+ -> **Note** For Active Directory, this is the username. Username should be in `domain\username` format. For AzureAD, this is the application ID. The account ID must be in lowercase.
 - `account_secret` (String, Sensitive) The password for the service account.
 
  -> **Note** For Active Directory, this is the password. For AzureAD, this is the client secret.

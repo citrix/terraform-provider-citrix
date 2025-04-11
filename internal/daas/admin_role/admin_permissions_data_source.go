@@ -13,7 +13,8 @@ import (
 )
 
 var (
-	_ datasource.DataSource = &AdminPermissionsDataSource{}
+	_ datasource.DataSource              = &AdminPermissionsDataSource{}
+	_ datasource.DataSourceWithConfigure = &AdminPermissionsDataSource{}
 )
 
 func NewAdminPermissionsDataSource() datasource.DataSource {

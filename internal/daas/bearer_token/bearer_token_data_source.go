@@ -12,7 +12,8 @@ import (
 )
 
 var (
-	_ datasource.DataSource = &BearerTokenDataSource{}
+	_ datasource.DataSource              = &BearerTokenDataSource{}
+	_ datasource.DataSourceWithConfigure = &BearerTokenDataSource{}
 )
 
 func NewBearerTokenDataSource() datasource.DataSource {

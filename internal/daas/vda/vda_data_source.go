@@ -13,7 +13,8 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ datasource.DataSource = &VdaDataSource{}
+	_ datasource.DataSource              = &VdaDataSource{}
+	_ datasource.DataSourceWithConfigure = &VdaDataSource{}
 )
 
 func NewVdaDataSource() datasource.DataSource {

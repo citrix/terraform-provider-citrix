@@ -11,7 +11,8 @@ import (
 )
 
 var (
-	_ datasource.DataSource = &TagDataSource{}
+	_ datasource.DataSource              = &TagDataSource{}
+	_ datasource.DataSourceWithConfigure = &TagDataSource{}
 )
 
 func NewTagDataSource() datasource.DataSource {

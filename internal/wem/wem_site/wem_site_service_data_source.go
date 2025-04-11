@@ -9,14 +9,13 @@ import (
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/datasourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 )
 
 var (
-	_ datasource.DataSource                     = &WemSiteDataSource{}
-	_ datasource.DataSourceWithConfigValidators = &WemSiteDataSource{}
+	_ datasource.DataSource              = &WemSiteDataSource{}
+	_ datasource.DataSourceWithConfigure = &WemSiteDataSource{}
 )
 
 func NewWemSiteDataSource() datasource.DataSource {
@@ -107,13 +106,4 @@ func (d *WemSiteDataSource) Read(ctx context.Context, req datasource.ReadRequest
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-}
-
-func (w *WemSiteDataSource) ConfigValidators(ctx context.Context) []datasource.ConfigValidator {
-	return []datasource.ConfigValidator{
-		datasourcevalidator.ExactlyOneOf(
-			path.MatchRoot("id"),
-			path.MatchRoot("name"),
-		),
-	}
 }

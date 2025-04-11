@@ -211,6 +211,55 @@ func (filter ClientNameFilterModel) GetFilterRequest(diagnostics *diag.Diagnosti
 	return filterRequest, nil
 }
 
+type ClientPlatformFilterModel struct {
+	Allowed  types.Bool   `tfsdk:"allowed"`
+	Enabled  types.Bool   `tfsdk:"enabled"`
+	Platform types.String `tfsdk:"platform"`
+}
+
+func (ClientPlatformFilterModel) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"enabled": schema.BoolAttribute{
+				Description: "Indicate whether the filter is being enabled.",
+				Required:    true,
+			},
+			"allowed": schema.BoolAttribute{
+				Description: "Indicate the filtered policy is allowed or denied if the filter condition is met.",
+				Required:    true,
+			},
+			"platform": schema.StringAttribute{
+				Description: "Name of the client platform to be filtered. Available values are `Windows`, `Linux`, `Mac`, `Ios`, `Android`, and `Html5`.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"Windows",
+						"Linux",
+						"Mac",
+						"Ios",
+						"Android",
+						"Html5",
+					),
+				},
+			},
+		},
+	}
+}
+
+func (ClientPlatformFilterModel) GetAttributes() map[string]schema.Attribute {
+	return ClientPlatformFilterModel{}.GetSchema().Attributes
+}
+
+func (filter ClientPlatformFilterModel) GetFilterRequest(diagnostics *diag.Diagnostics, serverValue string) (citrixorchestration.FilterRequest, error) {
+	filterRequest := citrixorchestration.FilterRequest{}
+	filterRequest.SetFilterType("ClientPlatform")
+	filterRequest.SetFilterData(filter.Platform.ValueString())
+	filterRequest.SetIsAllowed(filter.Allowed.ValueBool())
+	filterRequest.SetIsEnabled(filter.Enabled.ValueBool())
+
+	return filterRequest, nil
+}
+
 type DeliveryGroupFilterModel struct {
 	Allowed         types.Bool   `tfsdk:"allowed"`
 	Enabled         types.Bool   `tfsdk:"enabled"`

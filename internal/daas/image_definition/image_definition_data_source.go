@@ -10,7 +10,8 @@ import (
 )
 
 var (
-	_ datasource.DataSource = &ImageDefinitionDataSource{}
+	_ datasource.DataSource              = &ImageDefinitionDataSource{}
+	_ datasource.DataSourceWithConfigure = &ImageDefinitionDataSource{}
 )
 
 func NewImageDefinitionDataSource() datasource.DataSource {
