@@ -12,7 +12,8 @@ import (
 )
 
 var (
-	_ datasource.DataSource = &SiteSettingsDataSource{}
+	_ datasource.DataSource              = &SiteSettingsDataSource{}
+	_ datasource.DataSourceWithConfigure = &SiteSettingsDataSource{}
 )
 
 func NewSiteSettingsDataSource() datasource.DataSource {

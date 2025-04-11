@@ -15,7 +15,8 @@ import (
 )
 
 var (
-	_ datasource.DataSource = &AwsWorkspacesDirectoryConnectionDataSource{}
+	_ datasource.DataSource              = &AwsWorkspacesDirectoryConnectionDataSource{}
+	_ datasource.DataSourceWithConfigure = &AwsWorkspacesDirectoryConnectionDataSource{}
 )
 
 func NewAwsWorkspacesDirectoryConnectionDataSource() datasource.DataSource {

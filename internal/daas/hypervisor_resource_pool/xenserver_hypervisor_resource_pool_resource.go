@@ -290,7 +290,7 @@ func (r *xenserverHypervisorResourcePoolResource) Delete(ctx context.Context, re
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Resource Pool for Hypervisor "+hypervisorId, &resp.Diagnostics, 5, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Resource Pool for Hypervisor "+hypervisorId, &resp.Diagnostics, 5)
 	if err != nil {
 		return
 	}

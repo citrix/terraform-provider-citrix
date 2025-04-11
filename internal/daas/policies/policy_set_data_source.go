@@ -15,7 +15,8 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ datasource.DataSource = &PolicySetDataSource{}
+	_ datasource.DataSource              = &PolicySetDataSource{}
+	_ datasource.DataSourceWithConfigure = &PolicySetDataSource{}
 )
 
 func NewPolicySetDataSource() datasource.DataSource {
@@ -65,12 +66,12 @@ func (d *PolicySetDataSource) Read(ctx context.Context, req datasource.ReadReque
 	var err error
 	if !data.Id.IsNull() {
 		// Get refreshed policy set from Orchestration
-		policySet, err = getPolicySet(ctx, d.client, &resp.Diagnostics, data.Id.ValueString())
+		policySet, err = GetPolicySet(ctx, d.client, &resp.Diagnostics, data.Id.ValueString())
 		if err != nil {
 			return
 		}
 	} else {
-		policySets, err := getPolicySets(ctx, d.client, &resp.Diagnostics)
+		policySets, err := GetPolicySets(ctx, d.client, &resp.Diagnostics)
 		if err != nil {
 			return
 		}
@@ -86,7 +87,7 @@ func (d *PolicySetDataSource) Read(ctx context.Context, req datasource.ReadReque
 		}
 	}
 
-	policies, err := getPolicies(ctx, d.client, &resp.Diagnostics, policySet.GetPolicySetGuid())
+	policies, err := GetPolicies(ctx, d.client, &resp.Diagnostics, policySet.GetPolicySetGuid())
 	if err != nil {
 		return
 	}

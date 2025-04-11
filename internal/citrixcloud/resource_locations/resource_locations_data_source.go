@@ -16,7 +16,8 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ datasource.DataSource = &ResourceLocationsDataSource{}
+	_ datasource.DataSource              = &ResourceLocationsDataSource{}
+	_ datasource.DataSourceWithConfigure = &ResourceLocationsDataSource{}
 )
 
 func NewResourceLocationsDataSource() datasource.DataSource {

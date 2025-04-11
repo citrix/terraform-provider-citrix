@@ -4,8 +4,10 @@ package machine_catalog
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -123,10 +125,10 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 	if createTimeout == 0 {
 		createTimeout = getMachineCatalogTimeoutConfigs().CreateDefault
 	}
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Machine Catalog", &resp.Diagnostics, createTimeout, false)
-	if err != nil {
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Machine Catalog", &resp.Diagnostics, createTimeout)
+	if errors.Is(err, &util.JobPollError{}) {
 		return
-	}
+	} // if the job failed continue processing
 
 	machineCatalogPath := util.BuildResourcePathForGetRequest(plan.MachineCatalogFolderPath.ValueString(), plan.Name.ValueString())
 	setMachineCatalogTags(ctx, &resp.Diagnostics, r.client, machineCatalogPath, plan.Tags)
@@ -324,7 +326,7 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 	if updateTimeout == 0 {
 		updateTimeout = getMachineCatalogTimeoutConfigs().UpdateDefault
 	}
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Machine Catalog "+catalogName, &resp.Diagnostics, updateTimeout, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Machine Catalog "+catalogName, &resp.Diagnostics, updateTimeout)
 	if err != nil {
 		return
 	}
@@ -604,7 +606,7 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 				return
 			}
 
-			err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Machine Catalog "+catalogName, &resp.Diagnostics, 10, true)
+			err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Machine Catalog "+catalogName, &resp.Diagnostics, 10)
 			if err != nil {
 				return
 			}
@@ -762,10 +764,10 @@ func (r *machineCatalogResource) Delete(ctx context.Context, req resource.Delete
 	if deleteTimeout == 0 {
 		deleteTimeout = getMachineCatalogTimeoutConfigs().DeleteDefault
 	}
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Machine Catalog "+catalogName, &resp.Diagnostics, deleteTimeout, false)
-	if err != nil {
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Machine Catalog "+catalogName, &resp.Diagnostics, deleteTimeout)
+	if errors.Is(err, &util.JobPollError{}) {
 		return
-	}
+	} // if the job failed continue processing
 }
 
 func (r *machineCatalogResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -1039,6 +1041,45 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 						"Expected domain to be configured when identity_type is Active Directory.",
 					)
 					return
+				}
+			}
+
+			if !provSchemeModel.MachineAccountCreationRules.IsNull() {
+				machineAccountCreationRulesModel := util.ObjectValueToTypedObject[MachineAccountCreationRulesModel](ctx, &resp.Diagnostics, provSchemeModel.MachineAccountCreationRules)
+				if !machineAccountCreationRulesModel.StartsWith.IsNull() {
+					startsWith := machineAccountCreationRulesModel.StartsWith.ValueString()
+					namingScheme := machineAccountCreationRulesModel.NamingScheme.ValueString()
+					namingSchemeType := machineAccountCreationRulesModel.NamingSchemeType.ValueString()
+					wildCardCount := strings.Count(namingScheme, "#")
+					if len(startsWith) < wildCardCount {
+						resp.Diagnostics.AddAttributeError(
+							path.Root("starts_with"),
+							"Incorrect Attribute Configuration",
+							"Characters in starts_with must be equal to or greater than the number of wildcard (#) characters in naming_scheme.",
+						)
+
+						return
+					}
+
+					regexToMatch := ""
+					errMsg := ""
+					if strings.EqualFold(namingSchemeType, string(citrixorchestration.NAMINGSCHEMETYPE_ALPHABETIC)) {
+						regexToMatch = util.UpperCaseRegex
+						errMsg = "starts_with must contain only uppercase letters without any spaces."
+					} else if strings.EqualFold(namingSchemeType, string(citrixorchestration.NAMINGSCHEMETYPE_NUMERIC)) {
+						regexToMatch = util.NumbersRegex
+						errMsg = "starts_with must contain only numbers without any spaces."
+					}
+
+					if match, _ := regexp.MatchString(regexToMatch, startsWith); !match {
+						resp.Diagnostics.AddAttributeError(
+							path.Root("starts_with"),
+							"Incorrect Attribute Configuration",
+							errMsg,
+						)
+
+						return
+					}
 				}
 			}
 		}

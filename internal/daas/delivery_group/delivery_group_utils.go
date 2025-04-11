@@ -351,7 +351,7 @@ func addMachinesToDeliveryGroup(ctx context.Context, client *citrixdaasclient.Ci
 		)
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error adding machine(s) to Delivery Group "+deliveryGroupId, diagnostics, 5, true)
+	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error adding machine(s) to Delivery Group "+deliveryGroupId, diagnostics, 5)
 	if err != nil {
 		return err
 	}
@@ -373,7 +373,7 @@ func removeMachinesFromDeliveryGroup(ctx context.Context, client *citrixdaasclie
 			return err
 		}
 
-		err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error removing machine from Delivery Group "+deliveryGroupId, diagnostics, 5, true)
+		err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error removing machine from Delivery Group "+deliveryGroupId, diagnostics, 5)
 		if err != nil {
 			return err
 		}

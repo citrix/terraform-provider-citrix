@@ -13,7 +13,8 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ datasource.DataSource = &DeliveryGroupDataSource{}
+	_ datasource.DataSource              = &DeliveryGroupDataSource{}
+	_ datasource.DataSourceWithConfigure = &DeliveryGroupDataSource{}
 )
 
 func NewDeliveryGroupDataSource() datasource.DataSource {

@@ -97,8 +97,8 @@ const TimeRegex string = `^([0-1][0-9]|2[0-3]):[0-5][0-9]$`
 // TimeSpan dd.HH:MM:SS
 const TimeSpanRegex string = `^(\d+)\.((\d)|(1\d)|(2[0-3])):((\d)|[1-5][0-9]):((\d)|[1-5][0-9])$`
 
-// ID of the Default Site Policy Set
-const DefaultSitePolicySetId string = "00000000-0000-0000-0000-000000000000"
+// ID of the Default Site Policy Set for delivery group operation
+const DefaultSitePolicySetIdForDeliveryGroup string = "00000000-0000-0000-0000-000000000000"
 
 // Url Ending Forward Slash Regex
 const UrlValidator string = `^https?://.*\/$`
@@ -159,6 +159,12 @@ const AllScopeId string = "00000000-0000-0000-0000-000000000000"
 
 // ID of the Citrix Managed Users Scope
 const CtxManagedScopeId string = "f71a1148-7030-467a-a6d3-4a6bcf6a6532"
+
+// Regex for uppercase letters only
+const UpperCaseRegex string = `^[A-Z]+$`
+
+// Regex for numbers only
+const NumbersRegex string = `^[0-9]+$`
 
 // Restricted permissions in the cloud
 var RestrictedPermissionsInCloud = map[string]bool{
@@ -514,6 +520,22 @@ func ReadResource[ResponseType any](request any, ctx context.Context, client *ci
 	return response, httpResp, err
 }
 
+type JobPollError struct {
+	err error
+}
+
+func (e *JobPollError) Error() string {
+	return e.err.Error()
+}
+
+type JobError struct {
+	err error
+}
+
+func (e *JobError) Error() string {
+	return e.err.Error()
+}
+
 // <summary>
 // Helper function to process async job response. Always add errors to diagnostics
 // </summary>
@@ -524,8 +546,8 @@ func ReadResource[ResponseType any](request any, ctx context.Context, client *ci
 // <param name="diagnostics">Terraform diagnostics from context</param>
 // <param name="maxTimeout">Maximum timeout threashold for job status polling</param>
 // <returns>Error if job polling failed or job itself ended in failed state</returns>
-func ProcessAsyncJobResponse(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int32, returnJobError bool) (err error) {
-	return ProcessAsyncJobResponseWithAddToDiagsOption(ctx, client, jobResp, errContext, diagnostics, maxTimeout, returnJobError, true)
+func ProcessAsyncJobResponse(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int32) (err error) {
+	return ProcessAsyncJobResponseWithAddToDiagsOption(ctx, client, jobResp, errContext, diagnostics, maxTimeout, true)
 }
 
 // <summary>
@@ -539,7 +561,7 @@ func ProcessAsyncJobResponse(ctx context.Context, client *citrixdaasclient.Citri
 // <param name="maxTimeout">Maximum timeout threashold for job status polling</param>
 // <param name="addToDiagnostics">Indicates whether error will be added to diagnostics</param>
 // <returns>Error if job polling failed or job itself ended in failed state</returns>
-func ProcessAsyncJobResponseWithAddToDiagsOption(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int32, returnJobError bool, addToDiagnostics bool) (err error) {
+func ProcessAsyncJobResponseWithAddToDiagsOption(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int32, addToDiagnostics bool) (err error) {
 	txId := citrixdaasclient.GetTransactionIdFromHttpResponse(jobResp)
 
 	jobId := citrixdaasclient.GetJobIdFromHttpResponse(*jobResp)
@@ -554,7 +576,7 @@ func ProcessAsyncJobResponseWithAddToDiagsOption(ctx context.Context, client *ci
 					"\nError message: "+jobResponseModel.GetErrorString(),
 			)
 		}
-		return err
+		return &JobPollError{err: err}
 	}
 
 	if jobResponseModel.GetStatus() != citrixorchestration.JOBSTATUS_COMPLETE {
@@ -598,9 +620,7 @@ func ProcessAsyncJobResponseWithAddToDiagsOption(ctx context.Context, client *ci
 			)
 		}
 
-		if returnJobError {
-			return fmt.Errorf(errorMessage)
-		}
+		return &JobError{err: err}
 	}
 
 	return nil
@@ -616,8 +636,8 @@ func ProcessAsyncJobResponseWithAddToDiagsOption(ctx context.Context, client *ci
 // <param name="diagnostics">Terraform diagnostics from context</param>
 // <param name="maxTimeout">Maximum timeout threashold for job status polling</param>
 // <returns>Error if job polling failed or job itself ended in failed state</returns>
-func GetAsyncJobResult[ResponseType any](ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int32, returnJobError bool) (ResponseType, error) {
-	return GetAsyncJobResultWithAddToDiagsOption[ResponseType](ctx, client, jobResp, errContext, diagnostics, maxTimeout, returnJobError, true)
+func GetAsyncJobResult[ResponseType any](ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int32) (ResponseType, error) {
+	return GetAsyncJobResultWithAddToDiagsOption[ResponseType](ctx, client, jobResp, errContext, diagnostics, maxTimeout, true)
 }
 
 // <summary>
@@ -630,9 +650,9 @@ func GetAsyncJobResult[ResponseType any](ctx context.Context, client *citrixdaas
 // <param name="diagnostics">Terraform diagnostics from context</param>
 // <param name="maxTimeout">Maximum timeout threashold for job status polling</param>
 // <returns>Error if job polling failed or job itself ended in failed state</returns>
-func GetAsyncJobResultWithAddToDiagsOption[ResponseType any](ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int32, returnJobError bool, addToDiagnostics bool) (ResponseType, error) {
+func GetAsyncJobResultWithAddToDiagsOption[ResponseType any](ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int32, addToDiagnostics bool) (ResponseType, error) {
 	jobId := citrixdaasclient.GetJobIdFromHttpResponse(*jobResp)
-	err := ProcessAsyncJobResponseWithAddToDiagsOption(ctx, client, jobResp, errContext, diagnostics, maxTimeout, returnJobError, addToDiagnostics)
+	err := ProcessAsyncJobResponseWithAddToDiagsOption(ctx, client, jobResp, errContext, diagnostics, maxTimeout, addToDiagnostics)
 
 	var response ResponseType
 	if err != nil {

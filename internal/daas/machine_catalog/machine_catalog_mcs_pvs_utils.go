@@ -5,6 +5,7 @@ package machine_catalog
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -89,11 +90,15 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 			return nil, err
 		}
 		machineAccountCreationRules.SetNamingSchemeType(*namingScheme)
+		if !machineAccountCreationRulesModel.StartsWith.IsNull() {
+			machineAccountCreationRules.SetNextValue(machineAccountCreationRulesModel.StartsWith.ValueString())
+		}
 		if !provisioningSchemePlan.MachineDomainIdentity.IsNull() {
 			machineDomainIdentityModel := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, diag, provisioningSchemePlan.MachineDomainIdentity)
 			machineAccountCreationRules.SetDomain(machineDomainIdentityModel.Domain.ValueString())
 			machineAccountCreationRules.SetOU(machineDomainIdentityModel.Ou.ValueString())
 		}
+
 		provisioningScheme.SetMachineAccountCreationRules(machineAccountCreationRules)
 	}
 
@@ -724,6 +729,11 @@ func addMachinesToMcsPvsCatalog(ctx context.Context, client *citrixdaasclient.Ci
 			return err
 		}
 		updateMachineAccountCreationRule.SetNamingSchemeType(*namingScheme)
+
+		if !machineAccountCreationRulesModel.StartsWith.IsNull() {
+			updateMachineAccountCreationRule.SetNextValue(machineAccountCreationRulesModel.StartsWith.ValueString())
+		}
+
 		if !provisioningSchemePlan.MachineDomainIdentity.IsNull() {
 			machineDomainIdentityModel := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provisioningSchemePlan.MachineDomainIdentity)
 			updateMachineAccountCreationRule.SetDomain(machineDomainIdentityModel.Domain.ValueString())
@@ -837,10 +847,10 @@ func updateCatalogMachineProfile(ctx context.Context, client *citrixdaasclient.C
 		return err
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating machine profile for Machine Catalog "+catalog.GetName(), &resp.Diagnostics, 15, false)
-	if err != nil {
+	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating machine profile for Machine Catalog "+catalog.GetName(), &resp.Diagnostics, 15)
+	if errors.Is(err, &util.JobPollError{}) {
 		return err
-	}
+	} // if the job failed continue processing
 
 	return nil
 }
@@ -1268,10 +1278,10 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 			)
 		}
 
-		err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating Image for Machine Catalog "+catalogName, &resp.Diagnostics, maxTimeoutInMinutes, false)
-		if err != nil {
+		err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating Image for Machine Catalog "+catalogName, &resp.Diagnostics, maxTimeoutInMinutes)
+		if errors.Is(err, &util.JobPollError{}) {
 			return err
-		}
+		} // if the job failed continue processing
 	}
 
 	return nil

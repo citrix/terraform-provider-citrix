@@ -83,7 +83,7 @@ func (ServiceAccountModel) GetSchema() schema.Schema {
 			},
 			"account_id": schema.StringAttribute{
 				Description: "The account ID of the service account." +
-					"\n\n -> **Note** For Active Directory, this is the username. Username should be in `Domain\\UserName` format. For AzureAD, this is the application ID. The account ID must be in lowercase.",
+					"\n\n -> **Note** For Active Directory, this is the username. Username should be in `domain\\username` format. For AzureAD, this is the application ID. The account ID must be in lowercase.",
 				Required: true,
 				Validators: []validator.String{
 					// case sensitive

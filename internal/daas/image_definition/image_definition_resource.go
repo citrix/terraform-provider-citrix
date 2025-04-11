@@ -126,7 +126,7 @@ func (r *ImageDefinitionResource) Create(ctx context.Context, req resource.Creat
 		if createTimeout == 0 {
 			createTimeout = getImageDefinitionTimeoutConfigs().CreateDefault
 		}
-		err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Image Definition", &resp.Diagnostics, createTimeout, true)
+		err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Image Definition", &resp.Diagnostics, createTimeout)
 		if err != nil {
 			// Error has been added to diagnostics. Do not return since we need to mark the resource as tainted in the state
 		}
@@ -276,7 +276,7 @@ func (r *ImageDefinitionResource) Delete(ctx context.Context, req resource.Delet
 	if deleteTimeout == 0 {
 		deleteTimeout = getImageDefinitionTimeoutConfigs().DeleteDefault
 	}
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Image Definition", &resp.Diagnostics, deleteTimeout, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Image Definition", &resp.Diagnostics, deleteTimeout)
 	if err != nil {
 		return
 	}

@@ -30,7 +30,7 @@ jobs:
   # This workflow contains a job for preparing test env, and a job for running go tests
   gotest-prep:
     # GitHub environment for the job
-    environment: Go Test - Cloud
+    environment: Go Test - Cloud - Dev
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
@@ -62,7 +62,7 @@ jobs:
   gotest-cloud:
     needs: gotest-prep
     # GitHub environment for the job
-    environment: Go Test - Cloud
+    environment: Go Test - Cloud - Dev
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 

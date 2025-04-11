@@ -10,6 +10,8 @@ description: |-
 
 Manages a policy set and the policies within it. The order of the policies specified in this resource reflect the policy priority.
 
+-> **Note** There is a new terraform resource and data source `citrix_policy_set_v2` for managing policy sets. It is recommended to use this new resource for creating and managing policy sets.
+
 -> **Note** For detailed information about policy settings and filters, please refer to [this document](https://github.com/citrix/terraform-provider-citrix/blob/main/internal/daas/policies/policy_set_resource.md).
 
 ~> **Disclaimer** This feature is supported for Citrix Cloud customers, and for Citrix On-Premises customers with DDC version `2402` and above.
@@ -146,6 +148,7 @@ Optional:
 - `branch_repeater_filter` (Attributes) Definition of branch repeater policy filter. (see [below for nested schema](#nestedatt--policies--branch_repeater_filter))
 - `client_ip_filters` (Attributes Set) Set of Client ip policy filters. (see [below for nested schema](#nestedatt--policies--client_ip_filters))
 - `client_name_filters` (Attributes Set) Set of Client name policy filters. (see [below for nested schema](#nestedatt--policies--client_name_filters))
+- `client_platform_filters` (Attributes Set) Set of Client platform policy filters. (see [below for nested schema](#nestedatt--policies--client_platform_filters))
 - `delivery_group_filters` (Attributes Set) Set of Delivery group policy filters. (see [below for nested schema](#nestedatt--policies--delivery_group_filters))
 - `delivery_group_type_filters` (Attributes Set) Set of Delivery group type policy filters. (see [below for nested schema](#nestedatt--policies--delivery_group_type_filters))
 - `description` (String) Description of the policy.
@@ -211,6 +214,16 @@ Required:
 - `enabled` (Boolean) Indicate whether the filter is being enabled.
 
 
+<a id="nestedatt--policies--client_platform_filters"></a>
+### Nested Schema for `policies.client_platform_filters`
+
+Required:
+
+- `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
+- `enabled` (Boolean) Indicate whether the filter is being enabled.
+- `platform` (String) Name of the client platform to be filtered. Available values are `Windows`, `Linux`, `Mac`, `Ios`, `Android`, and `Html5`.
+
+
 <a id="nestedatt--policies--delivery_group_filters"></a>
 ### Nested Schema for `policies.delivery_group_filters`
 
@@ -265,6 +278,6 @@ Required:
 Import is supported using the following syntax:
 
 ```shell
-# Policy and Policy Set Association can be imported by specifying the Policy GUID
+# Policy and Policy Set Association can be imported by specifying the Policy Set GUID
 terraform import citrix_policy_set.example 00000000-0000-0000-0000-000000000000
 ```

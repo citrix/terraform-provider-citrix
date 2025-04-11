@@ -9,10 +9,6 @@ import (
 func (AccessControlFilterModel) GetDataSourceSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "Id of the policy filter.",
-				Computed:    true,
-			},
 			"enabled": schema.BoolAttribute{
 				Description: "Indicate whether the filter is being enabled.",
 				Computed:    true,
@@ -45,10 +41,6 @@ func (BranchRepeaterFilterModel) GetDataSourceSchema() schema.SingleNestedAttrib
 		Description: "Definition of branch repeater policy filter.",
 		Optional:    true,
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "Id of the branch repeater policy filter.",
-				Computed:    true,
-			},
 			"allowed": schema.BoolAttribute{
 				Description: "Indicate the filtered policy is allowed or denied if the filter condition is met.",
 				Computed:    true,
@@ -64,10 +56,6 @@ func (BranchRepeaterFilterModel) GetDataSourceAttributes() map[string]schema.Att
 func (ClientIPFilterModel) GetDataSourceSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "Id of the client ip policy filter.",
-				Computed:    true,
-			},
 			"enabled": schema.BoolAttribute{
 				Description: "Indicate whether the filter is being enabled.",
 				Computed:    true,
@@ -91,10 +79,6 @@ func (ClientIPFilterModel) GetDataSourceAttributes() map[string]schema.Attribute
 func (ClientNameFilterModel) GetDataSourceSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "Id of the client name policy filter.",
-				Computed:    true,
-			},
 			"enabled": schema.BoolAttribute{
 				Description: "Indicate whether the filter is being enabled.",
 				Computed:    true,
@@ -113,6 +97,33 @@ func (ClientNameFilterModel) GetDataSourceSchema() schema.NestedAttributeObject 
 
 func (ClientNameFilterModel) GetDataSourceAttributes() map[string]schema.Attribute {
 	return ClientNameFilterModel{}.GetDataSourceSchema().Attributes
+}
+
+func (ClientPlatformFilterModel) GetDataSourceSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Description: "Id of the client platform policy filter.",
+				Computed:    true,
+			},
+			"enabled": schema.BoolAttribute{
+				Description: "Indicate whether the filter is being enabled.",
+				Computed:    true,
+			},
+			"allowed": schema.BoolAttribute{
+				Description: "Indicate the filtered policy is allowed or denied if the filter condition is met.",
+				Computed:    true,
+			},
+			"platform": schema.StringAttribute{
+				Description: "Name of the client platform to be filtered.",
+				Computed:    true,
+			},
+		},
+	}
+}
+
+func (ClientPlatformFilterModel) GetDataSourceAttributes() map[string]schema.Attribute {
+	return ClientPlatformFilterModel{}.GetDataSourceSchema().Attributes
 }
 
 func (DeliveryGroupFilterModel) GetDataSourceSchema() schema.NestedAttributeObject {
@@ -141,10 +152,6 @@ func (DeliveryGroupFilterModel) GetDataSourceAttributes() map[string]schema.Attr
 func (DeliveryGroupTypeFilterModel) GetDataSourceSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "Id of the delivery group type policy filter.",
-				Computed:    true,
-			},
 			"enabled": schema.BoolAttribute{
 				Description: "Indicate whether the filter is being enabled.",
 				Computed:    true,
@@ -168,10 +175,6 @@ func (DeliveryGroupTypeFilterModel) GetDataSourceAttributes() map[string]schema.
 func (OuFilterModel) GetDataSourceSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "Id of the organizational unit policy filter.",
-				Computed:    true,
-			},
 			"enabled": schema.BoolAttribute{
 				Description: "Indicate whether the filter is being enabled.",
 				Computed:    true,
@@ -195,10 +198,6 @@ func (OuFilterModel) GetDataSourceAttributes() map[string]schema.Attribute {
 func (UserFilterModel) GetDataSourceSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "Id of the user policy filter.",
-				Computed:    true,
-			},
 			"enabled": schema.BoolAttribute{
 				Description: "Indicate whether the filter is being enabled.",
 				Computed:    true,
@@ -222,10 +221,6 @@ func (UserFilterModel) GetDataSourceAttributes() map[string]schema.Attribute {
 func (TagFilterModel) GetDataSourceSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Description: "Id of the tag policy filter.",
-				Computed:    true,
-			},
 			"enabled": schema.BoolAttribute{
 				Description: "Indicate whether the filter is being enabled.",
 				Computed:    true,

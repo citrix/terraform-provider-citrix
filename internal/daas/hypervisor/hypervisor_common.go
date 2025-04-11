@@ -39,7 +39,7 @@ func CreateHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 		return nil, err
 	}
 
-	hypervisor, err := util.GetAsyncJobResult[*citrixorchestration.HypervisorDetailResponseModel](ctx, client, httpResp, "Error creating Hypervisor", diagnostics, 10, true)
+	hypervisor, err := util.GetAsyncJobResult[*citrixorchestration.HypervisorDetailResponseModel](ctx, client, httpResp, "Error creating Hypervisor", diagnostics, 10)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func UpdateHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 		)
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating Hypervisor "+hypervisorName, diagnostics, 10, true)
+	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating Hypervisor "+hypervisorName, diagnostics, 10)
 	if err != nil {
 		return nil, err
 	}

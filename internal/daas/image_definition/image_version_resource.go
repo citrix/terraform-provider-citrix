@@ -269,7 +269,7 @@ func (r *ImageVersionResource) Create(ctx context.Context, req resource.CreateRe
 	if createTimeout == 0 {
 		createTimeout = getImageVersionTimeoutConfigs().CreateDefault
 	}
-	imageVersion, err = util.GetAsyncJobResult[*citrixorchestration.ImageVersionResponseModel](ctx, r.client, httpResp, "Error creating Image Version", &resp.Diagnostics, createTimeout, true)
+	imageVersion, err = util.GetAsyncJobResult[*citrixorchestration.ImageVersionResponseModel](ctx, r.client, httpResp, "Error creating Image Version", &resp.Diagnostics, createTimeout)
 	if err != nil {
 		return
 	}
@@ -412,7 +412,7 @@ func (r *ImageVersionResource) Delete(ctx context.Context, req resource.DeleteRe
 	if deleteTimeout == 0 {
 		deleteTimeout = getImageVersionTimeoutConfigs().DeleteDefault
 	}
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Image Version", &resp.Diagnostics, deleteTimeout, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Image Version", &resp.Diagnostics, deleteTimeout)
 	if err != nil {
 		return
 	}

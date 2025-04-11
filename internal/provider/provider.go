@@ -31,6 +31,11 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/daas/cvad_site"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/desktop_icon"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/image_definition"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/policy_filters"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/policy_priority"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/policy_resource"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/policy_set_resource"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/policy_setting"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/service_account"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/storefront_server"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/tags"
@@ -939,9 +944,25 @@ func (p *citrixProvider) DataSources(_ context.Context) []func() datasource.Data
 		cvad_site.NewSiteSettingsDataSource,
 		tags.NewTagDataSource,
 		policies.NewPolicySetDataSource,
+		policy_set_resource.NewPolicySetV2DataSource,
+		policy_priority.NewPolicyPriorityDataSource,
+		policy_resource.NewPolicyDataSource,
+		policy_setting.NewPolicySettingDataSource,
+		policy_filters.NewAccessControlPolicyFilterDataSource,
+		policy_filters.NewBranchRepeaterPolicyFilterDataSource,
+		policy_filters.NewClientIPPolicyFilterDataSource,
+		policy_filters.NewClientNamePolicyFilterDataSource,
+		policy_filters.NewClientPlatformPolicyFilterDataSource,
+		policy_filters.NewDeliveryGroupPolicyFilterDataSource,
+		policy_filters.NewDeliveryGroupTypePolicyFilterDataSource,
+		policy_filters.NewOUPolicyFilterDataSource,
+		policy_filters.NewTagPolicyFilterDataSource,
+		policy_filters.NewUserPolicyFilterDataSource,
+		policy_filters.NewPolicyFiltersDataSource,
 		storefront_server.NewStoreFrontServerDataSource,
 		image_definition.NewImageDefinitionDataSource,
 		image_definition.NewImageVersionDataSource,
+		service_account.NewServiceAccountDataSource,
 		// StoreFront DataSources
 		stf_roaming.NewSTFRoamingServiceDataSource,
 		// QuickCreate DataSources
@@ -991,6 +1012,20 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		admin_role.NewAdminRoleResource,
 		admin_scope.NewAdminScopeResource,
 		policies.NewPolicySetResource,
+		policy_resource.NewPolicyResource,
+		policy_set_resource.NewPolicySetV2Resource,
+		policy_filters.NewAccessControlFilterResource,
+		policy_filters.NewBranchRepeaterFilterResource,
+		policy_filters.NewClientIpFilterResource,
+		policy_filters.NewClientNameFilterResource,
+		policy_filters.NewClientPlatformFilterResource,
+		policy_filters.NewDeliveryGroupFilterResource,
+		policy_filters.NewDeliveryGroupTypeFilterResource,
+		policy_filters.NewOuFilterResource,
+		policy_filters.NewTagFilterResource,
+		policy_filters.NewUserFilterResource,
+		policy_setting.NewPolicySettingResource,
+		policy_priority.NewPolicyPriorityResource,
 		admin_user.NewAdminUserResource,
 		global_app_configuration.NewGacSettingsResource,
 		global_app_configuration.NewGacDiscoveryResource,

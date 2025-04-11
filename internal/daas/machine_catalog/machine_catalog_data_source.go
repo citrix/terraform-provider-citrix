@@ -13,7 +13,8 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ datasource.DataSource = &MachineCatalogDataSource{}
+	_ datasource.DataSource              = &MachineCatalogDataSource{}
+	_ datasource.DataSourceWithConfigure = &MachineCatalogDataSource{}
 )
 
 func NewMachineCatalogDataSource() datasource.DataSource {

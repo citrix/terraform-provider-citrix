@@ -164,6 +164,16 @@ func (r *policySetResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 			}
 		}
 
+		if !policy.ClientPlatformFilters.IsNull() {
+			clientPlatformFilters := util.ObjectSetToTypedArray[ClientPlatformFilterModel](ctx, &resp.Diagnostics, policy.ClientPlatformFilters)
+			if len(clientPlatformFilters) > 0 {
+				isDdcVersionSupported := util.CheckProductVersion(r.client, &resp.Diagnostics, 124, 124, 7, 44, errorSummary, "Policy Set Resource Client Platform Filters")
+				if !isDdcVersionSupported {
+					return
+				}
+			}
+		}
+
 		if !policy.DeliveryGroupFilters.IsNull() {
 			deliveryGroupFilters := util.ObjectSetToTypedArray[DeliveryGroupFilterModel](ctx, &resp.Diagnostics, policy.DeliveryGroupFilters)
 			for _, deliveryGroupFilter := range deliveryGroupFilters {
@@ -231,7 +241,7 @@ func (r *policySetResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	policySets, err := getPolicySets(ctx, r.client, &resp.Diagnostics)
+	policySets, err := GetPolicySets(ctx, r.client, &resp.Diagnostics)
 	if err != nil {
 		return
 	}
@@ -272,7 +282,7 @@ func (r *policySetResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	defaultBoolSettingValueMap, err := getGpoBooleanSettingDefaultValueMap(ctx, &resp.Diagnostics, r.client)
+	defaultBoolSettingValueMap, err := GetGpoBooleanSettingDefaultValueMap(ctx, &resp.Diagnostics, r.client)
 	if err != nil {
 		return
 	}
@@ -305,13 +315,13 @@ func (r *policySetResource) Create(ctx context.Context, req resource.CreateReque
 
 	// Associated the created policy set with the delivery groups
 	deliveryGroups := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.DeliveryGroups)
-	err = updateDeliveryGroupsWithPolicySet(ctx, &resp.Diagnostics, r.client, policySetResponse.GetName(), policySetResponse.GetPolicySetGuid(), deliveryGroups, fmt.Sprintf("associating Policy Set %s with Delivery Group", policySetResponse.GetName()))
+	err = UpdateDeliveryGroupsWithPolicySet(ctx, &resp.Diagnostics, r.client, policySetResponse.GetName(), policySetResponse.GetPolicySetGuid(), deliveryGroups, fmt.Sprintf("associating Policy Set %s with Delivery Group", policySetResponse.GetName()))
 	if err != nil {
 		return
 	}
 
 	// Try getting the new policy set with policy set GUID
-	policySet, err := getPolicySet(ctx, r.client, &resp.Diagnostics, policySetResponse.GetPolicySetGuid())
+	policySet, err := GetPolicySet(ctx, r.client, &resp.Diagnostics, policySetResponse.GetPolicySetGuid())
 	if err != nil {
 		return
 	}
@@ -333,12 +343,12 @@ func (r *policySetResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	// Try getting the new policy set with policy set GUID
-	policySet, err = getPolicySet(ctx, r.client, &resp.Diagnostics, policySetResponse.GetPolicySetGuid())
+	policySet, err = GetPolicySet(ctx, r.client, &resp.Diagnostics, policySetResponse.GetPolicySetGuid())
 	if err != nil {
 		return
 	}
 
-	policies, err := getPolicies(ctx, r.client, &resp.Diagnostics, policySetResponse.GetPolicySetGuid())
+	policies, err := GetPolicies(ctx, r.client, &resp.Diagnostics, policySetResponse.GetPolicySetGuid())
 	if err != nil {
 		return
 	}
@@ -429,7 +439,7 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 	policySetId := plan.Id.ValueString()
 	policySetName := plan.Name.ValueString()
 
-	policySets, err := getPolicySets(ctx, r.client, &resp.Diagnostics)
+	policySets, err := GetPolicySets(ctx, r.client, &resp.Diagnostics)
 	if err != nil {
 		return
 	}
@@ -602,7 +612,7 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 		}
 	}
 
-	defaultBoolSettingValueMap, err := getGpoBooleanSettingDefaultValueMap(ctx, &resp.Diagnostics, r.client)
+	defaultBoolSettingValueMap, err := GetGpoBooleanSettingDefaultValueMap(ctx, &resp.Diagnostics, r.client)
 	if err != nil {
 		return
 	}
@@ -769,7 +779,7 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 
 	// Update policy priority
 	// Try getting the new policy set with policy set GUID
-	policySet, err := getPolicySet(ctx, r.client, &resp.Diagnostics, policySetId)
+	policySet, err := GetPolicySet(ctx, r.client, &resp.Diagnostics, policySetId)
 	if err != nil {
 		return
 	}
@@ -806,17 +816,17 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 		}
 	}
 
-	err = updateDeliveryGroupsWithPolicySet(ctx, &resp.Diagnostics, r.client, policySet.GetName(), util.DefaultSitePolicySetId, deliveryGroupsToBeRemoved, fmt.Sprintf("removing Policy Set %s's associations with Delivery Group", policySet.GetName()))
+	err = UpdateDeliveryGroupsWithPolicySet(ctx, &resp.Diagnostics, r.client, policySet.GetName(), util.DefaultSitePolicySetIdForDeliveryGroup, deliveryGroupsToBeRemoved, fmt.Sprintf("removing Policy Set %s's associations with Delivery Group", policySet.GetName()))
 	if err != nil {
 		return
 	}
 
-	err = updateDeliveryGroupsWithPolicySet(ctx, &resp.Diagnostics, r.client, policySet.GetName(), policySet.GetPolicySetGuid(), deliveryGroupsToBeAdded, fmt.Sprintf("associating Policy Set %s with Delivery Group", policySet.GetName()))
+	err = UpdateDeliveryGroupsWithPolicySet(ctx, &resp.Diagnostics, r.client, policySet.GetName(), policySet.GetPolicySetGuid(), deliveryGroupsToBeAdded, fmt.Sprintf("associating Policy Set %s with Delivery Group", policySet.GetName()))
 	if err != nil {
 		return
 	}
 
-	policies, err := getPolicies(ctx, r.client, &resp.Diagnostics, policySetId)
+	policies, err := GetPolicies(ctx, r.client, &resp.Diagnostics, policySetId)
 	if err != nil {
 		return
 	}
@@ -882,7 +892,7 @@ func (r *policySetResource) Delete(ctx context.Context, req resource.DeleteReque
 		}
 		batchRequestItems := []citrixorchestration.BatchRequestItemModel{}
 		var editDeliveryGroupRequestBody citrixorchestration.EditDeliveryGroupRequestModel
-		editDeliveryGroupRequestBody.SetPolicySetGuid(util.DefaultSitePolicySetId)
+		editDeliveryGroupRequestBody.SetPolicySetGuid(util.DefaultSitePolicySetIdForDeliveryGroup)
 		editDeliveryGroupStringBody, err := util.ConvertToString(editDeliveryGroupRequestBody)
 		if err != nil {
 			resp.Diagnostics.AddError(

@@ -254,7 +254,7 @@ func (r *xenserverHypervisorResource) Delete(ctx context.Context, req resource.D
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Hypervisor "+hypervisorName, &resp.Diagnostics, 5, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Hypervisor "+hypervisorName, &resp.Diagnostics, 5)
 	if err != nil {
 		return
 	}

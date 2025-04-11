@@ -13,6 +13,7 @@ This folder contains examples of how to configure Citrix environments in various
     - [Basic MCS](#basic-mcs)
     - [Non-domain joined MCS](#non-domain-joined-mcs)
     - [Quick Deploy](#quick-deploy)
+    - [Basic Policy Set](#basic-policy-set)
 
 ## Deployment guides
 Complete steps from start to finish for a variety of senarios from [Citrix Tech Zone](https://community.citrix.com/tech-zone/automation/):
@@ -74,3 +75,10 @@ The difference is in [machine_catalogs.tf](non_domain_joined_azure_mcs_vda/machi
 ### Quick Deploy
 Examples of creating resources using DaaS Quick Deploy. This includes the account, directory or resource connection, image, and finally the deployment which is assigned to a list of usernames provided in the variables.
 * [AWS WorkSpaces Core](basic_aws_workspace_core_deployment)
+
+### Basic Policy Set
+Examples of resources related to a policy set. This includes the policy set, policies, policy filters, policy settings, and policy priorities. 
+- Policy Set is a collection of policies with their priorities defined. Policy set can also have scopes defined and have associated delivery groups specified.
+- Policies are linked to a policy set, they can be enabled or disabled.
+- Policy settings and policy filters are detailed configurations of a policy. Each setting or filter can only be associated with a single policy.
+- The priorities of policies with in a policy set are defined my the policy priority resource.

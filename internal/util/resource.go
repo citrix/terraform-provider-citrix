@@ -4,6 +4,7 @@ package util
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -230,10 +231,10 @@ func getSingleResourceFromHypervisor(ctx context.Context, client *citrixdaasclie
 		return nil, httpResp, err
 	}
 
-	resources, err := GetAsyncJobResultWithAddToDiagsOption[citrixorchestration.HypervisorResourceResponseModel](ctx, client, httpResp, "Error getting Hypervisor resources", diagnostics, 5, false, addToDiagnostics)
-	if err != nil {
+	resources, err := GetAsyncJobResultWithAddToDiagsOption[citrixorchestration.HypervisorResourceResponseModel](ctx, client, httpResp, "Error getting Hypervisor resources", diagnostics, 5, addToDiagnostics)
+	if errors.Is(err, &JobPollError{}) {
 		return nil, httpResp, err
-	}
+	} // if the job failed continue processing
 
 	for _, child := range resources.Children {
 		if strings.EqualFold(child.GetName(), resourceName) {
@@ -319,8 +320,8 @@ func getSingleHypervisorResource(ctx context.Context, client *citrixdaasclient.C
 		return nil, httpResp, err
 	}
 
-	resources, err := GetAsyncJobResultWithAddToDiagsOption[citrixorchestration.HypervisorResourceResponseModel](ctx, client, httpResp, "Error getting Hypervisor resources", diagnostics, 5, false, addToDiagnostics)
-	if err != nil {
+	resources, err := GetAsyncJobResultWithAddToDiagsOption[citrixorchestration.HypervisorResourceResponseModel](ctx, client, httpResp, "Error getting Hypervisor resources", diagnostics, 5, addToDiagnostics)
+	if errors.Is(err, &JobPollError{}) {
 		return nil, httpResp, err
 	}
 
@@ -383,8 +384,8 @@ func GetAllResourcePathList(ctx context.Context, client *citrixdaasclient.Citrix
 		return []string{}
 	}
 
-	resources, err := GetAsyncJobResultWithAddToDiagsOption[citrixorchestration.HypervisorResourceResponseModel](ctx, client, httpResp, "Error getting Hypervisor resources", diagnostics, 5, false, addToDiagnostics)
-	if err != nil {
+	resources, err := GetAsyncJobResultWithAddToDiagsOption[citrixorchestration.HypervisorResourceResponseModel](ctx, client, httpResp, "Error getting Hypervisor resources", diagnostics, 5, addToDiagnostics)
+	if errors.Is(err, &JobPollError{}) {
 		return []string{}
 	}
 
@@ -427,8 +428,8 @@ func getFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.C
 		return []string{}, err
 	}
 
-	resources, err := GetAsyncJobResultWithAddToDiagsOption[citrixorchestration.HypervisorResourceResponseModel](ctx, client, httpResp, "Error getting Hypervisor resources", diagnostics, 5, false, addToDiagnostics)
-	if err != nil {
+	resources, err := GetAsyncJobResultWithAddToDiagsOption[citrixorchestration.HypervisorResourceResponseModel](ctx, client, httpResp, "Error getting Hypervisor resources", diagnostics, 5, addToDiagnostics)
+	if errors.Is(err, &JobPollError{}) {
 		return []string{}, err
 	}
 

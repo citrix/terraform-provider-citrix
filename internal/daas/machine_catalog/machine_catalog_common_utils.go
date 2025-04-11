@@ -447,7 +447,7 @@ func getMachineCatalogMachineADAccounts(ctx context.Context, diagnostics *diag.D
 			return []citrixorchestration.ProvisioningSchemeMachineAccountResponseModel{}, err
 		}
 
-		adAccountsResp, err = util.GetAsyncJobResult[*citrixorchestration.ProvisioningSchemeMachineAccountResponseModelCollection](ctx, client, httpResp, errorMessage, diagnostics, 5, true)
+		adAccountsResp, err = util.GetAsyncJobResult[*citrixorchestration.ProvisioningSchemeMachineAccountResponseModelCollection](ctx, client, httpResp, errorMessage, diagnostics, 5)
 
 		if err != nil {
 			return []citrixorchestration.ProvisioningSchemeMachineAccountResponseModel{}, err

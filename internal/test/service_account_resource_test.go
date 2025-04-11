@@ -248,9 +248,7 @@ func serviceAccountSweeper(ctx context.Context, client *citrixclient.CitrixDaasC
 			deleteServiceAccountRequest := client.ApiClient.IdentityAPIsDAAS.IdentityDeleteServiceAccount(ctx, serviceAccountId)
 			httpResp, err := citrixclient.AddRequestData(deleteServiceAccountRequest, client).Execute()
 			if err != nil && httpResp.StatusCode != http.StatusNotFound {
-				return fmt.Errorf(
-					"Error deleting Service Account " + serviceAccountName + " during sweep",
-				)
+				return fmt.Errorf("Error deleting Service Account %s during sweep", serviceAccountName)
 			}
 
 			// service account deleted successfully

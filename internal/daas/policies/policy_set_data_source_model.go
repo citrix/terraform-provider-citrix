@@ -80,6 +80,11 @@ func (PolicyModel) GetDataSourceSchema() schema.NestedAttributeObject {
 				Computed:     true,
 				NestedObject: ClientNameFilterModel{}.GetDataSourceSchema(),
 			},
+			"client_platform_filters": schema.SetNestedAttribute{
+				Description:  "Set of Client platform policy filters.",
+				Computed:     true,
+				NestedObject: ClientPlatformFilterModel{}.GetDataSourceSchema(),
+			},
 			"delivery_group_filters": schema.SetNestedAttribute{
 				Description:  "Set of Delivery group policy filters.",
 				Computed:     true,

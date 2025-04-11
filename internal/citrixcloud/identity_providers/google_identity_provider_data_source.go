@@ -11,7 +11,8 @@ import (
 )
 
 var (
-	_ datasource.DataSource = &GoogleIdentityProviderDataSource{}
+	_ datasource.DataSource              = &GoogleIdentityProviderDataSource{}
+	_ datasource.DataSourceWithConfigure = &GoogleIdentityProviderDataSource{}
 )
 
 func NewGoogleIdentityProviderDataSource() datasource.DataSource {

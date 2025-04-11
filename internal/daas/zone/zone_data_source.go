@@ -13,7 +13,8 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ datasource.DataSource = &ZoneDataSource{}
+	_ datasource.DataSource              = &ZoneDataSource{}
+	_ datasource.DataSourceWithConfigure = &ZoneDataSource{}
 )
 
 func NewZoneDataSource() datasource.DataSource {

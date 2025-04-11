@@ -86,7 +86,7 @@ func (r *adminScopeResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Admin Scope: "+plan.Name.ValueString(), &resp.Diagnostics, 5, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Admin Scope: "+plan.Name.ValueString(), &resp.Diagnostics, 5)
 	if err != nil {
 		return
 	}
@@ -171,7 +171,7 @@ func (r *adminScopeResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Admin Scope: "+adminScopeName, &resp.Diagnostics, 5, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Admin Scope: "+adminScopeName, &resp.Diagnostics, 5)
 	if err != nil {
 		return
 	}
@@ -218,7 +218,7 @@ func (r *adminScopeResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Admin Scope: "+adminScopeName, &resp.Diagnostics, 5, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Admin Scope: "+adminScopeName, &resp.Diagnostics, 5)
 	if err != nil {
 		return
 	}

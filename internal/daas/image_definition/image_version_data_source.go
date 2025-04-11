@@ -12,7 +12,8 @@ import (
 )
 
 var (
-	_ datasource.DataSource = &ImageVersionDataSource{}
+	_ datasource.DataSource              = &ImageVersionDataSource{}
+	_ datasource.DataSourceWithConfigure = &ImageVersionDataSource{}
 )
 
 func NewImageVersionDataSource() datasource.DataSource {
