@@ -150,7 +150,7 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating zone "+plan.Name.ValueString(), &resp.Diagnostics, 5, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating zone "+plan.Name.ValueString(), &resp.Diagnostics, 5)
 	if err != nil {
 		return
 	}
@@ -245,7 +245,7 @@ func (r *zoneResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating zone "+plan.Name.ValueString(), &resp.Diagnostics, 5, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating zone "+plan.Name.ValueString(), &resp.Diagnostics, 5)
 	if err != nil {
 		return
 	}
@@ -297,7 +297,7 @@ func (r *zoneResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting zone "+state.Name.ValueString(), &resp.Diagnostics, 5, true)
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting zone "+state.Name.ValueString(), &resp.Diagnostics, 5)
 	if err != nil {
 		return
 	}
@@ -398,7 +398,7 @@ func (r ZoneResourceModel) updateZoneAfterCreate(ctx context.Context, client *ci
 		return nil, err
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating zone "+zoneName, diagnostics, 5, true)
+	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating zone "+zoneName, diagnostics, 5)
 	if err != nil {
 		return nil, err
 	}

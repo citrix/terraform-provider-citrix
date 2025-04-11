@@ -12,7 +12,8 @@ import (
 )
 
 var (
-	_ datasource.DataSource = &STFRoamingServiceDataSource{}
+	_ datasource.DataSource              = &STFRoamingServiceDataSource{}
+	_ datasource.DataSourceWithConfigure = &STFRoamingServiceDataSource{}
 )
 
 func NewSTFRoamingServiceDataSource() datasource.DataSource {

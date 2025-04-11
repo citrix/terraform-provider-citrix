@@ -14,7 +14,8 @@ import (
 )
 
 var (
-	_ datasource.DataSource = &PvsDataSource{}
+	_ datasource.DataSource              = &PvsDataSource{}
+	_ datasource.DataSourceWithConfigure = &PvsDataSource{}
 )
 
 func NewPvsDataSource() datasource.DataSource {

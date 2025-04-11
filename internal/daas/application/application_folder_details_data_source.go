@@ -17,7 +17,8 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ datasource.DataSource = &ApplicationDataSource{}
+	_ datasource.DataSource              = &ApplicationDataSource{}
+	_ datasource.DataSourceWithConfigure = &ApplicationDataSource{}
 )
 
 func NewApplicationDataSourceSource() datasource.DataSource {

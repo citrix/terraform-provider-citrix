@@ -357,8 +357,7 @@ func BuildDeliveryGroupResource(t *testing.T, deliveryGroup string, deliveryType
 }
 
 func BuildDeliveryGroupResourceWithZeroCatalogs(t *testing.T, deliveryGroup string) string {
-	return fmt.Sprintf(deliveryGroup)
-
+	return deliveryGroup
 }
 
 func deliveryGroupSweeper(ctx context.Context, deliveryGroupName string, client *citrixclient.CitrixDaasClient) error {

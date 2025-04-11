@@ -11,7 +11,8 @@ import (
 )
 
 var (
-	_ datasource.DataSource = &OktaIdentityProviderDataSource{}
+	_ datasource.DataSource              = &OktaIdentityProviderDataSource{}
+	_ datasource.DataSourceWithConfigure = &OktaIdentityProviderDataSource{}
 )
 
 func NewOktaIdentityProviderDataSource() datasource.DataSource {

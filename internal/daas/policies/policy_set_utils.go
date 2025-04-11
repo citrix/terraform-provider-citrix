@@ -19,7 +19,7 @@ import (
 )
 
 // Gets the policy set and logs any errors
-func getPolicySets(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) ([]citrixorchestration.PolicySetResponse, error) {
+func GetPolicySets(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) ([]citrixorchestration.PolicySetResponse, error) {
 	getPolicySetsRequest := client.ApiClient.GpoDAAS.GpoReadGpoPolicySets(ctx)
 	policySets, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.CollectionEnvelopeOfPolicySetResponse](getPolicySetsRequest, client)
 	if err != nil {
@@ -34,7 +34,7 @@ func getPolicySets(ctx context.Context, client *citrixdaasclient.CitrixDaasClien
 	return policySets.Items, err
 }
 
-func getPolicySet(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policySetId string) (*citrixorchestration.PolicySetResponse, error) {
+func GetPolicySet(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policySetId string) (*citrixorchestration.PolicySetResponse, error) {
 	getPolicySetRequest := client.ApiClient.GpoDAAS.GpoReadGpoPolicySet(ctx, policySetId)
 	getPolicySetRequest = getPolicySetRequest.WithPolicies(true)
 	policySet, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.PolicySetResponse](getPolicySetRequest, client)
@@ -57,7 +57,7 @@ func readPolicySet(ctx context.Context, client *citrixdaasclient.CitrixDaasClien
 }
 
 // Gets the policy set and logs any errors
-func getPolicies(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policySetId string) (*citrixorchestration.CollectionEnvelopeOfPolicyResponse, error) {
+func GetPolicies(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policySetId string) (*citrixorchestration.CollectionEnvelopeOfPolicyResponse, error) {
 	getPoliciesRequest := client.ApiClient.GpoDAAS.GpoReadGpoPolicies(ctx)
 	getPoliciesRequest = getPoliciesRequest.PolicySetGuid(policySetId)
 	getPoliciesRequest = getPoliciesRequest.WithFilters(true)
@@ -218,6 +218,14 @@ func constructPolicyFilterRequests(ctx context.Context, diagnostics *diag.Diagno
 		}
 	}
 
+	if !policy.ClientPlatformFilters.IsNull() && len(policy.ClientPlatformFilters.Elements()) > 0 {
+		clientPlatformFilters := util.ObjectSetToTypedArray[ClientPlatformFilterModel](ctx, diagnostics, policy.ClientPlatformFilters)
+		for _, clientPlatformFilter := range clientPlatformFilters {
+			filterRequest, _ := clientPlatformFilter.GetFilterRequest(diagnostics, serverValue)
+			filterRequests = append(filterRequests, filterRequest)
+		}
+	}
+
 	if !policy.DeliveryGroupFilters.IsNull() && len(policy.DeliveryGroupFilters.Elements()) > 0 {
 		deliveryGroupFilters := util.ObjectSetToTypedArray[DeliveryGroupFilterModel](ctx, diagnostics, policy.DeliveryGroupFilters)
 		for _, deliveryGroupFilter := range deliveryGroupFilters {
@@ -272,21 +280,24 @@ func constructPolicyPriorityRequest(ctx context.Context, client *citrixdaasclien
 	// 1. Construct map of policy name: policy id
 	// 2. Construct array of policy id based on the policy name order
 	// 3. post policy priority
-	policyNameIdMap := map[types.String]types.String{}
+	policyNameIdMap := map[types.String]string{}
 	if policySet.GetPolicies() != nil {
 		for _, policy := range policySet.GetPolicies() {
-			policyNameIdMap[types.StringValue(policy.GetPolicyName())] = types.StringValue(policy.GetPolicyGuid())
+			policyNameIdMap[types.StringValue(policy.GetPolicyName())] = policy.GetPolicyGuid()
 		}
 	}
-	policyPriority := []types.String{}
+	policyPriority := []string{}
 	for _, policyToCreate := range planedPolicies {
 		policyPriority = append(policyPriority, policyNameIdMap[policyToCreate.Name])
 	}
 
-	policySetId := policySet.GetPolicySetGuid()
+	return ConstructPolicyPriorityRequestWithIds(ctx, client, policySet.GetPolicySetGuid(), policyPriority)
+}
+
+func ConstructPolicyPriorityRequestWithIds(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, policySetId string, policyPriority []string) citrixorchestration.ApiGpoRankGpoPoliciesRequest {
 	createPolicyPriorityRequest := client.ApiClient.GpoDAAS.GpoRankGpoPolicies(ctx)
 	createPolicyPriorityRequest = createPolicyPriorityRequest.PolicySetGuid(policySetId)
-	createPolicyPriorityRequest = createPolicyPriorityRequest.RequestBody(util.ConvertBaseStringArrayToPrimitiveStringArray(policyPriority))
+	createPolicyPriorityRequest = createPolicyPriorityRequest.RequestBody(policyPriority)
 	return createPolicyPriorityRequest
 }
 
@@ -773,7 +784,7 @@ func constructEditDeliveryGroupPolicySetBatchRequestModel(diags *diag.Diagnostic
 	return batchRequestModel, nil
 }
 
-func updateDeliveryGroupsWithPolicySet(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, policySetName string, policySetGuid string, deliveryGroups []string, errorMessage string) error {
+func UpdateDeliveryGroupsWithPolicySet(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, policySetName string, policySetGuid string, deliveryGroups []string, errorMessage string) error {
 	if len(deliveryGroups) == 0 {
 		return nil
 	}
@@ -823,7 +834,7 @@ func getGpoUserSettingDefinitions(ctx context.Context, diagnostics *diag.Diagnos
 	return settingResp.GetItems(), nil
 }
 
-func getGpoBooleanSettingDefaultValueMap(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient) (map[string]string, error) {
+func GetGpoBooleanSettingDefaultValueMap(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient) (map[string]string, error) {
 	defaultValueMap := map[string]string{}
 	getSettingDefinitionsRequest := client.ApiClient.GpoDAAS.GpoGetSettingDefinitions(ctx)
 	getSettingDefinitionsRequest = getSettingDefinitionsRequest.IsLean(true)

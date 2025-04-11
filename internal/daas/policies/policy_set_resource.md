@@ -6,6 +6,7 @@ Please navigate to `Setting` node in WebStudio. Enable `Policy sets` setting to 
 
 ## Policy Set Resource Example
 ```
+// Using citrix_policy_set
 resource "citrix_policy_set" "example-policy-set" {
     name = "Policy Set Name"
     description = "Policy Set Description"
@@ -32,13 +33,59 @@ resource "citrix_policy_set" "example-policy-set" {
             ]
         },
         {
-            name = "Name of the Policy with Priority 0"
+            name = "Name of the Policy with Priority 1"
             description = "Policy in the example policy set with priority 1"
             enabled = false
             policy_settings = []
         }
     ]
 }
+
+// Using citrix_policy_set_v2
+resource "citrix_policy_set_v2" "policy_set_v2" {
+    name        = "Example Policy Set V2"
+    description = "Policy Set V2 Description"
+    scopes      = [ citrix_admin_scope.example-admin-scope.id ]
+    delivery_groups = [ citrix_delivery_group.example-delivery-group.id ]
+}
+
+resource "citrix_policy" "first_policy" {
+    policy_set_id   = citrix_policy_set_v2.policy_set_v2.id
+    name            = "Name of the Policy with Priority 0"
+    description     = "Policy in the example policy set v2 with priority 0"
+    enabled         = true
+}
+
+resource "citrix_policy_setting" "advance_warning_period" {
+    policy_id   = citrix_policy.first_policy.id
+    name        = "AdvanceWarningPeriod"
+    use_default = false
+    value       = "13:00:00"
+}
+
+resource "citrix_delivery_group_policy_filter" "delivery_group_filter" {
+    policy_id          = citrix_policy.first_policy.id
+    enabled            = true
+    allowed            = true
+    delivery_group_id  = citrix_delivery_group.example-delivery-group.id
+}
+
+resource "citrix_policy" "second_policy" {
+    policy_set_id   = citrix_policy_set_v2.policy_set_v2.id
+    name            = "Name of the Policy with Priority 1"
+    description     = "Policy in the example policy set v2 with priority 1"
+    enabled         = false
+}
+
+resource "citrix_policy_priority" "policy_priority" {
+    policy_set_id    = citrix_policy_set_v2.policy_set_v2.id
+    policy_priority  = [
+        citrix_policy.first_policy.id,
+        citrix_policy.second_policy.id
+    ]
+}
+
+
 ```
 
 * Please refer to [Available Policy Filters](#available-policy-filters) for more details on policy filters. 

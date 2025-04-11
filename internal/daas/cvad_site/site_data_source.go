@@ -10,7 +10,8 @@ import (
 )
 
 var (
-	_ datasource.DataSource = &SiteDataSource{}
+	_ datasource.DataSource              = &SiteDataSource{}
+	_ datasource.DataSourceWithConfigure = &SiteDataSource{}
 )
 
 func NewSiteDataSource() datasource.DataSource {

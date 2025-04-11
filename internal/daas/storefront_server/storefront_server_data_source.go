@@ -12,7 +12,8 @@ import (
 )
 
 var (
-	_ datasource.DataSource = &StoreFrontServerDataSource{}
+	_ datasource.DataSource              = &StoreFrontServerDataSource{}
+	_ datasource.DataSourceWithConfigure = &StoreFrontServerDataSource{}
 )
 
 func NewStoreFrontServerDataSource() datasource.DataSource {
