@@ -143,7 +143,7 @@ func validatePowerManagementSettings(ctx context.Context, diags *diag.Diagnostic
 
 	errStringSuffix := "cannot be set for a catalog with Random allocation type"
 
-	if autoscale.PeakLogOffAction.ValueString() != "Nothing" {
+	if !strings.EqualFold(autoscale.PeakLogOffAction.ValueString(), string(citrixorchestration.SESSIONCHANGEHOSTINGACTION_NOTHING)) {
 		return false, "PeakLogOffAction " + errStringSuffix
 	}
 
@@ -151,7 +151,7 @@ func validatePowerManagementSettings(ctx context.Context, diags *diag.Diagnostic
 		return false, "PeakLogOffTimeoutMinutes " + errStringSuffix
 	}
 
-	if autoscale.OffPeakLogOffAction.ValueString() != "Nothing" {
+	if !strings.EqualFold(autoscale.OffPeakLogOffAction.ValueString(), string(citrixorchestration.SESSIONCHANGEHOSTINGACTION_NOTHING)) {
 		return false, "OffPeakLogOffAction " + errStringSuffix
 	}
 
@@ -159,7 +159,7 @@ func validatePowerManagementSettings(ctx context.Context, diags *diag.Diagnostic
 		return false, "OffPeakLogOffTimeoutMinutes " + errStringSuffix
 	}
 
-	if autoscale.PeakAutoscaleAssignedPowerOnIdleAction.ValueString() != "Nothing" {
+	if !strings.EqualFold(autoscale.PeakAutoscaleAssignedPowerOnIdleAction.ValueString(), string(citrixorchestration.SESSIONCHANGEHOSTINGACTION_NOTHING)) {
 		return false, "PeakAutoscaleAssignedPowerOnIdleAction " + errStringSuffix
 	}
 
@@ -170,19 +170,19 @@ func validatePowerManagementSettings(ctx context.Context, diags *diag.Diagnostic
 	if sessionSupport == citrixorchestration.SESSIONSUPPORT_MULTI_SESSION {
 		errStringSuffix = "cannot be set for a MultiSession catalog"
 
-		if autoscale.PeakDisconnectAction.ValueString() != "Nothing" {
+		if !strings.EqualFold(autoscale.PeakDisconnectAction.ValueString(), string(citrixorchestration.SESSIONCHANGEHOSTINGACTION_NOTHING)) {
 			return false, "PeakDisconnectAction " + errStringSuffix
 		}
 
-		if autoscale.PeakExtendedDisconnectAction.ValueString() != "Nothing" {
+		if !strings.EqualFold(autoscale.PeakExtendedDisconnectAction.ValueString(), string(citrixorchestration.SESSIONCHANGEHOSTINGACTION_NOTHING)) {
 			return false, "PeakDisconnectTimeoutMinutes " + errStringSuffix
 		}
 
-		if autoscale.OffPeakDisconnectAction.ValueString() != "Nothing" {
+		if !strings.EqualFold(autoscale.OffPeakDisconnectAction.ValueString(), string(citrixorchestration.SESSIONCHANGEHOSTINGACTION_NOTHING)) {
 			return false, "OffPeakDisconnectAction " + errStringSuffix
 		}
 
-		if autoscale.OffPeakExtendedDisconnectAction.ValueString() != "Nothing" {
+		if !strings.EqualFold(autoscale.OffPeakExtendedDisconnectAction.ValueString(), string(citrixorchestration.SESSIONCHANGEHOSTINGACTION_NOTHING)) {
 			return false, "OffPeakDisconnectTimeoutMinutes " + errStringSuffix
 		}
 

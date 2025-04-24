@@ -128,6 +128,7 @@ type ApplicationResourceModel struct {
 	LimitToOneInstancePerUser types.Bool   `tfsdk:"limit_to_one_instance_per_user"`
 	Visible                   types.Bool   `tfsdk:"visible"`
 	BrowserName               types.String `tfsdk:"browser_name"`
+	CpuPriorityLevel          types.String `tfsdk:"cpu_priority_level"`
 }
 
 // Schema defines the schema for the data source.
@@ -231,7 +232,7 @@ func (ApplicationResourceModel) GetSchema() schema.Schema {
 				Default:     stringdefault.StaticString(""),
 				Validators: []validator.String{
 					validator.String(
-						stringvalidator.RegexMatches(regexp.MustCompile(util.AppCategoryPathRegex), "the category path must be in the format of `Category1\\Category2`"),
+						stringvalidator.RegexMatches(regexp.MustCompile(util.AppCategoryPathRegex), "the category path must be in the format of `Category1\\Category2` and cannot contain any of the following characters: \"<>|*?:/"),
 					),
 				},
 			},
@@ -293,6 +294,15 @@ func (ApplicationResourceModel) GetSchema() schema.Schema {
 					stringvalidator.LengthAtLeast(1),
 				},
 			},
+			"cpu_priority_level": schema.StringAttribute{
+				Description: "Specifies the CPU priority level for the application. Valid values are: `Low`, `BelowNormal`, `Normal`, `AboveNormal`, and `High`. Default is `Normal`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("Normal"),
+				Validators: []validator.String{
+					util.GetValidatorFromEnum(citrixorchestration.AllowedCpuPriorityLevelEnumValues),
+				},
+			},
 		},
 	}
 }
@@ -316,6 +326,7 @@ func (r ApplicationResourceModel) RefreshPropertyValues(ctx context.Context, dia
 	r.ShortcutAddedToStartMenu = types.BoolValue(application.GetShortcutAddedToStartMenu())
 	r.Visible = types.BoolValue(application.GetVisible())
 	r.BrowserName = types.StringValue(application.GetBrowserName())
+	r.CpuPriorityLevel = types.StringValue(string(application.GetCpuPriorityLevel()))
 
 	// Set optional values
 	adminFolder := application.GetApplicationFolder()

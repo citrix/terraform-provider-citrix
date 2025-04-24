@@ -10,6 +10,7 @@ import (
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	datasourceSchema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -54,6 +55,25 @@ func (r NameValueStringPairModel) GetSchema() schema.NestedAttributeObject {
 
 func (r NameValueStringPairModel) GetAttributes() map[string]schema.Attribute {
 	return NameValueStringPairModel{}.GetSchema().Attributes
+}
+
+func (r NameValueStringPairModel) GetDataSourceSchema() datasourceSchema.NestedAttributeObject {
+	return datasourceSchema.NestedAttributeObject{
+		Attributes: map[string]datasourceSchema.Attribute{
+			"name": datasourceSchema.StringAttribute{
+				Description: "Metadata name.",
+				Computed:    true,
+			},
+			"value": datasourceSchema.StringAttribute{
+				Description: "Metadata value.",
+				Computed:    true,
+			},
+		},
+	}
+}
+
+func (r NameValueStringPairModel) GetDataSourceAttributes() map[string]datasourceSchema.Attribute {
+	return NameValueStringPairModel{}.GetDataSourceSchema().Attributes
 }
 
 func (r NameValueStringPairModel) ValidateConfig(ctx context.Context, diagnostics *diag.Diagnostics, index int) bool {

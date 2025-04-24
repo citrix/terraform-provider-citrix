@@ -372,6 +372,7 @@ func (MachineDomainIdentityModel) GetSchema() schema.SingleNestedAttribute {
 				Description: "Service account for the domain. Only the username is required; do not include the domain name.",
 				Optional:    true,
 				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.NoPathRegex), "must not include domain name, only specify the username"),
 					stringvalidator.AlsoRequires(path.Expressions{
 						path.MatchRelative().AtParent().AtName("service_account_password"),
 					}...),

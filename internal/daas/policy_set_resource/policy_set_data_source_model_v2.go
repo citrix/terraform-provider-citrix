@@ -15,7 +15,7 @@ import (
 
 func (PolicySetV2Model) GetDataSourceSchema() schema.Schema {
 	return schema.Schema{
-		Description: "CVAD --- Manages a policy set and the policies within it. The order of the policies specified in this resource reflect the policy priority.",
+		Description: "CVAD --- Data source of a policy set and the policies within it. The order of the policies specified in this resource reflect the policy priority.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the policy set.",
@@ -45,9 +45,8 @@ func (PolicySetV2Model) GetDataSourceSchema() schema.Schema {
 			},
 			"delivery_groups": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "The IDs of the delivery groups for the policy set to apply on." +
-					"\n\n~> **Please Note** If `delivery_groups` attribute is unset or configured as an empty set, the policy set will not be assigned to any delivery group. None of the policies in the policy set will be applied.",
-				Computed: true,
+				Description: "The IDs of the delivery groups for the policy set to apply on.",
+				Computed:    true,
 			},
 		},
 	}

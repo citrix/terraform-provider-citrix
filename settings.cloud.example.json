@@ -274,6 +274,59 @@
         "TEST_POLICY_SET_DATA_SOURCE_NAME" : "{Policy Set Data Source Name}",
         "TEST_POLICY_SET_DATA_SOURCE_EXPECTED_POLICY_COUNT" : "{Policy Set Data Source Policy Count}",
 
+
+        // Policy Set V2 resource env variable
+        "TEST_POLICY_SET_V2_RESOURCE_NAME": "{name of the test policy set}",
+        "TEST_POLICY_SET_V2_RESOURCE_DESCRIPTION": "{description of the test policy set}",
+        // Policy Resource env variable
+        "TEST_POLICY_RESOURCE_NAME" : "{name of the test policy}",
+        "TEST_POLICY_RESOURCE_DESCRIPTION" : "{description of the test policy}",
+        // Policy Filter Resource env variable
+        "TEST_DELIVERY_GROUP_POLICY_FILTER_RESOURCE_DELIVERY_GROUP_ID": "{Delivery Group ID for the Policy Filter Test}",
+        "TEST_DELIVERY_GROUP_POLICY_FILTER_RESOURCE_DELIVERY_GROUP_ID_UPDATED": "{Updated Delivery Group ID for the Policy Filter Test}",
+        "TEST_TAG_POLICY_FILTER_RESOURCE_TAG_ID": "{Tag ID for the Policy Filter Test}",
+        "TEST_TAG_POLICY_FILTER_RESOURCE_TAG_ID_UPDATED": "{Updated Tag ID for the Policy Filter Test}",
+        // Policy Set V2 Data Source env variables
+        "TEST_POLICY_SET_V2_DATA_SOURCE_ID": "{Policy Set Data Source ID}",
+        "TEST_POLICY_SET_V2_DATA_SOURCE_NAME": "{Policy Set Data Source Name}",
+        // Policy Data Source env variables
+        "TEST_POLICY_DATA_SOURCE_ID": "{Policy Data Source ID}",
+        "TEST_POLICY_DATA_SOURCE_NAME": "{Policy Data Source Name}",
+        "TEST_POLICY_DATA_SOURCE_POLICY_SET_ID": "{Policy Data Source Policy Set ID}",
+        // Policy Setting Data Source env variables
+        "TEST_POLICY_SETTING_DATA_SOURCE_ID": "{Policy Setting Data Source ID}",
+        "TEST_POLICY_SETTING_DATA_SOURCE_NAME": "{Policy Setting Data Source Name}",
+        "TEST_POLICY_SETTING_DATA_SOURCE_POLICY_ID": "{Policy Setting Data Source Policy ID}",
+        // Policy Priority Data Source env variables
+        "TEST_POLICY_PRIORITY_DATA_SOURCE_POLICY_SET_ID": "{Policy Priority Data Source Policy Set ID}",
+        "TEST_POLICY_PRIORITY_DATA_SOURCE_POLICY_SET_NAME": "{Policy Priority Data Source Policy Set Name}",
+        "TEST_POLICY_PRIORITY_DATA_SOURCE_FIRST_POLICY_NAME": "{Name of the Policy with priority 0 in policy set for data source test}",
+        "TEST_POLICY_PRIORITY_DATA_SOURCE_SECOND_POLICY_NAME": "{Name of the Policy with priority 1 in policy set for data source test}",
+        // Policy Filter Data Source
+        "TEST_POLICY_FILTERS_DATA_SOURCE_ID": "{Policy Filters Data Source Policy ID}",
+        "TEST_POLICY_FILTERS_DATA_SOURCE_EXPECTED_CLIENT_NAME_FILTER_COUNT": "{Policy Filters Data Source Expected Client Name Filter Count}",
+        "TEST_ACCESS_CONTROL_POLICY_FILTER_DATA_SOURCE_ID": "{Access Control Policy Filter Data Source ID}",
+		"TEST_ACCESS_CONTROL_POLICY_FILTER_CONDITION": "{Access Control Policy Filter Condition}",
+		"TEST_ACCESS_CONTROL_POLICY_FILTER_GATEWAY": "{Access Control Policy Filter Gateway}",
+		"TEST_BRANCH_REPEATER_POLICY_FILTER_DATA_SOURCE_ID": "{Branch Repeater Policy Filter Data Source ID}",
+		"TEST_BRANCH_REPEATER_POLICY_FILTER_DATA_SOURCE_ALLOWED": "{Branch Repeater Policy Filter Data Source Allowed}",
+		"TEST_CLIENT_IP_POLICY_FILTER_DATA_SOURCE_ID": "{Client IP Policy Filter Data Source ID}",
+		"TEST_CLIENT_IP_POLICY_FILTER_DATA_SOURCE_IP_ADDRESS": "{Client IP Policy Filter Data Source IP Address}",
+		"TEST_CLIENT_NAME_POLICY_FILTER_DATA_SOURCE_ID": "{Client Name Policy Filter Data Source ID}",
+		"TEST_CLIENT_NAME_POLICY_FILTER_DATA_SOURCE_CLIENT_NAME": "{Client Name Policy Filter Data Source client name}",
+        "TEST_CLIENT_PLATFORM_POLICY_FILTER_DATA_SOURCE_ID": "{Client Platform Policy Filter Data Source ID}",
+		"TEST_CLIENT_PLATFORM_POLICY_FILTER_DATA_SOURCE_PLATFORM": "{Client Platform Policy Filter Data Source platform name}",
+		"TEST_DELIVERY_GROUP_POLICY_FILTER_DATA_SOURCE_ID": "{Delivery Group Policy Filter Data Source ID}",
+		"TEST_DELIVERY_GROUP_POLICY_FILTER_DATA_SOURCE_DELIVERY_GROUP_ID": "{Delivery Group Policy Filter Data Source Delivery Group ID}",
+		"TEST_DELIVERY_GROUP_TYPE_POLICY_FILTER_DATA_SOURCE_ID": "{Delivery Group Type Policy Filter Data Source ID}",
+		"TEST_DELIVERY_GROUP_TYPE_POLICY_FILTER_DATA_SOURCE_DELIVERY_GROUP_TYPE": "{Delivery Group Type Policy Filter Data Source Delivery Group Type}",
+		"TEST_OU_POLICY_FILTER_DATA_SOURCE_ID": "{OU Policy Filter Data Source ID}",
+		"TEST_OU_POLICY_FILTER_DATA_SOURCE_OU": "{OU Policy Filter Data Source OU}",
+		"TEST_TAG_POLICY_FILTER_DATA_SOURCE_ID": "{Tag Policy Filter Data Source ID}",
+		"TEST_TAG_POLICY_FILTER_DATA_SOURCE_TAG_ID": "{Tag Policy Filter Data Source Tag ID}",
+		"TEST_USER_POLICY_FILTER_DATA_SOURCE_ID": "{User Policy Filter Data Source ID}",
+		"TEST_USER_POLICY_FILTER_DATA_SOURCE_USER": "{User Policy Filter Data Source User}",
+
         // GAC Settings Go Tests
         "TEST_SETTINGS_CONFIG_SERVICE_URL" : "{workspace_url_with_port_number}",
         "TEST_SETTINGS_CONFIG_NAME" : "test-settings-config",

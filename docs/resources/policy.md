@@ -3,13 +3,13 @@
 page_title: "citrix_policy Resource - citrix"
 subcategory: "CVAD"
 description: |-
-  Manages an instance of the Policy Setting.
+  Manages an instance of the Policy.
   ~> Please Note Each policy can only associate with one policy set. The policy will be created in the default policy set if the policy is not referenced in any of the policy_ids of the citrix_policy_set_v2 resource.
 ---
 
 # citrix_policy (Resource)
 
-Manages an instance of the Policy Setting.
+Manages an instance of the Policy.
 
 ~> **Please Note** Each policy can only associate with one policy set. The policy will be created in the default policy set if the policy is not referenced in any of the `policy_ids` of the `citrix_policy_set_v2` resource.
 

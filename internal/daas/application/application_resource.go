@@ -94,6 +94,11 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 		createApplicationRequest.SetBrowserName(plan.BrowserName.ValueString())
 	}
 
+	if !plan.CpuPriorityLevel.IsNull() {
+		cpuPriorityLevelValue := citrixorchestration.CpuPriorityLevel(plan.CpuPriorityLevel.ValueString())
+		createApplicationRequest.SetCpuPriorityLevel(cpuPriorityLevelValue)
+	}
+
 	if plan.LimitVisibilityToUsers.IsNull() {
 		createApplicationRequest.SetIncludedUserFilterEnabled(false)
 		createApplicationRequest.SetIncludedUsers([]string{})
@@ -262,6 +267,11 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 
 	if plan.BrowserName.ValueString() != "" {
 		editApplicationRequestBody.SetBrowserName(plan.BrowserName.ValueString())
+	}
+
+	if !plan.CpuPriorityLevel.IsNull() {
+		cpuPriorityLevelValue := citrixorchestration.CpuPriorityLevel(plan.CpuPriorityLevel.ValueString())
+		editApplicationRequestBody.SetCpuPriorityLevel(cpuPriorityLevelValue)
 	}
 
 	if plan.LimitVisibilityToUsers.IsNull() {

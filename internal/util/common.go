@@ -130,7 +130,7 @@ const EmailRegex string = `^[\w-\.]+@([\w-]+\.)+[\w-]+$`
 const OktaDomainRegex string = `\.okta\.com$|\.okta-eu\.com$|\.oktapreview\.com$`
 
 // Application Category Path
-const AppCategoryPathRegex string = `^([a-zA-Z0-9 ]+\\)*[a-zA-Z0-9 ]+\\?$|^$`
+const AppCategoryPathRegex string = `^([^<>|*?":/\\]+\\)*[^<>|*?":/\\]+\\?$|^$`
 
 // SAML 2.0 Identity Provider Certificate REGEX
 const SamlIdpCertRegex string = `\.[Pp][Ee][Mm]$|\.[Cc][Rr][Tt]$|\.[Cc][Ee][Rr]$`

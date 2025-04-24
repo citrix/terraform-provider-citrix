@@ -668,7 +668,7 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 		}
 
 		if len(associatedMachineCatalogs) > 0 {
-			if plan.SharingKind.ValueString() == string(citrixorchestration.SHARINGKIND_PRIVATE) && associatedMachineCatalogProperties.AllocationType != citrixorchestration.ALLOCATIONTYPE_STATIC {
+			if strings.EqualFold(plan.SharingKind.ValueString(), string(citrixorchestration.SHARINGKIND_PRIVATE)) && associatedMachineCatalogProperties.AllocationType != citrixorchestration.ALLOCATIONTYPE_STATIC {
 				resp.Diagnostics.AddError(
 					fmt.Sprintf("Error %s Delivery Group", operation),
 					"When `sharing_kind` is `Private`, the associated machine catalogs must have `Static` allocation type.",
@@ -676,7 +676,7 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 				return
 			}
 
-			if plan.SharingKind.ValueString() == string(citrixorchestration.SHARINGKIND_SHARED) && associatedMachineCatalogProperties.AllocationType != citrixorchestration.ALLOCATIONTYPE_RANDOM {
+			if strings.EqualFold(plan.SharingKind.ValueString(), string(citrixorchestration.SHARINGKIND_SHARED)) && associatedMachineCatalogProperties.AllocationType != citrixorchestration.ALLOCATIONTYPE_RANDOM {
 				resp.Diagnostics.AddError(
 					fmt.Sprintf("Error %s Delivery Group", operation),
 					"When `sharing_kind` is `Shared`, the associated machine catalogs must have `Random` allocation type.",
@@ -710,7 +710,7 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 		if len(desktops) > 0 {
 			sessionRoamingShouldBeSet := true
 			sharingKind := plan.SharingKind.ValueString()
-			if sharingKind == string(citrixorchestration.SHARINGKIND_PRIVATE) {
+			if strings.EqualFold(sharingKind, string(citrixorchestration.SHARINGKIND_PRIVATE)) {
 				sessionRoamingShouldBeSet = false
 			}
 			isValid, errMsg := validateSessionRoaming(desktops, sessionRoamingShouldBeSet)
@@ -734,7 +734,7 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 	if !plan.DeliveryType.IsNull() && !plan.DeliveryType.IsUnknown() && !plan.SessionSupport.IsUnknown() && !plan.SharingKind.IsUnknown() {
 		deliveryType := plan.DeliveryType.ValueString()
 		sharingKind := plan.SharingKind.ValueString()
-		if (associatedMachineCatalogProperties.AllocationType == citrixorchestration.ALLOCATIONTYPE_STATIC || sharingKind == string(citrixorchestration.SHARINGKIND_PRIVATE)) &&
+		if (associatedMachineCatalogProperties.AllocationType == citrixorchestration.ALLOCATIONTYPE_STATIC || strings.EqualFold(sharingKind, string(citrixorchestration.SHARINGKIND_PRIVATE))) &&
 			deliveryType == string(citrixorchestration.DELIVERYKIND_DESKTOPS_AND_APPS) {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("delivery_type"),
