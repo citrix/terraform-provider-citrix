@@ -86,7 +86,10 @@ Param (
     [bool] $DisableSSLValidation = $false,
 
     [Parameter(Mandatory = $false)]
-    [bool] $OnPremises = $true
+    [bool] $OnPremises = $true,
+
+    [Parameter(Mandatory = $false)]
+    [switch] $SkipOrchestrationPolling
 )
 
 function Start-AzureVm {
@@ -154,7 +157,7 @@ if ($OnPremises -eq $true) {
 }
 
 # Skip polling for orchestration if the environment is cloud
-if ($OnPremises -eq $false) {
+if (($OnPremises -eq $false) -or $SkipOrchestrationPolling) {
     exit 0
 }
 

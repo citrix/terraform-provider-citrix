@@ -731,9 +731,9 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 		} else if environment == "JapanStaging" {
 			quickCreateHostname = "api.citrixcloudstaging.jp/quickcreateservice"
 		} else if environment == "Gov" {
-			quickCreateHostname = "quickcreate.apps.cloud.us"
+			quickCreateHostname = "api.cloud.us/quickcreateservice"
 		} else if environment == "GovStaging" {
-			quickCreateHostname = "quickcreate.apps.cloudstaging.us"
+			quickCreateHostname = "api.cloudstaging.us/quickcreateservice"
 		}
 	}
 

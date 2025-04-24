@@ -15,7 +15,7 @@ import (
 
 func (PolicyPriorityModel) GetDataSourceSchema() schema.Schema {
 	return schema.Schema{
-		Description: "CVAD --- Manages  the policy priorities within a policy set.",
+		Description: "CVAD --- Data source of the policy priorities within a policy set.",
 		Attributes: map[string]schema.Attribute{
 			"policy_set_id": schema.StringAttribute{
 				Description: "GUID identifier of the policy set.",

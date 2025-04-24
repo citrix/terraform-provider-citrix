@@ -60,6 +60,8 @@ This automation script is designed to onboard an existing site to Terraform. It 
     - `SetDependencyRelationship` (Switch): Add this switch to create dependency relationships between resources by replacing resouce ID with resource references.
     - `DisableSSLValidation` (Switch):
       - For Citrix on-premises customers **only**: Add this switch to disable SSL validation on both the PowerShell session and the provider client. SSL validation has to be disabled for this script to work if your on-premises DDC does not have a valid SSL certificate.
+    - `ShowClientSecret` (Switch):
+      - Use this switch to include the client secret value in the generated Terraform configuration file. Defaults to `$false` to ensure security.
 
 7. Wait for the script to complete. The execution time will depend on the complexity of the onboarding process and the resources being imported.
 

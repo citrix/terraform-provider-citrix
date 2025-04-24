@@ -36,6 +36,9 @@ Currently this script is still in TechPreview
 .Parameter DisableSSLValidation
     Disable SSL validation for this script. Required if DDC does not have a valid SSL certificate.
 
+.Parameter ShowClientSecret
+    Specifies whether to display the client secret value in the generated Terraform configuration file; defaults to `$false` for security.
+
 #>  
 
 [CmdletBinding()]
@@ -63,7 +66,10 @@ Param (
     [switch] $SetDependencyRelationship,
 
     [Parameter(Mandatory = $false)]
-    [switch] $DisableSSLValidation
+    [switch] $DisableSSLValidation,
+
+    [Parameter(Mandatory=$false)]
+    [switch] $ShowClientSecret
 )
 
 ### Helper Functions ###
@@ -224,7 +230,10 @@ function Start-GetRequest {
 function New-RequiredFiles {
 
     Write-Verbose "Creating required files for terraform."
-    # Create temporary import.tf for terraform import
+
+    # Determine the client secret value based on the ShowClientSecret flag
+    $secretValue = if ($ShowClientSecret) { $script:clientSecret } else { "<Input client secret value>" }
+
     if (!(Test-Path ".\citrix.tf")) {
         New-Item -path ".\" -name "citrix.tf" -type "file" -Force
         Write-Verbose "Created new file for terraform citrix provider configuration."
@@ -236,7 +245,7 @@ provider "citrix" {
     cvad_config = {
         hostname                    = "$script:hostname"
         client_id                   = "$script:domainFqdn\\$script:clientId"
-        # client_secret               = "<Input client secret value>"
+        # client_secret               = "$secretValue"
         disable_ssl_verification    = $disable_ssl_verification
     }
 }
@@ -249,7 +258,7 @@ provider "citrix" {
     cvad_config = {
         customer_id                 = "$script:customerId"
         client_id                   = "$script:clientId"
-        # client_secret               = "<Input client secret value>"
+        # client_secret               = "$secretValue"
         hostname                    = "$script:hostname"
         environment                 = "$script:environment"
     }
@@ -258,6 +267,7 @@ provider "citrix" {
         Set-Content -Path ".\citrix.tf" -Value $config
     }
 
+    # Create temporary import.tf for terraform import
     if (!(Test-Path ".\import.tf")) {
         New-Item -path ".\" -name "import.tf" -type "file" -Force
         Write-Verbose "Created new file for terraform import."

@@ -3,7 +3,7 @@ module github.com/citrix/terraform-provider-citrix
 go 1.24.1
 
 require (
-	github.com/citrix/citrix-daas-rest-go v1.0.15
+	github.com/citrix/citrix-daas-rest-go v1.0.16
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-azure-helpers v0.72.0
 	github.com/hashicorp/go-multierror v1.1.1
@@ -80,8 +80,8 @@ require (
 	golang.org/x/text v0.24.0 // indirect
 	golang.org/x/tools v0.32.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250414145226-207652e42e2e // indirect
-	google.golang.org/grpc v1.71.1 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250422160041-2d3770c4ea7f // indirect
+	google.golang.org/grpc v1.72.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v2 v2.3.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

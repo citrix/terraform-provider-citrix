@@ -28,7 +28,7 @@ type PolicyModel struct {
 
 func (PolicyModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "CVAD --- Manages an instance of the Policy Setting." +
+		Description: "CVAD --- Manages an instance of the Policy." +
 			"\n\n~> **Please Note** Each policy can only associate with one policy set. The policy will be created in the default policy set if the policy is not referenced in any of the `policy_ids` of the `citrix_policy_set_v2` resource.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{

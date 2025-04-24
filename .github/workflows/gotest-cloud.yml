@@ -142,6 +142,20 @@ jobs:
           echo "TEST_SERVICE_ACCOUNT_AD_ACCOUNT_SECRET=${{secrets.TEST_SERVICE_ACCOUNT_AD_ACCOUNT_SECRET}}" >> $GITHUB_ENV
           echo "TEST_SERVICE_ACCOUNT_AD_ACCOUNT_ID_UPDATED=${{secrets.TEST_SERVICE_ACCOUNT_AD_ACCOUNT_ID_UPDATED}}" >> $GITHUB_ENV
           echo "TEST_SERVICE_ACCOUNT_AD_ACCOUNT_SECRET_UPDATED=${{secrets.TEST_SERVICE_ACCOUNT_AD_ACCOUNT_SECRET_UPDATED}}" >> $GITHUB_ENV
+          echo "TEST_IMAGE_DEFINITION_NAME=${{vars.TEST_IMAGE_DEFINITION_NAME}}" >> $GITHUB_ENV
+          echo "TEST_IMAGE_DEFINITION_NAME_UPDATED=${{vars.TEST_IMAGE_DEFINITION_NAME_UPDATED}}" >> $GITHUB_ENV
+          echo "TEST_IMAGE_DEFINITION_DESCRIPTION=${{vars.TEST_IMAGE_DEFINITION_DESCRIPTION}}" >> $GITHUB_ENV
+          echo "TEST_IMAGE_DEFINITION_DESCRIPTION_UPDATED=${{vars.TEST_IMAGE_DEFINITION_DESCRIPTION_UPDATED}}" >> $GITHUB_ENV
+          echo "TEST_IMAGE_DEFINITION_OS_TYPE=${{vars.TEST_IMAGE_DEFINITION_OS_TYPE}}" >> $GITHUB_ENV
+          echo "TEST_IMAGE_DEFINITION_OS_TYPE_UPDATED=${{vars.TEST_IMAGE_DEFINITION_OS_TYPE_UPDATED}}" >> $GITHUB_ENV
+          echo "TEST_IMAGE_DEFINITION_SESSION_SUPPORT=${{vars.TEST_IMAGE_DEFINITION_SESSION_SUPPORT}}" >> $GITHUB_ENV
+          echo "TEST_IMAGE_DEFINITION_SESSION_SUPPORT_UPDATED=${{vars.TEST_IMAGE_DEFINITION_SESSION_SUPPORT_UPDATED}}" >> $GITHUB_ENV
+          echo "TEST_IMAGE_DEFINITION_HYPERVISOR_ID=${{secrets.TEST_IMAGE_DEFINITION_HYPERVISOR_ID}}" >> $GITHUB_ENV
+          echo "TEST_IMAGE_DEFINITION_HYPERVISOR_ID_UPDATED=${{secrets.TEST_IMAGE_DEFINITION_HYPERVISOR_ID_UPDATED}}" >> $GITHUB_ENV
+          echo "TEST_IMAGE_DEFINITION_HYPERVISOR_POOL_ID=${{secrets.TEST_IMAGE_DEFINITION_HYPERVISOR_POOL_ID}}" >> $GITHUB_ENV
+          echo "TEST_IMAGE_DEFINITION_HYPERVISOR_POOL_ID_UPDATED=${{secrets.TEST_IMAGE_DEFINITION_HYPERVISOR_POOL_ID_UPDATED}}" >> $GITHUB_ENV
+          echo "TEST_IMAGE_DEFINITION_RESOURCE_GROUP=${{secrets.TEST_IMAGE_DEFINITION_RESOURCE_GROUP}}" >> $GITHUB_ENV
+          echo "TEST_IMAGE_DEFINITION_RESOURCE_GROUP_UPDATED=${{secrets.TEST_IMAGE_DEFINITION_RESOURCE_GROUP_UPDATED}}" >> $GITHUB_ENV
 
       # Test PreCheck
       - name: Test Precheck
@@ -154,4 +168,4 @@ jobs:
       # Sweep
       - name: Sweep
         if: always()
-        run: go test -v ./internal/test -run "^TestAzureMcs$" -timeout 1h -sweep-run "citrix_zone,citrix_service_account,citrix_admin_folder,citrix_admin_role,citrix_admin_scope" -sweep="azure"
+        run: go test -v ./internal/test -run "^TestAzureMcs$" -timeout 1h -sweep-run "citrix_zone,citrix_image_definition,citrix_service_account,citrix_admin_folder,citrix_admin_role,citrix_admin_scope" -sweep="azure"

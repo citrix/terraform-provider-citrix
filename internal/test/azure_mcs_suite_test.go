@@ -37,6 +37,7 @@ func TestAzureMcsSuitePreCheck(t *testing.T) {
 	TestPolicySetResourcePreCheck(t)
 
 	if !isOnPremises {
+		TestAzureImageDefinitionResourcePreCheck(t)
 		TestMachineCatalogPreCheck_AzureAd(t)
 		TestMachineCatalogPreCheck_Workgroup(t)
 	} else {
@@ -205,6 +206,45 @@ func TestAzureMcs(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", resourcePoolName)),
 				),
+			},
+
+			/*******************Image Definition Test******************/
+			{
+				Config: composeTestResourceTf(BuildAzureImageDefinitionTestResource(t)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify the name of the image definition
+					resource.TestCheckResourceAttr("citrix_image_definition.test_azure_image_definition", "name", os.Getenv("TEST_IMAGE_DEFINITION_NAME")),
+					// Verify the description of the image definition
+					resource.TestCheckResourceAttr("citrix_image_definition.test_azure_image_definition", "description", os.Getenv("TEST_IMAGE_DEFINITION_DESCRIPTION")),
+					// Verify the os_type of the image definition
+					resource.TestCheckResourceAttr("citrix_image_definition.test_azure_image_definition", "os_type", os.Getenv("TEST_IMAGE_DEFINITION_OS_TYPE")),
+					// Verify the session_support of the image definition
+					resource.TestCheckResourceAttr("citrix_image_definition.test_azure_image_definition", "session_support", os.Getenv("TEST_IMAGE_DEFINITION_SESSION_SUPPORT")),
+				),
+				SkipFunc: skipForOnPrem(isOnPremises),
+			},
+			// Import testing
+			{
+				ResourceName:            "citrix_image_definition.test_azure_image_definition",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"hypervisor"},
+				SkipFunc:                skipForOnPrem(isOnPremises),
+			},
+			// Update and Read testing
+			{
+				Config: composeTestResourceTf(BuildAzureImageDefinitionUpdatedTestResource(t)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify the name of the image definition
+					resource.TestCheckResourceAttr("citrix_image_definition.test_azure_image_definition", "name", os.Getenv("TEST_IMAGE_DEFINITION_NAME_UPDATED")),
+					// Verify the description of the image definition
+					resource.TestCheckResourceAttr("citrix_image_definition.test_azure_image_definition", "description", os.Getenv("TEST_IMAGE_DEFINITION_DESCRIPTION_UPDATED")),
+					// Verify the os_type of the image definition
+					resource.TestCheckResourceAttr("citrix_image_definition.test_azure_image_definition", "os_type", os.Getenv("TEST_IMAGE_DEFINITION_OS_TYPE_UPDATED")),
+					// Verify the session_support of the image definition
+					resource.TestCheckResourceAttr("citrix_image_definition.test_azure_image_definition", "session_support", os.Getenv("TEST_IMAGE_DEFINITION_SESSION_SUPPORT_UPDATED")),
+				),
+				SkipFunc: skipForOnPrem(isOnPremises),
 			},
 
 			/*******************Service Account Test*******************/

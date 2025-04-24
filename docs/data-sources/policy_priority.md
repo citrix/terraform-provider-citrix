@@ -3,12 +3,12 @@
 page_title: "citrix_policy_priority Data Source - citrix"
 subcategory: "CVAD"
 description: |-
-  Manages  the policy priorities within a policy set.
+  Data source of the policy priorities within a policy set.
 ---
 
 # citrix_policy_priority (Data Source)
 
-Manages  the policy priorities within a policy set.
+Data source of the policy priorities within a policy set.
 
 ## Example Usage
 

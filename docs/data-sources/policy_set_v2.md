@@ -3,12 +3,12 @@
 page_title: "citrix_policy_set_v2 Data Source - citrix"
 subcategory: "CVAD"
 description: |-
-  Manages a policy set and the policies within it. The order of the policies specified in this resource reflect the policy priority.
+  Data source of a policy set and the policies within it. The order of the policies specified in this resource reflect the policy priority.
 ---
 
 # citrix_policy_set_v2 (Data Source)
 
-Manages a policy set and the policies within it. The order of the policies specified in this resource reflect the policy priority.
+Data source of a policy set and the policies within it. The order of the policies specified in this resource reflect the policy priority.
 
 ## Example Usage
 
@@ -36,7 +36,5 @@ data "citrix_policy_set_v2" "example_policy_set_v2_data_source_with_name" {
 
 - `assigned` (Boolean) Indicate whether the policy set is being assigned to delivery groups.
 - `delivery_groups` (Set of String) The IDs of the delivery groups for the policy set to apply on.
-
-~> **Please Note** If `delivery_groups` attribute is unset or configured as an empty set, the policy set will not be assigned to any delivery group. None of the policies in the policy set will be applied.
 - `description` (String) Description of the policy set.
 - `scopes` (Set of String) The IDs of the scopes for the policy set to be a part of.
