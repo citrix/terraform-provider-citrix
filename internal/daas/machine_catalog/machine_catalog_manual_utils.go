@@ -100,8 +100,8 @@ func getMachinesForManualCatalogs(ctx context.Context, diagnostics *diag.Diagnos
 				}
 				vmId = vm.GetId()
 			case citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER:
-				if machine.Datacenter.IsNull() || machine.Host.IsNull() {
-					return nil, nil, fmt.Errorf("datacenter and host are required for vSphere")
+				if machine.Datacenter.IsNull() {
+					return nil, nil, fmt.Errorf("datacenter is required for vSphere")
 				}
 
 				folderPath := hypervisor.GetXDPath()
@@ -127,17 +127,26 @@ func getMachinesForManualCatalogs(ctx context.Context, diagnostics *diag.Diagnos
 					folderPath = cluster.GetXDPath()
 				}
 
-				host, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, folderPath, machine.Host.ValueString(), "computeresource", "", hypervisor)
-				if err != nil {
-					return nil, httpResp, err
+				if !machine.Host.IsNull() {
+					host, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, folderPath, machine.Host.ValueString(), "computeresource", "", hypervisor)
+					if err != nil {
+						return nil, httpResp, err
+					}
+					folderPath = host.GetXDPath()
 				}
-				hostPath := host.GetXDPath()
-				vm, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, hostPath, machineName, util.VirtualMachineResourceType, "", hypervisor)
+
+				vm, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, folderPath, machineName, util.VirtualMachineResourceType, "", hypervisor)
 				if err != nil {
 					return nil, httpResp, err
 				}
 				vmId = vm.GetId()
 			case citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER:
+				vm, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, "", machineName, util.VirtualMachineResourceType, "", hypervisor)
+				if err != nil {
+					return nil, httpResp, err
+				}
+				vmId = vm.GetId()
+			case citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT:
 				vm, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, "", machineName, util.VirtualMachineResourceType, "", hypervisor)
 				if err != nil {
 					return nil, httpResp, err
@@ -416,6 +425,12 @@ func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Conte
 							machineFromPlan.MachineName = types.StringValue(hostedMachineName)
 						}
 					}
+				case citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT:
+					if hostedMachineName != "" {
+						if !strings.EqualFold(machineFromPlan.MachineName.ValueString(), hostedMachineName) {
+							machineFromPlan.MachineName = types.StringValue(hostedMachineName)
+						}
+					}
 				case citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM:
 					if hostedMachineName != "" {
 						if !strings.EqualFold(machineFromPlan.MachineName.ValueString(), hostedMachineName) {
@@ -509,6 +524,10 @@ func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Conte
 					machineModel.MachineName = types.StringValue(hostedMachineName)
 				}
 			case citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER:
+				if hostedMachineName != "" {
+					machineModel.MachineName = types.StringValue(hostedMachineName)
+				}
+			case citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT:
 				if hostedMachineName != "" {
 					machineModel.MachineName = types.StringValue(hostedMachineName)
 				}

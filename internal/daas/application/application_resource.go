@@ -99,6 +99,22 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 		createApplicationRequest.SetCpuPriorityLevel(cpuPriorityLevelValue)
 	}
 
+	if !plan.HomeZoneMode.IsNull() {
+		homeZoneMode, err := citrixorchestration.NewHomeZoneModeFromValue(plan.HomeZoneMode.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating Application "+plan.Name.ValueString(),
+				"Invalid HomeZoneMode value: "+err.Error(),
+			)
+			return
+		}
+		createApplicationRequest.SetHomeZoneMode(*homeZoneMode)
+	}
+
+	if !plan.HomeZone.IsNull() {
+		createApplicationRequest.SetHomeZone(plan.HomeZone.ValueString())
+	}
+
 	if plan.LimitVisibilityToUsers.IsNull() {
 		createApplicationRequest.SetIncludedUserFilterEnabled(false)
 		createApplicationRequest.SetIncludedUsers([]string{})
@@ -274,6 +290,22 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 		editApplicationRequestBody.SetCpuPriorityLevel(cpuPriorityLevelValue)
 	}
 
+	if !plan.HomeZoneMode.IsNull() {
+		homeZoneMode, err := citrixorchestration.NewHomeZoneModeFromValue(plan.HomeZoneMode.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating Application "+applicationName,
+				"Invalid HomeZoneMode value: "+err.Error(),
+			)
+			return
+		}
+		editApplicationRequestBody.SetHomeZoneMode(*homeZoneMode)
+	}
+
+	if !plan.HomeZone.IsNull() {
+		editApplicationRequestBody.SetHomeZone(plan.HomeZone.ValueString())
+	}
+
 	if plan.LimitVisibilityToUsers.IsNull() {
 		editApplicationRequestBody.SetIncludedUserFilterEnabled(false)
 		editApplicationRequestBody.SetIncludedUsers([]string{})
@@ -410,6 +442,25 @@ func (r *applicationResource) ValidateConfig(ctx context.Context, req resource.V
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	if !data.HomeZoneMode.IsNull() {
+		homeZoneMode := data.HomeZoneMode.ValueString()
+		if (homeZoneMode == string(citrixorchestration.HOMEZONEMODE_IGNORE) || homeZoneMode == string(citrixorchestration.HOMEZONEMODE_USER)) && !data.HomeZone.IsNull() {
+			resp.Diagnostics.AddError(
+				"Invalid configuration for HomeZone",
+				"HomeZone cannot be set when HomeZoneMode is set to Ignore or User",
+			)
+			return
+		}
+
+		if (homeZoneMode == string(citrixorchestration.HOMEZONEMODE_ONLY) || homeZoneMode == string(citrixorchestration.HOMEZONEMODE_PREFER)) && data.HomeZone.IsNull() {
+			resp.Diagnostics.AddError(
+				"Invalid configuration for HomeZone",
+				"HomeZone must be set when HomeZoneMode is set to Only or Prefer",
+			)
+			return
+		}
 	}
 
 	if !data.Metadata.IsNull() {

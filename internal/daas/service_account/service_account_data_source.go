@@ -4,7 +4,6 @@ package service_account
 
 import (
 	"context"
-	"strings"
 
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
@@ -55,30 +54,11 @@ func (d *ServiceAccountDataSource) Read(ctx context.Context, req datasource.Read
 		return
 	}
 
-	accountId := data.AccountId.ValueString()
-	getServiceAccounts := d.client.ApiClient.IdentityAPIsDAAS.IdentityGetServiceAccounts(ctx)
-	serviceAccounts, httpResp, err := citrixdaasclient.AddRequestData(getServiceAccounts, d.client).Execute()
-
+	// Fetch the service account using the account ID
+	serviceAccount, err := GetServiceAccountUsingAccountId(ctx, d.client, &resp.Diagnostics, data.AccountId.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading Service Accounts",
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
 		return
 	}
-
-	for _, serviceAccount := range serviceAccounts.GetItems() {
-		if strings.EqualFold(serviceAccount.GetAccountId(), accountId) {
-			data = data.RefreshPropertyValues(ctx, serviceAccount)
-			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-			return
-		}
-	}
-
-	resp.Diagnostics.AddError(
-		"Error reading Service Account "+accountId,
-		"Service Account not found.",
-	)
-
+	data = data.RefreshPropertyValues(ctx, *serviceAccount)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

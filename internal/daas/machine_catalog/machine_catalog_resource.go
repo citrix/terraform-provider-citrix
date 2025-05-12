@@ -367,14 +367,18 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		if err != nil {
 			return
 		}
+		stateProvSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, state.ProvisioningScheme)
+		machineAccountsInState := util.ObjectListToTypedArray[MachineADAccountModel](ctx, &resp.Diagnostics, stateProvSchemeModel.MachineADAccounts)
 
 		machineAccountsToAdd := []MachineADAccountModel{}
-		machineAccountsToDelete := []citrixorchestration.ProvisioningSchemeMachineAccountResponseModel{}
-		for _, machineAccountInCatalog := range machineAccountsInCatalog {
-			if machineAccountInCatalog.GetState() != citrixorchestration.PROVISIONINGSCHEMEMACHINEACCOUNTSTATE_IN_USE && !slices.ContainsFunc(machineAccountsInPlan, func(machineAccountInPlan MachineADAccountModel) bool {
-				return strings.EqualFold(machineAccountInPlan.ADAccountName.ValueString(), machineAccountInCatalog.GetSamName())
+		machineAccountsToDelete := []MachineADAccountModel{}
+
+		// Delete Machine Accounts that were present in the state but not in the plan
+		for _, machineAccountInState := range machineAccountsInState {
+			if machineAccountInState.State.ValueString() != string(citrixorchestration.PROVISIONINGSCHEMEMACHINEACCOUNTSTATE_IN_USE) && !slices.ContainsFunc(machineAccountsInPlan, func(machineAccountInPlan MachineADAccountModel) bool {
+				return strings.EqualFold(machineAccountInPlan.ADAccountName.ValueString(), machineAccountInState.ADAccountName.ValueString())
 			}) {
-				machineAccountsToDelete = append(machineAccountsToDelete, machineAccountInCatalog)
+				machineAccountsToDelete = append(machineAccountsToDelete, machineAccountInState)
 			}
 		}
 
@@ -409,7 +413,7 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 
 			batchRequestItems := []citrixorchestration.BatchRequestItemModel{}
 			for i, machineAccount := range machineAccountsToDelete {
-				relativeUrl := fmt.Sprintf("/MachineCatalogs/%s/MachineAccounts/%s", catalogId, machineAccount.GetSamName())
+				relativeUrl := fmt.Sprintf("/MachineCatalogs/%s/MachineAccounts/%s", catalogId, machineAccount.ADAccountName.ValueString())
 				var batchRequestItem citrixorchestration.BatchRequestItemModel
 				batchRequestItem.SetMethod(http.MethodDelete)
 				batchRequestItem.SetReference(strconv.Itoa(i))

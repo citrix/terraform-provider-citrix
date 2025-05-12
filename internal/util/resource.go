@@ -19,6 +19,7 @@ import (
 const AZURERM_FACTORY_NAME string = "AzureRmFactory"
 const VMWARE_FACTORY_NAME string = "VmwareFactory"
 const NUTANIX_PLUGIN_ID string = "AcropolisFactory"
+const OPENSHIFT_PLUGIN_ID string = "OpenShiftPluginFactory"
 
 // Gets the hypervisor and logs any errors
 func GetHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId string) (*citrixorchestration.HypervisorDetailResponseModel, error) {
@@ -264,7 +265,7 @@ func getSingleResourceFromHypervisor(ctx context.Context, client *citrixdaasclie
 		}
 	}
 
-	return nil, httpResp, fmt.Errorf("could not find resource")
+	return nil, httpResp, fmt.Errorf("could not find resource. Resource name: %s, resource type: %s", resourceName, resourceType)
 }
 
 func GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName string) (string, *http.Response, error) {
@@ -357,6 +358,10 @@ func getSingleHypervisorResource(ctx context.Context, client *citrixdaasclient.C
 			if strings.EqualFold(child.GetName(), resourceName) {
 				return &child, nil, nil
 			}
+		case citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT:
+			if strings.EqualFold(child.GetName(), resourceName) {
+				return &child, nil, nil
+			}
 		case citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM:
 			if strings.EqualFold(child.GetName(), resourceName) {
 				return &child, nil, nil
@@ -368,7 +373,7 @@ func getSingleHypervisorResource(ctx context.Context, client *citrixdaasclient.C
 		}
 	}
 
-	return nil, httpResp, fmt.Errorf("could not find resource")
+	return nil, httpResp, fmt.Errorf("could not find resource. Resource name: %s, resource type: %s", resourceName, resourceType)
 }
 
 func GetAllResourcePathList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId, folderPath, resourceType string, addToDiagnostics bool, noCache bool) []string {
@@ -417,7 +422,8 @@ func getFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.C
 	if connectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM &&
 		connectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER &&
 		connectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER &&
-		connectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM {
+		connectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM &&
+		connectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT {
 		req = req.Type_([]string{resourceType})
 	}
 
@@ -448,9 +454,9 @@ func getFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.C
 					name = strings.Split(name, " ")[0]
 				}
 				if _, exists := filterMap[strings.ToLower(name)]; exists {
-					if (connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM || connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER) && strings.EqualFold(resourceType, NetworkResourceType) {
+					if (connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM || connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER || connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT) && strings.EqualFold(resourceType, NetworkResourceType) {
 						result = append(result, child.GetRelativePath())
-					} else if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && strings.EqualFold(pluginId, NUTANIX_PLUGIN_ID) && strings.EqualFold(resourceType, NetworkResourceType) {
+					} else if (connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && strings.EqualFold(pluginId, NUTANIX_PLUGIN_ID) && strings.EqualFold(resourceType, NetworkResourceType)) || (connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT && strings.EqualFold(pluginId, OPENSHIFT_PLUGIN_ID) && strings.EqualFold(resourceType, NamespaceResourceType)) {
 						result = append(result, child.GetFullName())
 					} else {
 						result = append(result, child.GetXDPath())

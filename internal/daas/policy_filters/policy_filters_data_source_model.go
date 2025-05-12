@@ -123,10 +123,10 @@ func ParsePolicyFilters(ctx context.Context, diags *diag.Diagnostics, policy cit
 	if policy.GetFilters() != nil && len(policy.GetFilters()) != 0 {
 		for _, filter := range policy.GetFilters() {
 
-			var uuidFilterData PolicyFilterUuidDataClientModel
+			var uuidFilterData util.PolicyFilterUuidDataClientModel
 			_ = json.Unmarshal([]byte(filter.GetFilterData()), &uuidFilterData)
 
-			var gatewayFilterData PolicyFilterGatewayDataClientModel
+			var gatewayFilterData util.PolicyFilterGatewayDataClientModel
 			_ = json.Unmarshal([]byte(filter.GetFilterData()), &gatewayFilterData)
 
 			filterType := filter.GetFilterType()

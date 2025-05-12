@@ -47,6 +47,7 @@ jobs:
               -ClientId ${{secrets.CLIENT_ID}} `
               -ClientSecret ${{secrets.CLIENT_SECRET}} `
               -DomainFqdn ${{secrets.DOMAIN_FQDN}} `
+              -CitrixCloudHostname ${{secrets.CITRIX_CLOUD_HOSTNAME}} `
               -Hostname ${{secrets.HOSTNAME}} `
               -AzureClientId ${{secrets.AZURE_CLIENT_ID}} `
               -AzureClientSecret ${{secrets.AZURE_CLIENT_SECRET}} `

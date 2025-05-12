@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
@@ -210,16 +211,59 @@ func (r *awsHypervisorResourcePoolResource) ImportState(ctx context.Context, req
 
 	idParts := strings.Split(req.ID, ",")
 
-	if len(idParts) != 2 || idParts[0] == "" || idParts[1] == "" {
+	if len(idParts) > 2 {
 		resp.Diagnostics.AddError(
 			"Unexpected Import Identifier",
-			fmt.Sprintf("Expected import identifier with format: hypervisorId,hypervisorResourcePoolId. Got: %q", req.ID),
+			fmt.Sprintf("Expected import identifier with format: hypervisorResourcePoolId or hypervisorId,hypervisorResourcePoolId. Got: %q", req.ID),
 		)
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("hypervisor"), idParts[0])...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), idParts[1])...)
+	if len(idParts) == 2 {
+		if idParts[0] == "" || idParts[1] == "" {
+			resp.Diagnostics.AddError(
+				"Unexpected Import Identifier",
+				fmt.Sprintf("Expected import identifier with format: hypervisorId,hypervisorResourcePoolId. Got: %q", req.ID),
+			)
+			return
+		}
+
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("hypervisor"), idParts[0])...)
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), idParts[1])...)
+		return
+	}
+
+	// Support for importing hypervisor resource pool with only resource pool id
+	getHypervisorsAndResourcePoolsRequest := r.client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorsAndResourcePools(ctx)
+	hypervisorAndResourcePools, httpResp, err := citrixdaasclient.AddRequestData(getHypervisorsAndResourcePoolsRequest, r.client).Execute()
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error getting Hypervisor and Resource Pools",
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		return
+	}
+
+	for _, hypervisorAndResourcePool := range hypervisorAndResourcePools.GetItems() {
+		if hypervisorAndResourcePool.ConnectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS {
+			continue
+		}
+
+		resourcePools := hypervisorAndResourcePool.GetResourcePools()
+		if slices.ContainsFunc(resourcePools, func(resourcePool citrixorchestration.HypervisorBaseResponseModel) bool {
+			return strings.EqualFold(resourcePool.GetId(), req.ID)
+		}) {
+			resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("hypervisor"), hypervisorAndResourcePool.GetId())...)
+			resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
+			return
+		}
+	}
+
+	resp.Diagnostics.AddError(
+		"Error importing Hypervisor Resource Pool",
+		fmt.Sprintf("Hypervisor Resource Pool with ID %q not found", req.ID),
+	)
 
 }
 

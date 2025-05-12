@@ -82,7 +82,7 @@ func (filter DeliveryGroupFilterModel) GetFilterRequest(diagnostics *diag.Diagno
 	filterRequest := citrixorchestration.FilterRequest{}
 	filterRequest.SetFilterType("DesktopGroup")
 
-	policyFilterDataClientModel := PolicyFilterUuidDataClientModel{
+	policyFilterDataClientModel := util.PolicyFilterUuidDataClientModel{
 		Uuid:   filter.DeliveryGroupId.ValueString(),
 		Server: serverValue,
 	}
@@ -103,7 +103,7 @@ func (filter DeliveryGroupFilterModel) GetFilterRequest(diagnostics *diag.Diagno
 }
 
 func (r DeliveryGroupFilterModel) RefreshPropertyValues(ctx context.Context, diags *diag.Diagnostics, filter citrixorchestration.FilterResponse) DeliveryGroupFilterModel {
-	var uuidFilterData PolicyFilterUuidDataClientModel
+	var uuidFilterData util.PolicyFilterUuidDataClientModel
 	_ = json.Unmarshal([]byte(filter.GetFilterData()), &uuidFilterData)
 
 	r.Id = types.StringValue(filter.GetFilterGuid())

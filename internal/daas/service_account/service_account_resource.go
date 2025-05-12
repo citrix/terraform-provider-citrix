@@ -58,6 +58,8 @@ func (r *serviceAccountResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
+	errorMessage := fmt.Sprintf("Error creating Service Account %s", plan.DisplayName.ValueString())
+
 	serviceAccountRequestModel := citrixorchestration.CreateServiceAccountRequestModel{}
 	serviceAccountRequestModel.SetDisplayName(plan.DisplayName.ValueString())
 	serviceAccountRequestModel.SetDescription(plan.Description.ValueString())
@@ -81,7 +83,7 @@ func (r *serviceAccountResource) Create(ctx context.Context, req resource.Create
 		expiryDateTime, err := time.Parse(time.DateOnly, plan.SecretExpiryTime.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error creating Service Account",
+				errorMessage,
 				"Error parsing secret expiry time: "+plan.SecretExpiryTime.ValueString(),
 			)
 			return
@@ -93,15 +95,47 @@ func (r *serviceAccountResource) Create(ctx context.Context, req resource.Create
 	serviceAccountRequestModel.SetScopes(util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes))
 
 	createServiceAccountRequest := r.client.ApiClient.IdentityAPIsDAAS.IdentityCreateServiceAccount(ctx)
-	createServiceAccountRequest = createServiceAccountRequest.CreateServiceAccountRequestModel(serviceAccountRequestModel)
-	serviceAccountResponse, httpResp, err := citrixdaasclient.AddRequestData(createServiceAccountRequest, r.client).Execute()
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating Service Account "+plan.DisplayName.ValueString(),
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-		return
+	serviceAccountResponse := &citrixorchestration.ServiceAccountResponseModel{}
+	httpResp := &http.Response{}
+
+	// Check if the Cloud DDC version is supported for async operation
+	isDdcVersionSupported := r.client.ClientConfig.OrchestrationApiVersion >= util.DDCVersionToCreateServiceAccountWithAsync && !r.client.AuthConfig.OnPremises
+	if isDdcVersionSupported {
+		createServiceAccountRequest = createServiceAccountRequest.CreateServiceAccountRequestModel(serviceAccountRequestModel).Async(true)
+		_, httpResp, err = citrixdaasclient.AddRequestData(createServiceAccountRequest, r.client).Execute()
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				errorMessage,
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return
+		}
+
+		// Process the async job response
+		err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, errorMessage, &diags, 10)
+		if err != nil {
+			return
+		}
+
+		// Fetch the service account using the account ID
+		serviceAccountResponse, err = GetServiceAccountUsingAccountId(ctx, r.client, &resp.Diagnostics, plan.AccountId.ValueString())
+		if err != nil {
+			return
+		}
+
+	} else {
+		createServiceAccountRequest = createServiceAccountRequest.CreateServiceAccountRequestModel(serviceAccountRequestModel)
+		serviceAccountResponse, httpResp, err = citrixdaasclient.AddRequestData(createServiceAccountRequest, r.client).Execute()
+		if err != nil {
+			resp.Diagnostics.AddError(
+				errorMessage,
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return
+		}
 	}
 
 	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, serviceAccountResponse)

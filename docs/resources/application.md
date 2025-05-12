@@ -98,6 +98,8 @@ resource "citrix_application" "example-application" {
 - `delivery_groups_priority` (Attributes Set) Set of delivery groups with their corresponding priority. (see [below for nested schema](#nestedatt--delivery_groups_priority))
 - `description` (String) Description of the application.
 - `enabled` (Boolean) Indicates whether the application is enabled or disabled. Default is `true`.
+- `home_zone` (String) Specifies the home zone for the application. This can be set using the zone ID.
+- `home_zone_mode` (String) Defines the home zone mode for the application. Allowed values are: Prefer, Ignore, Only, User.
 - `icon` (String) The Id of the icon to be associated with the application.
 - `limit_to_one_instance_per_user` (Boolean) Specifies if the use of the application should be limited to only one instance per user. Default is `false`.
 - `limit_visibility_to_users` (Set of String) By default, the application is visible to all users within a delivery group. However, you can restrict its visibility to only certain users by specifying them in the `limit_visibility_to_users` list.

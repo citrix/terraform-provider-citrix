@@ -503,6 +503,7 @@ func ParseNetworkMappingToClientModel(networkMappings []NetworkMappingModel, res
 		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM ||
 		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER ||
 		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER ||
+		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT ||
 		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && hypervisorPluginId == NUTANIX_PLUGIN_ID {
 		networks = resourcePool.Networks
 	}
@@ -514,6 +515,7 @@ func ParseNetworkMappingToClientModel(networkMappings []NetworkMappingModel, res
 			resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM ||
 			resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER ||
 			resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER ||
+			resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT ||
 			resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && hypervisorPluginId == NUTANIX_PLUGIN_ID {
 			networkName = networkMapping.Network.ValueString()
 		} else if resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS {

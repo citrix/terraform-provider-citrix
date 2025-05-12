@@ -79,7 +79,7 @@ func (filter TagFilterModel) GetFilterRequest(diagnostics *diag.Diagnostics, ser
 	filterRequest := citrixorchestration.FilterRequest{}
 	filterRequest.SetFilterType("DesktopTag")
 
-	policyFilterDataClientModel := PolicyFilterUuidDataClientModel{
+	policyFilterDataClientModel := util.PolicyFilterUuidDataClientModel{
 		Uuid:   filter.Tag.ValueString(),
 		Server: serverValue,
 	}
@@ -100,7 +100,7 @@ func (filter TagFilterModel) GetFilterRequest(diagnostics *diag.Diagnostics, ser
 }
 
 func (r TagFilterModel) RefreshPropertyValues(ctx context.Context, diags *diag.Diagnostics, filter citrixorchestration.FilterResponse) TagFilterModel {
-	var uuidFilterData PolicyFilterUuidDataClientModel
+	var uuidFilterData util.PolicyFilterUuidDataClientModel
 	_ = json.Unmarshal([]byte(filter.GetFilterData()), &uuidFilterData)
 
 	r.Id = types.StringValue(filter.GetFilterGuid())

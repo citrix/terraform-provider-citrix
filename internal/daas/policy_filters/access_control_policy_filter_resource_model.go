@@ -94,7 +94,7 @@ func (filter AccessControlFilterModel) GetFilterRequest(diagnostics *diag.Diagno
 	filterRequest := citrixorchestration.FilterRequest{}
 	filterRequest.SetFilterType("AccessControl")
 
-	policyFilterDataClientModel := PolicyFilterGatewayDataClientModel{
+	policyFilterDataClientModel := util.PolicyFilterGatewayDataClientModel{
 		Connection: filter.Connection.ValueString(),
 		Condition:  filter.Condition.ValueString(),
 		Gateway:    filter.Gateway.ValueString(),
@@ -115,7 +115,7 @@ func (filter AccessControlFilterModel) GetFilterRequest(diagnostics *diag.Diagno
 }
 
 func (r AccessControlFilterModel) RefreshPropertyValues(ctx context.Context, diags *diag.Diagnostics, filter citrixorchestration.FilterResponse) AccessControlFilterModel {
-	var gatewayFilterData PolicyFilterGatewayDataClientModel
+	var gatewayFilterData util.PolicyFilterGatewayDataClientModel
 	_ = json.Unmarshal([]byte(filter.GetFilterData()), &gatewayFilterData)
 	r.Id = types.StringValue(filter.GetFilterGuid())
 	r.PolicyId = types.StringValue(filter.GetPolicyGuid())

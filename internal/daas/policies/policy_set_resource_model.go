@@ -64,17 +64,6 @@ func (PolicySettingModel) GetAttributes() map[string]schema.Attribute {
 	return PolicySettingModel{}.GetSchema().Attributes
 }
 
-type PolicyFilterUuidDataClientModel struct {
-	Server string `json:"server,omitempty"`
-	Uuid   string `json:"uuid,omitempty"`
-}
-
-type PolicyFilterGatewayDataClientModel struct {
-	Connection string `json:"connection,omitempty"`
-	Condition  string `json:"condition,omitempty"`
-	Gateway    string `json:"gateway,omitempty"`
-}
-
 type PolicyModel struct {
 	Id                       types.String `tfsdk:"id"`
 	Name                     types.String `tfsdk:"name"`
@@ -456,10 +445,10 @@ func ParsePolicyFilters(ctx context.Context, diags *diag.Diagnostics, policy cit
 	if policy.GetFilters() != nil && len(policy.GetFilters()) != 0 {
 		for _, filter := range policy.GetFilters() {
 
-			var uuidFilterData PolicyFilterUuidDataClientModel
+			var uuidFilterData util.PolicyFilterUuidDataClientModel
 			_ = json.Unmarshal([]byte(filter.GetFilterData()), &uuidFilterData)
 
-			var gatewayFilterData PolicyFilterGatewayDataClientModel
+			var gatewayFilterData util.PolicyFilterGatewayDataClientModel
 			_ = json.Unmarshal([]byte(filter.GetFilterData()), &gatewayFilterData)
 
 			filterType := filter.GetFilterType()

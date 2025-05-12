@@ -324,6 +324,44 @@ resource "citrix_machine_catalog" "example-scvmm-mtsession" {
     }
 }
 
+resource "citrix_machine_catalog" "example-openshift-mtsession" {
+    name                        = "example-openshift-mtsession"
+    description                 = "Example multi-session catalog on OpenShift hypervisor"
+    zone                        = citrix_zone.openshift-zone.id
+    allocation_type             = "Random"
+    session_support             = "MultiSession"
+    provisioning_type             = "MCS"
+    provisioning_scheme         = {
+        hypervisor = citrix_openshift_hypervisor.example-openshift-hypervisor.id
+        hypervisor_resource_pool = citrix_openshift_hypervisor_resource_pool.example-openshift-rp.id
+        identity_type = "ActiveDirectory"
+        machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+        openshift_machine_config = {
+            master_image_vm = "<Image VM name>"
+            cpu_count = 2
+            memory_mb = 4096
+            writeback_cache = {
+                writeback_cache_disk_size_gb = 32
+                writeback_cache_memory_size_mb = 2048
+            }
+        }
+        
+        number_of_total_machines = 1
+        machine_account_creation_rules = {
+            naming_scheme = "catalog-##"
+            naming_scheme_type = "Numeric"
+        }
+        network_mapping = [{
+            network = "<network name>"
+            network_device = "0"
+        }]
+    }
+}
+
 resource "citrix_machine_catalog" "example-azure-pvs-mtsession" {
 	name                		= "example-azure-pvs-mtsession"
 	description					= "Example multi-session catalog on Azure hypervisor"

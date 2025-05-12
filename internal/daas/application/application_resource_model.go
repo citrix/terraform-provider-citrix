@@ -129,6 +129,8 @@ type ApplicationResourceModel struct {
 	Visible                   types.Bool   `tfsdk:"visible"`
 	BrowserName               types.String `tfsdk:"browser_name"`
 	CpuPriorityLevel          types.String `tfsdk:"cpu_priority_level"`
+	HomeZoneMode              types.String `tfsdk:"home_zone_mode"`
+	HomeZone                  types.String `tfsdk:"home_zone"`
 }
 
 // Schema defines the schema for the data source.
@@ -303,6 +305,29 @@ func (ApplicationResourceModel) GetSchema() schema.Schema {
 					util.GetValidatorFromEnum(citrixorchestration.AllowedCpuPriorityLevelEnumValues),
 				},
 			},
+			"home_zone_mode": schema.StringAttribute{
+				Description: "Defines the home zone mode for the application. Allowed values are: Prefer, Ignore, Only, User.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(string(citrixorchestration.HOMEZONEMODE_USER)),
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						string(citrixorchestration.HOMEZONEMODE_PREFER),
+						string(citrixorchestration.HOMEZONEMODE_IGNORE),
+						string(citrixorchestration.HOMEZONEMODE_ONLY),
+						string(citrixorchestration.HOMEZONEMODE_USER),
+					),
+				},
+			},
+			"home_zone": schema.StringAttribute{
+				Description: "Specifies the home zone for the application. This can be set using the zone ID.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("00000000-0000-0000-0000-000000000000"),
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
+				},
+			},
 		},
 	}
 }
@@ -327,6 +352,8 @@ func (r ApplicationResourceModel) RefreshPropertyValues(ctx context.Context, dia
 	r.Visible = types.BoolValue(application.GetVisible())
 	r.BrowserName = types.StringValue(application.GetBrowserName())
 	r.CpuPriorityLevel = types.StringValue(string(application.GetCpuPriorityLevel()))
+	r.HomeZoneMode = types.StringValue(string(application.GetHomeZoneMode()))
+	r.HomeZone = types.StringValue(application.HomeZone.GetId())
 
 	// Set optional values
 	adminFolder := application.GetApplicationFolder()
