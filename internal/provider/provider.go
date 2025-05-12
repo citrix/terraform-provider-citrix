@@ -37,6 +37,7 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/daas/policy_set_resource"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/policy_setting"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/service_account"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/site_backup_schedule"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/storefront_server"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/tags"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/vda"
@@ -993,6 +994,7 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		hypervisor.NewXenserverHypervisorResource,
 		hypervisor.NewNutanixHypervisorResource,
 		hypervisor.NewSCVMMHypervisorResource,
+		hypervisor.NewOpenShiftHypervisorResource,
 		hypervisor_resource_pool.NewAzureHypervisorResourcePoolResource,
 		hypervisor_resource_pool.NewAwsHypervisorResourcePoolResource,
 		hypervisor_resource_pool.NewGcpHypervisorResourcePoolResource,
@@ -1000,6 +1002,7 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		hypervisor_resource_pool.NewVsphereHypervisorResourcePoolResource,
 		hypervisor_resource_pool.NewNutanixHypervisorResourcePoolResource,
 		hypervisor_resource_pool.NewSCVMMHypervisorResourcePoolResource,
+		hypervisor_resource_pool.NewOpenShiftHypervisorResourcePoolResource,
 		machine_catalog.NewMachineCatalogResource,
 		machine_catalog.NewMachinePropertiesResource,
 		delivery_group.NewDeliveryGroupResource,
@@ -1036,6 +1039,7 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		image_definition.NewImageVersionResource,
 		service_account.NewServiceAccountResource,
 		cvad_site.NewSiteSettingsResource,
+		site_backup_schedule.NewSiteBackupScheduleResource,
 		// StoreFront Resources
 		stf_deployment.NewSTFDeploymentResource,
 		stf_authentication.NewSTFAuthenticationServiceResource,

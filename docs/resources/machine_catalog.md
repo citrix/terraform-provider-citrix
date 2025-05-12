@@ -342,6 +342,44 @@ resource "citrix_machine_catalog" "example-scvmm-mtsession" {
     }
 }
 
+resource "citrix_machine_catalog" "example-openshift-mtsession" {
+    name                        = "example-openshift-mtsession"
+    description                 = "Example multi-session catalog on OpenShift hypervisor"
+    zone                        = citrix_zone.openshift-zone.id
+    allocation_type             = "Random"
+    session_support             = "MultiSession"
+    provisioning_type             = "MCS"
+    provisioning_scheme         = {
+        hypervisor = citrix_openshift_hypervisor.example-openshift-hypervisor.id
+        hypervisor_resource_pool = citrix_openshift_hypervisor_resource_pool.example-openshift-rp.id
+        identity_type = "ActiveDirectory"
+        machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+        openshift_machine_config = {
+            master_image_vm = "<Image VM name>"
+            cpu_count = 2
+            memory_mb = 4096
+            writeback_cache = {
+                writeback_cache_disk_size_gb = 32
+                writeback_cache_memory_size_mb = 2048
+            }
+        }
+        
+        number_of_total_machines = 1
+        machine_account_creation_rules = {
+            naming_scheme = "catalog-##"
+            naming_scheme_type = "Numeric"
+        }
+        network_mapping = [{
+            network = "<network name>"
+            network_device = "0"
+        }]
+    }
+}
+
 resource "citrix_machine_catalog" "example-azure-pvs-mtsession" {
 	name                		= "example-azure-pvs-mtsession"
 	description					= "Example multi-session catalog on Azure hypervisor"
@@ -578,7 +616,7 @@ Optional:
 
 ~> **Please Note** Folder path should should only be specified for cluster folders. For VM folders, they can be ignored and the folder path should be omitted.
 - `datacenter` (String) **[vSphere: Required]** The datacenter in which the machine resides. Required only if `is_power_managed = true`
-- `host` (String) **[vSphere, SCVMM: Required]** For vSphere, this is the IP address or FQDN of the host in which the machine resides. For SCVMM, this is the name of the host in which the machine resides. Required only if `is_power_managed = true`
+- `host` (String) **[SCVMM: Required, vSphere: Optional]** For vSphere, this is the IP address or FQDN of the host in which the machine resides. For SCVMM, this is the name of the host in which the machine resides. Required for SCVMM only if `is_power_managed = true`
 - `machine_name` (String) The name of the machine. Required only if `is_power_managed = true`
 - `project_name` (String) **[GCP: Required]** The project name in which the machine resides. Required only if `is_power_managed = true`
 - `region` (String) **[Azure, GCP: Required]** The region in which the machine resides. Required only if `is_power_managed = true`
@@ -624,6 +662,7 @@ Optional:
  **Please Note** In-Place update of metadata is only supported for Cloud environments and On-Premises DDC version 2505 or later. (see [below for nested schema](#nestedatt--provisioning_scheme--metadata))
 - `network_mapping` (Attributes List) Specifies how the attached NICs are mapped to networks. If this parameter is omitted, provisioned VMs are created with a single NIC, which is mapped to the default network in the hypervisor resource pool. If this parameter is supplied, machines are created with the number of NICs specified in the map, and each NIC is attached to the specified network.<br />Required when `provisioning_scheme.identity_type` is `AzureAD`. (see [below for nested schema](#nestedatt--provisioning_scheme--network_mapping))
 - `nutanix_machine_config` (Attributes) Machine Configuration For Nutanix MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--nutanix_machine_config))
+- `openshift_machine_config` (Attributes) Machine Configuration For OpenShift MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--openshift_machine_config))
 - `scvmm_machine_config` (Attributes) Machine Configuration for SCVMM MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--scvmm_machine_config))
 - `vsphere_machine_config` (Attributes) Machine Configuration for vSphere MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--vsphere_machine_config))
 - `xenserver_machine_config` (Attributes) Machine Configuration For XenServer MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--xenserver_machine_config))
@@ -939,6 +978,46 @@ Optional:
 - `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.-> **Note** When `reboot_duration` is set to `-1`, if a warning message should be displayed, `warning_duration` has to be set to `-1` to show the warning message immediately.-> **Note** When `reboot_duration` is not set to `-1`, `warning_duration` cannot be set to `-1`.
 - `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot. The optional pattern '%m%' is replaced by the number of minutes until the reboot.
 - `warning_repeat_interval` (Number) Number of minutes to wait before showing the reboot warning message again.
+
+
+
+<a id="nestedatt--provisioning_scheme--openshift_machine_config"></a>
+### Nested Schema for `provisioning_scheme.openshift_machine_config`
+
+Required:
+
+- `cpu_count` (Number) Number of CPU cores for the VDA VMs.
+- `master_image_vm` (String) The name of the virtual machine that will be used as master image. This property is case sensitive.
+- `memory_mb` (Number) Size of the memory in MB for the VDA VMs.
+
+Optional:
+
+- `image_update_reboot_options` (Attributes) The options for how rebooting is performed for image update. When omitted, image update on the VDAs will be performed on next shutdown. (see [below for nested schema](#nestedatt--provisioning_scheme--openshift_machine_config--image_update_reboot_options))
+- `master_image_note` (String) The note for the master image.
+- `use_full_disk_clone_provisioning` (Boolean) Specify if virtual machines created from the provisioning scheme should be created using the dedicated full disk clone feature. Default is `false`.
+- `writeback_cache` (Attributes) Write-back Cache config. Leave this empty to disable Write-back Cache. (see [below for nested schema](#nestedatt--provisioning_scheme--openshift_machine_config--writeback_cache))
+
+<a id="nestedatt--provisioning_scheme--openshift_machine_config--image_update_reboot_options"></a>
+### Nested Schema for `provisioning_scheme.openshift_machine_config.image_update_reboot_options`
+
+Required:
+
+- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. -> **Note** Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
+
+Optional:
+
+- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.-> **Note** When `reboot_duration` is set to `-1`, if a warning message should be displayed, `warning_duration` has to be set to `-1` to show the warning message immediately.-> **Note** When `reboot_duration` is not set to `-1`, `warning_duration` cannot be set to `-1`.
+- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot. The optional pattern '%m%' is replaced by the number of minutes until the reboot.
+- `warning_repeat_interval` (Number) Number of minutes to wait before showing the reboot warning message again.
+
+
+<a id="nestedatt--provisioning_scheme--openshift_machine_config--writeback_cache"></a>
+### Nested Schema for `provisioning_scheme.openshift_machine_config.writeback_cache`
+
+Required:
+
+- `writeback_cache_disk_size_gb` (Number) The size in GB of any temporary storage disk used by the write back cache.
+- `writeback_cache_memory_size_mb` (Number) The size of the in-memory write back cache in MB.
 
 
 

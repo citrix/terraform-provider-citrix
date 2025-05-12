@@ -22,19 +22,52 @@ Currently this script is still in TechPreview
     For Citrix on-premises customers: Use this to specify a DDC administrator password.
     For Citrix Cloud customers: Use this to specify Cloud API Key Client Secret.
 
+.Parameter DomainFqdn
+    The domain FQDN of the Active Directory in test environment. Only required for on-premises customers.
+
+.Parameter CitrixCloudHostname
+    The base URL of Citrix Cloud service. Only required for Citrix Cloud customers.
+
 .Parameter Hostname
     The Host name / base URL of Citrix DaaS service.
     For Citrix on-premises customers (Required): Use this to specify Delivery Controller hostname.
     For Citrix Cloud customers (Optional): Use this to force override the Citrix DaaS service hostname.
 
-.Parameter Environment
-    The Citrix Cloud environment of the customer. Only applicable for Citrix Cloud customers. Available options: Production, Staging
+.Parameter AzureClientId
+    The Client Id for Azure SPN used for powering on the Azure VMs for test environment.
 
-.Parameter SetDependencyRelationship
-    Create dependency relationships between resources by replacing resource IDs with resource references.
+.Parameter AzureClientSecret
+    The Client Secret for Azure SPN used for powering on the Azure VMs for test environment.
+
+.Parameter AzureTenantId
+    The Tenant Id for Azure SPN used for powering on the Azure VMs for test environment.
+
+.Parameter AzureSubscriptionId
+    The Subscription Id for powering on the Azure VMs for test environment.
+
+.Parameter AzureResourceGroupName
+    The Resource Group Name for powering on the Azure VMs for test environment.
+
+.Parameter AzureAdVmName
+    The Azure VM name of the Active Directory Domain Controller.
+
+.Parameter AzureConnectorVm1Name
+    The Azure VM name of the Citrix Cloud Connector 1.
+
+.Parameter AzureConnectorVm2Name
+    The Azure VM name of the Citrix Cloud Connector 2.
 
 .Parameter DisableSSLValidation
     Disable SSL validation for this script. Required if DDC does not have a valid SSL certificate.
+
+.Parameter OnPremises
+    Set to true if the script is used for powering on the on-premise test environment.
+
+.Parameter OrchestrationPollingTimeout
+    Timeout in seconds for polling the orchestration service to be available. Default is 600 seconds (10 minutes).
+
+.Parameter SkipOrchestrationPolling
+    Set this flag to skip polling for orchestration service to be available.
 
 #>  
 
@@ -49,8 +82,11 @@ Param (
     [Parameter(Mandatory = $true)]
     [string] $ClientSecret,
 
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [string] $DomainFqdn,
+
+    [Parameter(Mandatory = $false)]
+    [string] $CitrixCloudHostname,
 
     [Parameter(Mandatory = $true)]
     [string] $Hostname,
@@ -89,8 +125,64 @@ Param (
     [bool] $OnPremises = $true,
 
     [Parameter(Mandatory = $false)]
+    [int] $OrchestrationPollingTimeout = 600,
+
+    [Parameter(Mandatory = $false)]
     [switch] $SkipOrchestrationPolling
 )
+
+function Get-CCAuthToken {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string] $ccHostname,
+
+        [Parameter(Mandatory = $true)]
+        [string] $customerId,
+
+        [Parameter(Mandatory = $true)]
+        [string] $clientId,
+
+        [Parameter(Mandatory = $true)]
+        [string] $clientSecret
+    )
+
+    $ccauth_url = "https://$ccHostname/cctrustoauth2/$customerId/tokens/clients"
+    $body = @{
+        grant_type = "client_credentials"
+        client_id = $clientId
+        client_secret = $clientSecret
+    }
+    $bodyString = ($body.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join "&"
+
+    $response = Invoke-RestMethod -Uri $ccauth_url -Method POST -Body $bodyString -ContentType "application/x-www-form-urlencoded"
+    $token = $response.access_token
+    $authHeader = "CwsAuth Bearer=$token"
+
+    return $authHeader
+}
+
+function Start-DaasService {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string] $ccHostname,
+
+        [Parameter(Mandatory = $true)]
+        [string] $hostname,
+
+        [Parameter(Mandatory = $true)]
+        [string] $customerId,
+
+        [Parameter(Mandatory = $true)]
+        [string] $clientId,
+
+        [Parameter(Mandatory = $true)]
+        [string] $clientSecret
+    )
+
+    $authHeader = Get-CCAuthToken -ccHostname $ccHostname -customerId $customerId -clientId $clientId -clientSecret $clientSecret
+    $url = "https://$hostname/resourceprovider/$customerId/site/activation?customerId=$customerId"
+    Invoke-RestMethod -Uri $url -Method POST -Headers @{ "Authorization" = "$authHeader" }
+}
 
 function Start-AzureVm {
     param (
@@ -108,32 +200,54 @@ function Start-AzureVm {
 }
 
 function Get-Me {
-    $base64Auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$DomainFqdn\$ClientId", $ClientSecret)))
-    try {
-        if ($DisableSSLValidation) {
-            $response = Invoke-RestMethod -Uri "https://$Hostname/citrix/orchestration/api/techpreview/tokens" -Method POST -Headers @{ "Authorization" = "Basic $base64Auth" } -SkipCertificateCheck
-        } else {
-            $response = Invoke-RestMethod -Uri "https://$Hostname/citrix/orchestration/api/techpreview/tokens" -Method POST -Headers @{ "Authorization" = "Basic $base64Auth" }
+    if ($OnPremises) {
+        try {
+            $base64Auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$DomainFqdn\$ClientId", $ClientSecret)))
+            if ($DisableSSLValidation) {
+                $response = Invoke-RestMethod -Uri "https://$Hostname/citrix/orchestration/api/techpreview/tokens" -Method POST -Headers @{ "Authorization" = "Basic $base64Auth" } -SkipCertificateCheck
+            } else {
+                $response = Invoke-RestMethod -Uri "https://$Hostname/citrix/orchestration/api/techpreview/tokens" -Method POST -Headers @{ "Authorization" = "Basic $base64Auth" }
+            }
+        } catch {
+            if ($_.Exception.Response.StatusCode.value__ -ne 200) {
+                Write-Host "Failed to get auth token. Status Code: $($_.Exception.Response.StatusCode.value__)"
+                Write-Host "Error: $($_.Exception.Message)"
+                return $false
+            }
         }
-    } catch {
-        if ($_.Exception.Response.StatusCode.value__ -ne 200) {
-            Write-Host "Failed to get auth token. Status Code: $($_.Exception.Response.StatusCode.value__)"
-            Write-Host "Error: $($_.Exception.Message)"
-            return $false
+    
+        $token = $response.Token
+        try {
+            
+            if ($DisableSSLValidation) {
+                Invoke-RestMethod -Uri "https://$Hostname/citrix/orchestration/api/techpreview/me" -Method GET -Headers @{ "Authorization" = "Bearer $token" } -SkipCertificateCheck | Out-Null
+            } else {
+                Invoke-RestMethod -Uri "https://$Hostname/citrix/orchestration/api/techpreview/me" -Method GET -Headers @{ "Authorization" = "Bearer $token" } | Out-Null
+            }
+        } catch {
+            if ($_.Exception.Response.StatusCode.value__ -ne 200) {
+                Write-Host "Failed to get Site"
+                return $false
+            }
         }
-    }
-
-    $token = $response.Token
-    try {
-        if ($DisableSSLValidation) {
-            Invoke-RestMethod -Uri "https://$Hostname/citrix/orchestration/api/techpreview/me" -Method GET -Headers @{ "Authorization" = "Bearer $token" } -SkipCertificateCheck
-        } else {
-            Invoke-RestMethod -Uri "https://$Hostname/citrix/orchestration/api/techpreview/me" -Method GET -Headers @{ "Authorization" = "Bearer $token" }
+    } else {
+        try {
+            $authHeader = Get-CCAuthToken -cchostname $CitrixCloudHostname -customerId $CustomerId -clientId $ClientId -clientSecret $ClientSecret
+        } catch {
+            if ($_.Exception.Response.StatusCode.value__ -ne 200) {
+                Write-Host "Failed to get auth token. Status Code: $($_.Exception.Response.StatusCode.value__)"
+                Write-Host "Error: $($_.Exception.Message)"
+                return $false
+            }
         }
-    } catch {
-        if ($_.Exception.Response.StatusCode.value__ -ne 200) {
-            Write-Host "Failed to get Site"
-            return $false
+    
+        try {
+            Invoke-RestMethod -Uri "https://$Hostname/cvad/manage/me" -Method GET -Headers @{ "Authorization" = "$authHeader"; "Citrix-CustomerId" = "$CustomerId" } | Out-Null
+        } catch {
+            if ($_.Exception.Response.StatusCode.value__ -ne 200) {
+                Write-Host "Failed to get Site"
+                return $false
+            }
         }
     }
 
@@ -152,21 +266,26 @@ Start-AzureVm -ResourceGroupName $AzureResourceGroupName -VmName $AzureAdVmName
 if ($OnPremises -eq $true) {
     Start-AzureVm -ResourceGroupName $AzureResourceGroupName -VmName $AzureDdcVmName
 } else {
-    Start-AzureVm -ResourceGroupName $AzureResourceGroupName -VmName $AzureConnectorVm1Name
-    Start-AzureVm -ResourceGroupName $AzureResourceGroupName -VmName $AzureConnectorVm2Name
+    if ($AzureConnectorVm1Name) {
+        Start-AzureVm -ResourceGroupName $AzureResourceGroupName -VmName $AzureConnectorVm1Name
+    }
+    if ($AzureConnectorVm2Name) {
+        Start-AzureVm -ResourceGroupName $AzureResourceGroupName -VmName $AzureConnectorVm2Name
+    }
+    Start-DaasService -ccHostname $CitrixCloudHostname -hostname $Hostname -customerId $CustomerId -clientId $ClientId -clientSecret $ClientSecret
 }
 
-# Skip polling for orchestration if the environment is cloud
-if (($OnPremises -eq $false) -or $SkipOrchestrationPolling) {
+# Skip polling for orchestration if the flag is set
+if ($SkipOrchestrationPolling) {
     exit 0
 }
 
 # Poll for the orchestration service to be available
 ## Poll for GetMe API to return 200
-$timeout = 600
 $curTime = Get-Date
-$endTime = $curTime.AddSeconds($timeout)
+$endTime = $curTime.AddSeconds($OrchestrationPollingTimeout)
 $success = $false
+Write-Host "Start polling Orchestration service. Timeout is set to $OrchestrationPollingTimeout seconds."
 while ($curTime -le $endTime) {
     $success = Get-Me
     if ($success) {
@@ -179,7 +298,7 @@ while ($curTime -le $endTime) {
 }
 
 if ($success -eq $false) {
-    Write-Host "Orchestration service is not available after $timeout seconds."
+    Write-Error "Orchestration service is not available after $OrchestrationPollingTimeout seconds."
     exit 1
 }
 

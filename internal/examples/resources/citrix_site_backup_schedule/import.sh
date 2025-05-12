@@ -1,0 +1,1 @@
+terraform import citrix_site_backup_schedule.example-backup-schedule 1

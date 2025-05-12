@@ -150,7 +150,7 @@ func (MachineCatalogMachineModel) GetSchema() schema.NestedAttributeObject {
 				Optional:    true,
 			},
 			"host": schema.StringAttribute{
-				Description: "**[vSphere, SCVMM: Required]** For vSphere, this is the IP address or FQDN of the host in which the machine resides. For SCVMM, this is the name of the host in which the machine resides. Required only if `is_power_managed = true`",
+				Description: "**[SCVMM: Required, vSphere: Optional]** For vSphere, this is the IP address or FQDN of the host in which the machine resides. For SCVMM, this is the name of the host in which the machine resides. Required for SCVMM only if `is_power_managed = true`",
 				Optional:    true,
 			},
 		},
@@ -172,6 +172,7 @@ type ProvisioningSchemeModel struct {
 	XenserverMachineConfig      types.Object `tfsdk:"xenserver_machine_config"` // XenserverMachineConfigModel
 	NutanixMachineConfig        types.Object `tfsdk:"nutanix_machine_config"`   // NutanixMachineConfigModel
 	SCVMMMachineConfigModel     types.Object `tfsdk:"scvmm_machine_config"`     // SCVMMMachineConfigModel
+	OpenshiftMachineConfig      types.Object `tfsdk:"openshift_machine_config"` // OpenshiftMachineConfigModel
 	NumTotalMachines            types.Int64  `tfsdk:"number_of_total_machines"`
 	NetworkMapping              types.List   `tfsdk:"network_mapping"`    // List[NetworkMappingModel]
 	AvailabilityZones           types.List   `tfsdk:"availability_zones"` // List[string]
@@ -210,6 +211,7 @@ func (ProvisioningSchemeModel) GetSchema() schema.SingleNestedAttribute {
 			"vsphere_machine_config":   VsphereMachineConfigModel{}.GetSchema(),
 			"xenserver_machine_config": XenserverMachineConfigModel{}.GetSchema(),
 			"nutanix_machine_config":   NutanixMachineConfigModel{}.GetSchema(),
+			"openshift_machine_config": OpenshiftMachineConfigModel{}.GetSchema(),
 			"scvmm_machine_config":     SCVMMMachineConfigModel{}.GetSchema(),
 			"machine_domain_identity":  MachineDomainIdentityModel{}.GetSchema(),
 			"number_of_total_machines": schema.Int64Attribute{

@@ -50,14 +50,14 @@ This automation script is designed to onboard an existing site to Terraform. It 
     - `ClientSecret`: Your client secret for Citrix DaaS service authentication.
       - For Citrix on-premises customers: Use this to specify a DDC administrator password.
       - For Citrix Cloud customers: Use this to specify Citrix Cloud service principal secret.
-    - `DomainFqdn`: Your client secret for Citrix DaaS service authentication.
+    - `DomainFqdn`: The domain FQDN of the Active Directory. Only required for on-premises customers.
       - For Citrix on-premises customers **only** (Required): Use this to specify Domain FQDN.
     - `HostName`: The host name or base URL of your Citrix DaaS service.
       - For Citrix on-premises customers (Required): Use this to specify Delivery Controller hostname.
       - For Citrix Cloud customers (Optional): Use this to force override the Citrix DaaS service hostname.
     - `Environment`: 
       - For Citrix Cloud customers **only** (Optional): Your Citrix Cloud environment. The available options are `Production` and `Staging`. The default value is `Production`.
-    - `SetDependencyRelationship` (Switch): Add this switch to create dependency relationships between resources by replacing resouce ID with resource references.
+    - `SetDependencyRelationship` (Switch): Add this switch to create dependency relationships between resources by replacing resource ID with resource references.
     - `DisableSSLValidation` (Switch):
       - For Citrix on-premises customers **only**: Add this switch to disable SSL validation on both the PowerShell session and the provider client. SSL validation has to be disabled for this script to work if your on-premises DDC does not have a valid SSL certificate.
     - `ShowClientSecret` (Switch):

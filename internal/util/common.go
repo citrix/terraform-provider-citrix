@@ -94,6 +94,9 @@ const DateRegex string = `^\d{4}-\d{2}-\d{2}$`
 // Time HH:MM
 const TimeRegex string = `^([0-1][0-9]|2[0-3]):[0-5][0-9]$`
 
+// Time with seconds HH:MM:SS
+const TimeWithSecondsRegex string = `^([0-1][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$`
+
 // TimeSpan dd.HH:MM:SS
 const TimeSpanRegex string = `^(\d+)\.((\d)|(1\d)|(2[0-3])):((\d)|[1-5][0-9]):((\d)|[1-5][0-9])$`
 
@@ -216,6 +219,7 @@ const VirtualMachineResourceType string = "Vm"
 const TemplateResourceType string = "Template"
 const StorageResourceType string = "Storage"
 const NetworkResourceType string = "Network"
+const NamespaceResourceType string = "Namespace"
 const SecurityGroupResourceType = "SecurityGroup"
 const HostResourceType = "Host"
 const HostGroupResourceType = "HostGroup"
@@ -253,6 +257,7 @@ const NonCitrixGatewayConnections = "Non-Citrix Gateway Connections"
 const MetadataTerraformName = "ManagedBy"
 const MetadataTerrafomValue = "Terraform"
 const MetadataHypervisorSecretExpirationDateName = "Citrix_Orchestration_Hypervisor_Secret_Expiration_Date"
+const MetadataCitrixOrchestrationHypervisorSecretAllowEdit = "Citrix_Orchestration_Hypervisor_Secret_Allow_Edit"
 const MetadataCitrixPrefix = "citrix_"
 const MetadataImageManagementPrepPrefix = "imagemanagementprep_"
 const MetadataTaskDataPrefix = "taskdata_"
@@ -261,6 +266,8 @@ const MetadataTaskStatePrefix = "taskstate_"
 const ReplicaRatio = "SharedImageGalleryReplicaRatio"
 const ReplicaMaximum = "SharedImageGalleryReplicaMaximum"
 const SharedGallery = "UseSharedImageGallery"
+
+const DDCVersionToCreateServiceAccountWithAsync = 125
 
 // CC Admin User
 const AdminUserMonitorAccessPolicySuffix = " - Access to 'Monitor' tab only"
@@ -1548,4 +1555,82 @@ func PollZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, zo
 	}
 
 	return zone, err
+}
+
+var AllowedTimeZoneValues = []string{
+	"Afghanistan Standard Time",
+	"FLE Standard Time",
+	"Central Europe Standard Time",
+	"W. Central Africa Standard Time",
+	"UTC-11",
+	"W. Europe Standard Time",
+	"SA Western Standard Time",
+	"Pacific SA Standard Time",
+	"Argentina Standard Time",
+	"Caucasus Standard Time",
+	"AUS Eastern Standard Time",
+	"Azerbaijan Standard Time",
+	"Eastern Standard Time",
+	"Arab Standard Time",
+	"Bangladesh Standard Time",
+	"Belarus Standard Time",
+	"Romance Standard Time",
+	"Central America Standard Time",
+	"Atlantic Standard Time",
+	"Venezuela Standard Time",
+	"Central European Standard Time",
+	"South Africa Standard Time",
+	"UTC",
+	"E. South America Standard Time",
+	"Central Asia Standard Time",
+	"Singapore Standard Time",
+	"Greenwich Standard Time",
+	"Cape Verde Standard Time",
+	"SE Asia Standard Time",
+	"SA Pacific Standard Time",
+	"China Standard Time",
+	"Myanmar Standard Time",
+	"E. Africa Standard Time",
+	"Hawaiian Standard Time",
+	"E. Europe Standard Time",
+	"Tokyo Standard Time",
+	"Egypt Standard Time",
+	"SA Eastern Standard Time",
+	"GMT Standard Time",
+	"Fiji Standard Time",
+	"West Asia Standard Time",
+	"Georgian Standard Time",
+	"GTB Standard Time",
+	"Greenland Standard Time",
+	"West Pacific Standard Time",
+	"Mauritius Standard Time",
+	"India Standard Time",
+	"Iran Standard Time",
+	"Arabic Standard Time",
+	"Israel Standard Time",
+	"Jordan Standard Time",
+	"UTC+12",
+	"Korea Standard Time",
+	"Middle East Standard Time",
+	"Central Standard Time",
+	"Ulaanbaatar Standard Time",
+	"Morocco Standard Time",
+	"Namibia Standard Time",
+	"Nepal Standard Time",
+	"Central Pacific Standard Time",
+	"New Zealand Standard Time",
+	"Pakistan Standard Time",
+	"Paraguay Standard Time",
+	"Pacific Standard Time",
+	"Russian Standard Time",
+	"Samoa Standard Time",
+	"UTC-02",
+	"Sri Lanka Standard Time",
+	"Syria Standard Time",
+	"Taipei Standard Time",
+	"Tonga Standard Time",
+	"Türkiye Standard Time",
+	"Arabian Standard Time",
+	"Mountain Standard Time",
+	"Montevideo Standard Time",
 }

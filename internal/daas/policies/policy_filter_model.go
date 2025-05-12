@@ -80,7 +80,7 @@ func (filter AccessControlFilterModel) GetFilterRequest(diagnostics *diag.Diagno
 	filterRequest := citrixorchestration.FilterRequest{}
 	filterRequest.SetFilterType("AccessControl")
 
-	policyFilterDataClientModel := PolicyFilterGatewayDataClientModel{
+	policyFilterDataClientModel := util.PolicyFilterGatewayDataClientModel{
 		Connection: filter.Connection.ValueString(),
 		Condition:  filter.Condition.ValueString(),
 		Gateway:    filter.Gateway.ValueString(),
@@ -296,7 +296,7 @@ func (filter DeliveryGroupFilterModel) GetFilterRequest(diagnostics *diag.Diagno
 	filterRequest := citrixorchestration.FilterRequest{}
 	filterRequest.SetFilterType("DesktopGroup")
 
-	policyFilterDataClientModel := PolicyFilterUuidDataClientModel{
+	policyFilterDataClientModel := util.PolicyFilterUuidDataClientModel{
 		Uuid:   filter.DeliveryGroupId.ValueString(),
 		Server: serverValue,
 	}
@@ -473,7 +473,7 @@ func (filter TagFilterModel) GetFilterRequest(diagnostics *diag.Diagnostics, ser
 	filterRequest := citrixorchestration.FilterRequest{}
 	filterRequest.SetFilterType("DesktopTag")
 
-	policyFilterDataClientModel := PolicyFilterUuidDataClientModel{
+	policyFilterDataClientModel := util.PolicyFilterUuidDataClientModel{
 		Uuid:   filter.Tag.ValueString(),
 		Server: serverValue,
 	}

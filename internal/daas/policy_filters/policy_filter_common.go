@@ -39,17 +39,6 @@ type PolicyFilterInterface interface {
 	GetFilterRequest(diagnostics *diag.Diagnostics, serverValue string) (citrixorchestration.FilterRequest, error)
 }
 
-type PolicyFilterUuidDataClientModel struct {
-	Server string `json:"server,omitempty"`
-	Uuid   string `json:"uuid,omitempty"`
-}
-
-type PolicyFilterGatewayDataClientModel struct {
-	Connection string `json:"connection,omitempty"`
-	Condition  string `json:"condition,omitempty"`
-	Gateway    string `json:"gateway,omitempty"`
-}
-
 func getServerValue(client *citrixdaasclient.CitrixDaasClient) string {
 	if client.AuthConfig.OnPremises || !client.AuthConfig.ApiGateway {
 		return client.ApiClient.GetConfig().Host

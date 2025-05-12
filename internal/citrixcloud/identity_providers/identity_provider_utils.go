@@ -4,6 +4,7 @@ package cc_identity_providers
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -169,11 +170,32 @@ func deleteIdentityProvider(ctx context.Context, diagnostics *diag.Diagnostics, 
 	deleteIdpRequest := client.CwsClient.IdentityProvidersDAAS.CustomerIdentityProvidersTypeIdDelete(ctx, idpType, idpInstanceId, client.ClientConfig.CustomerId)
 	_, httpResp, err := citrixdaasclient.AddRequestData(deleteIdpRequest, client).Execute()
 	if err != nil {
-		diagnostics.AddError(
-			fmt.Sprintf("Error deleting %s Identity Provider with id: %s", idpType, idpInstanceId),
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
+		errBody := ""
+		if httpResp != nil && httpResp.Body != nil {
+			body, _ := io.ReadAll(httpResp.Body)
+			defer httpResp.Body.Close()
+			errBody = fmt.Sprintf("\nError body: %s", string(body))
+		}
+
+		if httpResp.StatusCode == http.StatusBadRequest && strings.Contains(errBody, "it is the currently selected authentication method") {
+			diagnostics.AddError(
+				fmt.Sprintf("Error deleting %s Identity Provider with id: %s", idpType, idpInstanceId),
+				"\n\nError message: "+util.ReadClientError(err)+errBody+
+					"\n\n\nCannot remove an Identity Provider that is in use. Follow these steps to select a different Identity Provider:\n"+
+					"\n1. Go to Citrix Cloud Console.\n"+
+					"\n2. Navigate to Workspace configuration > Authentication.\n"+
+					"\n3. The Workspace Authentication will consist of Connected identity providers.\n"+
+					"\n4. If the SAML IDP is selected, that means you cannot delete the SAML IDP via terraform.\n"+
+					"\n5. Select some other identity provider in the Connected Identity Providers list.\n"+
+					"\n6. After changing the identity provider from SAML to some other identity provider, you can delete the SAML IDP via the Citrix Cloud Console or via terraform.\n",
+			)
+		} else {
+			diagnostics.AddError(
+				fmt.Sprintf("Error deleting %s Identity Provider with id: %s", idpType, idpInstanceId),
+				"\n\nError message: "+util.ReadClientError(err)+errBody+
+					"\n\nTransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp),
+			)
+		}
 		return
 	}
 }

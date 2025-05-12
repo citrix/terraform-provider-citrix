@@ -565,6 +565,65 @@ func (SCVMMMachineConfigModel) GetAttributes() map[string]schema.Attribute {
 	return SCVMMMachineConfigModel{}.GetSchema().Attributes
 }
 
+type OpenshiftMachineConfigModel struct {
+	/** OpenShift Hypervisor **/
+	MasterImageVm                types.String `tfsdk:"master_image_vm"`
+	MasterImageNote              types.String `tfsdk:"master_image_note"`
+	ImageUpdateRebootOptions     types.Object `tfsdk:"image_update_reboot_options"`
+	CpuCount                     types.Int64  `tfsdk:"cpu_count"`
+	MemoryMB                     types.Int64  `tfsdk:"memory_mb"`
+	WritebackCache               types.Object `tfsdk:"writeback_cache"` // OpenshiftWritebackCacheModel
+	UseFullDiskCloneProvisioning types.Bool   `tfsdk:"use_full_disk_clone_provisioning"`
+}
+
+func (OpenshiftMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "Machine Configuration For OpenShift MCS catalog.",
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			"master_image_vm": schema.StringAttribute{
+				Description: "The name of the virtual machine that will be used as master image. This property is case sensitive.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(util.NoPathRegex),
+						"must not contain any path.",
+					),
+				},
+			},
+			"master_image_note": schema.StringAttribute{
+				Description: "The note for the master image.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(""),
+			},
+			"image_update_reboot_options": ImageUpdateRebootOptionsModel{}.GetSchema(),
+			"cpu_count": schema.Int64Attribute{
+				Description: "Number of CPU cores for the VDA VMs.",
+				Required:    true,
+			},
+			"memory_mb": schema.Int64Attribute{
+				Description: "Size of the memory in MB for the VDA VMs.",
+				Required:    true,
+			},
+			"writeback_cache": OpenshiftWritebackCacheModel{}.GetSchema(),
+			"use_full_disk_clone_provisioning": schema.BoolAttribute{
+				Description: "Specify if virtual machines created from the provisioning scheme should be created using the dedicated full disk clone feature. Default is `false`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.RequiresReplace(),
+				},
+			},
+		},
+	}
+}
+
+func (OpenshiftMachineConfigModel) GetAttributes() map[string]schema.Attribute {
+	return OpenshiftMachineConfigModel{}.GetSchema().Attributes
+}
+
 type AzureMasterImageModel struct {
 	ResourceGroup      types.String `tfsdk:"resource_group"`
 	SharedSubscription types.String `tfsdk:"shared_subscription"`
@@ -892,6 +951,41 @@ func (XenserverWritebackCacheModel) GetSchema() schema.SingleNestedAttribute {
 
 func (XenserverWritebackCacheModel) GetAttributes() map[string]schema.Attribute {
 	return XenserverWritebackCacheModel{}.GetSchema().Attributes
+}
+
+type OpenshiftWritebackCacheModel struct {
+	WriteBackCacheDiskSizeGB   types.Int64 `tfsdk:"writeback_cache_disk_size_gb"`
+	WriteBackCacheMemorySizeMB types.Int64 `tfsdk:"writeback_cache_memory_size_mb"`
+}
+
+func (OpenshiftWritebackCacheModel) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "Write-back Cache config. Leave this empty to disable Write-back Cache.",
+		Optional:    true,
+		PlanModifiers: []planmodifier.Object{
+			objectplanmodifier.RequiresReplace(),
+		},
+		Attributes: map[string]schema.Attribute{
+			"writeback_cache_disk_size_gb": schema.Int64Attribute{
+				Description: "The size in GB of any temporary storage disk used by the write back cache.",
+				Required:    true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(0),
+				},
+			},
+			"writeback_cache_memory_size_mb": schema.Int64Attribute{
+				Description: "The size of the in-memory write back cache in MB.",
+				Required:    true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(0),
+				},
+			},
+		},
+	}
+}
+
+func (OpenshiftWritebackCacheModel) GetAttributes() map[string]schema.Attribute {
+	return OpenshiftWritebackCacheModel{}.GetSchema().Attributes
 }
 
 type VsphereAndSCVMMWritebackCacheModel struct {
@@ -1415,6 +1509,34 @@ func (mc *XenserverMachineConfigModel) RefreshProperties(ctx context.Context, di
 	wbcDiskSize := provScheme.GetWriteBackCacheDiskSizeGB()
 	wbcMemorySize := provScheme.GetWriteBackCacheMemorySizeMB()
 	writebackCache := util.ObjectValueToTypedObject[XenserverWritebackCacheModel](ctx, diagnostics, mc.WritebackCache)
+	if wbcDiskSize != 0 {
+		writebackCache.WriteBackCacheDiskSizeGB = types.Int64Value(int64(provScheme.GetWriteBackCacheDiskSizeGB()))
+		if wbcMemorySize != 0 {
+			writebackCache.WriteBackCacheMemorySizeMB = types.Int64Value(int64(provScheme.GetWriteBackCacheMemorySizeMB()))
+		}
+		mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, writebackCache)
+	}
+
+	mc.UseFullDiskCloneProvisioning = types.BoolValue(provScheme.GetUseFullDiskCloneProvisioning())
+}
+
+func (mc *OpenshiftMachineConfigModel) RefreshProperties(ctx context.Context, diagnostics *diag.Diagnostics, catalog citrixorchestration.MachineCatalogDetailResponseModel) {
+	// Refresh Service Offering
+	provScheme := catalog.GetProvisioningScheme()
+	mc.CpuCount = types.Int64Value(int64(provScheme.GetCpuCount()))
+	mc.MemoryMB = types.Int64Value(int64(provScheme.GetMemoryMB()))
+
+	masterImage := provScheme.GetMasterImage()
+	mc.MasterImageVm = types.StringValue(masterImage.GetName())
+
+	// Refresh Master Image Note
+	currentDiskImage := provScheme.GetCurrentDiskImage()
+	mc.MasterImageNote = types.StringValue(currentDiskImage.GetMasterImageNote())
+
+	// Refresh Writeback Cache
+	wbcDiskSize := provScheme.GetWriteBackCacheDiskSizeGB()
+	wbcMemorySize := provScheme.GetWriteBackCacheMemorySizeMB()
+	writebackCache := util.ObjectValueToTypedObject[OpenshiftWritebackCacheModel](ctx, diagnostics, mc.WritebackCache)
 	if wbcDiskSize != 0 {
 		writebackCache.WriteBackCacheDiskSizeGB = types.Int64Value(int64(provScheme.GetWriteBackCacheDiskSizeGB()))
 		if wbcMemorySize != 0 {

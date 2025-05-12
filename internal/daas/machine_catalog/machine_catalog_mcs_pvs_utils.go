@@ -380,6 +380,30 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 			}
 		}
 		provisioningScheme.SetUseFullDiskCloneProvisioning(xenserverMachineConfig.UseFullDiskCloneProvisioning.ValueBool())
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT:
+		openshiftMachineConfig := util.ObjectValueToTypedObject[OpenshiftMachineConfigModel](ctx, diag, provisioningSchemePlan.OpenshiftMachineConfig)
+		provisioningScheme.SetCpuCount(int32(openshiftMachineConfig.CpuCount.ValueInt64()))
+		provisioningScheme.SetMemoryMB(int32(openshiftMachineConfig.MemoryMB.ValueInt64()))
+
+		image := openshiftMachineConfig.MasterImageVm.ValueString()
+		imagePath, err := getOnPremImagePath(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), image, "", "", "creating")
+		if err != nil {
+			return nil, err
+		}
+		provisioningScheme.SetMasterImagePath(imagePath)
+
+		masterImageNote := openshiftMachineConfig.MasterImageNote.ValueString()
+		provisioningScheme.SetMasterImageNote(masterImageNote)
+
+		if !openshiftMachineConfig.WritebackCache.IsNull() {
+			provisioningScheme.SetUseWriteBackCache(true)
+			writeBackCacheModel := util.ObjectValueToTypedObject[OpenshiftWritebackCacheModel](ctx, diag, openshiftMachineConfig.WritebackCache)
+			provisioningScheme.SetWriteBackCacheDiskSizeGB(int32(writeBackCacheModel.WriteBackCacheDiskSizeGB.ValueInt64()))
+			if !writeBackCacheModel.WriteBackCacheMemorySizeMB.IsNull() {
+				provisioningScheme.SetWriteBackCacheMemorySizeMB(int32(writeBackCacheModel.WriteBackCacheMemorySizeMB.ValueInt64()))
+			}
+		}
+		provisioningScheme.SetUseFullDiskCloneProvisioning(openshiftMachineConfig.UseFullDiskCloneProvisioning.ValueBool())
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM:
 		scvmmMachineConfig := util.ObjectValueToTypedObject[SCVMMMachineConfigModel](ctx, diag, provisioningSchemePlan.SCVMMMachineConfigModel)
 		provisioningScheme.SetMemoryMB(int32(scvmmMachineConfig.MemoryMB.ValueInt64()))
@@ -584,6 +608,10 @@ func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan Provisioning
 		xenserverMachineConfig := util.ObjectValueToTypedObject[XenserverMachineConfigModel](ctx, nil, provisioningSchemePlan.XenserverMachineConfig)
 		body.SetCpuCount(int32(xenserverMachineConfig.CpuCount.ValueInt64()))
 		body.SetMemoryMB(int32(xenserverMachineConfig.MemoryMB.ValueInt64()))
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT:
+		openshiftMachineConfig := util.ObjectValueToTypedObject[OpenshiftMachineConfigModel](ctx, nil, provisioningSchemePlan.OpenshiftMachineConfig)
+		body.SetCpuCount(int32(openshiftMachineConfig.CpuCount.ValueInt64()))
+		body.SetMemoryMB(int32(openshiftMachineConfig.MemoryMB.ValueInt64()))
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER:
 		vSphereMachineConfig := util.ObjectValueToTypedObject[VsphereMachineConfigModel](ctx, nil, provisioningSchemePlan.VsphereMachineConfig)
 		body.SetCpuCount(int32(vSphereMachineConfig.CpuCount.ValueInt64()))
@@ -1161,6 +1189,30 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 				}
 			}
 		}
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT:
+		openshiftMachineConfig := util.ObjectValueToTypedObject[OpenshiftMachineConfigModel](ctx, &resp.Diagnostics, provisioningSchemePlan.OpenshiftMachineConfig)
+		newImage := openshiftMachineConfig.MasterImageVm.ValueString()
+		imagePath, err = getOnPremImagePath(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), newImage, "", "", "updating")
+		if err != nil {
+			return err
+		}
+
+		masterImageNote = openshiftMachineConfig.MasterImageNote.ValueString()
+
+		// Set reboot options if configured
+		if !openshiftMachineConfig.ImageUpdateRebootOptions.IsNull() {
+			rebootOptionsPlan := util.ObjectValueToTypedObject[ImageUpdateRebootOptionsModel](ctx, &resp.Diagnostics, openshiftMachineConfig.ImageUpdateRebootOptions)
+			rebootOption.SetRebootDuration(int32(rebootOptionsPlan.RebootDuration.ValueInt64()))
+			warningDuration := int32(rebootOptionsPlan.WarningDuration.ValueInt64())
+			rebootOption.SetWarningDuration(warningDuration)
+			if warningDuration > 0 || warningDuration == -1 {
+				// if warning duration is not 0, it's set in plan and requires warning message body
+				rebootOption.SetWarningMessage(rebootOptionsPlan.WarningMessage.ValueString())
+				if !rebootOptionsPlan.WarningRepeatInterval.IsNull() {
+					rebootOption.SetWarningRepeatInterval(int32(rebootOptionsPlan.WarningRepeatInterval.ValueInt64()))
+				}
+			}
+		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM:
 		scvmmMachineConfig := util.ObjectValueToTypedObject[SCVMMMachineConfigModel](ctx, &resp.Diagnostics, provisioningSchemePlan.SCVMMMachineConfigModel)
 		newImage := scvmmMachineConfig.MasterImage.ValueString()
@@ -1369,6 +1421,10 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Con
 		xenserverMachineConfig := util.ObjectValueToTypedObject[XenserverMachineConfigModel](ctx, diagnostics, provSchemeModel.XenserverMachineConfig)
 		xenserverMachineConfig.RefreshProperties(ctx, diagnostics, *catalog)
 		provSchemeModel.XenserverMachineConfig = util.TypedObjectToObjectValue(ctx, diagnostics, xenserverMachineConfig)
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT:
+		openshiftMachineConfig := util.ObjectValueToTypedObject[OpenshiftMachineConfigModel](ctx, diagnostics, provSchemeModel.OpenshiftMachineConfig)
+		openshiftMachineConfig.RefreshProperties(ctx, diagnostics, *catalog)
+		provSchemeModel.OpenshiftMachineConfig = util.TypedObjectToObjectValue(ctx, diagnostics, openshiftMachineConfig)
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM:
 		scvmmMachineConfig := util.ObjectValueToTypedObject[SCVMMMachineConfigModel](ctx, diagnostics, provSchemeModel.SCVMMMachineConfigModel)
 		scvmmMachineConfig.RefreshProperties(ctx, diagnostics, *catalog)
