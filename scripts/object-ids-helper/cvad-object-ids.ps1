@@ -3,10 +3,9 @@
 <#
 Currently this script is still in TechPreview
 .SYNOPSIS
-    Script to onboard an existing site to terraform. 
-    
+    Script to fetch the object ids for the CVAD Resources for On-Prem and Cloud Resources.
 .DESCRIPTION 
-    The script should be able to collect the list of resources from DDC, import into terraform, and generate the TF skeletons.
+    The script should be able to collect the list of resources from DDC, fetch the object ids, and store those in a JSON file.
 
 .Parameter CustomerId
     The Citrix Cloud customer ID. Only applicable for Citrix Cloud customers. 

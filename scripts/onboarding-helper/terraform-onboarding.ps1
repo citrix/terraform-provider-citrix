@@ -1,5 +1,4 @@
-﻿
-# Copyright © 2024. Citrix Systems, Inc. All Rights Reserved.
+﻿# Copyright © 2024. Citrix Systems, Inc. All Rights Reserved.
 <#
 Currently this script is still in TechPreview
 .SYNOPSIS
@@ -544,6 +543,10 @@ function Get-ExistingCVADResources {
             "resourceApi"          = "hypervisors"
             "resourceProviderName" = "nutanix_hypervisor"
         }
+        "openshift_hypervisor" = @{
+            "resourceApi"          = "hypervisors"
+            "resourceProviderName" = "openshift_hypervisor"
+        }
         "machine_catalog"      = @{
             "resourceApi"          = "machinecatalogs"
             "resourceProviderName" = "machine_catalog"
@@ -873,6 +876,10 @@ function InjectPlaceHolderSensitiveValues {
             $filteredOutput += 'account_secret = "<input application_secret value>"'
             $filteredOutput += 'account_secret_format = "PlainText"'
         }
+        elseif($line -match 'citrix_openshift_hypervisor' -and $previousLine -match 'openshift_hypervisor.openshift'){
+            $filteredOutput += $line
+            $filteredOutput += 'service_account_token = "<Service_Access_Token_In_Plaintext>"'
+        }
         elseif ($line -match "application_id") {
             $filteredOutput += $line
             $filteredOutput += 'application_secret = "<input application_secret value>"'
@@ -982,6 +989,7 @@ $script:hypervisorResourceMap = @{
     "xenserver_hypervisor" = "XenServer"
     "vsphere_hypervisor"   = "VCenter"
     "nutanix_hypervisor"   = "Custom"
+    "openshift_hypervisor" = "OpenShift"
 }
 $NUTANIX_PLUGIN_ID = "AcropolisFactory"
 $script:applicationFolderPathMap = @{}
