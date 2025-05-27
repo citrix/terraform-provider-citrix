@@ -44,8 +44,9 @@ jobs:
         with:
           inlineScript: |
             ./scripts/test-env-power-management/azure_env.ps1 `
-              -ClientId ${{secrets.CLIENT_ID}} `
-              -ClientSecret ${{secrets.CLIENT_SECRET}} `
+              -CustomerId ${{secrets.CITRIX_CUSTOMER_ID}} `
+              -ClientId ${{secrets.CITRIX_CLIENT_ID}} `
+              -ClientSecret ${{secrets.CITRIX_CLIENT_SECRET}} `
               -DomainFqdn ${{secrets.DOMAIN_FQDN}} `
               -CitrixCloudHostname ${{secrets.CITRIX_CLOUD_HOSTNAME}} `
               -Hostname ${{secrets.HOSTNAME}} `
