@@ -165,10 +165,9 @@ function Get-CCAuthToken {
     $body = @{
         grant_type = "client_credentials"
         client_id = $clientId
-        client_secret = $clientSecret
+        client_secret = [uri]::EscapeDataString($clientSecret)
     }
     $bodyString = ($body.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join "&"
-    Write-Host "Body String: $bodyString"
 
     $response = Invoke-RestMethod -Uri $ccauth_url -Method POST -Body $bodyString -ContentType "application/x-www-form-urlencoded"
     $token = $response.access_token
