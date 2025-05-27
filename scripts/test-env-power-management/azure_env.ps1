@@ -45,23 +45,26 @@ Currently this script is still in TechPreview
 .Parameter AzureSubscriptionId
     The Subscription Id for powering on the Azure VMs for test environment.
 
-.Parameter AzureResourceGroupName
-    The Resource Group Name for powering on the Azure VMs for test environment.
+.Parameter AzureAdVmResourceGroupName
+    The Resource Group Name for powering on the Azure Active Directory VM for test environment.
 
 .Parameter AzureAdVmName
     The Azure VM name of the Active Directory Domain Controller.
 
-.Parameter AzureDdcVmName
-    The Azure VM name of the Citrix DaaS Delivery Controller.
-
-.Parameter AzureConnectorsResourceGroupName
-    The Resource Group Name for powering on the Azure Connector VMs for test environment.
+.Parameter AzureConnectorResourceGroupName
+    The Resource Group Name for powering on the Connector VMs for test environment.
 
 .Parameter AzureConnectorVm1Name
     The Azure VM name of the Citrix Cloud Connector 1.
 
 .Parameter AzureConnectorVm2Name
     The Azure VM name of the Citrix Cloud Connector 2.
+
+.Parameter AzureDdcResourceGroupName
+    The Resource Group Name for powering on the DDC VM for test environment.
+
+.Parameter AzureDdcVmName
+    The Azure VM name of the DDC.
 
 .Parameter DisableSSLValidation
     Disable SSL validation for this script. Required if DDC does not have a valid SSL certificate.
@@ -110,17 +113,20 @@ Param (
     [string] $AzureSubscriptionId,
 
     [Parameter(Mandatory = $true)]
-    [string] $AzureResourceGroupName,
+    [string] $AzureAdVmResourceGroupName,
 
     [Parameter(Mandatory = $true)]
     [string] $AzureAdVmName,
 
     [Parameter(Mandatory = $false)]
+    [string] $AzureDdcResourceGroupName,
+
+    [Parameter(Mandatory = $false)]
     [string] $AzureDdcVmName,
 
     [Parameter(Mandatory = $false)]
-    [string] $AzureConnectorsResourceGroupName,
-
+    [string] $AzureConnectorResourceGroupName,
+    
     [Parameter(Mandatory = $false)]
     [string] $AzureConnectorVm1Name,
 
@@ -270,16 +276,16 @@ $pscredential = New-Object -TypeName System.Management.Automation.PSCredential -
 Connect-AzAccount -ServicePrincipal -Credential $pscredential -TenantId $AzureTenantId -SubscriptionId $AzureSubscriptionId
 
 ## Get the VMs and power them up if they are not running
-Start-AzureVm -ResourceGroupName $AzureResourceGroupName -VmName $AzureAdVmName
+Start-AzureVm -ResourceGroupName $AzureAdVmResourceGroupName -VmName $AzureAdVmName
 
 if ($OnPremises -eq $true) {
-    Start-AzureVm -ResourceGroupName $AzureResourceGroupName -VmName $AzureDdcVmName
+    Start-AzureVm -ResourceGroupName $AzureDdcResourceGroupName -VmName $AzureDdcVmName
 } else {
     if ($AzureConnectorVm1Name) {
-        Start-AzureVm -ResourceGroupName $AzureConnectorsResourceGroupName -VmName $AzureConnectorVm1Name
+        Start-AzureVm -ResourceGroupName $AzureConnectorResourceGroupName -VmName $AzureConnectorVm1Name
     }
     if ($AzureConnectorVm2Name) {
-        Start-AzureVm -ResourceGroupName $AzureConnectorsResourceGroupName -VmName $AzureConnectorVm2Name
+        Start-AzureVm -ResourceGroupName $AzureConnectorResourceGroupName -VmName $AzureConnectorVm2Name
     }
     Start-DaasService -ccHostname $CitrixCloudHostname -hostname $Hostname -customerId $CustomerId -clientId $ClientId -clientSecret $ClientSecret
 }

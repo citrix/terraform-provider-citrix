@@ -52,8 +52,9 @@ jobs:
               -AzureClientSecret ${{secrets.AZURE_CLIENT_SECRET}} `
               -AzureTenantId ${{secrets.AZURE_TENANT_ID}} `
               -AzureSubscriptionId ${{secrets.AZURE_SUBSCRIPTION_ID}} `
-              -AzureResourceGroupName ${{secrets.AZURE_RESOURCE_GROUP_NAME}} `
+              -AzureDdcResourceGroupName ${{secrets.AZURE_DDC_RESOURCE_GROUP_NAME}} `
               -AzureDdcVmName ${{secrets.AZURE_DDC_VM_NAME}} `
+              -AzureAdVmResourceGroupName ${{secrets.AZURE_AD_VM_RESOURCE_GROUP_NAME}} `
               -AzureAdVmName ${{secrets.AZURE_AD_VM_NAME}} `
               -DisableSSLValidation $true
           azPSVersion: "latest"

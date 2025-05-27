@@ -50,9 +50,9 @@ jobs:
               -AzureClientSecret ${{secrets.AZURE_CLIENT_SECRET}} `
               -AzureTenantId ${{secrets.AZURE_TENANT_ID}} `
               -AzureSubscriptionId ${{secrets.AZURE_SUBSCRIPTION_ID}} `
-              -AzureResourceGroupName ${{secrets.AZURE_RESOURCE_GROUP_NAME}} `
+              -AzureAdVmResourceGroupName ${{secrets.AZURE_AD_VM_RESOURCE_GROUP_NAME}} `
               -AzureAdVmName ${{secrets.AZURE_AD_VM_NAME}} `
-              -AzureConnectorsResourceGroupName ${{secrets.AZURE_CONNECTORS_RESOURCE_GROUP_NAME}} `
+              -AzureConnectorResourceGroupName ${{secrets.AZURE_CONNECTOR_RESOURCE_GROUP_NAME}} `
               -AzureConnectorVm1Name ${{secrets.AZURE_CONNECTOR_VM1_NAME}} `
               -AzureConnectorVm2Name ${{secrets.AZURE_CONNECTOR_VM2_NAME}} `
               -OnPremises $false
