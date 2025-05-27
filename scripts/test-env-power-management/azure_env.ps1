@@ -51,6 +51,12 @@ Currently this script is still in TechPreview
 .Parameter AzureAdVmName
     The Azure VM name of the Active Directory Domain Controller.
 
+.Parameter AzureDdcVmName
+    The Azure VM name of the Citrix DaaS Delivery Controller.
+
+.Parameter AzureConnectorsResourceGroupName
+    The Resource Group Name for powering on the Azure Connector VMs for test environment.
+
 .Parameter AzureConnectorVm1Name
     The Azure VM name of the Citrix Cloud Connector 1.
 
@@ -111,6 +117,9 @@ Param (
 
     [Parameter(Mandatory = $false)]
     [string] $AzureDdcVmName,
+
+    [Parameter(Mandatory = $false)]
+    [string] $AzureConnectorsResourceGroupName,
 
     [Parameter(Mandatory = $false)]
     [string] $AzureConnectorVm1Name,
@@ -267,10 +276,10 @@ if ($OnPremises -eq $true) {
     Start-AzureVm -ResourceGroupName $AzureResourceGroupName -VmName $AzureDdcVmName
 } else {
     if ($AzureConnectorVm1Name) {
-        Start-AzureVm -ResourceGroupName $AzureResourceGroupName -VmName $AzureConnectorVm1Name
+        Start-AzureVm -ResourceGroupName $AzureConnectorsResourceGroupName -VmName $AzureConnectorVm1Name
     }
     if ($AzureConnectorVm2Name) {
-        Start-AzureVm -ResourceGroupName $AzureResourceGroupName -VmName $AzureConnectorVm2Name
+        Start-AzureVm -ResourceGroupName $AzureConnectorsResourceGroupName -VmName $AzureConnectorVm2Name
     }
     Start-DaasService -ccHostname $CitrixCloudHostname -hostname $Hostname -customerId $CustomerId -clientId $ClientId -clientSecret $ClientSecret
 }
