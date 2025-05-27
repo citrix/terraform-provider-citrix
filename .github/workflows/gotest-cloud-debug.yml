@@ -1,0 +1,61 @@
+# This is a Go Test workflow that is manually triggered
+
+name: GoTest - Debug
+
+# Controls when the action will run. Workflow runs when manually triggered using the UI
+# or API.
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'internal/**'
+      - '**.go'
+    types: [opened, reopened, synchronize]
+  workflow_dispatch:
+    # Inputs the workflow accepts.
+    inputs:
+      version:
+        # Friendly description to be shown in the UI
+        description: 'Release version that is tested against.'
+        # Default value if no value is explicitly provided
+        default: 'Latest'
+        # Input has to be provided for the workflow to run
+        required: false
+        # The data type of the input
+        type: string
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a job for preparing test env, and a job for running go tests
+  gotest-prep:
+    # GitHub environment for the job
+    environment: Go Test - Cloud - Dev
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout repo
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Run Azure PowerShell inline script
+        uses: azure/powershell@v2
+        with:
+          inlineScript: |
+            ./scripts/test-env-power-management/azure_env.ps1 `
+              -ClientId ${{secrets.CLIENT_ID}} `
+              -ClientSecret ${{secrets.CLIENT_SECRET}} `
+              -DomainFqdn ${{secrets.DOMAIN_FQDN}} `
+              -CitrixCloudHostname ${{secrets.CITRIX_CLOUD_HOSTNAME}} `
+              -Hostname ${{secrets.HOSTNAME}} `
+              -AzureClientId ${{secrets.AZURE_CLIENT_ID}} `
+              -AzureClientSecret ${{secrets.AZURE_CLIENT_SECRET}} `
+              -AzureTenantId ${{secrets.AZURE_TENANT_ID}} `
+              -AzureSubscriptionId ${{secrets.AZURE_SUBSCRIPTION_ID}} `
+              -AzureResourceGroupName ${{secrets.AZURE_RESOURCE_GROUP_NAME}} `
+              -AzureAdVmName ${{secrets.AZURE_AD_VM_NAME}} `
+              -AzureConnectorVm1Name ${{secrets.AZURE_CONNECTOR_VM1_NAME}} `
+              -AzureConnectorVm2Name ${{secrets.AZURE_CONNECTOR_VM2_NAME}} `
+              -OnPremises $false
+          azPSVersion: "latest"
