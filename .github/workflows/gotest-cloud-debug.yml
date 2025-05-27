@@ -8,9 +8,6 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - 'internal/**'
-      - '**.go'
     types: [opened, reopened, synchronize]
   workflow_dispatch:
     # Inputs the workflow accepts.
