@@ -75,7 +75,7 @@ func (r *AwsWorkspacesCloudFormationDataSource) Read(ctx context.Context, req da
 func getAwsWorkspacesCloudFormationTemplate(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) (*citrixquickcreate.AwsEdcAccountResourceFile, error) {
 	getTemplateRequestBody := citrixquickcreate.SearchAwsEdcAccountResourceRequest{}
 	getTemplateRequestBody.SetAccountType(citrixquickcreate.ACCOUNTTYPE_AWSEDC)
-	getTemplateRequestBody.SetResourceType(citrixquickcreate.AWSACCOUNTRESOURCETYPE_CLOUDFORMATION)
+	getTemplateRequestBody.SetResourceType(citrixquickcreate.AWSACCOUNTRESOURCETYPE_AWS_CLOUDFORMATION)
 	getTemplateRequestBody.SetFilterProperty("CreateType")
 	getTemplateRequestBody.SetFilterValue("AccountRoleCreation")
 
@@ -98,7 +98,7 @@ func getAwsWorkspacesCloudFormationTemplate(ctx context.Context, client *citrixd
 	}
 	resource := resources[0]
 	fileResource := resource.AwsEdcAccountResourceFile
-	if fileResource != nil && fileResource.GetResourceType() == citrixquickcreate.AWSACCOUNTRESOURCETYPE_CLOUDFORMATION {
+	if fileResource != nil && fileResource.GetResourceType() == citrixquickcreate.AWSACCOUNTRESOURCETYPE_AWS_CLOUDFORMATION {
 		return fileResource, nil
 	}
 

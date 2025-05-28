@@ -137,8 +137,8 @@ func (MachineCatalogMachineModel) GetSchema() schema.NestedAttributeObject {
 				Optional:    true,
 			},
 			"cluster_folder_path": schema.StringAttribute{
-				Description: "**[vSphere: Optional]** The folder path in which the cluster resides. If there are multiple folders in the path, they should be separated by `\\` in between each of them. To be used only if `is_power_managed = true`" +
-					"\n\n~> **Please Note** Folder path should should only be specified for cluster folders. For VM folders, they can be ignored and the folder path should be omitted.",
+				Description: "**[HPE Moonshot: Optional, vSphere: Optional]** The folder path in which the cluster resides. If there are multiple folders in the path, they should be separated by `\\` in between each of them. To be used only if `is_power_managed = true`" +
+					"\n\n~> **Please Note** Folder path should only be specified for cluster folders. For VM folders, they can be ignored and the folder path should be omitted.",
 				Optional: true,
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(util.AdminFolderPathWithBackslashRegex), "Folder Path must not start or end with a backslash"),

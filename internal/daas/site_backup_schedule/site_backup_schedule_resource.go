@@ -2,6 +2,7 @@ package site_backup_schedule
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -116,7 +117,17 @@ func (r *SiteBackupScheduleResource) Read(ctx context.Context, req resource.Read
 	}
 
 	// Get the backup restore schedule from remote
-	uid := convertStringToInt32(state.Id.ValueString())
+	uidInt, err := strconv.ParseInt(state.Id.ValueString(), 10, 32)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading Backup Schedule.",
+			fmt.Sprintf("Invalid Backup Schedule ID: %s", state.Id.ValueString()),
+		)
+		return
+	}
+	// Convert the uid into int32 value for the API call.
+	uid := int32(uidInt)
+
 	backupSchedule, err := getBackupSchedule(ctx, r.client, &resp.Diagnostics, uid)
 	if err != nil {
 		return
@@ -170,7 +181,15 @@ func (r *SiteBackupScheduleResource) Update(ctx context.Context, req resource.Up
 	body.SetFrequencyFactor(plan.FrequencyFactor.ValueInt32())
 
 	// Get String ID and convert it into int32
-	uid := convertStringToInt32(state.Id.ValueString())
+	uidInt, err := strconv.ParseInt(state.Id.ValueString(), 10, 32)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating Backup Schedule.",
+			fmt.Sprintf("Invalid Backup Schedule ID: %s", state.Id.ValueString()),
+		)
+		return
+	}
+	uid := int32(uidInt)
 
 	modifyBackupScheduleRequest := r.client.ApiClient.BackupRestoreAPIsDAAS.BackupRestoreModifyBackupSchedule(ctx, uid)
 	modifyBackupScheduleRequest = modifyBackupScheduleRequest.BackupRestoreScheduleRequestModel(body)
@@ -213,8 +232,18 @@ func (r *SiteBackupScheduleResource) Delete(ctx context.Context, req resource.De
 		return
 	}
 
+	// Get String ID and convert it into int32
+	uidInt, err := strconv.ParseInt(state.Id.ValueString(), 10, 32)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error deleting Backup Schedule.",
+			fmt.Sprintf("Invalid Backup Schedule ID: %s", state.Id.ValueString()),
+		)
+		return
+	}
+	uid := int32(uidInt)
+
 	// Delete the backup restore schedule
-	uid := convertStringToInt32(state.Id.ValueString())
 	deleteBackupScheduleRequest := r.client.ApiClient.BackupRestoreAPIsDAAS.BackupRestoreDeleteBackupSchedule(ctx, uid)
 	httpResp, err := citrixdaasclient.AddRequestData(deleteBackupScheduleRequest, r.client).Execute()
 	if err != nil {
@@ -267,17 +296,17 @@ func getBackupSchedule(ctx context.Context, client *citrixdaasclient.CitrixDaasC
 		return nil, err
 	}
 
-	return backupRestoreScheduleModel, nil
-}
-
-// The method converts the string Id into int32 value for the API call.
-// If the conversion fails, it returns -1 as a default value.
-func convertStringToInt32(value string) int32 {
-	intVal, err := strconv.ParseInt(value, 10, 32)
-	if err != nil {
-		return -1
+	// If you provide an ID that does not exist, the API will return a 200 OK response with an empty object.
+	// In such case, verify if the ID of the object returned is the same as the one requested.
+	if backupRestoreScheduleModel.GetUid() != id {
+		diagnostics.AddError(
+			"The Backup Schedule with ID: "+strconv.Itoa(int(id))+" does not exist.",
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp),
+		)
+		return nil, fmt.Errorf("Backup Schedule with ID: %d does not exist", id)
 	}
-	return int32(intVal)
+
+	return backupRestoreScheduleModel, nil
 }
 
 func getAllBackupSchedules(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) ([]citrixorchestration.BackupRestoreScheduleModel, error) {

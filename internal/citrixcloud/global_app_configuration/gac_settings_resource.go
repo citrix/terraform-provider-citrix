@@ -98,8 +98,8 @@ func (r *gacSettingsResource) Create(ctx context.Context, req resource.CreateReq
 	}
 
 	// Call the API
-	createSettingsRequest := r.client.GacClient.SettingsControllerDAAS.PostSettingsApiUsingPOST(ctx, util.GacAppName)
-	createSettingsRequest = createSettingsRequest.SettingsRecord(body)
+	createSettingsRequest := r.client.GacClient.SettingsDAAS.CreateSettings(ctx, util.GacAppName)
+	createSettingsRequest = createSettingsRequest.SettingsRecordModel(body)
 	_, httpResp, err := citrixdaasclient.AddRequestData(createSettingsRequest, r.client).Execute()
 
 	//In case of error, add it to diagnostics and return
@@ -199,9 +199,9 @@ func (r *gacSettingsResource) Update(ctx context.Context, req resource.UpdateReq
 	}
 
 	// Call the API
-	updateSettingsRequest := r.client.GacClient.SettingsControllerDAAS.PutSettingsApiUsingPUT(ctx, util.GacAppName, b64.StdEncoding.EncodeToString([]byte(plan.ServiceUrl.ValueString())))
-	updateSettingsRequest = updateSettingsRequest.SettingsRecord(body)
-	httpResp, err := citrixdaasclient.AddRequestData(updateSettingsRequest, r.client).Execute()
+	updateSettingsRequest := r.client.GacClient.SettingsDAAS.UpdateSettings(ctx, util.GacAppName, b64.StdEncoding.EncodeToString([]byte(plan.ServiceUrl.ValueString())))
+	updateSettingsRequest = updateSettingsRequest.SettingsRecordModel(body)
+	_, httpResp, err := citrixdaasclient.AddRequestData(updateSettingsRequest, r.client).Execute()
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -242,8 +242,8 @@ func (r *gacSettingsResource) Delete(ctx context.Context, req resource.DeleteReq
 	encodedServiceUrl := b64.StdEncoding.EncodeToString([]byte(state.ServiceUrl.ValueString()))
 	if state.TestChannel.ValueBool() {
 		//Delete settings configuration for the test channel
-		deleteSettingsForChannelRequest := r.client.GacClient.SettingsControllerDAAS.DeleteSettingsForChannel(ctx, util.GacAppName, util.GacTestChannelShortName, encodedServiceUrl)
-		httpResp, err := citrixdaasclient.AddRequestData(deleteSettingsForChannelRequest, r.client).Execute()
+		deleteSettingsForChannelRequest := r.client.GacClient.SettingsDAAS.DeleteSettingsForChannel(ctx, util.GacAppName, util.GacTestChannelShortName, encodedServiceUrl)
+		_, httpResp, err := citrixdaasclient.AddRequestData(deleteSettingsForChannelRequest, r.client).Execute()
 
 		if err != nil {
 			resp.Diagnostics.AddError(
@@ -255,8 +255,8 @@ func (r *gacSettingsResource) Delete(ctx context.Context, req resource.DeleteReq
 		}
 	} else {
 		//Delete settings configuration for the service url
-		deleteSettingsRequest := r.client.GacClient.SettingsControllerDAAS.DeleteSettingsApiUsingDELETE(ctx, util.GacAppName, encodedServiceUrl)
-		httpResp, err := citrixdaasclient.AddRequestData(deleteSettingsRequest, r.client).Execute()
+		deleteSettingsRequest := r.client.GacClient.SettingsDAAS.DeleteSettings(ctx, util.GacAppName, encodedServiceUrl)
+		_, httpResp, err := citrixdaasclient.AddRequestData(deleteSettingsRequest, r.client).Execute()
 
 		if err != nil {
 			resp.Diagnostics.AddError(
@@ -278,7 +278,7 @@ func (r *gacSettingsResource) ImportState(ctx context.Context, req resource.Impo
 func getSettingsConfiguration(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, serviceUrl string, isTestChannel bool) (*globalappconfiguration.GetAllSettingResponse, error) {
 	encodedServiceUrl := b64.StdEncoding.EncodeToString([]byte(serviceUrl))
 	if isTestChannel {
-		getSettingsForChannelRequest := client.GacClient.SettingsControllerDAAS.RetrieveSettingsForChannel(ctx, util.GacAppName, util.GacTestChannelShortName, encodedServiceUrl)
+		getSettingsForChannelRequest := client.GacClient.SettingsDAAS.RetrieveSettingsForChannel(ctx, util.GacAppName, util.GacTestChannelShortName, encodedServiceUrl)
 		getSettingsResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*globalappconfiguration.GetAllSettingResponse](getSettingsForChannelRequest, client)
 		if err != nil {
 			diagnostics.AddError(
@@ -289,7 +289,7 @@ func getSettingsConfiguration(ctx context.Context, client *citrixdaasclient.Citr
 		}
 		return getSettingsResponse, nil
 	} else {
-		getSettingsRequest := client.GacClient.SettingsControllerDAAS.GetSettingsApiUsingGET(ctx, util.GacAppName, encodedServiceUrl)
+		getSettingsRequest := client.GacClient.SettingsDAAS.RetrieveSettingsForURL(ctx, util.GacAppName, encodedServiceUrl)
 		getSettingsResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*globalappconfiguration.GetAllSettingResponse](getSettingsRequest, client)
 		if err != nil {
 			diagnostics.AddError(
@@ -305,11 +305,11 @@ func getSettingsConfiguration(ctx context.Context, client *citrixdaasclient.Citr
 func readSettingsConfiguration(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, serviceUrl string, isTestChannel bool) (*globalappconfiguration.GetAllSettingResponse, error) {
 	encodedServiceUrl := b64.StdEncoding.EncodeToString([]byte(serviceUrl))
 	if isTestChannel {
-		getSettingsForChannelRequest := client.GacClient.SettingsControllerDAAS.RetrieveSettingsForChannel(ctx, util.GacAppName, util.GacTestChannelShortName, encodedServiceUrl)
+		getSettingsForChannelRequest := client.GacClient.SettingsDAAS.RetrieveSettingsForChannel(ctx, util.GacAppName, util.GacTestChannelShortName, encodedServiceUrl)
 		getSettingsResponse, _, err := util.ReadResource[*globalappconfiguration.GetAllSettingResponse](getSettingsForChannelRequest, ctx, client, resp, "Test Channel Settings Configuration", serviceUrl)
 		return getSettingsResponse, err
 	} else {
-		getSettingsRequest := client.GacClient.SettingsControllerDAAS.GetSettingsApiUsingGET(ctx, util.GacAppName, encodedServiceUrl)
+		getSettingsRequest := client.GacClient.SettingsDAAS.RetrieveSettingsForURL(ctx, util.GacAppName, encodedServiceUrl)
 		getSettingsResponse, _, err := util.ReadResource[*globalappconfiguration.GetAllSettingResponse](getSettingsRequest, ctx, client, resp, "ServiceUrl Settings Configuration", serviceUrl)
 		return getSettingsResponse, err
 	}

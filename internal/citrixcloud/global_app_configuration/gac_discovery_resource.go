@@ -69,13 +69,13 @@ func (r *gacDiscoveryResource) Create(ctx context.Context, req resource.CreateRe
 	var domain globalappconfiguration.Domain
 	domain.SetName(plan.Domain.ValueString())
 
-	var aURLs []globalappconfiguration.AllowedWebStoreURL
-	var sURLs []globalappconfiguration.DiscoveryServiceURL
+	var aURLs []globalappconfiguration.AdminDomainURL
+	var sURLs []globalappconfiguration.AdminDomainURL
 
 	// Set the allowed web store urls
 	urls := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.AllowedWebStoreURLs)
 	for _, url := range urls {
-		var aURL globalappconfiguration.AllowedWebStoreURL
+		var aURL globalappconfiguration.AdminDomainURL
 		aURL.SetUrl(url)
 		aURLs = append(aURLs, aURL)
 	}
@@ -83,7 +83,7 @@ func (r *gacDiscoveryResource) Create(ctx context.Context, req resource.CreateRe
 	// Set the service urls
 	urls = util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.ServiceURLs)
 	for _, url := range urls {
-		var sURL globalappconfiguration.DiscoveryServiceURL
+		var sURL globalappconfiguration.AdminDomainURL
 		sURL.SetUrl(url)
 		sURLs = append(sURLs, sURL)
 	}
@@ -98,8 +98,8 @@ func (r *gacDiscoveryResource) Create(ctx context.Context, req resource.CreateRe
 	body.SetDomain(domain)
 
 	// Call the API
-	createDiscoveryRequest := r.client.GacClient.DiscoveryControllerDAAS.PostDiscoveryApiUsingPOST(ctx, util.GacAppName)
-	createDiscoveryRequest = createDiscoveryRequest.DiscoveryRecord(body)
+	createDiscoveryRequest := r.client.GacClient.DiscoveryDAAS.CreateDiscovery(ctx, util.GacAppName)
+	createDiscoveryRequest = createDiscoveryRequest.DiscoveryRecordModel(body)
 	_, httpResp, err := citrixdaasclient.AddRequestData(createDiscoveryRequest, r.client).Execute()
 
 	//In case of error, add it to diagnostics and return
@@ -177,13 +177,13 @@ func (r *gacDiscoveryResource) Update(ctx context.Context, req resource.UpdateRe
 	var domain globalappconfiguration.Domain
 	domain.SetName(plan.Domain.ValueString())
 
-	var aURLs []globalappconfiguration.AllowedWebStoreURL
-	var sURLs []globalappconfiguration.DiscoveryServiceURL
+	var aURLs []globalappconfiguration.AdminDomainURL
+	var sURLs []globalappconfiguration.AdminDomainURL
 
 	// Set the allowed web store urls
 	urls := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.AllowedWebStoreURLs)
 	for _, url := range urls {
-		var aURL globalappconfiguration.AllowedWebStoreURL
+		var aURL globalappconfiguration.AdminDomainURL
 		aURL.SetUrl(url)
 		aURLs = append(aURLs, aURL)
 	}
@@ -191,7 +191,7 @@ func (r *gacDiscoveryResource) Update(ctx context.Context, req resource.UpdateRe
 	// Set the service urls
 	urls = util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.ServiceURLs)
 	for _, url := range urls {
-		var sURL globalappconfiguration.DiscoveryServiceURL
+		var sURL globalappconfiguration.AdminDomainURL
 		sURL.SetUrl(url)
 		sURLs = append(sURLs, sURL)
 	}
@@ -206,9 +206,9 @@ func (r *gacDiscoveryResource) Update(ctx context.Context, req resource.UpdateRe
 	body.SetDomain(domain)
 
 	// Call the API
-	updateDiscoveryRequest := r.client.GacClient.DiscoveryControllerDAAS.PutDiscoveryApiUsingPUT(ctx, util.GacAppName, plan.Domain.ValueString())
-	updateDiscoveryRequest = updateDiscoveryRequest.DiscoveryRecord(body)
-	httpResp, err := citrixdaasclient.AddRequestData(updateDiscoveryRequest, r.client).Execute()
+	updateDiscoveryRequest := r.client.GacClient.DiscoveryDAAS.UpdateDiscovery(ctx, util.GacAppName, plan.Domain.ValueString())
+	updateDiscoveryRequest = updateDiscoveryRequest.DiscoveryRecordModel(body)
+	_, httpResp, err := citrixdaasclient.AddRequestData(updateDiscoveryRequest, r.client).Execute()
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -248,8 +248,8 @@ func (r *gacDiscoveryResource) Delete(ctx context.Context, req resource.DeleteRe
 	}
 
 	//Delete discovery configuration for the domain
-	deleteDiscoveryRequest := r.client.GacClient.DiscoveryControllerDAAS.DeleteDiscoveryApiUsingDELETE(ctx, util.GacAppName, state.Domain.ValueString())
-	httpResp, err := citrixdaasclient.AddRequestData(deleteDiscoveryRequest, r.client).Execute()
+	deleteDiscoveryRequest := r.client.GacClient.DiscoveryDAAS.DeleteDiscovery(ctx, util.GacAppName, state.Domain.ValueString())
+	_, httpResp, err := citrixdaasclient.AddRequestData(deleteDiscoveryRequest, r.client).Execute()
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -268,7 +268,7 @@ func (r *gacDiscoveryResource) ImportState(ctx context.Context, req resource.Imp
 }
 
 func getDiscoveryConfiguration(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, domain string) (*globalappconfiguration.GetAllDiscoveryResponse, error) {
-	getDiscoveryRequest := client.GacClient.DiscoveryControllerDAAS.GetDiscoveryApiUsingGET(ctx, util.GacAppName, domain)
+	getDiscoveryRequest := client.GacClient.DiscoveryDAAS.RetrieveDiscovery(ctx, util.GacAppName, domain)
 	getDiscoveryResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*globalappconfiguration.GetAllDiscoveryResponse](getDiscoveryRequest, client)
 	if err != nil {
 		diagnostics.AddError(
@@ -283,7 +283,7 @@ func getDiscoveryConfiguration(ctx context.Context, client *citrixdaasclient.Cit
 }
 
 func readDiscoveryConfiguration(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, domain string) (*globalappconfiguration.GetAllDiscoveryResponse, error) {
-	getDiscoveryRequest := client.GacClient.DiscoveryControllerDAAS.GetDiscoveryApiUsingGET(ctx, util.GacAppName, domain)
+	getDiscoveryRequest := client.GacClient.DiscoveryDAAS.RetrieveDiscovery(ctx, util.GacAppName, domain)
 	getDiscoveryResponse, _, err := util.ReadResource[*globalappconfiguration.GetAllDiscoveryResponse](getDiscoveryRequest, ctx, client, resp, "Discovery Configuration", domain)
 	return getDiscoveryResponse, err
 }

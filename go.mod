@@ -3,7 +3,7 @@ module github.com/citrix/terraform-provider-citrix
 go 1.24.1
 
 require (
-	github.com/citrix/citrix-daas-rest-go v1.0.17
+	github.com/citrix/citrix-daas-rest-go v1.0.18
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-azure-helpers v0.73.0
 	github.com/hashicorp/go-multierror v1.1.1

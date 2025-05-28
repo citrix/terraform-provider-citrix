@@ -366,6 +366,7 @@ resource "citrix_machine_catalog" "example-openshift-mtsession" {
                 writeback_cache_disk_size_gb = 32
                 writeback_cache_memory_size_mb = 2048
             }
+            machine_profile = "<machine profile VM name>"
         }
         
         number_of_total_machines = 1
@@ -612,9 +613,9 @@ Optional:
 
 - `availability_zone` (String) **[AWS: Required]** The availability zone in which the machine resides. Required only if `is_power_managed = true`
 - `cluster` (String) **[vSphere: Optional]** The cluster in which the machine resides. To be used only if `is_power_managed = true`
-- `cluster_folder_path` (String) **[vSphere: Optional]** The folder path in which the cluster resides. If there are multiple folders in the path, they should be separated by `\` in between each of them. To be used only if `is_power_managed = true`
+- `cluster_folder_path` (String) **[HPE Moonshot: Optional, vSphere: Optional]** The folder path in which the cluster resides. If there are multiple folders in the path, they should be separated by `\` in between each of them. To be used only if `is_power_managed = true`
 
-~> **Please Note** Folder path should should only be specified for cluster folders. For VM folders, they can be ignored and the folder path should be omitted.
+~> **Please Note** Folder path should only be specified for cluster folders. For VM folders, they can be ignored and the folder path should be omitted.
 - `datacenter` (String) **[vSphere: Required]** The datacenter in which the machine resides. Required only if `is_power_managed = true`
 - `host` (String) **[SCVMM: Required, vSphere: Optional]** For vSphere, this is the IP address or FQDN of the host in which the machine resides. For SCVMM, this is the name of the host in which the machine resides. Required for SCVMM only if `is_power_managed = true`
 - `machine_name` (String) The name of the machine. Required only if `is_power_managed = true`
@@ -993,6 +994,7 @@ Required:
 Optional:
 
 - `image_update_reboot_options` (Attributes) The options for how rebooting is performed for image update. When omitted, image update on the VDAs will be performed on next shutdown. (see [below for nested schema](#nestedatt--provisioning_scheme--openshift_machine_config--image_update_reboot_options))
+- `machine_profile` (String) The name of the virtual machine that will be used to identify the default value for the tags, virtual machine size, boot diagnostics and host cache property of OS disk.
 - `master_image_note` (String) The note for the master image.
 - `use_full_disk_clone_provisioning` (Boolean) Specify if virtual machines created from the provisioning scheme should be created using the dedicated full disk clone feature. Default is `false`.
 - `writeback_cache` (Attributes) Write-back Cache config. Leave this empty to disable Write-back Cache. (see [below for nested schema](#nestedatt--provisioning_scheme--openshift_machine_config--writeback_cache))

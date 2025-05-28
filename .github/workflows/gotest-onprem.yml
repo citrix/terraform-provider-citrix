@@ -44,16 +44,17 @@ jobs:
         with:
           inlineScript: |
             ./scripts/test-env-power-management/azure_env.ps1 `
-              -ClientId ${{secrets.CLIENT_ID}} `
-              -ClientSecret ${{secrets.CLIENT_SECRET}} `
+              -ClientId ${{secrets.CITRIX_CLIENT_ID}} `
+              -ClientSecret ${{secrets.CITRIX_CLIENT_SECRET}} `
               -DomainFqdn ${{secrets.DOMAIN_FQDN}} `
-              -Hostname ${{secrets.HOSTNAME}} `
+              -Hostname ${{secrets.CITRIX_HOSTNAME}} `
               -AzureClientId ${{secrets.AZURE_CLIENT_ID}} `
               -AzureClientSecret ${{secrets.AZURE_CLIENT_SECRET}} `
               -AzureTenantId ${{secrets.AZURE_TENANT_ID}} `
               -AzureSubscriptionId ${{secrets.AZURE_SUBSCRIPTION_ID}} `
-              -AzureResourceGroupName ${{secrets.AZURE_RESOURCE_GROUP_NAME}} `
+              -AzureDdcResourceGroupName ${{secrets.AZURE_DDC_RESOURCE_GROUP_NAME}} `
               -AzureDdcVmName ${{secrets.AZURE_DDC_VM_NAME}} `
+              -AzureAdVmResourceGroupName ${{secrets.AZURE_AD_VM_RESOURCE_GROUP_NAME}} `
               -AzureAdVmName ${{secrets.AZURE_AD_VM_NAME}} `
               -DisableSSLValidation $true
           azPSVersion: "latest"
@@ -121,6 +122,7 @@ jobs:
           echo "TEST_MC_RESOURCE_GROUP_MANUAL_POWER_MANAGED=${{secrets.TEST_MC_RESOURCE_GROUP_MANUAL_POWER_MANAGED}}" >> $GITHUB_ENV
           echo "TEST_MC_MACHINE_NAME_MANUAL_AZURE=${{secrets.TEST_MC_MACHINE_NAME_MANUAL_AZURE}}" >> $GITHUB_ENV
           echo "TEST_MC_MACHINE_ACCOUNT_MANUAL_AZURE=${{secrets.TEST_MC_MACHINE_ACCOUNT_MANUAL_AZURE}}" >> $GITHUB_ENV
+          echo "TEST_MC_VDA_AZURE_RESOURCE_GROUP=${{secrets.TEST_MC_VDA_AZURE_RESOURCE_GROUP}}" >> $GITHUB_ENV
           echo "TEST_DESKTOP_ICON_RAW_DATA=${{secrets.TEST_DESKTOP_ICON_RAW_DATA}}" >> $GITHUB_ENV
           echo "TEST_DG_NAME=${{vars.TEST_DG_NAME}}" >> $GITHUB_ENV
           echo "TEST_POLICY_SET_NAME=${{vars.TEST_POLICY_SET_NAME}}" >> $GITHUB_ENV
