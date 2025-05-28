@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"sync"
 
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	citrixwemservice "github.com/citrix/citrix-daas-rest-go/devicemanagement"
@@ -11,6 +12,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 )
+
+var mutex = &sync.Mutex{}
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
@@ -69,6 +72,9 @@ func NewWemDirectoryResource() resource.Resource {
 
 // Create implements resource.Resource.
 func (w *wemDirectoryResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
@@ -104,7 +110,7 @@ func (w *wemDirectoryResource) Create(ctx context.Context, req resource.CreateRe
 	// Generate Create MAchine AD Object API request
 	machineADObjectCreateRequest := w.client.WemClient.MachineADObjectDAAS.AdObjectCreate(ctx)
 	machineADObjectCreateRequest = machineADObjectCreateRequest.Body(body)
-	httpResp, err := citrixdaasclient.AddRequestData(machineADObjectCreateRequest, w.client).Execute()
+	_, httpResp, err := citrixdaasclient.ExecuteWithRetry[any](machineADObjectCreateRequest, w.client)
 
 	// In case of 400 Bad Request, add it to diagnostics and return
 	if httpResp.StatusCode == http.StatusBadRequest && err.Error() == "400 Bad Request  (Duplicate property)" {
@@ -142,6 +148,9 @@ func (w *wemDirectoryResource) Create(ctx context.Context, req resource.CreateRe
 
 // Delete implements resource.Resource.
 func (w *wemDirectoryResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Get current state
@@ -154,7 +163,7 @@ func (w *wemDirectoryResource) Delete(ctx context.Context, req resource.DeleteRe
 
 	// Generate Delete API request
 	machineADObjectDeleteRequest := w.client.WemClient.MachineADObjectDAAS.AdObjectDelete(ctx, state.Id.ValueString())
-	httpResp, err := citrixdaasclient.AddRequestData(machineADObjectDeleteRequest, w.client).Execute()
+	_, httpResp, err := citrixdaasclient.ExecuteWithRetry[any](machineADObjectDeleteRequest, w.client)
 
 	// In case of error, add it to diagnostics and return
 	if err != nil {
@@ -196,6 +205,9 @@ func (w *wemDirectoryResource) Read(ctx context.Context, req resource.ReadReques
 
 // Update implements resource.Resource.
 func (w *wemDirectoryResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
@@ -240,7 +252,7 @@ func (w *wemDirectoryResource) Update(ctx context.Context, req resource.UpdateRe
 	// Generate Update API request
 	machineADObjectUpdateRequest := w.client.WemClient.MachineADObjectDAAS.AdObjectUpdate(ctx)
 	machineADObjectUpdateRequest = machineADObjectUpdateRequest.Body(body)
-	httpResp, err := citrixdaasclient.AddRequestData(machineADObjectUpdateRequest, w.client).Execute()
+	_, httpResp, err := citrixdaasclient.ExecuteWithRetry[any](machineADObjectUpdateRequest, w.client)
 
 	// In case of error, add it to diagnostics and return
 	if err != nil {

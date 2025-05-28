@@ -43,6 +43,8 @@ resource "citrix_site_settings" "example" {
 - `use_vertical_scaling_for_sessions_on_machines` (Boolean) When set to `false`, sessions are distributed among the powered-on machines. For example, if you have two machines configured for 10 sessions each, the first machine handles five concurrent sessions and the second machine handles five. When set to `true`, sessions maximize powered-on machine capacity and save machine costs. For example, if you have two machines configured for 10 sessions each, the first machine handles the first 10 concurrent sessions. The second machine handles the eleventh session.
 - `web_ui_policy_set_enabled` (Boolean) Set this setting to `true` to show policy sets in the Policies node. With policy sets, you can group policies together for simplified, role-based access control.
 
+~> **Please Note** This attribute cannot be set to `false` when there are any policy sets of type `DeliveryGroupPolicies`.
+
 ### Read-Only
 
 - `id` (String) ID of the site.

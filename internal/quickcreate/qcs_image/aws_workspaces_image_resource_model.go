@@ -110,8 +110,8 @@ func (AwsWorkspacesImageModel) GetSchema() schema.Schema {
 				},
 				Validators: []validator.String{
 					stringvalidator.OneOf(
-						string(quickcreateservice.AWSEDCWORKSPACEIMAGEINGESTIONPROCESS_REGULAR_BYOP),
-						string(quickcreateservice.AWSEDCWORKSPACEIMAGEINGESTIONPROCESS_GRAPHICS_G4_DN_BYOP),
+						string(quickcreateservice.AWSEDCWORKSPACEIMAGEINGESTIONPROCESS_BYOL_REGULAR_BYOP),
+						string(quickcreateservice.AWSEDCWORKSPACEIMAGEINGESTIONPROCESS_BYOL_GRAPHICS_G4_DN_BYOP),
 					),
 				},
 			},

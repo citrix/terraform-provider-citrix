@@ -574,6 +574,7 @@ type OpenshiftMachineConfigModel struct {
 	MemoryMB                     types.Int64  `tfsdk:"memory_mb"`
 	WritebackCache               types.Object `tfsdk:"writeback_cache"` // OpenshiftWritebackCacheModel
 	UseFullDiskCloneProvisioning types.Bool   `tfsdk:"use_full_disk_clone_provisioning"`
+	MachineProfile               types.String `tfsdk:"machine_profile"`
 }
 
 func (OpenshiftMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
@@ -614,6 +615,19 @@ func (OpenshiftMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 				Default:     booldefault.StaticBool(false),
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.RequiresReplace(),
+				},
+			},
+			"machine_profile": schema.StringAttribute{
+				Description: "The name of the virtual machine that will be used to identify the default value for the tags, virtual machine size, boot diagnostics and host cache property of OS disk.",
+				Optional:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplaceIf(
+						func(_ context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+							resp.RequiresReplace = req.StateValue.IsNull() != req.ConfigValue.IsNull()
+						},
+						"Force replace when machine_profile is added or removed. Update is allowed only if previously set.",
+						"Force replace when machine_profile is added or removed. Update is allowed only if previously set.",
+					),
 				},
 			},
 		},
@@ -1546,6 +1560,13 @@ func (mc *OpenshiftMachineConfigModel) RefreshProperties(ctx context.Context, di
 	}
 
 	mc.UseFullDiskCloneProvisioning = types.BoolValue(provScheme.GetUseFullDiskCloneProvisioning())
+
+	machineProfile := provScheme.GetMachineProfile()
+
+	machineProfileVmName := machineProfile.GetName()
+	if machineProfileVmName != "" {
+		mc.MachineProfile = types.StringValue(machineProfileVmName)
+	}
 }
 
 func (mc *NutanixMachineConfigModel) RefreshProperties(catalog citrixorchestration.MachineCatalogDetailResponseModel) {

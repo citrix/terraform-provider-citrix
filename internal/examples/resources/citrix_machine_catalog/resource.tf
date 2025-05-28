@@ -348,6 +348,7 @@ resource "citrix_machine_catalog" "example-openshift-mtsession" {
                 writeback_cache_disk_size_gb = 32
                 writeback_cache_memory_size_mb = 2048
             }
+            machine_profile = "<machine profile VM name>"
         }
         
         number_of_total_machines = 1

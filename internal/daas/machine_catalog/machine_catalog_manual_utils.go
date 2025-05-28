@@ -171,6 +171,21 @@ func getMachinesForManualCatalogs(ctx context.Context, diagnostics *diag.Diagnos
 					}
 					vmId = vm.GetId()
 				}
+				if hypervisor.GetPluginId() == util.HPE_MOONSHOT_PLUGIN_ID {
+					folderPath := hypervisor.GetXDPath()
+
+					if !machine.ClusterFolderPath.IsNull() {
+						folders := strings.Split(machine.ClusterFolderPath.ValueString(), "\\")
+						for _, folder := range folders {
+							folderPath = fmt.Sprintf("%s\\%s.folder", folderPath, folder)
+						}
+					}
+					vm, httpResp, err := util.GetSingleHypervisorResourceWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, folderPath, machineName, util.VirtualMachineResourceType, "", hypervisor)
+					if err != nil {
+						return nil, httpResp, err
+					}
+					vmId = vm.GetId()
+				}
 			}
 
 			addMachineRequest.SetHostedMachineId(vmId)
@@ -444,7 +459,7 @@ func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Conte
 						}
 					}
 				case citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM:
-					if hyp.GetPluginId() == util.NUTANIX_PLUGIN_ID && hostedMachineName != "" {
+					if (hyp.GetPluginId() == util.NUTANIX_PLUGIN_ID || hyp.GetPluginId() == util.HPE_MOONSHOT_PLUGIN_ID) && hostedMachineName != "" {
 						if !strings.EqualFold(machineFromPlan.MachineName.ValueString(), hostedMachineName) {
 							machineFromPlan.MachineName = types.StringValue(hostedMachineName)
 						}
@@ -540,7 +555,7 @@ func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Conte
 					machineModel.Host = types.StringValue(host)
 				}
 			case citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM:
-				if hyp.GetPluginId() == util.NUTANIX_PLUGIN_ID && hostedMachineName != "" {
+				if (hyp.GetPluginId() == util.NUTANIX_PLUGIN_ID || hyp.GetPluginId() == util.HPE_MOONSHOT_PLUGIN_ID) && hostedMachineName != "" {
 					machineModel.MachineName = types.StringValue(hostedMachineName)
 				}
 			case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:

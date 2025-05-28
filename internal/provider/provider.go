@@ -46,6 +46,7 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/quickcreate/qcs_connection"
 	"github.com/citrix/terraform-provider-citrix/internal/quickcreate/qcs_deployment"
 	"github.com/citrix/terraform-provider-citrix/internal/quickcreate/qcs_image"
+	"github.com/citrix/terraform-provider-citrix/internal/quickdeploy/cma_image"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_authentication"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_deployment"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_multi_site"
@@ -440,6 +441,7 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	wemRegion := os.Getenv("CITRIX_WEM_REGION")
 	wemHostName := os.Getenv("CITRIX_WEM_HOSTNAME")
 	quick_create_host_name := os.Getenv("CITRIX_QUICK_CREATE_HOST_NAME")
+	catalog_service_host_name := os.Getenv("CITRIX_QUICK_DEPLOY_HOST_NAME")
 
 	// Initialize WEM on-prem client if WEM on-prem config is provided
 	wemOnPremHostName := os.Getenv("WEM_HOSTNAME")
@@ -505,7 +507,7 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 		}
 
-		validateAndInitializeDaaSClient(ctx, resp, client, clientId, clientSecret, hostname, environment, wemHostName, wemRegion, customerId, quick_create_host_name, p.version, wemOnPremHostName, wem_admin_username, wem_admin_password, disableSslVerification, disableDaasClient, wem_disable_ssl_verification)
+		validateAndInitializeDaaSClient(ctx, resp, client, clientId, clientSecret, hostname, environment, wemHostName, wemRegion, customerId, quick_create_host_name, catalog_service_host_name, p.version, wemOnPremHostName, wem_admin_username, wem_admin_password, disableSslVerification, disableDaasClient, wem_disable_ssl_verification)
 		if resp.Diagnostics.HasError() {
 			return
 		}
@@ -593,7 +595,7 @@ func validateAndInitializeStorefrontClient(ctx context.Context, resp *provider.C
 	client.InitializeStoreFrontClient(ctx, storefront_computer_name, storefront_ad_admin_username, storefront_ad_admin_password, storefront_disable_ssl_verification)
 }
 
-func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.ConfigureResponse, client *citrixclient.CitrixDaasClient, clientId, clientSecret, hostname, environment, wemHostName, wemRegion, customerId, quick_create_host_name, version, wemOnPremHostName, wem_admin_username, wem_admin_password string, disableSslVerification, disableDaasClient, wem_disable_ssl_verification bool) {
+func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.ConfigureResponse, client *citrixclient.CitrixDaasClient, clientId, clientSecret, hostname, environment, wemHostName, wemRegion, customerId, quick_create_host_name, catalog_service_host_name, version, wemOnPremHostName, wem_admin_username, wem_admin_password string, disableSslVerification, disableDaasClient, wem_disable_ssl_verification bool) {
 	if clientId == "" {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("cvad_config").AtName("client_id"),
@@ -738,6 +740,26 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 		}
 	}
 
+	catalogServiceHostname := ""
+	if catalog_service_host_name != "" {
+		// If customer specified a quick create host name, use it
+		catalogServiceHostname = catalog_service_host_name
+	} else {
+		if environment == "Production" {
+			catalogServiceHostname = "api.cloud.com/catalogservice"
+		} else if environment == "Staging" {
+			catalogServiceHostname = "api.cloudburrito.com/catalogservice"
+		} else if environment == "Japan" {
+			catalogServiceHostname = "api.citrixcloud.jp/catalogservice"
+		} else if environment == "JapanStaging" {
+			catalogServiceHostname = "api.citrixcloudstaging.jp/catalogservice"
+		} else if environment == "Gov" {
+			catalogServiceHostname = "api.cloud.us/catalogservice"
+		} else if environment == "GovStaging" {
+			catalogServiceHostname = "api.cloudstaging.us/catalogservice"
+		}
+	}
+
 	cwsHostName := ""
 	if environment == "Production" {
 		cwsHostName = "cws.citrixworkspacesapi.net"
@@ -871,6 +893,10 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 	if quickCreateHostname != "" {
 		client.InitializeQuickCreateClient(ctx, quickCreateHostname, middleware.MiddlewareAuthFunc)
 	}
+	// Set Quick Deploy Client
+	if catalogServiceHostname != "" {
+		client.InitializeQuickDeployClient(ctx, catalogServiceHostname, middleware.MiddlewareAuthFunc)
+	}
 	// Set CWS Client
 	if cwsHostName != "" {
 		client.InitializeCwsClient(ctx, cwsHostName, middleware.MiddlewareAuthFunc)
@@ -972,6 +998,8 @@ func (p *citrixProvider) DataSources(_ context.Context) []func() datasource.Data
 		qcs_account.NewAwsWorkspacesCloudFormationDataSource,
 		qcs_connection.NewAwsWorkspacesDirectoryConnectionDataSource,
 		qcs_deployment.NewAwsWorkspacesDeploymentDataSource,
+		// QuickDeploy DataSources
+		cma_image.NewCitrixManagedAzureImageDataSource,
 		// CC Identity Provider Resources
 		cc_identity_providers.NewOktaIdentityProviderDataSource,
 		cc_identity_providers.NewGoogleIdentityProviderDataSource,
@@ -995,6 +1023,8 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		hypervisor.NewNutanixHypervisorResource,
 		hypervisor.NewSCVMMHypervisorResource,
 		hypervisor.NewOpenShiftHypervisorResource,
+		hypervisor.NewHpeMoonshotHypervisorResource,
+		hypervisor.NewRemotePCWakeOnLANHypervisorResource,
 		hypervisor_resource_pool.NewAzureHypervisorResourcePoolResource,
 		hypervisor_resource_pool.NewAwsHypervisorResourcePoolResource,
 		hypervisor_resource_pool.NewGcpHypervisorResourcePoolResource,
@@ -1052,6 +1082,8 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		qcs_image.NewAwsEdcImageResource,
 		qcs_connection.NewAwsWorkspacesDirectoryConnectionResource,
 		qcs_deployment.NewAwsWorkspacesDeploymentResource,
+		// QuickDeploy Resources
+		cma_image.NewCitrixManagedAzureImageResource,
 		// CC Identity Provider Resources
 		cc_identity_providers.NewGoogleIdentityProviderResource,
 		cc_identity_providers.NewOktaIdentityProviderResource,

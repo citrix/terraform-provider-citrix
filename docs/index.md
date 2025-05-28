@@ -73,16 +73,18 @@ A service principal is an API client which is not associated with an email. It c
 
 ### What resource is supported for different connection types?
 
-| Connection Type                 |   Hypervisor       |   Resource Pool    |  MCS Power Managed   | MCS Provisioning     |          PVS             | Manual/Remote PC     |
-|---------------------------------|--------------------|--------------------|----------------------|----------------------|--------------------------|----------------------|
-| AzureRM                         |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_check_mark:        | :heavy_check_mark:   |
-| AWS EC2                         |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
-| GCP                             |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
-| vSphere                         |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
-| XenServer                       |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
-| Nutanix                         |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
-| SCVMM                           |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
-| OpenShift (**Techpreview**)     |:heavy_check_mark:  |:heavy_check_mark:  | :heavy_check_mark:   | :heavy_check_mark:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
+| Connection Type                         |   Hypervisor       |   Resource Pool          |  MCS Power Managed         | MCS Provisioning           |          PVS             | Manual/Remote PC     |
+|-----------------------------------------|--------------------|--------------------------|----------------------------|----------------------------|--------------------------|----------------------|
+| AzureRM                                 |:heavy_check_mark:  |:heavy_check_mark:        | :heavy_check_mark:         | :heavy_check_mark:         |:heavy_check_mark:        | :heavy_check_mark:   |
+| AWS EC2                                 |:heavy_check_mark:  |:heavy_check_mark:        | :heavy_check_mark:         | :heavy_check_mark:         |:heavy_multiplication_x:  | :heavy_check_mark:   |
+| GCP                                     |:heavy_check_mark:  |:heavy_check_mark:        | :heavy_check_mark:         | :heavy_check_mark:         |:heavy_multiplication_x:  | :heavy_check_mark:   |
+| vSphere                                 |:heavy_check_mark:  |:heavy_check_mark:        | :heavy_check_mark:         | :heavy_check_mark:         |:heavy_multiplication_x:  | :heavy_check_mark:   |
+| XenServer                               |:heavy_check_mark:  |:heavy_check_mark:        | :heavy_check_mark:         | :heavy_check_mark:         |:heavy_multiplication_x:  | :heavy_check_mark:   |
+| Nutanix                                 |:heavy_check_mark:  |:heavy_check_mark:        | :heavy_check_mark:         | :heavy_check_mark:         |:heavy_multiplication_x:  | :heavy_check_mark:   |
+| SCVMM                                   |:heavy_check_mark:  |:heavy_check_mark:        | :heavy_check_mark:         | :heavy_check_mark:         |:heavy_multiplication_x:  | :heavy_check_mark:   |
+| Red Hat OpenShift (**Techpreview**)     |:heavy_check_mark:  |:heavy_check_mark:        | :heavy_check_mark:         | :heavy_check_mark:         |:heavy_multiplication_x:  | :heavy_check_mark:   |
+| HPE Moonshot (**Techpreview**)          |:heavy_check_mark:  |:heavy_multiplication_x:  | :heavy_check_mark:         | :heavy_multiplication_x:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
+| Remote PC Wake On LAN (**Techpreview**) |:heavy_check_mark:  |:heavy_multiplication_x:  | :heavy_multiplication_x:   | :heavy_multiplication_x:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
 
 ### What URLs should be whitelisted in order to use the Citrix Terraform provider?
 - URLs of the Citrix admin consoles: please visit [this documentation](https://docs.citrix.com/en-us/citrix-cloud/overview/requirements/internet-connectivity-requirements.html) for more information.

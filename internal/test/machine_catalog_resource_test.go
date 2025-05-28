@@ -108,6 +108,9 @@ func TestMachineCatalogPreCheck_Azure(t *testing.T) {
 	if v := os.Getenv("TEST_MC_SUBNET"); v == "" {
 		t.Fatal("TEST_MC_SUBNET must be set for acceptance tests")
 	}
+	if v := os.Getenv("TEST_MC_VDA_AZURE_RESOURCE_GROUP"); v == "" {
+		t.Fatal("TEST_MC_VDA_AZURE_RESOURCE_GROUP must be set for acceptance tests")
+	}
 }
 func TestActiveDirectoryMachineCatalogResourceAzure(t *testing.T) {
 	name := os.Getenv("TEST_MC_NAME")
@@ -299,6 +302,9 @@ func TestMachineCatalogPreCheck_AzureAd(t *testing.T) {
 	if v := os.Getenv("TEST_MC_MACHINE_PROFILE_RESOURCE_GROUP"); v == "" {
 		t.Fatal("TEST_MC_MACHINE_PROFILE_RESOURCE_GROUP must be set for acceptance tests")
 	}
+	if v := os.Getenv("TEST_MC_VDA_AZURE_RESOURCE_GROUP"); v == "" {
+		t.Fatal("TEST_MC_VDA_AZURE_RESOURCE_GROUP must be set for acceptance tests")
+	}
 }
 
 func TestAzureADMachineCatalogResourceAzure(t *testing.T) {
@@ -389,6 +395,9 @@ func TestMachineCatalogPreCheck_Workgroup(t *testing.T) {
 	}
 	if v := os.Getenv("TEST_MC_IMAGE_CONTAINER"); v == "" {
 		t.Fatal("TEST_MC_IMAGE_CONTAINER must be set for acceptance tests")
+	}
+	if v := os.Getenv("TEST_MC_VDA_AZURE_RESOURCE_GROUP"); v == "" {
+		t.Fatal("TEST_MC_VDA_AZURE_RESOURCE_GROUP must be set for acceptance tests")
 	}
 }
 
@@ -1578,7 +1587,7 @@ var (
 				}
 				storage_type = "StandardSSD_LRS"
 				use_managed_disks = true
-
+				vda_resource_group = "%s"
 			}
 			number_of_total_machines = 	0
 			machine_account_creation_rules ={
@@ -1615,6 +1624,7 @@ var (
 				}
 				storage_type = "StandardSSD_LRS"
 				use_managed_disks = true
+				vda_resource_group = "%s"
 			}
 			number_of_total_machines = 	1
 			machine_account_creation_rules ={
@@ -1661,6 +1671,7 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 				writeback_cache_memory_size_mb = 256
 				storage_cost_saving = true
 			}
+			vda_resource_group = "%s"
 		}
 		network_mapping = [
 			{
@@ -1714,6 +1725,7 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 					writeback_cache_memory_size_mb = 256
 					storage_cost_saving = true
 				}
+				vda_resource_group = "%s"
 			}
 			network_mapping = [
 				{
@@ -1767,6 +1779,7 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 					writeback_cache_memory_size_mb = 256
 					storage_cost_saving = true
 				}
+				vda_resource_group = "%s"
 			}
 			network_mapping = [
 				{
@@ -1818,6 +1831,7 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 					writeback_cache_memory_size_mb = 256
 					storage_cost_saving = true
 				}
+				vda_resource_group = "%s"
 			}
 			network_mapping = [
 				{
@@ -1869,6 +1883,7 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 					writeback_cache_memory_size_mb = 256
 					storage_cost_saving = true
 				}
+				vda_resource_group = "%s"
 			}
 			network_mapping = [
 				{
@@ -1917,6 +1932,7 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 					writeback_cache_memory_size_mb = 256
 					storage_cost_saving = true
 				}
+				vda_resource_group = "%s"
 			}
 			number_of_total_machines = 	1
 			machine_account_creation_rules ={
@@ -1958,6 +1974,7 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 					writeback_cache_memory_size_mb = 256
 					storage_cost_saving = true
 				}
+				vda_resource_group = "%s"
 			}
 			availability_zones = ["1","3"]
 			number_of_total_machines = 	2
@@ -2620,6 +2637,7 @@ func BuildMachineCatalogResourceAzure(t *testing.T, machineResource, catalogName
 	storage_account := os.Getenv("TEST_MC_IMAGE_STORAGE_ACCOUNT")
 	container := os.Getenv("TEST_MC_IMAGE_CONTAINER")
 	subnet := os.Getenv("TEST_MC_SUBNET")
+	vdaResourceGroup := os.Getenv("TEST_MC_VDA_AZURE_RESOURCE_GROUP")
 	if machineResource == machinecatalog_testResources_azure_updated {
 		master_image = os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")
 	}
@@ -2629,10 +2647,10 @@ func BuildMachineCatalogResourceAzure(t *testing.T, machineResource, catalogName
 
 	if machineResource == machinecatalog_testResources_azure || machineResource == machinecatalog_testResources_azure_delete_machine {
 		// Do not pass service account id and password since we are using service account resource
-		return fmt.Sprintf(machineResource, catalogNameSuffix, name, identityType, domain, service_offering, resource_group, storage_account, container, master_image, subnet, namingScheme)
+		return fmt.Sprintf(machineResource, catalogNameSuffix, name, identityType, domain, service_offering, resource_group, storage_account, container, master_image, vdaResourceGroup, subnet, namingScheme)
 	}
 
-	return fmt.Sprintf(machineResource, catalogNameSuffix, name, identityType, domain, service_account, service_account_pass, service_offering, resource_group, storage_account, container, master_image, subnet, namingScheme)
+	return fmt.Sprintf(machineResource, catalogNameSuffix, name, identityType, domain, service_account, service_account_pass, service_offering, resource_group, storage_account, container, master_image, vdaResourceGroup, subnet, namingScheme)
 }
 
 func BuildMachineCatalogResourceAzureAd(t *testing.T, machineResource string) string {
@@ -2643,6 +2661,7 @@ func BuildMachineCatalogResourceAzureAd(t *testing.T, machineResource string) st
 	storage_account := os.Getenv("TEST_MC_IMAGE_STORAGE_ACCOUNT")
 	container := os.Getenv("TEST_MC_IMAGE_CONTAINER")
 	subnet := os.Getenv("TEST_MC_SUBNET")
+	vdaResourceGroup := os.Getenv("TEST_MC_VDA_AZURE_RESOURCE_GROUP")
 	namingScheme := "vda-##-AAD"
 
 	machine_profile_vm_name := os.Getenv("TEST_MC_MACHINE_PROFILE_VM_NAME")
@@ -2651,7 +2670,7 @@ func BuildMachineCatalogResourceAzureAd(t *testing.T, machineResource string) st
 		master_image = os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")
 	}
 
-	return fmt.Sprintf(machineResource, "-AAD", name, service_offering, resource_group, storage_account, container, master_image, machine_profile_vm_name, machine_profile_resource_group, subnet, namingScheme)
+	return fmt.Sprintf(machineResource, "-AAD", name, service_offering, resource_group, storage_account, container, master_image, machine_profile_vm_name, machine_profile_resource_group, vdaResourceGroup, subnet, namingScheme)
 }
 
 func BuildMachineCatalogResourceWorkgroup(t *testing.T, machineResource string) string {
@@ -2661,13 +2680,14 @@ func BuildMachineCatalogResourceWorkgroup(t *testing.T, machineResource string) 
 	resource_group := os.Getenv("TEST_MC_IMAGE_RESOURCE_GROUP")
 	storage_account := os.Getenv("TEST_MC_IMAGE_STORAGE_ACCOUNT")
 	container := os.Getenv("TEST_MC_IMAGE_CONTAINER")
+	vdaResourceGroup := os.Getenv("TEST_MC_VDA_AZURE_RESOURCE_GROUP")
 	namingScheme := "vda-##-WG"
 
 	if machineResource == machinecatalog_testResources_workgroup_updated {
 		master_image = os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")
 	}
 
-	return fmt.Sprintf(machineResource, "-WG", name, service_offering, resource_group, storage_account, container, master_image, namingScheme)
+	return fmt.Sprintf(machineResource, "-WG", name, service_offering, resource_group, storage_account, container, master_image, vdaResourceGroup, namingScheme)
 }
 
 func BuildMachineCatalogResourceGCP(t *testing.T, machineResource string) string {
@@ -2760,7 +2780,9 @@ func BuildMachineCatalogWithZeroMachines(t *testing.T, machineResource string) s
 	storage_account := os.Getenv("TEST_MC_IMAGE_STORAGE_ACCOUNT")
 	container := os.Getenv("TEST_MC_IMAGE_CONTAINER")
 	master_image := os.Getenv("TEST_MC_MASTER_IMAGE")
-	return fmt.Sprintf(machineResource, domain, service_offering, resource_group, storage_account, container, master_image)
+	vdaResourceGroup := os.Getenv("TEST_MC_VDA_AZURE_RESOURCE_GROUP")
+
+	return fmt.Sprintf(machineResource, domain, service_offering, resource_group, storage_account, container, master_image, vdaResourceGroup)
 }
 
 func BuildMachineCatalogResourceManualPowerManagedAzure(t *testing.T, machineResource string) string {

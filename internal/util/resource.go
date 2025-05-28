@@ -20,6 +20,8 @@ const AZURERM_FACTORY_NAME string = "AzureRmFactory"
 const VMWARE_FACTORY_NAME string = "VmwareFactory"
 const NUTANIX_PLUGIN_ID string = "AcropolisFactory"
 const OPENSHIFT_PLUGIN_ID string = "OpenShiftPluginFactory"
+const HPE_MOONSHOT_PLUGIN_ID = "HPMoonshotFactory"
+const REMOTE_PC_WAKE_ON_LAN_PLUGIN_ID string = "VdaWOLMachineManagerFactory"
 
 // Gets the hypervisor and logs any errors
 func GetHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId string) (*citrixorchestration.HypervisorDetailResponseModel, error) {
@@ -367,7 +369,7 @@ func getSingleHypervisorResource(ctx context.Context, client *citrixdaasclient.C
 				return &child, nil, nil
 			}
 		case citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM:
-			if hypervisor.GetPluginId() == NUTANIX_PLUGIN_ID && strings.EqualFold(child.GetName(), resourceName) {
+			if (hypervisor.GetPluginId() == NUTANIX_PLUGIN_ID || hypervisor.GetPluginId() == HPE_MOONSHOT_PLUGIN_ID) && strings.EqualFold(child.GetName(), resourceName) {
 				return &child, nil, nil
 			}
 		}

@@ -8,9 +8,9 @@ import (
 
 func AwsEdcWorkspaceImageIngestionProcessEnumToString(ingestionProcess quickcreateservice.AwsEdcWorkspaceImageIngestionProcess) string {
 	switch ingestionProcess {
-	case quickcreateservice.AWSEDCWORKSPACEIMAGEINGESTIONPROCESS_REGULAR_BYOP:
+	case quickcreateservice.AWSEDCWORKSPACEIMAGEINGESTIONPROCESS_BYOL_REGULAR_BYOP:
 		return "BYOL_REGULAR_BYOP"
-	case quickcreateservice.AWSEDCWORKSPACEIMAGEINGESTIONPROCESS_GRAPHICS_G4_DN_BYOP:
+	case quickcreateservice.AWSEDCWORKSPACEIMAGEINGESTIONPROCESS_BYOL_GRAPHICS_G4_DN_BYOP:
 		return "BYOL_GRAPHICS_G4DN_BYOP"
 	default:
 		return ""

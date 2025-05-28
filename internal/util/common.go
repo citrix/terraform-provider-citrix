@@ -21,6 +21,7 @@ import (
 	ccadmins "github.com/citrix/citrix-daas-rest-go/ccadmins"
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/citrix-daas-rest-go/citrixquickcreate"
+	"github.com/citrix/citrix-daas-rest-go/citrixquickdeploy"
 	citrixstorefrontclient "github.com/citrix/citrix-daas-rest-go/citrixstorefront/apis"
 	citrixstorefront "github.com/citrix/citrix-daas-rest-go/citrixstorefront/models"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -157,6 +158,9 @@ const CorsSiteSettingUrlRegex string = `^(https?:\/\/)([^/?#:]+)(:\d+)?([^/\\])$
 // NOT_EXIST error code
 const NOT_EXIST string = "NOT_EXIST"
 
+// Not Available string value
+const NotAvailableValue string = "N/A"
+
 // ID of the All Scope
 const AllScopeId string = "00000000-0000-0000-0000-000000000000"
 
@@ -278,6 +282,12 @@ var PlatformSettingsAssignedTo = []string{"AllUsersNoAuthentication"}
 const ServiceAccountAzureADDeviceManagementCapability = "AzureADDeviceManagement"
 const ServiceAccountIntuneEnrolledDeviceManagementCapability = "IntuneDeviceManagement"
 
+// CMA Master Image
+const HypervGen1 = "V1"
+const HypervGen2 = "V2"
+const OSPlatform_Windows = "Windows"
+const OSPlatform_Linux = "Linux"
+
 // <summary>
 // Helper function to validate if a string is a valid UUID or null
 // </summary>
@@ -356,6 +366,24 @@ func ReadQcsClientError(err error) string {
 		if msgObj.Detail.IsSet() {
 			return msgObj.GetDetail()
 		}
+	}
+
+	return err.Error()
+}
+
+func ReadCatalogServiceClientError(err error) string {
+	genericOpenApiError, ok := err.(*citrixquickdeploy.GenericOpenAPIError)
+	if !ok {
+		return err.Error()
+	}
+	msg := genericOpenApiError.Body()
+	if msg != nil {
+		var msgObj map[string]string
+		unmarshalError := json.Unmarshal(msg, &msgObj)
+		if unmarshalError != nil {
+			return err.Error()
+		}
+		return msgObj["message"]
 	}
 
 	return err.Error()
@@ -592,6 +620,8 @@ func ProcessAsyncJobResponseWithAddToDiagsOption(ctx context.Context, client *ci
 
 		if jobResponseModel.GetStatus() == citrixorchestration.JOBSTATUS_FAILED {
 			detailedErrorFound := false
+			additionalErrorMessageFound := false
+			additionalErrorMessage := ""
 			for _, kvp := range jobResponseModel.GetErrorParameters() {
 				if kvp.GetName() == "ErrorDetails" {
 					errorDetails := kvp.GetValue()
@@ -611,12 +641,32 @@ func ProcessAsyncJobResponseWithAddToDiagsOption(ctx context.Context, client *ci
 						detailedErrorFound = true
 						errorMessage += "\nError Message: service_offering does not support the VM Generation of the master image associated with this catalog."
 					}
+
+					prefix := "ErrorMessage :"
+
+					lines := strings.Split(errorDetails, "\n")
+
+					for _, line := range lines {
+						trimmedLine := strings.TrimSpace(line)
+
+						// Check if the trimmed line starts with our prefix
+						if strings.HasPrefix(trimmedLine, prefix) {
+							// Extract the part after the prefix
+							errorMsg := strings.TrimSpace(trimmedLine[len(prefix):])
+							additionalErrorMessageFound = true
+							additionalErrorMessage = errorMsg
+						}
+					}
+
 					break
 				}
 			}
 
 			if !detailedErrorFound {
-				errorMessage += "\nError message: " + jobResponseModel.GetErrorString()
+				errorMessage += "\n\nError Message : " + jobResponseModel.GetErrorString()
+			}
+			if additionalErrorMessageFound {
+				errorMessage += "\n\n" + additionalErrorMessage
 			}
 		}
 

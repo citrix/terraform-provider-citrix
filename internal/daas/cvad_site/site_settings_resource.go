@@ -8,6 +8,7 @@ import (
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/policies"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -170,6 +171,36 @@ func (r *siteSettingsResource) ModifyPlan(ctx context.Context, req resource.Modi
 	if r.client != nil && r.client.ApiClient == nil {
 		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
 		return
+	}
+
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var plan SiteSettingsModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if !plan.WebUiPolicySetEnabled.IsUnknown() &&
+		!plan.WebUiPolicySetEnabled.IsNull() &&
+		!plan.WebUiPolicySetEnabled.ValueBool() {
+		policySets, err := policies.GetPolicySets(ctx, r.client, &resp.Diagnostics)
+		if err != nil {
+			return
+		}
+		for _, policySet := range policySets {
+			if policySet.GetPolicySetType() == citrixorchestration.SDKGPOPOLICYSETTYPE_DELIVERY_GROUP_POLICIES {
+				err := fmt.Errorf("`WebUiPolicySetEnabled` cannot be set to `false` when there are any policy sets of type `DeliveryGroupPolicies`")
+				resp.Diagnostics.AddError(
+					"Error validating Site Settings",
+					err.Error(),
+				)
+				return
+			}
+		}
 	}
 }
 

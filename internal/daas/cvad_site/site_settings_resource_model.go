@@ -43,8 +43,9 @@ func (SiteSettingsModel) GetSchema() schema.Schema {
 				Computed:    true,
 			},
 			"web_ui_policy_set_enabled": schema.BoolAttribute{
-				Description: "Set this setting to `true` to show policy sets in the Policies node. With policy sets, you can group policies together for simplified, role-based access control.",
-				Optional:    true,
+				Description: "Set this setting to `true` to show policy sets in the Policies node. With policy sets, you can group policies together for simplified, role-based access control." +
+					"\n\n~> **Please Note** This attribute cannot be set to `false` when there are any policy sets of type `DeliveryGroupPolicies`.",
+				Optional: true,
 			},
 			"dns_resolution_enabled": schema.BoolAttribute{
 				Description: "For Cloud environments, set this setting to `true` when enabling the Rendezvous protocol that lets HDX sessions bypass the Citrix Cloud Connector and connect directly and securely to the Citrix Gateway service. For On-Premises environments, Set this setting to `true` if you want to present DNS names instead of IP addresses in the ICA file.",

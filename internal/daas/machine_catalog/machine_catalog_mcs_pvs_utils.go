@@ -404,6 +404,19 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 			}
 		}
 		provisioningScheme.SetUseFullDiskCloneProvisioning(openshiftMachineConfig.UseFullDiskCloneProvisioning.ValueBool())
+		if !openshiftMachineConfig.MachineProfile.IsNull() {
+			machineProfile, httpResp, err := util.GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", openshiftMachineConfig.MachineProfile.ValueString(), util.VirtualMachineResourceType, "")
+			if err != nil {
+				diag.AddError(
+					"Error creating Machine Catalog",
+					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+						fmt.Sprintf("\nFailed to locate machine profile %s on openshift, error: %s", openshiftMachineConfig.MachineProfile.ValueString(), err.Error()),
+				)
+				return nil, err
+			}
+
+			provisioningScheme.SetMachineProfilePath(machineProfile)
+		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM:
 		scvmmMachineConfig := util.ObjectValueToTypedObject[SCVMMMachineConfigModel](ctx, diag, provisioningSchemePlan.SCVMMMachineConfigModel)
 		provisioningScheme.SetMemoryMB(int32(scvmmMachineConfig.MemoryMB.ValueInt64()))
@@ -883,6 +896,42 @@ func updateCatalogMachineProfile(ctx context.Context, client *citrixdaasclient.C
 	return nil
 }
 
+func updateMemoryAndCpuCount(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, catalog *citrixorchestration.MachineCatalogDetailResponseModel, plan MachineCatalogResourceModel, connectionType citrixorchestration.HypervisorConnectionType) error {
+	provisioningSchemePlan := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
+
+	cpuCount := int32(0)
+	memoryMB := int32(0)
+	switch connectionType {
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT:
+		openshiftMachineConfig := util.ObjectValueToTypedObject[OpenshiftMachineConfigModel](ctx, &resp.Diagnostics, provisioningSchemePlan.OpenshiftMachineConfig)
+		cpuCount = int32(openshiftMachineConfig.CpuCount.ValueInt64())
+		memoryMB = int32(openshiftMachineConfig.MemoryMB.ValueInt64())
+	}
+
+	var body citrixorchestration.UpdateMachineCatalogRequestModel
+	body.SetCpuCount(cpuCount)
+	body.SetMemoryMB(memoryMB)
+
+	updateMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsUpdateMachineCatalog(ctx, catalog.GetId())
+	updateMachineCatalogRequest = updateMachineCatalogRequest.UpdateMachineCatalogRequestModel(body).Async(true)
+	_, httpResp, err := citrixdaasclient.AddRequestData(updateMachineCatalogRequest, client).Execute()
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating Machine Catalog "+catalog.GetName(),
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		return err
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating memory and cpu count for Machine Catalog "+catalog.GetName(), &resp.Diagnostics, 15)
+	if errors.Is(err, &util.JobPollError{}) {
+		return err
+	} // if the job failed continue processing
+
+	return nil
+}
+
 func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, catalog *citrixorchestration.MachineCatalogDetailResponseModel, plan MachineCatalogResourceModel, provisioningType *citrixorchestration.ProvisioningType, maxTimeoutInMinutes int32) error {
 
 	catalogName := catalog.GetName()
@@ -907,6 +956,8 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 		return errResp
 	}
 
+	connectionType := hypervisor.GetConnectionType()
+
 	// Check if XDPath has changed for the image
 	imagePath := ""
 	masterImageNote := ""
@@ -926,7 +977,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 	rebootOption.SetRebootDuration(-1) // Default to update on next shutdown
 	rebootOption.SetWarningDuration(0) // Default to no warning
 
-	switch hypervisor.GetConnectionType() {
+	switch connectionType {
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
 		azureMachineConfigModel := util.ObjectValueToTypedObject[AzureMachineConfigModel](ctx, &resp.Diagnostics, provisioningSchemePlan.AzureMachineConfig)
 		azureMachineProfile := azureMachineConfigModel.MachineProfile
@@ -1191,6 +1242,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT:
 		openshiftMachineConfig := util.ObjectValueToTypedObject[OpenshiftMachineConfigModel](ctx, &resp.Diagnostics, provisioningSchemePlan.OpenshiftMachineConfig)
+		openshiftMachineProfile := openshiftMachineConfig.MachineProfile.ValueString()
 		newImage := openshiftMachineConfig.MasterImageVm.ValueString()
 		imagePath, err = getOnPremImagePath(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), newImage, "", "", "updating")
 		if err != nil {
@@ -1213,6 +1265,19 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 				}
 			}
 		}
+
+		if openshiftMachineProfile != "" {
+			machineProfilePath, httpResp, err = util.GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", openshiftMachineConfig.MachineProfile.ValueString(), util.VirtualMachineResourceType, "")
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error updating Machine Catalog",
+					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+						fmt.Sprintf("\nFailed to locate machine profile %s on GCP, error: %s", openshiftMachineConfig.MachineProfile.ValueString(), err.Error()),
+				)
+				return err
+			}
+		}
+
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM:
 		scvmmMachineConfig := util.ObjectValueToTypedObject[SCVMMMachineConfigModel](ctx, &resp.Diagnostics, provisioningSchemePlan.SCVMMMachineConfigModel)
 		newImage := scvmmMachineConfig.MasterImage.ValueString()
@@ -1275,6 +1340,13 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 		err = updateCatalogMachineProfile(ctx, client, resp, catalog, machineProfilePath)
 		if err != nil {
 			return err
+		}
+
+		if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT {
+			err = updateMemoryAndCpuCount(ctx, client, resp, catalog, plan, connectionType)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
