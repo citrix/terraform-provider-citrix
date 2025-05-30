@@ -97,6 +97,12 @@ func (GcpHypervisorResourceModel) GetAttributes() map[string]schema.Attribute {
 	return GcpHypervisorResourceModel{}.GetSchema().Attributes
 }
 
+func (GcpHypervisorResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{
+		"service_account_id": true,
+	}
+}
+
 func (r GcpHypervisorResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel) GcpHypervisorResourceModel {
 	r.Id = types.StringValue(hypervisor.GetId())
 	r.Name = types.StringValue(hypervisor.GetName())

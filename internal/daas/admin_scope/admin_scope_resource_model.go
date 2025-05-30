@@ -99,3 +99,7 @@ func (AdminScopeModel) GetSchema() schema.Schema {
 func (AdminScopeModel) GetAttributes() map[string]schema.Attribute {
 	return AdminScopeModel{}.GetSchema().Attributes
 }
+
+func (AdminScopeModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}

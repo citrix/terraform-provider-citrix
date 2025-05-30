@@ -38,6 +38,10 @@ func (GACSettingsResourceModel) GetAttributes() map[string]schema.Attribute {
 	return GACSettingsResourceModel{}.GetSchema().Attributes
 }
 
+func (GACSettingsResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 type AppSettings struct {
 	Windows  types.Set `tfsdk:"windows"`  //Set[Windows]
 	Ios      types.Set `tfsdk:"ios"`      //Set[Ios]

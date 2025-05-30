@@ -146,6 +146,10 @@ func (VsphereHypervisorResourcePoolResourceModel) GetAttributes() map[string]sch
 	return VsphereHypervisorResourcePoolResourceModel{}.GetSchema().Attributes
 }
 
+func (VsphereHypervisorResourcePoolResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r VsphereHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) VsphereHypervisorResourcePoolResourceModel {
 
 	r.Id = types.StringValue(resourcePool.GetId())

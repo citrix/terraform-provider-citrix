@@ -238,3 +238,32 @@ func GetEffectiveMetadata(stateMetadata []NameValueStringPairModel, remoteMetada
 		return !exists
 	})
 }
+
+// MergeMetadata merges metadata from remote and plan, adds Terraform metadata, and ensures no duplicates.
+func MergeMetadata(remoteMetadata []NameValueStringPairModel, planMetadata []NameValueStringPairModel) []citrixorchestration.NameValueStringPairModel {
+	metadata := []citrixorchestration.NameValueStringPairModel{}
+	metadataMap := make(map[string]bool)
+
+	// Add plan metadata to metadata and track existing keys
+	for _, item := range planMetadata {
+		key := strings.ToLower(item.Name.ValueString())
+		AppendNameValueStringPair(&metadata, item.Name.ValueString(), item.Value.ValueString())
+		metadataMap[key] = true
+	}
+
+	// Add remote metadata if not already present in plan metadata
+	for _, item := range remoteMetadata {
+		key := strings.ToLower(item.Name.ValueString())
+		if !metadataMap[key] {
+			AppendNameValueStringPair(&metadata, item.Name.ValueString(), item.Value.ValueString())
+			metadataMap[key] = true
+		}
+	}
+
+	// Only append Terraform metadata if not already present
+	if !metadataMap[MetadataTerraformName] {
+		AppendTerraformMetadataInfo(&metadata)
+	}
+
+	return metadata
+}

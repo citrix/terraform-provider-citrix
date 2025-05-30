@@ -159,3 +159,9 @@ func (AdminUserResourceModel) GetSchema() schema.Schema {
 func (AdminUserResourceModel) GetAttributes() map[string]schema.Attribute {
 	return AdminUserResourceModel{}.GetSchema().Attributes
 }
+
+func (AdminUserResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{
+		"name": true,
+	}
+}

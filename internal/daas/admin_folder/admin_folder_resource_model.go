@@ -99,6 +99,10 @@ func (AdminFolderModel) GetAttributes() map[string]schema.Attribute {
 	return AdminFolderModel{}.GetSchema().Attributes
 }
 
+func (AdminFolderModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r AdminFolderModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, adminFolder *citrixorchestration.AdminFolderResponseModel) AdminFolderModel {
 	// Overwrite application folder with refreshed state
 	r.Id = types.StringValue(adminFolder.GetId())

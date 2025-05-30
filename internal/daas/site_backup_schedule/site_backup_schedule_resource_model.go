@@ -114,6 +114,10 @@ func (SiteBackupScheduleModel) GetAttributes() map[string]schema.Attribute {
 	return SiteBackupScheduleModel{}.GetSchema().Attributes
 }
 
+func (SiteBackupScheduleModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r SiteBackupScheduleModel) RefreshPropertyValues(backupSchedule *citrixorchestration.BackupRestoreScheduleModel) SiteBackupScheduleModel {
 	r.Id = types.StringValue(strconv.Itoa(int(backupSchedule.GetUid())))
 	r.Name = types.StringValue(backupSchedule.GetName())

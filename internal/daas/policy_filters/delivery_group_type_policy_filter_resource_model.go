@@ -73,6 +73,10 @@ func (DeliveryGroupTypeFilterModel) GetAttributes() map[string]schema.Attribute 
 	return DeliveryGroupTypeFilterModel{}.GetSchema().Attributes
 }
 
+func (DeliveryGroupTypeFilterModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (filter DeliveryGroupTypeFilterModel) GetId() string {
 	return filter.Id.ValueString()
 }

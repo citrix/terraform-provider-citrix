@@ -132,6 +132,50 @@ resource "citrix_machine_catalog" "example-aws-mtsession" {
     }	
 }
 
+resource "citrix_machine_catalog" "example-aws-with-machine-profile" {
+    name                        = "example-aws-with-machine-profile"
+    description                 = "Example multi-session catalog on AWS hypervisor"
+   	zone						= "<zone Id>"
+	allocation_type				= "Random"
+	session_support				= "MultiSession"
+	provisioning_type 			= "MCS"
+    provisioning_scheme         = {
+		hypervisor = citrix_aws_hypervisor.example-aws-hypervisor.id
+		hypervisor_resource_pool = citrix_aws_hypervisor_resource_pool.example-aws-hypervisor-resource-pool.id
+		identity_type      = "ActiveDirectory"
+		machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+			domain_ou				 = "<DomainOU>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+        aws_machine_config = {
+            image_ami = "<AMI ID for VDA>"
+			master_image = "<Image template AMI name>"
+			service_offering = "t2.small"
+            # Cannot provide security groups if you provide machine profile. Security Group values are taken from machine profile.
+            # security_groups = [
+            #     "default"
+            # ]
+            machine_profile = {
+                vm_name = "example-vm-name"
+                vm_id = "i-xxxxxxxxx"
+                vm_region_az = "us-east-1c"  # Example. Chose the region and availability zone where your VM is located.
+                # For machine profile, you can either provide VM related details or launch template related details, but not both.
+                # launch_template_name = "example_launch_template"
+                # launch_template_id = "lt-example"
+                # launch_template_version = "1"
+            }
+            tenancy_type = "Shared"
+        }
+		number_of_total_machines =  1
+        machine_account_creation_rules ={
+			naming_scheme 	   = "aws-multi-##"
+			naming_scheme_type = "Numeric"
+        }
+    }	
+}
+
 resource "citrix_machine_catalog" "example-gcp-mtsession" {
     name                        = "example-gcp-mtsession"
     description                 = "Example multi-session catalog on GCP hypervisor"

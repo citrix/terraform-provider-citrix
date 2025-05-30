@@ -155,6 +155,7 @@ type AwsMachineConfigModel struct {
 	MasterImageNote          types.String `tfsdk:"master_image_note"`
 	ImageUpdateRebootOptions types.Object `tfsdk:"image_update_reboot_options"`
 	/** AWS Hypervisor **/
+	MachineProfile types.Object `tfsdk:"machine_profile"`
 	ImageAmi       types.String `tfsdk:"image_ami"`
 	SecurityGroups types.List   `tfsdk:"security_groups"` // List[String]
 	TenancyType    types.String `tfsdk:"tenancy_type"`
@@ -179,10 +180,6 @@ func (AwsMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 				Description: "The name of the virtual machine image that will be used.",
 				Required:    true,
 			},
-			"image_ami": schema.StringAttribute{
-				Description: "AMI of the AWS image to be used as the template image for the machine catalog.",
-				Required:    true,
-			},
 			"master_image_note": schema.StringAttribute{
 				Description: "The note for the master image.",
 				Optional:    true,
@@ -190,10 +187,17 @@ func (AwsMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 				Default:     stringdefault.StaticString(""),
 			},
 			"image_update_reboot_options": ImageUpdateRebootOptionsModel{}.GetSchema(),
+			"machine_profile":             util.AwsMachineProfileModel{}.GetSchema(),
+			"image_ami": schema.StringAttribute{
+				Description: "AMI of the AWS image to be used as the template image for the machine catalog.",
+				Required:    true,
+			},
 			"security_groups": schema.ListAttribute{
 				ElementType: types.StringType,
-				Description: "Security groups to associate with the machine. When omitted, the default security group of the VPC will be used by default.",
-				Required:    true,
+				Optional:    true,
+				Description: "Security groups to associate with the machine. If omitted, the VPC's default security group is used." + "<br />" +
+					"Do not specify this value if a machine_profile is provided, as the security groups will be derived from the machine profile instead.",
+				Computed: true,
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
 				},
@@ -1370,6 +1374,19 @@ func (mc *AwsMachineConfigModel) RefreshProperties(ctx context.Context, diagnost
 	// Refresh Tenancy Type
 	tenancyType := provScheme.GetTenancyType()
 	mc.TenancyType = types.StringValue(tenancyType)
+
+	// Refresh Machine Profile
+	if provScheme.MachineProfile != nil {
+		machineProfile := provScheme.GetMachineProfile()
+		machineProfileModel := util.ParseAwsMachineProfileResponseToModel(machineProfile)
+		mc.MachineProfile = util.TypedObjectToObjectValue(ctx, diagnostics, machineProfileModel)
+	} else {
+		if attributesMap, err := util.ResourceAttributeMapFromObject(util.AwsMachineProfileModel{}); err == nil {
+			mc.MachineProfile = types.ObjectNull(attributesMap)
+		} else {
+			diagnostics.AddWarning("Error when creating null AwsMachineProfileModel", err.Error())
+		}
+	}
 }
 
 func (mc *GcpMachineConfigModel) RefreshProperties(ctx context.Context, diagnostics *diag.Diagnostics, catalog citrixorchestration.MachineCatalogDetailResponseModel) {

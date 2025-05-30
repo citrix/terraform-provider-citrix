@@ -202,6 +202,10 @@ func (ImageVersionModel) GetAttributes() map[string]schema.Attribute {
 	return ImageVersionModel{}.GetSchema().Attributes
 }
 
+func (ImageVersionModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 type ImageVersionTimeout struct {
 	Create types.Int32 `tfsdk:"create"`
 	Delete types.Int32 `tfsdk:"delete"`

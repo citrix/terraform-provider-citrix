@@ -105,6 +105,12 @@ func (AwsHypervisorResourceModel) GetAttributes() map[string]schema.Attribute {
 	return AwsHypervisorResourceModel{}.GetSchema().Attributes
 }
 
+func (AwsHypervisorResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{
+		"api_key": true,
+	}
+}
+
 func (r AwsHypervisorResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel) AwsHypervisorResourceModel {
 	r.Id = types.StringValue(hypervisor.GetId())
 	r.Name = types.StringValue(hypervisor.GetName())

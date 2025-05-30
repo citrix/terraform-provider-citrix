@@ -106,6 +106,10 @@ func (XenserverHypervisorResourcePoolResourceModel) GetAttributes() map[string]s
 	return XenserverHypervisorResourcePoolResourceModel{}.GetSchema().Attributes
 }
 
+func (XenserverHypervisorResourcePoolResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r XenserverHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) XenserverHypervisorResourcePoolResourceModel {
 
 	r.Id = types.StringValue(resourcePool.GetId())

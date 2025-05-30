@@ -66,6 +66,10 @@ func (OuFilterModel) GetAttributes() map[string]schema.Attribute {
 	return OuFilterModel{}.GetSchema().Attributes
 }
 
+func (OuFilterModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (filter OuFilterModel) GetId() string {
 	return filter.Id.ValueString()
 }

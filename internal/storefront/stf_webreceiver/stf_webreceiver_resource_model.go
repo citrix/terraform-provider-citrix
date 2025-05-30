@@ -1023,3 +1023,7 @@ func (STFWebReceiverResourceModel) GetSchema() schema.Schema {
 func (STFWebReceiverResourceModel) GetAttributes() map[string]schema.Attribute {
 	return STFWebReceiverResourceModel{}.GetSchema().Attributes
 }
+
+func (STFWebReceiverResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}

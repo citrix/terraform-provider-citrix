@@ -93,6 +93,10 @@ func (OpenShiftHypervisorResourcePoolResourceModel) GetAttributes() map[string]s
 	return OpenShiftHypervisorResourcePoolResourceModel{}.GetSchema().Attributes
 }
 
+func (OpenShiftHypervisorResourcePoolResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r OpenShiftHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) OpenShiftHypervisorResourcePoolResourceModel {
 
 	r.Id = types.StringValue(resourcePool.GetId())

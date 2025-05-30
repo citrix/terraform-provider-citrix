@@ -95,6 +95,10 @@ func (AwsHypervisorResourcePoolResourceModel) GetAttributes() map[string]schema.
 	return AwsHypervisorResourcePoolResourceModel{}.GetSchema().Attributes
 }
 
+func (AwsHypervisorResourcePoolResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r AwsHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) AwsHypervisorResourcePoolResourceModel {
 
 	r.Id = types.StringValue(resourcePool.GetId())

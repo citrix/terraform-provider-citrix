@@ -151,6 +151,12 @@ func (AzureHypervisorResourceModel) GetAttributes() map[string]schema.Attribute 
 	return AzureHypervisorResourceModel{}.GetSchema().Attributes
 }
 
+func (AzureHypervisorResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{
+		"application_id": true,
+	}
+}
+
 func (r AzureHypervisorResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel) AzureHypervisorResourceModel {
 	r.Id = types.StringValue(hypervisor.GetId())
 	r.Name = types.StringValue(hypervisor.GetName())

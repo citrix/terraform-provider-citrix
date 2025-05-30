@@ -137,6 +137,10 @@ func (AwsWorkspacesImageModel) GetAttributes() map[string]schema.Attribute {
 	return AwsWorkspacesImageModel{}.GetSchema().Attributes
 }
 
+func (AwsWorkspacesImageModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r AwsWorkspacesImageModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, isResource bool, image *quickcreateservice.AwsEdcImage) AwsWorkspacesImageModel {
 	r.Id = types.StringValue(image.GetImageId())
 	r.AccountId = types.StringValue(image.GetAccountId())

@@ -149,6 +149,12 @@ func (NutanixHypervisorResourceModel) GetAttributes() map[string]schema.Attribut
 	return NutanixHypervisorResourceModel{}.GetSchema().Attributes
 }
 
+func (NutanixHypervisorResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{
+		"username": true,
+	}
+}
+
 func (r NutanixHypervisorResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel) NutanixHypervisorResourceModel {
 	r.Id = types.StringValue(hypervisor.GetId())
 	r.Name = types.StringValue(hypervisor.GetName())

@@ -57,6 +57,10 @@ func (GACDiscoveryResourceModel) GetSchema() schema.Schema {
 	}
 }
 
+func (GACDiscoveryResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r GACDiscoveryResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, discoveryRecordModel globalappconfiguration.DiscoveryRecordModel) GACDiscoveryResourceModel {
 
 	r.Domain = types.StringValue(discoveryRecordModel.Domain.GetName())

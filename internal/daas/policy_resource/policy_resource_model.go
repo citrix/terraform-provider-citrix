@@ -67,6 +67,10 @@ func (PolicyModel) GetAttributes() map[string]schema.Attribute {
 	return PolicyModel{}.GetSchema().Attributes
 }
 
+func (PolicyModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r PolicyModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, policy *citrixorchestration.PolicyResponse) PolicyModel {
 	r.Id = types.StringValue(policy.GetPolicyGuid())
 	r.PolicySetId = types.StringValue(policy.GetPolicySetGuid())

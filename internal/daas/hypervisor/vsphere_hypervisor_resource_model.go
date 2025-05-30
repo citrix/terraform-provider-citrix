@@ -165,6 +165,12 @@ func (VsphereHypervisorResourceModel) GetAttributes() map[string]schema.Attribut
 	return VsphereHypervisorResourceModel{}.GetSchema().Attributes
 }
 
+func (VsphereHypervisorResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{
+		"username": true,
+	}
+}
+
 func (r VsphereHypervisorResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel) VsphereHypervisorResourceModel {
 	r.Id = types.StringValue(hypervisor.GetId())
 	r.Name = types.StringValue(hypervisor.GetName())

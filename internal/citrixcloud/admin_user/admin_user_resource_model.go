@@ -196,6 +196,17 @@ func (CCAdminUserResourceModel) GetAttributes() map[string]schema.Attribute {
 	return CCAdminUserResourceModel{}.GetSchema().Attributes
 }
 
+func (CCAdminUserResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{
+		"admin_id":         true,
+		"display_name":     true,
+		"email":            true,
+		"first_name":       true,
+		"last_name":        true,
+		"external_user_id": true,
+	}
+}
+
 func (r CCAdminUserResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, adminUser ccadmins.AdministratorResult) CCAdminUserResourceModel {
 	r.AccessType = types.StringValue(string(adminUser.GetAccessType()))
 	r.Type = types.StringValue(string(adminUser.GetType()))

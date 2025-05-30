@@ -63,6 +63,10 @@ func (ApplicationIconResourceModel) GetAttributes() map[string]schema.Attribute 
 	return ApplicationIconResourceModel{}.GetSchema().Attributes
 }
 
+func (ApplicationIconResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r ApplicationIconResourceModel) RefreshPropertyValues(application *citrixorchestration.IconResponseModel) ApplicationIconResourceModel {
 	// Overwrite application folder with refreshed state
 	r.Id = types.StringValue(application.GetId())

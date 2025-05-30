@@ -111,6 +111,10 @@ func (RemotePCWakeOnLANHypervisorResourceModel) GetAttributes() map[string]schem
 	return RemotePCWakeOnLANHypervisorResourceModel{}.GetSchema().Attributes
 }
 
+func (RemotePCWakeOnLANHypervisorResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r RemotePCWakeOnLANHypervisorResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel) RemotePCWakeOnLANHypervisorResourceModel {
 	r.Id = types.StringValue(hypervisor.GetId())
 	r.Name = types.StringValue(hypervisor.GetName())

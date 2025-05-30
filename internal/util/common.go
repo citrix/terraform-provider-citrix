@@ -227,6 +227,8 @@ const NamespaceResourceType string = "Namespace"
 const SecurityGroupResourceType = "SecurityGroup"
 const HostResourceType = "Host"
 const HostGroupResourceType = "HostGroup"
+const LaunchTemplateResourceType = "LaunchTemplate"
+const LaunchTemplateVersionResourceType = "LaunchTemplateVersion"
 
 // Azure Storage Types
 const StandardLRS = "Standard_LRS"
@@ -821,8 +823,8 @@ func GetSTFSTAUrlKey(remote citrixstorefront.STFSTAUrlModel) string {
 	return *remote.StaUrl.Get()
 }
 
-func GetQcsAwsWorkspacesWithUsernameKey(remote citrixquickcreate.AwsEdcDeploymentMachine) string {
-	return remote.GetUsername()
+func GetQcsAwsWorkspacesWithMachineIdKey(remote citrixquickcreate.AwsEdcDeploymentMachine) string {
+	return remote.GetMachineId()
 }
 
 // <summary>
@@ -1307,8 +1309,13 @@ func VerifyIdentityUserListCompleteness(inputUserNames []string, remoteUsers []c
 	return nil
 }
 
-func GetConfigValuesForSchema(ctx context.Context, diags *diag.Diagnostics, m ResourceModelWithAttributes) (string, map[string]interface{}) {
+func GetConfigValuesForSchema(ctx context.Context, diags *diag.Diagnostics, m ResourceModelWithAttributeMasking) (string, map[string]interface{}) {
+	maskedFields := m.GetAttributesNamesToMask()
 	sensitiveFields := GetSensitiveFieldsForAttribute(ctx, diags, m.GetAttributes())
+
+	for key, value := range maskedFields {
+		sensitiveFields[key] = value
+	}
 	dataObj := TypedObjectToObjectValue(ctx, diags, m)
 	return reflect.TypeOf(m).String(), GetConfigValuesForObject(ctx, diags, dataObj, sensitiveFields)
 }

@@ -63,6 +63,10 @@ func (DesktopIconResourceModel) GetAttributes() map[string]schema.Attribute {
 	return DesktopIconResourceModel{}.GetSchema().Attributes
 }
 
+func (DesktopIconResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r DesktopIconResourceModel) RefreshPropertyValues(desktop *citrixorchestration.IconResponseModel) DesktopIconResourceModel {
 	// Overwrite desktop folder with refreshed state
 	r.Id = types.StringValue(desktop.GetId())

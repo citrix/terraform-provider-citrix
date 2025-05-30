@@ -104,6 +104,10 @@ func (SiteSettingsModel) GetAttributes() map[string]schema.Attribute {
 	return SiteSettingsModel{}.GetSchema().Attributes
 }
 
+func (SiteSettingsModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r SiteSettingsModel) RefreshResourcePropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteSettingsResponse *citrixorchestration.SiteSettingsResponseModel, multipleRemotePcAssignments bool) SiteSettingsModel {
 	r.SiteId = types.StringValue(client.ClientConfig.SiteId)
 	if !r.WebUiPolicySetEnabled.IsNull() {

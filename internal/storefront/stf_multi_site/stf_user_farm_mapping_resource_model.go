@@ -241,3 +241,7 @@ func (STFUserFarmMappingResourceModel) GetSchema() schema.Schema {
 func (STFUserFarmMappingResourceModel) GetAttributes() map[string]schema.Attribute {
 	return STFUserFarmMappingResourceModel{}.GetSchema().Attributes
 }
+
+func (STFUserFarmMappingResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}

@@ -17,6 +17,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
+type ResourceModelWithAttributeMasking interface {
+	ResourceModelWithAttributes
+	GetAttributesNamesToMask() map[string]bool
+}
+
 type ResourceModelWithAttributes interface {
 	GetAttributes() map[string]resourceSchema.Attribute // workaround because NestedAttributeObject and SingleNestedAttribute do not share a base type
 }

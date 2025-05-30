@@ -94,7 +94,7 @@ type AwsWorkspacesDeploymentWorkspaceModel struct {
 }
 
 func (r AwsWorkspacesDeploymentWorkspaceModel) GetKey() string {
-	return r.Username.ValueString()
+	return r.MachineId.ValueString()
 }
 
 func (AwsWorkspacesDeploymentWorkspaceModel) GetSchema() schema.NestedAttributeObject {
@@ -167,7 +167,6 @@ func (AwsWorkspacesDeploymentWorkspaceModel) GetAttributes() map[string]schema.A
 }
 
 func (workspace AwsWorkspacesDeploymentWorkspaceModel) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, desktop citrixquickcreate.AwsEdcDeploymentMachine) util.ResourceModelWithAttributes {
-	workspace.Username = types.StringValue(desktop.GetUsername())
 	workspace.RootVolumeSize = types.Int64Value(int64(desktop.GetRootVolumeSize()))
 	workspace.UserVolumeSize = types.Int64Value(int64(desktop.GetUserVolumeSize()))
 	workspace.MaintenanceMode = types.BoolValue(desktop.GetMaintenanceMode())
@@ -175,6 +174,12 @@ func (workspace AwsWorkspacesDeploymentWorkspaceModel) RefreshListItem(ctx conte
 	workspace.MachineId = types.StringValue(desktop.GetMachineId())
 	workspace.MachineName = types.StringValue(desktop.GetMachineName())
 	workspace.BrokerMachineId = types.StringValue(desktop.GetBrokerMachineId())
+
+	if desktop.GetUsername() == "" {
+		workspace.Username = types.StringNull()
+	} else {
+		workspace.Username = types.StringValue(desktop.GetUsername())
+	}
 
 	return workspace
 }
@@ -348,6 +353,12 @@ func (AwsWorkspacesDeploymentResourceModel) GetAttributes() map[string]schema.At
 	return AwsWorkspacesDeploymentResourceModel{}.GetSchema().Attributes
 }
 
+func (AwsWorkspacesDeploymentResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{
+		"username": true,
+	}
+}
+
 func (r AwsWorkspacesDeploymentResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, deployment citrixquickcreate.AwsEdcDeployment) AwsWorkspacesDeploymentResourceModel {
 	r.Id = types.StringValue(deployment.GetDeploymentId())
 	r.Name = types.StringValue(deployment.GetDeploymentName())
@@ -384,26 +395,7 @@ func (r AwsWorkspacesDeploymentResourceModel) RefreshPropertyValues(ctx context.
 
 	r.UserDecoupledWorkspaces = types.BoolValue(deployment.GetUserDecoupledWorkspaces())
 
-	if len(deployment.GetWorkspaces()) > 0 {
-		if !deployment.GetUserDecoupledWorkspaces() {
-			r.Workspaces = util.RefreshListValueProperties[AwsWorkspacesDeploymentWorkspaceModel, citrixquickcreate.AwsEdcDeploymentMachine](ctx, diagnostics, r.Workspaces, deployment.GetWorkspaces(), util.GetQcsAwsWorkspacesWithUsernameKey)
-		} else {
-			updatedWorkspaces := []AwsWorkspacesDeploymentWorkspaceModel{}
-			for _, workspace := range deployment.GetWorkspaces() {
-				updatedWorkspaces = append(updatedWorkspaces, AwsWorkspacesDeploymentWorkspaceModel{
-					RootVolumeSize:  types.Int64Value(int64(workspace.GetRootVolumeSize())),
-					UserVolumeSize:  types.Int64Value(int64(workspace.GetUserVolumeSize())),
-					MaintenanceMode: types.BoolValue(workspace.GetMaintenanceMode()),
-					WorkspaceId:     types.StringValue(workspace.GetWorkspaceId()),
-					MachineId:       types.StringValue(workspace.GetMachineId()),
-					MachineName:     types.StringValue(workspace.GetMachineName()),
-					BrokerMachineId: types.StringValue(workspace.GetBrokerMachineId()),
-				})
-			}
-			workspacesList := util.TypedArrayToObjectList(ctx, diagnostics, updatedWorkspaces)
-			r.Workspaces = workspacesList
-		}
-	}
+	r.Workspaces = util.RefreshListValueProperties[AwsWorkspacesDeploymentWorkspaceModel, citrixquickcreate.AwsEdcDeploymentMachine](ctx, diagnostics, r.Workspaces, deployment.GetWorkspaces(), util.GetQcsAwsWorkspacesWithMachineIdKey)
 
 	return r
 }

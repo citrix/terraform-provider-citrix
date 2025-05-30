@@ -111,6 +111,10 @@ func (AzureHypervisorResourcePoolResourceModel) GetAttributes() map[string]schem
 	return AzureHypervisorResourcePoolResourceModel{}.GetSchema().Attributes
 }
 
+func (AzureHypervisorResourcePoolResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r AzureHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) AzureHypervisorResourcePoolResourceModel {
 
 	r.Id = types.StringValue(resourcePool.GetId())

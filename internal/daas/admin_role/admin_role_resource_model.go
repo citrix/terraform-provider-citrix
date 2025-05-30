@@ -110,3 +110,7 @@ func (AdminRoleModel) GetSchema() schema.Schema {
 func (AdminRoleModel) GetAttributes() map[string]schema.Attribute {
 	return AdminRoleModel{}.GetSchema().Attributes
 }
+
+func (AdminRoleModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}

@@ -27,7 +27,7 @@ Currently this script is still in TechPreview
     For Citrix Cloud customers (Optional): Use this to force override the Citrix DaaS service hostname.
 
 .Parameter Environment
-    The Citrix Cloud environment of the customer. Only applicable for Citrix Cloud customers. Available options: Production, Staging
+    The Citrix Cloud environment of the customer. Only applicable for Citrix Cloud customers. Available options: Production, Japan, Gov
 
 .Parameter DisableSSLValidation
     Disable SSL validation for this script. Required if DDC does not have a valid SSL certificate.
@@ -52,7 +52,7 @@ Param (
     [string] $Hostname = "api.cloud.com",
 
     [Parameter(Mandatory = $false)]
-    [ValidateSet("Production", "Staging")]
+    [ValidateSet("Production", "Staging", "Japan", "JapanStaging", "Gov", "GovStaging")]
     [string] $Environment = "Production",
 
     [Parameter(Mandatory = $false)]
@@ -170,6 +170,18 @@ function Get-AuthToken {
         elseif ($script:environment -eq "Staging") {
             $url = "https://api.cloudburrito.com/cctrustoauth2/$script:customerId/tokens/clients"
         }
+        elseif ($script:environment -eq "Japan") {
+            $url = "https://api.citrixcloud.jp/cctrustoauth2/$script:customerId/tokens/clients"
+        }
+        elseif ($script:environment -eq "JapanStaging") {
+            $url = "https://api.citrixcloud-test.jp/cctrustoauth2/$script:customerId/tokens/clients"
+        }
+        elseif ($script:environment -eq "Gov") {
+            $url = "https://api.citrixcloud.us/cctrustoauth2/$script:customerId/tokens/clients"
+        }
+        elseif ($script:environment -eq "GovStaging") {
+            $url = "https://api.citrixcloud-test.us/cctrustoauth2/$script:customerId/tokens/clients"
+        }
 
         $body = @{
             grant_type    = 'client_credentials'
@@ -226,8 +238,20 @@ function Get-UrlForWemObjects {
     if ($script:environment -eq "Production") {
         $script:wemHostName = "api.wem.cloud.com"
     }
-    else {
+    elseif ($script:environment -eq "Staging") {
         $script:wemHostName = "api.wem.cloudburrito.com"
+    }
+    elseif ($script:environment -eq "Japan") {
+        $script:wemHostName = "api.wem.citrixcloud.jp"
+    }
+    elseif ($script:environment -eq "JapanStaging") {
+        $script:wemHostName = "api.wem.citrixcloud-test.jp"
+    }
+    elseif ($script:environment -eq "Gov") {
+        $script:wemHostName = "api.wem.citrixcloud.us"
+    }
+    elseif ($script:environment -eq "GovStaging") {
+        $script:wemHostName = "api.wem.citrixcloud-test.us"
     }
 
     if ($requestPath -eq "sites") {
