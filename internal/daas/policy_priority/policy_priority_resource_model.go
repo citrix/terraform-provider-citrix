@@ -64,6 +64,10 @@ func (PolicyPriorityModel) GetAttributes() map[string]schema.Attribute {
 	return PolicyPriorityModel{}.GetSchema().Attributes
 }
 
+func (PolicyPriorityModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r PolicyPriorityModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, policySet *citrixorchestration.PolicySetResponse, policies *citrixorchestration.CollectionEnvelopeOfPolicyResponse) PolicyPriorityModel {
 	r.PolicySetId = types.StringValue(policySet.GetPolicySetGuid())
 	r.PolicySetName = types.StringValue(policySet.GetName())

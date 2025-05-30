@@ -108,7 +108,7 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 		zone, err := util.PollZone(ctx, r.client, zoneName, false)
 		if err == nil && zone != nil {
 			// zone exists. run an update on zone so that the description and metadata are updated
-			zone, err = plan.updateZoneAfterCreate(ctx, r.client, &resp.Diagnostics, zone.GetId(), zoneName)
+			zone, err = plan.updateZoneAfterCreate(ctx, r.client, &resp.Diagnostics, zone)
 
 			if err != nil {
 				return
@@ -378,33 +378,39 @@ func readZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, re
 	return zone, err
 }
 
-func (r ZoneResourceModel) updateZoneAfterCreate(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, zoneId, zoneName string) (*citrixorchestration.ZoneDetailResponseModel, error) {
+func (r ZoneResourceModel) updateZoneAfterCreate(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, zone *citrixorchestration.ZoneDetailResponseModel) (*citrixorchestration.ZoneDetailResponseModel, error) {
 	var editZoneRequestBody citrixorchestration.EditZoneRequestModel
-	editZoneRequestBody.SetName(zoneName)
+	editZoneRequestBody.SetName(zone.GetName())
 	editZoneRequestBody.SetDescription(r.Description.ValueString())
-	metadata := util.GetMetadataRequestModel(ctx, diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, r.Metadata))
+	var planMetadata []util.NameValueStringPairModel
+	if !r.Metadata.IsNull() {
+		planMetadata = util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, diagnostics, r.Metadata)
+	}
+	remoteMetadata := util.ParseNameValueStringPairToPluginModel(zone.GetMetadata())
+	// Merge metadata from plan and remote
+	metadata := util.MergeMetadata(remoteMetadata, planMetadata)
 	editZoneRequestBody.SetMetadata(metadata)
 
 	// Update zone
-	editZoneRequest := client.ApiClient.ZonesAPIsDAAS.ZonesEditZone(ctx, zoneId)
+	editZoneRequest := client.ApiClient.ZonesAPIsDAAS.ZonesEditZone(ctx, zone.GetId())
 	editZoneRequest = editZoneRequest.EditZoneRequestModel(editZoneRequestBody)
 	httpResp, err := citrixdaasclient.AddRequestData(editZoneRequest, client).Async(true).Execute()
 	if err != nil {
 		diagnostics.AddError(
-			"Error updating Zone "+zoneName,
+			"Error updating Zone "+zone.GetName(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
 		return nil, err
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating zone "+zoneName, diagnostics, 5)
+	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating zone "+zone.GetName(), diagnostics, 5)
 	if err != nil {
 		return nil, err
 	}
 
 	// Fetch updated zone from GetZone.
-	updatedZone, err := getZone(ctx, client, diagnostics, zoneId)
+	updatedZone, err := getZone(ctx, client, diagnostics, zone.GetId())
 	if err != nil {
 		return nil, err
 	}

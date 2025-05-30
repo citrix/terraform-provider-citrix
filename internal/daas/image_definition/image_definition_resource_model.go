@@ -156,6 +156,10 @@ func (ImageDefinitionModel) GetAttributes() map[string]schema.Attribute {
 	return ImageDefinitionModel{}.GetSchema().Attributes
 }
 
+func (ImageDefinitionModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 type ImageDefinitionTimeout struct {
 	Create types.Int32 `tfsdk:"create"`
 	Delete types.Int32 `tfsdk:"delete"`

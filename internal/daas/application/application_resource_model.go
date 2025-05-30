@@ -336,6 +336,12 @@ func (ApplicationResourceModel) GetAttributes() map[string]schema.Attribute {
 	return ApplicationResourceModel{}.GetSchema().Attributes
 }
 
+func (ApplicationResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{
+		"limit_visibility_to_users": true,
+	}
+}
+
 func (r ApplicationResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, application *citrixorchestration.ApplicationDetailResponseModel, applicationGroups *citrixorchestration.ApplicationGroupResponseModelCollection, applicationDeliveryGroups *citrixorchestration.ApplicationDeliveryGroupResponseModelCollection, tags []string) ApplicationResourceModel {
 	// Overwrite application with refreshed state
 	r.Id = types.StringValue(application.GetId())

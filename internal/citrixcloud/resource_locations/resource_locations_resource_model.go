@@ -59,6 +59,10 @@ func (ResourceLocationModel) GetAttributes() map[string]schema.Attribute {
 	return ResourceLocationModel{}.GetSchema().Attributes
 }
 
+func (ResourceLocationModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r ResourceLocationModel) RefreshPropertyValues(ccResourceLocation *ccresourcelocations.CitrixCloudServicesRegistryApiModelsLocationsResourceLocationModel) ResourceLocationModel {
 
 	// Overwrite resource location with refreshed state

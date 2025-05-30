@@ -99,6 +99,10 @@ func (TagResourceModel) GetAttributes() map[string]schema.Attribute {
 	return TagResourceModel{}.GetSchema().Attributes
 }
 
+func (TagResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r TagResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixclient.CitrixDaasClient, tag *citrixorchestration.TagDetailResponseModel) TagResourceModel {
 
 	r.Id = types.StringValue(tag.GetId())

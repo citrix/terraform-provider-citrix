@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -271,19 +270,65 @@ func (r *awsWorkspacesDeploymentResource) Update(ctx context.Context, req resour
 		}
 	}
 
-	// 3. Update WorkSpaces
 	deployment, _, err := getAwsWorkspacesDeploymentUsingId(ctx, r.client, &resp.Diagnostics, plan.Id.ValueString(), true)
 	if err != nil {
 		return
 	}
 
-	if !deployment.GetUserDecoupledWorkspaces() {
-		err = updateUserCoupledWorkspaces(ctx, &resp.Diagnostics, r.client, deployment, plan.Workspaces)
-	} else {
-		err = updateUserDecoupledWorkspaces(ctx, &resp.Diagnostics, r.client, deployment, plan.Workspaces)
+	// 3. Remove workspaces in state that are not in remote. Plan will recreate them
+	deploymentInState := removeWorkspacesInStateNotInRemote(ctx, &resp.Diagnostics, r.client, deployment, state)
+	diags = resp.State.Set(ctx, deploymentInState)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
+
+	// Retrieve values from plan again
+	diags = req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// 4. Update WorkSpaces
+	err = updateWorkspaces(ctx, &resp.Diagnostics, r.client, deployment, plan.Workspaces)
 	if err != nil {
 		return
+	}
+
+	// Fetch the latest remote configruation
+	deployment, _, err = getAwsWorkspacesDeploymentUsingId(ctx, r.client, &resp.Diagnostics, plan.Id.ValueString(), true)
+	if err != nil {
+		return
+	}
+
+	// Get updated values for workspaces in plan
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, *deployment)
+
+	// update maintenance mode for workspaces
+
+	var plannedDeployment AwsWorkspacesDeploymentResourceModel // Get the plan again for deployment to check maintenance mode. Above plan has updated values from remote
+	diags = req.Plan.Get(ctx, &plannedDeployment)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	brokerMachineIdMaintenanceModeMap := map[string]bool{}
+	plannedWorkspaces := util.ObjectListToTypedArray[AwsWorkspacesDeploymentWorkspaceModel](ctx, &resp.Diagnostics, plannedDeployment.Workspaces)
+	workspaces := util.ObjectListToTypedArray[AwsWorkspacesDeploymentWorkspaceModel](ctx, &resp.Diagnostics, plan.Workspaces)
+	for index, workspace := range workspaces {
+		plannedWorkspace := plannedWorkspaces[index]
+		if plannedWorkspace.MaintenanceMode.ValueBool() != workspace.MaintenanceMode.ValueBool() {
+			brokerMachineIdMaintenanceModeMap[workspace.BrokerMachineId.ValueString()] = plannedWorkspace.MaintenanceMode.ValueBool()
+		}
+	}
+
+	if len(brokerMachineIdMaintenanceModeMap) > 0 {
+		err = updateMachinesMaintenceMode(ctx, &resp.Diagnostics, r.client, deployment.GetDeploymentId(), brokerMachineIdMaintenanceModeMap)
+		if err != nil {
+			return
+		}
 	}
 
 	// Fetch the latest remote configruation and update state
@@ -660,38 +705,51 @@ func getUsernameMachineIdMap(deployment *citrixquickcreate.AwsEdcDeployment) map
 	return usernameMachineIdMap
 }
 
-func updateUserCoupledWorkspaces(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, deployment *citrixquickcreate.AwsEdcDeployment, planWorkspaces types.List) error {
+func updateWorkspaces(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, deployment *citrixquickcreate.AwsEdcDeployment, planWorkspaces types.List) error {
 	// 1. Find usernames in plan
-	workspaceUsernamesInPlan := []string{}
-	workspaceUsernameConfigMapInPlan := map[string]AwsWorkspacesDeploymentWorkspaceModel{}
+	existingWorkspacesInPlan := map[string]AwsWorkspacesDeploymentWorkspaceModel{}
+	addMachinesRequestDetails := []citrixquickcreate.AddAwsEdcWorkspace{}
 	workspacesInPlan := util.ObjectListToTypedArray[AwsWorkspacesDeploymentWorkspaceModel](ctx, diagnostics, planWorkspaces)
 	for _, workspace := range workspacesInPlan {
-		workspaceUsernamesInPlan = append(workspaceUsernamesInPlan, workspace.Username.ValueString())
-		workspaceUsernameConfigMapInPlan[workspace.Username.ValueString()] = workspace
+		if workspace.MachineId.IsUnknown() {
+			// Machine ID is not set. This is a new workspace to be created.
+			var addWorkspaceRequestDetail citrixquickcreate.AddAwsEdcWorkspace
+			username := util.UsernameForDecoupledWorkspaces
+			if !deployment.GetUserDecoupledWorkspaces() {
+				username = workspace.Username.ValueString()
+			}
+			addWorkspaceRequestDetail.SetUsername(username)
+			addWorkspaceRequestDetail.SetRootVolumeSize(int32(workspace.RootVolumeSize.ValueInt64()))
+			addWorkspaceRequestDetail.SetUserVolumeSize(int32(workspace.UserVolumeSize.ValueInt64()))
+			addMachinesRequestDetails = append(addMachinesRequestDetails, addWorkspaceRequestDetail)
+		} else {
+			existingWorkspacesInPlan[workspace.MachineId.ValueString()] = workspace
+		}
 	}
 
 	// 2. Delete removed workspaces and update existing ones
 	workspaceIdsForDeletion := []string{}
-	machinesForMaintenanceModeBeforeDeletion := []AwsWorkspacesDeploymentWorkspaceModel{}
+	brokerMachineIdMaintenanceModeMap := map[string]bool{}
 	updateWorkspaceMachineRequests := []citrixquickcreate.DeploymentQCSUpdateMachineAsyncRequest{}
 	for _, workspace := range deployment.GetWorkspaces() {
-		if !slices.Contains(workspaceUsernamesInPlan, workspace.GetUsername()) {
+		if plannedWorkspace, exists := existingWorkspacesInPlan[workspace.GetMachineId()]; !exists {
 			workspaceIdsForDeletion = append(workspaceIdsForDeletion, workspace.GetWorkspaceId())
-			machinesForMaintenanceModeBeforeDeletion = append(machinesForMaintenanceModeBeforeDeletion, AwsWorkspacesDeploymentWorkspaceModel{
-				Username:        types.StringValue(workspace.GetUsername()),
-				BrokerMachineId: types.StringValue(workspace.GetBrokerMachineId()),
-				MaintenanceMode: types.BoolValue(true),
-			})
+			if !workspace.GetMaintenanceMode() {
+				brokerMachineIdMaintenanceModeMap[workspace.GetBrokerMachineId()] = true
+			}
 		} else {
-			// Update existing workspace
-			plannedWorkspace := workspaceUsernameConfigMapInPlan[workspace.GetUsername()]
-			if plannedWorkspace.RootVolumeSize.ValueInt64() != int64(workspace.GetRootVolumeSize()) ||
-				plannedWorkspace.UserVolumeSize.ValueInt64() != int64(workspace.GetUserVolumeSize()) {
-				// Update existing workspace
+			// Update user or volume of existing workspace
+			if plannedWorkspace.UserVolumeSize.ValueInt64() != int64(workspace.GetUserVolumeSize()) {
+				var updateWorkspaceRequestDetail citrixquickcreate.UpdateAwsEdcDeploymentMachine
+				updateWorkspaceRequestDetail.SetAccountType(citrixquickcreate.ACCOUNTTYPE_AWSEDC)
+				updateWorkspaceRequestDetail.SetUserVolumeSize(int32(plannedWorkspace.UserVolumeSize.ValueInt64()))
+				updateWorkspaceRequest := client.QuickCreateClient.DeploymentQCS.UpdateMachineAsync(ctx, client.ClientConfig.CustomerId, deployment.GetDeploymentId(), workspace.GetMachineId())
+				updateWorkspaceRequest = updateWorkspaceRequest.Body(updateWorkspaceRequestDetail)
+				updateWorkspaceMachineRequests = append(updateWorkspaceMachineRequests, updateWorkspaceRequest)
+			} else if plannedWorkspace.RootVolumeSize.ValueInt64() != int64(workspace.GetRootVolumeSize()) {
 				var updateWorkspaceRequestDetail citrixquickcreate.UpdateAwsEdcDeploymentMachine
 				updateWorkspaceRequestDetail.SetAccountType(citrixquickcreate.ACCOUNTTYPE_AWSEDC)
 				updateWorkspaceRequestDetail.SetRootVolumeSize(int32(plannedWorkspace.RootVolumeSize.ValueInt64()))
-				updateWorkspaceRequestDetail.SetUserVolumeSize(int32(plannedWorkspace.UserVolumeSize.ValueInt64()))
 				updateWorkspaceRequest := client.QuickCreateClient.DeploymentQCS.UpdateMachineAsync(ctx, client.ClientConfig.CustomerId, deployment.GetDeploymentId(), workspace.GetMachineId())
 				updateWorkspaceRequest = updateWorkspaceRequest.Body(updateWorkspaceRequestDetail)
 				updateWorkspaceMachineRequests = append(updateWorkspaceMachineRequests, updateWorkspaceRequest)
@@ -701,7 +759,7 @@ func updateUserCoupledWorkspaces(ctx context.Context, diagnostics *diag.Diagnost
 
 	// 2.1 Delete removed workspaces
 	if len(workspaceIdsForDeletion) > 0 {
-		err := updateMachinesMaintenanceModeWithUsername(ctx, diagnostics, client, deployment, machinesForMaintenanceModeBeforeDeletion)
+		err := updateMachinesMaintenceMode(ctx, diagnostics, client, deployment.GetDeploymentId(), brokerMachineIdMaintenanceModeMap)
 		if err != nil {
 			return err
 		}
@@ -729,29 +787,7 @@ func updateUserCoupledWorkspaces(ctx context.Context, diagnostics *diag.Diagnost
 		}
 	}
 
-	// 3. Find workspaces to be created
-	deployment, _, err := getAwsWorkspacesDeploymentUsingId(ctx, client, diagnostics, deployment.GetDeploymentId(), true)
-	if err != nil {
-		return err
-	}
-	existingWorkspaceUsernames := []string{}
-	for _, workspace := range deployment.GetWorkspaces() {
-		existingWorkspaceUsernames = append(existingWorkspaceUsernames, workspace.GetUsername())
-	}
-
-	addMachinesRequestDetails := []citrixquickcreate.AddAwsEdcWorkspace{}
-	for _, username := range workspaceUsernamesInPlan {
-		if !slices.Contains(existingWorkspaceUsernames, username) {
-			// Create new workspace
-			workspaceConfig := workspaceUsernameConfigMapInPlan[username]
-			var addWorkspaceRequestDetail citrixquickcreate.AddAwsEdcWorkspace
-			addWorkspaceRequestDetail.SetUsername(username)
-			addWorkspaceRequestDetail.SetRootVolumeSize(int32(workspaceConfig.RootVolumeSize.ValueInt64()))
-			addWorkspaceRequestDetail.SetUserVolumeSize(int32(workspaceConfig.UserVolumeSize.ValueInt64()))
-			addMachinesRequestDetails = append(addMachinesRequestDetails, addWorkspaceRequestDetail)
-		}
-	}
-
+	// 3. Create any new workspaces
 	if len(addMachinesRequestDetails) > 0 {
 		addMachinesRequestBody := citrixquickcreate.AddAwsEdcDeploymentMachines{}
 		addMachinesRequestBody.SetAccountType(citrixquickcreate.ACCOUNTTYPE_AWSEDC)
@@ -773,92 +809,6 @@ func updateUserCoupledWorkspaces(ctx context.Context, diagnostics *diag.Diagnost
 		}
 	}
 
-	// 4. Call Orchestration Service to update workspace maintenance modes
-	deployment, _, err = getAwsWorkspacesDeploymentUsingId(ctx, client, diagnostics, deployment.GetDeploymentId(), true)
-	if err != nil {
-		return err
-	}
-
-	err = updateMachinesMaintenanceModeWithUsername(ctx, diagnostics, client, deployment, workspacesInPlan)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func updateUserDecoupledWorkspaces(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, deployment *citrixquickcreate.AwsEdcDeployment, plannedWorkspacesList types.List) error {
-	brokerIdMapForMaintenace := map[string]bool{}
-	workspaceIdsForDeletion := []string{}
-	for _, workspace := range deployment.GetWorkspaces() {
-		brokerIdMapForMaintenace[workspace.GetBrokerMachineId()] = true
-		workspaceIdsForDeletion = append(workspaceIdsForDeletion, workspace.GetMachineId())
-	}
-
-	// 1. Set existing workspaces to maintenance mode
-	err := updateMachinesMaintenceMode(ctx, diagnostics, client, deployment.GetDeploymentId(), brokerIdMapForMaintenace)
-	if err != nil {
-		return err
-	}
-
-	// 2. Delete existing workspaces
-	err = deleteAwsWorkspaceMachines(ctx, diagnostics, client, deployment, workspaceIdsForDeletion)
-	if err != nil {
-		return err
-	}
-
-	// 3. Add new workspaces
-	addMachinesRequestDetails := []citrixquickcreate.AddAwsEdcWorkspace{}
-	workspaces := util.ObjectListToTypedArray[AwsWorkspacesDeploymentWorkspaceModel](ctx, diagnostics, plannedWorkspacesList)
-	for _, workspace := range workspaces {
-		var addWorkspaceRequestDetail citrixquickcreate.AddAwsEdcWorkspace
-		addWorkspaceRequestDetail.SetUsername(util.UsernameForDecoupledWorkspaces)
-		addWorkspaceRequestDetail.SetRootVolumeSize(int32(workspace.RootVolumeSize.ValueInt64()))
-		addWorkspaceRequestDetail.SetUserVolumeSize(int32(workspace.UserVolumeSize.ValueInt64()))
-		addMachinesRequestDetails = append(addMachinesRequestDetails, addWorkspaceRequestDetail)
-	}
-
-	if len(addMachinesRequestDetails) > 0 {
-		addMachinesRequestBody := citrixquickcreate.AddAwsEdcDeploymentMachines{}
-		addMachinesRequestBody.SetAccountType(citrixquickcreate.ACCOUNTTYPE_AWSEDC)
-		addMachinesRequestBody.SetWorkspaces(addMachinesRequestDetails)
-		addMachinesRequest := client.QuickCreateClient.DeploymentQCS.AddMachineAsync(ctx, client.ClientConfig.CustomerId, deployment.GetDeploymentId())
-		addMachinesRequest = addMachinesRequest.Body(addMachinesRequestBody)
-		deploymentTask, httpResp, err := addMachinesRequest.Execute()
-		if err != nil {
-			diagnostics.AddError(
-				"Error adding new workspaces to AWS WorkSpaces Deployment: "+deployment.GetDeploymentName(),
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+util.ReadQcsClientError(err),
-			)
-			return err
-		}
-		err = util.WaitForQcsDeploymentTaskWithDiags(ctx, diagnostics, client, 3600, deploymentTask.GetTaskId(), "Add workspaces to deployment task", deployment.GetDeploymentName(), "adding new workspaces to")
-		if err != nil {
-			return err
-		}
-	}
-
-	/// 4. Update maintenace mode
-	deployment, _, err = getAwsWorkspacesDeploymentUsingId(ctx, client, diagnostics, deployment.GetDeploymentId(), true)
-	if err != nil {
-		return err
-	}
-	deploymentWorkspaces := deployment.GetWorkspaces()
-	if len(deploymentWorkspaces) != len(workspaces) {
-		diagnostics.AddError(
-			"Error updating AWS WorkSpaces Deployment: "+deployment.GetDeploymentName(),
-			"Number of workspaces in updated deployment does not match the number of workspaces in the plan",
-		)
-	}
-	brokerMachineIdMaintenanceModeMap := map[string]bool{}
-	for index, workspace := range workspaces {
-		brokerMachineIdMaintenanceModeMap[deploymentWorkspaces[index].GetBrokerMachineId()] = workspace.MaintenanceMode.ValueBool()
-	}
-	err = updateMachinesMaintenceMode(ctx, diagnostics, client, deployment.GetDeploymentId(), brokerMachineIdMaintenanceModeMap)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -884,11 +834,68 @@ func deleteAwsWorkspaceMachines(ctx context.Context, diagnostics *diag.Diagnosti
 	return nil
 }
 
+func removeWorkspacesInStateNotInRemote(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, deployment *citrixquickcreate.AwsEdcDeployment, deploymentInState AwsWorkspacesDeploymentResourceModel) AwsWorkspacesDeploymentResourceModel {
+	workspacesInState := util.ObjectListToTypedArray[AwsWorkspacesDeploymentWorkspaceModel](ctx, diagnostics, deploymentInState.Workspaces)
+	workspacesInRemote := map[string]bool{}
+	for _, workspace := range deployment.GetWorkspaces() {
+		workspacesInRemote[workspace.GetMachineId()] = true
+	}
+
+	finalWorkspacesInState := []AwsWorkspacesDeploymentWorkspaceModel{}
+	for _, workspaceInState := range workspacesInState {
+		if _, exists := workspacesInRemote[workspaceInState.MachineId.ValueString()]; exists {
+			finalWorkspacesInState = append(finalWorkspacesInState, workspaceInState)
+		}
+	}
+
+	deploymentInState.Workspaces = util.TypedArrayToObjectList[AwsWorkspacesDeploymentWorkspaceModel](ctx, diagnostics, finalWorkspacesInState)
+	return deploymentInState
+}
+
 func (r *awsWorkspacesDeploymentResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	if r.client != nil && r.client.QuickCreateClient == nil {
 		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
 		return
+	}
+
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var state AwsWorkspacesDeploymentResourceModel
+	diags := req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var plan AwsWorkspacesDeploymentResourceModel
+	diags = req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	stateWorkspaces := util.ObjectListToTypedArray[AwsWorkspacesDeploymentWorkspaceModel](ctx, &resp.Diagnostics, state.Workspaces)
+	planWorkspaces := util.ObjectListToTypedArray[AwsWorkspacesDeploymentWorkspaceModel](ctx, &resp.Diagnostics, plan.Workspaces)
+
+	stateMachineIdMap := map[string]AwsWorkspacesDeploymentWorkspaceModel{}
+
+	for _, workspace := range stateWorkspaces {
+		stateMachineIdMap[workspace.MachineId.ValueString()] = workspace
+	}
+
+	for _, planWorkspace := range planWorkspaces {
+		if stateWorkspace, exists := stateMachineIdMap[planWorkspace.MachineId.ValueString()]; exists {
+			if planWorkspace.UserVolumeSize.ValueInt64() != stateWorkspace.UserVolumeSize.ValueInt64() &&
+				planWorkspace.RootVolumeSize.ValueInt64() != stateWorkspace.RootVolumeSize.ValueInt64() {
+				resp.Diagnostics.AddError(
+					"Error modifying AWS WorkSpaces Deployment: "+state.Name.ValueString(),
+					"WorkSpaces root volume size and user volume size cannot be modified at the same time. Please modify them separately.",
+				)
+			}
+		}
 	}
 }

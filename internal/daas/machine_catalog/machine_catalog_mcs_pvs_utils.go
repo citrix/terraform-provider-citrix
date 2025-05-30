@@ -216,6 +216,15 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 		masterImageNote := awsMachineConfig.MasterImageNote.ValueString()
 		provisioningScheme.SetMasterImageNote(masterImageNote)
 
+		if !awsMachineConfig.MachineProfile.IsNull() {
+			machineProfile := util.ObjectValueToTypedObject[util.AwsMachineProfileModel](ctx, diag, awsMachineConfig.MachineProfile)
+			machineProfilePath, err := util.HandleMachineProfileForAwsMcsPvsCatalog(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), machineProfile, "Error creating Machine Catalog")
+			if err != nil {
+				return nil, err
+			}
+			provisioningScheme.SetMachineProfilePath(machineProfilePath)
+		}
+
 		securityGroupPaths := []string{}
 		for _, securityGroup := range util.StringListToStringArray(ctx, diag, awsMachineConfig.SecurityGroups) {
 			securityGroupPath, httpResp, err := util.GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", securityGroup, util.SecurityGroupResourceType, "")
@@ -1107,6 +1116,14 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 		}
 
 		masterImageNote = awsMachineConfig.MasterImageNote.ValueString()
+
+		if !awsMachineConfig.MachineProfile.IsNull() {
+			machineProfile := util.ObjectValueToTypedObject[util.AwsMachineProfileModel](ctx, &resp.Diagnostics, awsMachineConfig.MachineProfile)
+			machineProfilePath, err = util.HandleMachineProfileForAwsMcsPvsCatalog(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), machineProfile, "Error updating Machine Catalog")
+			if err != nil {
+				return err
+			}
+		}
 
 		// Set reboot options if configured
 		if !awsMachineConfig.ImageUpdateRebootOptions.IsNull() {

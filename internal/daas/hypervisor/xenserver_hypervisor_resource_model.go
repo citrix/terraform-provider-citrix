@@ -168,6 +168,12 @@ func (XenserverHypervisorResourceModel) GetAttributes() map[string]schema.Attrib
 	return XenserverHypervisorResourceModel{}.GetSchema().Attributes
 }
 
+func (XenserverHypervisorResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{
+		"username": true,
+	}
+}
+
 func (r XenserverHypervisorResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel) XenserverHypervisorResourceModel {
 	r.Id = types.StringValue(hypervisor.GetId())
 	r.Name = types.StringValue(hypervisor.GetName())

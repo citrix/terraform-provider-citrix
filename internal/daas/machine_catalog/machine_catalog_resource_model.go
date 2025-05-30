@@ -32,6 +32,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+func (MachineCatalogResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{
+		"ad_account_name":    true,
+		"service_account_id": true,
+		"service_account":    true,
+	}
+}
+
 // MachineCatalogResourceModel maps the resource schema data.
 type MachineCatalogResourceModel struct {
 	Id                       types.String `tfsdk:"id"`

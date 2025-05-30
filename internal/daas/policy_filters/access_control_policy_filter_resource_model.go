@@ -82,6 +82,10 @@ func (AccessControlFilterModel) GetAttributes() map[string]schema.Attribute {
 	return AccessControlFilterModel{}.GetSchema().Attributes
 }
 
+func (AccessControlFilterModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (filter AccessControlFilterModel) GetId() string {
 	return filter.Id.ValueString()
 }

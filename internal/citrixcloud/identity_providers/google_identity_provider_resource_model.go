@@ -94,6 +94,13 @@ func (GoogleIdentityProviderResourceModel) GetAttributes() map[string]schema.Att
 	return GoogleIdentityProviderResourceModel{}.GetSchema().Attributes
 }
 
+func (GoogleIdentityProviderResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{
+		"client_email":       true,
+		"google_customer_id": true,
+	}
+}
+
 func (r GoogleIdentityProviderResourceModel) RefreshIdAndNameValues(googleIdp *citrixcws.IdpStatusModel) GoogleIdentityProviderResourceModel {
 	r.Id = types.StringValue(googleIdp.GetIdpInstanceId())
 	r.Name = types.StringValue(googleIdp.GetIdpNickname())

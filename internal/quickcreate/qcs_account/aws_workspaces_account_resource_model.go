@@ -97,6 +97,12 @@ func (AwsWorkspacesAccountResourceModel) GetAttributes() map[string]schema.Attri
 	return AwsWorkspacesAccountResourceModel{}.GetSchema().Attributes
 }
 
+func (AwsWorkspacesAccountResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{
+		"aws_access_key_id": true,
+	}
+}
+
 func (r AwsWorkspacesAccountResourceModel) RefreshPropertyValues(account *quickcreateservice.AwsEdcAccount) AwsWorkspacesAccountResourceModel {
 	r.AccountId = types.StringValue(account.GetAccountId())
 	r.Name = types.StringValue(account.GetName())

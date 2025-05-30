@@ -120,6 +120,10 @@ func (SCVMMHypervisorResourcePoolResourceModel) GetAttributes() map[string]schem
 	return SCVMMHypervisorResourcePoolResourceModel{}.GetSchema().Attributes
 }
 
+func (SCVMMHypervisorResourcePoolResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r SCVMMHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) SCVMMHypervisorResourcePoolResourceModel {
 
 	r.Id = types.StringValue(resourcePool.GetId())

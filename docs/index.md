@@ -18,9 +18,33 @@ Check out the [release notes](https://github.com/citrix/terraform-provider-citri
 
 New to Terraform? Click [here](https://developer.hashicorp.com/terraform) to learn more.
 
-### Importing existing Citrix resources into Terraform
+### Roadmap Proposal for a Smoother Onboarding Experience
+To streamline your onboarding experience with the Citrix Terraform Provider, we recommend to start small by importing or creating one or two resources and build out from there.
 
-Experience the immediate benefits of Terraform by importing your Citrix resources (CVAD or DaaS) using our [Onboarding Script](https://github.com/citrix/terraform-provider-citrix/blob/main/scripts/onboarding-helper/terraform-onboarding.ps1). This allows you to quickly adopt infrastructure as code and streamline your infrastructure management. A comprehensive [ReadMe](https://github.com/citrix/terraform-provider-citrix/blob/main/scripts/onboarding-helper/README.md) is available to guide you through the process.
+#### Import Your Existing Resources Using the Onboarding Script
+Use our [Onboarding Script](https://github.com/citrix/terraform-provider-citrix/blob/main/scripts/onboarding-helper/) with the following parameters to import existing resources and create Terraform configuration files for them.
+
+- Use the `-ResourceTypes` parameter to specify just a few resource types (for example `citrix_zone`, `citrix_delivery_group`)
+- Use the `-NamesOrIds` parameter to filter for specific resources by name or ID
+
+Example:
+```powershell
+.\terraform-onboarding.ps1 CustomerId "{CustomerId}" -ClientId "{ClientId}" -ClientSecret "{ClientSecret}" -ResourceTypes "citrix_zone","citrix_delivery_group" -NamesOrIds "Primary Zone","Sales Delivery Group"
+```
+
+This incremental approach allows you to become familiar with Terraform concepts and the Citrix provider while working with a smaller, more focused set of resources.
+
+#### Manual Configuration
+Alternatively, we recommend starting by creating new `.tf` files for the core resources essential for a Citrix deployment:
+
+- [citrix_cloud_resource_location](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/cloud_resource_location) (for Citrix Cloud customers only)
+- [citrix_zone](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/zone)
+- citrix_{hosting provider}_hypervisor
+- citrix_{hosting provider}_hypervisor_resource_pool
+
+These resources are straightforward to configure and can be created or removed quickly. Begin your Terraform journey with these resources to build confidence in managing your Citrix deployment via Terraform.
+
+Once these resources are properly configured, the next step is to set up your [machine catalog](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/machine_catalog) with Terraform. Managing the machine catalog with Terraform will provide a solid foundation for designing a pipeline that meets your specific use case.
 
 ### Creating Citrix resources via Terraform
 
@@ -41,18 +65,6 @@ Basic example templates for getting started can be found in our [GitHub reposito
 ### Demo video
 [![alt text](https://raw.githubusercontent.com/citrix/terraform-provider-citrix/refs/heads/main/images/techzone-youtube-thumbnail.png)](https://www.youtube.com/watch?v=c33sMLaCVjY)
 https://www.youtube.com/watch?v=c33sMLaCVjY
-
-### Roadmap Proposal for a Smoother Onboarding Experience
-To streamline your onboarding experience with the Citrix Terraform Provider, we recommend starting with the core resources essential for a Citrix deployment:
-
-- Resource Location (for Citrix Cloud customers only)
-- Zone
-- Hypervisor
-- Hypervisor Resource Pool
-
-These resources are straightforward to configure and can be created or removed quickly. Begin your Terraform journey with these resources to build confidence in managing your Citrix deployment via Terraform.
-
-Once these resources are properly configured, the next step is to set up your [machine catalog](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/machine_catalog) with Terraform. Managing the machine catalog with Terraform will provide a solid foundation for designing a pipeline that meets your specific use case.
 
 ### (On-Premises Only) Enable Web Studio
 
@@ -91,7 +103,7 @@ A service principal is an API client which is not associated with an email. It c
 - URL of the HashiCorp Terraform registry: https://registry.terraform.io or a private registry.
 
 ### How do I get the ID to import a DaaS resource?
-The [Onboarding Script](https://github.com/citrix/terraform-provider-citrix/blob/main/scripts/onboarding-helper/) will discover all resource IDs and import them into a local terraform state file. You can then run `terraform state show` to inspect the state and discover the IDs.
+The [Object IDs Helper Script](https://github.com/citrix/terraform-provider-citrix/blob/main/scripts/object-ids-helper/) will discover all resource IDs and save them to a JSON file for easy reference.
 
 Alternatively the IDs can be found in Web Studio by looking at the network traces. Open your browser developer tools (usually F12) and navigate to the `Network` tab. Refresh Web Studio and click on the resource you want to find the ID for. There should be 2 corresponding network calls (`OPTIONS` then `GET`) for the resource which includes the ID as the last path in the url before the `?` query.
 

@@ -76,6 +76,10 @@ func (ClientPlatformFilterModel) GetAttributes() map[string]schema.Attribute {
 	return ClientPlatformFilterModel{}.GetSchema().Attributes
 }
 
+func (ClientPlatformFilterModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (filter ClientPlatformFilterModel) GetId() string {
 	return filter.Id.ValueString()
 }

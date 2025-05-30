@@ -150,6 +150,50 @@ resource "citrix_machine_catalog" "example-aws-mtsession" {
     }	
 }
 
+resource "citrix_machine_catalog" "example-aws-with-machine-profile" {
+    name                        = "example-aws-with-machine-profile"
+    description                 = "Example multi-session catalog on AWS hypervisor"
+   	zone						= "<zone Id>"
+	allocation_type				= "Random"
+	session_support				= "MultiSession"
+	provisioning_type 			= "MCS"
+    provisioning_scheme         = {
+		hypervisor = citrix_aws_hypervisor.example-aws-hypervisor.id
+		hypervisor_resource_pool = citrix_aws_hypervisor_resource_pool.example-aws-hypervisor-resource-pool.id
+		identity_type      = "ActiveDirectory"
+		machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+			domain_ou				 = "<DomainOU>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+        aws_machine_config = {
+            image_ami = "<AMI ID for VDA>"
+			master_image = "<Image template AMI name>"
+			service_offering = "t2.small"
+            # Cannot provide security groups if you provide machine profile. Security Group values are taken from machine profile.
+            # security_groups = [
+            #     "default"
+            # ]
+            machine_profile = {
+                vm_name = "example-vm-name"
+                vm_id = "i-xxxxxxxxx"
+                vm_region_az = "us-east-1c"  # Example. Chose the region and availability zone where your VM is located.
+                # For machine profile, you can either provide VM related details or launch template related details, but not both.
+                # launch_template_name = "example_launch_template"
+                # launch_template_id = "lt-example"
+                # launch_template_version = "1"
+            }
+            tenancy_type = "Shared"
+        }
+		number_of_total_machines =  1
+        machine_account_creation_rules ={
+			naming_scheme 	   = "aws-multi-##"
+			naming_scheme_type = "Numeric"
+        }
+    }	
+}
+
 resource "citrix_machine_catalog" "example-gcp-mtsession" {
     name                        = "example-gcp-mtsession"
     description                 = "Example multi-session catalog on GCP hypervisor"
@@ -675,14 +719,15 @@ Required:
 
 - `image_ami` (String) AMI of the AWS image to be used as the template image for the machine catalog.
 - `master_image` (String) The name of the virtual machine image that will be used.
-- `security_groups` (List of String) Security groups to associate with the machine. When omitted, the default security group of the VPC will be used by default.
 - `service_offering` (String) The AWS VM Sku to use when creating machines.
 - `tenancy_type` (String) Tenancy type of the machine. Choose between `Shared`, `Instance` and `Host`.
 
 Optional:
 
 - `image_update_reboot_options` (Attributes) The options for how rebooting is performed for image update. When omitted, image update on the VDAs will be performed on next shutdown. (see [below for nested schema](#nestedatt--provisioning_scheme--aws_machine_config--image_update_reboot_options))
+- `machine_profile` (Attributes) The name of the virtual machine that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone.<br />While providing machine profile, specify either `vm_name + vm_region_az + vm_id` or `launch_template_name + launch_template_version + launch_template_id`, but not both. (see [below for nested schema](#nestedatt--provisioning_scheme--aws_machine_config--machine_profile))
 - `master_image_note` (String) The note for the master image.
+- `security_groups` (List of String) Security groups to associate with the machine. If omitted, the VPC's default security group is used.<br />Do not specify this value if a machine_profile is provided, as the security groups will be derived from the machine profile instead.
 
 <a id="nestedatt--provisioning_scheme--aws_machine_config--image_update_reboot_options"></a>
 ### Nested Schema for `provisioning_scheme.aws_machine_config.image_update_reboot_options`
@@ -696,6 +741,19 @@ Optional:
 - `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.-> **Note** When `reboot_duration` is set to `-1`, if a warning message should be displayed, `warning_duration` has to be set to `-1` to show the warning message immediately.-> **Note** When `reboot_duration` is not set to `-1`, `warning_duration` cannot be set to `-1`.
 - `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot. The optional pattern '%m%' is replaced by the number of minutes until the reboot.
 - `warning_repeat_interval` (Number) Number of minutes to wait before showing the reboot warning message again.
+
+
+<a id="nestedatt--provisioning_scheme--aws_machine_config--machine_profile"></a>
+### Nested Schema for `provisioning_scheme.aws_machine_config.machine_profile`
+
+Optional:
+
+- `launch_template_id` (String) The launch template ID of the machine profile.
+- `launch_template_name` (String) The launch template name of the machine profile.
+- `launch_template_version` (String) The launch template version of the machine profile.
+- `vm_id` (String) The instance ID of the machine profile virtual machine.
+- `vm_name` (String) The name of the machine profile virtual machine.
+- `vm_region_az` (String) The region and availability zone of the machine profile virtual machine.
 
 
 

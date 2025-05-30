@@ -67,6 +67,10 @@ func (TagFilterModel) GetAttributes() map[string]schema.Attribute {
 	return TagFilterModel{}.GetSchema().Attributes
 }
 
+func (TagFilterModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (filter TagFilterModel) GetId() string {
 	return filter.Id.ValueString()
 }

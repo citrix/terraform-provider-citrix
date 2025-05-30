@@ -83,6 +83,12 @@ func (OktaIdentityProviderModel) GetAttributes() map[string]schema.Attribute {
 	return OktaIdentityProviderModel{}.GetSchema().Attributes
 }
 
+func (OktaIdentityProviderModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{
+		"okta_client_id": true,
+	}
+}
+
 func (r OktaIdentityProviderModel) RefreshPropertyValues(isResource bool, oktaIdp *citrixcws.IdpStatusModel) OktaIdentityProviderModel {
 
 	// Overwrite Okta Identity Provider Resource with refreshed state

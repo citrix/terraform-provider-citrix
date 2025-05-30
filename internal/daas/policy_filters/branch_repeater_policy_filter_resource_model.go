@@ -56,6 +56,10 @@ func (BranchRepeaterFilterModel) GetAttributes() map[string]schema.Attribute {
 	return BranchRepeaterFilterModel{}.GetSchema().Attributes
 }
 
+func (BranchRepeaterFilterModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (filter BranchRepeaterFilterModel) GetId() string {
 	return filter.Id.ValueString()
 }

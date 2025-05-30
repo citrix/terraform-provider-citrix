@@ -77,6 +77,10 @@ func (NutanixHypervisorResourcePoolResourceModel) GetAttributes() map[string]sch
 	return NutanixHypervisorResourcePoolResourceModel{}.GetSchema().Attributes
 }
 
+func (NutanixHypervisorResourcePoolResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r NutanixHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) NutanixHypervisorResourcePoolResourceModel {
 
 	r.Id = types.StringValue(resourcePool.GetId())

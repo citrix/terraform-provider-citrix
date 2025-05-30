@@ -72,6 +72,10 @@ func (ZoneResourceModel) GetAttributes() map[string]schema.Attribute {
 	return ZoneResourceModel{}.GetSchema().Attributes
 }
 
+func (ZoneResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r ZoneResourceModel) RefreshPropertyValues(ctx context.Context, diags *diag.Diagnostics, zone *citrixorchestration.ZoneDetailResponseModel, onpremises bool) ZoneResourceModel {
 	// Overwrite zone with refreshed state
 	r.Id = types.StringValue(zone.GetId())

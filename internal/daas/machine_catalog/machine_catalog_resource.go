@@ -1467,7 +1467,32 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 		resp.Plan.SetAttribute(ctx, paths[0], string(persistChanges))
 	}
 
+	catalogNameExists := false
+	if !plan.Name.IsUnknown() && r.client != nil {
+		// Validate Machine Catalog name to be unique
+		machineCatalogName := plan.Name.ValueString()
+		var nameCheckRequestModel citrixorchestration.CatalogNameCheckRequestModel
+		nameCheckRequestModel.SetName(machineCatalogName)
+
+		checkNameExistReq := r.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsTestMachineCatalogExists(ctx)
+		checkNameExistReq = checkNameExistReq.CatalogNameCheckRequestModel(nameCheckRequestModel)
+
+		_, err := citrixdaasclient.AddRequestData(checkNameExistReq, r.client).Execute()
+		if err == nil {
+			catalogNameExists = true
+		}
+	}
+
 	if req.State.Raw.IsNull() {
+		if catalogNameExists {
+			// Validate machine catalog name uniqueness for create
+			resp.Diagnostics.AddError(
+				"Machine Catalog Name Already Exists",
+				fmt.Sprintf("A Machine Catalog with the name '%s' already exists. Please choose a different name.", plan.Name.ValueString()),
+			)
+			return
+		}
+
 		return
 	}
 
@@ -1475,6 +1500,16 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 	diags = req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if catalogNameExists && !strings.EqualFold(plan.Name.ValueString(), state.Name.ValueString()) {
+		// Validate machine catalog name uniqueness for update if the name is changed
+		resp.Diagnostics.AddError(
+			"Machine Catalog Name Already Exists",
+			fmt.Sprintf("A Machine Catalog with the name '%s' already exists. Please choose a different name.", plan.Name.ValueString()),
+		)
+
 		return
 	}
 

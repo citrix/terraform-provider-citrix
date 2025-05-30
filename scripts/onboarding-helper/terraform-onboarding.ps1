@@ -1,4 +1,4 @@
-﻿# Copyright © 2024. Citrix Systems, Inc. All Rights Reserved.
+# Copyright © 2024. Citrix Systems, Inc. All Rights Reserved.
 <#
 Currently this script is still in TechPreview
 .SYNOPSIS
@@ -27,17 +27,29 @@ Currently this script is still in TechPreview
     For Citrix Cloud customers (Optional): Use this to force override the Citrix DaaS service hostname.
 
 .Parameter Environment
-    The Citrix Cloud environment of the customer. Only applicable for Citrix Cloud customers. Available options: Production, Staging
+    The Citrix Cloud environment of the customer. Only applicable for Citrix Cloud customers. Available options: Production, Japan, Gov
 
-.Parameter SetDependencyRelationship
-    Create dependency relationships between resources by replacing resource IDs with resource references.
+.Parameter ResourceTypes
+    Optional list of resource types to onboard. When specified, only those resources will be onboarded, the rest skipped.
+    This helps make the onboarding process more manageable by limiting the scope.
+    By default if (-NoDependencyRelationship is not specified), will resolve all dependency relationships between resources as long as the dependent resource is included.
+    Available resource types include: citrix_admin_folder, citrix_admin_role, citrix_admin_scope, citrix_admin_user, citrix_application, citrix_application_group, citrix_application_icon, citrix_aws_hypervisor, citrix_azure_hypervisor, citrix_delivery_group, citrix_gcp_hypervisor, citrix_image_definition, citrix_machine_catalog, citrix_nutanix_hypervisor, citrix_openshift_hypervisor, citrix_policy_set, citrix_scvmm_hypervisor, citrix_service_account, citrix_storefront_server, citrix_tag, citrix_vsphere_hypervisor, citrix_wem_configuration_set, citrix_wem_directory_object, citrix_xenserver_hypervisor, citrix_zone
+    citrix_<hypervisorType>_resource_pools are included with the citrix_<hypervisorType>_hypervisor resource.
+    citrix_image_version is included with the citrix_image_definition resource.
+
+.Parameter NamesOrIds
+    Optional string array parameter to filter resources by name or ID. Only resources with a Name or ID matching any of these values will be onboarded.
+    This allows you to onboard multiple specific resources by name or ID in a single operation.
+    By default if (-NoDependencyRelationship is not specified), will resolve all dependency relationships between resources as long as the dependent resource is included.
+
+.Parameter NoDependencyRelationship
+    Do not create dependency relationships between resources by replacing resource references with the resource IDs.
 
 .Parameter DisableSSLValidation
     Disable SSL validation for this script. Required if DDC does not have a valid SSL certificate.
 
 .Parameter ShowClientSecret
     Specifies whether to display the client secret value in the generated Terraform configuration file; defaults to `$false` for security.
-
 #>  
 
 [CmdletBinding()]
@@ -58,11 +70,18 @@ Param (
     [string] $Hostname = "api.cloud.com",
 
     [Parameter(Mandatory = $false)]
-    [ValidateSet("Production", "Staging")]
+    [ValidateSet("Production", "Staging", "Japan", "JapanStaging", "Gov", "GovStaging")]
     [string] $Environment = "Production",
 
     [Parameter(Mandatory = $false)]
-    [switch] $SetDependencyRelationship,
+    [ValidateSet("citrix_admin_folder", "citrix_admin_role", "citrix_admin_scope", "citrix_admin_user", "citrix_application", "citrix_application_group", "citrix_application_icon", "citrix_aws_hypervisor", "citrix_azure_hypervisor", "citrix_delivery_group", "citrix_gcp_hypervisor", "citrix_image_definition", "citrix_machine_catalog", "citrix_nutanix_hypervisor", "citrix_openshift_hypervisor", "citrix_policy_set", "citrix_scvmm_hypervisor", "citrix_service_account", "citrix_storefront_server", "citrix_tag", "citrix_vsphere_hypervisor", "citrix_wem_configuration_set", "citrix_wem_directory_object", "citrix_xenserver_hypervisor", "citrix_zone")]
+    [string[]] $ResourceTypes,
+
+    [Parameter(Mandatory = $false)]
+    [string[]] $NamesOrIds,
+
+    [Parameter(Mandatory = $false)]
+    [switch] $NoDependencyRelationship,
 
     [Parameter(Mandatory = $false)]
     [switch] $DisableSSLValidation,
@@ -180,6 +199,18 @@ function Get-AuthToken {
         }
         elseif ($script:environment -eq "Staging") {
             $url = "https://api.cloudburrito.com/cctrustoauth2/$script:customerId/tokens/clients"
+        }
+        elseif ($script:environment -eq "Japan") {
+            $url = "https://api.citrixcloud.jp/cctrustoauth2/$script:customerId/tokens/clients"
+        }
+        elseif ($script:environment -eq "JapanStaging") {
+            $url = "https://api.citrixcloud-test.jp/cctrustoauth2/$script:customerId/tokens/clients"
+        }
+        elseif ($script:environment -eq "Gov") {
+            $url = "https://api.citrixcloud.us/cctrustoauth2/$script:customerId/tokens/clients"
+        }
+        elseif ($script:environment -eq "GovStaging") {
+            $url = "https://api.citrixcloud-test.us/cctrustoauth2/$script:customerId/tokens/clients"
         }
 
         $body = @{
@@ -300,8 +331,20 @@ function Get-UrlForWemObjects {
     if ($script:environment -eq "Production") {
         $script:wemHostName = "api.wem.cloud.com"
     }
-    else {
+    elseif ($script:environment -eq "Staging") {
         $script:wemHostName = "api.wem.cloudburrito.com"
+    }
+    elseif ($script:environment -eq "Japan") {
+        $script:wemHostName = "api.wem.citrixcloud.jp"
+    }
+    elseif ($script:environment -eq "JapanStaging") {
+        $script:wemHostName = "api.wem.citrixcloud-test.jp"
+    }
+    elseif ($script:environment -eq "Gov") {
+        $script:wemHostName = "api.wem.citrixcloud.us"
+    }
+    elseif ($script:environment -eq "GovStaging") {
+        $script:wemHostName = "api.wem.citrixcloud-test.us"
     }
 
     if ($requestPath -eq "sites") {
@@ -367,6 +410,11 @@ function Get-ResourceList {
     $resourceList = @()
     $pathMap = @{}
     foreach ($item in $items) {
+        if (($NamesOrIds -and $NamesOrIds.Count -gt 0) -and # Filter by NamesOrIds if specified
+            (($item.Id -or $item.Name) -and # Item has an Id or Name
+            -not (($item.Id -and ($NamesOrIds -contains $item.Id)) -or ($item.Name -and ($NamesOrIds -contains $item.Name))))) { # Item's Id or Name is not in the filter list
+            continue # skip
+        }
 
         # Handle special case for Machine Catalogs
         if ($requestPath -eq "machinecatalogs" -and $item.provisioningType -ne "Manual" -and $item.provisioningType -ne "MCS" -and $item.provisioningType -ne "PVSStreaming") {
@@ -507,8 +555,14 @@ function Get-ImportMap {
 }
 
 # List all CVAD objects from existing site
-function Get-ExistingCVADResources {
+function Get-ExistingCVADResources([string[]]$filter = $null) {
    
+    # IMPORTANT: When adding a new resource type, the following places must be updated:
+    # 1. Add the resource to the ValidateSet parameter for ResourceTypes at the top of this script
+    # 2. Update the .PARAMETER ResourceTypes documentation in the script header comments
+    # 3. Update the README.md in this directory to include the new resource type
+    # 4. Add the resource to the $resources hashtable below without the `citrix_` prefix
+    
     Write-Verbose "Get list of all existing CVAD resources from the site."
     $resources = @{
         "zone"                 = @{
@@ -625,6 +679,12 @@ function Get-ExistingCVADResources {
     $script:cvadResourcesMap = @{}
 
     foreach ($resource in $resources.Keys) {
+        # Skip resources not in ResourceTypes if ResourceTypes parameter is specified
+        if ($filter -and $filter.Count -gt 0 -and -not $filter.Contains($resource)) {
+            Write-Verbose "Skipping resource type: $resource as it's not in the specified ResourceTypes parameter"
+            continue
+        }
+
         $api = $resources[$resource].resourceApi
         $resourceProviderName = $resources[$resource].resourceProviderName
         $script:cvadResourcesMap[$resource] = Get-ImportMap -resourceApi $api -resourceProviderName $resourceProviderName
@@ -781,7 +841,7 @@ function ReplaceDependencyRelationships {
         [string] $content
     )
 
-    if (-not $script:SetDependencyRelationship) {
+    if ($script:NoDependencyRelationship) {
         return $content
     }
 
@@ -958,6 +1018,9 @@ function PostProcessTerraformOutput {
     OrganizeTerraformResources -content $content
 }
 
+### End Helper Functions ###
+$ErrorActionPreference = "Stop"
+
 if ($DisableSSLValidation -and $PSVersionTable.PSVersion.Major -lt 7) {
     $code = @"
 using System.Net;
@@ -1000,13 +1063,20 @@ $script:TokenExpiryTime = (Get-Date).AddMinutes(-1) # Initialize the expiry time
 # Set environment variables for client secret
 $env:CITRIX_CLIENT_SECRET = $ClientSecret
 
+# Strip citrix_ prefix from ResourceTypes if present
+if ($ResourceTypes) {
+    $resouceTypesWithoutCitrixPrefix = $ResourceTypes | ForEach-Object { $_ -replace '^citrix_', '' }
+} else {
+    $resouceTypesWithoutCitrixPrefix = $null # import all resources
+}
+
 try {
     Get-Site
     Get-RequestBaseUrl
     New-RequiredFiles
 
     # Get CVAD resources from existing site
-    Get-ExistingCVADResources
+    Get-ExistingCVADResources $resouceTypesWithoutCitrixPrefix
 
     # Initialize terraform
     terraform init

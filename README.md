@@ -194,12 +194,28 @@ A machine catalog is a collection of machines managed as a single entity. Refer 
 A delivery group is a collection of machines selected from one or more machine catalogs. The delivery group can also specify which users can use those machines, plus the applications and desktops available to those users. Refer the [DaaS Delivery Group documentation](docs/resources/delivery_group.md) to configure a delivery group via terraform.
 
 ### Roadmap Proposal for a Smoother Onboarding Experience
-To streamline your onboarding experience with the Citrix Terraform Provider, we recommend starting with the core resources essential for a Citrix deployment:
+To streamline your onboarding experience with the Citrix Terraform Provider, we recommend to start small by importing or creating one or two resources and build out from there.
 
-- Resource Location (for Citrix Cloud customers only)
-- Zone
-- Hypervisor
-- Hypervisor Resource Pool
+#### Import Your Existing Resources Using the Onboarding Script
+Use our [Onboarding Script](https://github.com/citrix/terraform-provider-citrix/blob/main/scripts/onboarding-helper/) with the following parameters to import existing resources and create Terraform configuration files for them.
+
+- Use the `-ResourceTypes` parameter to specify just a few resource types (for example `citrix_zone`, `citrix_delivery_group`)
+- Use the `-NamesOrIds` parameter to filter for specific resources by name or ID
+
+Example:
+```powershell
+.\terraform-onboarding.ps1 CustomerId "{CustomerId}" -ClientId "{ClientId}" -ClientSecret "{ClientSecret}" -ResourceTypes "citrix_zone","citrix_delivery_group" -NamesOrIds "Primary Zone","Sales Delivery Group"
+```
+
+This incremental approach allows you to become familiar with Terraform concepts and the Citrix provider while working with a smaller, more focused set of resources.
+
+#### Manual Configuration
+Alternatively, we recommend starting by creating new `.tf` files for the core resources essential for a Citrix deployment:
+
+- [citrix_cloud_resource_location](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/cloud_resource_location) (for Citrix Cloud customers only)
+- [citrix_zone](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/zone)
+- citrix_{hosting provider}_hypervisor
+- citrix_{hosting provider}_hypervisor_resource_pool
 
 These resources are straightforward to configure and can be created or removed quickly. Begin your Terraform journey with these resources to build confidence in managing your Citrix deployment via Terraform.
 
@@ -225,25 +241,25 @@ QuickCreate service allows customers to create and manage Amazon WorkSpaces Core
 
 ### What resource is supported for different connection types?
 
-| Connection Type                         |   Hypervisor       |   Resource Pool          |  MCS Power Managed         | MCS Provisioning           |          PVS             | Manual/Remote PC     |
-|-----------------------------------------|--------------------|--------------------------|----------------------------|----------------------------|--------------------------|----------------------|
-| AzureRM                                 |:heavy_check_mark:  |:heavy_check_mark:        | :heavy_check_mark:         | :heavy_check_mark:         |:heavy_check_mark:        | :heavy_check_mark:   |
-| AWS EC2                                 |:heavy_check_mark:  |:heavy_check_mark:        | :heavy_check_mark:         | :heavy_check_mark:         |:heavy_multiplication_x:  | :heavy_check_mark:   |
-| GCP                                     |:heavy_check_mark:  |:heavy_check_mark:        | :heavy_check_mark:         | :heavy_check_mark:         |:heavy_multiplication_x:  | :heavy_check_mark:   |
-| vSphere                                 |:heavy_check_mark:  |:heavy_check_mark:        | :heavy_check_mark:         | :heavy_check_mark:         |:heavy_multiplication_x:  | :heavy_check_mark:   |
-| XenServer                               |:heavy_check_mark:  |:heavy_check_mark:        | :heavy_check_mark:         | :heavy_check_mark:         |:heavy_multiplication_x:  | :heavy_check_mark:   |
-| Nutanix                                 |:heavy_check_mark:  |:heavy_check_mark:        | :heavy_check_mark:         | :heavy_check_mark:         |:heavy_multiplication_x:  | :heavy_check_mark:   |
-| SCVMM                                   |:heavy_check_mark:  |:heavy_check_mark:        | :heavy_check_mark:         | :heavy_check_mark:         |:heavy_multiplication_x:  | :heavy_check_mark:   |
-| Red Hat OpenShift (**Techpreview**)     |:heavy_check_mark:  |:heavy_check_mark:        | :heavy_check_mark:         | :heavy_check_mark:         |:heavy_multiplication_x:  | :heavy_check_mark:   |
-| HPE Moonshot (**Techpreview**)          |:heavy_check_mark:  |:heavy_multiplication_x:  | :heavy_check_mark:         | :heavy_multiplication_x:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
-| Remote PC Wake On LAN (**Techpreview**) |:heavy_check_mark:  |:heavy_multiplication_x:  | :heavy_multiplication_x:   | :heavy_multiplication_x:   |:heavy_multiplication_x:  | :heavy_check_mark:   |
+| Connection Type                         |   Hypervisor       |   Resource Pool    |  MCS Power Managed | MCS Provisioning   |         PVS        | Manual/Remote PC     |
+|-----------------------------------------|--------------------|--------------------|--------------------|--------------------|--------------------|----------------------|
+| AzureRM                                 |:heavy_check_mark:  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:   |
+| AWS EC2                                 |:heavy_check_mark:  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | N/A                | :heavy_check_mark:   |
+| GCP                                     |:heavy_check_mark:  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | N/A                | :heavy_check_mark:   |
+| vSphere                                 |:heavy_check_mark:  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | N/A                | :heavy_check_mark:   |
+| XenServer                               |:heavy_check_mark:  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | N/A                | :heavy_check_mark:   |
+| Nutanix                                 |:heavy_check_mark:  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | N/A                | :heavy_check_mark:   |
+| SCVMM                                   |:heavy_check_mark:  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | N/A                | :heavy_check_mark:   |
+| Red Hat OpenShift (**Techpreview**)     |:heavy_check_mark:  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | N/A                | :heavy_check_mark:   |
+| HPE Moonshot (**Techpreview**)          |:heavy_check_mark:  | N/A                | :heavy_check_mark: | N/A                | N/A                | :heavy_check_mark:   |
+| Remote PC Wake On LAN (**Techpreview**) |:heavy_check_mark:  | N/A                | N/A                | N/A                | N/A                | :heavy_check_mark:   |
 
 ### What URLs should be whitelisted in order to use the Citrix Terraform provider?
 - URLs of the Citrix admin consoles: please visit [this documentation](https://docs.citrix.com/en-us/citrix-cloud/overview/requirements/internet-connectivity-requirements.html) for more information.
 - URL of the HashiCorp Terraform registry: https://registry.terraform.io or a private registry.
 
 ### How do I get the ID to import a DaaS resource?
-The [Onboarding Script](scripts/onboarding-helper/) will discover all resource IDs and import them into a local terraform state file. You can then run `terraform state show` to inspect the state and discover the IDs.
+The [Object IDs Helper Script](https://github.com/citrix/terraform-provider-citrix/blob/main/scripts/object-ids-helper/) will discover all resource IDs and save them to a JSON file for easy reference.
 
 Alternatively the IDs can be found in Web Studio by looking at the network traces. Open your browser developer tools (usually F12) and navigate to the `Network` tab. Refresh Web Studio and click on the resource you want to find the ID for. There should be 2 corresponding network calls (`OPTIONS` then `GET`) for the resource which includes the ID as the last path in the url before the `?` query.
 

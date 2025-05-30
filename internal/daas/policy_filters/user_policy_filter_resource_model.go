@@ -66,6 +66,12 @@ func (UserFilterModel) GetAttributes() map[string]schema.Attribute {
 	return UserFilterModel{}.GetSchema().Attributes
 }
 
+func (UserFilterModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{
+		"sid": true,
+	}
+}
+
 func (filter UserFilterModel) GetId() string {
 	return filter.Id.ValueString()
 }

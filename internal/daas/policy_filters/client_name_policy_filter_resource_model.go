@@ -66,6 +66,12 @@ func (ClientNameFilterModel) GetAttributes() map[string]schema.Attribute {
 	return ClientNameFilterModel{}.GetSchema().Attributes
 }
 
+func (ClientNameFilterModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{
+		"client_name": true,
+	}
+}
+
 func (filter ClientNameFilterModel) GetId() string {
 	return filter.Id.ValueString()
 }

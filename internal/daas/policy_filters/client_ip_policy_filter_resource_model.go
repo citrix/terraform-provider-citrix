@@ -70,6 +70,10 @@ func (ClientIPFilterModel) GetAttributes() map[string]schema.Attribute {
 	return ClientIPFilterModel{}.GetSchema().Attributes
 }
 
+func (ClientIPFilterModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (filter ClientIPFilterModel) GetId() string {
 	return filter.Id.ValueString()
 }

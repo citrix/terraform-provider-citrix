@@ -158,6 +158,12 @@ func (ApplicationGroupResourceModel) GetSchema() schema.Schema {
 	}
 }
 
+func (ApplicationGroupResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{
+		"included_users": true,
+	}
+}
+
 func (ApplicationGroupResourceModel) GetAttributes() map[string]schema.Attribute {
 	return ApplicationGroupResourceModel{}.GetSchema().Attributes
 }

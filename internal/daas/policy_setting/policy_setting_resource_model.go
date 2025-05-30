@@ -85,6 +85,10 @@ func (PolicySettingModel) GetAttributes() map[string]schema.Attribute {
 	return PolicySettingModel{}.GetSchema().Attributes
 }
 
+func (PolicySettingModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func buildSettingRequest(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policySetting PolicySettingModel, action string) (citrixorchestration.SettingRequest, error) {
 	settingRequest := citrixorchestration.SettingRequest{}
 	defaultBoolSettingValueMap, err := policies.GetGpoBooleanSettingDefaultValueMap(ctx, diagnostics, client)

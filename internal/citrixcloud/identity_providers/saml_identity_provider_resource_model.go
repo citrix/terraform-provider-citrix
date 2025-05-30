@@ -109,6 +109,10 @@ func (SamlAttributeNameMappings) GetAttributes() map[string]schema.Attribute {
 	return SamlAttributeNameMappings{}.GetSchema().Attributes
 }
 
+func (SamlIdentityProviderModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 type SamlIdentityProviderModel struct {
 	Id             types.String `tfsdk:"id"`
 	Name           types.String `tfsdk:"name"`

@@ -103,3 +103,7 @@ func (STFAuthenticationServiceResourceModel) GetSchema() schema.Schema {
 func (STFAuthenticationServiceResourceModel) GetAttributes() map[string]schema.Attribute {
 	return STFAuthenticationServiceResourceModel{}.GetSchema().Attributes
 }
+
+func (STFAuthenticationServiceResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}

@@ -64,6 +64,13 @@ func (PolicySettingModel) GetAttributes() map[string]schema.Attribute {
 	return PolicySettingModel{}.GetSchema().Attributes
 }
 
+func (PolicySetModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{
+		"client_name": true,
+		"sid":         true,
+	}
+}
+
 type PolicyModel struct {
 	Id                       types.String `tfsdk:"id"`
 	Name                     types.String `tfsdk:"name"`

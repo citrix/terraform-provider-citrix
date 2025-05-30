@@ -366,6 +366,10 @@ func (STFDeploymentResourceModel) GetAttributes() map[string]schema.Attribute {
 	return STFDeploymentResourceModel{}.GetSchema().Attributes
 }
 
+func (STFDeploymentResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r *STFDeploymentResourceModel) RefreshRoamingBeacon(ctx context.Context, diagnostics *diag.Diagnostics, roamInt *citrixstorefront.GetSTFRoamingInternalBeaconResponseModel, roamExt *citrixstorefront.GetSTFRoamingExternalBeaconResponseModel) {
 	refreshedRoamingBeacon := util.ObjectValueToTypedObject[RoamingBeacon](ctx, diagnostics, r.RoamingBeacon)
 	if roamInt.Internal[len(roamInt.Internal)-1:] != "/" {

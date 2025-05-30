@@ -141,6 +141,12 @@ func (ServiceAccountModel) GetAttributes() map[string]schema.Attribute {
 	return ServiceAccountModel{}.GetSchema().Attributes
 }
 
+func (ServiceAccountModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{
+		"account_id": true,
+	}
+}
+
 func (r ServiceAccountModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, serviceAccountModel *citrixorchestration.ServiceAccountResponseModel) ServiceAccountModel {
 	r.Id = types.StringValue(serviceAccountModel.GetServiceAccountUid())
 	if !strings.EqualFold(r.DisplayName.ValueString(), serviceAccountModel.GetDisplayName()) {

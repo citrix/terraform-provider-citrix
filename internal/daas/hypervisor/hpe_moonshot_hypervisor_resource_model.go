@@ -171,6 +171,12 @@ func (HpeMoonshotHypervisorResourceModel) GetAttributes() map[string]schema.Attr
 	return HpeMoonshotHypervisorResourceModel{}.GetSchema().Attributes
 }
 
+func (HpeMoonshotHypervisorResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{
+		"username": true,
+	}
+}
+
 func (r HpeMoonshotHypervisorResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, hypervisor *citrixorchestration.HypervisorDetailResponseModel) HpeMoonshotHypervisorResourceModel {
 	r.Id = types.StringValue(hypervisor.GetId())
 	r.Name = types.StringValue(hypervisor.GetName())

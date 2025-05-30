@@ -152,6 +152,10 @@ func (AwsWorkspacesDirectoryConnectionModel) GetAttributes() map[string]schema.A
 	return AwsWorkspacesDirectoryConnectionModel{}.GetSchema().Attributes
 }
 
+func (AwsWorkspacesDirectoryConnectionModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r AwsWorkspacesDirectoryConnectionModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, isResource bool, directory *quickcreateservice.AwsEdcDirectoryConnection) AwsWorkspacesDirectoryConnectionModel {
 	r.DirectoryConnectionId = types.StringValue(directory.GetConnectionId())
 	r.Name = types.StringValue(directory.GetName())

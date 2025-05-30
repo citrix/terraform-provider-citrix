@@ -120,6 +120,10 @@ func (GcpHypervisorResourcePoolResourceModel) GetAttributes() map[string]schema.
 	return GcpHypervisorResourcePoolResourceModel{}.GetSchema().Attributes
 }
 
+func (GcpHypervisorResourcePoolResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r GcpHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) GcpHypervisorResourcePoolResourceModel {
 
 	r.Id = types.StringValue(resourcePool.GetId())

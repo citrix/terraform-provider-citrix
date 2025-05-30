@@ -1380,6 +1380,14 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 	}
 }
 
+func (DeliveryGroupResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{
+		"allow_list": true,
+		"block_list": true,
+		"users":      true,
+	}
+}
+
 func (DeliveryGroupResourceModel) GetAttributes() map[string]schema.Attribute {
 	return DeliveryGroupResourceModel{}.GetSchema().Attributes
 }

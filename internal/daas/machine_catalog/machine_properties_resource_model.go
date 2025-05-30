@@ -67,6 +67,10 @@ func (MachinePropertiesModel) GetAttributes() map[string]schema.Attribute {
 	return MachinePropertiesModel{}.GetSchema().Attributes
 }
 
+func (MachinePropertiesModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r MachinePropertiesModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, machine *citrixorchestration.MachineDetailResponseModel, tagIds []string) MachinePropertiesModel {
 	machineName := strings.ToLower(machine.GetName())
 	r.Name = types.StringValue(machineName)

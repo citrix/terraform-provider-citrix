@@ -141,6 +141,10 @@ func (CitrixManagedAzureImageResourceModel) GetAttributes() map[string]schema.At
 	return CitrixManagedAzureImageResourceModel{}.GetSchema().Attributes
 }
 
+func (CitrixManagedAzureImageResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r CitrixManagedAzureImageResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, isResource bool, image *catalogservice.TemplateImageDetails, region *catalogservice.DeploymentRegionModel) CitrixManagedAzureImageResourceModel {
 	r.Id = types.StringValue(image.GetId())
 	r.Name = types.StringValue(image.GetName())

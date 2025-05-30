@@ -93,6 +93,10 @@ func (PolicySetV2Model) GetAttributes() map[string]schema.Attribute {
 	return PolicySetV2Model{}.GetSchema().Attributes
 }
 
+func (PolicySetV2Model) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
+}
+
 func (r PolicySetV2Model) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, isDefaultPolicySet bool, policySet *citrixorchestration.PolicySetResponse, policySetScopes []string, deliveryGroups []citrixorchestration.DeliveryGroupResponseModel) PolicySetV2Model {
 	// Set required values
 	r.Id = types.StringValue(policySet.GetPolicySetGuid())
