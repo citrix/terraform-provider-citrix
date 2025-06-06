@@ -68,12 +68,23 @@ func getRemotePcEnrollmentScopes(ctx context.Context, diagnostics *diag.Diagnost
 	return remotePCEnrollmentScopes, nil
 }
 
-func (r MachineCatalogResourceModel) updateCatalogWithRemotePcConfig(ctx context.Context, diagnostics *diag.Diagnostics, catalog *citrixorchestration.MachineCatalogDetailResponseModel) MachineCatalogResourceModel {
+func (r MachineCatalogResourceModel) updateCatalogWithRemotePcConfig(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, catalog *citrixorchestration.MachineCatalogDetailResponseModel) MachineCatalogResourceModel {
 	if catalog.GetProvisioningType() == citrixorchestration.PROVISIONINGTYPE_MANUAL {
 		r.IsRemotePc = types.BoolValue(catalog.GetIsRemotePC())
 	} else {
 		r.IsRemotePc = types.BoolNull()
 	}
+	if r.IsRemotePc.ValueBool() && r.IsPowerManaged.ValueBool() {
+		// If the catalog is Remote PC and power management is enabled, then its a Remote PC Wake-On-LAN catalog.
+		hypervisor := catalog.GetHypervisorConnection()
+		hypervisorName := hypervisor.GetName()
+		hyp, err := util.GetHypervisor(ctx, client, diagnostics, hypervisorName)
+		if err != nil {
+			return r
+		}
+		r.RemotePcPowerManagementHypervisor = types.StringValue(hyp.GetId())
+	}
+
 	rpcOUs := util.RefreshListValueProperties[RemotePcOuModel, citrixorchestration.RemotePCEnrollmentScopeResponseModel](ctx, diagnostics, r.RemotePcOus, catalog.GetRemotePCEnrollmentScopes(), util.GetOrchestrationRemotePcOuKey)
 	r.RemotePcOus = rpcOUs
 	return r

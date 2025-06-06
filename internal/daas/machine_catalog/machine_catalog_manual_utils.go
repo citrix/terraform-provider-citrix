@@ -385,8 +385,10 @@ func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Conte
 				hostedMachineName := hosting.GetHostedMachineName()
 
 				if !strings.EqualFold(hypervisorId, machineAccount.Hypervisor.ValueString()) {
-					machinesNotPresetInRemote[strings.ToLower(machineFromPlanName)] = true
-					continue
+					if !r.IsRemotePc.ValueBool() || !r.IsPowerManaged.ValueBool() || !strings.EqualFold(hypervisorId, r.RemotePcPowerManagementHypervisor.ValueString()) {
+						machinesNotPresetInRemote[strings.ToLower(machineFromPlanName)] = true
+						continue
+					}
 				}
 
 				if hypervisorId == "" {
@@ -459,7 +461,7 @@ func (r MachineCatalogResourceModel) updateCatalogWithMachines(ctx context.Conte
 						}
 					}
 				case citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM:
-					if (hyp.GetPluginId() == util.NUTANIX_PLUGIN_ID || hyp.GetPluginId() == util.HPE_MOONSHOT_PLUGIN_ID) && hostedMachineName != "" {
+					if (hyp.GetPluginId() == util.NUTANIX_PLUGIN_ID || hyp.GetPluginId() == util.HPE_MOONSHOT_PLUGIN_ID || hyp.GetPluginId() == util.REMOTE_PC_WAKE_ON_LAN_PLUGIN_ID) && hostedMachineName != "" {
 						if !strings.EqualFold(machineFromPlan.MachineName.ValueString(), hostedMachineName) {
 							machineFromPlan.MachineName = types.StringValue(hostedMachineName)
 						}

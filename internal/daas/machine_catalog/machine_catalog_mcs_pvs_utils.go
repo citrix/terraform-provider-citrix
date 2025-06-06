@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -728,19 +729,52 @@ func deleteMachinesFromMcsPvsCatalog(ctx context.Context, client *citrixdaasclie
 	machineDeleteRequestCount := int(catalog.GetTotalCount()) - int(provisioningSchemePlan.NumTotalMachines.ValueInt64())
 	machinesToDelete := []citrixorchestration.MachineResponseModel{}
 
-	for _, machine := range getMachinesResponses {
+	type prioritizedMachine struct {
+		machine  citrixorchestration.MachineResponseModel
+		priority int
+	}
 
+	var prioritizedCandidates []prioritizedMachine
+
+	for _, machine := range getMachinesResponses {
 		if machine.GetAllocationType() == citrixorchestration.ALLOCATIONTYPE_STATIC && len(machine.GetAssignedUsers()) > 0 {
 			continue
 		}
+		// Initialize priority for the current machine.
+		// The priority is used to determine the order in which machines should be deleted.
+		priority := 0
 
-		if !machine.GetDeliveryGroup().Id.IsSet() || machine.GetSessionCount() == 0 {
-			machinesToDelete = append(machinesToDelete, machine)
+		// Priority 1: Machine has no delivery group associated. This is the highest priority for deletion.
+		if !machine.GetDeliveryGroup().Id.IsSet() {
+			priority = 1
+		} else if machine.GetInMaintenanceMode() == true {
+			// Priority 2: Machine is currently in maintenance mode.
+			priority = 2
+		} else if machine.GetSessionCount() == 0 {
+			// Priority 3: Machine has zero active sessions.
+			priority = 3
 		}
 
+		// If the machine is eligible for deletion (i.e., has been assigned a priority),
+		// add it to our list of candidates.
+		if priority > 0 {
+			prioritizedCandidates = append(prioritizedCandidates, prioritizedMachine{
+				machine:  machine,
+				priority: priority,
+			})
+		}
+	}
+
+	// Sort the collected candidates by their assigned priority in ascending order.
+	sort.SliceStable(prioritizedCandidates, func(i, j int) bool {
+		return prioritizedCandidates[i].priority < prioritizedCandidates[j].priority
+	})
+
+	for _, candidate := range prioritizedCandidates {
 		if len(machinesToDelete) == machineDeleteRequestCount {
 			break
 		}
+		machinesToDelete = append(machinesToDelete, candidate.machine)
 	}
 
 	machinesToDeleteCount := len(machinesToDelete)
@@ -1568,7 +1602,7 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Con
 
 	// Identity Pool Properties
 	if provScheme.MachineAccountCreationRules != nil {
-		machineAccountCreationRulesModel := MachineAccountCreationRulesModel{}
+		machineAccountCreationRulesModel := util.ObjectValueToTypedObject[MachineAccountCreationRulesModel](ctx, diagnostics, provSchemeModel.MachineAccountCreationRules)
 		machineAccountCreationRulesModel.NamingScheme = types.StringValue(machineAccountCreateRules.GetNamingScheme())
 		namingSchemeType := machineAccountCreateRules.GetNamingSchemeType()
 		machineAccountCreationRulesModel.NamingSchemeType = types.StringValue(string(namingSchemeType))

@@ -42,31 +42,32 @@ func (MachineCatalogResourceModel) GetAttributesNamesToMask() map[string]bool {
 
 // MachineCatalogResourceModel maps the resource schema data.
 type MachineCatalogResourceModel struct {
-	Id                       types.String `tfsdk:"id"`
-	Name                     types.String `tfsdk:"name"`
-	Description              types.String `tfsdk:"description"`
-	IsPowerManaged           types.Bool   `tfsdk:"is_power_managed"`
-	IsRemotePc               types.Bool   `tfsdk:"is_remote_pc"`
-	PersistUserChanges       types.String `tfsdk:"persist_user_changes"`
-	AllocationType           types.String `tfsdk:"allocation_type"`
-	SessionSupport           types.String `tfsdk:"session_support"`
-	Zone                     types.String `tfsdk:"zone"`
-	VdaUpgradeType           types.String `tfsdk:"vda_upgrade_type"`
-	ProvisioningType         types.String `tfsdk:"provisioning_type"`
-	ProvisioningScheme       types.Object `tfsdk:"provisioning_scheme"` // ProvisioningSchemeModel
-	MachineAccounts          types.List   `tfsdk:"machine_accounts"`    // List[MachineAccountsModel]
-	RemotePcOus              types.List   `tfsdk:"remote_pc_ous"`       // List[RemotePcOuModel]
-	MinimumFunctionalLevel   types.String `tfsdk:"minimum_functional_level"`
-	Scopes                   types.Set    `tfsdk:"scopes"`           //Set[String]
-	BuiltInScopes            types.Set    `tfsdk:"built_in_scopes"`  //Set[String]
-	InheritedScopes          types.Set    `tfsdk:"inherited_scopes"` //Set[String]
-	MachineCatalogFolderPath types.String `tfsdk:"machine_catalog_folder_path"`
-	Tenants                  types.Set    `tfsdk:"tenants"`  // Set[String]
-	Metadata                 types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
-	Tags                     types.Set    `tfsdk:"tags"`     // Set[String]
-	DeleteVirtualMachines    types.Bool   `tfsdk:"delete_virtual_machines"`
-	DeleteMachineAccounts    types.String `tfsdk:"delete_machine_accounts"`
-	Timeout                  types.Object `tfsdk:"timeout"` // MachineCatalogTimeout
+	Id                                types.String `tfsdk:"id"`
+	Name                              types.String `tfsdk:"name"`
+	Description                       types.String `tfsdk:"description"`
+	IsPowerManaged                    types.Bool   `tfsdk:"is_power_managed"`
+	IsRemotePc                        types.Bool   `tfsdk:"is_remote_pc"`
+	RemotePcPowerManagementHypervisor types.String `tfsdk:"remote_pc_power_management_hypervisor"`
+	PersistUserChanges                types.String `tfsdk:"persist_user_changes"`
+	AllocationType                    types.String `tfsdk:"allocation_type"`
+	SessionSupport                    types.String `tfsdk:"session_support"`
+	Zone                              types.String `tfsdk:"zone"`
+	VdaUpgradeType                    types.String `tfsdk:"vda_upgrade_type"`
+	ProvisioningType                  types.String `tfsdk:"provisioning_type"`
+	ProvisioningScheme                types.Object `tfsdk:"provisioning_scheme"` // ProvisioningSchemeModel
+	MachineAccounts                   types.List   `tfsdk:"machine_accounts"`    // List[MachineAccountsModel]
+	RemotePcOus                       types.List   `tfsdk:"remote_pc_ous"`       // List[RemotePcOuModel]
+	MinimumFunctionalLevel            types.String `tfsdk:"minimum_functional_level"`
+	Scopes                            types.Set    `tfsdk:"scopes"`           //Set[String]
+	BuiltInScopes                     types.Set    `tfsdk:"built_in_scopes"`  //Set[String]
+	InheritedScopes                   types.Set    `tfsdk:"inherited_scopes"` //Set[String]
+	MachineCatalogFolderPath          types.String `tfsdk:"machine_catalog_folder_path"`
+	Tenants                           types.Set    `tfsdk:"tenants"`  // Set[String]
+	Metadata                          types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
+	Tags                              types.Set    `tfsdk:"tags"`     // Set[String]
+	DeleteVirtualMachines             types.Bool   `tfsdk:"delete_virtual_machines"`
+	DeleteMachineAccounts             types.String `tfsdk:"delete_machine_accounts"`
+	Timeout                           types.Object `tfsdk:"timeout"` // MachineCatalogTimeout
 }
 
 type MachineAccountsModel struct {
@@ -224,7 +225,8 @@ func (ProvisioningSchemeModel) GetSchema() schema.SingleNestedAttribute {
 			"machine_domain_identity":  MachineDomainIdentityModel{}.GetSchema(),
 			"number_of_total_machines": schema.Int64Attribute{
 				Description: "Number of VDA machines allocated in the catalog." +
-					"\n\n~> **Please Note** When deleting machines, ensure machines that need to be deleted have no active sessions. For machines with `Static` allocation type, also ensure there are no assigned users. If machines that qualify for deletion are more than the requested number of machines to delete, machines are chosen arbitrarily.",
+					"\n\n~> **Please Note** When deleting machines, ensure machines that need to be deleted have no active sessions. For machines with `Static` allocation type, also ensure there are no assigned users." +
+					"<br /><br />If machines that qualify for deletion are more than the requested number of machines to delete, machines are chosen in the following sequence of priority.<br />1. Machines with no associated Delivery Groups.<br />2. Machines in Maintenance Mode.<br />3. Machines with no active sessions.",
 				Required: true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(0),
@@ -449,6 +451,10 @@ func (MachineAccountCreationRulesModel) GetAttributes() map[string]schema.Attrib
 	return MachineAccountCreationRulesModel{}.GetSchema().Attributes
 }
 
+func (a MachineAccountCreationRulesModel) Equals(b MachineAccountCreationRulesModel) bool {
+	return types.String.Equal(a.NamingScheme, b.NamingScheme) && types.String.Equal(a.NamingSchemeType, b.NamingSchemeType) && types.String.Equal(a.StartsWith, b.StartsWith)
+}
+
 var _ util.RefreshableListItemWithAttributes[citrixorchestration.ProvisioningSchemeMachineAccountResponseModel] = MachineADAccountModel{}
 
 type MachineADAccountModel struct {
@@ -601,6 +607,10 @@ func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.RequiresReplace(),
 				},
+			},
+			"remote_pc_power_management_hypervisor": schema.StringAttribute{
+				Description: "The Id of the remote PC Wake on LAN hypervisor connection. Required only if `is_power_managed = true` and `is_remote_pc = true`.",
+				Optional:    true,
 			},
 			"allocation_type": schema.StringAttribute{
 				Description: "Denotes how the machines in the catalog are allocated to a user. Choose between `Static` and `Random`. Allocation type should be `Random` when `session_support = MultiSession`.",
@@ -834,7 +844,7 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 		r = r.updateCatalogWithMachines(ctx, diagnostics, client, machines)
 	}
 
-	r = r.updateCatalogWithRemotePcConfig(ctx, diagnostics, catalog)
+	r = r.updateCatalogWithRemotePcConfig(ctx, diagnostics, client, catalog)
 
 	hypervisorConnection := catalog.GetHypervisorConnection()
 	parentList := []string{
