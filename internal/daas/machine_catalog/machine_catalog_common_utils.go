@@ -122,6 +122,10 @@ func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ct
 			return nil, err
 		}
 		body.SetRemotePCEnrollmentScopes(remotePCEnrollmentScopes)
+		if plan.IsPowerManaged.ValueBool() {
+			body.SetHypervisorConnection(plan.RemotePcPowerManagementHypervisor.ValueString())
+			body.SetMachineType(citrixorchestration.MACHINETYPE_PHYSICAL)
+		}
 	} else {
 		machinesRequest, httpResp, err = getMachinesForManualCatalogs(ctx, diagnostics, client, util.ObjectListToTypedArray[MachineAccountsModel](ctx, diagnostics, plan.MachineAccounts))
 		if err != nil {

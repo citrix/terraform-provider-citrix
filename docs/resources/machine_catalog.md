@@ -543,6 +543,28 @@ resource "citrix_machine_catalog" "example-remote-pc" {
     ]
 }
 
+resource "citrix_machine_catalog" "example-remote-pc-wake-on-lan" {
+    name                        = "example-remote-pc-wake-on-lan-catalog"
+    description                 = "Example Remote PC catalog with Wake on LAN"
+    zone                        = "<zone Id>"
+    allocation_type             = "Static"
+    session_support             = "SingleSession"
+    is_power_managed            = true
+    is_remote_pc                = true
+    remote_pc_power_management_hypervisor = citrix_remote_pc_wake_on_lan_hypervisor.example-remotepc-wakeonlan-hypervisor.id
+    provisioning_type           = "Manual"
+    machine_accounts = [
+        {
+            machines = [
+                {
+                    machine_account = "DOMAIN\\MachineName1"
+                    machine_name  = "MachineName1"
+                }
+            ]
+        }
+    ]
+}
+
 resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
 	name                		= "example-non-domain-joined-azure-mcs"
 	description					= "Example catalog on Azure without domain join"
@@ -623,6 +645,7 @@ resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
 - `persist_user_changes` (String) Specify if user changes are persisted on the machines in the machine catalog. Choose between `Discard` and `OnLocal`. Defaults to OnLocal for manual or non-PVS single session static catalogs, Discard otherwise.
 - `provisioning_scheme` (Attributes) Machine catalog provisioning scheme. Required when `provisioning_type = MCS` or `provisioning_type = PVS_STREAMING`. (see [below for nested schema](#nestedatt--provisioning_scheme))
 - `remote_pc_ous` (Attributes List) Organizational Units to be included in the Remote PC machine catalog. Only to be used when `is_remote_pc = true`. For adding machines, use `machine_accounts`. (see [below for nested schema](#nestedatt--remote_pc_ous))
+- `remote_pc_power_management_hypervisor` (String) The Id of the remote PC Wake on LAN hypervisor connection. Required only if `is_power_managed = true` and `is_remote_pc = true`.
 - `scopes` (Set of String) The IDs of the scopes for the machine catalog to be a part of.
 - `tags` (Set of String) A set of identifiers of tags to associate with the machine catalog.
 - `timeout` (Attributes) Timeout in minutes for the long-running jobs in machine catalog resource's create, update, delete operation(s). (see [below for nested schema](#nestedatt--timeout))
@@ -688,7 +711,7 @@ Required:
 - `identity_type` (String) The identity type of the machines to be created. Supported values are `ActiveDirectory`, `AzureAD`, and `HybridAzureAD`.
 - `number_of_total_machines` (Number) Number of VDA machines allocated in the catalog.
 
-~> **Please Note** When deleting machines, ensure machines that need to be deleted have no active sessions. For machines with `Static` allocation type, also ensure there are no assigned users. If machines that qualify for deletion are more than the requested number of machines to delete, machines are chosen arbitrarily.
+~> **Please Note** When deleting machines, ensure machines that need to be deleted have no active sessions. For machines with `Static` allocation type, also ensure there are no assigned users.<br /><br />If machines that qualify for deletion are more than the requested number of machines to delete, machines are chosen in the following sequence of priority.<br />1. Machines with no associated Delivery Groups.<br />2. Machines in Maintenance Mode.<br />3. Machines with no active sessions.
 
 Optional:
 

@@ -131,7 +131,7 @@ func (r *remotePCWakeOnLANHypervisorResource) Read(ctx context.Context, req reso
 	}
 
 	// check if the hypervisor is of type Remote PC Wake On LAN
-	if hypervisor.GetConnectionType() != citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM || hypervisor.GetPluginId() != util.REMOTE_PC_WAKE_ON_LAN_PLUGIN_ID {
+	if hypervisor.GetPluginId() != util.REMOTE_PC_WAKE_ON_LAN_PLUGIN_ID {
 		resp.Diagnostics.AddError(
 			"Error reading Hypervisor",
 			"Hypervisor "+hypervisor.GetName()+" is not a Remote PC Wake On LAN connection type hypervisor.",

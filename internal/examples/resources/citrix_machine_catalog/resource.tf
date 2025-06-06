@@ -525,6 +525,28 @@ resource "citrix_machine_catalog" "example-remote-pc" {
     ]
 }
 
+resource "citrix_machine_catalog" "example-remote-pc-wake-on-lan" {
+    name                        = "example-remote-pc-wake-on-lan-catalog"
+    description                 = "Example Remote PC catalog with Wake on LAN"
+    zone                        = "<zone Id>"
+    allocation_type             = "Static"
+    session_support             = "SingleSession"
+    is_power_managed            = true
+    is_remote_pc                = true
+    remote_pc_power_management_hypervisor = citrix_remote_pc_wake_on_lan_hypervisor.example-remotepc-wakeonlan-hypervisor.id
+    provisioning_type           = "Manual"
+    machine_accounts = [
+        {
+            machines = [
+                {
+                    machine_account = "DOMAIN\\MachineName1"
+                    machine_name  = "MachineName1"
+                }
+            ]
+        }
+    ]
+}
+
 resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
 	name                		= "example-non-domain-joined-azure-mcs"
 	description					= "Example catalog on Azure without domain join"

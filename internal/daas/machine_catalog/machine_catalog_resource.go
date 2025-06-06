@@ -145,11 +145,15 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 	}
 
 	hypervisorConnection := catalog.GetHypervisorConnection()
-	hypervisorId := hypervisorConnection.GetId()
+	hypervisorNameOrId := hypervisorConnection.GetId()
+	// If hypervisor ID is not set, use the hypervisor name
+	if hypervisorNameOrId == "" {
+		hypervisorNameOrId = hypervisorConnection.GetName()
+	}
 	var connectionType citrixorchestration.HypervisorConnectionType
 	var pluginId string
-	if hypervisorId != "" {
-		hypervisor, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, hypervisorId)
+	if hypervisorNameOrId != "" {
+		hypervisor, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, hypervisorNameOrId)
 		if err != nil {
 			return
 		}
@@ -348,17 +352,30 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		addMachinesToManualCatalog(ctx, &resp.Diagnostics, r.client, resp, addMachinesList, catalogId)
 		deleteMachinesFromManualCatalog(ctx, r.client, resp, deleteMachinesMap, catalogId)
 	} else {
-		provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
-		machineAccountsInPlan := util.ObjectListToTypedArray[MachineADAccountModel](ctx, &resp.Diagnostics, provSchemeModel.MachineADAccounts)
+		planProvSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
+		stateProvSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, state.ProvisioningScheme)
+
+		// During update, the MachineAccountCreationRules in the terraform config stick to the updatePlan.
+		// It uses the same StartsWith value for creating new machines which causes conflict with existing machines and throws error.
+		// In order to avoid this conflict, we set the StartsWith value to null if the MachineAccountCreationRules in plan and state are equal.
+		planRules := util.ObjectValueToTypedObject[MachineAccountCreationRulesModel](ctx, &resp.Diagnostics, planProvSchemeModel.MachineAccountCreationRules)
+		stateRules := util.ObjectValueToTypedObject[MachineAccountCreationRulesModel](ctx, &resp.Diagnostics, stateProvSchemeModel.MachineAccountCreationRules)
+
+		if stateRules.Equals(planRules) {
+			planRules.StartsWith = types.StringNull()
+			planProvSchemeModel.MachineAccountCreationRules = util.TypedObjectToObjectValue(ctx, &resp.Diagnostics, planRules)
+		}
+
+		machineAccountsInPlan := util.ObjectListToTypedArray[MachineADAccountModel](ctx, &resp.Diagnostics, planProvSchemeModel.MachineADAccounts)
 		err = updateCatalogImageAndMachineProfile(ctx, r.client, resp, catalog, plan, provisioningType, updateTimeout)
 
 		if err != nil {
 			return
 		}
 
-		if catalog.GetTotalCount() > int32(provSchemeModel.NumTotalMachines.ValueInt64()) {
+		if catalog.GetTotalCount() > int32(planProvSchemeModel.NumTotalMachines.ValueInt64()) {
 			// delete machines from machine catalog
-			err = deleteMachinesFromMcsPvsCatalog(ctx, r.client, resp, catalog, provSchemeModel, machineAccountsInPlan)
+			err = deleteMachinesFromMcsPvsCatalog(ctx, r.client, resp, catalog, planProvSchemeModel, machineAccountsInPlan)
 			if err != nil {
 				return
 			}
@@ -367,7 +384,6 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		if err != nil {
 			return
 		}
-		stateProvSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, state.ProvisioningScheme)
 		machineAccountsInState := util.ObjectListToTypedArray[MachineADAccountModel](ctx, &resp.Diagnostics, stateProvSchemeModel.MachineADAccounts)
 
 		machineAccountsToAdd := []MachineADAccountModel{}
@@ -400,7 +416,7 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 
 		// Remove Machine Accounts from Catalog here
 		if len(machineAccountsToDelete) > 0 {
-			batchApiHeaders, httpResp, err := generateBatchApiHeaders(ctx, &resp.Diagnostics, r.client, provSchemeModel, true)
+			batchApiHeaders, httpResp, err := generateBatchApiHeaders(ctx, &resp.Diagnostics, r.client, planProvSchemeModel, true)
 			txId := citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
 			if err != nil {
 				resp.Diagnostics.AddError(
@@ -446,7 +462,7 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		}
 
 		if len(machineAccountsToUpdate) > 0 {
-			batchApiHeaders, httpResp, err := generateBatchApiHeaders(ctx, &resp.Diagnostics, r.client, provSchemeModel, true)
+			batchApiHeaders, httpResp, err := generateBatchApiHeaders(ctx, &resp.Diagnostics, r.client, planProvSchemeModel, true)
 			txId := citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
 			if err != nil {
 				resp.Diagnostics.AddError(
@@ -519,7 +535,7 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 
 		// Add new Machine Accounts to Catalog. Accounts to be add will be passed to the addMachinesToMcsPvsCatalog function
 		if len(machineAccountsToAdd) > 0 {
-			batchApiHeaders, httpResp, err := generateBatchApiHeaders(ctx, &resp.Diagnostics, r.client, provSchemeModel, true)
+			batchApiHeaders, httpResp, err := generateBatchApiHeaders(ctx, &resp.Diagnostics, r.client, planProvSchemeModel, true)
 			txId := citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
 			if err != nil {
 				resp.Diagnostics.AddError(
@@ -578,9 +594,9 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 			}
 		}
 
-		if catalog.GetTotalCount() < int32(provSchemeModel.NumTotalMachines.ValueInt64()) {
+		if catalog.GetTotalCount() < int32(planProvSchemeModel.NumTotalMachines.ValueInt64()) {
 			// add machines to machine catalog
-			err = addMachinesToMcsPvsCatalog(ctx, r.client, resp, catalog, provSchemeModel)
+			err = addMachinesToMcsPvsCatalog(ctx, r.client, resp, catalog, planProvSchemeModel)
 			if err != nil {
 				return
 			}
@@ -1247,7 +1263,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 			)
 		}
 
-	} else if data.ProvisioningType.ValueString() == provisioningTypeManual {
+	} else if data.ProvisioningType.ValueString() == provisioningTypeManual && data.RemotePcPowerManagementHypervisor.IsNull() {
 		// Manual provisioning type
 		if !data.IsPowerManaged.IsUnknown() && data.IsPowerManaged.IsNull() {
 			resp.Diagnostics.AddAttributeError(
@@ -1304,6 +1320,46 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 					"Incorrect Attribute Configuration",
 					"Remote PC Access catalog cannot be power managed.",
 				)
+			}
+		}
+	} else if data.ProvisioningType.ValueString() == provisioningTypeManual && !data.RemotePcPowerManagementHypervisor.IsNull() {
+		if data.IsRemotePc.IsNull() || !data.IsRemotePc.ValueBool() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("is_remote_pc"),
+				"Incorrect Attribute Configuration",
+				"Wake on LAN hypervisor cannot be configured when is_remote_pc is not set to true.",
+			)
+		}
+
+		if data.IsPowerManaged.IsNull() || !data.IsPowerManaged.ValueBool() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("is_power_managed"),
+				"Incorrect Attribute Configuration",
+				"Wake on LAN hypervisor cannot be configured when is_power_managed is not set to true.",
+			)
+		}
+
+		if !data.MachineAccounts.IsNull() {
+			machineAccounts := util.ObjectListToTypedArray[MachineAccountsModel](ctx, &resp.Diagnostics, data.MachineAccounts)
+			for _, machineAccount := range machineAccounts {
+				if !machineAccount.Hypervisor.IsUnknown() && !machineAccount.Hypervisor.IsNull() {
+					resp.Diagnostics.AddAttributeError(
+						path.Root("machine_accounts"),
+						"Incorrect Attribute Configuration",
+						"Hypervisor cannot be configured when machines are power managed by Remote PC Wake on LAN connection.",
+					)
+				}
+
+				machines := util.ObjectListToTypedArray[MachineCatalogMachineModel](ctx, &resp.Diagnostics, machineAccount.Machines)
+				for _, machine := range machines {
+					if !machine.MachineName.IsUnknown() && machine.MachineName.IsNull() {
+						resp.Diagnostics.AddAttributeError(
+							path.Root("machine_accounts"),
+							"Missing Attribute Configuration",
+							"Expected machine_name to be configured when machines are power managed.",
+						)
+					}
+				}
 			}
 		}
 	}
