@@ -463,6 +463,8 @@ Required:
 
 - `published_name` (String) A display name for the desktop.
 
+~> **Please Note** When `published_name` of the desktop changes, the desktop will be recreated, which could prevent disconnected sessions to the previous desktop from being resumed.
+
 Optional:
 
 - `description` (String) A description for the published desktop. The name and description are shown in Citrix Workspace app.
@@ -476,6 +478,12 @@ Optional:
 ~> **Please Note** If `restricted_access_users` attribute is omitted or set to `null`, all authenticated users will have access to this Desktop. If attribute is specified as an empty object i.e. `{}`, then no user will have access to the desktop because `allow_list` and `block_list` will be set as empty sets by default.
 
 ~> **Please Note** For Remote PC Delivery Groups desktops, `restricted_access_users` has to be set. (see [below for nested schema](#nestedatt--desktops--restricted_access_users))
+
+Read-Only:
+
+- `id` (String) GUID identifier of the desktop. 
+
+~> **Please Note** When ID of the desktop shows up as `Known after apply` in plan, it means that the desktop will be recreated when applied. Recreating desktop will result in a new `EntitlementPolicyRuleUid` being generated for the desktop, which could prevent disconnected sessions to the previous desktop from being resumed.
 
 <a id="nestedatt--desktops--restricted_access_users"></a>
 ### Nested Schema for `desktops.restricted_access_users`

@@ -14,6 +14,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -646,10 +647,17 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	var state DeliveryGroupResourceModel
 
 	operation := "updating"
 	if create {
 		operation = "creating"
+	} else {
+		diags := req.State.Get(ctx, &state)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 
 	if r.client.AuthConfig.OnPremises && !plan.DefaultDesktopIcon.IsNull() && plan.DefaultDesktopIcon.ValueString() != "1" {
@@ -822,6 +830,31 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 				"Error "+operation+" Delivery Group "+plan.Name.ValueString(),
 				"Error message: "+errMsg,
 			)
+			return
+		}
+	}
+
+	if operation == "updating" && len(desktops) > 0 {
+		existingDesktops := util.ObjectListToTypedArray[DeliveryGroupDesktop](ctx, &resp.Diagnostics, state.Desktops)
+
+		desktopIdMap := map[string]string{}
+		for _, existingDesktop := range existingDesktops {
+			desktopIdMap[strings.ToLower(existingDesktop.PublishedName.ValueString())] = existingDesktop.Id.ValueString()
+		}
+
+		updatedDesktops := []DeliveryGroupDesktop{}
+		for _, desktop := range desktops {
+			if existingId, exists := desktopIdMap[strings.ToLower(desktop.PublishedName.ValueString())]; exists {
+				desktop.Id = types.StringValue(existingId)
+			}
+			updatedDesktops = append(updatedDesktops, desktop)
+		}
+
+		plan.Desktops = util.TypedArrayToObjectList(ctx, &resp.Diagnostics, updatedDesktops)
+
+		diags := resp.Plan.Set(ctx, &plan)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
 			return
 		}
 	}
