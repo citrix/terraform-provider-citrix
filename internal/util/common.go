@@ -60,6 +60,9 @@ const AwsSubnetIdFormat = `^subnet-[a-zA-Z0-9]+$`
 // Domain FQDN
 const DomainFqdnRegex string = `^(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}$`
 
+// Domain Regex with http/https
+const DomainRegexWithProtocol string = `^(http:\/\/|https:\/\/)(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}$`
+
 // Lowercase Regex
 const LowerCaseRegex string = `^[^A-Z]*$`
 
@@ -163,6 +166,9 @@ const NotAvailableValue string = "N/A"
 
 // ID of the All Scope
 const AllScopeId string = "00000000-0000-0000-0000-000000000000"
+
+// Default for HomeZone in citrix_application
+const DefaultHomeZone = "00000000-0000-0000-0000-000000000000"
 
 // ID of the Citrix Managed Users Scope
 const CtxManagedScopeId string = "f71a1148-7030-467a-a6d3-4a6bcf6a6532"
@@ -289,6 +295,11 @@ const HypervGen1 = "V1"
 const HypervGen2 = "V2"
 const OSPlatform_Windows = "Windows"
 const OSPlatform_Linux = "Linux"
+
+const MachineCatalogServiceOfferingSupportsSpotVm = "SupportsSpotVM"
+const MachineCatalogBackupVmConfigurationTypeRegular = "Regular"
+const MachineCatalogBackupVmConfigurationTypeSpot = "Spot"
+const MachineCatalogCustomPropertyBackupVmConfiguration = "BackupVmConfiguration"
 
 // <summary>
 // Helper function to validate if a string is a valid UUID or null

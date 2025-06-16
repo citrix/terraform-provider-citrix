@@ -636,7 +636,7 @@ func validateRebootSchedules(ctx context.Context, diagnostics *diag.Diagnostics,
 
 func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, plan DeliveryGroupResourceModel, associatedMachineCatalogProperties AssociatedMachineCatalogProperties) (citrixorchestration.CreateDeliveryGroupRequestModel, error) {
 	desktops := util.ObjectListToTypedArray[DeliveryGroupDesktop](ctx, diagnostics, plan.Desktops)
-	deliveryGroupDesktopsArray, err := verifyUsersAndParseDeliveryGroupDesktopsToClientModel(ctx, diagnostics, client, desktops)
+	deliveryGroupDesktopsArray, err := verifyUsersAndParseDeliveryGroupDesktopsToClientModel(ctx, diagnostics, client, desktops, []DeliveryGroupDesktop{})
 
 	if err != nil {
 		return citrixorchestration.CreateDeliveryGroupRequestModel{}, err
@@ -877,7 +877,8 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 
 func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, plan DeliveryGroupResourceModel, state DeliveryGroupResourceModel, currentDeliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel) (citrixorchestration.EditDeliveryGroupRequestModel, error) {
 	desktops := util.ObjectListToTypedArray[DeliveryGroupDesktop](ctx, diagnostics, plan.Desktops)
-	deliveryGroupDesktopsArray, err := verifyUsersAndParseDeliveryGroupDesktopsToClientModel(ctx, diagnostics, client, desktops)
+	existingDesktops := util.ObjectListToTypedArray[DeliveryGroupDesktop](ctx, diagnostics, state.Desktops)
+	deliveryGroupDesktopsArray, err := verifyUsersAndParseDeliveryGroupDesktopsToClientModel(ctx, diagnostics, client, desktops, existingDesktops)
 	if err != nil {
 		return citrixorchestration.EditDeliveryGroupRequestModel{}, err
 	}
@@ -1369,6 +1370,7 @@ func (schedule DeliveryGroupRebootSchedule) RefreshListItem(ctx context.Context,
 }
 
 func (dgDesktop DeliveryGroupDesktop) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, desktop citrixorchestration.DesktopResponseModel) util.ResourceModelWithAttributes {
+	dgDesktop.Id = types.StringValue(desktop.GetId())
 	dgDesktop.PublishedName = types.StringValue(desktop.GetPublishedName())
 	dgDesktop.DesktopDescription = types.StringValue(desktop.GetDescription())
 
@@ -1536,15 +1538,26 @@ func getRebootScheduleDaysInWeekActionValue(v []string) []citrixorchestration.Re
 	return res
 }
 
-func verifyUsersAndParseDeliveryGroupDesktopsToClientModel(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, deliveryGroupDesktops []DeliveryGroupDesktop) ([]citrixorchestration.DesktopRequestModel, error) {
+func verifyUsersAndParseDeliveryGroupDesktopsToClientModel(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, deliveryGroupDesktops []DeliveryGroupDesktop, existingDesktops []DeliveryGroupDesktop) ([]citrixorchestration.DesktopRequestModel, error) {
 	desktopRequests := []citrixorchestration.DesktopRequestModel{}
 
 	if deliveryGroupDesktops == nil {
 		return desktopRequests, nil
 	}
 
+	desktopIdMap := map[string]string{}
+	for _, existingDesktop := range existingDesktops {
+		desktopIdMap[strings.ToLower(existingDesktop.PublishedName.ValueString())] = existingDesktop.Id.ValueString()
+	}
+
 	for _, deliveryGroupDesktop := range deliveryGroupDesktops {
 		var desktopRequest citrixorchestration.DesktopRequestModel
+
+		// Check if the desktop already exists in the existing desktops
+		if existingDesktopId, exists := desktopIdMap[strings.ToLower(deliveryGroupDesktop.PublishedName.ValueString())]; exists {
+			desktopRequest.SetId(existingDesktopId)
+		}
+
 		desktopRequest.SetPublishedName(deliveryGroupDesktop.PublishedName.ValueString())
 		desktopRequest.SetDescription(deliveryGroupDesktop.DesktopDescription.ValueString())
 		if !deliveryGroupDesktop.EnableSessionRoaming.IsNull() {
@@ -1803,6 +1816,16 @@ func updateIdentityUserDetails(ctx context.Context, client *citrixdaasclient.Cit
 
 func (r DeliveryGroupResourceModel) updatePlanWithRestrictedAccessUsers(ctx context.Context, diagnostics *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel) DeliveryGroupResourceModel {
 	advancedAccessPolicies := deliveryGroup.GetAdvancedAccessPolicy()
+
+	if len(advancedAccessPolicies) == 0 {
+		if attributes, err := util.ResourceAttributeMapFromObject(RestrictedAccessUsers{}); err == nil {
+			r.RestrictedAccessUsers = types.ObjectNull(attributes)
+		} else {
+			diagnostics.AddWarning("Error when creating null RestrictedAccessUsers", err.Error())
+		}
+		return r
+	}
+
 	accessPolicy := advancedAccessPolicies[0]
 	if !r.AllowAnonymousAccess.IsNull() {
 		allowedUsers := accessPolicy.GetAllowedUsers()

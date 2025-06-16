@@ -454,10 +454,10 @@ func (r *applicationResource) ValidateConfig(ctx context.Context, req resource.V
 			return
 		}
 
-		if (homeZoneMode == string(citrixorchestration.HOMEZONEMODE_ONLY) || homeZoneMode == string(citrixorchestration.HOMEZONEMODE_PREFER)) && data.HomeZone.IsNull() {
+		if (homeZoneMode == string(citrixorchestration.HOMEZONEMODE_ONLY) || homeZoneMode == string(citrixorchestration.HOMEZONEMODE_PREFER)) && (data.HomeZone.IsNull() || data.HomeZone.ValueString() == util.DefaultHomeZone) {
 			resp.Diagnostics.AddError(
 				"Invalid configuration for HomeZone",
-				"HomeZone must be set when HomeZoneMode is set to Only or Prefer",
+				"HomeZone cannot be null/default when HomeZoneMode is set to Only or Prefer",
 			)
 			return
 		}

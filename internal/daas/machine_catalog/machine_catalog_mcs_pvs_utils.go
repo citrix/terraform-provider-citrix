@@ -5,6 +5,7 @@ package machine_catalog
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -136,6 +137,26 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 			return nil, err
 		}
 		provisioningScheme.SetServiceOfferingPath(serviceOfferingPath)
+
+		backupVmConfigs, err := getBackupVmConfigurationUsingSecondaryVmSizes(ctx, diag, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, azureMachineConfigModel)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(backupVmConfigs) > 0 {
+			backupVmConfigsStr, err := json.Marshal(backupVmConfigs)
+			if err != nil {
+				diag.AddError(
+					"Error creating Machine Catalog",
+					"Error marshalling backup VM configurations: "+err.Error(),
+				)
+				return nil, err
+			}
+
+			customProperties := provisioningScheme.GetCustomProperties()
+			util.AppendNameValueStringPair(&customProperties, util.MachineCatalogCustomPropertyBackupVmConfiguration, string(backupVmConfigsStr))
+			provisioningScheme.SetCustomProperties(customProperties)
+		}
 
 		if *provisioningType == citrixorchestration.PROVISIONINGTYPE_MCS {
 			err = setProvisioningSchemeForMcsCatalog(ctx, client, azureMachineConfigModel, diag, &provisioningScheme, hypervisor, hypervisorResourcePool)
@@ -580,6 +601,12 @@ func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan Provisioning
 		return body, err
 	}
 
+	customProperties, err := parseCustomPropertiesToClientModel(ctx, diagnostics, client, provisioningSchemePlan, hypervisor.ConnectionType, provisioningType, true)
+	if err != nil {
+		return body, err
+	}
+	body.SetCustomProperties(customProperties)
+
 	// Resolve resource path for service offering and master image
 	switch hypervisor.GetConnectionType() {
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
@@ -596,6 +623,25 @@ func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan Provisioning
 			return body, err
 		}
 		body.SetServiceOfferingPath(serviceOfferingPath)
+
+		backupVmConfigs, err := getBackupVmConfigurationUsingSecondaryVmSizes(ctx, diagnostics, client, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, azureMachineConfigModel)
+		if err != nil {
+			return body, err
+		}
+
+		backupVmConfigsStr, err := json.Marshal(backupVmConfigs)
+		if err != nil {
+			diagnostics.AddError(
+				"Error updating Machine Catalog",
+				"Error marshalling backup VM configurations: "+err.Error(),
+			)
+			return body, err
+		}
+
+		customProperties := body.GetCustomProperties()
+		util.AppendNameValueStringPair(&customProperties, util.MachineCatalogCustomPropertyBackupVmConfiguration, string(backupVmConfigsStr))
+		body.SetCustomProperties(customProperties)
+
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
 		awsMachineConfig := util.ObjectValueToTypedObject[AwsMachineConfigModel](ctx, nil, provisioningSchemePlan.AwsMachineConfig)
 		inputServiceOffering := awsMachineConfig.ServiceOffering.ValueString()
@@ -695,12 +741,6 @@ func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan Provisioning
 	} else if provisioningSchemePlan.IdentityType.ValueString() == string(citrixorchestration.IDENTITYTYPE_AZURE_AD) {
 		body.SetServiceAccountUid([]string{})
 	}
-
-	customProperties, err := parseCustomPropertiesToClientModel(ctx, diagnostics, client, provisioningSchemePlan, hypervisor.ConnectionType, provisioningType, true)
-	if err != nil {
-		return body, err
-	}
-	body.SetCustomProperties(customProperties)
 
 	return body, nil
 }
@@ -2050,4 +2090,53 @@ func appendUseAzureComputeGalleryCustomProperties(ctx context.Context, diagnosti
 	}
 
 	return updateCustomProperties
+}
+
+func getBackupVmConfigurationUsingSecondaryVmSizes(ctx context.Context, diag *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, hypervisorName string, hypervisorResourcePoolName string, serviceOfferingFolderPath string, azureMachineConfig AzureMachineConfigModel) ([]BackupVmConfigurationModel, error) {
+	backUpVmConfigs := []BackupVmConfigurationModel{}
+
+	if azureMachineConfig.SecondaryVmSizes.IsNull() {
+		return backUpVmConfigs, nil
+	}
+
+	secondaryVmSizes := util.ObjectListToTypedArray[SecondaryVmSizeModel](ctx, diag, azureMachineConfig.SecondaryVmSizes)
+	serviceOfferings, _, err := util.GetAllChildrenForResourcePath(ctx, client, diag, hypervisorName, hypervisorResourcePoolName, serviceOfferingFolderPath, util.ServiceOfferingResourceType, true, false)
+	if err != nil {
+		// error already added to diagnostics
+		return nil, err
+	}
+
+	for _, secondaryVmSize := range secondaryVmSizes {
+		var index int
+		if index = slices.IndexFunc(serviceOfferings, func(serviceOffering citrixorchestration.HypervisorResourceResponseModel) bool {
+			return strings.EqualFold(serviceOffering.GetName(), secondaryVmSize.VmSize.ValueString())
+		}); index == -1 {
+			diag.AddError(
+				"Error creating Machine Catalog",
+				fmt.Sprintf("VM SKU %s is invalid or not available for hypervisor %s", secondaryVmSize.VmSize.ValueString(), hypervisorName),
+			)
+
+			return nil, fmt.Errorf("VM SKU %s is invalid or not available for hypervisor %s", secondaryVmSize.VmSize.ValueString(), hypervisorName)
+		}
+
+		backUpVmConfig := BackupVmConfigurationModel{
+			ServiceOffering: secondaryVmSize.VmSize.ValueString(),
+			Type:            util.MachineCatalogBackupVmConfigurationTypeRegular,
+		}
+
+		if secondaryVmSize.UseSpotPricingIfAvailable.ValueBool() {
+			serviceOffering := serviceOfferings[index]
+			serviceOfferingData := serviceOffering.GetAdditionalData()
+			for _, data := range serviceOfferingData {
+				if strings.EqualFold(data.GetName(), util.MachineCatalogServiceOfferingSupportsSpotVm) && strings.EqualFold(data.GetValue(), "True") {
+					backUpVmConfig.Type = util.MachineCatalogBackupVmConfigurationTypeSpot
+					break
+				}
+			}
+		}
+
+		backUpVmConfigs = append(backUpVmConfigs, backUpVmConfig)
+	}
+
+	return backUpVmConfigs, nil
 }

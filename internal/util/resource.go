@@ -44,7 +44,7 @@ func GetHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.Cit
 	resourcePool, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.HypervisorResourcePoolDetailResponseModel](getResourcePoolsRequest, client)
 	if err != nil {
 		diagnostics.AddError(
-			"Error reading ResourcePool for Hypervisor "+hypervisorId,
+			"Error reading ResourcePool "+hypervisorResourcePoolId+" for Hypervisor "+hypervisorId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+ReadClientError(err),
 		)
@@ -212,6 +212,34 @@ func GetSingleResourceFromHypervisorWithNoCacheRetry(ctx context.Context, client
 		}
 	}
 	return resource, httpResp, nil
+}
+
+func GetAllChildrenForResourcePath(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorName, hypervisorPoolName, folderPath string, resourceType string, addToDiagnostics bool, noCache bool) ([]citrixorchestration.HypervisorResourceResponseModel, *http.Response, error) {
+	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorResourcePoolResources(ctx, hypervisorName, hypervisorPoolName)
+	req = req.Children(1)
+	req = req.NoCache(noCache)
+
+	if folderPath != "" {
+		req = req.Path(folderPath)
+	}
+
+	if resourceType != "" {
+		req = req.Type_([]string{resourceType})
+	}
+
+	req = req.Async(true)
+
+	_, httpResp, err := citrixdaasclient.AddRequestData(req, client).Execute()
+	if err != nil {
+		return nil, httpResp, err
+	}
+
+	resources, err := GetAsyncJobResultWithAddToDiagsOption[citrixorchestration.HypervisorResourceResponseModel](ctx, client, httpResp, "Error getting Hypervisor resources", diagnostics, 5, addToDiagnostics)
+	if errors.Is(err, &JobPollError{}) {
+		return nil, httpResp, err
+	}
+
+	return resources.Children, httpResp, nil
 }
 
 func getSingleResourceFromHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName string, addToDiagnostics bool, noCache bool) (*citrixorchestration.HypervisorResourceResponseModel, *http.Response, error) {

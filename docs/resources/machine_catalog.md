@@ -799,6 +799,9 @@ Optional:
 - `machine_profile` (Attributes) The name of the virtual machine or template spec that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone.<br />Required when provisioning_type is set to PVSStreaming or when identity_type is set to `AzureAD` (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--machine_profile))
 - `master_image_note` (String) The note for the master image.
 - `prepared_image` (Attributes) Specifying the prepared master image to be used for machine catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--prepared_image))
+- `secondary_vm_sizes` (Attributes List) Secondary VM sizes to be used when the primary machine size (service_offering) reaches full capacity. A maxiumum of 10 VM sizes can be specified. The priority of the VM sizes is determined by the order in which they are specified with the first VM size having the highest priority.
+
+~> **Please Note** This field can only be used when `machine_profile` is specified. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--secondary_vm_sizes))
 - `use_azure_compute_gallery` (Attributes) Use this to place prepared image in Azure Compute Gallery. Required when `storage_type = Azure_Ephemeral_OS_Disk`.
 
 ~> **Please Note** `use_azure_compute_gallery` cannot be specified when the prepared image is using a shared image gallery. The machine catalog will inherit the azure compute gallery settings of the prepared image. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--use_azure_compute_gallery))
@@ -885,6 +888,18 @@ Required:
 
 - `image_definition` (String) ID of the image definition.
 - `image_version` (String) ID of the image version.
+
+
+<a id="nestedatt--provisioning_scheme--azure_machine_config--secondary_vm_sizes"></a>
+### Nested Schema for `provisioning_scheme.azure_machine_config.secondary_vm_sizes`
+
+Required:
+
+- `vm_size` (String) The name of the Azure VM SKU.
+
+Optional:
+
+- `use_spot_pricing_if_available` (Boolean) Azure supports two types of VMs: regular and spot. Regular VMs are standard VMs with pay-as-you-go prices. Spot is offered by Azure at a discounted rate, utilizing unused Azure capacity. Set this to `true` to use spot pricing if it's available for the specified VM SKU.
 
 
 <a id="nestedatt--provisioning_scheme--azure_machine_config--use_azure_compute_gallery"></a>

@@ -328,6 +328,16 @@ func (r *ImageDefinitionResource) ModifyPlan(ctx context.Context, req resource.M
 		if err != nil {
 			return
 		}
+
+		if !plan.HypervisorResourcePool.IsNull() && !plan.HypervisorResourcePool.IsUnknown() {
+			// Check if the hypervisor resource pool exists and belongs to the specified hypervisor
+			hypervisorResourcePoolId := plan.HypervisorResourcePool.ValueString()
+			_, err := util.GetHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, hypervisorId, hypervisorResourcePoolId)
+			if err != nil {
+				return
+			}
+		}
+
 		if hypervisor.GetConnectionType() == citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM {
 			if r.client.ClientConfig.OrchestrationApiVersion >= 121 {
 				// At least one type of hypervisor image definition is required for Orchestration API version 121 and above

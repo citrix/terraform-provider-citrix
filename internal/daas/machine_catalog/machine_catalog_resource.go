@@ -996,6 +996,14 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 					rebootOptions := util.ObjectValueToTypedObject[ImageUpdateRebootOptionsModel](ctx, &resp.Diagnostics, azureMachineConfigModel.ImageUpdateRebootOptions)
 					rebootOptions.ValidateConfig(&resp.Diagnostics)
 				}
+
+				if !azureMachineConfigModel.SecondaryVmSizes.IsNull() && !azureMachineConfigModel.MachineProfile.IsUnknown() && azureMachineConfigModel.MachineProfile.IsNull() {
+					resp.Diagnostics.AddAttributeError(
+						path.Root("secondary_vm_sizes"),
+						"Incorrect Attribute Configuration",
+						"secondary_vm_sizes cannot be configured when machine_profile is not set.",
+					)
+				}
 			}
 
 			if !provSchemeModel.AwsMachineConfig.IsNull() {

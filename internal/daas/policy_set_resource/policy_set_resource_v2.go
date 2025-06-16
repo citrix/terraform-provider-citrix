@@ -278,6 +278,12 @@ func (r *policySetV2Resource) Delete(ctx context.Context, req resource.DeleteReq
 		return
 	}
 
+	// Remove associations with delivery groups before attempting to delete the policy set
+	err = updatePolicySetDeliveryGroups(ctx, &resp.Diagnostics, r.client, PolicySetV2Model{}, state)
+	if err != nil {
+		return
+	}
+
 	// Delete Policy Set
 	deletePolicySetRequest := r.client.ApiClient.GpoDAAS.GpoDeleteGpoPolicySet(ctx, state.Id.ValueString())
 	httpResp, err := citrixdaasclient.AddRequestData(deletePolicySetRequest, r.client).Execute()
