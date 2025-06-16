@@ -889,12 +889,27 @@ func (r *awsWorkspacesDeploymentResource) ModifyPlan(ctx context.Context, req re
 
 	for _, planWorkspace := range planWorkspaces {
 		if stateWorkspace, exists := stateMachineIdMap[planWorkspace.MachineId.ValueString()]; exists {
-			if planWorkspace.UserVolumeSize.ValueInt64() != stateWorkspace.UserVolumeSize.ValueInt64() &&
-				planWorkspace.RootVolumeSize.ValueInt64() != stateWorkspace.RootVolumeSize.ValueInt64() {
+			plannedUserVolumeSize := planWorkspace.UserVolumeSize.ValueInt64()
+			plannedRootVolumeSize := planWorkspace.RootVolumeSize.ValueInt64()
+			stateUserVolumeSize := stateWorkspace.UserVolumeSize.ValueInt64()
+			stateRootVolumeSize := stateWorkspace.RootVolumeSize.ValueInt64()
+
+			if plannedUserVolumeSize != stateUserVolumeSize &&
+				plannedRootVolumeSize != stateRootVolumeSize {
 				resp.Diagnostics.AddError(
 					"Error modifying AWS WorkSpaces Deployment: "+state.Name.ValueString(),
 					"WorkSpaces root volume size and user volume size cannot be modified at the same time. Please modify them separately.",
 				)
+				return
+			}
+
+			if plannedUserVolumeSize < stateUserVolumeSize ||
+				plannedRootVolumeSize < stateRootVolumeSize {
+				resp.Diagnostics.AddError(
+					"Error modifying AWS WorkSpaces Deployment: "+state.Name.ValueString(),
+					"WorkSpaces root volume size and user volume size cannot be reduced.",
+				)
+				return
 			}
 		}
 	}

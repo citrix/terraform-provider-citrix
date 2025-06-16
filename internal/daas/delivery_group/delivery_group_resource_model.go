@@ -726,6 +726,7 @@ func (RestrictedAccessUsers) GetAttributes() map[string]schema.Attribute {
 var _ util.RefreshableListItemWithAttributes[citrixorchestration.DesktopResponseModel] = DeliveryGroupDesktop{}
 
 type DeliveryGroupDesktop struct {
+	Id                    types.String `tfsdk:"id"`
 	PublishedName         types.String `tfsdk:"published_name"`
 	DesktopDescription    types.String `tfsdk:"description"`
 	RestrictToTag         types.String `tfsdk:"restrict_to_tag"`
@@ -742,9 +743,15 @@ func (DeliveryGroupDesktop) GetSchema() schema.NestedAttributeObject {
 	var restrictedAccessUsers RestrictedAccessUsers
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Description: "GUID identifier of the desktop. " +
+					"\n\n~> **Please Note** When ID of the desktop shows up as `Known after apply` in plan, it means that the desktop will be recreated when applied. Recreating desktop will result in a new `EntitlementPolicyRuleUid` being generated for the desktop, which could prevent disconnected sessions to the previous desktop from being resumed.",
+				Computed: true,
+			},
 			"published_name": schema.StringAttribute{
-				Description: "A display name for the desktop.",
-				Required:    true,
+				Description: "A display name for the desktop." +
+					"\n\n~> **Please Note** When `published_name` of the desktop changes, the desktop will be recreated, which could prevent disconnected sessions to the previous desktop from being resumed.",
+				Required: true,
 			},
 			"description": schema.StringAttribute{
 				Description: "A description for the published desktop. The name and description are shown in Citrix Workspace app.",

@@ -322,8 +322,6 @@ func (ApplicationResourceModel) GetSchema() schema.Schema {
 			"home_zone": schema.StringAttribute{
 				Description: "Specifies the home zone for the application. This can be set using the zone ID.",
 				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString("00000000-0000-0000-0000-000000000000"),
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
 				},
@@ -359,7 +357,11 @@ func (r ApplicationResourceModel) RefreshPropertyValues(ctx context.Context, dia
 	r.BrowserName = types.StringValue(application.GetBrowserName())
 	r.CpuPriorityLevel = types.StringValue(string(application.GetCpuPriorityLevel()))
 	r.HomeZoneMode = types.StringValue(string(application.GetHomeZoneMode()))
-	r.HomeZone = types.StringValue(application.HomeZone.GetId())
+	if application.HomeZone.GetId() == util.DefaultHomeZone {
+		r.HomeZone = types.StringNull()
+	} else {
+		r.HomeZone = types.StringValue(application.HomeZone.GetId())
+	}
 
 	// Set optional values
 	adminFolder := application.GetApplicationFolder()

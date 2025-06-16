@@ -4,6 +4,8 @@ package machine_catalog
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -45,6 +47,7 @@ type AzureMachineConfigModel struct {
 	WritebackCache           types.Object `tfsdk:"writeback_cache"`
 	DiskEncryptionSet        types.Object `tfsdk:"disk_encryption_set"`
 	EnrollInIntune           types.Bool   `tfsdk:"enroll_in_intune"`
+	SecondaryVmSizes         types.List   `tfsdk:"secondary_vm_sizes"` // List[SecondaryVmSizeModel]
 }
 
 func (AzureMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
@@ -141,6 +144,16 @@ func (AzureMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 			},
 			"machine_profile": util.AzureMachineProfileModel{}.GetSchema(),
 			"writeback_cache": AzureWritebackCacheModel{}.GetSchema(),
+			"secondary_vm_sizes": schema.ListNestedAttribute{
+				Description: "Secondary VM sizes to be used when the primary machine size (service_offering) reaches full capacity. A maxiumum of 10 VM sizes can be specified. The priority of the VM sizes is determined by the order in which they are specified with the first VM size having the highest priority." +
+					"\n\n~> **Please Note** This field can only be used when `machine_profile` is specified.",
+				Optional:     true,
+				NestedObject: SecondaryVmSizeModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+					listvalidator.SizeAtMost(10),
+				},
+			},
 		},
 	}
 }
@@ -1317,6 +1330,31 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 				mc.StorageType = types.StringValue(util.AzureEphemeralOSDisk)
 				isUseEphemeralOsDiskSet = true
 			}
+		case util.MachineCatalogCustomPropertyBackupVmConfiguration:
+			var backupVmConfigs []BackupVmConfigurationModel
+			err := json.Unmarshal([]byte(stringPair.GetValue()), &backupVmConfigs)
+			if err != nil {
+				diagnostics.AddError(
+					"Error parsing Backup VM Configuration",
+					fmt.Sprintf("Failed to parse Backup VM Configuration. Error: %s", err.Error()),
+				)
+				return
+			} else {
+				secondaryVmSizes := []SecondaryVmSizeModel{}
+				if len(backupVmConfigs) == 0 {
+					mc.SecondaryVmSizes = util.TypedArrayToObjectList[SecondaryVmSizeModel](ctx, diagnostics, nil)
+				} else {
+					for _, backupVmConfig := range backupVmConfigs {
+						useSpotPricingIfAvailable := strings.EqualFold(backupVmConfig.Type, util.MachineCatalogBackupVmConfigurationTypeSpot)
+						secondaryVmSize := SecondaryVmSizeModel{
+							VmSize:                    types.StringValue(backupVmConfig.ServiceOffering),
+							UseSpotPricingIfAvailable: types.BoolValue(useSpotPricingIfAvailable),
+						}
+						secondaryVmSizes = append(secondaryVmSizes, secondaryVmSize)
+					}
+					mc.SecondaryVmSizes = util.TypedArrayToObjectList[SecondaryVmSizeModel](ctx, diagnostics, secondaryVmSizes)
+				}
+			}
 		default:
 		}
 	}
@@ -1719,4 +1757,38 @@ func (PreparedImageConfigModel) GetSchema() schema.SingleNestedAttribute {
 
 func (PreparedImageConfigModel) GetAttributes() map[string]schema.Attribute {
 	return PreparedImageConfigModel{}.GetSchema().Attributes
+}
+
+type SecondaryVmSizeModel struct {
+	VmSize                    types.String `tfsdk:"vm_size"`
+	UseSpotPricingIfAvailable types.Bool   `tfsdk:"use_spot_pricing_if_available"`
+}
+
+func (SecondaryVmSizeModel) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"vm_size": schema.StringAttribute{
+				Description: "The name of the Azure VM SKU.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthBetween(1, 255),
+				},
+			},
+			"use_spot_pricing_if_available": schema.BoolAttribute{
+				Description: "Azure supports two types of VMs: regular and spot. Regular VMs are standard VMs with pay-as-you-go prices. Spot is offered by Azure at a discounted rate, utilizing unused Azure capacity. Set this to `true` to use spot pricing if it's available for the specified VM SKU. ",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+		},
+	}
+}
+
+func (SecondaryVmSizeModel) GetAttributes() map[string]schema.Attribute {
+	return SecondaryVmSizeModel{}.GetSchema().Attributes
+}
+
+type BackupVmConfigurationModel struct {
+	ServiceOffering string `json:"ServiceOffering"`
+	Type            string `json:"Type"`
 }
