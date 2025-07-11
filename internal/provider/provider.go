@@ -87,6 +87,8 @@ var (
 
 // New is a helper function to simplify provider server and testing implementation.
 func New(version string) func() provider.Provider {
+	tflog.Info(context.Background(), "Citrix Terraform Provider version: "+version)
+
 	return func() provider.Provider {
 		return &citrixProvider{
 			version: version,

@@ -195,6 +195,7 @@ resource "citrix_delivery_group" "example-delivery-group" {
 
 ~> **Please Note** Adding or removing values from this property will not add or remove machines. Adding an object will assign (or reassign if already assigned) the machine to user(s). Removing an object will unassign the corresponding machine. (see [below for nested schema](#nestedatt--assign_machines_to_users))
 - `associated_machine_catalogs` (Attributes Set) Machine catalogs from which to assign machines to the newly created delivery group. (see [below for nested schema](#nestedatt--associated_machine_catalogs))
+- `autoscale_plugins` (Attributes List) A list of autoscale plugins to be associated with the delivery group. (see [below for nested schema](#nestedatt--autoscale_plugins))
 - `autoscale_settings` (Attributes) The power management settings governing the machine(s) in the delivery group. (see [below for nested schema](#nestedatt--autoscale_settings))
 - `color_depth` (String) Specifies the color depth for the delivery group. Available values are `FourBit`, `EightBit`, `SixteenBit`, and `TwentyFourBit`. Defaults to `TwentyFourBit`.
 - `custom_access_policies` (Attributes List) Custom Access Policies for the delivery group. To manage built-in access policies use the `default_access_policies` instead. (see [below for nested schema](#nestedatt--custom_access_policies))
@@ -286,6 +287,25 @@ Required:
 
 - `machine_catalog` (String) Id of the machine catalog from which to add machines.
 - `machine_count` (Number) The number of machines to assign from the machine catalog to the delivery group.
+
+
+<a id="nestedatt--autoscale_plugins"></a>
+### Nested Schema for `autoscale_plugins`
+
+Required:
+
+- `dates` (Set of String) The list of dates for the autoscale plugin. Dates should be in the format `YYYY-MM-DD`.
+- `name` (String) The name of the autoscale plugin.
+- `priority` (Number) The priority of this plugin with respect to other plugins associated with the same delivery group. Priority 1 is the highest priority.
+
+Optional:
+
+- `description` (String) Description for the autoscale plugin.
+- `enabled` (Boolean) Whether the autoscale plugin is enabled. Default is `true`.
+
+Read-Only:
+
+- `id` (String) The identifier of the autoscale plugin.
 
 
 <a id="nestedatt--autoscale_settings"></a>

@@ -177,6 +177,9 @@ func (w *wemDirectoryResource) Delete(ctx context.Context, req resource.DeleteRe
 
 // Read implements resource.Resource.
 func (w *wemDirectoryResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Get current state

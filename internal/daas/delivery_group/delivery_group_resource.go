@@ -268,6 +268,15 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
+	if !plan.AutoscalePlugins.IsNull() {
+		autoscalePluginsPlan := util.ObjectListToTypedArray[DeliveryGroupAutoscalePluginModel](ctx, &resp.Diagnostics, plan.AutoscalePlugins)
+		err := createDeliveryGroupAutoscalePlugins(ctx, r.client, &resp.Diagnostics, deliveryGroupId, autoscalePluginsPlan)
+		if err != nil {
+			r.updateDeliveryGroupState(ctx, resp, plan, deliveryGroupId)
+			return
+		}
+	}
+
 	setDeliveryGroupTags(ctx, &resp.Diagnostics, r.client, deliveryGroupId, plan.Tags)
 
 	r.updateDeliveryGroupState(ctx, resp, plan, deliveryGroupId)
@@ -313,6 +322,11 @@ func (r *deliveryGroupResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
+	deliveryGroupAutoscalePlugins, err := getDeliveryGroupAutoscalePlugins(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
+	if err != nil {
+		return
+	}
+
 	if deliveryGroup.GetPolicySetGuid() == util.DefaultSitePolicySetIdForDeliveryGroup {
 		deliveryGroup.SetPolicySetGuid("")
 	}
@@ -327,7 +341,7 @@ func (r *deliveryGroupResource) Read(ctx context.Context, req resource.ReadReque
 
 	tags := getDeliveryGroupTags(ctx, &resp.Diagnostics, r.client, deliveryGroupId)
 
-	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, deliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule, tags)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, deliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule, deliveryGroupAutoscalePlugins, tags)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -403,6 +417,8 @@ func (r *deliveryGroupResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
+	updateAutoscalePlugin(ctx, r.client, &resp.Diagnostics, deliveryGroupId, state, plan)
+
 	setDeliveryGroupTags(ctx, &resp.Diagnostics, r.client, deliveryGroupId, plan.Tags)
 
 	// Get desktops
@@ -432,6 +448,11 @@ func (r *deliveryGroupResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
+	deliveryGroupAutoscalePlugins, err := getDeliveryGroupAutoscalePlugins(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
+	if err != nil {
+		return
+	}
+
 	// Fetch updated delivery group from GetDeliveryGroup.
 	updatedDeliveryGroup, err := util.GetDeliveryGroup(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
 	if err != nil {
@@ -446,7 +467,7 @@ func (r *deliveryGroupResource) Update(ctx context.Context, req resource.UpdateR
 
 	tags := getDeliveryGroupTags(ctx, &resp.Diagnostics, r.client, deliveryGroupId)
 
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, updatedDeliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule, tags)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, updatedDeliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule, deliveryGroupAutoscalePlugins, tags)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -631,6 +652,21 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 
 	if !data.RebootSchedules.IsNull() {
 		validateRebootSchedules(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[DeliveryGroupRebootSchedule](ctx, &resp.Diagnostics, data.RebootSchedules))
+	}
+
+	if !data.AutoscalePlugins.IsNull() {
+		autoscalePlugins := util.ObjectListToTypedArray[DeliveryGroupAutoscalePluginModel](ctx, &resp.Diagnostics, data.AutoscalePlugins)
+		pluginPriorities := map[int32]bool{}
+		for _, autoscalePlugin := range autoscalePlugins {
+			if _, exists := pluginPriorities[autoscalePlugin.Priority.ValueInt32()]; exists {
+				resp.Diagnostics.AddError(
+					"Error validating autoscale plugins for Delivery Group "+data.Name.ValueString(),
+					fmt.Sprintf("Duplicate priority %d found in autoscale plugins.", autoscalePlugin.Priority.ValueInt32()),
+				)
+				return
+			}
+			pluginPriorities[autoscalePlugin.Priority.ValueInt32()] = true
+		}
 	}
 
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
@@ -866,6 +902,16 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 		diags := resp.Plan.Set(ctx, &plan)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
+	if !plan.AutoscalePlugins.IsNull() {
+		errorSummary := fmt.Sprintf("Error %s Delivery Group", operation)
+		feature := "Autoscale plugins for Delivery Groups"
+		isFeatureSupportedForCurrentDDC := util.CheckProductVersion(r.client, &resp.Diagnostics, 125, 124, 7, 44, errorSummary, feature)
+
+		if !isFeatureSupportedForCurrentDDC {
 			return
 		}
 	}

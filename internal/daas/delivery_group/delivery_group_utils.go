@@ -1493,6 +1493,16 @@ func (dgAssignMachinesToUsers DeliveryGroupAssignMachinesToUsersModel) RefreshLi
 	return dgAssignMachinesToUsers
 }
 
+func (dgAutoscalePlugin DeliveryGroupAutoscalePluginModel) RefreshListItem(ctx context.Context, diagnostics *diag.Diagnostics, autoscalePlugin citrixorchestration.AutoscaleGroupPluginModel) util.ResourceModelWithAttributes {
+	dgAutoscalePlugin.Id = types.StringValue(strconv.Itoa(int(autoscalePlugin.GetUid())))
+	dgAutoscalePlugin.Name = types.StringValue(autoscalePlugin.GetName())
+	dgAutoscalePlugin.Description = types.StringValue(autoscalePlugin.GetDescription())
+	dgAutoscalePlugin.Priority = types.Int32Value(autoscalePlugin.GetPriority())
+	dgAutoscalePlugin.Enabled = types.BoolValue(autoscalePlugin.GetEnabled())
+	dgAutoscalePlugin.Dates = util.StringArrayToStringSet(ctx, diagnostics, autoscalePlugin.GetDates())
+	return dgAutoscalePlugin
+}
+
 func getFrequencyActionValue(v string) citrixorchestration.RebootScheduleFrequency {
 	frequency, err := citrixorchestration.NewRebootScheduleFrequencyFromValue(v)
 
@@ -1677,6 +1687,12 @@ func (r DeliveryGroupResourceModel) updatePlanWithAssociatedCatalogs(ctx context
 func (r DeliveryGroupResourceModel) updatePlanWithDesktops(ctx context.Context, diagnostics *diag.Diagnostics, deliveryGroupDesktops *citrixorchestration.DesktopResponseModelCollection) DeliveryGroupResourceModel {
 	desktops := util.RefreshListValueProperties[DeliveryGroupDesktop, citrixorchestration.DesktopResponseModel](ctx, diagnostics, r.Desktops, deliveryGroupDesktops.GetItems(), util.GetOrchestrationDesktopKey)
 	r.Desktops = desktops
+	return r
+}
+
+func (r DeliveryGroupResourceModel) updatePlanWithAutoscalePlugins(ctx context.Context, diagnostics *diag.Diagnostics, autoscalePlugins *citrixorchestration.AutoscaleGroupPluginModelCollection) DeliveryGroupResourceModel {
+	autoscalePluginModels := util.RefreshListValueProperties[DeliveryGroupAutoscalePluginModel, citrixorchestration.AutoscaleGroupPluginModel](ctx, diagnostics, r.AutoscalePlugins, autoscalePlugins.GetItems(), util.GetOrchestrationAutoscalePluginKey)
+	r.AutoscalePlugins = autoscalePluginModels
 	return r
 }
 
@@ -2354,6 +2370,130 @@ func getAssignUsersToMachinesRequestModel(ctx context.Context, client *citrixdaa
 	return assignMachinesToUsersRequests, nil
 }
 
+func getDeliveryGroupAutoscalePlugins(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string) (*citrixorchestration.AutoscaleGroupPluginModelCollection, error) {
+	majorVersion, minorVersion, err := util.GetProductMajorAndMinorVersion(client)
+	if err != nil {
+		diagnostics.AddError(
+			"Error fetching product version",
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(nil)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		return nil, err
+	}
+	orchestrationVersion := client.ClientConfig.OrchestrationApiVersion
+	supportedOrchestrationApiVersion := util.AutoscalePluginCloudOrchestrationApiVersion
+	if client.AuthConfig.OnPremises {
+		supportedOrchestrationApiVersion = util.AutoscalePluginOnpremOrchestrationApiVersion
+	}
+
+	if orchestrationVersion < supportedOrchestrationApiVersion ||
+		majorVersion < util.AutoscalePluginProductMajorVersion ||
+		(majorVersion == util.AutoscalePluginProductMajorVersion && minorVersion < util.AutoscalePluginProductMinorVersion) {
+		return &citrixorchestration.AutoscaleGroupPluginModelCollection{}, nil
+	}
+
+	getAutoscalePluginsRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroupAutoscaleGroupPlugins(ctx, deliveryGroupId).Type_(string(citrixorchestration.AUTOSCALEPLUGINTYPE_HOLIDAY)) // Only holiday plugin is supported for now
+	autoscalePlugins, httpResp, err := citrixdaasclient.AddRequestData(getAutoscalePluginsRequest, client).Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error fetching Delivery Group Autoscale Plugins",
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		return nil, err
+	}
+
+	return autoscalePlugins, nil
+}
+
+func createDeliveryGroupAutoscalePlugins(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string, autoscalePlugins []DeliveryGroupAutoscalePluginModel) error {
+	for _, autoscalePluginPlan := range autoscalePlugins {
+		autoscalePlugin := citrixorchestration.CreateAutoscaleGroupPluginRequestModel{}
+		autoscalePlugin.SetName(autoscalePluginPlan.Name.ValueString())
+		autoscalePlugin.SetType(citrixorchestration.AUTOSCALEPLUGINTYPE_HOLIDAY) // Only holiday plugin is supported for now
+		autoscalePlugin.SetDescription(autoscalePluginPlan.Description.ValueString())
+		autoscalePlugin.SetPriority(autoscalePluginPlan.Priority.ValueInt32())
+		autoscalePlugin.SetEnabled(autoscalePluginPlan.Enabled.ValueBool())
+
+		autoscalePlugin.SetDates(util.StringSetToStringArray(ctx, diagnostics, autoscalePluginPlan.Dates))
+		createAutoscalePluginsRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsCreateDeliveryGroupAutoscaleGroupPlugin(ctx, deliveryGroupId)
+		createAutoscalePluginsRequest = createAutoscalePluginsRequest.CreateAutoscaleGroupPluginRequestModel(autoscalePlugin)
+		httpResp, err := citrixdaasclient.AddRequestData(createAutoscalePluginsRequest, client).Execute()
+
+		if err != nil {
+			diagnostics.AddError(
+				"Error creating autoscale plugin for Delivery Group "+deliveryGroupId,
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func updateDeliveryGroupAutoscalePlugins(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string, autoscalePlugins []DeliveryGroupAutoscalePluginModel) error {
+	for _, autoscalePluginPlan := range autoscalePlugins {
+		autoscalePlugin := citrixorchestration.UpdateAutoscaleGroupPluginRequestModel{}
+		autoscalePlugin.SetName(autoscalePluginPlan.Name.ValueString())
+		autoscalePlugin.SetDescription(autoscalePluginPlan.Description.ValueString())
+		autoscalePlugin.SetPriority(autoscalePluginPlan.Priority.ValueInt32())
+		autoscalePlugin.SetEnabled(autoscalePluginPlan.Enabled.ValueBool())
+		autoscalePlugin.SetDates(util.StringSetToStringArray(ctx, diagnostics, autoscalePluginPlan.Dates))
+
+		pluginId, err := strconv.ParseInt(autoscalePluginPlan.Id.ValueString(), 10, 32)
+		if err != nil {
+			diagnostics.AddError(
+				"Error updating autoscale plugin for Delivery Group "+deliveryGroupId,
+				fmt.Sprintf("Invalid plugin ID %s: %v", autoscalePluginPlan.Id.ValueString(), err),
+			)
+			return err
+		}
+		updateAutoscalePluginRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsUpdateDeliveryGroupAutoscaleGroupPlugin(ctx, deliveryGroupId, int32(pluginId))
+		updateAutoscalePluginRequest = updateAutoscalePluginRequest.UpdateAutoscaleGroupPluginRequestModel(autoscalePlugin)
+		httpResp, err := citrixdaasclient.AddRequestData(updateAutoscalePluginRequest, client).Execute()
+
+		if err != nil {
+			diagnostics.AddError(
+				"Error updating autoscale plugin for Delivery Group "+deliveryGroupId,
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func deleteDeliveryGroupAutoscalePlugins(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string, autoscalePluginIds []string) error {
+	for _, autoscalePluginId := range autoscalePluginIds {
+		pluginId, err := strconv.ParseInt(autoscalePluginId, 10, 32)
+		if err != nil {
+			diagnostics.AddError(
+				"Error deleting autoscale plugin for Delivery Group "+deliveryGroupId,
+				fmt.Sprintf("Invalid plugin ID %s: %v", autoscalePluginId, err),
+			)
+			return err
+		}
+
+		deleteAutoscalePluginsRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsDeleteDeliveryGroupAutoscaleGroupPlugin(ctx, deliveryGroupId, int32(pluginId))
+		httpResp, err := citrixdaasclient.AddRequestData(deleteAutoscalePluginsRequest, client).Execute()
+
+		if err != nil {
+			diagnostics.AddError(
+				"Error deleting autoscale plugin for Delivery Group "+deliveryGroupId,
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (r *deliveryGroupResource) updateDeliveryGroupState(ctx context.Context, resp *resource.CreateResponse, plan DeliveryGroupResourceModel, deliveryGroupId string) {
 	deliveryGroup, err := util.GetDeliveryGroup(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
 	if err != nil {
@@ -2386,6 +2526,12 @@ func (r *deliveryGroupResource) updateDeliveryGroupState(ctx context.Context, re
 		return
 	}
 
+	// Get autoscale plugins
+	deliveryGroupAutoscalePlugins, err := getDeliveryGroupAutoscalePlugins(ctx, r.client, &resp.Diagnostics, deliveryGroupId)
+	if err != nil {
+		return
+	}
+
 	if r.client.AuthConfig.OnPremises {
 		// DDC 2402 LTSR has a bug where UPN is not returned for AD users. Call Identity API to fetch details for users
 		deliveryGroup, deliveryGroupDesktops, _ = updateDeliveryGroupAndDesktopUsers(ctx, r.client, &resp.Diagnostics, deliveryGroup, deliveryGroupDesktops)
@@ -2394,7 +2540,7 @@ func (r *deliveryGroupResource) updateDeliveryGroupState(ctx context.Context, re
 
 	tags := getDeliveryGroupTags(ctx, &resp.Diagnostics, r.client, deliveryGroupId)
 
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, deliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule, tags)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, deliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule, deliveryGroupAutoscalePlugins, tags)
 
 	// Set state to fully populated data
 	diags := resp.State.Set(ctx, plan)
@@ -2402,4 +2548,41 @@ func (r *deliveryGroupResource) updateDeliveryGroupState(ctx context.Context, re
 	if resp.Diagnostics.HasError() {
 		return
 	}
+}
+
+func updateAutoscalePlugin(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string, state DeliveryGroupResourceModel, plan DeliveryGroupResourceModel) {
+	stateAutoscalePlugins := util.ObjectListToTypedArray[DeliveryGroupAutoscalePluginModel](ctx, diagnostics, state.AutoscalePlugins)
+	planAutoscalePlugins := util.ObjectListToTypedArray[DeliveryGroupAutoscalePluginModel](ctx, diagnostics, plan.AutoscalePlugins)
+	planAutoscalePluginsMap := map[string]DeliveryGroupAutoscalePluginModel{}
+	autoscalePluginsToBeCreated := []DeliveryGroupAutoscalePluginModel{}
+	autoscalePluginsToBeUpdated := []DeliveryGroupAutoscalePluginModel{}
+	autoscalePluginsToBeDeleted := []string{}
+	for _, planAutoscalePlugin := range planAutoscalePlugins {
+		if planAutoscalePlugin.Id.IsUnknown() {
+			autoscalePluginsToBeCreated = append(autoscalePluginsToBeCreated, planAutoscalePlugin)
+			continue
+		}
+
+		// update existing autoscale plugin
+		index := slices.IndexFunc(stateAutoscalePlugins, func(existingPlugin DeliveryGroupAutoscalePluginModel) bool {
+			return planAutoscalePlugin.Id.ValueString() == existingPlugin.Id.ValueString()
+		})
+		stateAutoscalePlugin := stateAutoscalePlugins[index]
+		if !stateAutoscalePlugin.Equals(planAutoscalePlugin) {
+			autoscalePluginsToBeUpdated = append(autoscalePluginsToBeUpdated, planAutoscalePlugin)
+		}
+
+		planAutoscalePluginsMap[planAutoscalePlugin.Id.ValueString()] = planAutoscalePlugin
+	}
+
+	for _, stateAutoscalePlugin := range stateAutoscalePlugins {
+		if _, exists := planAutoscalePluginsMap[stateAutoscalePlugin.Id.ValueString()]; !exists {
+			autoscalePluginsToBeDeleted = append(autoscalePluginsToBeDeleted, stateAutoscalePlugin.Id.ValueString())
+		}
+	}
+
+	// create, update and delete autoscale plugins. Ignore errors so we can continue and set the state. Errors are already added to diagnostics.
+	deleteDeliveryGroupAutoscalePlugins(ctx, client, diagnostics, deliveryGroupId, autoscalePluginsToBeDeleted)
+	updateDeliveryGroupAutoscalePlugins(ctx, client, diagnostics, deliveryGroupId, autoscalePluginsToBeUpdated)
+	createDeliveryGroupAutoscalePlugins(ctx, client, diagnostics, deliveryGroupId, autoscalePluginsToBeCreated)
 }

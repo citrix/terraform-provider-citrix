@@ -279,7 +279,11 @@ const ReplicaRatio = "SharedImageGalleryReplicaRatio"
 const ReplicaMaximum = "SharedImageGalleryReplicaMaximum"
 const SharedGallery = "UseSharedImageGallery"
 
-const DDCVersionToCreateServiceAccountWithAsync = 125
+const DDCVersionToCreateServiceAccountWithAsync int32 = 125
+const AutoscalePluginCloudOrchestrationApiVersion int32 = 125
+const AutoscalePluginOnpremOrchestrationApiVersion int32 = 124
+const AutoscalePluginProductMajorVersion = 7
+const AutoscalePluginProductMinorVersion = 44
 
 // CC Admin User
 const AdminUserMonitorAccessPolicySuffix = " - Access to 'Monitor' tab only"
@@ -836,6 +840,10 @@ func GetSTFSTAUrlKey(remote citrixstorefront.STFSTAUrlModel) string {
 
 func GetQcsAwsWorkspacesWithMachineIdKey(remote citrixquickcreate.AwsEdcDeploymentMachine) string {
 	return remote.GetMachineId()
+}
+
+func GetOrchestrationAutoscalePluginKey(remote citrixorchestration.AutoscaleGroupPluginModel) string {
+	return strconv.Itoa(int(remote.GetUid()))
 }
 
 // <summary>

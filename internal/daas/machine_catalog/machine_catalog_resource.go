@@ -72,6 +72,17 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
+	catalogNameExists := checkIfCatalogNameExists(ctx, r.client, plan.Name.ValueString())
+
+	if catalogNameExists {
+		// Validate machine catalog name uniqueness for create
+		resp.Diagnostics.AddError(
+			"Machine Catalog Name Already Exists",
+			fmt.Sprintf("A Machine Catalog with the name '%s' already exists. Please choose a different name.", plan.Name.ValueString()),
+		)
+		return
+	}
+
 	if !plan.ProvisioningScheme.IsNull() {
 		provSchemePlan := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
 		if !provSchemePlan.MachineADAccounts.IsNull() {
@@ -629,6 +640,29 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 			err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error updating Machine Catalog "+catalogName, &resp.Diagnostics, 10)
 			if err != nil {
 				return
+			}
+		}
+	}
+
+	if !plan.ProvisioningScheme.IsNull() {
+		provSchemePlan := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
+		if provSchemePlan.ApplyUpdatesToExistingMachines.ValueBool() {
+			machines, err := util.GetMachineCatalogMachines(ctx, r.client, &resp.Diagnostics, catalog.GetId())
+			if err != nil {
+				return
+			}
+
+			for _, machine := range machines {
+				machineSid := machine.GetSid()
+				applyUpdateRequest := r.client.ApiClient.ProvisionedVirtualMachineAPIsDAAS.ProvisionedVirtualMachineApplyProvisionedVirtualMachineConfigurationUpdate(ctx, machineSid)
+				httpResp, err := citrixdaasclient.AddRequestData(applyUpdateRequest, r.client).Execute()
+				if err != nil {
+					resp.Diagnostics.AddWarning(
+						"Error applying update to machine "+machine.GetName(),
+						"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+							"\nError message: "+util.ReadClientError(err),
+					)
+				}
 			}
 		}
 	}
@@ -1531,32 +1565,9 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 		resp.Plan.SetAttribute(ctx, paths[0], string(persistChanges))
 	}
 
-	catalogNameExists := false
-	if !plan.Name.IsUnknown() && r.client != nil {
-		// Validate Machine Catalog name to be unique
-		machineCatalogName := plan.Name.ValueString()
-		var nameCheckRequestModel citrixorchestration.CatalogNameCheckRequestModel
-		nameCheckRequestModel.SetName(machineCatalogName)
-
-		checkNameExistReq := r.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsTestMachineCatalogExists(ctx)
-		checkNameExistReq = checkNameExistReq.CatalogNameCheckRequestModel(nameCheckRequestModel)
-
-		_, err := citrixdaasclient.AddRequestData(checkNameExistReq, r.client).Execute()
-		if err == nil {
-			catalogNameExists = true
-		}
-	}
+	catalogNameExists := checkIfCatalogNameExists(ctx, r.client, plan.Name.ValueString())
 
 	if req.State.Raw.IsNull() {
-		if catalogNameExists {
-			// Validate machine catalog name uniqueness for create
-			resp.Diagnostics.AddError(
-				"Machine Catalog Name Already Exists",
-				fmt.Sprintf("A Machine Catalog with the name '%s' already exists. Please choose a different name.", plan.Name.ValueString()),
-			)
-			return
-		}
-
 		return
 	}
 
