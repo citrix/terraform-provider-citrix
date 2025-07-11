@@ -955,9 +955,27 @@ func addMachinesToMcsPvsCatalog(ctx context.Context, client *citrixdaasclient.Ci
 	return nil
 }
 
-func updateCatalogMachineProfile(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, catalog *citrixorchestration.MachineCatalogDetailResponseModel, machineProfilePath string) error {
+func updateCatalogMachineProfile(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, plan MachineCatalogResourceModel, catalog *citrixorchestration.MachineCatalogDetailResponseModel, machineProfilePath string) error {
 	var body citrixorchestration.UpdateMachineCatalogRequestModel
 	body.SetMachineProfilePath(machineProfilePath)
+	provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
+	if provSchemeModel.NetworkMapping.IsNull() {
+		provScheme := catalog.GetProvisioningScheme()
+		networkMapping := provScheme.GetNetworkMaps()
+
+		updateNetworkMapping := []citrixorchestration.NetworkMapRequestModel{}
+
+		for _, networkMap := range networkMapping {
+			updateNetworkMap := citrixorchestration.NetworkMapRequestModel{}
+			updateNetworkMap.SetNetworkPath(networkMap.Network.GetXDPath())
+			updateNetworkMap.SetNetworkDeviceNameOrId(networkMap.GetDeviceId())
+			updateNetworkMapping = append(updateNetworkMapping, updateNetworkMap)
+		}
+
+		if len(updateNetworkMapping) > 0 {
+			body.SetNetworkMapping(updateNetworkMapping)
+		}
+	}
 
 	updateMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsUpdateMachineCatalog(ctx, catalog.GetId())
 	updateMachineCatalogRequest = updateMachineCatalogRequest.UpdateMachineCatalogRequestModel(body).Async(true)
@@ -1428,7 +1446,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 	}
 
 	if machineProfile.GetXDPath() != machineProfilePath {
-		err = updateCatalogMachineProfile(ctx, client, resp, catalog, machineProfilePath)
+		err = updateCatalogMachineProfile(ctx, client, resp, plan, catalog, machineProfilePath)
 		if err != nil {
 			return err
 		}

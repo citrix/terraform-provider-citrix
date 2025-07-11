@@ -1049,6 +1049,82 @@ func (DeliveryGroupAssignMachinesToUsersModel) GetAttributes() map[string]schema
 	return DeliveryGroupAssignMachinesToUsersModel{}.GetSchema().Attributes
 }
 
+var _ util.RefreshableListItemWithAttributes[citrixorchestration.AutoscaleGroupPluginModel] = DeliveryGroupAutoscalePluginModel{}
+
+type DeliveryGroupAutoscalePluginModel struct {
+	Id          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	Description types.String `tfsdk:"description"`
+	Priority    types.Int32  `tfsdk:"priority"`
+	Enabled     types.Bool   `tfsdk:"enabled"`
+	Dates       types.Set    `tfsdk:"dates"` // Set[string]
+}
+
+func (r DeliveryGroupAutoscalePluginModel) Equals(other DeliveryGroupAutoscalePluginModel) bool {
+	return r.Id.Equal(other.Id) &&
+		r.Name.Equal(other.Name) &&
+		r.Description.Equal(other.Description) &&
+		r.Priority.Equal(other.Priority) &&
+		r.Enabled.Equal(other.Enabled) &&
+		r.Dates.Equal(other.Dates)
+}
+
+func (r DeliveryGroupAutoscalePluginModel) GetKey() string {
+	return r.Id.ValueString()
+}
+
+func (DeliveryGroupAutoscalePluginModel) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				Description: "The identifier of the autoscale plugin.",
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"name": schema.StringAttribute{
+				Description: "The name of the autoscale plugin.",
+				Required:    true,
+			},
+			"description": schema.StringAttribute{
+				Description: "Description for the autoscale plugin.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(""),
+			},
+			"priority": schema.Int32Attribute{
+				Description: "The priority of this plugin with respect to other plugins associated with the same delivery group. Priority 1 is the highest priority.",
+				Required:    true,
+				Validators: []validator.Int32{
+					int32validator.AtLeast(1),
+				},
+			},
+			"enabled": schema.BoolAttribute{
+				Description: "Whether the autoscale plugin is enabled. Default is `true`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
+			},
+			"dates": schema.SetAttribute{
+				ElementType: types.StringType,
+				Description: "The list of dates for the autoscale plugin. Dates should be in the format `YYYY-MM-DD`.",
+				Required:    true,
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
+					setvalidator.ValueStringsAre(
+						stringvalidator.RegexMatches(regexp.MustCompile(util.DateRegex), "Date must be in the format YYYY-MM-DD"),
+					),
+				},
+			},
+		},
+	}
+}
+
+func (DeliveryGroupAutoscalePluginModel) GetAttributes() map[string]schema.Attribute {
+	return DeliveryGroupAutoscalePluginModel{}.GetSchema().Attributes
+}
+
 var _ util.RefreshableListItemWithAttributes[citrixorchestration.MachineResponseModel] = DeliveryGroupAssignMachinesToUsersModel{}
 
 func (r DeliveryGroupResourceModel) updatePlanWithAssignMachinesToUsers(ctx context.Context, diagnostics *diag.Diagnostics, dgMachines []citrixorchestration.MachineResponseModel) DeliveryGroupResourceModel {
@@ -1112,6 +1188,7 @@ type DeliveryGroupResourceModel struct {
 	AssignMachinesToUsers       types.List   `tfsdk:"assign_machines_to_users"` // List[DeliveryGroupAssignMachinesToUsersModel]
 	SecureIcaRequired           types.Bool   `tfsdk:"secure_ica_required"`
 	LoadBalancingType           types.String `tfsdk:"load_balancing_type"`
+	AutoscalePlugins            types.List   `tfsdk:"autoscale_plugins"` //List[DeliveryGroupAutoscalePluginModel]
 }
 
 func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
@@ -1383,6 +1460,14 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 					util.GetValidatorFromEnum(citrixorchestration.AllowedLoadBalanceTypeEnumValues),
 				},
 			},
+			"autoscale_plugins": schema.ListNestedAttribute{
+				Description:  "A list of autoscale plugins to be associated with the delivery group.",
+				Optional:     true,
+				NestedObject: DeliveryGroupAutoscalePluginModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
 		},
 	}
 }
@@ -1399,7 +1484,7 @@ func (DeliveryGroupResourceModel) GetAttributes() map[string]schema.Attribute {
 	return DeliveryGroupResourceModel{}.GetSchema().Attributes
 }
 
-func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixclient.CitrixDaasClient, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, dgDesktops *citrixorchestration.DesktopResponseModelCollection, dgPowerTimeSchemes *citrixorchestration.PowerTimeSchemeResponseModelCollection, dgMachines []citrixorchestration.MachineResponseModel, dgRebootSchedule *citrixorchestration.RebootScheduleResponseModelCollection, tags []string) DeliveryGroupResourceModel {
+func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixclient.CitrixDaasClient, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, dgDesktops *citrixorchestration.DesktopResponseModelCollection, dgPowerTimeSchemes *citrixorchestration.PowerTimeSchemeResponseModelCollection, dgMachines []citrixorchestration.MachineResponseModel, dgRebootSchedule *citrixorchestration.RebootScheduleResponseModelCollection, deliveryGroupAutoscalePlugins *citrixorchestration.AutoscaleGroupPluginModelCollection, tags []string) DeliveryGroupResourceModel {
 
 	// Set required values
 	r.Id = types.StringValue(deliveryGroup.GetId())
@@ -1452,6 +1537,7 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 	r = r.updatePlanWithRebootSchedule(ctx, diagnostics, dgRebootSchedule)
 	r = r.updatePlanWithAppProtection(ctx, diagnostics, deliveryGroup)
 	r = r.updatePlanWithAssignMachinesToUsers(ctx, diagnostics, dgMachines)
+	r = r.updatePlanWithAutoscalePlugins(ctx, diagnostics, deliveryGroupAutoscalePlugins)
 
 	var defaultAccessPolicies []citrixorchestration.AdvancedAccessPolicyResponseModel
 	var customAccessPolicies []citrixorchestration.AdvancedAccessPolicyResponseModel

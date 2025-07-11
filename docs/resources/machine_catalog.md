@@ -116,6 +116,46 @@ resource "citrix_machine_catalog" "example_azure_prepared_image_mtsession" {
 	}
 }
 
+resource "citrix_machine_catalog" "example-entra-joined-azure-mcs" {
+    name                        = "example-entra-joined-azure-mcs"
+    description                 = "Example catalog on Azure Entra joined"
+    zone                        = "<zone Id>"
+    allocation_type             = "Static"
+    session_support             = "SingleSession"
+    provisioning_type           = "MCS"
+    provisioning_scheme         =   {
+        hypervisor = citrix_azure_hypervisor.example-azure-hypervisor.id
+		hypervisor_resource_pool = citrix_azure_hypervisor_resource_pool.example-azure-hypervisor-resource-pool.id
+        identity_type      = "AzureAD"
+        machine_domain_identity = {
+            service_account_id = citrix_service_account.example-azuread-service-account.id # GUID identifier of the service account (ServiceAccountUid)
+        }
+        azure_machine_config = {
+            enroll_in_intune = false # Set to true if you want to enroll machines in Intune
+            storage_type = "Premium_LRS"
+            use_managed_disks = true
+            service_offering = "Standard_D2s_v3"
+            machine_profile = {
+                machine_profile_resource_group = "<machine profile resource group>"
+                machine_profile_vm_name = "<machine profile VM name>" 
+            }
+            azure_master_image = {
+                resource_group = var.azure_master_image_resource_group
+                master_image = var.azure_master_image_snapshot # Can be changed to gallery image
+            }
+        }
+        network_mapping = [{
+            network = "testSubnet"
+            network_device = "0"
+        }]
+        number_of_total_machines =  1
+        machine_account_creation_rules ={
+            naming_scheme =     "azuread-single-##"
+            naming_scheme_type ="Numeric"
+        }
+    }
+}
+
 resource "citrix_machine_catalog" "example-aws-mtsession" {
     name                        = "example-aws-mtsession"
     description                 = "Example multi-session catalog on AWS hypervisor"
@@ -715,6 +755,9 @@ Required:
 
 Optional:
 
+- `apply_updates_to_existing_machines` (Boolean) Synchronizes the properties of all existing virtual machines with the provisioning scheme and then reboots those machines. This also includes any changes made with Set-ProvScheme or Set-ProvVM.
+
+~> **Please Note** As long as this property is set to true, any update to the machine catalog (even outside of the provisioning scheme) will trigger an immediate reboot of all existing machines that are powered on and can disrupt any active sessions. It is safest to turn this property to `true`, run `apply` to update the existing machines, then turn it to `false`. Since the property is read from the resource plan, subsequent `apply` operations will not trigger an update.
 - `availability_zones` (List of String) The Availability Zones for provisioning virtual machines.
 - `aws_machine_config` (Attributes) Machine Configuration For AWS EC2 MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--aws_machine_config))
 - `azure_machine_config` (Attributes) Machine Configuration For Azure MCS and PVS Streaming catalogs. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config))

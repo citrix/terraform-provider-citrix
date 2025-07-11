@@ -548,3 +548,21 @@ func IsAzureImageDefinitionUsingSharedImageGallery(imageDefinitionResp *citrixor
 	}
 	return preparedImageUseSharedGallery
 }
+
+func checkIfCatalogNameExists(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, machineCatalogName string) bool {
+	catalogNameExists := false
+	if client != nil {
+		// Validate Machine Catalog name to be unique
+		var nameCheckRequestModel citrixorchestration.CatalogNameCheckRequestModel
+		nameCheckRequestModel.SetName(machineCatalogName)
+
+		checkNameExistReq := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsTestMachineCatalogExists(ctx)
+		checkNameExistReq = checkNameExistReq.CatalogNameCheckRequestModel(nameCheckRequestModel)
+
+		_, err := citrixdaasclient.AddRequestData(checkNameExistReq, client).Execute()
+		if err == nil {
+			catalogNameExists = true
+		}
+	}
+	return catalogNameExists
+}

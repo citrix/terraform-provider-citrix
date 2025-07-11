@@ -172,25 +172,26 @@ func (MachineCatalogMachineModel) GetAttributes() map[string]schema.Attribute {
 
 // ProvisioningSchemeModel maps the nested provisioning scheme resource schema data.
 type ProvisioningSchemeModel struct {
-	Hypervisor                  types.String `tfsdk:"hypervisor"`
-	HypervisorResourcePool      types.String `tfsdk:"hypervisor_resource_pool"`
-	AzureMachineConfig          types.Object `tfsdk:"azure_machine_config"`     // AzureMachineConfigModel
-	AwsMachineConfig            types.Object `tfsdk:"aws_machine_config"`       // AwsMachineConfigModel
-	GcpMachineConfig            types.Object `tfsdk:"gcp_machine_config"`       // GcpMachineConfigModel
-	VsphereMachineConfig        types.Object `tfsdk:"vsphere_machine_config"`   // VsphereMachineConfigModel
-	XenserverMachineConfig      types.Object `tfsdk:"xenserver_machine_config"` // XenserverMachineConfigModel
-	NutanixMachineConfig        types.Object `tfsdk:"nutanix_machine_config"`   // NutanixMachineConfigModel
-	SCVMMMachineConfigModel     types.Object `tfsdk:"scvmm_machine_config"`     // SCVMMMachineConfigModel
-	OpenshiftMachineConfig      types.Object `tfsdk:"openshift_machine_config"` // OpenshiftMachineConfigModel
-	NumTotalMachines            types.Int64  `tfsdk:"number_of_total_machines"`
-	NetworkMapping              types.List   `tfsdk:"network_mapping"`    // List[NetworkMappingModel]
-	AvailabilityZones           types.List   `tfsdk:"availability_zones"` // List[string]
-	IdentityType                types.String `tfsdk:"identity_type"`
-	MachineDomainIdentity       types.Object `tfsdk:"machine_domain_identity"`        // MachineDomainIdentityModel
-	MachineAccountCreationRules types.Object `tfsdk:"machine_account_creation_rules"` // MachineAccountCreationRulesModel
-	MachineADAccounts           types.List   `tfsdk:"machine_ad_accounts"`            // Set[MachineADAccountModel]
-	CustomProperties            types.List   `tfsdk:"custom_properties"`              // List[CustomPropertyModel]
-	Metadata                    types.List   `tfsdk:"metadata"`                       // List[NameValueStringPairModel]
+	Hypervisor                     types.String `tfsdk:"hypervisor"`
+	HypervisorResourcePool         types.String `tfsdk:"hypervisor_resource_pool"`
+	AzureMachineConfig             types.Object `tfsdk:"azure_machine_config"`     // AzureMachineConfigModel
+	AwsMachineConfig               types.Object `tfsdk:"aws_machine_config"`       // AwsMachineConfigModel
+	GcpMachineConfig               types.Object `tfsdk:"gcp_machine_config"`       // GcpMachineConfigModel
+	VsphereMachineConfig           types.Object `tfsdk:"vsphere_machine_config"`   // VsphereMachineConfigModel
+	XenserverMachineConfig         types.Object `tfsdk:"xenserver_machine_config"` // XenserverMachineConfigModel
+	NutanixMachineConfig           types.Object `tfsdk:"nutanix_machine_config"`   // NutanixMachineConfigModel
+	SCVMMMachineConfigModel        types.Object `tfsdk:"scvmm_machine_config"`     // SCVMMMachineConfigModel
+	OpenshiftMachineConfig         types.Object `tfsdk:"openshift_machine_config"` // OpenshiftMachineConfigModel
+	NumTotalMachines               types.Int64  `tfsdk:"number_of_total_machines"`
+	NetworkMapping                 types.List   `tfsdk:"network_mapping"`    // List[NetworkMappingModel]
+	AvailabilityZones              types.List   `tfsdk:"availability_zones"` // List[string]
+	IdentityType                   types.String `tfsdk:"identity_type"`
+	MachineDomainIdentity          types.Object `tfsdk:"machine_domain_identity"`        // MachineDomainIdentityModel
+	MachineAccountCreationRules    types.Object `tfsdk:"machine_account_creation_rules"` // MachineAccountCreationRulesModel
+	MachineADAccounts              types.List   `tfsdk:"machine_ad_accounts"`            // Set[MachineADAccountModel]
+	CustomProperties               types.List   `tfsdk:"custom_properties"`              // List[CustomPropertyModel]
+	Metadata                       types.List   `tfsdk:"metadata"`                       // List[NameValueStringPairModel]
+	ApplyUpdatesToExistingMachines types.Bool   `tfsdk:"apply_updates_to_existing_machines"`
 }
 
 func (ProvisioningSchemeModel) GetSchema() schema.SingleNestedAttribute {
@@ -305,6 +306,11 @@ func (ProvisioningSchemeModel) GetSchema() schema.SingleNestedAttribute {
 				},
 			},
 			"metadata": provSchemeMetadataSchema,
+			"apply_updates_to_existing_machines": schema.BoolAttribute{
+				Description: "Synchronizes the properties of all existing virtual machines with the provisioning scheme and then reboots those machines. This also includes any changes made with Set-ProvScheme or Set-ProvVM." +
+					"\n\n~> **Please Note** As long as this property is set to true, any update to the machine catalog (even outside of the provisioning scheme) will trigger an immediate reboot of all existing machines that are powered on and can disrupt any active sessions. It is safest to turn this property to `true`, run `apply` to update the existing machines, then turn it to `false`. Since the property is read from the resource plan, subsequent `apply` operations will not trigger an update.",
+				Optional: true,
+			},
 		},
 	}
 }

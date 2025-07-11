@@ -33,7 +33,7 @@ Currently this script is still in TechPreview
     Optional list of resource types to onboard. When specified, only those resources will be onboarded, the rest skipped.
     This helps make the onboarding process more manageable by limiting the scope.
     By default if (-NoDependencyRelationship is not specified), will resolve all dependency relationships between resources as long as the dependent resource is included.
-    Available resource types include: citrix_admin_folder, citrix_admin_role, citrix_admin_scope, citrix_admin_user, citrix_application, citrix_application_group, citrix_application_icon, citrix_aws_hypervisor, citrix_azure_hypervisor, citrix_delivery_group, citrix_gcp_hypervisor, citrix_image_definition, citrix_machine_catalog, citrix_nutanix_hypervisor, citrix_openshift_hypervisor, citrix_policy_set, citrix_scvmm_hypervisor, citrix_service_account, citrix_storefront_server, citrix_tag, citrix_vsphere_hypervisor, citrix_wem_configuration_set, citrix_wem_directory_object, citrix_xenserver_hypervisor, citrix_zone
+    Available resource types include: citrix_admin_folder, citrix_admin_role, citrix_admin_scope, citrix_admin_user, citrix_application, citrix_application_group, citrix_application_icon, citrix_aws_hypervisor, citrix_azure_hypervisor, citrix_delivery_group, citrix_gcp_hypervisor, citrix_image_definition, citrix_machine_catalog, citrix_nutanix_hypervisor, citrix_openshift_hypervisor, citrix_policy_set, citrix_scvmm_hypervisor, citrix_service_account, citrix_storefront_server, citrix_tag, citrix_vsphere_hypervisor, citrix_xenserver_hypervisor, citrix_zone
     citrix_<hypervisorType>_resource_pools are included with the citrix_<hypervisorType>_hypervisor resource.
     citrix_image_version is included with the citrix_image_definition resource.
 
@@ -74,7 +74,7 @@ Param (
     [string] $Environment = "Production",
 
     [Parameter(Mandatory = $false)]
-    [ValidateSet("citrix_admin_folder", "citrix_admin_role", "citrix_admin_scope", "citrix_admin_user", "citrix_application", "citrix_application_group", "citrix_application_icon", "citrix_aws_hypervisor", "citrix_azure_hypervisor", "citrix_delivery_group", "citrix_gcp_hypervisor", "citrix_image_definition", "citrix_machine_catalog", "citrix_nutanix_hypervisor", "citrix_openshift_hypervisor", "citrix_policy_set", "citrix_scvmm_hypervisor", "citrix_service_account", "citrix_storefront_server", "citrix_tag", "citrix_vsphere_hypervisor", "citrix_wem_configuration_set", "citrix_wem_directory_object", "citrix_xenserver_hypervisor", "citrix_zone")]
+    [ValidateSet("citrix_admin_folder", "citrix_admin_role", "citrix_admin_scope", "citrix_admin_user", "citrix_application", "citrix_application_group", "citrix_application_icon", "citrix_aws_hypervisor", "citrix_azure_hypervisor", "citrix_delivery_group", "citrix_gcp_hypervisor", "citrix_image_definition", "citrix_machine_catalog", "citrix_nutanix_hypervisor", "citrix_openshift_hypervisor", "citrix_policy_set", "citrix_scvmm_hypervisor", "citrix_service_account", "citrix_storefront_server", "citrix_tag", "citrix_vsphere_hypervisor", "citrix_xenserver_hypervisor", "citrix_zone")]
     [string[]] $ResourceTypes,
 
     [Parameter(Mandatory = $false)]
@@ -321,56 +321,6 @@ provider "citrix" {
 
 }
 
-# Function to get the URL for WEM objects
-function Get-UrlForWemObjects {
-    param(
-        [parameter(Mandatory = $true)]
-        [string] $requestPath
-    )
-
-    if ($script:environment -eq "Production") {
-        $script:wemHostName = "api.wem.cloud.com"
-    }
-    elseif ($script:environment -eq "Staging") {
-        $script:wemHostName = "api.wem.cloudburrito.com"
-    }
-    elseif ($script:environment -eq "Japan") {
-        $script:wemHostName = "api.wem.citrixcloud.jp"
-    }
-    elseif ($script:environment -eq "JapanStaging") {
-        $script:wemHostName = "api.wem.citrixcloud-test.jp"
-    }
-    elseif ($script:environment -eq "Gov") {
-        $script:wemHostName = "api.wem.citrixcloud.us"
-    }
-    elseif ($script:environment -eq "GovStaging") {
-        $script:wemHostName = "api.wem.citrixcloud-test.us"
-    }
-
-    if ($requestPath -eq "sites") {
-        return "https://$script:wemHostName/services/wem/sites?includeHidden=true&includeUnboundAgentsSite=true"
-    }
-    else {
-        return "https://$script:wemHostName/services/wem/machines"
-    }
-}
-
-# Function to find Catalog AD objects
-function Find-CatalogADObjects {
-    param(
-        [parameter(Mandatory = $true)]
-        [array] $items
-    )
-
-    $catalogItems = @()
-    foreach ($item in $items) {
-        if ($item.type -eq "Catalog") {
-            $catalogItems += $item
-        }
-    }
-    return $catalogItems
-}
-
 # Function to get list of resources for a given resource provider
 function Get-ResourceList {
     param(
@@ -383,10 +333,6 @@ function Get-ResourceList {
 
     $url = "$script:urlBase/$requestPath"
 
-    # Update url for WEM Objects
-    if ($resourceProviderName -in "wem_configuration_set", "wem_directory_object") {
-        $url = Get-UrlForWemObjects -requestPath $requestPath
-    }
     
     # Check if the resource provider is supported in the current environment (eg. WEM is not supported for most environments)
     try {
@@ -402,10 +348,7 @@ function Get-ResourceList {
     
     $items = $response.Items
 
-    # WEM supports AD object type 'Catalog'. Filter out other object types
-    if ($resourceProviderName -eq "wem_directory_object" -and $items.Count -gt 0) {
-        $items = Find-CatalogADObjects -items $items
-    }
+
 
     $resourceList = @()
     $pathMap = @{}
@@ -655,21 +598,8 @@ function Get-ExistingCVADResources([string[]]$filter = $null) {
         }
     }
 
-    # Add WEM resources for cloud customer environment
-    if (-not($script:onPremise)) {
-        $wemResources = @{
-            "wem_configuration_set" = @{
-                "resourceApi"          = "sites"
-                "resourceProviderName" = "wem_configuration_set"
-            }
-            "wem_directory_object"  = @{
-                "resourceApi"          = "ad_objects"
-                "resourceProviderName" = "wem_directory_object"
-            }
-        }
-        $resources += $wemResources
-    }else {
     # If On-Prem add admin resource
+    if (($script:onPremise)) {
         $resources.Add("admin_user", @{
             "resourceApi"          = "Admin/Administrators"
             "resourceProviderName" = "admin_user"
@@ -848,9 +778,7 @@ function ReplaceDependencyRelationships {
     Write-Verbose "Creating dependency relationships between resources."
     # Create dependency relationships between resources with id references
     foreach ($resource in $script:cvadResourcesMap.Keys) {
-        if ($resource -like "wem_*") {
-            continue
-        }
+
         foreach ($id in $script:cvadResourcesMap[$resource].Keys) {
             if($resource -like "*_resource_pool" -or $resource -like "image_version") {
                 $idArray = $id -split ","

@@ -98,6 +98,46 @@ resource "citrix_machine_catalog" "example_azure_prepared_image_mtsession" {
 	}
 }
 
+resource "citrix_machine_catalog" "example-entra-joined-azure-mcs" {
+    name                        = "example-entra-joined-azure-mcs"
+    description                 = "Example catalog on Azure Entra joined"
+    zone                        = "<zone Id>"
+    allocation_type             = "Static"
+    session_support             = "SingleSession"
+    provisioning_type           = "MCS"
+    provisioning_scheme         =   {
+        hypervisor = citrix_azure_hypervisor.example-azure-hypervisor.id
+		hypervisor_resource_pool = citrix_azure_hypervisor_resource_pool.example-azure-hypervisor-resource-pool.id
+        identity_type      = "AzureAD"
+        machine_domain_identity = {
+            service_account_id = citrix_service_account.example-azuread-service-account.id # GUID identifier of the service account (ServiceAccountUid)
+        }
+        azure_machine_config = {
+            enroll_in_intune = false # Set to true if you want to enroll machines in Intune
+            storage_type = "Premium_LRS"
+            use_managed_disks = true
+            service_offering = "Standard_D2s_v3"
+            machine_profile = {
+                machine_profile_resource_group = "<machine profile resource group>"
+                machine_profile_vm_name = "<machine profile VM name>" 
+            }
+            azure_master_image = {
+                resource_group = var.azure_master_image_resource_group
+                master_image = var.azure_master_image_snapshot # Can be changed to gallery image
+            }
+        }
+        network_mapping = [{
+            network = "testSubnet"
+            network_device = "0"
+        }]
+        number_of_total_machines =  1
+        machine_account_creation_rules ={
+            naming_scheme =     "azuread-single-##"
+            naming_scheme_type ="Numeric"
+        }
+    }
+}
+
 resource "citrix_machine_catalog" "example-aws-mtsession" {
     name                        = "example-aws-mtsession"
     description                 = "Example multi-session catalog on AWS hypervisor"
