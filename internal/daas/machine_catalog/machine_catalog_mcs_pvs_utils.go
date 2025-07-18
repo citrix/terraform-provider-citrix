@@ -955,7 +955,7 @@ func addMachinesToMcsPvsCatalog(ctx context.Context, client *citrixdaasclient.Ci
 	return nil
 }
 
-func updateCatalogMachineProfile(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, plan MachineCatalogResourceModel, catalog *citrixorchestration.MachineCatalogDetailResponseModel, machineProfilePath string) error {
+func updateCatalogMachineProfile(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, plan MachineCatalogResourceModel, catalog *citrixorchestration.MachineCatalogDetailResponseModel, machineProfilePath string, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel, hypervisorPluginId string) error {
 	var body citrixorchestration.UpdateMachineCatalogRequestModel
 	body.SetMachineProfilePath(machineProfilePath)
 	provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
@@ -975,6 +975,17 @@ func updateCatalogMachineProfile(ctx context.Context, client *citrixdaasclient.C
 		if len(updateNetworkMapping) > 0 {
 			body.SetNetworkMapping(updateNetworkMapping)
 		}
+	} else {
+		networkMappingModel := util.ObjectListToTypedArray[util.NetworkMappingModel](ctx, &resp.Diagnostics, provSchemeModel.NetworkMapping)
+		networkMapping, err := util.ParseNetworkMappingToClientModel(networkMappingModel, resourcePool, hypervisorPluginId)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating Machine Catalog",
+				fmt.Sprintf("Failed to find hypervisor network, error: %s", err.Error()),
+			)
+			return err
+		}
+		body.SetNetworkMapping(networkMapping)
 	}
 
 	updateMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsUpdateMachineCatalog(ctx, catalog.GetId())
@@ -1446,7 +1457,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 	}
 
 	if machineProfile.GetXDPath() != machineProfilePath {
-		err = updateCatalogMachineProfile(ctx, client, resp, plan, catalog, machineProfilePath)
+		err = updateCatalogMachineProfile(ctx, client, resp, plan, catalog, machineProfilePath, hypervisorResourcePool, hypervisor.GetPluginId())
 		if err != nil {
 			return err
 		}
