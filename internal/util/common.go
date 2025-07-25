@@ -284,6 +284,7 @@ const AutoscalePluginCloudOrchestrationApiVersion int32 = 125
 const AutoscalePluginOnpremOrchestrationApiVersion int32 = 124
 const AutoscalePluginProductMajorVersion = 7
 const AutoscalePluginProductMinorVersion = 44
+const DDCVersion125 = 125
 
 // CC Admin User
 const AdminUserMonitorAccessPolicySuffix = " - Access to 'Monitor' tab only"
@@ -304,6 +305,9 @@ const MachineCatalogServiceOfferingSupportsSpotVm = "SupportsSpotVM"
 const MachineCatalogBackupVmConfigurationTypeRegular = "Regular"
 const MachineCatalogBackupVmConfigurationTypeSpot = "Spot"
 const MachineCatalogCustomPropertyBackupVmConfiguration = "BackupVmConfiguration"
+
+// Hypervisor
+const AmazonWorkSpacesCoreRoleBasedAuthKeyAndSecret = "role_based_auth"
 
 // <summary>
 // Helper function to validate if a string is a valid UUID or null

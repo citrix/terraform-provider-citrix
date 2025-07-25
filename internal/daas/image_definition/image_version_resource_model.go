@@ -101,6 +101,42 @@ func (VsphereImageSpecsModel) GetAttributes() map[string]schema.Attribute {
 	return VsphereImageSpecsModel{}.GetSchema().Attributes
 }
 
+type AmazonWorkspacesCoreImageSpecsModel struct {
+	ServiceOffering types.String `tfsdk:"service_offering"`
+	MasterImage     types.String `tfsdk:"master_image"`
+	ImageAmi        types.String `tfsdk:"image_ami"`
+	MachineProfile  types.Object `tfsdk:"machine_profile"`
+}
+
+func (AmazonWorkspacesCoreImageSpecsModel) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "Image configuration for Amazon Workspaces Core image version.",
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			"service_offering": schema.StringAttribute{
+				Description: "The AWS VM Sku to use when creating machines.",
+				Required:    true,
+			},
+			"master_image": schema.StringAttribute{
+				Description: "The name of the virtual machine image that will be used.",
+				Required:    true,
+			},
+			"image_ami": schema.StringAttribute{
+				Description: "AMI of the AWS image to be used as the template image for the machine catalog.",
+				Required:    true,
+			},
+			"machine_profile": util.AmazonWorkspacesCoreMachineProfileModel{}.GetSchema(),
+		},
+		PlanModifiers: []planmodifier.Object{
+			objectplanmodifier.RequiresReplace(),
+		},
+	}
+}
+
+func (AmazonWorkspacesCoreImageSpecsModel) GetAttributes() map[string]schema.Attribute {
+	return AmazonWorkspacesCoreImageSpecsModel{}.GetSchema().Attributes
+}
+
 type ImageVersionModel struct {
 	// Computed Attributes
 	Id            types.String `tfsdk:"id"`
@@ -113,12 +149,13 @@ type ImageVersionModel struct {
 	NetworkMapping  types.List   `tfsdk:"network_mapping"` // List[NetworkMappingModel]
 
 	// Optional Attributes
-	Description       types.String `tfsdk:"description"`
-	AzureImageSpecs   types.Object `tfsdk:"azure_image_specs"`
-	VsphereImageSpecs types.Object `tfsdk:"vsphere_image_specs"`
-	SessionSupport    types.String `tfsdk:"session_support"`
-	OsType            types.String `tfsdk:"os_type"`
-	Timeout           types.Object `tfsdk:"timeout"`
+	Description                    types.String `tfsdk:"description"`
+	AzureImageSpecs                types.Object `tfsdk:"azure_image_specs"`
+	VsphereImageSpecs              types.Object `tfsdk:"vsphere_image_specs"`
+	AmazonWorkspacesCoreImageSpecs types.Object `tfsdk:"amazon_workspaces_core_image_specs"`
+	SessionSupport                 types.String `tfsdk:"session_support"`
+	OsType                         types.String `tfsdk:"os_type"`
+	Timeout                        types.Object `tfsdk:"timeout"`
 }
 
 func (ImageVersionModel) GetSchema() schema.Schema {
@@ -183,8 +220,9 @@ func (ImageVersionModel) GetSchema() schema.Schema {
 				Computed:    true,
 				Default:     stringdefault.StaticString(""),
 			},
-			"azure_image_specs":   util.AzureImageSpecsModel{}.GetSchema(),
-			"vsphere_image_specs": VsphereImageSpecsModel{}.GetSchema(),
+			"azure_image_specs":                  util.AzureImageSpecsModel{}.GetSchema(),
+			"vsphere_image_specs":                VsphereImageSpecsModel{}.GetSchema(),
+			"amazon_workspaces_core_image_specs": AmazonWorkspacesCoreImageSpecsModel{}.GetSchema(),
 			"session_support": schema.StringAttribute{
 				Description: "Session support for the image version.",
 				Computed:    true,
@@ -303,6 +341,32 @@ func (r ImageVersionModel) RefreshPropertyValues(ctx context.Context, diagnostic
 		}
 
 		r.VsphereImageSpecs = util.TypedObjectToObjectValue(ctx, diagnostics, vsphereImageSpecs)
+	case util.AMAZON_WORKSPACES_CORE_FACTORY_NAME:
+		amazonWorkspacesCoreImageSpecs := util.ObjectValueToTypedObject[AmazonWorkspacesCoreImageSpecsModel](ctx, diagnostics, r.AmazonWorkspacesCoreImageSpecs)
+		imageScheme := imageContext.GetImageScheme()
+		/* For AWS master image, the returned master image name looks like:
+		* {Image Name} (ami-000123456789abcde)
+		* The Name property in MasterImage will be image name without ami id appended
+		 */
+		amazonWorkspacesCoreImageSpecs.MasterImage = types.StringValue(strings.Split(masterImage.GetName(), " (ami-")[0])
+		amazonWorkspacesCoreImageSpecs.ImageAmi = types.StringValue(strings.TrimSuffix((strings.Split(masterImage.GetName(), " (")[1]), ")"))
+
+		if imageScheme.MachineProfile != nil {
+			machineProfile := imageScheme.GetMachineProfile()
+			machineProfileModel := util.ParseAwsMachineProfileResponseToModel(machineProfile)
+			amazonWorkspacesCoreImageSpecs.MachineProfile = util.TypedObjectToObjectValue(ctx, diagnostics, machineProfileModel)
+		} else {
+			if attributesMap, err := util.ResourceAttributeMapFromObject(util.AwsMachineProfileModel{}); err == nil {
+				amazonWorkspacesCoreImageSpecs.MachineProfile = types.ObjectNull(attributesMap)
+			} else {
+				diagnostics.AddWarning("Error when creating null AmazonWorkspacesCoreMachineProfileModel", err.Error())
+			}
+		}
+
+		if imageScheme.GetServiceOffering() != "" {
+			amazonWorkspacesCoreImageSpecs.ServiceOffering = types.StringValue(strings.TrimSuffix(imageScheme.GetServiceOffering(), ".serviceoffering"))
+		}
+		r.AmazonWorkspacesCoreImageSpecs = util.TypedObjectToObjectValue(ctx, diagnostics, amazonWorkspacesCoreImageSpecs)
 	default:
 		diagnostics.AddError(
 			"Error refreshing Image Version",

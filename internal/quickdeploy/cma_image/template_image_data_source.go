@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 )
 
@@ -68,8 +69,8 @@ func (d *CitrixManagedAzureImageDataSource) Read(ctx context.Context, req dataso
 		return
 	}
 
-	// Try getting the Citirx Managed Azure Template Image
-	image, _, err := getTemplateImageWithId(ctx, d.client, &resp.Diagnostics, id, true)
+	// Try getting the Citrix Managed Azure Template Image
+	image, _, err := util.GetTemplateImageWithId(ctx, d.client, &resp.Diagnostics, id, true)
 	if err != nil {
 		// Remove from state
 		resp.State.RemoveResource(ctx)

@@ -4,6 +4,10 @@ package policy_setting
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -102,6 +106,15 @@ func (r *policySettingResource) Read(ctx context.Context, req resource.ReadReque
 
 	policySetting, err := getPolicySetting(ctx, r.client, &resp.Diagnostics, state.Id.ValueString())
 	if err != nil {
+		// Check if this is a "policy setting not found" error
+		if errors.Is(err, util.ErrPolicySettingNotFound) {
+			resp.Diagnostics.AddWarning(
+				"Policy Setting not found",
+				fmt.Sprintf("Policy Setting %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", state.Id.ValueString()),
+			)
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		return
 	}
 
@@ -192,12 +205,72 @@ func (r *policySettingResource) ModifyPlan(ctx context.Context, req resource.Mod
 		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
 		return
 	}
+
+	// Skip validation if this is a destroy operation
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var plan PolicySettingModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Validation for policy settings with complex value types
+	if !plan.Name.IsNull() && !plan.Name.IsUnknown() && !plan.Enabled.IsNull() {
+		settingName := plan.Name.ValueString()
+
+		// Get setting definitions from API to check value type
+		getSettingDefinitionsReq := r.client.ApiClient.GpoDAAS.GpoGetSettingDefinitions(ctx)
+		getSettingDefinitionsReq = getSettingDefinitionsReq.NamePattern(settingName)
+		getSettingDefinitionsReq = getSettingDefinitionsReq.IsLean(true)
+		settingDefinitions, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.SettingDefinitionEnvelope](getSettingDefinitionsReq, r.client)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error fetching setting definitions",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return
+		}
+
+		validSettingName := false
+		// Check if this setting has a complex value type
+		for _, definition := range settingDefinitions.GetItems() {
+			if strings.EqualFold(definition.GetSettingName(), settingName) {
+				valueType := definition.GetValueType()
+				validSettingName = true
+				if valueType != util.POLICYSETTING_GO_VALUETYPE_STATE && valueType != util.POLICYSETTING_GO_VALUETYPE_STATEALLOWED {
+					resp.Diagnostics.AddError(
+						fmt.Sprintf("Invalid configuration for %s", settingName),
+						fmt.Sprintf("Policy setting %s has a complex value type (%s) and cannot use 'enabled' field. Use 'value' field instead.", settingName, valueType),
+					)
+					return
+				}
+				break
+			}
+		}
+		if !validSettingName {
+			resp.Diagnostics.AddError(
+				fmt.Sprintf("Invalid configuration for %s", settingName),
+				fmt.Sprintf("Policy setting %s is not a valid setting name.", settingName),
+			)
+			return
+		}
+	}
 }
 
 func getPolicySetting(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policySettingId string) (*citrixorchestration.SettingResponse, error) {
 	getPolicySettingReq := client.ApiClient.GpoDAAS.GpoReadGpoSetting(ctx, policySettingId)
 	policySetting, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.SettingResponse](getPolicySettingReq, client)
 	if err != nil {
+		// Check if this is a 404 Not Found error - return a specific error that can be handled by the caller
+		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
+			return nil, fmt.Errorf("%w: %v", util.ErrPolicySettingNotFound, err)
+		}
+
 		diagnostics.AddError(
 			"Error Reading Policy Setting "+policySettingId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+

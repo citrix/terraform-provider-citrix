@@ -3,7 +3,6 @@ package cma_image
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -96,32 +95,11 @@ func (r *citrixManagedAzureImageResource) Create(ctx context.Context, req resour
 	}
 
 	// Set subscription ID based on the subscription name
-	getSubscriptionReq := r.client.QuickDeployClient.AzureSubscriptionsCMD.GetSubscriptions(ctx, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId)
-	subscriptionResp, httpResp, err := citrixdaasclient.AddRequestData(getSubscriptionReq, r.client).Execute()
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error getting Citrix Managed Azure subscription: "+plan.SubscriptionName.ValueString(),
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadCatalogServiceClientError(err),
-		)
+	subscription := util.GetCitrixManagedSubscriptionWithName(ctx, r.client, &resp.Diagnostics, plan.SubscriptionName.ValueString())
+	if subscription == nil {
 		return
 	}
-	subscriptionId := ""
-	for _, subscription := range subscriptionResp.GetSubscriptions() {
-		if strings.EqualFold(subscription.GetName(), plan.SubscriptionName.ValueString()) {
-			subscriptionId = subscription.GetSubscriptionId()
-			break
-		}
-	}
-	if subscriptionId == "" {
-		resp.Diagnostics.AddError(
-			"Error getting Citrix Managed Azure subscription: "+plan.SubscriptionName.ValueString(),
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: Subscription not found",
-		)
-		return
-	}
-	importImageBody.SetAzureSubscriptionId(subscriptionId)
+	importImageBody.SetAzureSubscriptionId(subscription.GetSubscriptionId())
 
 	importTemplateImageRequest := r.client.QuickDeployClient.MasterImageCMD.ImportTemplateImage(ctx, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId)
 	importTemplateImageRequest = importTemplateImageRequest.Body(importImageBody)
@@ -156,7 +134,7 @@ func (r *citrixManagedAzureImageResource) Create(ctx context.Context, req resour
 	region = util.GetCmaRegion(ctx, r.client, &resp.Diagnostics, image.GetRegion())
 
 	// Map response body to schema and populate computed attribute values
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, true, image, region)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, image, region)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -179,7 +157,7 @@ func (r *citrixManagedAzureImageResource) Read(ctx context.Context, req resource
 	}
 
 	// Try getting the Citrix Managed Azure Template Image
-	image, _, err := getTemplateImageWithId(ctx, r.client, &resp.Diagnostics, state.Id.ValueString(), true)
+	image, _, err := util.GetTemplateImageWithId(ctx, r.client, &resp.Diagnostics, state.Id.ValueString(), true)
 	if err != nil {
 		// Remove from state
 		resp.State.RemoveResource(ctx)
@@ -189,7 +167,7 @@ func (r *citrixManagedAzureImageResource) Read(ctx context.Context, req resource
 	region := util.GetCmaRegion(ctx, r.client, &resp.Diagnostics, image.GetRegion())
 
 	// Map response body to schema and populate computed attribute values
-	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, true, image, region)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, image, region)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, state)
@@ -233,7 +211,7 @@ func (r *citrixManagedAzureImageResource) Update(ctx context.Context, req resour
 	}
 
 	// Try getting the updated Citrix Managed Azure Template Image
-	image, httpResp, err := getTemplateImageWithId(ctx, r.client, &resp.Diagnostics, imageId, false)
+	image, httpResp, err := util.GetTemplateImageWithId(ctx, r.client, &resp.Diagnostics, imageId, false)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error getting Template Image: "+plan.Name.ValueString(),
@@ -246,7 +224,7 @@ func (r *citrixManagedAzureImageResource) Update(ctx context.Context, req resour
 	region := util.GetCmaRegion(ctx, r.client, &resp.Diagnostics, image.GetRegion())
 
 	// Map response body to schema and populate computed attribute values
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, true, image, region)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, image, region)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -360,29 +338,11 @@ func (r *citrixManagedAzureImageResource) ModifyPlan(ctx context.Context, req re
 	if !plan.Region.IsUnknown() && r.client != nil {
 		util.GetCmaRegion(ctx, r.client, &resp.Diagnostics, plan.Region.ValueString())
 	}
-}
 
-func getTemplateImageWithId(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, imageId string, addWarningIfNotFound bool) (*citrixquickdeploy.TemplateImageDetails, *http.Response, error) {
-	getImageRequest := client.QuickDeployClient.MasterImageCMD.GetTemplateImage(ctx, client.ClientConfig.CustomerId, client.ClientConfig.SiteId, imageId)
-	image, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickdeploy.TemplateImageDetails](getImageRequest, client)
-
-	if err != nil {
-		if addWarningIfNotFound && httpResp.StatusCode == http.StatusNotFound {
-			diagnostics.AddWarning(
-				fmt.Sprintf("Template Image with ID: %s not found", imageId),
-				fmt.Sprintf("Template Image with ID: %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", imageId),
-			)
-			return nil, httpResp, err
-		}
-		diagnostics.AddError(
-			"Error getting Template Image: "+imageId,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadCatalogServiceClientError(err),
-		)
-		return nil, httpResp, err
+	// Validate subscription
+	if !plan.SubscriptionName.IsUnknown() && r.client != nil {
+		util.GetCitrixManagedSubscriptionWithName(ctx, r.client, &resp.Diagnostics, plan.SubscriptionName.ValueString())
 	}
-
-	return image, httpResp, nil
 }
 
 func waitForImageImportCompletion(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, imageResp *citrixquickdeploy.TemplateImageOverview) (*citrixquickdeploy.TemplateImageDetails, *http.Response, error) {
@@ -399,7 +359,7 @@ func waitForImageImportCompletion(ctx context.Context, client *citrixdaasclient.
 		// Sleep ahead of getting the image to account for the time of resource group creation
 		time.Sleep(time.Second * time.Duration(30))
 
-		image, httpResp, err := getTemplateImageWithId(ctx, client, diagnostics, imageId, false)
+		image, httpResp, err := util.GetTemplateImageWithId(ctx, client, diagnostics, imageId, false)
 		if err != nil {
 			return nil, httpResp, err
 		}

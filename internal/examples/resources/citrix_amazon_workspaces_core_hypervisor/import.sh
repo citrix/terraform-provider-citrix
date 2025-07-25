@@ -1,0 +1,2 @@
+# Amazon WorkSpaces Core Hypervisor can be imported by specifying the GUID
+terraform import citrix_amazon_workspaces_core_hypervisor.example-amazon-workspaces-core-hypervisor b2339edf-7b00-436e-9c3a-54c987c3526e

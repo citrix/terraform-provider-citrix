@@ -2371,24 +2371,24 @@ func getAssignUsersToMachinesRequestModel(ctx context.Context, client *citrixdaa
 }
 
 func getDeliveryGroupAutoscalePlugins(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string) (*citrixorchestration.AutoscaleGroupPluginModelCollection, error) {
-	majorVersion, minorVersion, err := util.GetProductMajorAndMinorVersion(client)
-	if err != nil {
-		diagnostics.AddError(
-			"Error fetching product version",
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(nil)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-		return nil, err
-	}
 	orchestrationVersion := client.ClientConfig.OrchestrationApiVersion
-	supportedOrchestrationApiVersion := util.AutoscalePluginCloudOrchestrationApiVersion
 	if client.AuthConfig.OnPremises {
-		supportedOrchestrationApiVersion = util.AutoscalePluginOnpremOrchestrationApiVersion
-	}
+		majorVersion, minorVersion, err := util.GetProductMajorAndMinorVersion(client)
+		if err != nil {
+			diagnostics.AddError(
+				"Error fetching product version",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(nil)+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			return nil, err
+		}
 
-	if orchestrationVersion < supportedOrchestrationApiVersion ||
-		majorVersion < util.AutoscalePluginProductMajorVersion ||
-		(majorVersion == util.AutoscalePluginProductMajorVersion && minorVersion < util.AutoscalePluginProductMinorVersion) {
+		if orchestrationVersion < util.AutoscalePluginOnpremOrchestrationApiVersion ||
+			majorVersion < util.AutoscalePluginProductMajorVersion ||
+			(majorVersion == util.AutoscalePluginProductMajorVersion && minorVersion < util.AutoscalePluginProductMinorVersion) {
+			return &citrixorchestration.AutoscaleGroupPluginModelCollection{}, nil
+		}
+	} else if orchestrationVersion < util.AutoscalePluginCloudOrchestrationApiVersion {
 		return &citrixorchestration.AutoscaleGroupPluginModelCollection{}, nil
 	}
 

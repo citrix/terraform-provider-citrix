@@ -162,6 +162,61 @@ func (AzureMachineConfigModel) GetAttributes() map[string]schema.Attribute {
 	return AzureMachineConfigModel{}.GetSchema().Attributes
 }
 
+type AmazonWorkspacesCoreMachineConfigModel struct {
+	ServiceOffering                   types.String `tfsdk:"service_offering"`
+	AmazonWorkspacesCorePreparedImage types.Object `tfsdk:"prepared_image"` // PreparedImageConfigModel
+	ImageUpdateRebootOptions          types.Object `tfsdk:"image_update_reboot_options"`
+	MasterImageNote                   types.String `tfsdk:"master_image_note"`
+	MachineProfile                    types.Object `tfsdk:"machine_profile"` // AmazonWorkspacesCoreMachineProfileModel
+	TenancyType                       types.String `tfsdk:"tenancy_type"`
+}
+
+func (AmazonWorkspacesCoreMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "Machine Configuration for Amazon Workspaces Core catalogs.",
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			"service_offering": schema.StringAttribute{
+				Description: "The AWS VM Sku to use when creating machines.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(util.AwsEc2InstanceTypeRegex),
+						"must follow AWS EC2 instance type naming convention in lower case. Eg: t2.micro, m5.large, etc.",
+					),
+				},
+			},
+			"prepared_image":              PreparedImageConfigModel{}.GetSchema(),
+			"image_update_reboot_options": ImageUpdateRebootOptionsModel{}.GetSchema(),
+			"master_image_note": schema.StringAttribute{
+				Description: "The note for the image.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString(""),
+			},
+			"machine_profile": util.AmazonWorkspacesCoreMachineProfileModel{}.GetSchema(),
+			"tenancy_type": schema.StringAttribute{
+				Description: "Tenancy type of the machine. Choose between `Shared`, `Instance` and `Host`.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf(
+						"Shared",
+						"Instance",
+						"Host",
+					),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+		},
+	}
+}
+
+func (AmazonWorkspacesCoreMachineConfigModel) GetAttributes() map[string]schema.Attribute {
+	return AmazonWorkspacesCoreMachineConfigModel{}.GetSchema().Attributes
+}
+
 type AwsMachineConfigModel struct {
 	ServiceOffering          types.String `tfsdk:"service_offering"`
 	MasterImage              types.String `tfsdk:"master_image"`
@@ -1423,6 +1478,43 @@ func (mc *AwsMachineConfigModel) RefreshProperties(ctx context.Context, diagnost
 			mc.MachineProfile = types.ObjectNull(attributesMap)
 		} else {
 			diagnostics.AddWarning("Error when creating null AwsMachineProfileModel", err.Error())
+		}
+	}
+}
+
+func (mc *AmazonWorkspacesCoreMachineConfigModel) RefreshProperties(ctx context.Context, diagnostics *diag.Diagnostics, catalog citrixorchestration.MachineCatalogDetailResponseModel) {
+	// Refresh Service Offering
+	provScheme := catalog.GetProvisioningScheme()
+	if provScheme.GetServiceOffering() != "" {
+		mc.ServiceOffering = types.StringValue(provScheme.GetServiceOffering())
+	}
+
+	currentImage := provScheme.GetCurrentImageVersion()
+	imageVersion := currentImage.GetImageVersion()
+	imageDefinition := imageVersion.GetImageDefinition()
+	preparedImageConfig := util.ObjectValueToTypedObject[PreparedImageConfigModel](ctx, diagnostics, mc.AmazonWorkspacesCorePreparedImage)
+	preparedImageConfig.ImageDefinition = types.StringValue(imageDefinition.GetId())
+	preparedImageConfig.ImageVersion = types.StringValue(imageVersion.GetId())
+
+	mc.AmazonWorkspacesCorePreparedImage = util.TypedObjectToObjectValue(ctx, diagnostics, preparedImageConfig)
+
+	// Refresh Master Image Note
+	mc.MasterImageNote = types.StringValue(currentImage.GetImageAssignmentNote())
+
+	// Refresh Tenancy Type
+	tenancyType := provScheme.GetTenancyType()
+	mc.TenancyType = types.StringValue(tenancyType)
+
+	// Refresh Machine Profile
+	if provScheme.MachineProfile != nil {
+		machineProfile := provScheme.GetMachineProfile()
+		machineProfileModel := util.ParseAmazonWorkspacesCoreMachineProfileResponseToModel(machineProfile)
+		mc.MachineProfile = util.TypedObjectToObjectValue(ctx, diagnostics, machineProfileModel)
+	} else {
+		if attributesMap, err := util.ResourceAttributeMapFromObject(util.AmazonWorkspacesCoreMachineProfileModel{}); err == nil {
+			mc.MachineProfile = types.ObjectNull(attributesMap)
+		} else {
+			diagnostics.AddWarning("Error when creating null AmazonWorkspacesCoreMachineProfileModel", err.Error())
 		}
 	}
 }

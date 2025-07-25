@@ -4,7 +4,9 @@ package policy_resource
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
@@ -95,6 +97,15 @@ func (r *policyResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 	policy, err := GetPolicy(ctx, r.client, &resp.Diagnostics, state.Id.ValueString(), false, false)
 	if err != nil {
+		// Check if this is a "policy not found" error
+		if errors.Is(err, util.ErrPolicyNotFound) {
+			resp.Diagnostics.AddWarning(
+				"Policy not found",
+				fmt.Sprintf("Policy %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", state.Id.ValueString()),
+			)
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		return
 	}
 
@@ -267,6 +278,11 @@ func GetPolicy(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, d
 	getPolicyReq = getPolicyReq.WithSettings(withSettings)
 	policy, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.PolicyResponse](getPolicyReq, client)
 	if err != nil {
+		// Check if this is a 404 Not Found error - return a specific error that can be handled by the caller
+		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
+			return nil, fmt.Errorf("%w: %v", util.ErrPolicyNotFound, err)
+		}
+
 		diagnostics.AddError(
 			"Error reading Policy "+policyId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+

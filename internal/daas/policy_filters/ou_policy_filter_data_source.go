@@ -4,6 +4,8 @@ package policy_filters
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -62,6 +64,13 @@ func (d *ouPolicyFilterDataSource) Read(ctx context.Context, req datasource.Read
 		// Get refreshed policy set from Orchestration
 		policyFilter, err = getPolicyFilter(ctx, d.client, &resp.Diagnostics, data.Id.ValueString())
 		if err != nil {
+			// Check if this is a "policy filter not found" error
+			if errors.Is(err, util.ErrPolicyFilterNotFound) {
+				resp.Diagnostics.AddError(
+					"Policy Filter not found",
+					fmt.Sprintf("Policy Filter with ID %s was not found.", data.Id.ValueString()),
+				)
+			}
 			return
 		}
 	}

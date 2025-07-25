@@ -19,7 +19,7 @@ import (
 
 type ResourceModelWithAttributeMasking interface {
 	ResourceModelWithAttributes
-	GetAttributesNamesToMask() map[string]bool
+	GetAttributesNamesToMask() map[string]bool // Sensitive attributes are automatically masked. Only include attributes that need to be masked but are not marked as sensitive in the schema.
 }
 
 type ResourceModelWithAttributes interface {

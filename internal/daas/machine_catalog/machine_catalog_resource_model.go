@@ -34,9 +34,8 @@ import (
 
 func (MachineCatalogResourceModel) GetAttributesNamesToMask() map[string]bool {
 	return map[string]bool{
-		"ad_account_name":    true,
-		"service_account_id": true,
-		"service_account":    true,
+		"ad_account_name": true,
+		"service_account": true,
 	}
 }
 
@@ -172,26 +171,27 @@ func (MachineCatalogMachineModel) GetAttributes() map[string]schema.Attribute {
 
 // ProvisioningSchemeModel maps the nested provisioning scheme resource schema data.
 type ProvisioningSchemeModel struct {
-	Hypervisor                     types.String `tfsdk:"hypervisor"`
-	HypervisorResourcePool         types.String `tfsdk:"hypervisor_resource_pool"`
-	AzureMachineConfig             types.Object `tfsdk:"azure_machine_config"`     // AzureMachineConfigModel
-	AwsMachineConfig               types.Object `tfsdk:"aws_machine_config"`       // AwsMachineConfigModel
-	GcpMachineConfig               types.Object `tfsdk:"gcp_machine_config"`       // GcpMachineConfigModel
-	VsphereMachineConfig           types.Object `tfsdk:"vsphere_machine_config"`   // VsphereMachineConfigModel
-	XenserverMachineConfig         types.Object `tfsdk:"xenserver_machine_config"` // XenserverMachineConfigModel
-	NutanixMachineConfig           types.Object `tfsdk:"nutanix_machine_config"`   // NutanixMachineConfigModel
-	SCVMMMachineConfigModel        types.Object `tfsdk:"scvmm_machine_config"`     // SCVMMMachineConfigModel
-	OpenshiftMachineConfig         types.Object `tfsdk:"openshift_machine_config"` // OpenshiftMachineConfigModel
-	NumTotalMachines               types.Int64  `tfsdk:"number_of_total_machines"`
-	NetworkMapping                 types.List   `tfsdk:"network_mapping"`    // List[NetworkMappingModel]
-	AvailabilityZones              types.List   `tfsdk:"availability_zones"` // List[string]
-	IdentityType                   types.String `tfsdk:"identity_type"`
-	MachineDomainIdentity          types.Object `tfsdk:"machine_domain_identity"`        // MachineDomainIdentityModel
-	MachineAccountCreationRules    types.Object `tfsdk:"machine_account_creation_rules"` // MachineAccountCreationRulesModel
-	MachineADAccounts              types.List   `tfsdk:"machine_ad_accounts"`            // Set[MachineADAccountModel]
-	CustomProperties               types.List   `tfsdk:"custom_properties"`              // List[CustomPropertyModel]
-	Metadata                       types.List   `tfsdk:"metadata"`                       // List[NameValueStringPairModel]
-	ApplyUpdatesToExistingMachines types.Bool   `tfsdk:"apply_updates_to_existing_machines"`
+	Hypervisor                        types.String `tfsdk:"hypervisor"`
+	HypervisorResourcePool            types.String `tfsdk:"hypervisor_resource_pool"`
+	AzureMachineConfig                types.Object `tfsdk:"azure_machine_config"`                  // AzureMachineConfigModel
+	AwsMachineConfig                  types.Object `tfsdk:"aws_machine_config"`                    // AwsMachineConfigModel
+	AmazonWorkspacesCoreMachineConfig types.Object `tfsdk:"amazon_workspaces_core_machine_config"` // AmazonWorkspacesCoreMachineConfigModel
+	GcpMachineConfig                  types.Object `tfsdk:"gcp_machine_config"`                    // GcpMachineConfigModel
+	VsphereMachineConfig              types.Object `tfsdk:"vsphere_machine_config"`                // VsphereMachineConfigModel
+	XenserverMachineConfig            types.Object `tfsdk:"xenserver_machine_config"`              // XenserverMachineConfigModel
+	NutanixMachineConfig              types.Object `tfsdk:"nutanix_machine_config"`                // NutanixMachineConfigModel
+	SCVMMMachineConfigModel           types.Object `tfsdk:"scvmm_machine_config"`                  // SCVMMMachineConfigModel
+	OpenshiftMachineConfig            types.Object `tfsdk:"openshift_machine_config"`              // OpenshiftMachineConfigModel
+	NumTotalMachines                  types.Int64  `tfsdk:"number_of_total_machines"`
+	NetworkMapping                    types.List   `tfsdk:"network_mapping"`    // List[NetworkMappingModel]
+	AvailabilityZones                 types.List   `tfsdk:"availability_zones"` // List[string]
+	IdentityType                      types.String `tfsdk:"identity_type"`
+	MachineDomainIdentity             types.Object `tfsdk:"machine_domain_identity"`        // MachineDomainIdentityModel
+	MachineAccountCreationRules       types.Object `tfsdk:"machine_account_creation_rules"` // MachineAccountCreationRulesModel
+	MachineADAccounts                 types.List   `tfsdk:"machine_ad_accounts"`            // Set[MachineADAccountModel]
+	CustomProperties                  types.List   `tfsdk:"custom_properties"`              // List[CustomPropertyModel]
+	Metadata                          types.List   `tfsdk:"metadata"`                       // List[NameValueStringPairModel]
+	ApplyUpdatesToExistingMachines    types.Bool   `tfsdk:"apply_updates_to_existing_machines"`
 }
 
 func (ProvisioningSchemeModel) GetSchema() schema.SingleNestedAttribute {
@@ -215,15 +215,16 @@ func (ProvisioningSchemeModel) GetSchema() schema.SingleNestedAttribute {
 					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
 				},
 			},
-			"azure_machine_config":     AzureMachineConfigModel{}.GetSchema(),
-			"aws_machine_config":       AwsMachineConfigModel{}.GetSchema(),
-			"gcp_machine_config":       GcpMachineConfigModel{}.GetSchema(),
-			"vsphere_machine_config":   VsphereMachineConfigModel{}.GetSchema(),
-			"xenserver_machine_config": XenserverMachineConfigModel{}.GetSchema(),
-			"nutanix_machine_config":   NutanixMachineConfigModel{}.GetSchema(),
-			"openshift_machine_config": OpenshiftMachineConfigModel{}.GetSchema(),
-			"scvmm_machine_config":     SCVMMMachineConfigModel{}.GetSchema(),
-			"machine_domain_identity":  MachineDomainIdentityModel{}.GetSchema(),
+			"azure_machine_config":                  AzureMachineConfigModel{}.GetSchema(),
+			"aws_machine_config":                    AwsMachineConfigModel{}.GetSchema(),
+			"amazon_workspaces_core_machine_config": AmazonWorkspacesCoreMachineConfigModel{}.GetSchema(),
+			"gcp_machine_config":                    GcpMachineConfigModel{}.GetSchema(),
+			"vsphere_machine_config":                VsphereMachineConfigModel{}.GetSchema(),
+			"xenserver_machine_config":              XenserverMachineConfigModel{}.GetSchema(),
+			"nutanix_machine_config":                NutanixMachineConfigModel{}.GetSchema(),
+			"openshift_machine_config":              OpenshiftMachineConfigModel{}.GetSchema(),
+			"scvmm_machine_config":                  SCVMMMachineConfigModel{}.GetSchema(),
+			"machine_domain_identity":               MachineDomainIdentityModel{}.GetSchema(),
 			"number_of_total_machines": schema.Int64Attribute{
 				Description: "Number of VDA machines allocated in the catalog." +
 					"\n\n~> **Please Note** When deleting machines, ensure machines that need to be deleted have no active sessions. For machines with `Static` allocation type, also ensure there are no assigned users." +
@@ -436,6 +437,10 @@ func (MachineAccountCreationRulesModel) GetSchema() schema.SingleNestedAttribute
 			"naming_scheme": schema.StringAttribute{
 				Description: "Defines the template name for AD accounts created in the identity pool.",
 				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+					stringvalidator.LengthAtMost(15),
+				},
 			},
 			"naming_scheme_type": schema.StringAttribute{
 				Description: "Type of naming scheme. This defines the format of the variable part of the AD account names that will be created. Choose between `Numeric` and `Alphabetic`.",

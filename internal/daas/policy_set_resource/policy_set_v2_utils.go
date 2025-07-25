@@ -87,6 +87,10 @@ func updatePolicySetDeliveryGroups(ctx context.Context, diagnostics *diag.Diagno
 func getPolicySetDetailsForRefreshState(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, policySetId string) (*citrixorchestration.PolicySetResponse, []string, []citrixorchestration.DeliveryGroupResponseModel, error) {
 	policySet, err := policies.GetPolicySet(ctx, client, diagnostics, policySetId)
 	if err != nil {
+		// Check if this is a "policy set not found" error - return a specific error that can be handled by the caller
+		if strings.Contains(err.Error(), "policy set not found") {
+			return nil, nil, nil, fmt.Errorf("policy set not found: %w", err)
+		}
 		return nil, nil, nil, err
 	}
 

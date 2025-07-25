@@ -27,6 +27,7 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_role"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_user"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/application"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/autoscale_plugin_template"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/bearer_token"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/cvad_site"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/desktop_icon"
@@ -46,6 +47,7 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/quickcreate/qcs_connection"
 	"github.com/citrix/terraform-provider-citrix/internal/quickcreate/qcs_deployment"
 	"github.com/citrix/terraform-provider-citrix/internal/quickcreate/qcs_image"
+	"github.com/citrix/terraform-provider-citrix/internal/quickdeploy/cma_catalog"
 	"github.com/citrix/terraform-provider-citrix/internal/quickdeploy/cma_image"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_authentication"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_deployment"
@@ -992,6 +994,7 @@ func (p *citrixProvider) DataSources(_ context.Context) []func() datasource.Data
 		image_definition.NewImageDefinitionDataSource,
 		image_definition.NewImageVersionDataSource,
 		service_account.NewServiceAccountDataSource,
+		autoscale_plugin_template.NewAutoscalePluginTemplateDataSource,
 		// StoreFront DataSources
 		stf_roaming.NewSTFRoamingServiceDataSource,
 		// QuickCreate DataSources
@@ -1027,6 +1030,7 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		hypervisor.NewOpenShiftHypervisorResource,
 		hypervisor.NewHpeMoonshotHypervisorResource,
 		hypervisor.NewRemotePCWakeOnLANHypervisorResource,
+		hypervisor.NewAmazonWorkSpacesCoreHypervisorResource,
 		hypervisor_resource_pool.NewAzureHypervisorResourcePoolResource,
 		hypervisor_resource_pool.NewAwsHypervisorResourcePoolResource,
 		hypervisor_resource_pool.NewGcpHypervisorResourcePoolResource,
@@ -1035,6 +1039,7 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		hypervisor_resource_pool.NewNutanixHypervisorResourcePoolResource,
 		hypervisor_resource_pool.NewSCVMMHypervisorResourcePoolResource,
 		hypervisor_resource_pool.NewOpenShiftHypervisorResourcePoolResource,
+		hypervisor_resource_pool.NewAmazonWorkSpacesCoreHypervisorResourcePoolResource,
 		machine_catalog.NewMachineCatalogResource,
 		machine_catalog.NewMachinePropertiesResource,
 		delivery_group.NewDeliveryGroupResource,
@@ -1072,6 +1077,7 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		service_account.NewServiceAccountResource,
 		cvad_site.NewSiteSettingsResource,
 		site_backup_schedule.NewSiteBackupScheduleResource,
+		autoscale_plugin_template.NewAutoscalePluginTemplateResource,
 		// StoreFront Resources
 		stf_deployment.NewSTFDeploymentResource,
 		stf_authentication.NewSTFAuthenticationServiceResource,
@@ -1086,6 +1092,7 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		qcs_deployment.NewAwsWorkspacesDeploymentResource,
 		// QuickDeploy Resources
 		cma_image.NewCitrixManagedAzureImageResource,
+		cma_catalog.NewCitrixManagedCatalogResource,
 		// CC Identity Provider Resources
 		cc_identity_providers.NewGoogleIdentityProviderResource,
 		cc_identity_providers.NewOktaIdentityProviderResource,

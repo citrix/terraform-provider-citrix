@@ -173,6 +173,25 @@ resource "citrix_delivery_group" "example-delivery-group" {
         }
     ]
     color_depth = "TwentyFourBit"
+    autoscale_plugins = [
+        {
+            name ="plugin-1"
+            description = "test plugin"
+            priority = 10
+            enabled = true
+            dates = [
+                "2025-12-31",
+                "2025-12-25",
+            ]
+        },
+        {
+            name ="plugin-2"
+            description = "test plugin 2"
+            priority = 20
+            enabled = true
+            dates = citrix_autoscale_plugin_template.example-template.dates # Alternatively, you can use data source. Eg. data.citrix_autoscale_plugin_template.example-template.dates
+        }
+    ]
 }
 ```
 

@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
@@ -104,126 +103,8 @@ func (r *ImageVersionResource) Create(ctx context.Context, req resource.CreateRe
 		imageScheme.SetNetworkMapping(networkMapping)
 	}
 
-	if !plan.AzureImageSpecs.IsNull() {
-		azureImageSpecs := util.ObjectValueToTypedObject[util.AzureImageSpecsModel](ctx, &resp.Diagnostics, plan.AzureImageSpecs)
-		sharedSubscription := azureImageSpecs.SharedSubscription.ValueString()
-		resourceGroup := azureImageSpecs.ResourceGroup.ValueString()
-		masterImage := azureImageSpecs.MasterImage.ValueString()
-
-		masterImagePath, err = util.BuildAzureMasterImagePath(ctx, r.client, &resp.Diagnostics, azureImageSpecs.GalleryImage, sharedSubscription, resourceGroup, "", "", masterImage, hypervisorId, plan.ResourcePool.ValueString(), "Error creating Image Version")
-		if err != nil {
-			return
-		}
-
-		machineProfile := azureImageSpecs.MachineProfile
-		if !machineProfile.IsNull() {
-			machineProfilePath, err := util.HandleMachineProfileForAzureMcsPvsCatalog(ctx, r.client, &resp.Diagnostics, hypervisorId, hypervisorResourcePool.GetName(), util.ObjectValueToTypedObject[util.AzureMachineProfileModel](ctx, &resp.Diagnostics, machineProfile), "Error creating Image Version")
-			if err != nil {
-				return
-			}
-			imageScheme.SetMachineProfile(machineProfilePath)
-		}
-
-		// Set ServiceOfferingPath
-		serviceOffering := azureImageSpecs.ServiceOffering.ValueString()
-		serviceOfferingQueryPath := "serviceoffering.folder"
-		serviceOfferingPath, httpResp, err := util.GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx, r.client, &resp.Diagnostics, hypervisorId, hypervisorResourcePool.GetName(), serviceOfferingQueryPath, serviceOffering, util.ServiceOfferingResourceType, "")
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error creating Image Version",
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					fmt.Sprintf("\nFailed to resolve service offering %s on Azure, error: %s", serviceOffering, err.Error()),
-			)
-			return
-		}
-		imageScheme.SetServiceOfferingPath(serviceOfferingPath)
-
-		// Set CustomProperties
-		customProperties := &[]citrixorchestration.NameValueStringPairModel{}
-		// Set Storage Type
-		util.AppendNameValueStringPair(customProperties, "StorageType", azureImageSpecs.StorageType.ValueString())
-		licenseType := azureImageSpecs.LicenseType.ValueString()
-		// Set License Type
-		util.AppendNameValueStringPair(customProperties, "LicenseType", licenseType)
-		// Set Disk Encryption Set
-		if !azureImageSpecs.DiskEncryptionSet.IsNull() {
-			diskEncryptionSetModel := util.ObjectValueToTypedObject[util.AzureDiskEncryptionSetModel](ctx, &resp.Diagnostics, azureImageSpecs.DiskEncryptionSet)
-			diskEncryptionSet := diskEncryptionSetModel.DiskEncryptionSetName.ValueString()
-			diskEncryptionSetRg := diskEncryptionSetModel.DiskEncryptionSetResourceGroup.ValueString()
-			des, httpResp, err := util.GetSingleResourceFromHypervisorWithNoCacheRetry(ctx, r.client, &resp.Diagnostics, hypervisorId, plan.ResourcePool.ValueString(), fmt.Sprintf("%s\\diskencryptionset.folder", hypervisorResourcePool.GetXDPath()), diskEncryptionSet, "", diskEncryptionSetRg)
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error creating Image Version",
-					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-						fmt.Sprintf("\nFailed to locate disk encryption set %s in resource group %s, error: %s", diskEncryptionSet, diskEncryptionSetRg, err.Error()),
-				)
-			}
-			util.AppendNameValueStringPair(customProperties, "DiskEncryptionSetId", des.GetId())
-		}
-		imageScheme.SetCustomProperties(*customProperties)
-	} else if !plan.VsphereImageSpecs.IsNull() {
-		vsphereImageSpecs := util.ObjectValueToTypedObject[VsphereImageSpecsModel](ctx, &resp.Diagnostics, plan.VsphereImageSpecs)
-		imageScheme.SetMemoryMB(vsphereImageSpecs.MemoryMB.ValueInt32())
-
-		imageVm := vsphereImageSpecs.MasterImageVm.ValueString()
-		snapshotPath := vsphereImageSpecs.ImageSnapshot.ValueString()
-		masterImagePath = fmt.Sprintf("XDHyp:\\HostingUnits\\%s\\%s.vm", hypervisorResourcePool.GetName(), imageVm)
-		for _, snapshot := range strings.Split(snapshotPath, "/") {
-			masterImagePath += fmt.Sprintf("\\%s.snapshot", snapshot)
-		}
-
-		imageScheme.SetCpuCount(vsphereImageSpecs.CpuCount.ValueInt32())
-		if !vsphereImageSpecs.MachineProfile.IsNull() {
-			// Set Machine Profile
-			machineProfileName := vsphereImageSpecs.MachineProfile.ValueString()
-			machineProfile, httpResp, err := util.GetSingleResourceFromHypervisorWithNoCacheRetry(ctx, r.client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", machineProfileName, util.TemplateResourceType, "")
-			if err != nil {
-				resp.Diagnostics.AddError(
-					"Error creating Machine Catalog",
-					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-						fmt.Sprintf("\nFailed to locate machine profile %s on vSphere, error: %s", machineProfileName, err.Error()),
-				)
-				return
-			}
-
-			imageScheme.SetMachineProfile(machineProfile.GetXDPath())
-
-			// CPU count will inherit from machine profile
-			machineProfileAdditionalData := machineProfile.GetAdditionalData()
-			machineProfileCpuCountSpecified := false
-			for _, entry := range machineProfileAdditionalData {
-				if strings.EqualFold(entry.GetName(), util.CPU_COUNT_PROPERTY_NAME) {
-					machineProfileCpuCountSpecified = true
-					machineProfileCpuCount, err := strconv.ParseInt(entry.GetValue(), 10, 32)
-					if err != nil {
-						resp.Diagnostics.AddError(
-							"Error creating vSphere Image Version",
-							"Unable to parse the number of CPU(s) from the configuration of machine profile "+machineProfileName,
-						)
-						return
-					}
-					if int32(machineProfileCpuCount) != vsphereImageSpecs.CpuCount.ValueInt32() {
-						resp.Diagnostics.AddError(
-							"Error creating vSphere Image Version",
-							fmt.Sprintf("The specified `cpu_count` value %d does not match the number of CPU(s) %d of machine profile %s.", vsphereImageSpecs.CpuCount.ValueInt32(), machineProfileCpuCount, machineProfileName),
-						)
-						return
-					}
-				}
-			}
-			if !machineProfileCpuCountSpecified {
-				resp.Diagnostics.AddError(
-					"Error creating vSphere Image Version",
-					"Machine profile "+machineProfileName+" does not have the number of CPU(s) specified.",
-				)
-				return
-			}
-		}
-	} else {
-		resp.Diagnostics.AddError(
-			"Error creating Image Version",
-			"Unsupported hypervisor connection: "+hypervisorId,
-		)
+	masterImagePath, err = buildImageScheme(ctx, r.client, &resp.Diagnostics, &imageScheme, plan, hypervisor, hypervisorResourcePool)
+	if err != nil {
 		return
 	}
 
@@ -567,6 +448,15 @@ func validateImageVersionConfigs(ctx context.Context, client *citrixdaasclient.C
 		machineProfileSpecified := !vsphereImageSpecs.MachineProfile.IsNull()
 		err = validateImageVersionMachineProfileConfigs(diagnostics, plan.Id.ValueString(), imageVersionsInDefinition, machineProfileSpecified, operation)
 		if err != nil {
+			return err
+		}
+	case util.AMAZON_WORKSPACES_CORE_FACTORY_NAME:
+		if plan.AmazonWorkspacesCoreImageSpecs.IsNull() {
+			err := fmt.Errorf("amazon_workspaces_core_image_specs is required when creating image version with an Amazon Workspaces Core hypervisor connection")
+			diagnostics.AddError(
+				"Error "+operation+" Image Version",
+				err.Error(),
+			)
 			return err
 		}
 	default:
