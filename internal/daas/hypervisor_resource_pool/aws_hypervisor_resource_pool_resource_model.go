@@ -80,7 +80,7 @@ func (AwsHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 					stringplanmodifier.RequiresReplaceIfConfigured(),
 				},
 			},
-			"metadata": util.GetMetadataListSchema("Hypervosor Resource Pool"),
+			"metadata": util.GetMetadataListSchema("Hypervisor Resource Pool"),
 			"vm_tagging": schema.BoolAttribute{
 				Description: "Indicates whether VMs created by provisioning operations should be tagged. Default is `true`.",
 				Optional:    true,

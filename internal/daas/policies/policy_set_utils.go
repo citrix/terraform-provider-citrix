@@ -39,6 +39,11 @@ func GetPolicySet(ctx context.Context, client *citrixdaasclient.CitrixDaasClient
 	getPolicySetRequest = getPolicySetRequest.WithPolicies(true)
 	policySet, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.PolicySetResponse](getPolicySetRequest, client)
 	if err != nil {
+		// Check if this is a 404 Not Found error - return a specific error that can be handled by the caller
+		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
+			return nil, fmt.Errorf("%w: %v", util.ErrPolicySetNotFound, err)
+		}
+
 		diagnostics.AddError(
 			"Error Reading Policy Set "+policySetId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+

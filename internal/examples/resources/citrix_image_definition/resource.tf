@@ -20,3 +20,12 @@ resource "citrix_image_definition" "example_vsphere_image_definition" {
     hypervisor      = citrix_vsphere_hypervisor.example_vsphere_hypervisor.id
     hypervisor_resource_pool = citrix_vsphere_hypervisor_resource_pool.example_vsphere_hypervisor_resource_pool.id
 }
+
+resource "citrix_image_definition" "example_workspaces_core_image_definition" {
+    name            = "Example Amazon WorkSpaces Core Image Definition"
+    description     = "Example Amazon WorkSpaces Core Image Definition Description"
+    os_type         = "Windows"
+    session_support = "MultiSession"
+    hypervisor      = citrix_amazon_workspaces_core_hypervisor.example-amazon-workspaces-core-hypervisor-using-api-key.id
+    hypervisor_resource_pool = citrix_amazon_workspaces_core_hypervisor_resource_pool.example-amazon-workspaces-core-hypervisor-resource-pool.id
+}

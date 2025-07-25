@@ -4,6 +4,7 @@ package policy_set_resource
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -139,6 +140,15 @@ func (r *policySetV2Resource) Read(ctx context.Context, req resource.ReadRequest
 
 	policySet, policySetScopes, associatedDeliveryGroups, err := getPolicySetDetailsForRefreshState(ctx, &resp.Diagnostics, r.client, state.Id.ValueString())
 	if err != nil {
+		// Check if this is a "policy set not found" error
+		if errors.Is(err, util.ErrPolicySetNotFound) {
+			resp.Diagnostics.AddWarning(
+				"Policy Set not found",
+				fmt.Sprintf("Policy Set %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", state.Id.ValueString()),
+			)
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		return
 	}
 

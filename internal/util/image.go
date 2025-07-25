@@ -413,13 +413,108 @@ func (AzureImageSpecsModel) GetSchema() schema.SingleNestedAttribute {
 			objectplanmodifier.RequiresReplace(),
 		},
 		Validators: []validator.Object{
-			objectvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("vsphere_image_specs")),
+			objectvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("vsphere_image_specs"), path.MatchRelative().AtParent().AtName("amazon_workspaces_core_image_specs")),
 		},
 	}
 }
 
 func (AzureImageSpecsModel) GetAttributes() map[string]schema.Attribute {
 	return AzureImageSpecsModel{}.GetSchema().Attributes
+}
+
+type AmazonWorkspacesCoreMachineProfileModel struct {
+	VmName                types.String `tfsdk:"vm_name"`
+	VmRegionAZ            types.String `tfsdk:"vm_region_az"`
+	VmId                  types.String `tfsdk:"vm_id"`
+	LaunchTemplateName    types.String `tfsdk:"launch_template_name"`
+	LaunchTemplateVersion types.String `tfsdk:"launch_template_version"`
+	LaunchTemplateId      types.String `tfsdk:"launch_template_id"`
+}
+
+func (AmazonWorkspacesCoreMachineProfileModel) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "The name of the virtual machine that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone." + "<br />" +
+			"While providing machine profile, specify either `vm_name + vm_region_az + vm_id` or `launch_template_name + launch_template_version + launch_template_id`, but not both.",
+		Required: true,
+		Attributes: map[string]schema.Attribute{
+			"vm_name": schema.StringAttribute{
+				Description: "The name of the machine profile virtual machine.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("vm_region_az"),
+						path.MatchRelative().AtParent().AtName("vm_id"),
+					}...),
+					stringvalidator.ExactlyOneOf(path.Expressions{
+						path.MatchRelative().AtParent().AtName("launch_template_name"),
+					}...),
+				},
+			},
+			"vm_region_az": schema.StringAttribute{
+				Description: "The region and availability zone of the machine profile virtual machine.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("vm_name"),
+						path.MatchRelative().AtParent().AtName("vm_id"),
+					}...),
+				},
+			},
+			"vm_id": schema.StringAttribute{
+				Description: "The instance ID of the machine profile virtual machine.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("vm_name"),
+						path.MatchRelative().AtParent().AtName("vm_region_az"),
+					}...),
+				},
+			},
+			"launch_template_name": schema.StringAttribute{
+				Description: "The launch template name of the machine profile.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("launch_template_version"),
+						path.MatchRelative().AtParent().AtName("launch_template_id"),
+					}...),
+				},
+			},
+			"launch_template_version": schema.StringAttribute{
+				Description: "The launch template version of the machine profile.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("launch_template_name"),
+						path.MatchRelative().AtParent().AtName("launch_template_id"),
+					}...),
+				},
+			},
+			"launch_template_id": schema.StringAttribute{
+				Description: "The launch template ID of the machine profile.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.AlsoRequires(path.Expressions{
+						path.MatchRelative().AtParent().AtName("launch_template_name"),
+						path.MatchRelative().AtParent().AtName("launch_template_version"),
+					}...),
+				},
+			},
+		},
+		PlanModifiers: []planmodifier.Object{
+			objectplanmodifier.RequiresReplaceIf(
+				func(_ context.Context, req planmodifier.ObjectRequest, resp *objectplanmodifier.RequiresReplaceIfFuncResponse) {
+					resp.RequiresReplace = req.ConfigValue.IsNull() != req.StateValue.IsNull()
+				},
+				"Force replace when machine_profile is added or removed. Update is allowed only if previously set.",
+				"Force replace when machine_profile is added or removed. Update is allowed only if previously set.",
+			),
+		},
+	}
+}
+
+func (AmazonWorkspacesCoreMachineProfileModel) GetAttributes() map[string]schema.Attribute {
+	return AmazonWorkspacesCoreMachineProfileModel{}.GetSchema().Attributes
 }
 
 type AwsMachineProfileModel struct {
@@ -565,12 +660,100 @@ func HandleMachineProfileForAwsMcsPvsCatalog(ctx context.Context, client *citrix
 	}
 }
 
+func HandleMachineProfileForAmazonWorkspacesCoreMcsCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diag *diag.Diagnostics, hypervisorName string, resourcePoolName string, machineProfile AmazonWorkspacesCoreMachineProfileModel, errorTitle string) (string, error) {
+	isUsingImageTemplate := false
+	if machineProfile.VmName.IsNull() || machineProfile.VmName.IsUnknown() {
+		isUsingImageTemplate = true
+	}
+
+	if isUsingImageTemplate {
+		launchTemplateName := machineProfile.LaunchTemplateName.ValueString()
+		launchTemplateVersion := machineProfile.LaunchTemplateVersion.ValueString()
+		launchTemplateId := machineProfile.LaunchTemplateId.ValueString()
+
+		folderPath := fmt.Sprintf("%s (%s).launchtemplate", launchTemplateName, launchTemplateId)
+
+		launchTemplate := fmt.Sprintf("%s (%s)", launchTemplateId, launchTemplateVersion)
+		machineProfilePath, httpResp, err := GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx, client, diag, hypervisorName, resourcePoolName, folderPath, launchTemplate, LaunchTemplateVersionResourceType, "")
+		if err != nil {
+			diag.AddError(
+				errorTitle,
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					fmt.Sprintf("\nFailed to locate machine profile launch template %s with version %s on AWS, error: %s", folderPath, launchTemplate, err.Error()),
+			)
+			return "", fmt.Errorf("Failed to locate machine profile launch template %s with version %s on AWS, error: %s", folderPath, launchTemplate, err.Error())
+		}
+		return machineProfilePath, nil
+	} else {
+		machineProfileVmName := machineProfile.VmName.ValueString()
+		machineProfileVmRegionAZ := machineProfile.VmRegionAZ.ValueString()
+		machineProfileVmId := machineProfile.VmId.ValueString()
+
+		folderPath := fmt.Sprintf("%s.availabilityzone", machineProfileVmRegionAZ)
+
+		awsMachineProfile := fmt.Sprintf("%s (%s)", machineProfileVmName, machineProfileVmId)
+		machineProfilePath, httpResp, err := GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx, client, diag, hypervisorName, resourcePoolName, folderPath, awsMachineProfile, VirtualMachineResourceType, "")
+		if err != nil {
+			diag.AddError(
+				errorTitle,
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					fmt.Sprintf("\nFailed to locate machine profile %s on AWS, error: %s", machineProfileVmName, err.Error()),
+			)
+			return "", fmt.Errorf("Failed to locate machine profile VM %s on AWS, error: %s", machineProfileVmName, err.Error())
+		}
+		return machineProfilePath, nil
+	}
+}
+
 func ParseAwsMachineProfileResponseToModel(machineProfileResponse citrixorchestration.HypervisorResourceRefResponseModel) *AwsMachineProfileModel {
 	machineProfileModel := AwsMachineProfileModel{}
 	if machineProfileName := machineProfileResponse.GetName(); machineProfileName != "" {
 		machineProfileSegments := strings.Split(machineProfileResponse.GetXDPath(), "\\")
 		lastIndex := len(machineProfileSegments) - 1
-		if strings.HasSuffix(machineProfileSegments[lastIndex], "Vm") {
+		if strings.HasSuffix(strings.ToLower(machineProfileSegments[lastIndex]), "vm") {
+			machineProfileModel.VmName = types.StringValue(strings.Split(machineProfileName, " (i-")[0])
+			machineProfileModel.VmId = types.StringValue(strings.TrimSuffix((strings.Split(machineProfileName, " (")[1]), ")"))
+		} else {
+			launchTemplateVersion := strings.TrimSuffix(machineProfileSegments[lastIndex], ".launchtemplateversion")
+			machineProfileModel.LaunchTemplateId = types.StringValue(strings.Split(launchTemplateVersion, " (")[0])
+			machineProfileModel.LaunchTemplateVersion = types.StringValue(strings.TrimSuffix((strings.Split(launchTemplateVersion, " (")[1]), ")"))
+		}
+
+		regionAzIndex := slices.IndexFunc(machineProfileSegments, func(machineProfileSegment string) bool {
+			return strings.Contains(machineProfileSegment, ".availabilityzone")
+		})
+
+		if regionAzIndex != -1 {
+			regionAZ := strings.TrimSuffix(machineProfileSegments[regionAzIndex], ".availabilityzone")
+			machineProfileModel.VmRegionAZ = types.StringValue(regionAZ)
+		}
+
+		templateNameIndex := slices.IndexFunc(machineProfileSegments, func(machineProfileSegment string) bool {
+			return strings.Contains(machineProfileSegment, ".launchtemplate")
+		})
+
+		if templateNameIndex != -1 {
+			launchTemplate := strings.TrimSuffix(machineProfileSegments[templateNameIndex], ".launchtemplate")
+			templateName := strings.Split(launchTemplate, " (")[0]
+			machineProfileModel.LaunchTemplateName = types.StringValue(templateName)
+		}
+	} else {
+		machineProfileModel.VmName = types.StringNull()
+		machineProfileModel.VmId = types.StringNull()
+		machineProfileModel.VmRegionAZ = types.StringNull()
+		machineProfileModel.LaunchTemplateName = types.StringNull()
+		machineProfileModel.LaunchTemplateVersion = types.StringNull()
+		machineProfileModel.LaunchTemplateId = types.StringNull()
+	}
+	return &machineProfileModel
+}
+
+func ParseAmazonWorkspacesCoreMachineProfileResponseToModel(machineProfileResponse citrixorchestration.HypervisorResourceRefResponseModel) *AmazonWorkspacesCoreMachineProfileModel {
+	machineProfileModel := AmazonWorkspacesCoreMachineProfileModel{}
+	if machineProfileName := machineProfileResponse.GetName(); machineProfileName != "" {
+		machineProfileSegments := strings.Split(machineProfileResponse.GetXDPath(), "\\")
+		lastIndex := len(machineProfileSegments) - 1
+		if strings.HasSuffix(strings.ToLower(machineProfileSegments[lastIndex]), "vm") {
 			machineProfileModel.VmName = types.StringValue(strings.Split(machineProfileName, " (i-")[0])
 			machineProfileModel.VmId = types.StringValue(strings.TrimSuffix((strings.Split(machineProfileName, " (")[1]), ")"))
 		} else {

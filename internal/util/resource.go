@@ -17,6 +17,7 @@ import (
 
 // Plugin Factory Names
 const AZURERM_FACTORY_NAME string = "AzureRmFactory"
+const AMAZON_WORKSPACES_CORE_FACTORY_NAME string = "AmazonWorkSpacesCoreMachineManagerFactory"
 const VMWARE_FACTORY_NAME string = "VmwareFactory"
 const NUTANIX_PLUGIN_ID string = "AcropolisFactory"
 const OPENSHIFT_PLUGIN_ID string = "OpenShiftPluginFactory"
@@ -480,11 +481,11 @@ func getFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.C
 		for _, child := range resources.Children {
 			if strings.EqualFold(child.ResourceType, resourceType) {
 				name := child.GetName()
-				if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS {
+				if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS || connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AMAZON_WORK_SPACES_CORE {
 					name = strings.Split(name, " ")[0]
 				}
 				if _, exists := filterMap[strings.ToLower(name)]; exists {
-					if (connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM || connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER || connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT) && strings.EqualFold(resourceType, NetworkResourceType) {
+					if (connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM || connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER || connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT || connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AMAZON_WORK_SPACES_CORE) && strings.EqualFold(resourceType, NetworkResourceType) {
 						result = append(result, child.GetRelativePath())
 					} else if (connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && strings.EqualFold(pluginId, NUTANIX_PLUGIN_ID) && strings.EqualFold(resourceType, NetworkResourceType)) || (connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT && strings.EqualFold(pluginId, OPENSHIFT_PLUGIN_ID) && strings.EqualFold(resourceType, NamespaceResourceType)) {
 						result = append(result, child.GetFullName())

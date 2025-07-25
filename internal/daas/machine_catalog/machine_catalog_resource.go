@@ -1049,6 +1049,15 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 				}
 			}
 
+			if !provSchemeModel.AmazonWorkspacesCoreMachineConfig.IsNull() {
+				amazonWorkspacesCoreMachineConfigModel := util.ObjectValueToTypedObject[AmazonWorkspacesCoreMachineConfigModel](ctx, &resp.Diagnostics, provSchemeModel.AmazonWorkspacesCoreMachineConfig)
+				if !amazonWorkspacesCoreMachineConfigModel.ImageUpdateRebootOptions.IsNull() {
+					// Validate Image Update Reboot Options
+					rebootOptions := util.ObjectValueToTypedObject[ImageUpdateRebootOptionsModel](ctx, &resp.Diagnostics, amazonWorkspacesCoreMachineConfigModel.ImageUpdateRebootOptions)
+					rebootOptions.ValidateConfig(&resp.Diagnostics)
+				}
+			}
+
 			if !provSchemeModel.GcpMachineConfig.IsNull() {
 				gcpMachineConfigModel := util.ObjectValueToTypedObject[GcpMachineConfigModel](ctx, &resp.Diagnostics, provSchemeModel.GcpMachineConfig)
 				if !gcpMachineConfigModel.ImageUpdateRebootOptions.IsNull() {

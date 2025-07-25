@@ -234,6 +234,49 @@ resource "citrix_machine_catalog" "example-aws-with-machine-profile" {
     }	
 }
 
+resource "citrix_machine_catalog" "example-amazon-workspaces-core-mtsession" {
+    name                        = "example-amazon-workspaces-core-mtsession"
+    description                 = "Example multi-session catalog on Amazon WorkSpaces Core hypervisor"
+   	zone						= "<zone Id>"
+	allocation_type				= "Random"
+	session_support				= "MultiSession"
+	provisioning_type 			= "MCS"
+    provisioning_scheme         = {
+		hypervisor = citrix_amazon_workspaces_core_hypervisor.example-amazon-workspaces-core-hypervisor-using-api-key.id
+		hypervisor_resource_pool = citrix_amazon_workspaces_core_hypervisor_resource_pool.example-amazon-workspaces-core-hypervisor-resource-pool.id
+		identity_type      = "ActiveDirectory"
+		machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+			domain_ou				 = "<DomainOU>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+        amazon_workspaces_core_machine_config = {
+            service_offering = "t2.small"
+            prepared_image = {
+                image_definition = citrix_image_definition.example_workspaces_core_image_definition.id
+                image_version = citrix_image_version.example_workspaces_core_image_version.id
+            }
+			machine_profile = {
+                vm_name = "example-vm-name"
+                vm_id = "i-xxxxxxxxx"
+                vm_region_az = "us-east-1c"  # Example. Chose the region and availability zone where your VM is located.
+                # For machine profile, you can either provide VM related details or launch template related details, but not both.
+                # launch_template_name = "example_launch_template"
+                # launch_template_id = "lt-example"
+                # launch_template_version = "1"
+            }
+            master_image_note = "Example Image Note"
+            tenancy_type = "Shared"
+        }
+		number_of_total_machines =  1
+        machine_account_creation_rules ={
+			naming_scheme 	   = "wsc-multi-##"
+			naming_scheme_type = "Numeric"
+        }
+    }	
+}
+
 resource "citrix_machine_catalog" "example-gcp-mtsession" {
     name                        = "example-gcp-mtsession"
     description                 = "Example multi-session catalog on GCP hypervisor"
@@ -755,6 +798,7 @@ Required:
 
 Optional:
 
+- `amazon_workspaces_core_machine_config` (Attributes) Machine Configuration for Amazon Workspaces Core catalogs. (see [below for nested schema](#nestedatt--provisioning_scheme--amazon_workspaces_core_machine_config))
 - `apply_updates_to_existing_machines` (Boolean) Synchronizes the properties of all existing virtual machines with the provisioning scheme and then reboots those machines. This also includes any changes made with Set-ProvScheme or Set-ProvVM.
 
 ~> **Please Note** As long as this property is set to true, any update to the machine catalog (even outside of the provisioning scheme) will trigger an immediate reboot of all existing machines that are powered on and can disrupt any active sessions. It is safest to turn this property to `true`, run `apply` to update the existing machines, then turn it to `false`. Since the property is read from the resource plan, subsequent `apply` operations will not trigger an update.
@@ -777,6 +821,58 @@ Optional:
 - `scvmm_machine_config` (Attributes) Machine Configuration for SCVMM MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--scvmm_machine_config))
 - `vsphere_machine_config` (Attributes) Machine Configuration for vSphere MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--vsphere_machine_config))
 - `xenserver_machine_config` (Attributes) Machine Configuration For XenServer MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--xenserver_machine_config))
+
+<a id="nestedatt--provisioning_scheme--amazon_workspaces_core_machine_config"></a>
+### Nested Schema for `provisioning_scheme.amazon_workspaces_core_machine_config`
+
+Required:
+
+- `machine_profile` (Attributes) The name of the virtual machine that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone.<br />While providing machine profile, specify either `vm_name + vm_region_az + vm_id` or `launch_template_name + launch_template_version + launch_template_id`, but not both. (see [below for nested schema](#nestedatt--provisioning_scheme--amazon_workspaces_core_machine_config--machine_profile))
+- `service_offering` (String) The AWS VM Sku to use when creating machines.
+- `tenancy_type` (String) Tenancy type of the machine. Choose between `Shared`, `Instance` and `Host`.
+
+Optional:
+
+- `image_update_reboot_options` (Attributes) The options for how rebooting is performed for image update. When omitted, image update on the VDAs will be performed on next shutdown. (see [below for nested schema](#nestedatt--provisioning_scheme--amazon_workspaces_core_machine_config--image_update_reboot_options))
+- `master_image_note` (String) The note for the image.
+- `prepared_image` (Attributes) Specifying the prepared master image to be used for machine catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--amazon_workspaces_core_machine_config--prepared_image))
+
+<a id="nestedatt--provisioning_scheme--amazon_workspaces_core_machine_config--machine_profile"></a>
+### Nested Schema for `provisioning_scheme.amazon_workspaces_core_machine_config.machine_profile`
+
+Optional:
+
+- `launch_template_id` (String) The launch template ID of the machine profile.
+- `launch_template_name` (String) The launch template name of the machine profile.
+- `launch_template_version` (String) The launch template version of the machine profile.
+- `vm_id` (String) The instance ID of the machine profile virtual machine.
+- `vm_name` (String) The name of the machine profile virtual machine.
+- `vm_region_az` (String) The region and availability zone of the machine profile virtual machine.
+
+
+<a id="nestedatt--provisioning_scheme--amazon_workspaces_core_machine_config--image_update_reboot_options"></a>
+### Nested Schema for `provisioning_scheme.amazon_workspaces_core_machine_config.image_update_reboot_options`
+
+Required:
+
+- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. -> **Note** Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
+
+Optional:
+
+- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.-> **Note** When `reboot_duration` is set to `-1`, if a warning message should be displayed, `warning_duration` has to be set to `-1` to show the warning message immediately.-> **Note** When `reboot_duration` is not set to `-1`, `warning_duration` cannot be set to `-1`.
+- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot. The optional pattern '%m%' is replaced by the number of minutes until the reboot.
+- `warning_repeat_interval` (Number) Number of minutes to wait before showing the reboot warning message again.
+
+
+<a id="nestedatt--provisioning_scheme--amazon_workspaces_core_machine_config--prepared_image"></a>
+### Nested Schema for `provisioning_scheme.amazon_workspaces_core_machine_config.prepared_image`
+
+Required:
+
+- `image_definition` (String) ID of the image definition.
+- `image_version` (String) ID of the image version.
+
+
 
 <a id="nestedatt--provisioning_scheme--aws_machine_config"></a>
 ### Nested Schema for `provisioning_scheme.aws_machine_config`

@@ -49,3 +49,21 @@ resource "citrix_image_version" "example_vsphere_image_version" {
 		// machine_profile = "machine_profile_template_name"
 	}
 }
+
+resource "citrix_image_version" "example_workspaces_core_image_version" {
+    image_definition = citrix_image_definition.example_workspaces_core_image_definition.id
+	hypervisor = citrix_amazon_workspaces_core_hypervisor.example-amazon-workspaces-core-hypervisor.id
+	hypervisor_resource_pool = citrix_amazon_workspaces_core_hypervisor_resource_pool.example-amazon-workspaces-core-hypervisor-resource-pool.id
+	description = "Example image version for Amazon WorkSpaces Core"
+
+	amazon_workspaces_core_image_specs = {
+        service_offering = "T3 Medium Instance"
+        master_image = "example_master_image"
+        image_ami = "ami-00000000000000000"
+        machine_profile = {
+            vm_name = "example_vm_name"
+            vm_region_az = "us-east-1a"
+            vm_id = "i-0000000000000000"
+        }
+	}
+}

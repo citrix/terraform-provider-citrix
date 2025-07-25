@@ -5,6 +5,7 @@ package policy_filters
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -89,6 +90,11 @@ func getPolicyFilter(ctx context.Context, client *citrixdaasclient.CitrixDaasCli
 	getPolicyFilterRequest := client.ApiClient.GpoDAAS.GpoReadGpoFilter(ctx, policyFilterId)
 	policyFilter, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.FilterResponse](getPolicyFilterRequest, client)
 	if err != nil {
+		// Check if this is a 404 Not Found error - return a specific error that can be handled by the caller
+		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
+			return nil, fmt.Errorf("%w: %v", util.ErrPolicyFilterNotFound, err)
+		}
+
 		diagnostics.AddError(
 			"Error Reading Policy Filter "+policyFilterId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+

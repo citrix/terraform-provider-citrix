@@ -99,7 +99,7 @@ func (r *serviceAccountResource) Create(ctx context.Context, req resource.Create
 	httpResp := &http.Response{}
 
 	// Check if the Cloud DDC version is supported for async operation
-	isDdcVersionSupported := r.client.ClientConfig.OrchestrationApiVersion >= util.DDCVersionToCreateServiceAccountWithAsync && !r.client.AuthConfig.OnPremises
+	isDdcVersionSupported := r.client.ClientConfig.OrchestrationApiVersion >= util.DDCVersion125 && !r.client.AuthConfig.OnPremises
 	if isDdcVersionSupported {
 		createServiceAccountRequest = createServiceAccountRequest.CreateServiceAccountRequestModel(serviceAccountRequestModel).Async(true)
 		_, httpResp, err = citrixdaasclient.AddRequestData(createServiceAccountRequest, r.client).Execute()

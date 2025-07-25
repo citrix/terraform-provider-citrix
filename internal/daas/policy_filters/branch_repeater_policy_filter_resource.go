@@ -4,6 +4,8 @@ package policy_filters
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 
@@ -91,6 +93,15 @@ func (r *branchRepeaterFilterResource) Read(ctx context.Context, req resource.Re
 
 	policyFilter, err := getPolicyFilter(ctx, r.client, &resp.Diagnostics, state.GetId())
 	if err != nil {
+		// Check if this is a "policy filter not found" error
+		if errors.Is(err, util.ErrPolicyFilterNotFound) {
+			resp.Diagnostics.AddWarning(
+				"Policy Filter not found",
+				fmt.Sprintf("Policy Filter %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", state.GetId()),
+			)
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		return
 	}
 

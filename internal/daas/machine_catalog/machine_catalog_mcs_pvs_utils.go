@@ -273,6 +273,51 @@ func buildProvSchemeForCatalog(ctx context.Context, client *citrixdaasclient.Cit
 			return nil, err
 		}
 		provisioningScheme.SetTenancyType(*tenancyType)
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AMAZON_WORK_SPACES_CORE:
+		amazonWorkspacesCoreMachineConfig := util.ObjectValueToTypedObject[AmazonWorkspacesCoreMachineConfigModel](ctx, diag, provisioningSchemePlan.AmazonWorkspacesCoreMachineConfig)
+		inputServiceOffering := amazonWorkspacesCoreMachineConfig.ServiceOffering.ValueString()
+		serviceOffering, httpResp, err := util.GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx, client, diag, hypervisor.GetId(), hypervisorResourcePool.GetId(), "", inputServiceOffering, util.ServiceOfferingResourceType, "")
+
+		if err != nil {
+			diag.AddError(
+				"Error creating Machine Catalog",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					fmt.Sprintf("\nFailed to resolve service offering %s on AWS, error: %s", serviceOffering, err.Error()),
+			)
+			return nil, err
+		}
+		provisioningScheme.SetServiceOfferingPath(serviceOffering)
+
+		preparedImageConfig := util.ObjectValueToTypedObject[PreparedImageConfigModel](ctx, diag, amazonWorkspacesCoreMachineConfig.AmazonWorkspacesCorePreparedImage)
+		provisioningScheme.SetPrepareImage(true)
+
+		var assignImageVersionToProvScheme citrixorchestration.AssignImageVersionToProvisioningSchemeRequestModel
+		assignImageVersionToProvScheme.SetImageDefinition(preparedImageConfig.ImageDefinition.ValueString())
+		assignImageVersionToProvScheme.SetImageVersion(preparedImageConfig.ImageVersion.ValueString())
+		assignImageVersionToProvScheme.SetImageAssignmentNote(amazonWorkspacesCoreMachineConfig.MasterImageNote.ValueString())
+		provisioningScheme.SetAssignImageVersionToProvisioningScheme(assignImageVersionToProvScheme)
+		provisioningScheme.SetResourcePool(hypervisorResourcePool.GetName()) // Override with name to adapt to image version workflow
+
+		if !amazonWorkspacesCoreMachineConfig.MachineProfile.IsNull() {
+			machineProfile := util.ObjectValueToTypedObject[util.AmazonWorkspacesCoreMachineProfileModel](ctx, diag, amazonWorkspacesCoreMachineConfig.MachineProfile)
+			machineProfilePath, err := util.HandleMachineProfileForAmazonWorkspacesCoreMcsCatalog(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), machineProfile, "Error creating Machine Catalog")
+			if err != nil {
+				return nil, err
+			}
+			provisioningScheme.SetMachineProfilePath(machineProfilePath)
+		}
+
+		tenancyType, err := citrixorchestration.NewTenancyTypeFromValue(amazonWorkspacesCoreMachineConfig.TenancyType.ValueString())
+		if err != nil {
+			diag.AddError(
+				"Error creating Machine Catalog",
+				"Unsupported provisioning type.",
+			)
+
+			return nil, err
+		}
+		provisioningScheme.SetTenancyType(*tenancyType)
+
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
 		gcpMachineConfig := util.ObjectValueToTypedObject[GcpMachineConfigModel](ctx, diag, provisioningSchemePlan.GcpMachineConfig)
 		imagePath := ""
@@ -575,6 +620,7 @@ func setProvisioningSchemeForMcsCatalog(ctx context.Context, client *citrixdaasc
 		var assignImageVersionToProvScheme citrixorchestration.AssignImageVersionToProvisioningSchemeRequestModel
 		assignImageVersionToProvScheme.SetImageDefinition(preparedImageConfig.ImageDefinition.ValueString())
 		assignImageVersionToProvScheme.SetImageVersion(preparedImageConfig.ImageVersion.ValueString())
+		assignImageVersionToProvScheme.SetImageAssignmentNote(azureMachineConfigModel.MasterImageNote.ValueString())
 		provisioningScheme.SetAssignImageVersionToProvisioningScheme(assignImageVersionToProvScheme)
 		provisioningScheme.SetResourcePool(hypervisorResourcePool.GetName()) // Override with name to adapt to image version workflow
 	}
@@ -672,6 +718,20 @@ func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan Provisioning
 			securityGroupPaths = append(securityGroupPaths, securityGroupPath)
 		}
 		body.SetSecurityGroups(securityGroupPaths)
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AMAZON_WORK_SPACES_CORE:
+		amazonWorkspacesCoreMachineConfig := util.ObjectValueToTypedObject[AmazonWorkspacesCoreMachineConfigModel](ctx, nil, provisioningSchemePlan.AmazonWorkspacesCoreMachineConfig)
+		inputServiceOffering := amazonWorkspacesCoreMachineConfig.ServiceOffering.ValueString()
+		serviceOffering, httpResp, err := util.GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx, client, diagnostics, hypervisor.GetId(), hypervisorResourcePool.GetId(), "", inputServiceOffering, util.ServiceOfferingResourceType, "")
+
+		if err != nil {
+			diagnostics.AddError(
+				"Error updating Machine Catalog",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					fmt.Sprintf("\nFailed to resolve service offering %s on AWS, error: %s", inputServiceOffering, err.Error()),
+			)
+			return body, err
+		}
+		body.SetServiceOfferingPath(serviceOffering)
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER:
 		xenserverMachineConfig := util.ObjectValueToTypedObject[XenserverMachineConfigModel](ctx, nil, provisioningSchemePlan.XenserverMachineConfig)
@@ -955,7 +1015,7 @@ func addMachinesToMcsPvsCatalog(ctx context.Context, client *citrixdaasclient.Ci
 	return nil
 }
 
-func updateCatalogMachineProfile(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, plan MachineCatalogResourceModel, catalog *citrixorchestration.MachineCatalogDetailResponseModel, machineProfilePath string) error {
+func updateCatalogMachineProfile(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, plan MachineCatalogResourceModel, catalog *citrixorchestration.MachineCatalogDetailResponseModel, machineProfilePath string, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel, hypervisorPluginId string) error {
 	var body citrixorchestration.UpdateMachineCatalogRequestModel
 	body.SetMachineProfilePath(machineProfilePath)
 	provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
@@ -975,6 +1035,17 @@ func updateCatalogMachineProfile(ctx context.Context, client *citrixdaasclient.C
 		if len(updateNetworkMapping) > 0 {
 			body.SetNetworkMapping(updateNetworkMapping)
 		}
+	} else {
+		networkMappingModel := util.ObjectListToTypedArray[util.NetworkMappingModel](ctx, &resp.Diagnostics, provSchemeModel.NetworkMapping)
+		networkMapping, err := util.ParseNetworkMappingToClientModel(networkMappingModel, resourcePool, hypervisorPluginId)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating Machine Catalog",
+				fmt.Sprintf("Failed to find hypervisor network, error: %s", err.Error()),
+			)
+			return err
+		}
+		body.SetNetworkMapping(networkMapping)
 	}
 
 	updateMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsUpdateMachineCatalog(ctx, catalog.GetId())
@@ -1231,6 +1302,42 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 				}
 			}
 		}
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AMAZON_WORK_SPACES_CORE:
+		amazonWorkspacesCoreMachineConfig := util.ObjectValueToTypedObject[AmazonWorkspacesCoreMachineConfigModel](ctx, &resp.Diagnostics, provisioningSchemePlan.AmazonWorkspacesCoreMachineConfig)
+
+		usePreparedImage = true
+		preparedImageModel := util.ObjectValueToTypedObject[PreparedImageConfigModel](ctx, &resp.Diagnostics, amazonWorkspacesCoreMachineConfig.AmazonWorkspacesCorePreparedImage)
+		currentImageVersionDetails := currentImageDetails.GetImageVersion()
+		currentImageDefinitionDetails := currentImageVersionDetails.GetImageDefinition()
+		imageDefinition = preparedImageModel.ImageDefinition.ValueString()
+		imageVersion = preparedImageModel.ImageVersion.ValueString()
+		currentImageVersion = currentImageVersionDetails.GetId()
+		currentImageDefinition = currentImageDefinitionDetails.GetId()
+
+		masterImageNote = amazonWorkspacesCoreMachineConfig.MasterImageNote.ValueString()
+
+		if !amazonWorkspacesCoreMachineConfig.MachineProfile.IsNull() {
+			machineProfile := util.ObjectValueToTypedObject[util.AmazonWorkspacesCoreMachineProfileModel](ctx, &resp.Diagnostics, amazonWorkspacesCoreMachineConfig.MachineProfile)
+			machineProfilePath, err = util.HandleMachineProfileForAmazonWorkspacesCoreMcsCatalog(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), machineProfile, "Error updating Machine Catalog")
+			if err != nil {
+				return err
+			}
+		}
+
+		// Set reboot options if configured
+		if !amazonWorkspacesCoreMachineConfig.ImageUpdateRebootOptions.IsNull() {
+			rebootOptionsPlan := util.ObjectValueToTypedObject[ImageUpdateRebootOptionsModel](ctx, &resp.Diagnostics, amazonWorkspacesCoreMachineConfig.ImageUpdateRebootOptions)
+			rebootOption.SetRebootDuration(int32(rebootOptionsPlan.RebootDuration.ValueInt64()))
+			warningDuration := int32(rebootOptionsPlan.WarningDuration.ValueInt64())
+			rebootOption.SetWarningDuration(warningDuration)
+			if warningDuration > 0 || warningDuration == -1 {
+				// if warning duration is not 0, it's set in plan and requires warning message body
+				rebootOption.SetWarningMessage(rebootOptionsPlan.WarningMessage.ValueString())
+				if !rebootOptionsPlan.WarningRepeatInterval.IsNull() {
+					rebootOption.SetWarningRepeatInterval(int32(rebootOptionsPlan.WarningRepeatInterval.ValueInt64()))
+				}
+			}
+		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
 		gcpMachineConfig := util.ObjectValueToTypedObject[GcpMachineConfigModel](ctx, &resp.Diagnostics, provisioningSchemePlan.GcpMachineConfig)
 		newImage := gcpMachineConfig.MasterImage.ValueString()
@@ -1445,8 +1552,64 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 		}
 	}
 
+	// Updating image is not supported for PVSStreaming catalog
+	if !(*provisioningType == citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING) {
+
+		replicaRatio, replicaMaximum, useSharedGallery := setComputeGalleryValues(customProps)
+
+		updateReplicaRatio, updateReplicaMaximum, updateUseSharedGallery := setComputeGalleryValues(updateCustomProperties)
+
+		if masterImage.GetXDPath() != imagePath || currentDiskImage.GetMasterImageNote() != masterImageNote || updateReplicaRatio != replicaRatio || updateReplicaMaximum != replicaMaximum || updateUseSharedGallery != useSharedGallery || currentImageDefinition != imageDefinition || currentImageVersion != imageVersion {
+			// Update Master Image for Machine Catalog
+			var updateProvisioningSchemeModel citrixorchestration.UpdateMachineCatalogProvisioningSchemeRequestModel
+
+			functionalLevel, err := citrixorchestration.NewFunctionalLevelFromValue(plan.MinimumFunctionalLevel.ValueString())
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error updating Machine Catalog "+catalogName,
+					fmt.Sprintf("Unsupported minimum functional level %s.", plan.MinimumFunctionalLevel.ValueString()),
+				)
+				return err
+			}
+
+			updateProvisioningSchemeModel.SetMinimumFunctionalLevel(*functionalLevel)
+			updateProvisioningSchemeModel.SetStoreOldImage(true)
+
+			if !usePreparedImage {
+				updateProvisioningSchemeModel.SetMasterImagePath(imagePath)
+				updateProvisioningSchemeModel.SetMasterImageNote(masterImageNote)
+			} else {
+				var assignImageVersionToProvScheme citrixorchestration.AssignImageVersionToProvisioningSchemeRequestModel
+				assignImageVersionToProvScheme.SetImageDefinition(imageDefinition)
+				assignImageVersionToProvScheme.SetImageVersion(imageVersion)
+				updateProvisioningSchemeModel.SetAssignImageVersionToProvisioningScheme(assignImageVersionToProvScheme)
+			}
+			updateProvisioningSchemeModel.SetRebootOptions(rebootOption)
+
+			if len(updateCustomProperties) > 0 {
+				updateProvisioningSchemeModel.SetCustomProperties(updateCustomProperties)
+			}
+
+			updateMasterImageRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsUpdateMachineCatalogProvisioningScheme(ctx, catalogId)
+			updateMasterImageRequest = updateMasterImageRequest.UpdateMachineCatalogProvisioningSchemeRequestModel(updateProvisioningSchemeModel)
+			_, httpResp, err := citrixdaasclient.AddRequestData(updateMasterImageRequest, client).Async(true).Execute()
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error updating Image for Machine Catalog "+catalogName,
+					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+						"\nError message: "+util.ReadClientError(err),
+				)
+			}
+
+			err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating Image for Machine Catalog "+catalogName, &resp.Diagnostics, maxTimeoutInMinutes)
+			if errors.Is(err, &util.JobPollError{}) {
+				return err
+			} // if the job failed continue processing
+		}
+	}
+
 	if machineProfile.GetXDPath() != machineProfilePath {
-		err = updateCatalogMachineProfile(ctx, client, resp, plan, catalog, machineProfilePath)
+		err = updateCatalogMachineProfile(ctx, client, resp, plan, catalog, machineProfilePath, hypervisorResourcePool, hypervisor.GetPluginId())
 		if err != nil {
 			return err
 		}
@@ -1457,64 +1620,6 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 				return err
 			}
 		}
-	}
-
-	// Updating image is not supported for PVSStreaming catalog
-	if !(*provisioningType == citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING) {
-
-		replicaRatio, replicaMaximum, useSharedGallery := setComputeGalleryValues(customProps)
-
-		updateReplicaRatio, updateReplicaMaximum, updateUseSharedGallery := setComputeGalleryValues(updateCustomProperties)
-
-		if masterImage.GetXDPath() == imagePath && currentDiskImage.GetMasterImageNote() == masterImageNote && updateReplicaRatio == replicaRatio && updateReplicaMaximum == replicaMaximum && updateUseSharedGallery == useSharedGallery && currentImageDefinition == imageDefinition && currentImageVersion == imageVersion {
-			return nil
-		}
-
-		// Update Master Image for Machine Catalog
-		var updateProvisioningSchemeModel citrixorchestration.UpdateMachineCatalogProvisioningSchemeRequestModel
-
-		functionalLevel, err := citrixorchestration.NewFunctionalLevelFromValue(plan.MinimumFunctionalLevel.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error updating Machine Catalog "+catalogName,
-				fmt.Sprintf("Unsupported minimum functional level %s.", plan.MinimumFunctionalLevel.ValueString()),
-			)
-			return err
-		}
-
-		updateProvisioningSchemeModel.SetMinimumFunctionalLevel(*functionalLevel)
-		updateProvisioningSchemeModel.SetStoreOldImage(true)
-
-		if !usePreparedImage {
-			updateProvisioningSchemeModel.SetMasterImagePath(imagePath)
-			updateProvisioningSchemeModel.SetMasterImageNote(masterImageNote)
-		} else {
-			var assignImageVersionToProvScheme citrixorchestration.AssignImageVersionToProvisioningSchemeRequestModel
-			assignImageVersionToProvScheme.SetImageDefinition(imageDefinition)
-			assignImageVersionToProvScheme.SetImageVersion(imageVersion)
-			updateProvisioningSchemeModel.SetAssignImageVersionToProvisioningScheme(assignImageVersionToProvScheme)
-		}
-		updateProvisioningSchemeModel.SetRebootOptions(rebootOption)
-
-		if len(updateCustomProperties) > 0 {
-			updateProvisioningSchemeModel.SetCustomProperties(updateCustomProperties)
-		}
-
-		updateMasterImageRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsUpdateMachineCatalogProvisioningScheme(ctx, catalogId)
-		updateMasterImageRequest = updateMasterImageRequest.UpdateMachineCatalogProvisioningSchemeRequestModel(updateProvisioningSchemeModel)
-		_, httpResp, err := citrixdaasclient.AddRequestData(updateMasterImageRequest, client).Async(true).Execute()
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error updating Image for Machine Catalog "+catalogName,
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+util.ReadClientError(err),
-			)
-		}
-
-		err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating Image for Machine Catalog "+catalogName, &resp.Diagnostics, maxTimeoutInMinutes)
-		if errors.Is(err, &util.JobPollError{}) {
-			return err
-		} // if the job failed continue processing
 	}
 
 	return nil
@@ -1578,6 +1683,28 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Con
 		}
 		awsMachineConfig.RefreshProperties(ctx, diagnostics, *catalog)
 		provSchemeModel.AwsMachineConfig = util.TypedObjectToObjectValue(ctx, diagnostics, awsMachineConfig)
+		for _, stringPair := range customProperties {
+			if stringPair.GetName() == "Zones" {
+				availability_zones := strings.Split(stringPair.GetValue(), ",")
+				provSchemeModel.AvailabilityZones = util.StringArrayToStringList(ctx, diagnostics, availability_zones)
+			}
+		}
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AMAZON_WORK_SPACES_CORE:
+		amazonWorkspacesCoreMachineConfig := util.ObjectValueToTypedObject[AmazonWorkspacesCoreMachineConfigModel](ctx, diagnostics, provSchemeModel.AmazonWorkspacesCoreMachineConfig)
+		if !provSchemeModel.AmazonWorkspacesCoreMachineConfig.IsNull() {
+			if serviceOfferingObject, httpResp, err := util.GetSingleResourceFromHypervisorWithNoCacheRetry(ctx, client, diagnostics, hypervisor.GetId(), resourcePool.GetId(), "", provScheme.GetServiceOffering(), util.ServiceOfferingResourceType, ""); err == nil {
+				provScheme.SetServiceOffering(serviceOfferingObject.GetId())
+				catalog.SetProvisioningScheme(provScheme)
+			} else {
+				diagnostics.AddError(
+					"Error updating Machine Catalog "+catalog.GetName(),
+					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+						fmt.Sprintf("\nFailed to resolve AWS service offering %s, error: %s", provScheme.GetServiceOffering(), err.Error()),
+				)
+			}
+		}
+		amazonWorkspacesCoreMachineConfig.RefreshProperties(ctx, diagnostics, *catalog)
+		provSchemeModel.AmazonWorkspacesCoreMachineConfig = util.TypedObjectToObjectValue(ctx, diagnostics, amazonWorkspacesCoreMachineConfig)
 		for _, stringPair := range customProperties {
 			if stringPair.GetName() == "Zones" {
 				availability_zones := strings.Split(stringPair.GetValue(), ",")
