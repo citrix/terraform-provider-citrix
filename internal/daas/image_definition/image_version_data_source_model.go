@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
@@ -53,6 +54,39 @@ func (AzureImageSpecsDataSourceModel) GetDataSourceSchema() schema.SingleNestedA
 
 func (AzureImageSpecsDataSourceModel) GetDataSourceAttributes() map[string]schema.Attribute {
 	return AzureImageSpecsDataSourceModel{}.GetDataSourceSchema().Attributes
+}
+
+type AmazonWorkspacesCoreImageSpecsDataSourceModel struct {
+	ServiceOffering types.String `tfsdk:"service_offering"`
+	MasterImage     types.String `tfsdk:"master_image"`
+	ImageAmi        types.String `tfsdk:"image_ami"`
+	MachineProfile  types.Object `tfsdk:"machine_profile"`
+}
+
+func (AmazonWorkspacesCoreImageSpecsDataSourceModel) GetDataSourceSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "Image configuration for Amazon Workspaces Core image version.",
+		Computed:    true,
+		Attributes: map[string]schema.Attribute{
+			"service_offering": schema.StringAttribute{
+				Description: "The AWS VM Sku to use when creating machines.",
+				Computed:    true,
+			},
+			"master_image": schema.StringAttribute{
+				Description: "The name of the virtual machine image that will be used.",
+				Computed:    true,
+			},
+			"image_ami": schema.StringAttribute{
+				Description: "AMI of the AWS image to be used as the template image for the machine catalog.",
+				Computed:    true,
+			},
+			"machine_profile": util.AmazonWorkspacesCoreMachineProfileModel{}.GetDataSourceSchema(),
+		},
+	}
+}
+
+func (AmazonWorkspacesCoreImageSpecsDataSourceModel) GetDataSourceAttributes() map[string]schema.Attribute {
+	return AmazonWorkspacesCoreImageSpecsDataSourceModel{}.GetDataSourceSchema().Attributes
 }
 
 type VsphereImageSpecsDataSourceModel struct {
@@ -141,8 +175,9 @@ func (ImageVersionModel) GetDataSourceSchema() schema.Schema {
 				Description: "Description of the image version.",
 				Computed:    true,
 			},
-			"azure_image_specs":   AzureImageSpecsDataSourceModel{}.GetDataSourceSchema(),
-			"vsphere_image_specs": VsphereImageSpecsDataSourceModel{}.GetDataSourceSchema(),
+			"azure_image_specs":                  AzureImageSpecsDataSourceModel{}.GetDataSourceSchema(),
+			"vsphere_image_specs":                VsphereImageSpecsDataSourceModel{}.GetDataSourceSchema(),
+			"amazon_workspaces_core_image_specs": AmazonWorkspacesCoreImageSpecsDataSourceModel{}.GetDataSourceSchema(),
 			"session_support": schema.StringAttribute{
 				Description: "Session support for the image version.",
 				Computed:    true,
@@ -221,6 +256,19 @@ func (r ImageVersionModel) RefreshDataSourcePropertyValues(ctx context.Context, 
 		}
 
 		r.VsphereImageSpecs = util.DataSourceTypedObjectToObjectValue(ctx, diagnostics, vsphereImageSpecs)
+	case util.AMAZON_WORKSPACES_CORE_FACTORY_NAME:
+		amazonWSCImageSpecs := AmazonWorkspacesCoreImageSpecsDataSourceModel{}
+		serviceOffering := strings.TrimSuffix(imageScheme.GetServiceOffering(), ".serviceoffering")
+		amazonWSCImageSpecs.ServiceOffering = types.StringValue(serviceOffering)
+		masterImageName := masterImage.GetName()
+		amazonWSCImageSpecs.MasterImage = types.StringValue(strings.Split(masterImageName, " (ami-")[0])
+		amazonWSCImageSpecs.ImageAmi = types.StringValue(strings.TrimSuffix((strings.Split(masterImageName, " (")[1]), ")"))
+		updatedMachineProfile, err := refreshAmazonWSCImageVersionMachineProfile(ctx, diagnostics, false, imageScheme)
+		if err == nil {
+			amazonWSCImageSpecs.MachineProfile = updatedMachineProfile
+		}
+
+		r.AmazonWorkspacesCoreImageSpecs = util.DataSourceTypedObjectToObjectValue(ctx, diagnostics, amazonWSCImageSpecs)
 	default:
 		diagnostics.AddError(
 			"Error refreshing Image Version data source",

@@ -70,11 +70,16 @@ func (PolicySettingModel) GetSchema() schema.Schema {
 				},
 			},
 			"value": schema.StringAttribute{
-				Description: "Value of the policy setting.",
+				Description: "Value of the policy setting. Use this field when the policy setting has a complex value type (not boolean).",
 				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.ConflictsWith(
+						path.MatchRoot("enabled"),
+					),
+				},
 			},
 			"enabled": schema.BoolAttribute{
-				Description: "Whether of the policy setting has enabled or allowed value.",
+				Description: "Whether the policy setting is enabled or allowed. Use this field when the policy setting has a boolean value type.",
 				Optional:    true,
 			},
 		},
@@ -121,24 +126,40 @@ func buildSettingRequest(ctx context.Context, client *citrixdaasclient.CitrixDaa
 	return settingRequest, nil
 }
 
-func (r PolicySettingModel) RefreshPropertyValues(policySetting *citrixorchestration.SettingResponse) PolicySettingModel {
+func (r PolicySettingModel) RefreshPropertyValues(policySetting *citrixorchestration.SettingResponse, settingsDefinitions *citrixorchestration.SettingDefinitionEnvelope) PolicySettingModel {
 	r.Id = types.StringValue(policySetting.GetSettingGuid())
 	r.PolicyId = types.StringValue(policySetting.GetPolicyGuid())
 	r.Name = types.StringValue(policySetting.GetSettingName())
 	r.UseDefault = types.BoolValue(policySetting.GetUseDefault())
+
+	hasComplexValueType := false
+	for _, definition := range settingsDefinitions.GetItems() {
+		if strings.EqualFold(definition.GetSettingName(), policySetting.GetSettingName()) {
+			valueType := definition.GetValueType()
+			if valueType != util.POLICYSETTING_GO_VALUETYPE_STATE && valueType != util.POLICYSETTING_GO_VALUETYPE_STATEALLOWED {
+				hasComplexValueType = true
+			}
+			break
+		}
+	}
+
 	if !policySetting.GetUseDefault() {
-		settingValue := types.StringValue(policySetting.GetSettingValue())
-		if strings.EqualFold(policySetting.GetSettingValue(), "true") ||
-			policySetting.GetSettingValue() == "1" {
+		settingValue := policySetting.GetSettingValue()
+
+		if hasComplexValueType {
+			r.Enabled = types.BoolNull()
+			r.Value = types.StringValue(settingValue)
+		} else if strings.EqualFold(settingValue, "true") ||
+			settingValue == "1" {
 			r.Enabled = types.BoolValue(true)
 			r.Value = types.StringNull()
-		} else if strings.EqualFold(policySetting.GetSettingValue(), "false") ||
-			policySetting.GetSettingValue() == "0" {
+		} else if strings.EqualFold(settingValue, "false") ||
+			settingValue == "0" {
 			r.Enabled = types.BoolValue(false)
 			r.Value = types.StringNull()
 		} else {
 			r.Enabled = types.BoolNull()
-			r.Value = settingValue
+			r.Value = types.StringValue(settingValue)
 		}
 	}
 

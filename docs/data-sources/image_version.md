@@ -41,6 +41,7 @@ data "citrix_image_version" "example_image_version_by_version_number" {
 
 ### Read-Only
 
+- `amazon_workspaces_core_image_specs` (Attributes) Image configuration for Amazon Workspaces Core image version. (see [below for nested schema](#nestedatt--amazon_workspaces_core_image_specs))
 - `azure_image_specs` (Attributes) Image configuration for Azure image version. (see [below for nested schema](#nestedatt--azure_image_specs))
 - `description` (String) Description of the image version.
 - `hypervisor` (String) Id of the hypervisor to use for creating this image version.
@@ -57,6 +58,30 @@ Optional:
 
 - `create` (Number) Timeout in minutes for the long-running jobs in create operation. Defaults to 10. Minimum value is 5.
 - `delete` (Number) Timeout in minutes for the long-running jobs in delete operation. Defaults to 10. Minimum value is 5.
+
+
+<a id="nestedatt--amazon_workspaces_core_image_specs"></a>
+### Nested Schema for `amazon_workspaces_core_image_specs`
+
+Read-Only:
+
+- `image_ami` (String) AMI of the AWS image to be used as the template image for the machine catalog.
+- `machine_profile` (Attributes) The name of the virtual machine of template spec that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone. (see [below for nested schema](#nestedatt--amazon_workspaces_core_image_specs--machine_profile))
+- `master_image` (String) The name of the virtual machine image that will be used.
+- `service_offering` (String) The AWS VM Sku to use when creating machines.
+
+<a id="nestedatt--amazon_workspaces_core_image_specs--machine_profile"></a>
+### Nested Schema for `amazon_workspaces_core_image_specs.machine_profile`
+
+Read-Only:
+
+- `launch_template_id` (String) The ID of the launch template.
+- `launch_template_name` (String) The name of the launch template.
+- `launch_template_version` (String) The version of the launch template.
+- `vm_id` (String) The ID of the virtual machine.
+- `vm_name` (String) The name of the virtual machine.
+- `vm_region_az` (String) The region and availability zone of the virtual machine.
+
 
 
 <a id="nestedatt--azure_image_specs"></a>

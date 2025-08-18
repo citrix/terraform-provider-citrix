@@ -87,8 +87,10 @@ func (d *policySettingDataSource) Read(ctx context.Context, req datasource.ReadR
 		}
 	}
 
+	settingsDefinition, err := getSettingsDefinitions(ctx, d.client, &resp.Diagnostics, policySetting.GetSettingName())
+
 	// Refresh values
-	data = data.RefreshPropertyValues(policySetting)
+	data = data.RefreshPropertyValues(policySetting, settingsDefinition)
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

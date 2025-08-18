@@ -85,7 +85,12 @@ func (r *policySettingResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(policySetting)
+	settingDefinitions, err := getSettingsDefinitions(ctx, r.client, &resp.Diagnostics, policySetting.GetSettingName())
+	if err != nil {
+		return
+	}
+
+	plan = plan.RefreshPropertyValues(policySetting, settingDefinitions)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -118,7 +123,12 @@ func (r *policySettingResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
-	state = state.RefreshPropertyValues(policySetting)
+	settingsDefinition, err := getSettingsDefinitions(ctx, r.client, &resp.Diagnostics, policySetting.GetSettingName())
+	if err != nil {
+		return
+	}
+
+	state = state.RefreshPropertyValues(policySetting, settingsDefinition)
 	diags = resp.State.Set(ctx, state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -147,7 +157,12 @@ func (r *policySettingResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(policySetting)
+	settingsDefinition, err := getSettingsDefinitions(ctx, r.client, &resp.Diagnostics, policySetting.GetSettingName())
+	if err != nil {
+		return
+	}
+
+	plan = plan.RefreshPropertyValues(policySetting, settingsDefinition)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -219,20 +234,13 @@ func (r *policySettingResource) ModifyPlan(ctx context.Context, req resource.Mod
 	}
 
 	// Validation for policy settings with complex value types
-	if !plan.Name.IsNull() && !plan.Name.IsUnknown() && !plan.Enabled.IsNull() {
+	hasComplexValueType := false
+	if !plan.Name.IsNull() && !plan.Name.IsUnknown() {
 		settingName := plan.Name.ValueString()
 
 		// Get setting definitions from API to check value type
-		getSettingDefinitionsReq := r.client.ApiClient.GpoDAAS.GpoGetSettingDefinitions(ctx)
-		getSettingDefinitionsReq = getSettingDefinitionsReq.NamePattern(settingName)
-		getSettingDefinitionsReq = getSettingDefinitionsReq.IsLean(true)
-		settingDefinitions, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.SettingDefinitionEnvelope](getSettingDefinitionsReq, r.client)
+		settingDefinitions, err := getSettingsDefinitions(ctx, r.client, &resp.Diagnostics, settingName)
 		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error fetching setting definitions",
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+util.ReadClientError(err),
-			)
 			return
 		}
 
@@ -243,11 +251,7 @@ func (r *policySettingResource) ModifyPlan(ctx context.Context, req resource.Mod
 				valueType := definition.GetValueType()
 				validSettingName = true
 				if valueType != util.POLICYSETTING_GO_VALUETYPE_STATE && valueType != util.POLICYSETTING_GO_VALUETYPE_STATEALLOWED {
-					resp.Diagnostics.AddError(
-						fmt.Sprintf("Invalid configuration for %s", settingName),
-						fmt.Sprintf("Policy setting %s has a complex value type (%s) and cannot use 'enabled' field. Use 'value' field instead.", settingName, valueType),
-					)
-					return
+					hasComplexValueType = true
 				}
 				break
 			}
@@ -256,6 +260,22 @@ func (r *policySettingResource) ModifyPlan(ctx context.Context, req resource.Mod
 			resp.Diagnostics.AddError(
 				fmt.Sprintf("Invalid configuration for %s", settingName),
 				fmt.Sprintf("Policy setting %s is not a valid setting name.", settingName),
+			)
+			return
+		}
+
+		if hasComplexValueType && !plan.Enabled.IsNull() {
+			resp.Diagnostics.AddError(
+				"Invalid configuration for policy setting",
+				fmt.Sprintf("Policy setting %s has a complex value type. Use the 'value' field instead of 'enabled'.", settingName),
+			)
+			return
+		}
+
+		if !hasComplexValueType && !plan.Value.IsNull() {
+			resp.Diagnostics.AddError(
+				"Invalid configuration for policy setting",
+				fmt.Sprintf("Policy setting %s has a boolean value type. Use the 'enabled' field instead of 'value'.", settingName),
 			)
 			return
 		}
@@ -298,4 +318,22 @@ func updatePolicySetting(ctx context.Context, client *citrixdaasclient.CitrixDaa
 		return err
 	}
 	return nil
+}
+
+func getSettingsDefinitions(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, settingName string) (*citrixorchestration.SettingDefinitionEnvelope, error) {
+	getSettingDefinitionsReq := client.ApiClient.GpoDAAS.GpoGetSettingDefinitions(ctx)
+	getSettingDefinitionsReq = getSettingDefinitionsReq.NamePattern(settingName)
+	getSettingDefinitionsReq = getSettingDefinitionsReq.IsLean(true)
+	settingDefinitions, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.SettingDefinitionEnvelope](getSettingDefinitionsReq, client)
+	if err != nil {
+		diagnostics.AddError(
+			"Error fetching setting definitions",
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+
+		return nil, err
+	}
+
+	return settingDefinitions, nil
 }
