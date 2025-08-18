@@ -67,12 +67,12 @@ const DomainRegexWithProtocol string = `^(http:\/\/|https:\/\/)(([a-zA-Z0-9-_]){
 const LowerCaseRegex string = `^[^A-Z]*$`
 
 // SAM
-const SamRegex string = `^[a-zA-Z][a-zA-Z0-9\-_]{0,61}[a-zA-Z0-9]\\\w[\w\.\- ]+$`
+const SamRegex string = `(^(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}|^[a-zA-Z][a-zA-Z0-9\-_]{0,61}[a-zA-Z0-9])\\\w[\w\.\- ]+$`
 
 // UPN
 const UpnRegex string = `^[^@]+@\b(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}$`
 
-const SamAndUpnRegex string = `^[a-zA-Z][a-zA-Z0-9\-_]{0,61}[a-zA-Z0-9]\\\w[\w\.\- ]+$|^[^@]+@\b(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}$`
+const SamAndUpnRegex string = SamRegex + `|` + UpnRegex
 
 // SAM
 const ComputerAccountRegex string = `^[a-zA-Z0-9\-_]{0,61}[a-zA-Z0-9]\\\w[\w\.\- ]+\$$`

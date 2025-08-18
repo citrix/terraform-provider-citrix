@@ -449,6 +449,34 @@ func refreshAzureImageVersionMachineProfile(ctx context.Context, diagnostics *di
 	}
 }
 
+func refreshAmazonWSCImageVersionMachineProfile(ctx context.Context, diagnostics *diag.Diagnostics, isResource bool, imageScheme citrixorchestration.ImageSchemeResponseModel) (types.Object, error) {
+	var machineProfileToReturn types.Object
+	if imageScheme.MachineProfile != nil {
+		machineProfile := imageScheme.GetMachineProfile()
+		machineProfileModel := util.ParseAmazonWorkspacesCoreMachineProfileResponseToModel(machineProfile)
+		if isResource {
+			machineProfileToReturn = util.TypedObjectToObjectValue(ctx, diagnostics, machineProfileModel)
+		} else {
+			machineProfileToReturn = util.DataSourceTypedObjectToObjectValue(ctx, diagnostics, machineProfileModel)
+		}
+		return machineProfileToReturn, nil
+	} else {
+		var attributesMap map[string]attr.Type
+		var err error
+		if isResource {
+			attributesMap, err = util.ResourceAttributeMapFromObject(util.AmazonWorkspacesCoreMachineProfileModel{})
+		} else {
+			attributesMap, err = util.DataSourceAttributeMapFromObject(util.AmazonWorkspacesCoreMachineProfileModel{})
+		}
+		if err != nil {
+			diagnostics.AddWarning("Error when creating null AmazonWorkspacesCoreMachineProfileModel", err.Error())
+			return machineProfileToReturn, err
+		}
+		machineProfileToReturn = types.ObjectNull(attributesMap)
+		return machineProfileToReturn, err
+	}
+}
+
 func identifyImageVersionSpec(diagnostics *diag.Diagnostics, imageVersionSpecs []citrixorchestration.ImageVersionSpecResponseModel) (citrixorchestration.ImageVersionSpecResponseModel, bool) {
 	for _, spec := range imageVersionSpecs {
 		if spec.Context != nil {

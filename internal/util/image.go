@@ -517,6 +517,43 @@ func (AmazonWorkspacesCoreMachineProfileModel) GetAttributes() map[string]schema
 	return AmazonWorkspacesCoreMachineProfileModel{}.GetSchema().Attributes
 }
 
+func (AmazonWorkspacesCoreMachineProfileModel) GetDataSourceSchema() dataSourceSchema.SingleNestedAttribute {
+	return dataSourceSchema.SingleNestedAttribute{
+		Description: "The name of the virtual machine of template spec that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone.",
+		Computed:    true,
+		Attributes: map[string]dataSourceSchema.Attribute{
+			"vm_name": dataSourceSchema.StringAttribute{
+				Description: "The name of the virtual machine.",
+				Computed:    true,
+			},
+			"vm_region_az": dataSourceSchema.StringAttribute{
+				Description: "The region and availability zone of the virtual machine.",
+				Computed:    true,
+			},
+			"vm_id": dataSourceSchema.StringAttribute{
+				Description: "The ID of the virtual machine.",
+				Computed:    true,
+			},
+			"launch_template_name": dataSourceSchema.StringAttribute{
+				Description: "The name of the launch template.",
+				Computed:    true,
+			},
+			"launch_template_version": dataSourceSchema.StringAttribute{
+				Description: "The version of the launch template.",
+				Computed:    true,
+			},
+			"launch_template_id": dataSourceSchema.StringAttribute{
+				Description: "The ID of the launch template.",
+				Computed:    true,
+			},
+		},
+	}
+}
+
+func (AmazonWorkspacesCoreMachineProfileModel) GetDataSourceAttributes() map[string]dataSourceSchema.Attribute {
+	return AmazonWorkspacesCoreMachineProfileModel{}.GetDataSourceSchema().Attributes
+}
+
 type AwsMachineProfileModel struct {
 	VmName                types.String `tfsdk:"vm_name"`
 	VmRegionAZ            types.String `tfsdk:"vm_region_az"`
@@ -873,6 +910,7 @@ func ParseNetworkMappingToClientModel(networkMappings []NetworkMappingModel, res
 		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER ||
 		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER ||
 		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT ||
+		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AMAZON_WORK_SPACES_CORE ||
 		resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && hypervisorPluginId == NUTANIX_PLUGIN_ID {
 		networks = resourcePool.Networks
 	}
@@ -887,7 +925,8 @@ func ParseNetworkMappingToClientModel(networkMappings []NetworkMappingModel, res
 			resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT ||
 			resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && hypervisorPluginId == NUTANIX_PLUGIN_ID {
 			networkName = networkMapping.Network.ValueString()
-		} else if resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS {
+		} else if resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS ||
+			resourcePool.ConnectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_AMAZON_WORK_SPACES_CORE {
 			networkName = fmt.Sprintf("%s (%s)", networkMapping.Network.ValueString(), resourcePool.GetResourcePoolRootId())
 		}
 		network := slices.IndexFunc(networks, func(c citrixorchestration.HypervisorResourceRefResponseModel) bool {

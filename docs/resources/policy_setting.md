@@ -43,8 +43,8 @@ resource "citrix_policy_setting" "example_policy_setting" {
 
 ### Optional
 
-- `enabled` (Boolean) Whether of the policy setting has enabled or allowed value.
-- `value` (String) Value of the policy setting.
+- `enabled` (Boolean) Whether the policy setting is enabled or allowed. Use this field when the policy setting has a boolean value type.
+- `value` (String) Value of the policy setting. Use this field when the policy setting has a complex value type (not boolean).
 
 ### Read-Only
 
