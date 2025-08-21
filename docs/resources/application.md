@@ -104,7 +104,7 @@ resource "citrix_application" "example-application" {
 - `limit_to_one_instance_per_user` (Boolean) Specifies if the use of the application should be limited to only one instance per user. Default is `false`.
 - `limit_visibility_to_users` (Set of String) By default, the application is visible to all users within a delivery group. However, you can restrict its visibility to only certain users by specifying them in the `limit_visibility_to_users` list.
 
--> **Note** Users must be in `DOMAIN\UserOrGroupName` or `user@domain.com` format
+-> **Note** Users must be in SID, SAM account name (`DOMAIN\UserOrGroupName`) or UPN (`user@domain.com`) format
 - `max_total_instances` (Number) Control the use of this application by limiting the number of instances running at the same time. If set to 0, it allows unlimited use.
 - `metadata` (Attributes List) Metadata for the Application. (see [below for nested schema](#nestedatt--metadata))
 - `shortcut_added_to_desktop` (Boolean) Indicates whether a shortcut to the application is added to the desktop. Default is `false`.

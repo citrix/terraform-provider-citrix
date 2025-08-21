@@ -14,6 +14,10 @@ func TestAzureImageDefinitionResourcePreCheck(t *testing.T) {
 	checkTestEnvironmentVariables(t, azureImageDefinitionTestVariables)
 }
 
+func TestAzureImageDefinitionResourcePreCheckForTestSuite(t *testing.T) {
+	checkTestEnvironmentVariables(t, azureImageDefinitionTestVariablesForTestSuite)
+}
+
 func AzureImageDefinitionResourceHelper(t *testing.T, pre121 bool) {
 	var imageDefinitionResource string
 	var imageDefinitionResourceUpdated string
@@ -87,8 +91,20 @@ func BuildAzureImageDefinitionTestResource(t *testing.T) string {
 	imageDefinitionDescription := os.Getenv("TEST_IMAGE_DEFINITION_DESCRIPTION")
 	imageDefinitionOsType := os.Getenv("TEST_IMAGE_DEFINITION_OS_TYPE")
 	imageDefinitionSessionSupport := os.Getenv("TEST_IMAGE_DEFINITION_SESSION_SUPPORT")
-	imageDefinitionHypervisorId := os.Getenv("TEST_IMAGE_DEFINITION_HYPERVISOR_ID")
-	imageDefinitionHypervisorPoolId := os.Getenv("TEST_IMAGE_DEFINITION_HYPERVISOR_POOL_ID")
+	imageDefinitionHypervisorId := fmt.Sprintf(`"%s"`, os.Getenv("TEST_IMAGE_DEFINITION_HYPERVISOR_ID"))
+	imageDefinitionHypervisorPoolId := fmt.Sprintf(`"%s"`, os.Getenv("TEST_IMAGE_DEFINITION_HYPERVISOR_POOL_ID"))
+	imageDefinitionResourceGroup := os.Getenv("TEST_IMAGE_DEFINITION_RESOURCE_GROUP")
+
+	return fmt.Sprintf(azureImageDefinitionTestResource, imageDefinitionName, imageDefinitionDescription, imageDefinitionOsType, imageDefinitionSessionSupport, imageDefinitionHypervisorId, imageDefinitionHypervisorPoolId, imageDefinitionResourceGroup)
+}
+
+func BuildAzureImageDefinitionTestResourceForTestSuite(t *testing.T) string {
+	imageDefinitionName := os.Getenv("TEST_IMAGE_DEFINITION_NAME")
+	imageDefinitionDescription := os.Getenv("TEST_IMAGE_DEFINITION_DESCRIPTION")
+	imageDefinitionOsType := os.Getenv("TEST_IMAGE_DEFINITION_OS_TYPE")
+	imageDefinitionSessionSupport := os.Getenv("TEST_IMAGE_DEFINITION_SESSION_SUPPORT")
+	imageDefinitionHypervisorId := "citrix_azure_hypervisor.testHypervisor.id"
+	imageDefinitionHypervisorPoolId := "citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool.id"
 	imageDefinitionResourceGroup := os.Getenv("TEST_IMAGE_DEFINITION_RESOURCE_GROUP")
 
 	return fmt.Sprintf(azureImageDefinitionTestResource, imageDefinitionName, imageDefinitionDescription, imageDefinitionOsType, imageDefinitionSessionSupport, imageDefinitionHypervisorId, imageDefinitionHypervisorPoolId, imageDefinitionResourceGroup)
@@ -99,8 +115,20 @@ func BuildAzureImageDefinitionUpdatedTestResource(t *testing.T) string {
 	imageDefinitionDescription := os.Getenv("TEST_IMAGE_DEFINITION_DESCRIPTION_UPDATED")
 	imageDefinitionOsType := os.Getenv("TEST_IMAGE_DEFINITION_OS_TYPE_UPDATED")
 	imageDefinitionSessionSupport := os.Getenv("TEST_IMAGE_DEFINITION_SESSION_SUPPORT_UPDATED")
-	imageDefinitionHypervisorId := os.Getenv("TEST_IMAGE_DEFINITION_HYPERVISOR_ID_UPDATED")
-	imageDefinitionHypervisorPoolId := os.Getenv("TEST_IMAGE_DEFINITION_HYPERVISOR_POOL_ID")
+	imageDefinitionHypervisorId := fmt.Sprintf(`"%s"`, os.Getenv("TEST_IMAGE_DEFINITION_HYPERVISOR_ID_UPDATED"))
+	imageDefinitionHypervisorPoolId := fmt.Sprintf(`"%s"`, os.Getenv("TEST_IMAGE_DEFINITION_HYPERVISOR_POOL_ID"))
+	imageDefinitionResourceGroup := os.Getenv("TEST_IMAGE_DEFINITION_RESOURCE_GROUP_UPDATED")
+
+	return fmt.Sprintf(azureImageDefinitionTestResource, imageDefinitionName, imageDefinitionDescription, imageDefinitionOsType, imageDefinitionSessionSupport, imageDefinitionHypervisorId, imageDefinitionHypervisorPoolId, imageDefinitionResourceGroup)
+}
+
+func BuildAzureImageDefinitionUpdatedTestResourceForTestSuite(t *testing.T) string {
+	imageDefinitionName := os.Getenv("TEST_IMAGE_DEFINITION_NAME_UPDATED")
+	imageDefinitionDescription := os.Getenv("TEST_IMAGE_DEFINITION_DESCRIPTION_UPDATED")
+	imageDefinitionOsType := os.Getenv("TEST_IMAGE_DEFINITION_OS_TYPE_UPDATED")
+	imageDefinitionSessionSupport := os.Getenv("TEST_IMAGE_DEFINITION_SESSION_SUPPORT_UPDATED")
+	imageDefinitionHypervisorId := "citrix_azure_hypervisor.testHypervisor.id"
+	imageDefinitionHypervisorPoolId := "citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool.id"
 	imageDefinitionResourceGroup := os.Getenv("TEST_IMAGE_DEFINITION_RESOURCE_GROUP_UPDATED")
 
 	return fmt.Sprintf(azureImageDefinitionTestResource, imageDefinitionName, imageDefinitionDescription, imageDefinitionOsType, imageDefinitionSessionSupport, imageDefinitionHypervisorId, imageDefinitionHypervisorPoolId, imageDefinitionResourceGroup)
@@ -122,8 +150,8 @@ func BuildAzureImageDefinitionUpdatedTestResourcePre121(t *testing.T) string {
 	imageDefinitionDescription := os.Getenv("TEST_IMAGE_DEFINITION_DESCRIPTION_UPDATED")
 	imageDefinitionOsType := os.Getenv("TEST_IMAGE_DEFINITION_OS_TYPE_UPDATED")
 	imageDefinitionSessionSupport := os.Getenv("TEST_IMAGE_DEFINITION_SESSION_SUPPORT_UPDATED")
-	imageDefinitionHypervisorPoolId := os.Getenv("TEST_IMAGE_DEFINITION_HYPERVISOR_POOL_ID")
-	imageDefinitionHypervisorId := os.Getenv("TEST_IMAGE_DEFINITION_HYPERVISOR_ID_UPDATED")
+	imageDefinitionHypervisorPoolId := fmt.Sprintf(`"%s"`, os.Getenv("TEST_IMAGE_DEFINITION_HYPERVISOR_POOL_ID"))
+	imageDefinitionHypervisorId := fmt.Sprintf(`"%s"`, os.Getenv("TEST_IMAGE_DEFINITION_HYPERVISOR_ID_UPDATED"))
 
 	return fmt.Sprintf(azureImageDefinitionTestResourcePre121, imageDefinitionName, imageDefinitionDescription, imageDefinitionOsType, imageDefinitionSessionSupport, imageDefinitionHypervisorId, imageDefinitionHypervisorPoolId)
 }
@@ -219,14 +247,27 @@ var (
 		"TEST_IMAGE_DEFINITION_RESOURCE_GROUP_UPDATED",
 	}
 
+	azureImageDefinitionTestVariablesForTestSuite = []string{
+		"TEST_IMAGE_DEFINITION_NAME",
+		"TEST_IMAGE_DEFINITION_NAME_UPDATED",
+		"TEST_IMAGE_DEFINITION_DESCRIPTION",
+		"TEST_IMAGE_DEFINITION_DESCRIPTION_UPDATED",
+		"TEST_IMAGE_DEFINITION_OS_TYPE",
+		"TEST_IMAGE_DEFINITION_OS_TYPE_UPDATED",
+		"TEST_IMAGE_DEFINITION_SESSION_SUPPORT",
+		"TEST_IMAGE_DEFINITION_SESSION_SUPPORT_UPDATED",
+		"TEST_IMAGE_DEFINITION_RESOURCE_GROUP",
+		"TEST_IMAGE_DEFINITION_RESOURCE_GROUP_UPDATED",
+	}
+
 	azureImageDefinitionTestResource = `
 resource "citrix_image_definition" "test_azure_image_definition" {
 	name 			= "%s"
 	description 	= "%s"
 	os_type 		= "%s"
 	session_support = "%s"
-	hypervisor      = "%s"
-	hypervisor_resource_pool = "%s"
+	hypervisor      = %s
+	hypervisor_resource_pool = %s
     azure_image_definition = {
 		resource_group = "%s"
         use_image_gallery = false
@@ -240,8 +281,8 @@ resource "citrix_image_definition" "test_azure_image_definition" {
 	description 	= "%s"
 	os_type 		= "%s"
 	session_support = "%s"
-	hypervisor      = "%s"
-	hypervisor_resource_pool = "%s"
+	hypervisor      = %s
+	hypervisor_resource_pool = %s
 }
 `
 

@@ -1595,7 +1595,8 @@ var (
 				naming_scheme_type ="Numeric"
 			}
 		}
-	
+
+		delete_machine_accounts 	= "Delete"
 		zone						= citrix_zone.test.id
 	}
 	`
@@ -1632,7 +1633,8 @@ var (
 				naming_scheme_type ="Numeric"
 			}
 		}
-	
+
+		delete_machine_accounts 	= "Delete"
 		zone						= citrix_zone.test.id
 	}
 	`
@@ -1686,6 +1688,7 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 		}
 	}
 
+	delete_machine_accounts 	= "Delete"
 	zone						= citrix_zone.test.id
 }
 `
@@ -1740,6 +1743,8 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 				naming_scheme_type ="Numeric"
 			}
 		}
+
+		delete_machine_accounts 	= "Delete"
 		zone						= citrix_zone.test.id
 	}
 	`
@@ -1794,6 +1799,8 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 				naming_scheme_type ="Numeric"
 			}
 		}
+
+		delete_machine_accounts 	= "Delete"
 		zone						= citrix_zone.test.id
 	}
 	`
@@ -1846,6 +1853,7 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 			}
 		}
 
+		delete_machine_accounts 	= "Delete"
 		zone						= citrix_zone.test.id
 	}
 	`
@@ -1898,6 +1906,8 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 				naming_scheme_type ="Numeric"
 			}
 		}
+
+		delete_machine_accounts 	= "Delete"
 		zone						= citrix_zone.test.id
 	}
 	`
@@ -1941,6 +1951,7 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 			}
 		}
 
+		delete_machine_accounts 	= "Delete"
 		zone						= citrix_zone.test.id
 	}
 	`
@@ -1983,6 +1994,8 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 				naming_scheme_type ="Numeric"
 			}
 		}
+		
+		delete_machine_accounts 	= "Delete"
 		zone						= citrix_zone.test.id
 	}
 	`

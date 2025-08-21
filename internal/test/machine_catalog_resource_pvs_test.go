@@ -178,6 +178,7 @@ resource "citrix_machine_catalog" "testPvsMachineCatalog" {
 		}
 	}
 
+	delete_machine_accounts 	= "Delete"
 	zone						= "%s"
 }`
 
@@ -231,6 +232,7 @@ resource "citrix_machine_catalog" "testPvsMachineCatalog" {
 		}
 	}
 
+	delete_machine_accounts 	= "Delete"
 	zone						= "%s"
 }`
 
@@ -284,6 +286,7 @@ resource "citrix_machine_catalog" "testPvsMachineCatalog" {
 		}
 	}
 
+	delete_machine_accounts 	= "Delete"
 	zone						= "%s"
 }`
 
