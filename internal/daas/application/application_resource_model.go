@@ -217,12 +217,12 @@ func (ApplicationResourceModel) GetSchema() schema.Schema {
 			"limit_visibility_to_users": schema.SetAttribute{
 				ElementType: types.StringType,
 				Description: "By default, the application is visible to all users within a delivery group. However, you can restrict its visibility to only certain users by specifying them in the `limit_visibility_to_users` list." +
-					"\n\n-> **Note** Users must be in `DOMAIN\\UserOrGroupName` or `user@domain.com` format",
+					"\n\n-> **Note** Users must be in SID, SAM account name (`DOMAIN\\UserOrGroupName`) or UPN (`user@domain.com`) format",
 				Optional: true,
 				Validators: []validator.Set{
 					setvalidator.ValueStringsAre(
 						validator.String(
-							stringvalidator.RegexMatches(regexp.MustCompile(util.SamAndUpnRegex), "must be in `Domain\\UserOrGroupName` or `user@domain.com` format"),
+							stringvalidator.RegexMatches(regexp.MustCompile(util.SamUpnSidRegex), "must be in SID, SAM account name (`DOMAIN\\UserOrGroupName`) or UPN (`user@domain.com`) format"),
 						),
 					),
 				},

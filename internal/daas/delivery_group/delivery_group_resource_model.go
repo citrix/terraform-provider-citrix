@@ -688,28 +688,28 @@ func (RestrictedAccessUsers) getSchemaInternal(forDeliveryGroup bool) schema.Sin
 		Attributes: map[string]schema.Attribute{
 			"allow_list": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: fmt.Sprintf("Users who can use this %s. \n\n-> **Note** Users must be in `DOMAIN\\UserOrGroupName` or `user@domain.com` format", resource),
+				Description: fmt.Sprintf("Users who can use this %s. \n\n-> **Note** Users must be in SID, SAM account name (`DOMAIN\\UserOrGroupName`) or UPN (`user@domain.com`) format", resource),
 				Optional:    true,
 				Computed:    true,
 				Default:     setdefault.StaticValue(types.SetValueMust(types.StringType, []attr.Value{})),
 				Validators: []validator.Set{
 					setvalidator.ValueStringsAre(
 						validator.String(
-							stringvalidator.RegexMatches(regexp.MustCompile(util.SamAndUpnRegex), "must be in `DOMAIN\\UserOrGroupName` or `user@domain.com` format"),
+							stringvalidator.RegexMatches(regexp.MustCompile(util.SamUpnSidRegex), "must be in SID, SAM account name (`DOMAIN\\UserOrGroupName`) or UPN (`user@domain.com`) format"),
 						),
 					),
 				},
 			},
 			"block_list": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: fmt.Sprintf("Users who cannot use this %s. A block list is meaningful only when used to block users in the allow list. \n\n-> **Note** Users must be in `DOMAIN\\UserOrGroupName` or `user@domain.com` format", resource),
+				Description: fmt.Sprintf("Users who cannot use this %s. A block list is meaningful only when used to block users in the allow list. \n\n-> **Note** Users must be in SID, SAM account name (`DOMAIN\\UserOrGroupName`) or UPN (`user@domain.com`) format", resource),
 				Optional:    true,
 				Computed:    true,
 				Default:     setdefault.StaticValue(types.SetValueMust(types.StringType, []attr.Value{})),
 				Validators: []validator.Set{
 					setvalidator.ValueStringsAre(
 						validator.String(
-							stringvalidator.RegexMatches(regexp.MustCompile(util.SamAndUpnRegex), "must be in `DOMAIN\\UserOrGroupName` or `user@domain.com` format"),
+							stringvalidator.RegexMatches(regexp.MustCompile(util.SamUpnSidRegex), "must be in SID, SAM account name (`DOMAIN\\UserOrGroupName`) or UPN (`user@domain.com`) format"),
 						),
 					),
 				},
@@ -1030,13 +1030,13 @@ func (DeliveryGroupAssignMachinesToUsersModel) GetSchema() schema.NestedAttribut
 			},
 			"users": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "The list of users to assign to the machine. \n\n-> **Note** Users must be in `DOMAIN\\UserName` or `user@domain.com` format.",
+				Description: "The list of users to assign to the machine. \n\n-> **Note** Users must be in SID, SAM account name (`DOMAIN\\UserName`) or UPN (`user@domain.com`) format.",
 				Required:    true,
 				Validators: []validator.Set{
 					setvalidator.SizeAtLeast(1),
 					setvalidator.ValueStringsAre(
 						validator.String(
-							stringvalidator.RegexMatches(regexp.MustCompile(util.SamAndUpnRegex), "must be in `DOMAIN\\UserName` or `user@domain.com` format"),
+							stringvalidator.RegexMatches(regexp.MustCompile(util.SamUpnSidRegex), "must be in SID, SAM account name (`DOMAIN\\UserName`) or UPN (`user@domain.com`) format"),
 						),
 					),
 				},

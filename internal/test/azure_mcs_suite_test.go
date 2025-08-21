@@ -37,7 +37,7 @@ func TestAzureMcsSuitePreCheck(t *testing.T) {
 	TestPolicySetResourcePreCheck(t)
 
 	if !isOnPremises {
-		TestAzureImageDefinitionResourcePreCheck(t)
+		TestAzureImageDefinitionResourcePreCheckForTestSuite(t)
 		TestMachineCatalogPreCheck_AzureAd(t)
 		TestMachineCatalogPreCheck_Workgroup(t)
 	} else {
@@ -210,7 +210,12 @@ func TestAzureMcs(t *testing.T) {
 
 			/*******************Image Definition Test******************/
 			{
-				Config: composeTestResourceTf(BuildAzureImageDefinitionTestResource(t)),
+				Config: composeTestResourceTf(
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
+					BuildZoneResource(t, zoneInput, true),
+					BuildAzureImageDefinitionTestResourceForTestSuite(t),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the image definition
 					resource.TestCheckResourceAttr("citrix_image_definition.test_azure_image_definition", "name", os.Getenv("TEST_IMAGE_DEFINITION_NAME")),
@@ -233,7 +238,12 @@ func TestAzureMcs(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: composeTestResourceTf(BuildAzureImageDefinitionUpdatedTestResource(t)),
+				Config: composeTestResourceTf(
+					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
+					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
+					BuildZoneResource(t, zoneInput, true),
+					BuildAzureImageDefinitionUpdatedTestResourceForTestSuite(t),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the image definition
 					resource.TestCheckResourceAttr("citrix_image_definition.test_azure_image_definition", "name", os.Getenv("TEST_IMAGE_DEFINITION_NAME_UPDATED")),

@@ -36,7 +36,7 @@ resource "citrix_application_group" "example-application-group" {
 - `enabled` (Boolean) Whether the application group is enabled or not. Defaults to `true`.
 - `included_users` (Set of String) Users who can use this application group. 
 
--> **Note** User must be in `Domain\UserOrGroupName` or `user@domain.com` format
+-> **Note** User must be in SID, SAM account name (`DOMAIN\UserOrGroupName`) or UPN (`user@domain.com`) format
 - `metadata` (Attributes List) Metadata for the Application Group. (see [below for nested schema](#nestedatt--metadata))
 - `restrict_to_tag` (String) The tag to restrict the application group to.
 - `scopes` (Set of String) The IDs of the scopes for the application group to be a part of.

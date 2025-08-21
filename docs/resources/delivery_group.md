@@ -296,7 +296,7 @@ Required:
 - `machine_name` (String) The name of the machine. For domain-joined machines, the name must be in the format <domain>\<machine>, all in lowercase. For non domain-joined machines, use the machine name, all in lowercase.
 - `users` (Set of String) The list of users to assign to the machine. 
 
--> **Note** Users must be in `DOMAIN\UserName` or `user@domain.com` format.
+-> **Note** Users must be in SID, SAM account name (`DOMAIN\UserName`) or UPN (`user@domain.com`) format.
 
 
 <a id="nestedatt--associated_machine_catalogs"></a>
@@ -531,10 +531,10 @@ Optional:
 
 - `allow_list` (Set of String) Users who can use this Desktop. 
 
--> **Note** Users must be in `DOMAIN\UserOrGroupName` or `user@domain.com` format
+-> **Note** Users must be in SID, SAM account name (`DOMAIN\UserOrGroupName`) or UPN (`user@domain.com`) format
 - `block_list` (Set of String) Users who cannot use this Desktop. A block list is meaningful only when used to block users in the allow list. 
 
--> **Note** Users must be in `DOMAIN\UserOrGroupName` or `user@domain.com` format
+-> **Note** Users must be in SID, SAM account name (`DOMAIN\UserOrGroupName`) or UPN (`user@domain.com`) format
 
 
 
@@ -601,10 +601,10 @@ Optional:
 
 - `allow_list` (Set of String) Users who can use this Delivery Group. 
 
--> **Note** Users must be in `DOMAIN\UserOrGroupName` or `user@domain.com` format
+-> **Note** Users must be in SID, SAM account name (`DOMAIN\UserOrGroupName`) or UPN (`user@domain.com`) format
 - `block_list` (Set of String) Users who cannot use this Delivery Group. A block list is meaningful only when used to block users in the allow list. 
 
--> **Note** Users must be in `DOMAIN\UserOrGroupName` or `user@domain.com` format
+-> **Note** Users must be in SID, SAM account name (`DOMAIN\UserOrGroupName`) or UPN (`user@domain.com`) format
 
 ## Import
 

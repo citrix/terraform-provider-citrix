@@ -74,6 +74,8 @@ const UpnRegex string = `^[^@]+@\b(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}$`
 
 const SamAndUpnRegex string = SamRegex + `|` + UpnRegex
 
+const SamUpnSidRegex string = SamRegex + `|` + UpnRegex + `|` + ActiveDirectorySidRegex
+
 // SAM
 const ComputerAccountRegex string = `^[a-zA-Z0-9\-_]{0,61}[a-zA-Z0-9]\\\w[\w\.\- ]+\$$`
 
@@ -1142,15 +1144,20 @@ func CheckStoreFrontVersion(client *citrixstorefrontclient.STFVersion, ctx conte
 func RefreshUsersList(ctx context.Context, diags *diag.Diagnostics, usersSet types.Set, usersInRemote []citrixorchestration.IdentityUserResponseModel) types.Set {
 	samNamesMap := map[string]int{}
 	upnMap := map[string]int{}
+	sidMap := map[string]int{}
 
 	for index, userInRemote := range usersInRemote {
 		userSamName := userInRemote.GetSamName()
 		userPrincipalName := userInRemote.GetPrincipalName()
+		userSid := userInRemote.GetSid()
 		if userSamName != "" {
 			samNamesMap[strings.ToLower(userSamName)] = index
 		}
 		if userPrincipalName != "" {
 			upnMap[strings.ToLower(userPrincipalName)] = index
+		}
+		if userSid != "" {
+			sidMap[strings.ToLower(userSid)] = index
 		}
 	}
 
@@ -1167,9 +1174,14 @@ func RefreshUsersList(ctx context.Context, diags *diag.Diagnostics, usersSet typ
 			samNamesMap[strings.ToLower(user)] = -1
 			if index != -1 {
 				userPrincipalName := usersInRemote[index].GetPrincipalName()
+				userSid := usersInRemote[index].GetSid()
 				_, exists = upnMap[strings.ToLower(userPrincipalName)]
 				if exists {
 					upnMap[strings.ToLower(userPrincipalName)] = -1
+				}
+				_, exists = sidMap[strings.ToLower(userSid)]
+				if exists {
+					sidMap[strings.ToLower(userSid)] = -1
 				}
 			}
 
@@ -1186,9 +1198,36 @@ func RefreshUsersList(ctx context.Context, diags *diag.Diagnostics, usersSet typ
 			upnMap[strings.ToLower(user)] = -1
 			if index != -1 {
 				samName := usersInRemote[index].GetSamName()
+				userSid := usersInRemote[index].GetSid()
 				_, exists = samNamesMap[strings.ToLower(samName)]
 				if exists {
 					samNamesMap[strings.ToLower(samName)] = -1
+				}
+				_, exists = sidMap[strings.ToLower(userSid)]
+				if exists {
+					sidMap[strings.ToLower(userSid)] = -1
+				}
+			}
+		}
+
+		sidRegex, _ := regexp.Compile(ActiveDirectorySidRegex)
+		if sidRegex.MatchString(user) {
+			index, exists := sidMap[strings.ToLower(user)]
+			if !exists {
+				continue
+			}
+			res = append(res, user)
+			sidMap[strings.ToLower(user)] = -1
+			if index != -1 {
+				samName := usersInRemote[index].GetSamName()
+				userPrincipalName := usersInRemote[index].GetPrincipalName()
+				_, exists = samNamesMap[strings.ToLower(samName)]
+				if exists {
+					samNamesMap[strings.ToLower(samName)] = -1
+				}
+				_, exists = upnMap[strings.ToLower(userPrincipalName)]
+				if exists {
+					upnMap[strings.ToLower(userPrincipalName)] = -1
 				}
 			}
 		}
@@ -1318,7 +1357,7 @@ func VerifyIdentityUserListCompleteness(inputUserNames []string, remoteUsers []c
 	missingUsers := []string{}
 	for _, includedUser := range inputUserNames {
 		userIndex := slices.IndexFunc(remoteUsers, func(i citrixorchestration.IdentityUserResponseModel) bool {
-			return strings.EqualFold(includedUser, i.GetSamName()) || strings.EqualFold(includedUser, i.GetPrincipalName())
+			return strings.EqualFold(includedUser, i.GetSamName()) || strings.EqualFold(includedUser, i.GetPrincipalName()) || strings.EqualFold(includedUser, i.GetSid())
 		})
 		if userIndex == -1 {
 			missingUsers = append(missingUsers, includedUser)

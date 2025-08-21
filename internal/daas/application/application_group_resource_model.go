@@ -78,12 +78,12 @@ func (ApplicationGroupResourceModel) GetSchema() schema.Schema {
 			"included_users": schema.SetAttribute{
 				ElementType: types.StringType,
 				Description: "Users who can use this application group. " +
-					"\n\n-> **Note** User must be in `Domain\\UserOrGroupName` or `user@domain.com` format",
+					"\n\n-> **Note** User must be in SID, SAM account name (`DOMAIN\\UserOrGroupName`) or UPN (`user@domain.com`) format",
 				Optional: true,
 				Validators: []validator.Set{
 					setvalidator.ValueStringsAre(
 						validator.String(
-							stringvalidator.RegexMatches(regexp.MustCompile(util.SamAndUpnRegex), "must be in `Domain\\UserOrGroupName` or `user@domain.com` format"),
+							stringvalidator.RegexMatches(regexp.MustCompile(util.SamUpnSidRegex), "must be in SID, SAM account name (`DOMAIN\\UserOrGroupName`) or UPN (`user@domain.com`) format"),
 						),
 					),
 				},
