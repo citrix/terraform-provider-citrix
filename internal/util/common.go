@@ -1343,9 +1343,13 @@ func GetUserIdsUsingIdentity(ctx context.Context, client *citrixdaasclient.Citri
 	}
 
 	for _, user := range allUsersFromIdentity {
-		id := user.GetOid() // Azure AD users
+		// Order of priority: UserIdentity, SID, OID
+		id := user.GetUserIdentity()
 		if id == "" {
-			id = user.GetSid() // For AD users, OID is empty, use SID
+			id = user.GetSid()
+		}
+		if id == "" {
+			id = user.GetOid()
 		}
 		userIds = append(userIds, id)
 	}
