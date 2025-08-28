@@ -113,6 +113,11 @@ func TestMachineCatalogPreCheck_Azure(t *testing.T) {
 	}
 }
 func TestActiveDirectoryMachineCatalogResourceAzure(t *testing.T) {
+	ctx := context.Background()
+	client := sharedClientForSweepers(ctx)
+
+	orchestrationApiVersion := client.ClientConfig.OrchestrationApiVersion
+
 	name := os.Getenv("TEST_MC_NAME")
 	zoneInput := os.Getenv("TEST_ZONE_INPUT_AZURE")
 
@@ -128,13 +133,21 @@ func TestActiveDirectoryMachineCatalogResourceAzure(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: composeTestResourceTf(
-					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "-AD", "ActiveDirectory"),
-					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
-					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
-					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zoneInput, false),
-				),
+				Config: func() string {
+					var mcResource string
+					if orchestrationApiVersion >= 120 {
+						mcResource = BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "-AD", "ActiveDirectory")
+					} else {
+						mcResource = BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_without_serv_acc_uid, "-AD", "ActiveDirectory")
+					}
+					return composeTestResourceTf(
+						mcResource,
+						BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
+						BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+						BuildHypervisorResourceAzure(t, hypervisor_testResources),
+						BuildZoneResource(t, zoneInput, false),
+					)
+				}(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AD", "name", name),
@@ -181,13 +194,21 @@ func TestActiveDirectoryMachineCatalogResourceAzure(t *testing.T) {
 			},
 			// Delete machine test
 			{
-				Config: composeTestResourceTf(
-					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "-AD", "ActiveDirectory"),
-					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
-					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
-					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zoneInput, false),
-				),
+				Config: func() string {
+					var mcResource string
+					if orchestrationApiVersion >= 120 {
+						mcResource = BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "-AD", "ActiveDirectory")
+					} else {
+						mcResource = BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_without_serv_acc_uid_delete_machine, "-AD", "ActiveDirectory")
+					}
+					return composeTestResourceTf(
+						mcResource,
+						BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
+						BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+						BuildHypervisorResourceAzure(t, hypervisor_testResources),
+						BuildZoneResource(t, zoneInput, false),
+					)
+				}(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify updated name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-AD", "name", name),
@@ -203,6 +224,10 @@ func TestActiveDirectoryMachineCatalogResourceAzure(t *testing.T) {
 }
 
 func TestHybridAzureADMachineCatalogResourceAzure(t *testing.T) {
+	ctx := context.Background()
+	client := sharedClientForSweepers(ctx)
+
+	orchestrationApiVersion := client.ClientConfig.OrchestrationApiVersion
 	name := os.Getenv("TEST_MC_NAME") + "-HybAAD"
 	zoneInput := os.Getenv("TEST_ZONE_INPUT_AZURE")
 
@@ -217,13 +242,21 @@ func TestHybridAzureADMachineCatalogResourceAzure(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: composeTestResourceTf(
-					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "-HybAAD", "HybridAzureAD"),
-					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
-					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
-					BuildHypervisorResourceAzure(t, hypervisor_testResources),
-					BuildZoneResource(t, zoneInput, false),
-				),
+				Config: func() string {
+					var mcResource string
+					if orchestrationApiVersion >= 120 {
+						mcResource = BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "-HybAAD", "HybridAzureAD")
+					} else {
+						mcResource = BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_without_serv_acc_uid, "-HybAAD", "HybridAzureAD")
+					}
+					return composeTestResourceTf(
+						mcResource,
+						BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
+						BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
+						BuildHypervisorResourceAzure(t, hypervisor_testResources),
+						BuildZoneResource(t, zoneInput, false),
+					)
+				}(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of catalog
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "name", name),
@@ -1575,7 +1608,8 @@ var (
 			identity_type = "ActiveDirectory"
 			machine_domain_identity = {
 				domain 						= "%s"
-				service_account_id 			= citrix_service_account.testServiceAccountAD.id
+				service_account				= "%s"
+				service_account_password 	= "%s"
 			}
 			azure_machine_config = {
 				service_offering 	 = "%s"
@@ -1613,7 +1647,8 @@ var (
 			identity_type = "ActiveDirectory"
 			machine_domain_identity = {
 				domain 						= "%s"
-				service_account_id 			= citrix_service_account.testServiceAccountAD.id
+				service_account				= "%s"
+				service_account_password 	= "%s"
 			}
 			azure_machine_config = {
 				service_offering 	 = "%s"
@@ -1800,6 +1835,165 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 			}
 		}
 
+		delete_machine_accounts 	= "Delete"
+		zone						= citrix_zone.test.id
+	}
+	`
+	machinecatalog_testResources_azure_without_serv_acc_uid = `
+resource "citrix_machine_catalog" "testMachineCatalog%s" {
+	name                		= "%s"
+	description					= "on prem catalog for import testing"
+	allocation_type				= "Random"
+	session_support				= "MultiSession"
+	provisioning_type			= "MCS"
+	minimum_functional_level    = "L7_9"
+	provisioning_scheme			= 	{
+		hypervisor			 = citrix_azure_hypervisor.testHypervisor.id
+		hypervisor_resource_pool = citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool.id
+		identity_type = "%s"
+		machine_domain_identity = {
+			domain 						= "%s"
+			service_account				= "%s"
+			service_account_password 	= "%s"
+		}
+		azure_machine_config = {
+			service_offering 	 = "%s"
+			azure_master_image 	 = {
+				resource_group 		 = "%s"
+				storage_account 	 = "%s"
+				container 			 = "%s"
+				master_image		 = "%s"
+			}
+			storage_type = "StandardSSD_LRS"
+			use_managed_disks = true
+			writeback_cache = {
+				wbc_disk_storage_type = "StandardSSD_LRS"
+				persist_wbc = true
+				persist_os_disk = true
+				persist_vm = true
+				writeback_cache_disk_size_gb = 127
+				writeback_cache_memory_size_mb = 256
+				storage_cost_saving = true
+			}
+		}
+		network_mapping = [
+			{
+				network_device = "0"
+				network 	   = "%s"
+			}
+		]
+		number_of_total_machines = 	1
+		machine_account_creation_rules ={
+			naming_scheme =     "%s"
+			naming_scheme_type ="Numeric"
+		}
+	}
+	delete_machine_accounts 	= "Delete"
+	zone						= citrix_zone.test.id
+}
+`
+	machinecatalog_testResources_azure_without_serv_acc_updated = `
+	resource "citrix_machine_catalog" "testMachineCatalog%s" {
+		name                		= "%s"
+		description					= "updatedCatalog"
+		allocation_type				= "Random"
+		session_support				= "MultiSession"
+		provisioning_type			= "MCS"
+		minimum_functional_level    = "L7_20"
+		provisioning_scheme			= 	{
+			hypervisor			 = citrix_azure_hypervisor.testHypervisor.id
+			hypervisor_resource_pool = citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool.id
+			identity_type = "%s"
+			machine_domain_identity = {
+				domain 						= "%s"
+				service_account				= "%s"
+				service_account_password 	= "%s"
+			}
+			azure_machine_config = {
+				service_offering 	 = "%s"
+				azure_master_image 	 = {
+					resource_group 		 = "%s"
+					storage_account 	 = "%s"
+					container 			 = "%s"
+					master_image		 = "%s"
+				}
+				storage_type = "StandardSSD_LRS"
+				use_managed_disks = true
+				writeback_cache = {
+					wbc_disk_storage_type = "StandardSSD_LRS"
+					persist_wbc = true
+					persist_os_disk = true
+					persist_vm = true
+					writeback_cache_disk_size_gb = 127
+					writeback_cache_memory_size_mb = 256
+					storage_cost_saving = true
+				}
+			}
+			network_mapping = [
+				{
+					network_device = "0"
+					network 	   = "%s"
+				}
+			]
+			number_of_total_machines = 	2
+			machine_account_creation_rules ={
+				naming_scheme =     "%s"
+				naming_scheme_type ="Numeric"
+			}
+		}
+		delete_machine_accounts 	= "Delete"
+		zone						= citrix_zone.test.id
+	}`
+	machinecatalog_testResources_azure_without_serv_acc_uid_delete_machine = `
+	resource "citrix_machine_catalog" "testMachineCatalog%s" {
+		name                		= "%s"
+		description					= "updatedCatalog"		
+		allocation_type				= "Random"
+		session_support				= "MultiSession"
+		provisioning_type			= "MCS"
+		provisioning_scheme			= 	{
+			hypervisor			 	 = citrix_azure_hypervisor.testHypervisor.id
+			hypervisor_resource_pool = citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool.id
+			identity_type = "%s"
+			machine_domain_identity = {
+				domain 						= "%s"
+				service_account				= "%s"
+				service_account_password 	= "%s"
+			}
+			azure_machine_config = {
+				service_offering 	 	 = "%s"
+				azure_master_image 	 = {
+					resource_group 		 = "%s"
+					storage_account 	 = "%s"
+					container 			 = "%s"
+					master_image		 = "%s"
+				}
+				storage_type = "StandardSSD_LRS"
+				use_managed_disks = true
+				
+				writeback_cache = {
+					wbc_disk_storage_type = "StandardSSD_LRS"
+					persist_wbc = true
+					persist_os_disk = true
+					persist_vm = true
+					writeback_cache_disk_size_gb = 127
+					writeback_cache_memory_size_mb = 256
+					storage_cost_saving = true
+				}
+			}
+			network_mapping = [
+				{
+					network_device = "0"
+					network 	   = "%s"
+				}
+			]
+			availability_zones = ["1","3"]
+			number_of_total_machines = 	1
+			machine_account_creation_rules ={
+				naming_scheme =     "%s"
+				naming_scheme_type ="Numeric"
+			}
+		}
 		delete_machine_accounts 	= "Delete"
 		zone						= citrix_zone.test.id
 	}
@@ -2658,9 +2852,13 @@ func BuildMachineCatalogResourceAzure(t *testing.T, machineResource, catalogName
 	//machine account
 	domain := os.Getenv("TEST_MC_DOMAIN")
 
-	if machineResource == machinecatalog_testResources_azure || machineResource == machinecatalog_testResources_azure_delete_machine {
+	switch machineResource {
+	case machinecatalog_testResources_azure, machinecatalog_testResources_azure_delete_machine:
 		// Do not pass service account id and password since we are using service account resource
 		return fmt.Sprintf(machineResource, catalogNameSuffix, name, identityType, domain, service_offering, resource_group, storage_account, container, master_image, vdaResourceGroup, subnet, namingScheme)
+	case machinecatalog_testResources_azure_without_serv_acc_uid, machinecatalog_testResources_azure_without_serv_acc_uid_delete_machine, machinecatalog_testResources_azure_without_serv_acc_updated:
+		// Do not pass service account id and password since we are using service account resource
+		return fmt.Sprintf(machineResource, catalogNameSuffix, name, identityType, domain, service_account, service_account_pass, service_offering, resource_group, storage_account, container, master_image, subnet, namingScheme)
 	}
 
 	return fmt.Sprintf(machineResource, catalogNameSuffix, name, identityType, domain, service_account, service_account_pass, service_offering, resource_group, storage_account, container, master_image, vdaResourceGroup, subnet, namingScheme)
@@ -2788,6 +2986,8 @@ func BuildMachineCatalogResourceAwsEc2(t *testing.T, machineResource string) str
 
 func BuildMachineCatalogWithZeroMachines(t *testing.T, machineResource string) string {
 	domain := os.Getenv("TEST_MC_DOMAIN")
+	service_account := os.Getenv("TEST_MC_SERVICE_ACCOUNT")
+	service_account_pass := os.Getenv("TEST_MC_SERVICE_ACCOUNT_PASS")
 	service_offering := os.Getenv("TEST_MC_SERVICE_OFFERING")
 	resource_group := os.Getenv("TEST_MC_IMAGE_RESOURCE_GROUP")
 	storage_account := os.Getenv("TEST_MC_IMAGE_STORAGE_ACCOUNT")
@@ -2795,7 +2995,7 @@ func BuildMachineCatalogWithZeroMachines(t *testing.T, machineResource string) s
 	master_image := os.Getenv("TEST_MC_MASTER_IMAGE")
 	vdaResourceGroup := os.Getenv("TEST_MC_VDA_AZURE_RESOURCE_GROUP")
 
-	return fmt.Sprintf(machineResource, domain, service_offering, resource_group, storage_account, container, master_image, vdaResourceGroup)
+	return fmt.Sprintf(machineResource, domain, service_account, service_account_pass, service_offering, resource_group, storage_account, container, master_image, vdaResourceGroup)
 }
 
 func BuildMachineCatalogResourceManualPowerManagedAzure(t *testing.T, machineResource string) string {

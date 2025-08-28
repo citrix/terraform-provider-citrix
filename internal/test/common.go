@@ -40,6 +40,26 @@ func skipForGitHubAction(isGitHubAction bool) func() (bool, error) {
 	}
 }
 
+func skipForCVADVersion(isPre2407AndOnPremises bool) func() (bool, error) {
+	return func() (bool, error) {
+		if isPre2407AndOnPremises {
+			return true, nil
+		}
+
+		return false, nil
+	}
+}
+
+func skipForPolicySet(isDDCVersionSupportedForPolicy bool) func() (bool, error) {
+	return func() (bool, error) {
+		if !isDDCVersionSupportedForPolicy {
+			return true, nil
+		}
+
+		return false, nil
+	}
+}
+
 // Used to aggregate arbitrary number of terraform resource blocks
 func composeTestResourceTf(resources ...string) string {
 	var result = ""

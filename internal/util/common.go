@@ -1041,7 +1041,7 @@ func CheckProductVersion(client *citrixdaasclient.CitrixDaasClient, diagnostics 
 	if client.AuthConfig.OnPremises {
 		productVersionSplit := strings.Split(client.ClientConfig.ProductVersion, ".")
 		productMajorVersion, err := strconv.Atoi(productVersionSplit[0])
-		if err != nil {
+		if err != nil && diagnostics != nil {
 			diagnostics.AddError(
 				errorSummary,
 				"Error parsing product major version. Error: "+err.Error(),
@@ -1050,7 +1050,7 @@ func CheckProductVersion(client *citrixdaasclient.CitrixDaasClient, diagnostics 
 		}
 
 		productMinorVersion, err := strconv.Atoi(productVersionSplit[1])
-		if err != nil {
+		if err != nil && diagnostics != nil {
 			diagnostics.AddError(
 				errorSummary,
 				"Error parsing product minor version. Error: "+err.Error(),
@@ -1058,8 +1058,8 @@ func CheckProductVersion(client *citrixdaasclient.CitrixDaasClient, diagnostics 
 			return false
 		}
 
-		if productMajorVersion < requiredProductMajorVersion ||
-			(productMajorVersion == requiredProductMajorVersion && productMinorVersion < requiredProductMinorVersion) {
+		if (productMajorVersion < requiredProductMajorVersion ||
+			(productMajorVersion == requiredProductMajorVersion && productMinorVersion < requiredProductMinorVersion)) && diagnostics != nil {
 			diagnostics.AddError(
 				errorSummary,
 				fmt.Sprintf("%s is not supported for current DDC version %d.%d. Please upgrade your DDC product version to %d.%d or above.", feature, productMajorVersion, productMinorVersion, requiredProductMajorVersion, requiredProductMinorVersion),
@@ -1068,7 +1068,7 @@ func CheckProductVersion(client *citrixdaasclient.CitrixDaasClient, diagnostics 
 		}
 
 		// Validate Orchestration version
-		if client.ClientConfig.OrchestrationApiVersion < requiredOnPremOrchestrationApiVersion {
+		if client.ClientConfig.OrchestrationApiVersion < requiredOnPremOrchestrationApiVersion && diagnostics != nil {
 			diagnostics.AddError(
 				errorSummary,
 				fmt.Sprintf("%s is not supported for current DDC Orchestration Service version %d. Please upgrade your DDC Orchestration Service version to %d or above.", feature, client.ClientConfig.OrchestrationApiVersion, requiredOnPremOrchestrationApiVersion),
@@ -1077,7 +1077,7 @@ func CheckProductVersion(client *citrixdaasclient.CitrixDaasClient, diagnostics 
 		}
 	} else {
 		// Validate Orchestration version
-		if client.ClientConfig.OrchestrationApiVersion < requiredCloudOrchestrationApiVersion {
+		if client.ClientConfig.OrchestrationApiVersion < requiredCloudOrchestrationApiVersion && diagnostics != nil {
 			diagnostics.AddError(
 				errorSummary,
 				fmt.Sprintf("%s is not supported for current DDC Orchestration Service version %d. Please upgrade your DDC Orchestration Service version to %d or above.", feature, client.ClientConfig.OrchestrationApiVersion, requiredCloudOrchestrationApiVersion),
@@ -1343,9 +1343,13 @@ func GetUserIdsUsingIdentity(ctx context.Context, client *citrixdaasclient.Citri
 	}
 
 	for _, user := range allUsersFromIdentity {
-		id := user.GetOid() // Azure AD users
+		// Order of priority: UserIdentity, SID, OID
+		id := user.GetUserIdentity()
 		if id == "" {
-			id = user.GetSid() // For AD users, OID is empty, use SID
+			id = user.GetSid()
+		}
+		if id == "" {
+			id = user.GetOid()
 		}
 		userIds = append(userIds, id)
 	}
