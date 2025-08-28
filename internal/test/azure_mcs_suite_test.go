@@ -3,29 +3,48 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/citrix/terraform-provider-citrix/internal/util"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
 // testHypervisorPreCheck validates the necessary env variable exist
 // in the testing environment
 func TestAzureMcsSuitePreCheck(t *testing.T) {
+	ctx := context.Background()
+	client := sharedClientForSweepers(ctx)
+
+	diag := diag.Diagnostics{}
+
+	isDDCVersionSupportedForCatalogAndDelGrp := util.CheckProductVersion(client, &diag, 120, 120, 7, 42, "", "")
+
+	isDDCVersionSupportedForPolicy := util.CheckProductVersion(client, &diag, 120, 118, 7, 41, "", "")
 	customerId := os.Getenv("CITRIX_CUSTOMER_ID")
 	isOnPremises := true
 	if customerId != "" && customerId != "CitrixOnPremises" {
 		// Tests being run in cloud env
 		isOnPremises = false
 	}
+	isPre2407AndOnPremises := false
+	if isOnPremises && !isDDCVersionSupportedForCatalogAndDelGrp {
+		// Tests being run in on-premises environment with CVAD version < 2407
+		isPre2407AndOnPremises = true
+	}
 
 	TestProviderPreCheck(t)
 	TestHypervisorPreCheck_Azure(t)
 	TestHypervisorResourcePoolPreCheck_Azure(t)
-	TestServiceAccountPreCheck_AD(t)
+
+	if !isPre2407AndOnPremises {
+		TestServiceAccountPreCheck_AD(t)
+	}
 	TestMachineCatalogPreCheck_Azure(t)
 	TestMachineCatalogPreCheck_Manual_Power_Managed_Azure(t)
 	TestDesktopIconPreCheck(t)
@@ -34,7 +53,9 @@ func TestAzureMcsSuitePreCheck(t *testing.T) {
 	TestApplicationResourcePreCheck(t)
 	TestAdminScopeResourcePreCheck(t)
 	TestAdminRolePreCheck(t)
-	TestPolicySetResourcePreCheck(t)
+	if isDDCVersionSupportedForPolicy {
+		TestPolicySetResourcePreCheck(t)
+	}
 
 	if !isOnPremises {
 		TestAzureImageDefinitionResourcePreCheckForTestSuite(t)
@@ -46,11 +67,23 @@ func TestAzureMcsSuitePreCheck(t *testing.T) {
 }
 
 func TestAzureMcs(t *testing.T) {
+	ctx := context.Background()
+	client := sharedClientForSweepers(ctx)
+	diag := diag.Diagnostics{}
+	isDDCVersionSupportedForPolicy := util.CheckProductVersion(client, &diag, 120, 118, 7, 41, "", "")
+
+	isDDCVersionSupportedForCatalogAndDelGrp := util.CheckProductVersion(client, &diag, 120, 120, 7, 42, "", "")
+
 	customerId := os.Getenv("CITRIX_CUSTOMER_ID")
 	isOnPremises := true
 	if customerId != "" && customerId != "CitrixOnPremises" {
 		// Tests being run in cloud env
 		isOnPremises = false
+	}
+	isPre2407AndOnPremises := false
+	if isOnPremises && !isDDCVersionSupportedForCatalogAndDelGrp {
+		// Tests being run in on-premises environment with CVAD version < 2407
+		isPre2407AndOnPremises = true
 	}
 	gotestContext := os.Getenv("GOTEST_CONTEXT")
 	isGitHubAction := false
@@ -90,14 +123,18 @@ func TestAzureMcs(t *testing.T) {
 			TestProviderPreCheck(t)
 			TestHypervisorPreCheck_Azure(t)
 			TestHypervisorResourcePoolPreCheck_Azure(t)
-			TestServiceAccountPreCheck_AD(t)
+			if !isPre2407AndOnPremises {
+				TestServiceAccountPreCheck_AD(t)
+			}
 			TestMachineCatalogPreCheck_Azure(t)
 			TestMachineCatalogPreCheck_Manual_Power_Managed_Azure(t)
 			TestDesktopIconPreCheck(t)
 			TestDeliveryGroupPreCheck(t)
 			TestAdminFolderPreCheck(t)
 			TestApplicationResourcePreCheck(t)
-			TestPolicySetResourcePreCheck(t)
+			if isDDCVersionSupportedForPolicy {
+				TestPolicySetResourcePreCheck(t)
+			}
 		},
 		Steps: []resource.TestStep{
 			/****************** Zone Test ******************/
@@ -268,6 +305,7 @@ func TestAzureMcs(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_service_account.testServiceAccountAD", "display_name", os.Getenv("TEST_SERVICE_ACCOUNT_DISPLAY_NAME")),
 					resource.TestCheckResourceAttr("citrix_service_account.testServiceAccountAD", "identity_provider_identifier", os.Getenv("TEST_SERVICE_ACCOUNT_AD_DOMAIN_NAME")),
 				),
+				SkipFunc: skipForCVADVersion(isPre2407AndOnPremises),
 			},
 			// Import testing
 			{
@@ -277,6 +315,7 @@ func TestAzureMcs(t *testing.T) {
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
 				ImportStateVerifyIgnore: []string{"account_secret", "account_secret_format"},
+				SkipFunc:                skipForCVADVersion(isPre2407AndOnPremises),
 			},
 			// Update and Read
 			{
@@ -285,50 +324,60 @@ func TestAzureMcs(t *testing.T) {
 					// Verify name of hypervisor
 					resource.TestCheckResourceAttr("citrix_service_account.testServiceAccountAD", "display_name", fmt.Sprintf("%s-updated", os.Getenv("TEST_SERVICE_ACCOUNT_DISPLAY_NAME"))),
 				),
+				SkipFunc: skipForCVADVersion(isPre2407AndOnPremises),
 			},
 
 			/****************** Machine Catalog Test - MCS AD / AAD / HybridAAD - Manual Power Managed ******************/
 			// Create and Read testing
 			{
-				Config: composeAzureMachineCatalogTestResourceTf(t, isOnPremises),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					/*** Verify MCS AD Machine Catalog ***/
-					// Verify name of catalog
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", machineCatalogName),
-					// Verify domain FQDN
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "session_support", "MultiSession"),
-					// Verify machine catalog identity type
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.identity_type", "ActiveDirectory"),
-					// Verify nic network
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.network_mapping.0.network", os.Getenv("TEST_MC_SUBNET")),
+				Config: composeAzureMachineCatalogTestResourceTf(t, isOnPremises, isPre2407AndOnPremises),
+				Check: func() resource.TestCheckFunc {
+					checks := []resource.TestCheckFunc{
+						/*** Verify MCS AD Machine Catalog ***/
+						// Verify name of catalog
+						resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", machineCatalogName),
+						// Verify domain FQDN
+						resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "session_support", "MultiSession"),
+						// Verify machine catalog identity type
+						resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.identity_type", "ActiveDirectory"),
+						// Verify nic network
+						resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.network_mapping.0.network", os.Getenv("TEST_MC_SUBNET")),
 
-					/*** Verify MCS Hybrid AAD Machine Catalog ***/
-					// Verify name of catalog
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "name", hybridCatalogName),
-					// Verify domain FQDN
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "session_support", "MultiSession"),
-					// Verify machine catalog identity type
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "provisioning_scheme.identity_type", "HybridAzureAD"),
-					// Verify nic network
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "provisioning_scheme.network_mapping.0.network", os.Getenv("TEST_MC_SUBNET")),
+						/*** Verify MCS Hybrid AAD Machine Catalog ***/
+						// Verify name of catalog
+						resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "name", hybridCatalogName),
+						// Verify domain FQDN
+						resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "session_support", "MultiSession"),
+						// Verify machine catalog identity type
+						resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "provisioning_scheme.identity_type", "HybridAzureAD"),
+						// Verify nic network
+						resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog-HybAAD", "provisioning_scheme.network_mapping.0.network", os.Getenv("TEST_MC_SUBNET")),
 
-					/*** Optional - Verify MCS AAD / WorkGroup Machine Catalog ***/
-					composeCloudMachineCatalogTestVerification(isOnPremises, aadCatalogName, workgroupCatalogName),
+						/*** Optional - Verify MCS AAD / WorkGroup Machine Catalog ***/
+						composeCloudMachineCatalogTestVerification(isOnPremises, aadCatalogName, workgroupCatalogName),
 
-					/*** Verify Manual Power Managed Machine Catalog ***/
-					// Verify name of catalog
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogManualPowerManaged", "name", manualPmCatalogName),
-					// Verify session support
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogManualPowerManaged", "session_support", os.Getenv("TEST_MC_SESSION_SUPPORT_MANUAL_POWER_MANAGED")),
-					// Verify total number of machines
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogManualPowerManaged", "machine_accounts.#", "1"),
+						/*** Verify Manual Power Managed Machine Catalog ***/
+						// Verify name of catalog
+						resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogManualPowerManaged", "name", manualPmCatalogName),
+						// Verify session support
+						resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogManualPowerManaged", "session_support", os.Getenv("TEST_MC_SESSION_SUPPORT_MANUAL_POWER_MANAGED")),
+						// Verify total number of machines
+						resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogManualPowerManaged", "machine_accounts.#", "1"),
+					}
 
-					/***Verify Machine Catalog with Zero Machine Count***/
-					// Verify name of catalog
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogMachines", "name", "ZeroMachinesCatalog"),
-					// Verify total number of machines
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogMachines", "provisioning_scheme.number_of_total_machines", "0"),
-				),
+					// Only test Zero Machine Catalog if not pre-2407 and on-premises
+					if !isPre2407AndOnPremises {
+						zeroMachineChecks := []resource.TestCheckFunc{
+							/***Verify Machine Catalog with Zero Machine Count***/
+							// Verify name of catalog
+							resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogMachines", "name", "ZeroMachinesCatalog"),
+							// Verify total number of machines
+							resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogMachines", "provisioning_scheme.number_of_total_machines", "0"),
+						}
+						checks = append(checks, zeroMachineChecks...)
+					}
+					return resource.ComposeAggregateTestCheckFunc(checks...)
+				}(),
 			},
 			// ImportState testing - MCS AD
 			{
@@ -381,15 +430,28 @@ func TestAzureMcs(t *testing.T) {
 			/****************** Delivery Group Test - Create ******************/
 			// Create and Read testing
 			{
-				Config: composeTestResourceTf(
-					BuildDeliveryGroupResourceWithZeroCatalogs(t, testDeliveryGroupWithZeroCatalogs),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
-					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "", "ActiveDirectory"),
-					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
-					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
-					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneInput, true),
-				),
+				Config: func() string {
+					resources := []string{
+						BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
+					}
+					if !isPre2407AndOnPremises {
+						resources = append(resources,
+							BuildDeliveryGroupResourceWithZeroCatalogs(t, testDeliveryGroupWithZeroCatalogs),
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "", "ActiveDirectory"),
+							BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
+						)
+					} else {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_without_serv_acc_uid, "", "ActiveDirectory"),
+						)
+					}
+					resources = append(resources,
+						BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
+						BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
+						BuildZoneResource(t, zoneInput, true),
+					)
+					return composeTestResourceTf(resources...)
+				}(),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of delivery group
@@ -421,75 +483,110 @@ func TestAzureMcs(t *testing.T) {
 			// Machine Catalog: Update description, master image and add machine test
 			// Delivery Group: Update name, description and add machine testing
 			{
-				Config: composeTestResourceTf(
-					BuildDeliveryGroupResourceWithZeroCatalogs(t, testDeliveryGroupWithZeroCatalogsUpdated),
-					BuildMachineCatalogWithZeroMachines(t, machinecatalog_testResources_zeroMachines_azureUpdated),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources_updated, "DesktopsAndApps"),
-					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
-					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
-					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
-					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneInput, true),
-				),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					/*** Verify Machine Catalog ***/
-					// Verify updated name of catalog
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", machineCatalogName),
-					// Verify updated description
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "description", "updatedCatalog"),
-					// Verify updated image
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.azure_machine_config.azure_master_image.master_image", os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")),
-					// Verify domain admin username
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.machine_domain_identity.service_account", os.Getenv("TEST_MC_SERVICE_ACCOUNT")),
-					// Verify machine catalog identity type
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.identity_type", "ActiveDirectory"),
-					// Verify total number of machines
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.number_of_total_machines", "2"),
+				Config: func() string {
+					resources := []string{
 
-					/*** Verify Delivery Group ***/
-					// Verify name of delivery group
-					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "name", fmt.Sprintf("%s-updated", deliveryGroupName)),
-					// Verify description of delivery group
-					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "description", "Delivery Group for testing updated"),
-					// Verify delivery type of delivery group
-					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "delivery_type", "DesktopsAndApps"),
-					// Verify number of desktops
-					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "desktops.#", "1"),
-					// Verify number of reboot schedules
-					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "reboot_schedules.#", "1"),
-					// Verify number of reboot schedules
-					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "reboot_schedules.0.ignore_maintenance_mode", "false"),
-					// Verify total number of machines in delivery group
-					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "total_machines", "2"),
+						BuildDeliveryGroupResource(t, testDeliveryGroupResources_updated, "DesktopsAndApps"),
+					}
+					if !isPre2407AndOnPremises {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_updated, "", "ActiveDirectory"),
+							BuildDeliveryGroupResourceWithZeroCatalogs(t, testDeliveryGroupWithZeroCatalogsUpdated),
+							BuildMachineCatalogWithZeroMachines(t, machinecatalog_testResources_zeroMachines_azureUpdated),
+							BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated))
+					} else {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_without_serv_acc_updated, "", "ActiveDirectory"),
+						)
+					}
+					resources = append(resources,
+						BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
+						BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
+						BuildZoneResource(t, zoneInput, true),
+					)
+					return composeTestResourceTf(resources...)
+				}(),
+				Check: func() resource.TestCheckFunc {
+					checks := []resource.TestCheckFunc{
+						/*** Verify Machine Catalog ***/
+						// Verify updated name of catalog
+						resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", machineCatalogName),
+						// Verify updated description
+						resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "description", "updatedCatalog"),
+						// Verify updated image
+						resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.azure_machine_config.azure_master_image.master_image", os.Getenv("TEST_MC_MASTER_IMAGE_UPDATED")),
+						// Verify domain admin username
+						resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.machine_domain_identity.service_account", os.Getenv("TEST_MC_SERVICE_ACCOUNT")),
+						// Verify machine catalog identity type
+						resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.identity_type", "ActiveDirectory"),
+						// Verify total number of machines
+						resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.number_of_total_machines", "2"),
 
-					/*** Verify Machine Catalog with Updated Machine Count ***/
-					// Verify name of catalog
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogMachines", "name", "UpdatedOneMachineCatalog"),
-					// Verify total number of machines
-					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogMachines", "provisioning_scheme.number_of_total_machines", "1"),
+						/*** Verify Delivery Group ***/
+						// Verify name of delivery group
+						resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "name", fmt.Sprintf("%s-updated", deliveryGroupName)),
+						// Verify description of delivery group
+						resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "description", "Delivery Group for testing updated"),
+						// Verify delivery type of delivery group
+						resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "delivery_type", "DesktopsAndApps"),
+						// Verify number of desktops
+						resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "desktops.#", "1"),
+						// Verify number of reboot schedules
+						resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "reboot_schedules.#", "1"),
+						// Verify number of reboot schedules
+						resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "reboot_schedules.0.ignore_maintenance_mode", "false"),
+						// Verify total number of machines in delivery group
+						resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "total_machines", "2"),
+					}
 
-					/*** Verify Delivery Group with Updated Machine Count ***/
-					// Verify name of delivery group
-					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroupZeroCatalogs", "name", "DeliveryGroupWithAssociatedCatalogs"),
-					// Verify the presence of an associated machine catalog
-					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroupZeroCatalogs", "associated_machine_catalogs.#", "1"),
-					// Verify machine count in the associated machine catalog
-					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroupZeroCatalogs", "associated_machine_catalogs.0.machine_count", "1"),
-				),
+					// Only test Updated Machine Count when not pre-2407 and on-premises
+					if !isPre2407AndOnPremises {
+						updatedMachineChecks := []resource.TestCheckFunc{
+							/*** Verify Machine Catalog with Updated Machine Count ***/
+							// Verify name of catalog
+							resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogMachines", "name", "UpdatedOneMachineCatalog"),
+							// Verify total number of machines
+							resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalogMachines", "provisioning_scheme.number_of_total_machines", "1"),
+
+							/*** Verify Delivery Group with Updated Machine Count ***/
+							// Verify name of delivery group
+							resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroupZeroCatalogs", "name", "DeliveryGroupWithAssociatedCatalogs"),
+							// Verify the presence of an associated machine catalog
+							resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroupZeroCatalogs", "associated_machine_catalogs.#", "1"),
+							// Verify machine count in the associated machine catalog
+							resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroupZeroCatalogs", "associated_machine_catalogs.0.machine_count", "1"),
+						}
+						checks = append(checks, updatedMachineChecks...)
+					}
+
+					return resource.ComposeAggregateTestCheckFunc(checks...)
+				}(),
 			},
 
 			/****************** Machine Catalog & Delivery Group Test - MCS AD - Delete Machine ******************/
 			// Delivery Group: Remove machine test
 			// Machine Catalog: Delete machine test
 			{
-				Config: composeTestResourceTf(
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
-					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
-					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
-					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
-					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneInput, true),
-				),
+				Config: func() string {
+					resources := []string{
+						BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
+					}
+					if !isPre2407AndOnPremises {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
+							BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated))
+					} else {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_without_serv_acc_uid_delete_machine, "", "ActiveDirectory"),
+						)
+					}
+					resources = append(resources,
+						BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
+						BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
+						BuildZoneResource(t, zoneInput, true),
+					)
+					return composeTestResourceTf(resources...)
+				}(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify total number of machines in delivery group
 					resource.TestCheckResourceAttr("citrix_delivery_group.testDeliveryGroup", "total_machines", "1"),
@@ -505,15 +602,27 @@ func TestAzureMcs(t *testing.T) {
 			/****************** Admin Folder Test ******************/
 			// Create and Read testing
 			{
-				Config: composeTestResourceTf(
-					BuildAdminFolderResource(t, testAdminFolderResource, "ContainsApplications"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
-					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
-					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
-					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
-					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneInput, true),
-				),
+				Config: func() string {
+					resources := []string{
+						BuildAdminFolderResource(t, testAdminFolderResource, "ContainsApplications"),
+						BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
+					}
+					if !isPre2407AndOnPremises {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
+							BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated))
+					} else {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_without_serv_acc_uid_delete_machine, "", "ActiveDirectory"),
+						)
+					}
+					resources = append(resources,
+						BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
+						BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
+						BuildZoneResource(t, zoneInput, true),
+					)
+					return composeTestResourceTf(resources...)
+				}(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of admin folder
 					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "name", folder_name_1),
@@ -538,15 +647,27 @@ func TestAzureMcs(t *testing.T) {
 			},
 			// Update type testing
 			{
-				Config: composeTestResourceTf(
-					BuildAdminFolderResource(t, testAdminFolderResource, "ContainsApplicationGroups"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
-					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
-					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
-					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
-					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneInput, true),
-				),
+				Config: func() string {
+					resources := []string{
+						BuildAdminFolderResource(t, testAdminFolderResource, "ContainsApplicationGroups"),
+						BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
+					}
+					if !isPre2407AndOnPremises {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
+							BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated))
+					} else {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_without_serv_acc_uid_delete_machine, "", "ActiveDirectory"),
+						)
+					}
+					resources = append(resources,
+						BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
+						BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
+						BuildZoneResource(t, zoneInput, true),
+					)
+					return composeTestResourceTf(resources...)
+				}(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of admin folder
 					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "name", folder_name_1),
@@ -565,15 +686,27 @@ func TestAzureMcs(t *testing.T) {
 			},
 			// Update name and parent path testing
 			{
-				Config: composeTestResourceTf(
-					BuildAdminFolderResource(t, testAdminFolderResource_nameAndParentPathUpdated1, "ContainsApplications"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
-					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
-					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
-					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
-					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneInput, true),
-				),
+				Config: func() string {
+					resources := []string{
+						BuildAdminFolderResource(t, testAdminFolderResource_nameAndParentPathUpdated1, "ContainsApplications"),
+						BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
+					}
+					if !isPre2407AndOnPremises {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
+							BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated))
+					} else {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_without_serv_acc_uid_delete_machine, "", "ActiveDirectory"),
+						)
+					}
+					resources = append(resources,
+						BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
+						BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
+						BuildZoneResource(t, zoneInput, true),
+					)
+					return composeTestResourceTf(resources...)
+				}(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of admin folder
 					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "name", folder_name_1_updated),
@@ -592,15 +725,27 @@ func TestAzureMcs(t *testing.T) {
 			},
 			// Update name and remove parent path testing
 			{
-				Config: composeTestResourceTf(
-					BuildAdminFolderResource(t, testAdminFolderResource_parentPathRemoved, "ContainsApplications"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
-					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
-					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
-					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
-					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneInput, true),
-				),
+				Config: func() string {
+					resources := []string{
+						BuildAdminFolderResource(t, testAdminFolderResource_parentPathRemoved, "ContainsApplications"),
+						BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
+					}
+					if !isPre2407AndOnPremises {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
+							BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated))
+					} else {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_without_serv_acc_uid_delete_machine, "", "ActiveDirectory"),
+						)
+					}
+					resources = append(resources,
+						BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
+						BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
+						BuildZoneResource(t, zoneInput, true),
+					)
+					return composeTestResourceTf(resources...)
+				}(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of admin folder
 					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "name", folder_name_1_updated),
@@ -617,15 +762,27 @@ func TestAzureMcs(t *testing.T) {
 			},
 			// Update name and remove parent path testing
 			{
-				Config: composeTestResourceTf(
-					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
-					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
-					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
-					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
-					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneInput, true),
-				),
+				Config: func() string {
+					resources := []string{
+						BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
+						BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
+					}
+					if !isPre2407AndOnPremises {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
+							BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated))
+					} else {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_without_serv_acc_uid_delete_machine, "", "ActiveDirectory"),
+						)
+					}
+					resources = append(resources,
+						BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
+						BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
+						BuildZoneResource(t, zoneInput, true),
+					)
+					return composeTestResourceTf(resources...)
+				}(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of admin folder
 					resource.TestCheckResourceAttr("citrix_admin_folder.testAdminFolder1", "name", folder_name_1_updated),
@@ -646,83 +803,110 @@ func TestAzureMcs(t *testing.T) {
 			/****************** Application Test / Policy Test / Admin Scope / Admin Role Test - In Parallel ******************/
 			// Create and Read testing
 			{
-				Config: composeTestResourceTf(
-					BuildAdminRoleResource(t, adminRoleTestResource),
-					BuildAdminScopeResource(t, adminScopeTestResource),
-					BuildPolicySetResource(t, policy_set_testResource),
-					BuildApplicationResource(t, testApplicationResource),
-					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
-					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
-					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
-					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
-					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneInput, true),
-				),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					/*** Verify Application ***/
-					// Verify name of application
-					resource.TestCheckResourceAttr("citrix_application.testApplication", "name", applicationName),
-					// Verify description of application
-					resource.TestCheckResourceAttr("citrix_application.testApplication", "description", "Application for testing"),
-					// Verify the number of delivery groups
-					resource.TestCheckResourceAttr("citrix_application.testApplication", "delivery_groups.#", "1"),
-					// Verify the command line executable
-					resource.TestCheckResourceAttr("citrix_application.testApplication", "installed_app_properties.command_line_executable", "test.exe"),
+				Config: func() string {
+					resources := []string{
+						BuildAdminRoleResource(t, adminRoleTestResource),
+						BuildAdminScopeResource(t, adminScopeTestResource),
 
-					// /*** Verify Policy Set ***/
-					// Verify name of the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "name", os.Getenv("TEST_POLICY_SET_NAME")+"-1"),
-					// Verify description of the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "description", "Test policy set description"),
-					// Verify type of the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "type", "DeliveryGroupPolicies"),
-					// Verify the number of scopes of the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.#", "0"),
-					// Verify the number of policies in the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.#", "2"),
-					// Verify name of the first policy in the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.name", "first-test-policy"),
-					// Verify policy settings of the first policy in the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.policy_settings.#", "3"),
-					resource.TestCheckTypeSetElemNestedAttrs("citrix_policy_set.testPolicySet", "policies.0.policy_settings.*", map[string]string{
-						"name":        "AdvanceWarningPeriod",
-						"use_default": "false",
-						"value":       "13:00:00",
-					}),
-					resource.TestCheckTypeSetElemNestedAttrs("citrix_policy_set.testPolicySet", "policies.0.policy_settings.*", map[string]string{
-						"name":        "AllowFileDownload",
-						"enabled":     "true",
-						"use_default": "false",
-					}),
-					// Verify name of the second policy in the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.1.name", "second-test-policy"),
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.1.policy_settings.#", "1"),
-					resource.TestCheckTypeSetElemNestedAttrs("citrix_policy_set.testPolicySet", "policies.1.policy_settings.*", map[string]string{
-						"name":        "AdvanceWarningPeriod",
-						"use_default": "true",
-					}),
+						BuildApplicationResource(t, testApplicationResource),
+						BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
+						BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
+					}
+					if isDDCVersionSupportedForPolicy {
+						resources = append(resources,
+							BuildPolicySetResource(t, policy_set_testResource),
+						)
+					}
+					if !isPre2407AndOnPremises {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
+							BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated))
+					} else {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_without_serv_acc_uid_delete_machine, "", "ActiveDirectory"),
+						)
+					}
+					resources = append(resources,
+						BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
+						BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
+						BuildZoneResource(t, zoneInput, true),
+					)
+					return composeTestResourceTf(resources...)
+				}(),
+				Check: func() resource.TestCheckFunc {
+					checks := []resource.TestCheckFunc{
+						/*** Verify Application ***/
+						// Verify name of application
+						resource.TestCheckResourceAttr("citrix_application.testApplication", "name", applicationName),
+						// Verify description of application
+						resource.TestCheckResourceAttr("citrix_application.testApplication", "description", "Application for testing"),
+						// Verify the number of delivery groups
+						resource.TestCheckResourceAttr("citrix_application.testApplication", "delivery_groups.#", "1"),
+						// Verify the command line executable
+						resource.TestCheckResourceAttr("citrix_application.testApplication", "installed_app_properties.command_line_executable", "test.exe"),
+					}
 
-					/*** Verify Admin Scope ***/
-					// Verify the name of the admin scope
-					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "name", adminScopeName),
-					// Verify the description of the admin scope
-					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "description", "test scope created via terraform"),
+					if isDDCVersionSupportedForPolicy {
+						// /*** Verify Policy Set ***/
+						checks = append(checks,
+							// Verify name of the policy set
+							resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "name", os.Getenv("TEST_POLICY_SET_NAME")+"-1"),
+							// Verify description of the policy set
+							resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "description", "Test policy set description"),
 
-					/*** Verify Admin Role ***/
-					// Verify the name of the admin role
-					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "name", adminRoleName),
-					// Verify the description of the admin role
-					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "description", "Test role created via terraform"),
-					// Verify the value of the can_launch_manage flag (Set to true by default)
-					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "can_launch_manage", "true"),
-					// Verify the value of the can_launch_monitor flag (Set to true by default)
-					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "can_launch_monitor", "true"),
-					// Verify the permissions list
-					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "permissions.#", "2"),
-					resource.TestCheckTypeSetElemAttr("citrix_admin_role.test_role", "permissions.*", "Director_DismissAlerts"),
-					resource.TestCheckTypeSetElemAttr("citrix_admin_role.test_role", "permissions.*", "DesktopGroup_AddApplicationGroup"),
-				),
+							// Verify type of the policy set
+							resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "type", "DeliveryGroupPolicies"),
+							// Verify the number of scopes of the policy set
+							resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.#", "0"),
+							// Verify the number of policies in the policy set
+							resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.#", "2"),
+							// Verify name of the first policy in the policy set
+							resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.name", "first-test-policy"),
+							// Verify policy settings of the first policy in the policy set
+							resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.policy_settings.#", "3"),
+							resource.TestCheckTypeSetElemNestedAttrs("citrix_policy_set.testPolicySet", "policies.0.policy_settings.*", map[string]string{
+								"name":        "AdvanceWarningPeriod",
+								"use_default": "false",
+								"value":       "13:00:00",
+							}),
+							resource.TestCheckTypeSetElemNestedAttrs("citrix_policy_set.testPolicySet", "policies.0.policy_settings.*", map[string]string{
+								"name":        "AllowFileDownload",
+								"enabled":     "true",
+								"use_default": "false",
+							}),
+							// Verify name of the second policy in the policy set
+							resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.1.name", "second-test-policy"),
+							resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.1.policy_settings.#", "1"),
+							resource.TestCheckTypeSetElemNestedAttrs("citrix_policy_set.testPolicySet", "policies.1.policy_settings.*", map[string]string{
+								"name":        "AdvanceWarningPeriod",
+								"use_default": "true",
+							}),
+						)
+					}
+
+					checks = append(checks,
+						/*** Verify Admin Scope ***/
+						// Verify the name of the admin scope
+						resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "name", adminScopeName),
+						// Verify the description of the admin scope
+						resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "description", "test scope created via terraform"),
+
+						/*** Verify Admin Role ***/
+						// Verify the name of the admin role
+						resource.TestCheckResourceAttr("citrix_admin_role.test_role", "name", adminRoleName),
+						// Verify the description of the admin role
+						resource.TestCheckResourceAttr("citrix_admin_role.test_role", "description", "Test role created via terraform"),
+						// Verify the value of the can_launch_manage flag (Set to true by default)
+						resource.TestCheckResourceAttr("citrix_admin_role.test_role", "can_launch_manage", "true"),
+						// Verify the value of the can_launch_monitor flag (Set to true by default)
+						resource.TestCheckResourceAttr("citrix_admin_role.test_role", "can_launch_monitor", "true"),
+						// Verify the permissions list
+						resource.TestCheckResourceAttr("citrix_admin_role.test_role", "permissions.#", "2"),
+						resource.TestCheckTypeSetElemAttr("citrix_admin_role.test_role", "permissions.*", "Director_DismissAlerts"),
+						resource.TestCheckTypeSetElemAttr("citrix_admin_role.test_role", "permissions.*", "DesktopGroup_AddApplicationGroup"),
+					)
+					return resource.ComposeAggregateTestCheckFunc(checks...)
+				}(),
 			},
 
 			// ImportState testing - Application
@@ -742,6 +926,7 @@ func TestAzureMcs(t *testing.T) {
 				// The last_updated attribute does not exist in the Orchestration
 				// API, therefore there is no value for it during import.
 				ImportStateVerifyIgnore: []string{"last_updated", "assigned"},
+				SkipFunc:                skipForPolicySet(isDDCVersionSupportedForPolicy),
 			},
 			// ImportState testing - Admin Scope
 			{
@@ -764,82 +949,124 @@ func TestAzureMcs(t *testing.T) {
 
 			// Update and Read testing
 			{
-				Config: composeTestResourceTf(
-					BuildAdminRoleResource(t, adminRoleTestResource_updated),
-					BuildAdminScopeResource(t, adminScopeTestResource_updated),
-					BuildPolicySetResource(t, policy_set_updated_testResource),
-					BuildApplicationResource(t, testApplicationResource_updated),
-					BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
-					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
-					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
-					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
-					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneInput, true),
-				),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					/*** Verify Application ***/
-					// Verify name of application
-					resource.TestCheckResourceAttr("citrix_application.testApplication", "name", fmt.Sprintf("%s-updated", applicationName)),
-					// Verify description of application
-					resource.TestCheckResourceAttr("citrix_application.testApplication", "description", "Application for testing updated"),
-					// Verify the command line arguments
-					resource.TestCheckResourceAttr("citrix_application.testApplication", "installed_app_properties.command_line_arguments", "update test arguments"),
-					// Verify the command line executable
-					resource.TestCheckResourceAttr("citrix_application.testApplication", "installed_app_properties.command_line_executable", "updated_test.exe"),
-					// Verify the application folder path
-					resource.TestCheckResourceAttr("citrix_application.testApplication", "application_folder_path", folder_name_2),
+				Config: func() string {
+					resources := []string{
+						BuildAdminRoleResource(t, adminRoleTestResource_updated),
+						BuildAdminScopeResource(t, adminScopeTestResource_updated),
+					}
+					if isDDCVersionSupportedForPolicy {
+						resources = append(resources, BuildPolicySetResource(t, policy_set_updated_testResource))
+					}
+					resources = append(resources,
+						BuildApplicationResource(t, testApplicationResource_updated),
+						BuildAdminFolderResourceWithTwoTypes(t, testAdminFolderResource_twoTypes, "ContainsMachineCatalogs", "ContainsApplications"),
+						BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
+					)
+					if !isPre2407AndOnPremises {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
+							BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated))
+					} else {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_without_serv_acc_uid_delete_machine, "", "ActiveDirectory"),
+						)
+					}
+					resources = append(resources,
+						BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
+						BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
+						BuildZoneResource(t, zoneInput, true),
+					)
+					return composeTestResourceTf(resources...)
+				}(),
+				Check: func() resource.TestCheckFunc {
+					checks := []resource.TestCheckFunc{
+						/*** Verify Application ***/
+						// Verify name of application
+						resource.TestCheckResourceAttr("citrix_application.testApplication", "name", fmt.Sprintf("%s-updated", applicationName)),
+						// Verify description of application
+						resource.TestCheckResourceAttr("citrix_application.testApplication", "description", "Application for testing updated"),
+						// Verify the command line arguments
+						resource.TestCheckResourceAttr("citrix_application.testApplication", "installed_app_properties.command_line_arguments", "update test arguments"),
+						// Verify the command line executable
+						resource.TestCheckResourceAttr("citrix_application.testApplication", "installed_app_properties.command_line_executable", "updated_test.exe"),
+						// Verify the application folder path
+						resource.TestCheckResourceAttr("citrix_application.testApplication", "application_folder_path", folder_name_2),
+					}
 
-					// Verify name of the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "name", os.Getenv("TEST_POLICY_SET_NAME")+"-3"),
-					// Verify description of the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "description", "Test policy set description updated"),
-					// Verify type of the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "type", "DeliveryGroupPolicies"),
-					// Verify the number of scopes of the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.#", "0"),
-					// Verify the number of policies in the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.#", "1"),
-					// Verify name of the second policy in the policy set
-					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.name", "first-test-policy"),
+					// Only test PolicySet when isDDCVersionSupportedForPolicy is true
+					if isDDCVersionSupportedForPolicy {
+						policySetChecks := []resource.TestCheckFunc{
+							// Verify name of the policy set
+							resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "name", os.Getenv("TEST_POLICY_SET_NAME")+"-3"),
+							// Verify description of the policy set
+							resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "description", "Test policy set description updated"),
+							// Verify type of the policy set
+							resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "type", "DeliveryGroupPolicies"),
+							// Verify the number of scopes of the policy set
+							resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "scopes.#", "0"),
+							// Verify the number of policies in the policy set
+							resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.#", "1"),
+							// Verify name of the second policy in the policy set
+							resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.name", "first-test-policy"),
+						}
+						checks = append(checks, policySetChecks...)
+					}
 
-					/*** Verify Admin Scope ***/
-					// Verify the name of the admin scope
-					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "name", fmt.Sprintf("%s-updated", adminScopeName)),
-					// Verify the description of the admin scope
-					resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "description", "Updated description for test scope"),
+					// Add remaining checks
+					remainingChecks := []resource.TestCheckFunc{
+						/*** Verify Admin Scope ***/
+						// Verify the name of the admin scope
+						resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "name", fmt.Sprintf("%s-updated", adminScopeName)),
+						// Verify the description of the admin scope
+						resource.TestCheckResourceAttr("citrix_admin_scope.test_scope", "description", "Updated description for test scope"),
 
-					/*** Verify Admin Role ***/
-					// Verify the name of the admin role
-					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "name", fmt.Sprintf("%s-updated", adminRoleName)),
-					// Verify the description of the admin role
-					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "description", "Updated description for test role"),
-					// Verify the value of the can_launch_manage flag
-					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "can_launch_manage", "true"),
-					// Verify the value of the can_launch_monitor flag
-					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "can_launch_monitor", "true"),
-					// Verify the permissions list
-					resource.TestCheckResourceAttr("citrix_admin_role.test_role", "permissions.#", "3"),
-					resource.TestCheckTypeSetElemAttr("citrix_admin_role.test_role", "permissions.*", "Director_DismissAlerts"),
-					resource.TestCheckTypeSetElemAttr("citrix_admin_role.test_role", "permissions.*", "ApplicationGroup_AddScope"),
-					resource.TestCheckTypeSetElemAttr("citrix_admin_role.test_role", "permissions.*", "AppLib_AddPackage"),
-				),
+						/*** Verify Admin Role ***/
+						// Verify the name of the admin role
+						resource.TestCheckResourceAttr("citrix_admin_role.test_role", "name", fmt.Sprintf("%s-updated", adminRoleName)),
+						// Verify the description of the admin role
+						resource.TestCheckResourceAttr("citrix_admin_role.test_role", "description", "Updated description for test role"),
+						// Verify the value of the can_launch_manage flag
+						resource.TestCheckResourceAttr("citrix_admin_role.test_role", "can_launch_manage", "true"),
+						// Verify the value of the can_launch_monitor flag
+						resource.TestCheckResourceAttr("citrix_admin_role.test_role", "can_launch_monitor", "true"),
+						// Verify the permissions list
+						resource.TestCheckResourceAttr("citrix_admin_role.test_role", "permissions.#", "3"),
+						resource.TestCheckTypeSetElemAttr("citrix_admin_role.test_role", "permissions.*", "Director_DismissAlerts"),
+						resource.TestCheckTypeSetElemAttr("citrix_admin_role.test_role", "permissions.*", "ApplicationGroup_AddScope"),
+						resource.TestCheckTypeSetElemAttr("citrix_admin_role.test_role", "permissions.*", "AppLib_AddPackage"),
+					}
+					checks = append(checks, remainingChecks...)
+
+					return resource.ComposeAggregateTestCheckFunc(checks...)
+				}(),
 			},
 
 			/****************** Admin User Test - On-Premises test only ******************/
 			// Create and Read testing
 			{
-				Config: composeTestResourceTf(
-					BuildAdminUserResource(t, adminUserTestResource),
-					BuildAdminRoleResource(t, adminRoleTestResource_updated),
-					BuildAdminScopeResource(t, adminScopeTestResource_updated),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
-					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
-					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
-					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
-					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneInput, true),
-				),
+				Config: func() string {
+					resources := []string{
+						BuildAdminUserResource(t, adminUserTestResource),
+						BuildAdminRoleResource(t, adminRoleTestResource_updated),
+						BuildAdminScopeResource(t, adminScopeTestResource_updated),
+						BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
+					}
+					if !isPre2407AndOnPremises {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
+							BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated))
+					} else {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_without_serv_acc_uid_delete_machine, "", "ActiveDirectory"),
+						)
+					}
+					resources = append(resources,
+						BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
+						BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
+						BuildZoneResource(t, zoneInput, true),
+					)
+					return composeTestResourceTf(resources...)
+				}(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the admin user
 					resource.TestCheckResourceAttr("citrix_admin_user.test_admin_user", "name", userName),
@@ -866,17 +1093,29 @@ func TestAzureMcs(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: composeTestResourceTf(
-					BuildAdminUserResource(t, adminUserTestResource_updated),
-					BuildAdminRoleResource(t, adminRoleTestResource_updated),
-					BuildAdminScopeResource(t, adminScopeTestResource_updated),
-					BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
-					BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
-					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
-					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
-					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
-					BuildZoneResource(t, zoneInput, true),
-				),
+				Config: func() string {
+					resources := []string{
+						BuildAdminUserResource(t, adminUserTestResource_updated),
+						BuildAdminRoleResource(t, adminRoleTestResource_updated),
+						BuildAdminScopeResource(t, adminScopeTestResource_updated),
+						BuildDeliveryGroupResource(t, testDeliveryGroupResources, "DesktopsAndApps"),
+					}
+					if !isPre2407AndOnPremises {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_delete_machine, "", "ActiveDirectory"),
+							BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated))
+					} else {
+						resources = append(resources,
+							BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_without_serv_acc_uid_delete_machine, "", "ActiveDirectory"),
+						)
+					}
+					resources = append(resources,
+						BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
+						BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
+						BuildZoneResource(t, zoneInput, true),
+					)
+					return composeTestResourceTf(resources...)
+				}(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the admin user
 					resource.TestCheckResourceAttr("citrix_admin_user.test_admin_user", "name", userName),
@@ -897,20 +1136,33 @@ func TestAzureMcs(t *testing.T) {
 	})
 }
 
-func composeAzureMachineCatalogTestResourceTf(t *testing.T, isOnPremises bool) string {
+func composeAzureMachineCatalogTestResourceTf(t *testing.T, isOnPremises bool, isPre2407AndOnPremises bool) string {
 	zoneInput := os.Getenv("TEST_ZONE_INPUT_AZURE")
 
 	if isOnPremises {
-		return composeTestResourceTf(
-			BuildMachineCatalogWithZeroMachines(t, machinecatalog_testResources_zeroMachines_azure),
+		resources := []string{
+
 			BuildMachineCatalogResourceManualPowerManagedAzure(t, machinecatalog_testResources_manual_power_managed_azure),
-			BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "-HybAAD", "HybridAzureAD"),
-			BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "", "ActiveDirectory"),
-			BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
+		}
+		if !isPre2407AndOnPremises {
+			resources = append(resources,
+				BuildMachineCatalogWithZeroMachines(t, machinecatalog_testResources_zeroMachines_azure),
+				BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "-HybAAD", "HybridAzureAD"),
+				BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure, "", "ActiveDirectory"),
+				BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated),
+			)
+		} else {
+			resources = append(resources,
+				BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_without_serv_acc_uid, "-HybAAD", "HybridAzureAD"),
+				BuildMachineCatalogResourceAzure(t, machinecatalog_testResources_azure_without_serv_acc_uid, "", "ActiveDirectory"),
+			)
+		}
+		resources = append(resources,
 			BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 			BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
 			BuildZoneResource(t, zoneInput, true),
 		)
+		return composeTestResourceTf(resources...)
 	}
 	return composeTestResourceTf(
 		BuildMachineCatalogWithZeroMachines(t, machinecatalog_testResources_zeroMachines_azure),
