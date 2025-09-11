@@ -754,7 +754,7 @@ function RemoveComputedProperties {
     # Restore the delivery_groups_priority block using unique placeholders
     $index = 0
     foreach ($match in $deliveryGroupsPriorityMatches) {
-        $content = $content -replace "PLACEHOLDER_DELIVERY_GROUPS_PRIORITY_$index", $match.Value
+        $content = $content -replace "PLACEHOLDER_DELIVERY_GROUPS_PRIORITY_$index\s", "$($match.Value)`n"
         $index++
     }
 
