@@ -490,7 +490,7 @@ function Get-ImportMap {
         
         $resourceMap[$resourceMapKey] = $resourceName
         $resourceContent = "resource `"citrix_$resourceProviderName`" `"$resourceName`" {}`n"
-        Add-Content -Path ".\import.tf" -Value $resourceContent
+        Add-Content -Path ".\import.tf" -Value $resourceContent -Encoding utf8
         $index += 1
     }
 
@@ -918,8 +918,8 @@ function OrganizeTerraformResources {
         $filename = "$resourceType.tf"
     
         # Append the resource block to the file
-        Add-Content -Path $filename -Value $resourceBlock
-        Add-Content -Path $filename -Value "`n"  # Add a newline for separation
+        Add-Content -Path $filename -Value $resourceBlock -Encoding utf8
+        Add-Content -Path $filename -Value "`n" -Encoding utf8  # Add a newline for separation
     }
 
     Write-Verbose "Resource files created successfully."
