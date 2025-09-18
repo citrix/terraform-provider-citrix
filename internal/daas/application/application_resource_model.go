@@ -295,6 +295,14 @@ func (ApplicationResourceModel) GetSchema() schema.Schema {
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
 				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplaceIf(func(_ context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+						resp.RequiresReplace = req.StateValue != req.ConfigValue && strings.EqualFold(req.StateValue.ValueString(), req.ConfigValue.ValueString())
+					},
+						"Force replacement when browser_name casing is changed",
+						"Force replacement when browser_name casing is changed",
+					),
+				},
 			},
 			"cpu_priority_level": schema.StringAttribute{
 				Description: "Specifies the CPU priority level for the application. Valid values are: `Low`, `BelowNormal`, `Normal`, `AboveNormal`, and `High`. Default is `Normal`.",

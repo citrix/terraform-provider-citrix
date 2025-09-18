@@ -29,10 +29,18 @@ resource "citrix_stf_authentication_service" "example-stf-authentication-service
 
 ### Optional
 
+- `citrix_ag_basic_options` (Attributes) The Citrix AG Basic Authentication options. (see [below for nested schema](#nestedatt--citrix_ag_basic_options))
 - `claims_factory_name` (String) The claims factory names to use for the StoreFront authentication services. Defaults to `standardClaimsFactory`.
 - `friendly_name` (String) The friendly name the authentication service should be known as. Defaults to `Authentication Service`.
 - `site_id` (String) The IIS site to configure the authentication service for. Defaults to `1`.
 - `virtual_path` (String) The IIS virtual path to use for the authentication service. Defaults to `/Citrix/Authentication`.
+
+<a id="nestedatt--citrix_ag_basic_options"></a>
+### Nested Schema for `citrix_ag_basic_options`
+
+Required:
+
+- `credential_validation_mode` (String) The credential validation mode for Citrix AG Basic Authentication. Possible values are `Auto`, `Kerberos`, and `Password`.
 
 ## Import
 

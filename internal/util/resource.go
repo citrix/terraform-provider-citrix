@@ -17,6 +17,7 @@ import (
 
 // Plugin Factory Names
 const AZURERM_FACTORY_NAME string = "AzureRmFactory"
+const AWS_FACTORY_NAME string = "AWSMachineManagerFactory"
 const AMAZON_WORKSPACES_CORE_FACTORY_NAME string = "AmazonWorkSpacesCoreMachineManagerFactory"
 const VMWARE_FACTORY_NAME string = "VmwareFactory"
 const NUTANIX_PLUGIN_ID string = "AcropolisFactory"

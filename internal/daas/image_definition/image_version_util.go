@@ -134,6 +134,39 @@ func buildImageScheme(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 				return masterImagePath, err
 			}
 		}
+	case util.AWS_FACTORY_NAME:
+		awsEc2ImageSpecs := util.ObjectValueToTypedObject[AwsEc2ImageSpecsModel](ctx, diagnostics, plan.AwsEc2ImageSpecs)
+		inputServiceOffering := awsEc2ImageSpecs.ServiceOffering.ValueString()
+		serviceOffering, httpResp, err := util.GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, hypervisorResourcePool.GetId(), "", inputServiceOffering, util.ServiceOfferingResourceType, "")
+
+		if err != nil {
+			diagnostics.AddError(
+				"Error creating Image Version",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					fmt.Sprintf("\nFailed to resolve service offering %s on AWS, error: %s", serviceOffering, err.Error()),
+			)
+			return masterImagePath, err
+		}
+		imageScheme.SetServiceOfferingPath(serviceOffering)
+
+		masterImage := awsEc2ImageSpecs.AmiName.ValueString()
+		imageId := fmt.Sprintf("%s (%s)", masterImage, awsEc2ImageSpecs.AmiId.ValueString())
+		masterImagePath, httpResp, err = util.GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx, client, diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), "", imageId, util.TemplateResourceType, "")
+		if err != nil {
+			diagnostics.AddError(
+				"Error creating Image Version",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					fmt.Sprintf("\nFailed to locate AWS image %s with AMI %s, error: %s", masterImage, awsEc2ImageSpecs.AmiId.ValueString(), err.Error()),
+			)
+			return masterImagePath, err
+		}
+
+		machineProfile := util.ObjectValueToTypedObject[util.AwsMachineProfileModel](ctx, diagnostics, awsEc2ImageSpecs.MachineProfile)
+		machineProfilePath, err := util.HandleMachineProfileForAwsMcsPvsCatalog(ctx, client, diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), machineProfile, "Error creating AWS EC2 Image Version")
+		if err != nil {
+			return masterImagePath, err
+		}
+		imageScheme.SetMachineProfile(machineProfilePath)
 	case util.AMAZON_WORKSPACES_CORE_FACTORY_NAME:
 		amazonWorkspacesCoreImageSpecs := util.ObjectValueToTypedObject[AmazonWorkspacesCoreImageSpecsModel](ctx, diagnostics, plan.AmazonWorkspacesCoreImageSpecs)
 		inputServiceOffering := amazonWorkspacesCoreImageSpecs.ServiceOffering.ValueString()
@@ -163,7 +196,7 @@ func buildImageScheme(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 
 		if !amazonWorkspacesCoreImageSpecs.MachineProfile.IsNull() {
 			machineProfile := util.ObjectValueToTypedObject[util.AwsMachineProfileModel](ctx, diagnostics, amazonWorkspacesCoreImageSpecs.MachineProfile)
-			machineProfilePath, err := util.HandleMachineProfileForAwsMcsPvsCatalog(ctx, client, diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), machineProfile, "Error creating Machine Catalog")
+			machineProfilePath, err := util.HandleMachineProfileForAwsMcsPvsCatalog(ctx, client, diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), machineProfile, "Error creating AWS WorkSpaces Core Image Version")
 			if err != nil {
 				return masterImagePath, err
 			}

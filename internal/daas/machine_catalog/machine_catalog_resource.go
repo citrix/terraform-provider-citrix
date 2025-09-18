@@ -987,14 +987,6 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 						"enroll_in_intune can only be configured when identity_type is Azure AD.",
 					)
 				}
-				if data.AllocationType.ValueString() != allocationTypeStatic &&
-					azureMachineConfigModel.EnrollInIntune.ValueBool() {
-					resp.Diagnostics.AddAttributeError(
-						path.Root("enroll_in_intune"),
-						"Incorrect Attribute Configuration",
-						fmt.Sprintf("Azure Intune auto enrollment is only supported when `allocation_type` is %s.", allocationTypeStatic),
-					)
-				}
 
 				if !azureMachineConfigModel.AzurePvsConfiguration.IsNull() {
 					resp.Diagnostics.AddAttributeError(
@@ -1042,10 +1034,49 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 
 			if !provSchemeModel.AwsMachineConfig.IsNull() {
 				awsMachineConfigModel := util.ObjectValueToTypedObject[AwsMachineConfigModel](ctx, &resp.Diagnostics, provSchemeModel.AwsMachineConfig)
+
+				if (!awsMachineConfigModel.ImageAmi.IsUnknown() && awsMachineConfigModel.ImageAmi.IsNull()) &&
+					(!awsMachineConfigModel.AwsEc2PreparedImage.IsUnknown() && awsMachineConfigModel.AwsEc2PreparedImage.IsNull()) {
+					resp.Diagnostics.AddAttributeError(
+						path.Root("aws_machine_config"),
+						"Missing Attribute Configuration",
+						fmt.Sprintf("Expected either `image_ami` or `prepared_image` to be configured when provisioning_type is %s.", provisioningTypeMcs),
+					)
+				}
+
 				if !awsMachineConfigModel.ImageUpdateRebootOptions.IsNull() {
 					// Validate Image Update Reboot Options
 					rebootOptions := util.ObjectValueToTypedObject[ImageUpdateRebootOptionsModel](ctx, &resp.Diagnostics, awsMachineConfigModel.ImageUpdateRebootOptions)
 					rebootOptions.ValidateConfig(&resp.Diagnostics)
+				}
+
+				if !awsMachineConfigModel.SecondaryVmSizes.IsNull() {
+					secondaryVmSizes := util.ObjectListToTypedArray[SecondaryVmSizeModel](ctx, &resp.Diagnostics, awsMachineConfigModel.SecondaryVmSizes)
+					// Validate Secondary VM Sizes
+					secondaryVmSizeDictionary := map[string]bool{}
+					for _, secondaryVmSize := range secondaryVmSizes {
+						if strings.EqualFold(secondaryVmSize.VmSize.ValueString(), awsMachineConfigModel.ServiceOffering.ValueString()) {
+							resp.Diagnostics.AddAttributeError(
+								path.Root("secondary_vm_sizes"),
+								"Invalid `secondary_vm_sizes` Attribute Configuration",
+								fmt.Sprintf("secondary_vm_sizes cannot contain the service offering %s used by the AWS machine configs.", awsMachineConfigModel.ServiceOffering.ValueString()),
+							)
+						}
+						instanceType := "Regular"
+						if secondaryVmSize.UseSpotPricingIfAvailable.ValueBool() {
+							instanceType = "Spot"
+						}
+						key := fmt.Sprintf("%s:%s", secondaryVmSize.VmSize, instanceType)
+						if _, exists := secondaryVmSizeDictionary[key]; exists {
+							resp.Diagnostics.AddAttributeError(
+								path.Root("secondary_vm_sizes"),
+								"Invalid `secondary_vm_sizes` Attribute Configuration",
+								fmt.Sprintf("secondary_vm_sizes cannot contain duplicate entries. Duplicate entry found for `vm_size` %s with `use_spot_pricing_if_available` value set to %t.", secondaryVmSize.VmSize.ValueString(), secondaryVmSize.UseSpotPricingIfAvailable.ValueBool()),
+							)
+						} else {
+							secondaryVmSizeDictionary[key] = true
+						}
+					}
 				}
 			}
 
@@ -1549,6 +1580,16 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 					)
 				}
 				return
+			}
+		}
+
+		if !provSchemePlan.AwsMachineConfig.IsUnknown() && !provSchemePlan.AwsMachineConfig.IsNull() {
+			awsMachineConfigModel := util.ObjectValueToTypedObject[AwsMachineConfigModel](ctx, &resp.Diagnostics, provSchemePlan.AwsMachineConfig)
+			if !awsMachineConfigModel.SecondaryVmSizes.IsUnknown() && !awsMachineConfigModel.SecondaryVmSizes.IsNull() {
+				isAwsSecondaryVmSizesSupported := util.CheckProductVersion(r.client, &resp.Diagnostics, 126, 126, 7, 46, "Error validating 'aws_machine_config.secondary_vm_sizes' attribute", "AWS Machine Config Secondary VM Sizes")
+				if !isAwsSecondaryVmSizesSupported {
+					return
+				}
 			}
 		}
 	}

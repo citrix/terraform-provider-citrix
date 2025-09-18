@@ -116,6 +116,28 @@ func (r *stfAuthenticationServiceResource) Create(ctx context.Context, req resou
 		return
 	}
 
+	// citrixAGBasicOptions := CitrixAGBasicOptions{}
+	if !plan.CitrixAGBasicOptions.IsNull() {
+		err = setCitrixAGBasicOptions(ctx, &resp.Diagnostics, r.client, siteIdInt, plan)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error setting Citrix AG Basic Options",
+				"Error message: "+err.Error(),
+			)
+		}
+		getCitrixAGBasicOptionsResponse, err := getCitrixAGBasicOptions(ctx, &resp.Diagnostics, r.client, siteIdInt, plan.VirtualPath.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error getting Citrix AG Basic Options",
+				"Error message: "+err.Error(),
+			)
+			return
+		}
+
+		plan.RefreshCitrixAGBasicOptions(ctx, &resp.Diagnostics, getCitrixAGBasicOptionsResponse)
+
+	}
+
 	getAuthServiceResponse, err := getSTFAuthenticationService(ctx, &resp.Diagnostics, r.client, plan)
 	if err != nil {
 		return
@@ -157,6 +179,27 @@ func (r *stfAuthenticationServiceResource) Read(ctx context.Context, req resourc
 		resp.State.RemoveResource(ctx)
 		return
 	}
+
+	// Get site ID from state
+	siteIdInt, err := strconv.ParseInt(state.SiteId.ValueString(), 10, 64)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading StoreFront Authentication Service",
+			"Error message: "+err.Error(),
+		)
+		return
+	}
+
+	getCitrixAGBasicOptionsResponse, err := getCitrixAGBasicOptions(ctx, &resp.Diagnostics, r.client, siteIdInt, state.VirtualPath.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error getting Citrix AG Basic Options",
+			"Error message: "+err.Error(),
+		)
+		return
+	}
+
+	state.RefreshCitrixAGBasicOptions(ctx, &resp.Diagnostics, getCitrixAGBasicOptionsResponse)
 
 	state.RefreshPropertyValues(ctx, &resp.Diagnostics, STFAuthenticationService)
 
@@ -237,6 +280,28 @@ func (r *stfAuthenticationServiceResource) Update(ctx context.Context, req resou
 	err = setSTFClaimsFactoryNames(ctx, &resp.Diagnostics, r.client, siteIdInt, plan.VirtualPath.ValueString(), plan.ClaimsFactoryName.ValueString())
 	if err != nil {
 		return
+	}
+
+	if !plan.CitrixAGBasicOptions.IsNull() {
+		err = setCitrixAGBasicOptions(ctx, &resp.Diagnostics, r.client, siteIdInt, plan)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error setting Citrix AG Basic Options",
+				"Error message: "+err.Error(),
+			)
+		}
+
+		getCitrixAGBasicOptionsResponse, err := getCitrixAGBasicOptions(ctx, &resp.Diagnostics, r.client, siteIdInt, plan.VirtualPath.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error getting Citrix AG Basic Options",
+				"Error message: "+err.Error(),
+			)
+			return
+		}
+
+		plan.RefreshCitrixAGBasicOptions(ctx, &resp.Diagnostics, getCitrixAGBasicOptionsResponse)
+
 	}
 
 	getAuthServiceResponse, err := getSTFAuthenticationService(ctx, &resp.Diagnostics, r.client, plan)
@@ -384,4 +449,44 @@ func setSTFClaimsFactoryNames(ctx context.Context, diagnostics *diag.Diagnostics
 		return err
 	}
 	return nil
+}
+
+func setCitrixAGBasicOptions(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteIdInt int64, plan STFAuthenticationServiceResourceModel) error {
+	var getAuthServiceBody citrixstorefront.GetSTFAuthenticationServiceRequestModel
+	var setCitrixAGBasicOptionsBody citrixstorefront.SetSTFCitrixAGBasicOptionsRequestModel
+	getAuthServiceBody.SetSiteId(siteIdInt)
+	getAuthServiceBody.SetVirtualPath(plan.VirtualPath.ValueString())
+
+	citrixAGBasicOptions := util.ObjectValueToTypedObject[CitrixAGBasicOptions](ctx, diagnostics, plan.CitrixAGBasicOptions)
+
+	setCitrixAGBasicOptionsBody.SetCredentialValidationMode(citrixAGBasicOptions.CredentialValidationMode.ValueString())
+
+	setCitrixAGBasicOptionsRequest := client.StorefrontClient.AuthenticationServiceSF.STFSetCitrixAGBasicOptions(ctx, getAuthServiceBody, setCitrixAGBasicOptionsBody)
+	err := setCitrixAGBasicOptionsRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error setting Citrix AG Basic Options",
+			fmt.Sprintf("Failed to set Citrix AG Basic Options. Error Message: %s", err.Error()),
+		)
+		return err
+	}
+	return nil
+}
+
+func getCitrixAGBasicOptions(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteIdInt int64, virtualPath string) (*citrixstorefront.STFCitrixAGBasicOptionsResponseModel, error) {
+	var getAuthServiceBody citrixstorefront.GetSTFAuthenticationServiceRequestModel
+	getAuthServiceBody.SetSiteId(siteIdInt)
+	getAuthServiceBody.SetVirtualPath(virtualPath)
+
+	getCitrixAGBasicOptionsRequest := client.StorefrontClient.AuthenticationServiceSF.STFGetCitrixAGBasicOptions(ctx, getAuthServiceBody)
+
+	citrixAGBasicOptionsResponse, err := getCitrixAGBasicOptionsRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error fetching Citrix AG Basic Options",
+			"Error message: "+err.Error(),
+		)
+		return nil, err
+	}
+	return &citrixAGBasicOptionsResponse, nil
 }

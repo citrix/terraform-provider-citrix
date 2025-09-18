@@ -34,9 +34,11 @@ resource "citrix_application_group" "example-application-group" {
 - `application_group_folder_path` (String) The path of the folder in which the application group is located.
 - `description` (String) Description of the application group.
 - `enabled` (Boolean) Whether the application group is enabled or not. Defaults to `true`.
-- `included_users` (Set of String) Users who can use this application group. 
+- `included_users` (Set of String) Restrict access to applications in this application group to only users included in this list. 
 
 -> **Note** User must be in SID, SAM account name (`DOMAIN\UserOrGroupName`) or UPN (`user@domain.com`) format
+
+~> **Please Note** If `included_users` attribute is omitted or set to `null`, all users in the specified delivery groups will have access to applications in this application group. If attribute is specified as an empty list i.e. `[]`, then no user will have access to the applications in this application group.
 - `metadata` (Attributes List) Metadata for the Application Group. (see [below for nested schema](#nestedatt--metadata))
 - `restrict_to_tag` (String) The tag to restrict the application group to.
 - `scopes` (Set of String) The IDs of the scopes for the application group to be a part of.

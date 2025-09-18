@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int32validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
@@ -24,6 +25,55 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
+
+type AwsEc2ImageSpecsModel struct {
+	AmiName         types.String `tfsdk:"ami_name"`
+	AmiId           types.String `tfsdk:"ami_id"`
+	ServiceOffering types.String `tfsdk:"service_offering"`
+	MachineProfile  types.Object `tfsdk:"machine_profile"`
+}
+
+func (AwsEc2ImageSpecsModel) GetSchema() schema.SingleNestedAttribute {
+	machineProfileSchema := util.AwsMachineProfileModel{}.GetSchema()
+	machineProfileSchema.Required = true
+	machineProfileSchema.Optional = false
+	machineProfileSchema.Validators = []validator.Object{}
+	return schema.SingleNestedAttribute{
+		Description: "Image configuration for AWS EC2 image version.",
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			"service_offering": schema.StringAttribute{
+				Description: "The AWS VM Sku to use when creating machines.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(util.AwsEc2InstanceTypeRegex),
+						"must follow AWS EC2 instance type naming convention in lower case. Eg: t2.micro, m5.large, etc.",
+					),
+				},
+			},
+			"ami_name": schema.StringAttribute{
+				Description: "The name of the AWS EC2 image that will be used.",
+				Required:    true,
+			},
+			"ami_id": schema.StringAttribute{
+				Description: "ID of AWS EC2 image to be used as the template image for the machine catalog.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.AwsAmiRegex), "must be specified in the AMI format"),
+				},
+			},
+			"machine_profile": machineProfileSchema,
+		},
+		PlanModifiers: []planmodifier.Object{
+			objectplanmodifier.RequiresReplace(),
+		},
+	}
+}
+
+func (AwsEc2ImageSpecsModel) GetAttributes() map[string]schema.Attribute {
+	return AwsEc2ImageSpecsModel{}.GetSchema().Attributes
+}
 
 type VsphereImageSpecsModel struct {
 	MasterImageVm  types.String `tfsdk:"master_image_vm"`
@@ -151,6 +201,7 @@ type ImageVersionModel struct {
 	// Optional Attributes
 	Description                    types.String `tfsdk:"description"`
 	AzureImageSpecs                types.Object `tfsdk:"azure_image_specs"`
+	AwsEc2ImageSpecs               types.Object `tfsdk:"aws_ec2_image_specs"`
 	VsphereImageSpecs              types.Object `tfsdk:"vsphere_image_specs"`
 	AmazonWorkspacesCoreImageSpecs types.Object `tfsdk:"amazon_workspaces_core_image_specs"`
 	SessionSupport                 types.String `tfsdk:"session_support"`
@@ -221,6 +272,7 @@ func (ImageVersionModel) GetSchema() schema.Schema {
 				Default:     stringdefault.StaticString(""),
 			},
 			"azure_image_specs":                  util.AzureImageSpecsModel{}.GetSchema(),
+			"aws_ec2_image_specs":                AwsEc2ImageSpecsModel{}.GetSchema(),
 			"vsphere_image_specs":                VsphereImageSpecsModel{}.GetSchema(),
 			"amazon_workspaces_core_image_specs": AmazonWorkspacesCoreImageSpecsModel{}.GetSchema(),
 			"session_support": schema.StringAttribute{
@@ -269,7 +321,7 @@ func (ImageVersionTimeout) GetAttributes() map[string]schema.Attribute {
 	return ImageVersionTimeout{}.GetSchema().Attributes
 }
 
-func (r ImageVersionModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, imageVersion *citrixorchestration.ImageVersionResponseModel) ImageVersionModel {
+func (r ImageVersionModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, imageVersion *citrixorchestration.ImageVersionResponseModel) ImageVersionModel {
 	r, imageSpecs, specConfigured := r.RefreshImageVersionBaseProperties(ctx, diagnostics, imageVersion)
 	if specConfigured {
 		return r
@@ -318,7 +370,6 @@ func (r ImageVersionModel) RefreshPropertyValues(ctx context.Context, diagnostic
 		azureImageSpecs = util.ParseMasterImageToAzureImageModel(ctx, diagnostics, azureImageSpecs, masterImage)
 		r.AzureImageSpecs = util.TypedObjectToObjectValue(ctx, diagnostics, azureImageSpecs)
 	case util.VMWARE_FACTORY_NAME:
-		imageScheme := imageContext.GetImageScheme()
 		masterImageXdPath := masterImage.GetXDPath()
 		vsphereImageSpecs := util.ObjectValueToTypedObject[VsphereImageSpecsModel](ctx, diagnostics, r.VsphereImageSpecs)
 		masterImageVm, imageSnapshot := parseVsphereImageXdPath(masterImageXdPath)
@@ -341,9 +392,34 @@ func (r ImageVersionModel) RefreshPropertyValues(ctx context.Context, diagnostic
 		}
 
 		r.VsphereImageSpecs = util.TypedObjectToObjectValue(ctx, diagnostics, vsphereImageSpecs)
+	case util.AWS_FACTORY_NAME:
+		awsEc2ImageSpecs := util.ObjectValueToTypedObject[AwsEc2ImageSpecsModel](ctx, diagnostics, r.AwsEc2ImageSpecs)
+		/* For AWS master image, the returned master image name looks like:
+		* {Image Name} (ami-000123456789abcde)
+		* The Name property in MasterImage will be image name without ami id appended
+		 */
+		awsEc2ImageSpecs.AmiName = types.StringValue(strings.Split(masterImage.GetName(), " (ami-")[0])
+		awsEc2ImageSpecs.AmiId = types.StringValue(strings.TrimSuffix((strings.Split(masterImage.GetName(), " (")[1]), ")"))
+
+		updatedMachineProfile, err := refreshAwsEc2ImageVersionMachineProfile(ctx, diagnostics, true, imageScheme)
+		if err == nil {
+			awsEc2ImageSpecs.MachineProfile = updatedMachineProfile
+		}
+
+		rawServiceOffering := strings.TrimSuffix(imageScheme.GetServiceOffering(), ".serviceoffering")
+		if serviceOfferingObject, httpResp, err := util.GetSingleResourceFromHypervisorWithNoCacheRetry(ctx, client, diagnostics, hypervisor.GetId(), resourcePool.GetId(), "", rawServiceOffering, util.ServiceOfferingResourceType, ""); err == nil {
+			awsEc2ImageSpecs.ServiceOffering = types.StringValue(serviceOfferingObject.GetId())
+		} else {
+			diagnostics.AddError(
+				"Error updating AWS image version",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					fmt.Sprintf("\nFailed to resolve AWS service offering %s, error: %s", rawServiceOffering, err.Error()),
+			)
+		}
+
+		r.AwsEc2ImageSpecs = util.TypedObjectToObjectValue(ctx, diagnostics, awsEc2ImageSpecs)
 	case util.AMAZON_WORKSPACES_CORE_FACTORY_NAME:
 		amazonWorkspacesCoreImageSpecs := util.ObjectValueToTypedObject[AmazonWorkspacesCoreImageSpecsModel](ctx, diagnostics, r.AmazonWorkspacesCoreImageSpecs)
-		imageScheme := imageContext.GetImageScheme()
 		/* For AWS master image, the returned master image name looks like:
 		* {Image Name} (ami-000123456789abcde)
 		* The Name property in MasterImage will be image name without ami id appended
@@ -351,16 +427,9 @@ func (r ImageVersionModel) RefreshPropertyValues(ctx context.Context, diagnostic
 		amazonWorkspacesCoreImageSpecs.MasterImage = types.StringValue(strings.Split(masterImage.GetName(), " (ami-")[0])
 		amazonWorkspacesCoreImageSpecs.ImageAmi = types.StringValue(strings.TrimSuffix((strings.Split(masterImage.GetName(), " (")[1]), ")"))
 
-		if imageScheme.MachineProfile != nil {
-			machineProfile := imageScheme.GetMachineProfile()
-			machineProfileModel := util.ParseAwsMachineProfileResponseToModel(machineProfile)
-			amazonWorkspacesCoreImageSpecs.MachineProfile = util.TypedObjectToObjectValue(ctx, diagnostics, machineProfileModel)
-		} else {
-			if attributesMap, err := util.ResourceAttributeMapFromObject(util.AwsMachineProfileModel{}); err == nil {
-				amazonWorkspacesCoreImageSpecs.MachineProfile = types.ObjectNull(attributesMap)
-			} else {
-				diagnostics.AddWarning("Error when creating null AmazonWorkspacesCoreMachineProfileModel", err.Error())
-			}
+		updatedMachineProfile, err := refreshAmazonWSCImageVersionMachineProfile(ctx, diagnostics, true, imageScheme)
+		if err == nil {
+			amazonWorkspacesCoreImageSpecs.MachineProfile = updatedMachineProfile
 		}
 
 		if imageScheme.GetServiceOffering() != "" {
@@ -447,6 +516,19 @@ func refreshAzureImageVersionMachineProfile(ctx context.Context, diagnostics *di
 		machineProfileToReturn = types.ObjectNull(attributesMap)
 		return machineProfileToReturn, err
 	}
+}
+
+func refreshAwsEc2ImageVersionMachineProfile(ctx context.Context, diagnostics *diag.Diagnostics, isResource bool, imageScheme citrixorchestration.ImageSchemeResponseModel) (types.Object, error) {
+	var machineProfileToReturn types.Object
+	machineProfile := imageScheme.GetMachineProfile()
+	machineProfileModel := util.ParseAwsMachineProfileResponseToModel(machineProfile)
+	if isResource {
+		machineProfileToReturn = util.TypedObjectToObjectValue(ctx, diagnostics, machineProfileModel)
+	} else {
+		machineProfileToReturn = util.DataSourceTypedObjectToObjectValue(ctx, diagnostics, machineProfileModel)
+	}
+	return machineProfileToReturn, nil
+
 }
 
 func refreshAmazonWSCImageVersionMachineProfile(ctx context.Context, diagnostics *diag.Diagnostics, isResource bool, imageScheme citrixorchestration.ImageSchemeResponseModel) (types.Object, error) {

@@ -168,7 +168,7 @@ func (r *ImageVersionResource) Create(ctx context.Context, req resource.CreateRe
 		)
 	}
 
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, imageVersion)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, imageVersion)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &plan)
@@ -196,7 +196,7 @@ func (r *ImageVersionResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, imageVersion)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, imageVersion)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -251,7 +251,7 @@ func (r *ImageVersionResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, imageVersion)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, imageVersion)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &plan)
@@ -450,6 +450,15 @@ func validateImageVersionConfigs(ctx context.Context, client *citrixdaasclient.C
 		if err != nil {
 			return err
 		}
+	case util.AWS_FACTORY_NAME:
+		if plan.AwsEc2ImageSpecs.IsNull() {
+			err := fmt.Errorf("aws_ec2_image_specs is required when creating image version with an AWS EC2 hypervisor connection")
+			diagnostics.AddError(
+				"Error "+operation+" Image Version",
+				err.Error(),
+			)
+			return err
+		}
 	case util.AMAZON_WORKSPACES_CORE_FACTORY_NAME:
 		if plan.AmazonWorkspacesCoreImageSpecs.IsNull() {
 			err := fmt.Errorf("amazon_workspaces_core_image_specs is required when creating image version with an Amazon Workspaces Core hypervisor connection")
@@ -465,6 +474,7 @@ func validateImageVersionConfigs(ctx context.Context, client *citrixdaasclient.C
 			"Error "+operation+" Image Version",
 			err.Error(),
 		)
+		return err
 	}
 	return nil
 }

@@ -13,3 +13,11 @@ resource "citrix_amazon_workspaces_core_hypervisor" "example-amazon-workspaces-c
     use_iam_role      = true
     region            = "us-east-1"
 }
+
+resource "citrix_amazon_workspaces_core_hypervisor" "example-amazon-workspaces-core-hypervisor-using-connector-proxy" {
+    name                                                  = "example-amazon-workspaces-core-hypervisor"
+    zone                                                  = "<Zone Id>"
+    use_iam_role                                          = true
+    region                                                = "us-east-1"
+    use_system_proxy_for_hypervisor_traffic_on_connectors = true
+}

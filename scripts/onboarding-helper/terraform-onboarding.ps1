@@ -128,7 +128,7 @@ function Invoke-WebRequestWithRetry {
         [HashTable]$Headers = @{},
 
         [Parameter(Mandatory = $false)]
-        [string]$ContentType = 'application/json',
+        [string]$ContentType = 'application/json; charset=utf-8',
 
         [Parameter(Mandatory = $false)]
         [HashTable]$Body,
@@ -178,7 +178,7 @@ function Get-AuthToken {
         $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}\{1}:{2}" -f $script:domainFqdn, $script:clientId, $script:clientSecret)))
         $basicAuth = "Basic $base64AuthInfo"
         $response = Invoke-WebRequestWithRetry -Uri $url -Method 'POST' -Headers @{Authorization = $basicAuth } 
-        $jsonObj = ConvertFrom-Json $([String]::new($response.Content))
+        $jsonObj = ConvertFrom-Json $response.Content
         return $jsonObj.Token
     }
     else {
@@ -220,8 +220,8 @@ function Get-AuthToken {
         }
         $contentType = 'application/x-www-form-urlencoded'
         $response = Invoke-WebRequestWithRetry -Uri $url -Method 'POST' -body $body -ContentType $contentType
-        $jsonObj = ConvertFrom-Json $([String]::new($response.Content))
-        
+        $jsonObj = ConvertFrom-Json $response.Content
+
         # Save the new token and calculate the expiry time of the refresh token
         $script:Token = $jsonObj.access_token
         $script:TokenExpiryTime = (Get-Date).AddSeconds([int]($jsonObj.expires_in * 0.9)) # Calculate the expiry time of the refresh token with buffer
@@ -251,9 +251,9 @@ function Start-GetRequest {
         }
     }
     
-    $contentType = 'application/json'
     $response = Invoke-WebRequestWithRetry -Uri $url -Method 'GET' -Headers $headers -ContentType $contentType
-    $jsonObj = ConvertFrom-Json $([String]::new($response.Content))
+    $responseJsonString = [regex]::Replace($response.Content, '\\x([0-9A-Fa-f]{2})', { param($hex) '\u{0}' -f $hex.Groups[1].Value.PadLeft(4,'0') })
+    $jsonObj = ConvertFrom-Json $responseJsonString
     return $jsonObj
 }
 
@@ -280,7 +280,7 @@ provider "citrix" {
     }
 }
 "@
-        Set-Content -Path ".\citrix.tf" -Value $config
+        Set-Content -Path ".\citrix.tf" -Value $config -Encoding utf8
     }
     else {
         $config = @"
@@ -294,7 +294,7 @@ provider "citrix" {
     }
 }
 "@
-        Set-Content -Path ".\citrix.tf" -Value $config
+        Set-Content -Path ".\citrix.tf" -Value $config -Encoding utf8
     }
 
     # Create temporary import.tf for terraform import
@@ -490,7 +490,7 @@ function Get-ImportMap {
         
         $resourceMap[$resourceMapKey] = $resourceName
         $resourceContent = "resource `"citrix_$resourceProviderName`" `"$resourceName`" {}`n"
-        Add-Content -Path ".\import.tf" -Value $resourceContent
+        Add-Content -Path ".\import.tf" -Value $resourceContent -Encoding utf8
         $index += 1
     }
 
@@ -656,13 +656,13 @@ function PostProcessProviderConfig {
 
     Write-Verbose "Post-processing provider config."
     # Post-process the provider config output in citrix.tf
-    $content = Get-Content -Path ".\citrix.tf" -Raw
+    $content = Get-Content -Path ".\citrix.tf" -Raw -Encoding utf8
 
     # Uncomment field for client secret in provider config
     $content = $content -replace "# ", ""
 
     # Overwrite provider config with processed value
-    Set-Content -Path ".\citrix.tf" -Value $content
+    Set-Content -Path ".\citrix.tf" -Value $content -Encoding utf8
 }
 
 function RemoveComputedPropertiesForZone {
@@ -754,7 +754,7 @@ function RemoveComputedProperties {
     # Restore the delivery_groups_priority block using unique placeholders
     $index = 0
     foreach ($match in $deliveryGroupsPriorityMatches) {
-        $content = $content -replace "PLACEHOLDER_DELIVERY_GROUPS_PRIORITY_$index", $match.Value
+        $content = $content -replace "PLACEHOLDER_DELIVERY_GROUPS_PRIORITY_$index\s", "$($match.Value)`n"
         $index++
     }
 
@@ -903,7 +903,7 @@ function OrganizeTerraformResources {
 
     Write-Verbose "Organizing terraform resources into separate files."
     # Post-process the terraform output
-    $content = Get-Content -Path ".\resource.tf" -Raw
+    $content = Get-Content -Path ".\resource.tf" -Raw -Encoding utf8
 
     # Regular expression to match resource blocks starting with # and ending with an empty line
     $resourcePattern = '(#\s*(\w+)\.\w+:\s*.*?)(\n\s*\n|\s*$)'
@@ -918,8 +918,8 @@ function OrganizeTerraformResources {
         $filename = "$resourceType.tf"
     
         # Append the resource block to the file
-        Add-Content -Path $filename -Value $resourceBlock
-        Add-Content -Path $filename -Value "`n"  # Add a newline for separation
+        Add-Content -Path $filename -Value $resourceBlock -Encoding utf8
+        Add-Content -Path $filename -Value "`n" -Encoding utf8  # Add a newline for separation
     }
 
     Write-Verbose "Resource files created successfully."
@@ -928,7 +928,7 @@ function OrganizeTerraformResources {
 function PostProcessTerraformOutput {
 
     # Post-process the terraform output
-    $content = Get-Content -Path ".\resource.tf" -Raw
+    $content = Get-Content -Path ".\resource.tf" -Raw -Encoding utf8
 
     # Inject placeholder for sensitive values in tf
     $content = InjectPlaceHolderSensitiveValues -content $content
@@ -940,7 +940,7 @@ function PostProcessTerraformOutput {
     $content = RemoveComputedProperties -content $content
     
     # Overwrite extracted terraform with processed value
-    Set-Content -Path ".\resource.tf" -Value $content
+    Set-Content -Path ".\resource.tf" -Value $content -Encoding utf8
 
     # Organize terraform resources into separate files
     OrganizeTerraformResources -content $content

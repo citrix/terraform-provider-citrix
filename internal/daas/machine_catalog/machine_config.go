@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -145,7 +146,7 @@ func (AzureMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 			"machine_profile": util.AzureMachineProfileModel{}.GetSchema(),
 			"writeback_cache": AzureWritebackCacheModel{}.GetSchema(),
 			"secondary_vm_sizes": schema.ListNestedAttribute{
-				Description: "Secondary VM sizes to be used when the primary machine size (service_offering) reaches full capacity. A maxiumum of 10 VM sizes can be specified. The priority of the VM sizes is determined by the order in which they are specified with the first VM size having the highest priority." +
+				Description: "Secondary VM sizes to be used when the primary machine size (service_offering) reaches full capacity. A maximum of 10 VM sizes can be specified. The priority of the VM sizes is determined by the order in which they are specified with the first VM size having the highest priority." +
 					"\n\n~> **Please Note** This field can only be used when `machine_profile` is specified.",
 				Optional:     true,
 				NestedObject: SecondaryVmSizeModel{}.GetSchema(),
@@ -223,10 +224,12 @@ type AwsMachineConfigModel struct {
 	MasterImageNote          types.String `tfsdk:"master_image_note"`
 	ImageUpdateRebootOptions types.Object `tfsdk:"image_update_reboot_options"`
 	/** AWS Hypervisor **/
-	MachineProfile types.Object `tfsdk:"machine_profile"`
-	ImageAmi       types.String `tfsdk:"image_ami"`
-	SecurityGroups types.List   `tfsdk:"security_groups"` // List[String]
-	TenancyType    types.String `tfsdk:"tenancy_type"`
+	MachineProfile      types.Object `tfsdk:"machine_profile"`
+	ImageAmi            types.String `tfsdk:"image_ami"`
+	SecurityGroups      types.List   `tfsdk:"security_groups"` // List[String]
+	AwsEc2PreparedImage types.Object `tfsdk:"prepared_image"`  // PreparedImageConfigModel
+	TenancyType         types.String `tfsdk:"tenancy_type"`
+	SecondaryVmSizes    types.List   `tfsdk:"secondary_vm_sizes"` // List[SecondaryVmSizeModel]
 }
 
 func (AwsMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
@@ -246,20 +249,38 @@ func (AwsMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 			},
 			"master_image": schema.StringAttribute{
 				Description: "The name of the virtual machine image that will be used.",
-				Required:    true,
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("prepared_image")),
+				},
 			},
 			"master_image_note": schema.StringAttribute{
 				Description: "The note for the master image.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(""),
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplaceIf(
+						func(ctx context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+							isValueChanged := req.StateValue.ValueString() != req.PlanValue.ValueString()
+							isPreparedImageUsed := checkIfAwsMachineCatalogIsUsingPreparedImage(ctx, req.State)
+							resp.RequiresReplace = isValueChanged && isPreparedImageUsed
+						},
+						"Update master_image_note requires force replacement when prepared image is being used.",
+						"Update master_image_note requires force replacement when prepared image is being used.",
+					),
+				},
 			},
 			"image_update_reboot_options": ImageUpdateRebootOptionsModel{}.GetSchema(),
 			"machine_profile":             util.AwsMachineProfileModel{}.GetSchema(),
 			"image_ami": schema.StringAttribute{
 				Description: "AMI of the AWS image to be used as the template image for the machine catalog.",
-				Required:    true,
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("prepared_image")),
+				},
 			},
+			"prepared_image": PreparedImageConfigModel{}.GetSchema(),
 			"security_groups": schema.ListAttribute{
 				ElementType: types.StringType,
 				Optional:    true,
@@ -268,6 +289,7 @@ func (AwsMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 				Computed: true,
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
+					listvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("prepared_image")),
 				},
 			},
 			"tenancy_type": schema.StringAttribute{
@@ -282,6 +304,17 @@ func (AwsMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"secondary_vm_sizes": schema.ListNestedAttribute{
+				Description: "Secondary VM sizes to be used when the primary machine size (service_offering) reaches full capacity. A maximum of 10 VM sizes can be specified. The priority of the VM sizes is determined by the order in which they are specified with the first VM size having the highest priority." +
+					"\n\n~> **Please Note** The `secondary_vm_sizes` cannot contain the value of `service_offering`",
+				Optional:     true,
+				NestedObject: SecondaryVmSizeModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+					listvalidator.SizeAtMost(10),
+					listvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("prepared_image")),
 				},
 			},
 		},
@@ -828,6 +861,7 @@ type AzureWritebackCacheModel struct {
 	StorageCostSaving          types.Bool   `tfsdk:"storage_cost_saving"`
 	WriteBackCacheDiskSizeGB   types.Int64  `tfsdk:"writeback_cache_disk_size_gb"`
 	WriteBackCacheMemorySizeMB types.Int64  `tfsdk:"writeback_cache_memory_size_mb"`
+	WriteBackCacheDriveLetter  types.String `tfsdk:"writeback_cache_drive_letter"`
 }
 
 func (AzureWritebackCacheModel) GetSchema() schema.SingleNestedAttribute {
@@ -913,6 +947,13 @@ func (AzureWritebackCacheModel) GetSchema() schema.SingleNestedAttribute {
 				Optional:    true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(0),
+				},
+			},
+			"writeback_cache_drive_letter": schema.StringAttribute{
+				Description: "The drive letter for the write back cache.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthBetween(1, 1),
 				},
 			},
 		},
@@ -1304,6 +1345,13 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 		if wbcMemorySize != 0 {
 			azureWbcModel.WriteBackCacheMemorySizeMB = types.Int64Value(int64(provScheme.GetWriteBackCacheMemorySizeMB()))
 		}
+		if provScheme.GetWriteBackCacheDriveLetter() != "" {
+			if slices.Contains(util.EscapedUnicodeNullCharacters, provScheme.GetWriteBackCacheDriveLetter()) {
+				azureWbcModel.WriteBackCacheDriveLetter = types.StringNull()
+			} else {
+				azureWbcModel.WriteBackCacheDriveLetter = types.StringValue(provScheme.GetWriteBackCacheDriveLetter())
+			}
+		}
 		// default bool values to false because Orchestration won't return them in the custom properties
 		azureWbcModel.PersistOsDisk = types.BoolValue(false)
 		azureWbcModel.PersistVm = types.BoolValue(false)
@@ -1346,7 +1394,11 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 		case "PersistVm":
 			azureWbcModel.PersistVm = util.StringToTypeBool(stringPair.GetValue())
 		case "StorageTypeAtShutdown":
-			azureWbcModel.StorageCostSaving = types.BoolValue(true)
+			if !strings.EqualFold(stringPair.GetValue(), "") {
+				// Only overwrite StorageCostSaving to true when the value is present and is not empty
+				// If the value is empty, it means StorageCostSaving might had been set before and disabled, or specifically set to false with empty string value
+				azureWbcModel.StorageCostSaving = types.BoolValue(true)
+			}
 		case "LicenseType":
 			licenseType := stringPair.GetValue()
 			if licenseType == "" {
@@ -1447,18 +1499,33 @@ func (mc *AwsMachineConfigModel) RefreshProperties(ctx context.Context, diagnost
 		mc.ServiceOffering = types.StringValue(provScheme.GetServiceOffering())
 	}
 
-	// Refresh Master Image
-	masterImage := provScheme.GetMasterImage()
-	/* For AWS master image, the returned master image name looks like:
-	 * {Image Name} (ami-000123456789abcde)
-	 * The Name property in MasterImage will be image name without ami id appended
-	 */
-	mc.MasterImage = types.StringValue(strings.Split(masterImage.GetName(), " (ami-")[0])
-	mc.ImageAmi = types.StringValue(strings.TrimSuffix((strings.Split(masterImage.GetName(), " (")[1]), ")"))
+	if provScheme.CurrentImageVersion != nil {
+		// refresh image version
+		currentImage := provScheme.GetCurrentImageVersion()
+		imageVersion := currentImage.GetImageVersion()
+		imageDefinition := imageVersion.GetImageDefinition()
+		preparedImageConfig := util.ObjectValueToTypedObject[PreparedImageConfigModel](ctx, diagnostics, mc.AwsEc2PreparedImage)
+		preparedImageConfig.ImageDefinition = types.StringValue(imageDefinition.GetId())
+		preparedImageConfig.ImageVersion = types.StringValue(imageVersion.GetId())
+		mc.AwsEc2PreparedImage = util.TypedObjectToObjectValue(ctx, diagnostics, preparedImageConfig)
+		mc.MasterImageNote = types.StringValue(currentImage.GetImageAssignmentNote())
+		// Set default/null values for other properties
+		mc.ImageAmi = types.StringNull()
+		mc.MasterImage = types.StringNull()
+	} else {
+		// Refresh Master Image
+		masterImage := provScheme.GetMasterImage()
+		/* For AWS master image, the returned master image name looks like:
+		 * {Image Name} (ami-000123456789abcde)
+		 * The Name property in MasterImage will be image name without ami id appended
+		 */
+		mc.MasterImage = types.StringValue(strings.Split(masterImage.GetName(), " (ami-")[0])
+		mc.ImageAmi = types.StringValue(strings.TrimSuffix((strings.Split(masterImage.GetName(), " (")[1]), ")"))
 
-	// Refresh Master Image Note
-	currentDiskImage := provScheme.GetCurrentDiskImage()
-	mc.MasterImageNote = types.StringValue(currentDiskImage.GetMasterImageNote())
+		// Refresh Master Image Note
+		currentDiskImage := provScheme.GetCurrentDiskImage()
+		mc.MasterImageNote = types.StringValue(currentDiskImage.GetMasterImageNote())
+	}
 
 	// Refresh Security Group
 	securityGroups := provScheme.GetSecurityGroups()
@@ -1478,6 +1545,34 @@ func (mc *AwsMachineConfigModel) RefreshProperties(ctx context.Context, diagnost
 			mc.MachineProfile = types.ObjectNull(attributesMap)
 		} else {
 			diagnostics.AddWarning("Error when creating null AwsMachineProfileModel", err.Error())
+		}
+	}
+
+	// Refresh custom properties
+	customProperties := provScheme.GetCustomProperties()
+	for _, stringPair := range customProperties {
+		switch stringPair.GetName() {
+		case util.MachineCatalogCustomPropertyBackupVmConfiguration:
+			if stringPair.GetValue() == "" {
+				mc.SecondaryVmSizes = util.TypedArrayToObjectList[SecondaryVmSizeModel](ctx, diagnostics, nil)
+				continue
+			} else {
+				secondaryVmSizes := []SecondaryVmSizeModel{}
+				backupVmConfigStrings := strings.Split(stringPair.GetValue(), "|")
+				for _, backVmConfigString := range backupVmConfigStrings {
+					backVmConfigStringParts := strings.Split(backVmConfigString, ":")
+					secondaryVmConfig := SecondaryVmSizeModel{
+						VmSize:                    types.StringValue(backVmConfigStringParts[0]),
+						UseSpotPricingIfAvailable: types.BoolValue(false),
+					}
+					if len(backVmConfigStringParts) > 1 {
+						secondaryVmConfig.UseSpotPricingIfAvailable = types.BoolValue(strings.EqualFold(backVmConfigStringParts[1], util.MachineCatalogBackupVmConfigurationTypeSpot))
+					}
+					secondaryVmSizes = append(secondaryVmSizes, secondaryVmConfig)
+				}
+				mc.SecondaryVmSizes = util.TypedArrayToObjectList(ctx, diagnostics, secondaryVmSizes)
+			}
+		default:
 		}
 	}
 }
@@ -1635,7 +1730,11 @@ func (mc *VsphereMachineConfigModel) RefreshProperties(ctx context.Context, diag
 			writebackCache.WriteBackCacheMemorySizeMB = types.Int64Value(int64(provScheme.GetWriteBackCacheMemorySizeMB()))
 		}
 		if provScheme.GetWriteBackCacheDriveLetter() != "" {
-			writebackCache.WriteBackCacheDriveLetter = types.StringValue(provScheme.GetWriteBackCacheDriveLetter())
+			if slices.Contains(util.EscapedUnicodeNullCharacters, provScheme.GetWriteBackCacheDriveLetter()) {
+				writebackCache.WriteBackCacheDriveLetter = types.StringNull()
+			} else {
+				writebackCache.WriteBackCacheDriveLetter = types.StringValue(provScheme.GetWriteBackCacheDriveLetter())
+			}
 		}
 		mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, writebackCache)
 	}
@@ -1760,7 +1859,11 @@ func (mc *SCVMMMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 			writebackCache.WriteBackCacheMemorySizeMB = types.Int64Value(int64(provScheme.GetWriteBackCacheMemorySizeMB()))
 		}
 		if provScheme.GetWriteBackCacheDriveLetter() != "" {
-			writebackCache.WriteBackCacheDriveLetter = types.StringValue(provScheme.GetWriteBackCacheDriveLetter())
+			if slices.Contains(util.EscapedUnicodeNullCharacters, provScheme.GetWriteBackCacheDriveLetter()) {
+				writebackCache.WriteBackCacheDriveLetter = types.StringNull()
+			} else {
+				writebackCache.WriteBackCacheDriveLetter = types.StringValue(provScheme.GetWriteBackCacheDriveLetter())
+			}
 		}
 		mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, writebackCache)
 	}
@@ -1860,14 +1963,18 @@ func (SecondaryVmSizeModel) GetSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
 			"vm_size": schema.StringAttribute{
-				Description: "The name of the Azure VM SKU.",
+				Description: "The name of the VM SKU.",
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(1, 255),
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(util.LowerCaseRegex),
+						"must be all in lowercase",
+					),
 				},
 			},
 			"use_spot_pricing_if_available": schema.BoolAttribute{
-				Description: "Azure supports two types of VMs: regular and spot. Regular VMs are standard VMs with pay-as-you-go prices. Spot is offered by Azure at a discounted rate, utilizing unused Azure capacity. Set this to `true` to use spot pricing if it's available for the specified VM SKU. ",
+				Description: "The cloud provider supports two types of VMs: regular and spot. Regular VMs are standard VMs with pay-as-you-go prices. Spot is offered at a discounted rate, utilizing unused cloud provider capacity. Set this to `true` to use spot pricing if it's available for the specified VM SKU. ",
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),

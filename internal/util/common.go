@@ -67,7 +67,7 @@ const DomainRegexWithProtocol string = `^(http:\/\/|https:\/\/)(([a-zA-Z0-9-_]){
 const LowerCaseRegex string = `^[^A-Z]*$`
 
 // SAM
-const SamRegex string = `(^(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}|^[a-zA-Z][a-zA-Z0-9\-_]{0,61}[a-zA-Z0-9])\\\w[\w\.\- ]+$`
+const SamRegex string = `(^(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}|^[a-zA-Z][a-zA-Z0-9\-_]{0,61}[a-zA-Z0-9])\\[^"\/\[\]:;\|=,\+\*\?<>]+$`
 
 // UPN
 const UpnRegex string = `^[^@]+@\b(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}$`
@@ -304,12 +304,16 @@ const OSPlatform_Windows = "Windows"
 const OSPlatform_Linux = "Linux"
 
 const MachineCatalogServiceOfferingSupportsSpotVm = "SupportsSpotVM"
+const MachineCatalogServiceOfferingSupportedInstanceMarketTypes = "SupportedInstanceMarketTypes"
 const MachineCatalogBackupVmConfigurationTypeRegular = "Regular"
 const MachineCatalogBackupVmConfigurationTypeSpot = "Spot"
 const MachineCatalogCustomPropertyBackupVmConfiguration = "BackupVmConfiguration"
 
 // Hypervisor
 const AmazonWorkSpacesCoreRoleBasedAuthKeyAndSecret = "role_based_auth"
+
+// Escaped unicode null characters
+var EscapedUnicodeNullCharacters = []string{"\u0000", "\x00"}
 
 // <summary>
 // Helper function to validate if a string is a valid UUID or null
@@ -1036,7 +1040,7 @@ func CheckFunctionalLevelValues(client *citrixdaasclient.CitrixDaasClient, diagn
 // <summary>
 // Helper function to check the version requirement for DDC.
 // </summary>
-func CheckProductVersion(client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, requiredCloudOrchestrationApiVersion int32, requiredOnPremOrchestrationApiVersion int32, requiredProductMajorVersion int, requiredProductMinorVersion int, errorSummary, feature string) bool {
+func CheckProductVersion(client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, requiredCloudOrchestrationApiVersion int32, requiredOnPremOrchestrationApiVersion int32, requiredProductMajorVersion int, requiredProductMinorVersion int, errorSummary string, feature string) bool {
 	// Validate DDC version
 	if client.AuthConfig.OnPremises {
 		productVersionSplit := strings.Split(client.ClientConfig.ProductVersion, ".")

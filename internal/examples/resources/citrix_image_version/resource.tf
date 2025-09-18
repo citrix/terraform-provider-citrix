@@ -50,6 +50,28 @@ resource "citrix_image_version" "example_vsphere_image_version" {
 	}
 }
 
+resource "citrix_image_version" "example_aws_ec2_image_version" {
+    image_definition = citrix_image_definition.example_aws_ec2_image_definition.id
+	hypervisor = citrix_aws_hypervisor.example-aws-hypervisor.id
+	hypervisor_resource_pool = citrix_aws_hypervisor_resource_pool.example-aws-hypervisor-resource-pool.id
+	description = "Example image version for AWS EC2"
+
+	aws_ec2_image_specs = {
+        service_offering = "t3.medium"
+        ami_name = "example_master_image"
+        ami_id = "ami-00000000000000000"
+        machine_profile = {
+            vm_name = "example-vm-name"
+            vm_id = "i-xxxxxxxxx"
+            vm_region_az = "us-east-1c"  # Example. Chose the region and availability zone where your VM is located.
+            # For machine profile, you can either provide VM related details or launch template related details, but not both.
+            # launch_template_name = "example_launch_template"
+            # launch_template_id = "lt-example"
+            # launch_template_version = "1"
+        }
+	}
+}
+
 resource "citrix_image_version" "example_workspaces_core_image_version" {
     image_definition = citrix_image_definition.example_workspaces_core_image_definition.id
 	hypervisor = citrix_amazon_workspaces_core_hypervisor.example-amazon-workspaces-core-hypervisor.id

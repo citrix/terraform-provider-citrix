@@ -65,6 +65,28 @@ resource "citrix_image_version" "example_vsphere_image_version" {
 	}
 }
 
+resource "citrix_image_version" "example_aws_ec2_image_version" {
+    image_definition = citrix_image_definition.example_aws_ec2_image_definition.id
+	hypervisor = citrix_aws_hypervisor.example-aws-hypervisor.id
+	hypervisor_resource_pool = citrix_aws_hypervisor_resource_pool.example-aws-hypervisor-resource-pool.id
+	description = "Example image version for AWS EC2"
+
+	aws_ec2_image_specs = {
+        service_offering = "t3.medium"
+        ami_name = "example_master_image"
+        ami_id = "ami-00000000000000000"
+        machine_profile = {
+            vm_name = "example-vm-name"
+            vm_id = "i-xxxxxxxxx"
+            vm_region_az = "us-east-1c"  # Example. Chose the region and availability zone where your VM is located.
+            # For machine profile, you can either provide VM related details or launch template related details, but not both.
+            # launch_template_name = "example_launch_template"
+            # launch_template_id = "lt-example"
+            # launch_template_version = "1"
+        }
+	}
+}
+
 resource "citrix_image_version" "example_workspaces_core_image_version" {
     image_definition = citrix_image_definition.example_workspaces_core_image_definition.id
 	hypervisor = citrix_amazon_workspaces_core_hypervisor.example-amazon-workspaces-core-hypervisor.id
@@ -96,6 +118,7 @@ resource "citrix_image_version" "example_workspaces_core_image_version" {
 ### Optional
 
 - `amazon_workspaces_core_image_specs` (Attributes) Image configuration for Amazon Workspaces Core image version. (see [below for nested schema](#nestedatt--amazon_workspaces_core_image_specs))
+- `aws_ec2_image_specs` (Attributes) Image configuration for AWS EC2 image version. (see [below for nested schema](#nestedatt--aws_ec2_image_specs))
 - `azure_image_specs` (Attributes) Image configuration for Azure image version. (see [below for nested schema](#nestedatt--azure_image_specs))
 - `description` (String) Description of the image version.
 - `network_mapping` (Attributes List) Specifies how the attached NICs are mapped to networks. (see [below for nested schema](#nestedatt--network_mapping))
@@ -121,6 +144,30 @@ Required:
 
 <a id="nestedatt--amazon_workspaces_core_image_specs--machine_profile"></a>
 ### Nested Schema for `amazon_workspaces_core_image_specs.machine_profile`
+
+Optional:
+
+- `launch_template_id` (String) The launch template ID of the machine profile.
+- `launch_template_name` (String) The launch template name of the machine profile.
+- `launch_template_version` (String) The launch template version of the machine profile.
+- `vm_id` (String) The instance ID of the machine profile virtual machine.
+- `vm_name` (String) The name of the machine profile virtual machine.
+- `vm_region_az` (String) The region and availability zone of the machine profile virtual machine.
+
+
+
+<a id="nestedatt--aws_ec2_image_specs"></a>
+### Nested Schema for `aws_ec2_image_specs`
+
+Required:
+
+- `ami_id` (String) ID of AWS EC2 image to be used as the template image for the machine catalog.
+- `ami_name` (String) The name of the AWS EC2 image that will be used.
+- `machine_profile` (Attributes) The name of the virtual machine that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone.<br />While providing machine profile, specify either `vm_name + vm_region_az + vm_id` or `launch_template_name + launch_template_version + launch_template_id`, but not both. (see [below for nested schema](#nestedatt--aws_ec2_image_specs--machine_profile))
+- `service_offering` (String) The AWS VM Sku to use when creating machines.
+
+<a id="nestedatt--aws_ec2_image_specs--machine_profile"></a>
+### Nested Schema for `aws_ec2_image_specs.machine_profile`
 
 Optional:
 

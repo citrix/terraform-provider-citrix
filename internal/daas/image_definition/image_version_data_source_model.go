@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -54,6 +55,39 @@ func (AzureImageSpecsDataSourceModel) GetDataSourceSchema() schema.SingleNestedA
 
 func (AzureImageSpecsDataSourceModel) GetDataSourceAttributes() map[string]schema.Attribute {
 	return AzureImageSpecsDataSourceModel{}.GetDataSourceSchema().Attributes
+}
+
+type AwsEc2ImageSpecsDataSourceModel struct {
+	ImageName       types.String `tfsdk:"image_name"`
+	ImageAmi        types.String `tfsdk:"image_ami"`
+	ServiceOffering types.String `tfsdk:"service_offering"`
+	MachineProfile  types.Object `tfsdk:"machine_profile"`
+}
+
+func (AwsEc2ImageSpecsDataSourceModel) GetDataSourceSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "Image configuration for AWS EC2 image version.",
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			"service_offering": schema.StringAttribute{
+				Description: "The AWS VM Sku to use when creating machines.",
+				Computed:    true,
+			},
+			"image_name": schema.StringAttribute{
+				Description: "The name of the virtual machine image that will be used.",
+				Computed:    true,
+			},
+			"image_ami": schema.StringAttribute{
+				Description: "AMI of the AWS image to be used as the template image for the machine catalog.",
+				Computed:    true,
+			},
+			"machine_profile": util.AwsMachineProfileModel{}.GetDataSourceSchema(),
+		},
+	}
+}
+
+func (AwsEc2ImageSpecsDataSourceModel) GetDataSourceAttributes() map[string]schema.Attribute {
+	return AwsEc2ImageSpecsDataSourceModel{}.GetDataSourceSchema().Attributes
 }
 
 type AmazonWorkspacesCoreImageSpecsDataSourceModel struct {
@@ -176,6 +210,7 @@ func (ImageVersionModel) GetDataSourceSchema() schema.Schema {
 				Computed:    true,
 			},
 			"azure_image_specs":                  AzureImageSpecsDataSourceModel{}.GetDataSourceSchema(),
+			"aws_ec2_image_specs":                AwsEc2ImageSpecsDataSourceModel{}.GetDataSourceSchema(),
 			"vsphere_image_specs":                VsphereImageSpecsDataSourceModel{}.GetDataSourceSchema(),
 			"amazon_workspaces_core_image_specs": AmazonWorkspacesCoreImageSpecsDataSourceModel{}.GetDataSourceSchema(),
 			"session_support": schema.StringAttribute{
@@ -195,7 +230,7 @@ func (ImageVersionModel) GetDataSourceAttributes() map[string]schema.Attribute {
 	return ImageVersionModel{}.GetDataSourceSchema().Attributes
 }
 
-func (r ImageVersionModel) RefreshDataSourcePropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, imageVersion *citrixorchestration.ImageVersionResponseModel) ImageVersionModel {
+func (r ImageVersionModel) RefreshDataSourcePropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, imageVersion *citrixorchestration.ImageVersionResponseModel) ImageVersionModel {
 	r, imageSpecs, specConfigured := r.RefreshImageVersionBaseProperties(ctx, diagnostics, imageVersion)
 	if specConfigured {
 		return r
@@ -256,6 +291,34 @@ func (r ImageVersionModel) RefreshDataSourcePropertyValues(ctx context.Context, 
 		}
 
 		r.VsphereImageSpecs = util.DataSourceTypedObjectToObjectValue(ctx, diagnostics, vsphereImageSpecs)
+	case util.AWS_FACTORY_NAME:
+		awsEc2ImageSpecs := AwsEc2ImageSpecsDataSourceModel{}
+
+		machineProfile, err := refreshAwsEc2ImageVersionMachineProfile(ctx, diagnostics, false, imageScheme)
+		if err == nil {
+			awsEc2ImageSpecs.MachineProfile = machineProfile
+		}
+
+		if imageScheme.GetServiceOffering() != "" {
+			rawServiceOffering := strings.TrimSuffix(imageScheme.GetServiceOffering(), ".serviceoffering")
+			if serviceOfferingObject, httpResp, err := util.GetSingleResourceFromHypervisorWithNoCacheRetry(ctx, client, diagnostics, r.Hypervisor.ValueString(), r.ResourcePool.ValueString(), "", rawServiceOffering, util.ServiceOfferingResourceType, ""); err == nil {
+				awsEc2ImageSpecs.ServiceOffering = types.StringValue(serviceOfferingObject.GetId())
+			} else {
+				diagnostics.AddError(
+					"Error reading AWS image version",
+					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+						fmt.Sprintf("\nFailed to resolve AWS service offering %s, error: %s", rawServiceOffering, err.Error()),
+				)
+			}
+		}
+		/* For AWS master image, the returned master image name looks like:
+		* {Image Name} (ami-000123456789abcde)
+		* The Name property in MasterImage will be image name without ami id appended
+		 */
+		awsEc2ImageSpecs.ImageName = types.StringValue(strings.Split(masterImage.GetName(), " (ami-")[0])
+		awsEc2ImageSpecs.ImageAmi = types.StringValue(strings.TrimSuffix((strings.Split(masterImage.GetName(), " (")[1]), ")"))
+
+		r.AwsEc2ImageSpecs = util.DataSourceTypedObjectToObjectValue(ctx, diagnostics, awsEc2ImageSpecs)
 	case util.AMAZON_WORKSPACES_CORE_FACTORY_NAME:
 		amazonWSCImageSpecs := AmazonWorkspacesCoreImageSpecsDataSourceModel{}
 		serviceOffering := strings.TrimSuffix(imageScheme.GetServiceOffering(), ".serviceoffering")

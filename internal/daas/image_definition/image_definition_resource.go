@@ -364,6 +364,17 @@ func (r *ImageDefinitionResource) ModifyPlan(ctx context.Context, req resource.M
 			)
 			return
 		}
+
+		if hypervisor.GetConnectionType() == citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS {
+			if r.client.ClientConfig.OrchestrationApiVersion < 126 {
+				// AWS EC2 Image Definition is supported from Orchestration API version 126 and above
+				resp.Diagnostics.AddError(
+					"Error validating Image Definition configuration",
+					"AWS EC2 Image Definition is supported from Orchestration service version 126 and above. Current Orchestration Service version is "+fmt.Sprintf("%d", r.client.ClientConfig.OrchestrationApiVersion),
+				)
+				return
+			}
+		}
 	}
 
 	if !plan.AzureImageDefinitionModel.IsUnknown() && !plan.AzureImageDefinitionModel.IsNull() {

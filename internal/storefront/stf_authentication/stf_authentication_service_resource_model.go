@@ -6,6 +6,7 @@ import (
 	"context"
 
 	citrixstorefront "github.com/citrix/citrix-daas-rest-go/citrixstorefront/models"
+	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"golang.org/x/exp/maps"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -23,10 +24,11 @@ import (
 // SFAuthenticationServiceResourceModel maps the resource schema data.
 
 type STFAuthenticationServiceResourceModel struct {
-	SiteId            types.String `tfsdk:"site_id"`
-	VirtualPath       types.String `tfsdk:"virtual_path"`
-	FriendlyName      types.String `tfsdk:"friendly_name"`
-	ClaimsFactoryName types.String `tfsdk:"claims_factory_name"`
+	SiteId               types.String `tfsdk:"site_id"`
+	VirtualPath          types.String `tfsdk:"virtual_path"`
+	FriendlyName         types.String `tfsdk:"friendly_name"`
+	ClaimsFactoryName    types.String `tfsdk:"claims_factory_name"`
+	CitrixAGBasicOptions types.Object `tfsdk:"citrix_ag_basic_options"`
 }
 
 func (r *STFAuthenticationServiceResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, authService *citrixstorefront.STFAuthenticationServiceResponseModel) {
@@ -54,6 +56,7 @@ func (r *STFAuthenticationServiceResourceModel) RefreshPropertyValues(ctx contex
 		return
 	}
 	r.ClaimsFactoryName = types.StringValue(claimsFactoryNamesMapKeys[0])
+
 }
 
 func (STFAuthenticationServiceResourceModel) GetSchema() schema.Schema {
@@ -96,6 +99,7 @@ func (STFAuthenticationServiceResourceModel) GetSchema() schema.Schema {
 				Computed:    true,
 				Default:     stringdefault.StaticString("standardClaimsFactory"),
 			},
+			"citrix_ag_basic_options": CitrixAGBasicOptions{}.GetSchema(),
 		},
 	}
 }
@@ -106,4 +110,44 @@ func (STFAuthenticationServiceResourceModel) GetAttributes() map[string]schema.A
 
 func (STFAuthenticationServiceResourceModel) GetAttributesNamesToMask() map[string]bool {
 	return map[string]bool{}
+}
+
+type CitrixAGBasicOptions struct {
+	CredentialValidationMode types.String `tfsdk:"credential_validation_mode"`
+}
+
+func (CitrixAGBasicOptions) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "The Citrix AG Basic Authentication options.",
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			"credential_validation_mode": schema.StringAttribute{
+				Description: "The credential validation mode for Citrix AG Basic Authentication. Possible values are `Auto`, `Kerberos`, and `Password`.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf("Auto", "Kerberos", "Password"),
+				},
+			},
+		},
+	}
+}
+
+func (CitrixAGBasicOptions) GetAttributes() map[string]schema.Attribute {
+	return CitrixAGBasicOptions{}.GetSchema().Attributes
+}
+
+func (r *STFAuthenticationServiceResourceModel) RefreshCitrixAGBasicOptions(ctx context.Context, diagnostics *diag.Diagnostics, resp *citrixstorefront.STFCitrixAGBasicOptionsResponseModel) {
+	refreshedAGBasicOptions := util.ObjectValueToTypedObject[CitrixAGBasicOptions](ctx, diagnostics, r.CitrixAGBasicOptions)
+
+	switch resp.CredentialValidationMode {
+	case 0:
+		refreshedAGBasicOptions.CredentialValidationMode = types.StringValue("Password")
+	case 1:
+		refreshedAGBasicOptions.CredentialValidationMode = types.StringValue("Kerberos")
+	case 2:
+		refreshedAGBasicOptions.CredentialValidationMode = types.StringValue("Auto")
+	}
+
+	refreshedAGBasicOptionsObject := util.TypedObjectToObjectValue(ctx, diagnostics, refreshedAGBasicOptions)
+	r.CitrixAGBasicOptions = refreshedAGBasicOptionsObject
 }
