@@ -4,7 +4,9 @@ package hypervisor
 
 import (
 	"context"
+	"encoding/json"
 	"regexp"
+	"strconv"
 	"strings"
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
@@ -23,19 +25,24 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+const (
+	UseSystemProxyForHypervisorTrafficOnConnectors_CustomProperty = "UseSystemProxyForHypervisorTrafficOnConnectors"
+)
+
 // HypervisorResourceModel maps the resource schema data.
 type AmazonWorkSpacesCoreHypervisorResourceModel struct {
 	/**** Connection Details ****/
-	Id         types.String `tfsdk:"id"`
-	Name       types.String `tfsdk:"name"`
-	Zone       types.String `tfsdk:"zone"`
-	Scopes     types.Set    `tfsdk:"scopes"`   // Set[string]
-	Metadata   types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
-	Tenants    types.Set    `tfsdk:"tenants"`  // Set[string]
-	Region     types.String `tfsdk:"region"`
-	ApiKey     types.String `tfsdk:"api_key"`
-	SecretKey  types.String `tfsdk:"secret_key"`
-	UseIamRole types.Bool   `tfsdk:"use_iam_role"`
+	Id                                             types.String `tfsdk:"id"`
+	Name                                           types.String `tfsdk:"name"`
+	Zone                                           types.String `tfsdk:"zone"`
+	Scopes                                         types.Set    `tfsdk:"scopes"`   // Set[string]
+	Metadata                                       types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
+	Tenants                                        types.Set    `tfsdk:"tenants"`  // Set[string]
+	Region                                         types.String `tfsdk:"region"`
+	ApiKey                                         types.String `tfsdk:"api_key"`
+	SecretKey                                      types.String `tfsdk:"secret_key"`
+	UseIamRole                                     types.Bool   `tfsdk:"use_iam_role"`
+	UseSystemProxyForHypervisorTrafficOnConnectors types.Bool   `tfsdk:"use_system_proxy_for_hypervisor_traffic_on_connectors"`
 }
 
 func (AmazonWorkSpacesCoreHypervisorResourceModel) GetSchema() schema.Schema {
@@ -116,6 +123,12 @@ func (AmazonWorkSpacesCoreHypervisorResourceModel) GetSchema() schema.Schema {
 				Description: "A set of identifiers of tenants to associate with the hypervisor connection.",
 				Computed:    true,
 			},
+			"use_system_proxy_for_hypervisor_traffic_on_connectors": schema.BoolAttribute{
+				Description: "When set to `true`, the hypervisor connection will be setup with the proxy configured during connector installation. Default value is `false`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
 		},
 	}
 }
@@ -152,6 +165,21 @@ func (r AmazonWorkSpacesCoreHypervisorResourceModel) RefreshPropertyValues(ctx c
 		r.Metadata = util.RefreshListValueProperties[util.NameValueStringPairModel](ctx, diagnostics, r.Metadata, effectiveMetadata, util.GetOrchestrationNameValueStringPairKey)
 	} else {
 		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
+	}
+
+	customPropertiesString := hypervisor.GetCustomProperties()
+	var customProperties []citrixorchestration.NameValueStringPairModel
+	err := json.Unmarshal([]byte(customPropertiesString), &customProperties)
+	if err != nil {
+		diagnostics.AddWarning("Error reading AWS WorkSpaces Core Hypervisor custom properties", err.Error())
+		return r
+	}
+
+	for _, customProperty := range customProperties {
+		if customProperty.GetName() == UseSystemProxyForHypervisorTrafficOnConnectors_CustomProperty {
+			proxy, _ := strconv.ParseBool(customProperty.GetValue())
+			r.UseSystemProxyForHypervisorTrafficOnConnectors = types.BoolValue(proxy)
+		}
 	}
 
 	r.Tenants = util.RefreshTenantSet(ctx, diagnostics, hypervisor.GetTenants())

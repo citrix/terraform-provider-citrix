@@ -35,6 +35,7 @@ data "citrix_image_version" "example_image_version_by_version_number" {
 
 ### Optional
 
+- `aws_ec2_image_specs` (Attributes) Image configuration for AWS EC2 image version. (see [below for nested schema](#nestedatt--aws_ec2_image_specs))
 - `id` (String) The id of the image version.
 - `timeout` (Attributes) Timeout in minutes for the long-running jobs in image definition resource's create, delete operation(s). (see [below for nested schema](#nestedatt--timeout))
 - `version_number` (Number) The version number of the image version.
@@ -50,6 +51,30 @@ data "citrix_image_version" "example_image_version_by_version_number" {
 - `os_type` (String) The OS type of the image version.
 - `session_support` (String) Session support for the image version.
 - `vsphere_image_specs` (Attributes) Image configuration for vSphere image version. (see [below for nested schema](#nestedatt--vsphere_image_specs))
+
+<a id="nestedatt--aws_ec2_image_specs"></a>
+### Nested Schema for `aws_ec2_image_specs`
+
+Read-Only:
+
+- `image_ami` (String) AMI of the AWS image to be used as the template image for the machine catalog.
+- `image_name` (String) The name of the virtual machine image that will be used.
+- `machine_profile` (Attributes) The name of the virtual machine that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone. (see [below for nested schema](#nestedatt--aws_ec2_image_specs--machine_profile))
+- `service_offering` (String) The AWS VM Sku to use when creating machines.
+
+<a id="nestedatt--aws_ec2_image_specs--machine_profile"></a>
+### Nested Schema for `aws_ec2_image_specs.machine_profile`
+
+Read-Only:
+
+- `launch_template_id` (String) The launch template ID of the machine profile.
+- `launch_template_name` (String) The launch template name of the machine profile.
+- `launch_template_version` (String) The launch template version of the machine profile.
+- `vm_id` (String) The instance ID of the machine profile virtual machine.
+- `vm_name` (String) The name of the machine profile virtual machine.
+- `vm_region_az` (String) The region and availability zone of the machine profile virtual machine.
+
+
 
 <a id="nestedatt--timeout"></a>
 ### Nested Schema for `timeout`

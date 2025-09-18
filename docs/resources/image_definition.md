@@ -27,6 +27,15 @@ resource "citrix_image_definition" "example_azure_image_definition" {
     }
 }
 
+resource "citrix_image_definition" "example_aws_ec2_image_definition" {
+    name            = "Example AWS EC2 Image Definition"
+    description     = "Example AWS EC2 Image Definition Description"
+    os_type         = "Windows"
+    session_support = "MultiSession"
+    hypervisor      = citrix_aws_hypervisor.example_aws_hypervisor.id
+    hypervisor_resource_pool = citrix_aws_hypervisor_resource_pool.example_aws_hypervisor_resource_pool.id
+}
+
 resource "citrix_image_definition" "example_vsphere_image_definition" {
     name            = "Example vSphere Image Definition"
     description     = "Example vSphere Image Definition Description"

@@ -281,7 +281,7 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 	editApplicationRequestBody.SetShortcutAddedToStartMenu(plan.ShortcutAddedToStartMenu.ValueBool())
 	editApplicationRequestBody.SetVisible(plan.Visible.ValueBool())
 
-	if plan.BrowserName.ValueString() != "" {
+	if plan.BrowserName.ValueString() != "" && !strings.EqualFold(plan.BrowserName.ValueString(), state.BrowserName.ValueString()) {
 		editApplicationRequestBody.SetBrowserName(plan.BrowserName.ValueString())
 	}
 
@@ -639,21 +639,12 @@ func buildDeliveryGroupsPriorityRequestModel(ctx context.Context, diagnostics *d
 }
 
 func validateDeliveryGroupsPriority(ctx context.Context, diagnostics *diag.Diagnostics, data ApplicationResourceModel) {
-	// Make sure the delivery_groups_priority does not have duplicated priority values
+	// Make sure the delivery_groups_priority does not have duplicated delivery group id values
 	if !data.DeliveryGroupsPriority.IsNull() && !data.DeliveryGroupsPriority.IsUnknown() {
 		dgPriority := util.ObjectSetToTypedArray[DeliveryGroupPriorityModel](ctx, diagnostics, data.DeliveryGroupsPriority)
-		priorityMap := map[int32]bool{}
 		deliveryGroupMap := map[string]bool{}
 		isValid := true
 		for _, dg := range dgPriority {
-			if !dg.Priority.IsUnknown() && !dg.Priority.IsNull() {
-				if priorityMap[dg.Priority.ValueInt32()] {
-					isValid = false
-				} else {
-					priorityMap[dg.Priority.ValueInt32()] = true
-				}
-			}
-
 			if !dg.Id.IsUnknown() && !dg.Id.IsNull() {
 				if deliveryGroupMap[dg.Id.ValueString()] {
 					isValid = false
@@ -665,7 +656,7 @@ func validateDeliveryGroupsPriority(ctx context.Context, diagnostics *diag.Diagn
 			if !isValid {
 				diagnostics.AddError(
 					"Invalid configuration in delivery_groups_priority",
-					"The value of priority and delivery group id should be unique in delivery_groups_priority",
+					"The value of delivery group id should be unique in delivery_groups_priority",
 				)
 				return
 			}

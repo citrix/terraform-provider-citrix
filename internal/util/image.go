@@ -413,7 +413,11 @@ func (AzureImageSpecsModel) GetSchema() schema.SingleNestedAttribute {
 			objectplanmodifier.RequiresReplace(),
 		},
 		Validators: []validator.Object{
-			objectvalidator.ExactlyOneOf(path.MatchRelative().AtParent().AtName("vsphere_image_specs"), path.MatchRelative().AtParent().AtName("amazon_workspaces_core_image_specs")),
+			objectvalidator.ExactlyOneOf(
+				path.MatchRelative().AtParent().AtName("vsphere_image_specs"),
+				path.MatchRelative().AtParent().AtName("amazon_workspaces_core_image_specs"),
+				path.MatchRelative().AtParent().AtName("aws_ec2_image_specs"),
+			),
 		},
 	}
 }
@@ -650,6 +654,43 @@ func (AwsMachineProfileModel) GetSchema() schema.SingleNestedAttribute {
 
 func (AwsMachineProfileModel) GetAttributes() map[string]schema.Attribute {
 	return AwsMachineProfileModel{}.GetSchema().Attributes
+}
+
+func (AwsMachineProfileModel) GetDataSourceSchema() dataSourceSchema.SingleNestedAttribute {
+	return dataSourceSchema.SingleNestedAttribute{
+		Description: "The name of the virtual machine that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone.",
+		Computed:    true,
+		Attributes: map[string]dataSourceSchema.Attribute{
+			"vm_name": dataSourceSchema.StringAttribute{
+				Description: "The name of the machine profile virtual machine.",
+				Computed:    true,
+			},
+			"vm_region_az": dataSourceSchema.StringAttribute{
+				Description: "The region and availability zone of the machine profile virtual machine.",
+				Computed:    true,
+			},
+			"vm_id": dataSourceSchema.StringAttribute{
+				Description: "The instance ID of the machine profile virtual machine.",
+				Computed:    true,
+			},
+			"launch_template_name": dataSourceSchema.StringAttribute{
+				Description: "The launch template name of the machine profile.",
+				Computed:    true,
+			},
+			"launch_template_version": dataSourceSchema.StringAttribute{
+				Description: "The launch template version of the machine profile.",
+				Computed:    true,
+			},
+			"launch_template_id": dataSourceSchema.StringAttribute{
+				Description: "The launch template ID of the machine profile.",
+				Computed:    true,
+			},
+		},
+	}
+}
+
+func (AwsMachineProfileModel) GetDataSourceAttributes() map[string]dataSourceSchema.Attribute {
+	return AwsMachineProfileModel{}.GetDataSourceSchema().Attributes
 }
 
 func HandleMachineProfileForAwsMcsPvsCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diag *diag.Diagnostics, hypervisorName string, resourcePoolName string, machineProfile AwsMachineProfileModel, errorTitle string) (string, error) {

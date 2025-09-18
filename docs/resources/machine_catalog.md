@@ -60,6 +60,7 @@ resource "citrix_machine_catalog" "example-azure-mtsession" {
 				persist_vm = true
 				writeback_cache_disk_size_gb = 127
                 writeback_cache_memory_size_mb = 256
+                writeback_cache_drive_letter = "E"
 				storage_cost_saving = true
 			}
         }
@@ -104,6 +105,7 @@ resource "citrix_machine_catalog" "example_azure_prepared_image_mtsession" {
 				persist_vm = true
 				writeback_cache_disk_size_gb = 127
                 writeback_cache_memory_size_mb = 256
+                writeback_cache_drive_letter = "E"
 				storage_cost_saving = true
 			}
         }
@@ -180,7 +182,13 @@ resource "citrix_machine_catalog" "example-aws-mtsession" {
             security_groups = [
                 "default"
             ]
-            tenancy_type = "Shared"
+            tenancy_type        = "Shared"
+            secondary_vm_sizes  = [
+                {
+                    vm_size                         = "t2.micro"
+                    use_spot_pricing_if_available   = false
+                }
+            ]
         }
 		number_of_total_machines =  1
         machine_account_creation_rules ={
@@ -225,6 +233,57 @@ resource "citrix_machine_catalog" "example-aws-with-machine-profile" {
                 # launch_template_version = "1"
             }
             tenancy_type = "Shared"
+        }
+		number_of_total_machines =  1
+        machine_account_creation_rules ={
+			naming_scheme 	   = "aws-multi-##"
+			naming_scheme_type = "Numeric"
+        }
+    }	
+}
+
+resource "citrix_machine_catalog" "example-aws-mtsession-with-prepared-image" {
+    name                        = "example-aws-mtsession-with-prepared-image"
+    description                 = "Example multi-session catalog on AWS hypervisor using Prepared Image"
+   	zone						= "<zone Id>"
+	allocation_type				= "Random"
+	session_support				= "MultiSession"
+	provisioning_type 			= "MCS"
+    provisioning_scheme         = {
+		hypervisor = citrix_aws_hypervisor.example-aws-hypervisor.id
+		hypervisor_resource_pool = citrix_aws_hypervisor_resource_pool.example-aws-hypervisor-resource-pool.id
+		identity_type      = "ActiveDirectory"
+		machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+			domain_ou				 = "<DomainOU>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+        aws_machine_config = {
+            prepared_image = {
+                image_definition = citrix_image_definition.example_aws_ec2_image_definition.id
+                image_version = citrix_image_version.example_aws_ec2_image_version.id
+            }
+			service_offering = "t2.small"
+            security_groups = [
+                "default"
+            ]
+            tenancy_type        = "Shared"
+            secondary_vm_sizes  = [
+                {
+                    vm_size                         = "t2.micro"
+                    use_spot_pricing_if_available   = false
+                }
+            ]
+            machine_profile = {
+                vm_name = "example-vm-name"
+                vm_id = "i-xxxxxxxxx"
+                vm_region_az = "us-east-1c"  # Example. Chose the region and availability zone where your VM is located.
+                # For machine profile, you can either provide VM related details or launch template related details, but not both.
+                # launch_template_name = "example_launch_template"
+                # launch_template_id = "lt-example"
+                # launch_template_version = "1"
+            }
         }
 		number_of_total_machines =  1
         machine_account_creation_rules ={
@@ -879,16 +938,20 @@ Required:
 
 Required:
 
-- `image_ami` (String) AMI of the AWS image to be used as the template image for the machine catalog.
-- `master_image` (String) The name of the virtual machine image that will be used.
 - `service_offering` (String) The AWS VM Sku to use when creating machines.
 - `tenancy_type` (String) Tenancy type of the machine. Choose between `Shared`, `Instance` and `Host`.
 
 Optional:
 
+- `image_ami` (String) AMI of the AWS image to be used as the template image for the machine catalog.
 - `image_update_reboot_options` (Attributes) The options for how rebooting is performed for image update. When omitted, image update on the VDAs will be performed on next shutdown. (see [below for nested schema](#nestedatt--provisioning_scheme--aws_machine_config--image_update_reboot_options))
 - `machine_profile` (Attributes) The name of the virtual machine that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone.<br />While providing machine profile, specify either `vm_name + vm_region_az + vm_id` or `launch_template_name + launch_template_version + launch_template_id`, but not both. (see [below for nested schema](#nestedatt--provisioning_scheme--aws_machine_config--machine_profile))
+- `master_image` (String) The name of the virtual machine image that will be used.
 - `master_image_note` (String) The note for the master image.
+- `prepared_image` (Attributes) Specifying the prepared master image to be used for machine catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--aws_machine_config--prepared_image))
+- `secondary_vm_sizes` (Attributes List) Secondary VM sizes to be used when the primary machine size (service_offering) reaches full capacity. A maximum of 10 VM sizes can be specified. The priority of the VM sizes is determined by the order in which they are specified with the first VM size having the highest priority.
+
+~> **Please Note** The `secondary_vm_sizes` cannot contain the value of `service_offering` (see [below for nested schema](#nestedatt--provisioning_scheme--aws_machine_config--secondary_vm_sizes))
 - `security_groups` (List of String) Security groups to associate with the machine. If omitted, the VPC's default security group is used.<br />Do not specify this value if a machine_profile is provided, as the security groups will be derived from the machine profile instead.
 
 <a id="nestedatt--provisioning_scheme--aws_machine_config--image_update_reboot_options"></a>
@@ -918,6 +981,27 @@ Optional:
 - `vm_region_az` (String) The region and availability zone of the machine profile virtual machine.
 
 
+<a id="nestedatt--provisioning_scheme--aws_machine_config--prepared_image"></a>
+### Nested Schema for `provisioning_scheme.aws_machine_config.prepared_image`
+
+Required:
+
+- `image_definition` (String) ID of the image definition.
+- `image_version` (String) ID of the image version.
+
+
+<a id="nestedatt--provisioning_scheme--aws_machine_config--secondary_vm_sizes"></a>
+### Nested Schema for `provisioning_scheme.aws_machine_config.secondary_vm_sizes`
+
+Required:
+
+- `vm_size` (String) The name of the VM SKU.
+
+Optional:
+
+- `use_spot_pricing_if_available` (Boolean) The cloud provider supports two types of VMs: regular and spot. Regular VMs are standard VMs with pay-as-you-go prices. Spot is offered at a discounted rate, utilizing unused cloud provider capacity. Set this to `true` to use spot pricing if it's available for the specified VM SKU.
+
+
 
 <a id="nestedatt--provisioning_scheme--azure_machine_config"></a>
 ### Nested Schema for `provisioning_scheme.azure_machine_config`
@@ -938,7 +1022,7 @@ Optional:
 - `machine_profile` (Attributes) The name of the virtual machine or template spec that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone.<br />Required when provisioning_type is set to PVSStreaming or when identity_type is set to `AzureAD` (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--machine_profile))
 - `master_image_note` (String) The note for the master image.
 - `prepared_image` (Attributes) Specifying the prepared master image to be used for machine catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--prepared_image))
-- `secondary_vm_sizes` (Attributes List) Secondary VM sizes to be used when the primary machine size (service_offering) reaches full capacity. A maxiumum of 10 VM sizes can be specified. The priority of the VM sizes is determined by the order in which they are specified with the first VM size having the highest priority.
+- `secondary_vm_sizes` (Attributes List) Secondary VM sizes to be used when the primary machine size (service_offering) reaches full capacity. A maximum of 10 VM sizes can be specified. The priority of the VM sizes is determined by the order in which they are specified with the first VM size having the highest priority.
 
 ~> **Please Note** This field can only be used when `machine_profile` is specified. (see [below for nested schema](#nestedatt--provisioning_scheme--azure_machine_config--secondary_vm_sizes))
 - `use_azure_compute_gallery` (Attributes) Use this to place prepared image in Azure Compute Gallery. Required when `storage_type = Azure_Ephemeral_OS_Disk`.
@@ -1034,11 +1118,11 @@ Required:
 
 Required:
 
-- `vm_size` (String) The name of the Azure VM SKU.
+- `vm_size` (String) The name of the VM SKU.
 
 Optional:
 
-- `use_spot_pricing_if_available` (Boolean) Azure supports two types of VMs: regular and spot. Regular VMs are standard VMs with pay-as-you-go prices. Spot is offered by Azure at a discounted rate, utilizing unused Azure capacity. Set this to `true` to use spot pricing if it's available for the specified VM SKU.
+- `use_spot_pricing_if_available` (Boolean) The cloud provider supports two types of VMs: regular and spot. Regular VMs are standard VMs with pay-as-you-go prices. Spot is offered at a discounted rate, utilizing unused cloud provider capacity. Set this to `true` to use spot pricing if it's available for the specified VM SKU.
 
 
 <a id="nestedatt--provisioning_scheme--azure_machine_config--use_azure_compute_gallery"></a>
@@ -1064,6 +1148,7 @@ Optional:
 
 - `persist_wbc` (Boolean) Persist Write-back Cache
 - `storage_cost_saving` (Boolean) Save storage cost by downgrading the storage type of the disk to Standard HDD when VM shut down.
+- `writeback_cache_drive_letter` (String) The drive letter for the write back cache.
 - `writeback_cache_memory_size_mb` (Number) The size of the in-memory write back cache in MB.
 
 

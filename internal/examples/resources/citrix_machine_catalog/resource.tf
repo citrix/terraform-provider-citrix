@@ -42,6 +42,7 @@ resource "citrix_machine_catalog" "example-azure-mtsession" {
 				persist_vm = true
 				writeback_cache_disk_size_gb = 127
                 writeback_cache_memory_size_mb = 256
+                writeback_cache_drive_letter = "E"
 				storage_cost_saving = true
 			}
         }
@@ -86,6 +87,7 @@ resource "citrix_machine_catalog" "example_azure_prepared_image_mtsession" {
 				persist_vm = true
 				writeback_cache_disk_size_gb = 127
                 writeback_cache_memory_size_mb = 256
+                writeback_cache_drive_letter = "E"
 				storage_cost_saving = true
 			}
         }
@@ -162,7 +164,13 @@ resource "citrix_machine_catalog" "example-aws-mtsession" {
             security_groups = [
                 "default"
             ]
-            tenancy_type = "Shared"
+            tenancy_type        = "Shared"
+            secondary_vm_sizes  = [
+                {
+                    vm_size                         = "t2.micro"
+                    use_spot_pricing_if_available   = false
+                }
+            ]
         }
 		number_of_total_machines =  1
         machine_account_creation_rules ={
@@ -207,6 +215,57 @@ resource "citrix_machine_catalog" "example-aws-with-machine-profile" {
                 # launch_template_version = "1"
             }
             tenancy_type = "Shared"
+        }
+		number_of_total_machines =  1
+        machine_account_creation_rules ={
+			naming_scheme 	   = "aws-multi-##"
+			naming_scheme_type = "Numeric"
+        }
+    }	
+}
+
+resource "citrix_machine_catalog" "example-aws-mtsession-with-prepared-image" {
+    name                        = "example-aws-mtsession-with-prepared-image"
+    description                 = "Example multi-session catalog on AWS hypervisor using Prepared Image"
+   	zone						= "<zone Id>"
+	allocation_type				= "Random"
+	session_support				= "MultiSession"
+	provisioning_type 			= "MCS"
+    provisioning_scheme         = {
+		hypervisor = citrix_aws_hypervisor.example-aws-hypervisor.id
+		hypervisor_resource_pool = citrix_aws_hypervisor_resource_pool.example-aws-hypervisor-resource-pool.id
+		identity_type      = "ActiveDirectory"
+		machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+			domain_ou				 = "<DomainOU>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+        aws_machine_config = {
+            prepared_image = {
+                image_definition = citrix_image_definition.example_aws_ec2_image_definition.id
+                image_version = citrix_image_version.example_aws_ec2_image_version.id
+            }
+			service_offering = "t2.small"
+            security_groups = [
+                "default"
+            ]
+            tenancy_type        = "Shared"
+            secondary_vm_sizes  = [
+                {
+                    vm_size                         = "t2.micro"
+                    use_spot_pricing_if_available   = false
+                }
+            ]
+            machine_profile = {
+                vm_name = "example-vm-name"
+                vm_id = "i-xxxxxxxxx"
+                vm_region_az = "us-east-1c"  # Example. Chose the region and availability zone where your VM is located.
+                # For machine profile, you can either provide VM related details or launch template related details, but not both.
+                # launch_template_name = "example_launch_template"
+                # launch_template_id = "lt-example"
+                # launch_template_version = "1"
+            }
         }
 		number_of_total_machines =  1
         machine_account_creation_rules ={

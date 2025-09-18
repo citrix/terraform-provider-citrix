@@ -77,8 +77,9 @@ func (ApplicationGroupResourceModel) GetSchema() schema.Schema {
 			},
 			"included_users": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "Users who can use this application group. " +
-					"\n\n-> **Note** User must be in SID, SAM account name (`DOMAIN\\UserOrGroupName`) or UPN (`user@domain.com`) format",
+				Description: "Restrict access to applications in this application group to only users included in this list. " +
+					"\n\n-> **Note** User must be in SID, SAM account name (`DOMAIN\\UserOrGroupName`) or UPN (`user@domain.com`) format" +
+					"\n\n~> **Please Note** If `included_users` attribute is omitted or set to `null`, all users in the specified delivery groups will have access to applications in this application group. If attribute is specified as an empty list i.e. `[]`, then no user will have access to the applications in this application group.",
 				Optional: true,
 				Validators: []validator.Set{
 					setvalidator.ValueStringsAre(

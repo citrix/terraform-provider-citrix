@@ -99,7 +99,7 @@ func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ct
 		if err != nil {
 			return nil, err
 		}
-		provisioningScheme, err := getProvSchemeForCatalog(plan, ctx, client, diagnostics, isOnPremises, provisioningType)
+		provisioningScheme, err := getProvSchemeForCreateCatalog(plan, ctx, client, diagnostics, isOnPremises, provisioningType)
 		if err != nil {
 			return nil, err
 		}
@@ -413,6 +413,22 @@ func checkIfCatalogAttributeCanBeUpdated(ctx context.Context, state tfsdk.State)
 	}
 
 	return true
+}
+
+func checkIfAwsMachineCatalogIsUsingPreparedImage(ctx context.Context, state tfsdk.State) bool {
+	var stateModel MachineCatalogResourceModel
+	_ = state.Get(ctx, &stateModel)
+
+	if !stateModel.ProvisioningScheme.IsNull() && !stateModel.ProvisioningScheme.IsUnknown() {
+		provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &diag.Diagnostics{}, stateModel.ProvisioningScheme)
+		if !provSchemeModel.AwsMachineConfig.IsNull() && !provSchemeModel.AwsMachineConfig.IsUnknown() {
+			awsMachineConfigModel := util.ObjectValueToTypedObject[AwsMachineConfigModel](ctx, &diag.Diagnostics{}, provSchemeModel.AwsMachineConfig)
+			if !awsMachineConfigModel.AwsEc2PreparedImage.IsNull() && !awsMachineConfigModel.AwsEc2PreparedImage.IsUnknown() {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func setMachineCatalogTags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, catalogIdOrPath string, tagSet types.Set) {

@@ -103,7 +103,7 @@ func (d *ImageVersionDataSource) Read(ctx context.Context, req datasource.ReadRe
 		}
 	}
 
-	data = data.RefreshDataSourcePropertyValues(ctx, &resp.Diagnostics, imageVersion)
+	data = data.RefreshDataSourcePropertyValues(ctx, &resp.Diagnostics, d.client, imageVersion)
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
