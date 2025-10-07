@@ -345,12 +345,30 @@ func (r *amazonWorkSpacesCoreHypervisorResource) ModifyPlan(ctx context.Context,
 		return
 	}
 
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var plan AmazonWorkSpacesCoreHypervisorResourceModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+
 	// Check if the DDC version supports Amazon WorkSpaces Core hypervisors
 	isDdcVersionSupported := !r.client.AuthConfig.OnPremises && r.client.ClientConfig.OrchestrationApiVersion >= util.DDCVersion125
 	if !isDdcVersionSupported {
 		resp.Diagnostics.AddError(
 			"Unsupported DDC Version",
 			"The current DDC version does not support creating Amazon WorkSpaces Core hypervisors.",
+		)
+		return
+	}
+
+	if !plan.UseSystemProxyForHypervisorTrafficOnConnectors.IsNull() && !plan.UseSystemProxyForHypervisorTrafficOnConnectors.IsUnknown() &&
+		!r.client.AuthConfig.OnPremises && r.client.ClientConfig.OrchestrationApiVersion < util.DDCVersion126 &&
+		plan.UseSystemProxyForHypervisorTrafficOnConnectors.ValueBool() {
+		resp.Diagnostics.AddError(
+			"Unsupported Configuration",
+			"UseSystemProxyForHypervisorTrafficOnConnectors property is not supported for DDC versions below 126.",
 		)
 		return
 	}

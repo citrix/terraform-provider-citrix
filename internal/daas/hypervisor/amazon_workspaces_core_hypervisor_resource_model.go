@@ -167,18 +167,21 @@ func (r AmazonWorkSpacesCoreHypervisorResourceModel) RefreshPropertyValues(ctx c
 		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
 	}
 
-	customPropertiesString := hypervisor.GetCustomProperties()
-	var customProperties []citrixorchestration.NameValueStringPairModel
-	err := json.Unmarshal([]byte(customPropertiesString), &customProperties)
-	if err != nil {
-		diagnostics.AddWarning("Error reading AWS WorkSpaces Core Hypervisor custom properties", err.Error())
-		return r
-	}
+	r.UseSystemProxyForHypervisorTrafficOnConnectors = types.BoolValue(false)
 
-	for _, customProperty := range customProperties {
-		if customProperty.GetName() == UseSystemProxyForHypervisorTrafficOnConnectors_CustomProperty {
-			proxy, _ := strconv.ParseBool(customProperty.GetValue())
-			r.UseSystemProxyForHypervisorTrafficOnConnectors = types.BoolValue(proxy)
+	customPropertiesString := hypervisor.GetCustomProperties()
+	if customPropertiesString != "" {
+		var customProperties []citrixorchestration.NameValueStringPairModel
+		err := json.Unmarshal([]byte(customPropertiesString), &customProperties)
+		if err == nil {
+			for _, customProperty := range customProperties {
+				if customProperty.GetName() == UseSystemProxyForHypervisorTrafficOnConnectors_CustomProperty {
+					proxy, _ := strconv.ParseBool(customProperty.GetValue())
+					r.UseSystemProxyForHypervisorTrafficOnConnectors = types.BoolValue(proxy)
+				}
+			}
+		} else {
+			diagnostics.AddWarning("Error reading AWS WorkSpaces Core Hypervisor custom properties", err.Error())
 		}
 	}
 

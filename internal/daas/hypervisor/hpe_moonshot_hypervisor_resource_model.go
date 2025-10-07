@@ -112,7 +112,7 @@ func (HpeMoonshotHypervisorResourceModel) GetSchema() schema.Schema {
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
 					listvalidator.ValueStringsAre(
-						stringvalidator.RegexMatches(regexp.MustCompile(util.SslThumbprintRegex), "must be specified with SSL thumbprint without colons"),
+						stringvalidator.RegexMatches(regexp.MustCompile(util.SslThumbprintRegex), "must be a valid SSL thumbprint. It should not have any colons and can only be 40 or 64 characters long. The SSL thumbprint only supports the following characters: '0-9', 'a-f' and 'A-F'"),
 					),
 				},
 			},

@@ -304,6 +304,16 @@ func (r *azureHypervisorResourcePoolResource) Delete(ctx context.Context, req re
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	timeoutConfigs := util.ObjectValueToTypedObject[ResourcePoolTimeout](ctx, &resp.Diagnostics, state.Timeout)
+	deleteTimeout := timeoutConfigs.Delete.ValueInt32()
+	if deleteTimeout == 0 {
+		deleteTimeout = getResourcePoolTimeoutConfigs().DeleteDefault
+	}
+
+	// Wait for any provisioned images pending delete to clear before attempting deletion
+	if err := waitForProvImagesPendingDelete(ctx, r.client, &resp.Diagnostics, state.Hypervisor.ValueString(), state.Id.ValueString(), deleteTimeout); err != nil {
+		return
+	}
 
 	// Delete resource pool
 	hypervisorId := state.Hypervisor.ValueString()

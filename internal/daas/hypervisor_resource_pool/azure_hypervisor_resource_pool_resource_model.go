@@ -26,6 +26,7 @@ type AzureHypervisorResourcePoolResourceModel struct {
 	Name       types.String `tfsdk:"name"`
 	Hypervisor types.String `tfsdk:"hypervisor"`
 	Metadata   types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
+	Timeout    types.Object `tfsdk:"timeout"`
 	VmTagging  types.Bool   `tfsdk:"vm_tagging"`
 	/**** Resource Pool Details ****/
 	Region         types.String `tfsdk:"region"`
@@ -102,9 +103,31 @@ func (AzureHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 					),
 				},
 			},
+			"timeout":  ResourcePoolTimeout{}.GetSchema(),
 			"metadata": util.GetMetadataListSchema("Hypervisor Resource Pool"),
 		},
 	}
+}
+
+type ResourcePoolTimeout struct {
+	Delete types.Int32 `tfsdk:"delete"`
+}
+
+func getResourcePoolTimeoutConfigs() util.TimeoutConfigs {
+	return util.TimeoutConfigs{
+
+		Delete:        true,
+		DeleteDefault: 10,
+		DeleteMin:     5,
+	}
+}
+
+func (ResourcePoolTimeout) GetSchema() schema.SingleNestedAttribute {
+	return util.GetTimeoutSchema("resource pool", getResourcePoolTimeoutConfigs())
+}
+
+func (ResourcePoolTimeout) GetAttributes() map[string]schema.Attribute {
+	return ResourcePoolTimeout{}.GetSchema().Attributes
 }
 
 func (AzureHypervisorResourcePoolResourceModel) GetAttributes() map[string]schema.Attribute {
@@ -144,7 +167,6 @@ func (r AzureHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx cont
 	} else {
 		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
 	}
-
 	return r
 }
 

@@ -287,6 +287,7 @@ const AutoscalePluginOnpremOrchestrationApiVersion int32 = 124
 const AutoscalePluginProductMajorVersion = 7
 const AutoscalePluginProductMinorVersion = 44
 const DDCVersion125 = 125
+const DDCVersion126 = 126
 
 // CC Admin User
 const AdminUserMonitorAccessPolicySuffix = " - Access to 'Monitor' tab only"

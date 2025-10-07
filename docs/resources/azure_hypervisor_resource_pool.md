@@ -41,6 +41,7 @@ resource "citrix_azure_hypervisor_resource_pool" "example-azure-hypervisor-resou
 ### Optional
 
 - `metadata` (Attributes List) Metadata for the Hypervisor Resource Pool. (see [below for nested schema](#nestedatt--metadata))
+- `timeout` (Attributes) Timeout in minutes for the long-running jobs in resource pool resource's delete operation(s). (see [below for nested schema](#nestedatt--timeout))
 - `vm_tagging` (Boolean) Indicates whether VMs created by provisioning operations should be tagged. Default is `true`.
 
 ### Read-Only
@@ -54,6 +55,14 @@ Required:
 
 - `name` (String) Metadata name.
 - `value` (String) Metadata value.
+
+
+<a id="nestedatt--timeout"></a>
+### Nested Schema for `timeout`
+
+Optional:
+
+- `delete` (Number) Timeout in minutes for the long-running jobs in delete operation. Defaults to 10. Minimum value is 5.
 
 ## Import
 
