@@ -148,8 +148,10 @@ func (AzureMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 			"secondary_vm_sizes": schema.ListNestedAttribute{
 				Description: "Secondary VM sizes to be used when the primary machine size (service_offering) reaches full capacity. A maximum of 10 VM sizes can be specified. The priority of the VM sizes is determined by the order in which they are specified with the first VM size having the highest priority." +
 					"\n\n~> **Please Note** This field can only be used when `machine_profile` is specified.",
-				Optional:     true,
-				NestedObject: SecondaryVmSizeModel{}.GetSchema(),
+				Optional: true,
+				NestedObject: SecondaryVmSizeModel{}.GetSchema([]validator.String{
+					stringvalidator.LengthBetween(1, 255),
+				}),
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
 					listvalidator.SizeAtMost(10),
@@ -233,6 +235,14 @@ type AwsMachineConfigModel struct {
 }
 
 func (AwsMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
+	secondaryVmSizeSchema := SecondaryVmSizeModel{}.GetSchema([]validator.String{
+		stringvalidator.LengthBetween(1, 255),
+		stringvalidator.RegexMatches(
+			regexp.MustCompile(util.AwsEc2InstanceTypeRegex),
+			"must follow AWS EC2 instance type naming convention. Eg: t2.micro, m5.large, etc.",
+		),
+	})
+
 	return schema.SingleNestedAttribute{
 		Description: "Machine Configuration For AWS EC2 MCS catalog.",
 		Optional:    true,
@@ -310,7 +320,7 @@ func (AwsMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 				Description: "Secondary VM sizes to be used when the primary machine size (service_offering) reaches full capacity. A maximum of 10 VM sizes can be specified. The priority of the VM sizes is determined by the order in which they are specified with the first VM size having the highest priority." +
 					"\n\n~> **Please Note** The `secondary_vm_sizes` cannot contain the value of `service_offering`",
 				Optional:     true,
-				NestedObject: SecondaryVmSizeModel{}.GetSchema(),
+				NestedObject: secondaryVmSizeSchema,
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
 					listvalidator.SizeAtMost(10),
@@ -1959,19 +1969,13 @@ type SecondaryVmSizeModel struct {
 	UseSpotPricingIfAvailable types.Bool   `tfsdk:"use_spot_pricing_if_available"`
 }
 
-func (SecondaryVmSizeModel) GetSchema() schema.NestedAttributeObject {
+func (SecondaryVmSizeModel) GetSchema(vmSizeValidators []validator.String) schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
 			"vm_size": schema.StringAttribute{
 				Description: "The name of the VM SKU.",
 				Required:    true,
-				Validators: []validator.String{
-					stringvalidator.LengthBetween(1, 255),
-					stringvalidator.RegexMatches(
-						regexp.MustCompile(util.LowerCaseRegex),
-						"must be all in lowercase",
-					),
-				},
+				Validators:  vmSizeValidators,
 			},
 			"use_spot_pricing_if_available": schema.BoolAttribute{
 				Description: "The cloud provider supports two types of VMs: regular and spot. Regular VMs are standard VMs with pay-as-you-go prices. Spot is offered at a discounted rate, utilizing unused cloud provider capacity. Set this to `true` to use spot pricing if it's available for the specified VM SKU. ",
@@ -1984,7 +1988,9 @@ func (SecondaryVmSizeModel) GetSchema() schema.NestedAttributeObject {
 }
 
 func (SecondaryVmSizeModel) GetAttributes() map[string]schema.Attribute {
-	return SecondaryVmSizeModel{}.GetSchema().Attributes
+	return SecondaryVmSizeModel{}.GetSchema([]validator.String{
+		stringvalidator.LengthBetween(1, 255),
+	}).Attributes
 }
 
 type BackupVmConfigurationModel struct {

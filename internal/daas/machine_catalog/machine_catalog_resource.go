@@ -1136,7 +1136,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 
 			if !provSchemeModel.MachineDomainIdentity.IsNull() && provSchemeModel.IdentityType.ValueString() == string(citrixorchestration.IDENTITYTYPE_ACTIVE_DIRECTORY) {
 				machineDomainIdentityModel := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemeModel.MachineDomainIdentity)
-				if machineDomainIdentityModel.Domain.IsNull() {
+				if !machineDomainIdentityModel.Domain.IsUnknown() && machineDomainIdentityModel.Domain.IsNull() {
 					resp.Diagnostics.AddAttributeError(
 						path.Root("domain"),
 						"Missing Attribute Configuration",

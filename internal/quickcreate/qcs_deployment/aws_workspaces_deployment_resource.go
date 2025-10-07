@@ -622,7 +622,16 @@ func updateMachinesMaintenanceModeWithUsername(ctx context.Context, diagnostics 
 	usernameBrokerMachineIdMap := getUsernameMachineIdMap(deployment)
 	brokerMachineIdMaintenanceModeMap := map[string]bool{}
 	for _, workspace := range plannedWorkspaces {
-		brokerMachineIdMaintenanceModeMap[usernameBrokerMachineIdMap[workspace.Username.ValueString()]] = workspace.MaintenanceMode.ValueBool()
+		if brokerMachineId, exists := usernameBrokerMachineIdMap[workspace.Username.ValueString()]; exists {
+			if brokerMachineId == "" {
+				diagnostics.AddWarning(
+					"Error updating maintenance mode for machine",
+					fmt.Sprintf("Missing Broker Id for WorkSpace with user %s", workspace.Username.ValueString()),
+				)
+				continue
+			}
+			brokerMachineIdMaintenanceModeMap[brokerMachineId] = workspace.MaintenanceMode.ValueBool()
+		}
 	}
 
 	return updateMachinesMaintenceMode(ctx, diagnostics, client, deployment.GetDeploymentId(), brokerMachineIdMaintenanceModeMap)
