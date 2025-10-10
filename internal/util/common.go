@@ -853,6 +853,10 @@ func GetQcsAwsWorkspacesWithMachineIdKey(remote citrixquickcreate.AwsEdcDeployme
 	return remote.GetMachineId()
 }
 
+func GetQcsAwsWorkspacesWithUsernameKey(remote citrixquickcreate.AwsEdcDeploymentMachine) string {
+	return strings.ToLower(remote.GetUsername())
+}
+
 func GetOrchestrationAutoscalePluginKey(remote citrixorchestration.AutoscaleGroupPluginModel) string {
 	return strconv.Itoa(int(remote.GetUid()))
 }

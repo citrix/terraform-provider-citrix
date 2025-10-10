@@ -115,8 +115,14 @@ func (r *awsWorkspacesDeploymentResource) Create(ctx context.Context, req resour
 			"Error creating AWS WorkSpaces Deployment: "+plan.Name.ValueString(),
 			"Number of workspaces created does not match the number of workspaces in the plan",
 		)
+		plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, *deploymentResult)
+
+		// Set state to populated data
+		diags = resp.State.Set(ctx, plan)
+		resp.Diagnostics.Append(diags...)
 		return
 	}
+
 	if len(workspaces) > 0 {
 		if plan.UserDecoupledWorkspaces.ValueBool() {
 			deploymentWorkspaces := deploymentResult.GetWorkspaces()
@@ -129,6 +135,11 @@ func (r *awsWorkspacesDeploymentResource) Create(ctx context.Context, req resour
 			err = updateMachinesMaintenanceModeWithUsername(ctx, &resp.Diagnostics, r.client, deploymentResult, workspaces)
 		}
 		if err != nil {
+			plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, *deploymentResult)
+
+			// Set state to populated data
+			diags = resp.State.Set(ctx, plan)
+			resp.Diagnostics.Append(diags...)
 			return
 		}
 	}
