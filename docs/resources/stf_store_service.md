@@ -89,6 +89,7 @@ resource "citrix_stf_store_service" "example-stf-store-service" {
 - `friendly_name` (String) The friendly name of the Store
 - `launch_options` (Attributes) Launch options for the Store (see [below for nested schema](#nestedatt--launch_options))
 - `load_balance` (Boolean) Whether the Store is load balanced.
+- `optimal_launch_gateway` (Attributes) Optimal launch gateway selection for the Store (see [below for nested schema](#nestedatt--optimal_launch_gateway))
 - `pna` (Attributes) StoreFront PNA (Program Neighborhood Agent) state of the Store (see [below for nested schema](#nestedatt--pna))
 - `roaming_account` (Attributes) Roaming account settings for the Store (see [below for nested schema](#nestedatt--roaming_account))
 - `site_id` (String) The IIS site id of the StoreFront storeservice. Defaults to 1.
@@ -169,6 +170,22 @@ Optional:
 - `require_launch_reference` (Boolean) Specifies whether or not the use of launch references is enforced. Default is true.
 - `set_no_load_bias_flag` (Boolean) Specifies whether XenApp load bias should be used. Default is false.
 - `vda_logon_data_provider` (String) The Vda logon data provider to use during launch. Default is empty string.
+
+
+<a id="nestedatt--optimal_launch_gateway"></a>
+### Nested Schema for `optimal_launch_gateway`
+
+Required:
+
+- `gateway_name` (String) The name of the Gateway.
+
+Optional:
+
+- `enabled_on_direct_access` (Boolean) If true, enabled on direct access (internal network). Default is false.
+- `farm_name` (List of String) List of farm names considered for optimal gateway.
+- `zone_name` (List of String) List of zone names considered for optimal gateway.
+
+~> **Please Note** At least one of zone_name or farm_name must be specified.
 
 
 <a id="nestedatt--pna"></a>

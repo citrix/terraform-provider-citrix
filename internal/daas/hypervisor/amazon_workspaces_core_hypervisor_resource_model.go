@@ -47,7 +47,7 @@ type AmazonWorkSpacesCoreHypervisorResourceModel struct {
 
 func (AmazonWorkSpacesCoreHypervisorResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "CVAD --- Manages an Amazon WorkSpaces Core hypervisor. Note that this feature is in Tech Preview.",
+		Description: "CVAD --- Manages an Amazon WorkSpaces Core hypervisor.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the hypervisor.",

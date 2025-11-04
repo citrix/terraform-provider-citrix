@@ -28,7 +28,7 @@ type OktaIdentityProviderModel struct {
 func (OktaIdentityProviderModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		// This description is used by the documentation generator and the language server.
-		Description: "Citrix Cloud --- Manages a Citrix Cloud Okta Identity Provider instance. Note that this feature is in Tech Preview.",
+		Description: "Citrix Cloud --- Manages a Citrix Cloud Okta Identity Provider instance.",
 
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{

@@ -432,7 +432,7 @@ Optional:
 
 Read-Only:
 
-- `id` (String) ID of the resource location.
+- `id` (String) ID of the access policy.
 
 <a id="nestedatt--custom_access_policies--exclude_criteria_filters"></a>
 ### Nested Schema for `custom_access_policies.exclude_criteria_filters`
@@ -474,7 +474,7 @@ Optional:
 
 Read-Only:
 
-- `id` (String) ID of the resource location.
+- `id` (String) ID of the access policy.
 
 <a id="nestedatt--default_access_policies--exclude_criteria_filters"></a>
 ### Nested Schema for `default_access_policies.exclude_criteria_filters`

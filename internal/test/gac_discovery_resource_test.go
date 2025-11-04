@@ -11,6 +11,10 @@ import (
 )
 
 func TestGacDiscoveryPreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if domain := os.Getenv("TEST_GAC_DISCOVERY_DOMAIN"); domain == "" {
 		t.Fatal("TEST_GAC_DISCOVERY_DOMAIN must be set for acceptance tests")
 	}

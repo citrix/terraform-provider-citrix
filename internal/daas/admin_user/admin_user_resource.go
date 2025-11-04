@@ -276,11 +276,10 @@ func getAdminIfExists(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 		}
 	}
 
-	errMsg := fmt.Sprintf("Could not find Admin User: %s\\%s", adminUserDomainName, adminUserName)
-	err := fmt.Errorf(errMsg)
+	err := fmt.Errorf("Could not find Admin User: %s\\%s", adminUserDomainName, adminUserName)
 	diagnostics.AddError(
 		"Error fetching Admin User: "+adminUserDomainName+"\\"+adminUserName,
-		errMsg,
+		err.Error(),
 	)
 
 	return nil, err

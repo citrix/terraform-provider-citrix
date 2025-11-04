@@ -10,6 +10,10 @@ import (
 )
 
 func TestAwsWorkspacesAccountDataSourcePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 
 	if v := os.Getenv("TEST_AWS_WORKSPACES_ACCOUNT_DATA_SOURCE_GUID"); v == "" {
 		t.Fatal("TEST_AWS_WORKSPACES_ACCOUNT_GUID must be set for acceptance tests")

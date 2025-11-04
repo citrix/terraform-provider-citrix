@@ -13,6 +13,10 @@ import (
 // TestZoneDataSourcePreCheck validates the necessary env variable exist
 // in the testing environment
 func TestZoneDataSourcePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_ZONE_DATASOURCE_ID"); v == "" {
 		t.Fatal("TEST_ZONE_DATASOURCE_ID must be set for acceptance tests")
 	}

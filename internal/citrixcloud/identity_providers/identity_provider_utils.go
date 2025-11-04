@@ -61,7 +61,12 @@ func readIdentityProvider(ctx context.Context, client *citrixdaasclient.CitrixDa
 	if err != nil {
 		return nil, err
 	}
-	return getIdpWithInstanceId(&resp.Diagnostics, getIdpsResult, idpType, idpInstanceId)
+	getIdpResult, err := readIdpWithInstanceId(ctx, resp, getIdpsResult, idpType, idpInstanceId)
+	if err != nil {
+		return nil, err
+	}
+
+	return getIdpResult, nil
 }
 
 func getIdentityProvidersWithType(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, idpType string) (*citrixcws.IdpStatusesModel, error) {
@@ -131,6 +136,26 @@ func getIdpWithInstanceId(diagnostics *diag.Diagnostics, idpsResult *citrixcws.I
 		fmt.Sprintf("Error fetching %s Identity Provider with id: %s", idpType, idpInstanceId),
 		"Error message: "+err.Error(),
 	)
+	return nil, err
+}
+
+func readIdpWithInstanceId(ctx context.Context, resp *resource.ReadResponse, idpsResult *citrixcws.IdpStatusesModel, idpType string, idpInstanceId string) (*citrixcws.IdpStatusModel, error) {
+	err := fmt.Errorf("no %s Identity Provider found with id: %s", idpType, idpInstanceId)
+	for _, idp := range idpsResult.GetItems() {
+		if strings.EqualFold(idp.GetIdpInstanceId(), idpInstanceId) {
+			return &idp, nil
+		}
+	}
+
+	resourceType := fmt.Sprintf("%s Identity Provider", idpType)
+	resourceId := idpInstanceId
+
+	resp.Diagnostics.AddWarning(
+		fmt.Sprintf("%s not found", resourceType),
+		fmt.Sprintf("%s %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", resourceType, resourceId),
+	)
+
+	resp.State.RemoveResource(ctx)
 	return nil, err
 }
 

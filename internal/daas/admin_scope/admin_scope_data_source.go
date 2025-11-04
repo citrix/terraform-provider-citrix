@@ -4,11 +4,16 @@ package admin_scope
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"strings"
 
+	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 )
 
 var (
@@ -70,6 +75,11 @@ func (d *AdminScopeDataSource) Read(ctx context.Context, req datasource.ReadRequ
 	getAdminScopeRequest := d.client.ApiClient.AdminAPIsDAAS.AdminGetAdminScope(ctx, adminScopeNameOrId)
 	adminScope, httpResp, err := citrixdaasclient.AddRequestData(getAdminScopeRequest, d.client).Execute()
 
+	if err != nil && httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
+		// Check for Tenant ID
+		adminScope, httpResp, err = getTenantScopeByTenantNameOrId(ctx, d.client, &resp.Diagnostics, adminScopeNameOrId)
+	}
+
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error listing AdminScope: "+adminScopeNameOrId,
@@ -82,4 +92,17 @@ func (d *AdminScopeDataSource) Read(ctx context.Context, req datasource.ReadRequ
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+func getTenantScopeByTenantNameOrId(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, tenantNameOrId string) (*citrixorchestration.ScopeResponseModel, *http.Response, error) {
+	adminScopes, httpResp, err := util.FetchScopes(ctx, client, diagnostics)
+	if err != nil {
+		return nil, httpResp, err
+	}
+	for _, scope := range adminScopes {
+		if strings.EqualFold(scope.GetTenantId(), tenantNameOrId) || strings.EqualFold(scope.GetTenantName(), tenantNameOrId) {
+			return &scope, httpResp, nil
+		}
+	}
+	return nil, httpResp, fmt.Errorf("no scope matched for scope name: %s", tenantNameOrId)
 }

@@ -137,12 +137,20 @@ resource "citrix_policy_set" "testPolicySet" {
 )
 
 func TestPolicySetResourcePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_POLICY_SET_NAME"); v == "" {
 		t.Fatal("TEST_POLICY_SET_NAME must be set for acceptance tests")
 	}
 }
 
 func TestPolicySetResourceWithDeliveryGroupIdPreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_POLICY_SET_NAME"); v == "" {
 		t.Fatal("TEST_POLICY_SET_NAME must be set for acceptance tests")
 	}

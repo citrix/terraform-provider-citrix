@@ -417,8 +417,7 @@ func getAuthTokenForOnPremSiteSettingsRequest(client *citrixdaasclient.CitrixDaa
 	}
 
 	if cwsAuthToken == "" {
-		err := fmt.Errorf("TransactionId: " + citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp) +
-			"\nError message: Unable to fetch Auth Token")
+		err := fmt.Errorf("TransactionId: %s\nError message: Unable to fetch Auth Token", citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp))
 		diagnostics.AddError(
 			fmt.Sprintf("Error %s Site Settings for site %s", operation, siteId),
 			err.Error(),

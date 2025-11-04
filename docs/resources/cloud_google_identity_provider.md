@@ -3,12 +3,12 @@
 page_title: "citrix_cloud_google_identity_provider Resource - citrix"
 subcategory: "Citrix Cloud"
 description: |-
-  Manages a Citrix Cloud Google Cloud Identity Provider instance. Note that this feature is in Tech Preview.
+  Manages a Citrix Cloud Google Cloud Identity Provider instance.
 ---
 
 # citrix_cloud_google_identity_provider (Resource)
 
-Manages a Citrix Cloud Google Cloud Identity Provider instance. Note that this feature is in Tech Preview.
+Manages a Citrix Cloud Google Cloud Identity Provider instance.
 
 ## Example Usage
 

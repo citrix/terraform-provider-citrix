@@ -42,11 +42,12 @@ type CitrixManagedCatalogResourceModel struct {
 	MaxUsersPerVm       types.Int64  `tfsdk:"max_users_per_vm"`
 	MachineNamingScheme types.Object `tfsdk:"machine_naming_scheme"` // MachineNamingSchemeModel
 	PowerSchedule       types.Object `tfsdk:"power_schedule"`        // PowerScheduleModel
+	OnPremConnectivity  types.Object `tfsdk:"on_prem_connectivity"`  // OnPremConnectivityModel
 }
 
 func (CitrixManagedCatalogResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "DaaS Quick Deploy - Citrix Managed Azure --- Manages a Citrix Managed Catalog.",
+		Description: "DaaS Quick Deploy - Citrix Managed Azure --- Manages a Citrix Managed Catalog. **Note that this feature is in Tech Preview.**",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the managed catalog.",
@@ -140,6 +141,7 @@ func (CitrixManagedCatalogResourceModel) GetSchema() schema.Schema {
 			},
 			"machine_naming_scheme": MachineNamingSchemeModel{}.GetSchema(),
 			"power_schedule":        PowerScheduleModel{}.GetSchema(),
+			"on_prem_connectivity":  OnPremConnectivityModel{}.GetSchema(),
 		},
 	}
 }
@@ -369,6 +371,35 @@ func (PowerScheduleModel) GetAttributes() map[string]schema.Attribute {
 	return PowerScheduleModel{}.GetSchema().Attributes
 }
 
+type OnPremConnectivityModel struct {
+	OnPremNetworkConnectionId types.String `tfsdk:"onprem_network_connection_id"`
+	DomainIdentity            types.Object `tfsdk:"domain_identity"` // MachineDomainIdentityModel
+}
+
+func (OnPremConnectivityModel) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "On-Premises connectivity configuration for creating a domain-joined catalog.",
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			"onprem_network_connection_id": schema.StringAttribute{
+				Description: "The GUID identifier of the Network Connection for the on-premises network.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be a valid GUID"),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"domain_identity": util.MachineDomainIdentityModel{}.GetCmaSchema(),
+		},
+	}
+}
+
+func (OnPremConnectivityModel) GetAttributes() map[string]schema.Attribute {
+	return OnPremConnectivityModel{}.GetSchema().Attributes
+}
+
 func (r CitrixManagedCatalogResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, catalog *citrixquickdeploy.CatalogOverview, capacity *citrixquickdeploy.CatalogCapacitySettingsModel, region *catalogservice.DeploymentRegionModel) CitrixManagedCatalogResourceModel {
 	r.Id = types.StringValue(catalog.GetId())
 	r.Name = types.StringValue(catalog.GetName())
@@ -400,6 +431,11 @@ func (r CitrixManagedCatalogResourceModel) RefreshPropertyValues(ctx context.Con
 	r.NumberOfMachines = types.Int64Value(int64(capacity.ScaleSettings.GetMaxInstances()))
 
 	r = r.updatePlanWithPowerSchedule(ctx, diagnostics, capacity)
+
+	// Refresh on-prem connectivity if domain joined
+	if catalog.GetVnetPeeringId() != "" {
+		r = r.updatePlanWithOnPremConnectivity(ctx, diagnostics, catalog)
+	}
 
 	return r
 }
@@ -438,6 +474,15 @@ func (r CitrixManagedCatalogResourceModel) shouldSetRegion(region citrixquickdep
 	// Always store name in state for the first time, but allow either if already specified in state or plan
 	return r.Region.ValueString() == "" ||
 		(!strings.EqualFold(r.Region.ValueString(), region.GetName()) && !strings.EqualFold(r.Region.ValueString(), region.GetId()))
+}
+
+func (r CitrixManagedCatalogResourceModel) updatePlanWithOnPremConnectivity(ctx context.Context, diagnostics *diag.Diagnostics, catalog *citrixquickdeploy.CatalogOverview) CitrixManagedCatalogResourceModel {
+	onPremConnectivity := util.ObjectValueToTypedObject[OnPremConnectivityModel](ctx, diagnostics, r.OnPremConnectivity)
+
+	onPremConnectivity.OnPremNetworkConnectionId = types.StringValue(catalog.GetVnetPeeringId())
+
+	r.OnPremConnectivity = util.TypedObjectToObjectValue(ctx, diagnostics, onPremConnectivity)
+	return r
 }
 
 func getTimeSchemeDayValue(v string) citrixorchestration.TimeSchemeDays {

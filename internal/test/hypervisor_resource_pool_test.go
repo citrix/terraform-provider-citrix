@@ -44,6 +44,10 @@ func init() {
 }
 
 func TestHypervisorResourcePoolPreCheck_Azure(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_HYPERV_RP_NAME"); v == "" {
 		t.Fatal("TEST_HYPERV_RP_NAME must be set for acceptance tests")
 	}
@@ -117,6 +121,10 @@ func TestHypervisorResourcePoolAzureRM(t *testing.T) {
 }
 
 func TestHypervisorResourcePoolPreCheck_GCP(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_HYPERV_RP_NAME_GCP"); v == "" {
 		t.Fatal("TEST_HYPERV_RP_NAME_GCP must be set for acceptance tests")
 	}
@@ -189,6 +197,10 @@ func TestHypervisorResourcePoolGCP(t *testing.T) {
 }
 
 func TestHypervisorResourcePoolPreCheck_Xenserver(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_HYPERV_RP_NAME_XENSERVER"); v == "" {
 		t.Fatal("TEST_HYPERV_RP_NAME_XENSERVER must be set for acceptance tests")
 	}
@@ -263,6 +275,10 @@ func TestHypervisorResourcePoolXenserver(t *testing.T) {
 }
 
 func TestHypervisorResourcePoolPreCheck_Vsphere(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_HYPERV_RP_NAME_VSPHERE"); v == "" {
 		t.Fatal("TEST_HYPERV_RP_NAME_VSPHERE must be set for acceptance tests")
 	}
@@ -344,6 +360,10 @@ func TestHypervisorResourcePoolVsphere(t *testing.T) {
 }
 
 func TestHypervisorResourcePoolPreCheck_Nutanix(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_HYPERV_RP_NAME_NUTANIX"); v == "" {
 		t.Fatal("TEST_HYPERV_RP_NAME_NUTANIX must be set for acceptance tests")
 	}
@@ -402,6 +422,10 @@ func TestHypervisorResourcePoolNutanix(t *testing.T) {
 }
 
 func TestHypervisorResourcePoolPreCheck_SCVMM(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_HYPERV_RP_NAME_SCVMM"); v == "" {
 		t.Fatal("TEST_HYPERV_RP_NAME_SCVMM must be set for acceptance tests")
 	}
@@ -479,6 +503,10 @@ func TestHypervisorResourcePoolSCVMM(t *testing.T) {
 }
 
 func TestHypervisorResourcePoolPreCheck_Aws_Ec2(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_HYPERV_RP_NAME_AWS_EC2"); v == "" {
 		t.Fatal("TEST_HYPERV_RP_NAME_AWS_EC2 must be set for acceptance tests")
 	}

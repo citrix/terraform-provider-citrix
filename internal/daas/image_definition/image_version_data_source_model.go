@@ -171,7 +171,7 @@ func (VsphereImageSpecsDataSourceModel) GetDataSourceAttributes() map[string]sch
 
 func (ImageVersionModel) GetDataSourceSchema() schema.Schema {
 	return schema.Schema{
-		Description: "CVAD --- Data source an image version. **Note that this feature is in Tech Preview.**",
+		Description: "CVAD --- Data source an image version.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The id of the image version.",

@@ -323,7 +323,7 @@ func (r *serviceAccountResource) ModifyPlan(ctx context.Context, req resource.Mo
 	}
 
 	if !plan.Scopes.IsUnknown() && !plan.Scopes.IsNull() {
-		scopesResponse, httpResp, err := util.FetchScopes(ctx, r.client)
+		scopesResponses, httpResp, err := util.FetchScopes(ctx, r.client, &resp.Diagnostics)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching scopes",
@@ -334,7 +334,7 @@ func (r *serviceAccountResource) ModifyPlan(ctx context.Context, req resource.Mo
 		}
 
 		scopeIds := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes)
-		for _, scope := range scopesResponse.GetItems() {
+		for _, scope := range scopesResponses {
 			if slices.ContainsFunc(scopeIds, func(scopeId string) bool {
 				return strings.EqualFold(scope.GetId(), scopeId)
 			}) {

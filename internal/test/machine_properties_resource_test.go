@@ -12,6 +12,10 @@ import (
 
 // TestMachinePropertiesResourcePreCheck validates the necessary env variable exist in the testing environment
 func TestMachinePropertiesResourcePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_MACHINE_PROPERTIES_RESOURCE_NAME"); v == "" {
 		t.Fatal("TEST_MACHINE_PROPERTIES_RESOURCE_NAME must be set for acceptance tests")
 	}

@@ -10,6 +10,10 @@ import (
 )
 
 func TestSiteDataSourcePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_SITE_DATA_SOURCE_EXPECTED_SITE_ID"); v == "" {
 		t.Fatal("TEST_SITE_DATA_SOURCE_EXPECTED_SITE_ID must be set for acceptance tests")
 	}

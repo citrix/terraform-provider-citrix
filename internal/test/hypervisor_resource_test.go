@@ -64,6 +64,10 @@ func init() {
 // testHypervisorPreCheck validates the necessary env variable exist
 // in the testing environment
 func TestHypervisorPreCheck_Azure(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_ZONE_INPUT_AZURE"); v == "" {
 		t.Fatal("TEST_ZONE_INPUT_AZURE must be set for acceptance tests")
 	}
@@ -130,6 +134,10 @@ func TestHypervisorResourceAzureRM(t *testing.T) {
 }
 
 func TestHypervisorPreCheck_GCP(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_ZONE_INPUT_GCP"); v == "" {
 		t.Fatal("TEST_ZONE_INPUT_GCP must be set for acceptance tests")
 	}
@@ -187,6 +195,10 @@ func TestHypervisorResourceGCP(t *testing.T) {
 }
 
 func TestHypervisorPreCheck_Vsphere(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_ZONE_INPUT_VSPHERE"); v == "" {
 		t.Fatal("TEST_ZONE_INPUT_VSPHERE must be set for acceptance tests")
 	}
@@ -254,6 +266,10 @@ func TestHypervisorResourceVsphere(t *testing.T) {
 }
 
 func TestHypervisorPreCheck_Xenserver(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_ZONE_INPUT_XENSERVER"); v == "" {
 		t.Fatal("TEST_ZONE_INPUT_XENSERVER must be set for acceptance tests")
 	}
@@ -320,6 +336,10 @@ func TestHypervisorResourceXenserver(t *testing.T) {
 }
 
 func TestHypervisorPreCheck_Nutanix(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_ZONE_INPUT_NUTANIX"); v == "" {
 		t.Fatal("TEST_ZONE_INPUT_NUTANIX must be set for acceptance tests")
 	}
@@ -381,6 +401,10 @@ func TestHypervisorResourceNutanix(t *testing.T) {
 }
 
 func TestHypervisorPreCheck_SCVMM(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_ZONE_INPUT_SCVMM"); v == "" {
 		t.Fatal("TEST_ZONE_INPUT_SCVMM must be set for acceptance tests")
 	}
@@ -448,6 +472,10 @@ func TestHypervisorResourceSCVMM(t *testing.T) {
 }
 
 func TestHypervisorPreCheck_AWS_EC2(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_ZONE_INPUT_AWS_EC2"); v == "" {
 		t.Fatal("TEST_ZONE_INPUT_AWS_EC2 must be set for acceptance tests")
 	}

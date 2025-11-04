@@ -15,6 +15,10 @@ import (
 // TestHypervisorResourcePoolDataSourcePreCheck validates the necessary env variable exist
 // in the testing environment
 func TestHypervisorResourcePoolDataSourcePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_HYPERVISOR_RP_DATASOURCE_ID"); v == "" {
 		t.Fatal("TEST_HYPERVISOR_RP_DATASOURCE_ID must be set for acceptance tests")
 	}

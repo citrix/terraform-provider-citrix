@@ -5,6 +5,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/citrix/citrix-daas-rest-go/citrixquickdeploy"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -42,6 +43,8 @@ func (d *CitrixManagedAzureImageDataSource) Configure(ctx context.Context, req d
 }
 
 func (d *CitrixManagedAzureImageDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
 	var data CitrixManagedAzureImageDataSourceModel
 
 	// Read Terraform configuration data into the model
@@ -52,15 +55,15 @@ func (d *CitrixManagedAzureImageDataSource) Read(ctx context.Context, req dataso
 
 	// Get image Id from Name
 	getTemplateImagesRequest := d.client.QuickDeployClient.MasterImageCMD.GetImages(ctx, d.client.ClientConfig.CustomerId, d.client.ClientConfig.SiteId)
-	images, _, err := citrixdaasclient.AddRequestData(getTemplateImagesRequest, d.client).Execute()
+	images, _, err := citrixdaasclient.ExecuteWithRetry[*citrixquickdeploy.CustomerTemplateImageOverviewsModel](getTemplateImagesRequest, d.client)
 	if err != nil {
 		resp.Diagnostics.AddError("Error getting Citrix Managed Azure Template Images", err.Error())
 		return
 	}
 	id := ""
 	for _, image := range images.GetItems() {
-		if strings.EqualFold(image.Name, data.Name.ValueString()) {
-			id = image.Id
+		if strings.EqualFold(image.GetName(), data.Name.ValueString()) {
+			id = image.GetId()
 			break
 		}
 	}

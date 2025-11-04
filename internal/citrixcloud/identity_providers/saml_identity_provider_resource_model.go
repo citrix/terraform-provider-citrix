@@ -141,7 +141,7 @@ type SamlIdentityProviderModel struct {
 
 func (SamlIdentityProviderModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Citrix Cloud --- Manages a SAML 2.0 Identity Provider instance. Note that this feature is in Tech Preview.",
+		Description: "Citrix Cloud --- Manages a SAML 2.0 Identity Provider instance.",
 
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{

@@ -11,6 +11,10 @@ import (
 )
 
 func TestResourceLocationPreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if name := os.Getenv("TEST_RESOURCE_LOCATION_NAME"); name == "" {
 		t.Fatal("TEST_RESOURCE_LOCATION_NAME must be set for acceptance tests")
 	}

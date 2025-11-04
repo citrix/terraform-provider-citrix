@@ -96,7 +96,7 @@ func setProvSchemePropertiesForCreateCatalog(ctx context.Context, client *citrix
 			machineAccountCreationRules.SetNextValue(machineAccountCreationRulesModel.StartsWith.ValueString())
 		}
 		if !provisioningSchemePlan.MachineDomainIdentity.IsNull() {
-			machineDomainIdentityModel := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, diag, provisioningSchemePlan.MachineDomainIdentity)
+			machineDomainIdentityModel := util.ObjectValueToTypedObject[util.MachineDomainIdentityModel](ctx, diag, provisioningSchemePlan.MachineDomainIdentity)
 			machineAccountCreationRules.SetDomain(machineDomainIdentityModel.Domain.ValueString())
 			machineAccountCreationRules.SetOU(machineDomainIdentityModel.Ou.ValueString())
 		}
@@ -613,7 +613,7 @@ func setProvSchemePropertiesForCreateCatalog(ctx context.Context, client *citrix
 	provisioningScheme.SetMetadata(metadata)
 
 	if !provisioningSchemePlan.MachineDomainIdentity.IsNull() {
-		machineDomainIdentityModel := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, diag, provisioningSchemePlan.MachineDomainIdentity)
+		machineDomainIdentityModel := util.ObjectValueToTypedObject[util.MachineDomainIdentityModel](ctx, diag, provisioningSchemePlan.MachineDomainIdentity)
 		if !machineDomainIdentityModel.ServiceAccountId.IsNull() {
 			provisioningScheme.SetServiceAccountUid([]string{machineDomainIdentityModel.ServiceAccountId.ValueString()})
 		}
@@ -832,7 +832,7 @@ func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan Provisioning
 	}
 
 	if !provisioningSchemePlan.MachineDomainIdentity.IsNull() {
-		machineDomainIdentityModel := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, diagnostics, provisioningSchemePlan.MachineDomainIdentity)
+		machineDomainIdentityModel := util.ObjectValueToTypedObject[util.MachineDomainIdentityModel](ctx, diagnostics, provisioningSchemePlan.MachineDomainIdentity)
 		if !machineDomainIdentityModel.ServiceAccountId.IsNull() {
 			body.SetServiceAccountUid([]string{machineDomainIdentityModel.ServiceAccountId.ValueString()})
 		} else {
@@ -845,7 +845,7 @@ func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan Provisioning
 	return body, nil
 }
 
-func generateAdminCredentialHeader(machineDomainIdentityModel MachineDomainIdentityModel) string {
+func generateAdminCredentialHeader(machineDomainIdentityModel util.MachineDomainIdentityModel) string {
 	domain := machineDomainIdentityModel.Domain.ValueString()
 	if !machineDomainIdentityModel.ServiceAccountDomain.IsNull() {
 		domain = machineDomainIdentityModel.ServiceAccountDomain.ValueString()
@@ -959,7 +959,7 @@ func addMachinesToMcsPvsCatalog(ctx context.Context, client *citrixdaasclient.Ci
 		}
 
 		if !provisioningSchemePlan.MachineDomainIdentity.IsNull() {
-			machineDomainIdentityModel := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provisioningSchemePlan.MachineDomainIdentity)
+			machineDomainIdentityModel := util.ObjectValueToTypedObject[util.MachineDomainIdentityModel](ctx, &resp.Diagnostics, provisioningSchemePlan.MachineDomainIdentity)
 			updateMachineAccountCreationRule.SetDomain(machineDomainIdentityModel.Domain.ValueString())
 			updateMachineAccountCreationRule.SetOU(machineDomainIdentityModel.Ou.ValueString())
 		}
@@ -1041,12 +1041,11 @@ func addMachinesToMcsPvsCatalog(ctx context.Context, client *citrixdaasclient.Ci
 	}
 
 	if successfulJobs < int(addMachinesCount) {
-		errMsg := fmt.Sprintf("An error occurred while adding machine(s) to the Machine Catalog. %d of %d machines were added to the Machine Catalog.", successfulJobs, addMachinesCount)
-		err = fmt.Errorf(errMsg)
+		err = fmt.Errorf("An error occurred while adding machine(s) to the Machine Catalog. %d of %d machines were added to the Machine Catalog.", successfulJobs, addMachinesCount)
 		resp.Diagnostics.AddError(
 			"Error updating Machine Catalog "+catalogName,
 			"TransactionId: "+txId+
-				"\n"+errMsg,
+				"\n"+err.Error(),
 		)
 
 		return err
@@ -1869,7 +1868,7 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Con
 	}
 
 	// Set service account uid
-	machineDomainIdentityModel := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, diagnostics, provSchemeModel.MachineDomainIdentity)
+	machineDomainIdentityModel := util.ObjectValueToTypedObject[util.MachineDomainIdentityModel](ctx, diagnostics, provSchemeModel.MachineDomainIdentity)
 
 	serviceAccountIds := provScheme.GetServiceAccountUid()
 	if len(serviceAccountIds) > 0 {
@@ -1878,7 +1877,7 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Con
 	} else if provScheme.GetIdentityType() == citrixorchestration.IDENTITYTYPE_HYBRID_AZURE_AD || provScheme.GetIdentityType() == citrixorchestration.IDENTITYTYPE_ACTIVE_DIRECTORY {
 		machineDomainIdentityModel.ServiceAccountId = types.StringNull()
 	} else {
-		if attributes, err := util.ResourceAttributeMapFromObject(MachineDomainIdentityModel{}); err == nil {
+		if attributes, err := util.ResourceAttributeMapFromObject(util.MachineDomainIdentityModel{}); err == nil {
 			provSchemeModel.MachineDomainIdentity = types.ObjectNull(attributes)
 		} else {
 			diagnostics.AddWarning("Error when creating null MachineDomainIdentityModel", err.Error())
@@ -2226,12 +2225,11 @@ func setMachinesToMaintenanceMode(ctx context.Context, diagnostics *diag.Diagnos
 		}
 
 		if successfulJobs < len(batchRequestItems) {
-			errMsg := fmt.Sprintf("An error occurred while putting machine(s) into maintenance mode. %d of %d machines were put in the maintenance mode.", successfulJobs, len(batchRequestItems))
-			err = fmt.Errorf(errMsg)
+			err = fmt.Errorf("An error occurred while putting machine(s) into maintenance mode. %d of %d machines were put in the maintenance mode.", successfulJobs, len(batchRequestItems))
 			diagnostics.AddError(
 				"Error setting Machine(s) to maintenance mode for Machine Catalog "+catalogId,
 				"TransactionId: "+txId+
-					"\n"+errMsg,
+					"\n"+err.Error(),
 			)
 
 			return err

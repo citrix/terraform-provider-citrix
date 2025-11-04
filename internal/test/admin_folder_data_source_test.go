@@ -13,6 +13,10 @@ import (
 
 // TestAdminFolderDataSourcePreCheck validates the necessary env variable exist in the testing environment
 func TestAdminFolderDataSourcePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_ADMIN_FOLDER_DATA_SOURCE_ID"); v == "" {
 		t.Fatal("TEST_ADMIN_FOLDER_DATA_SOURCE_ID must be set for acceptance tests")
 	}

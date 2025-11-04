@@ -29,14 +29,14 @@ func getMachineADObjectBySid(ctx context.Context, client *citrixdaasclient.Citri
 	machineADObjectList := machineADObjectQueryResponse.GetItems()
 
 	if err != nil {
-		err = fmt.Errorf("TransactionId: " + citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp) + "\nError message: " + util.ReadClientError(err))
+		err = fmt.Errorf("TransactionId: %s\nError message: %s", citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp), util.ReadClientError(err))
 		return citrixwemservice.MachineModel{}, err
 	}
 
 	if len(machineADObjectList) != 0 {
 		return machineADObjectList[0], nil
 	}
-	return citrixwemservice.MachineModel{}, fmt.Errorf("WEM Directory object with SID " + machineCatalogId + " not found")
+	return citrixwemservice.MachineModel{}, fmt.Errorf("WEM Directory object with SID %s not found", machineCatalogId)
 }
 
 func getMachineADObjectById(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, machineADObjectId string) (*citrixwemservice.MachineModel, error) {
@@ -48,12 +48,12 @@ func getMachineADObjectById(ctx context.Context, client *citrixdaasclient.Citrix
 	machineADObjectQueryResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixwemservice.MachineModel](machineADObjectQueryRequest, client)
 
 	if err != nil {
-		err = fmt.Errorf("TransactionId: " + citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp) + "\nError message: " + util.ReadClientError(err))
+		err = fmt.Errorf("TransactionId: %s\nError message: %s", citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp), util.ReadClientError(err))
 		return machineADObjectQueryResponse, err
 	}
 
 	if machineADObjectQueryResponse == nil {
-		return machineADObjectQueryResponse, fmt.Errorf("wem directory object with ID " + machineADObjectId + " not found")
+		return machineADObjectQueryResponse, fmt.Errorf("wem directory object with ID %s not found", machineADObjectId)
 	}
 	return machineADObjectQueryResponse, nil
 }

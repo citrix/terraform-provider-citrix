@@ -134,6 +134,34 @@ func (r *citrixManagedCatalogResource) Create(ctx context.Context, req resource.
 	templateImageModel.SetCitrixPrepared(templateImage.CitrixPrepared)
 	managedCatalogConfigBody.SetAddCatalogImage(templateImageModel)
 
+	// Set on-prem connectivity if specified
+	if !plan.OnPremConnectivity.IsNull() {
+		onPremConnectivity := util.ObjectValueToTypedObject[OnPremConnectivityModel](ctx, &resp.Diagnostics, plan.OnPremConnectivity)
+
+		var connectivityModel citrixquickdeploy.CatalogOnPremConnectivityModel
+		connectivityModel.SetVnetPeeringId(onPremConnectivity.OnPremNetworkConnectionId.ValueString())
+		managedCatalogConfigBody.SetAddCatalogOnPremConnectivity(connectivityModel)
+
+		if !onPremConnectivity.DomainIdentity.IsNull() {
+			domainIdentity := util.ObjectValueToTypedObject[util.MachineDomainIdentityModel](ctx, &resp.Diagnostics, onPremConnectivity.DomainIdentity)
+			var domainConfiguration citrixquickdeploy.CatalogDomainModel
+			domainConfiguration.SetDomainName(domainIdentity.Domain.ValueString())
+			if domainIdentity.Ou.ValueString() != "" {
+				domainConfiguration.SetDomainOu(domainIdentity.Ou.ValueString())
+			}
+			domainConfiguration.SetServiceAccountName(domainIdentity.ServiceAccount.ValueString())
+			managedCatalogConfigBody.SetAddCatalogDomain(domainConfiguration)
+
+			var domainDeploymentSecret citrixquickdeploy.DeploySecretsModel
+			domainDeploymentSecret.SetServiceAccountPassword(domainIdentity.ServiceAccountPassword.ValueString())
+			managedCatalogConfigBody.SetDeploySecrets(domainDeploymentSecret)
+
+			// Set domain joined to true
+			addCatalog.SetIsDomainJoined(true)
+			managedCatalogConfigBody.SetAddCatalog(addCatalog)
+		}
+	}
+
 	createManagedCatalogRequest := r.client.QuickDeployClient.CatalogCMD.ConfigureAndDeployCitrixManagedCatalogApi(ctx, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId)
 	createManagedCatalogRequest = createManagedCatalogRequest.Body(managedCatalogConfigBody)
 
@@ -151,7 +179,7 @@ func (r *citrixManagedCatalogResource) Create(ctx context.Context, req resource.
 	// Get Catalog ID from name
 	catalogId := ""
 	getManagedCatalogsRequest := r.client.QuickDeployClient.CatalogCMD.GetCustomerManagedCatalogs(ctx, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId)
-	catalogs, httpResp, err := citrixdaasclient.AddRequestData(getManagedCatalogsRequest, r.client).Execute()
+	catalogs, httpResp, _ := citrixdaasclient.ExecuteWithRetry[*citrixquickdeploy.CustomerManagedCatalogOverviewsModel](getManagedCatalogsRequest, r.client)
 	for _, catalog := range catalogs.GetItems() {
 		if catalog.GetName() == plan.Name.ValueString() {
 			catalogId = catalog.GetId()
@@ -263,7 +291,7 @@ func (r *citrixManagedCatalogResource) Update(ctx context.Context, req resource.
 
 	catalogId := plan.Id.ValueString()
 	// Try getting the existing Citrix Managed Catalog
-	catalog, httpResp, err := getManagedCatalogWithId(ctx, r.client, &resp.Diagnostics, catalogId, true)
+	catalog, _, err := getManagedCatalogWithId(ctx, r.client, &resp.Diagnostics, catalogId, true)
 	if err != nil {
 		return
 	}
@@ -284,7 +312,7 @@ func (r *citrixManagedCatalogResource) Update(ctx context.Context, req resource.
 		updateCatalogImageRequest = updateCatalogImageRequest.Body(templateImageUpdateModel)
 
 		// Update Citrix Managed Azure Template Image
-		_, httpResp, err = citrixdaasclient.AddRequestData(updateCatalogImageRequest, r.client).Execute()
+		_, httpResp, err := citrixdaasclient.AddRequestData(updateCatalogImageRequest, r.client).Execute()
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating Citrix Managed Catalog Image: "+plan.Name.ValueString(),
@@ -334,7 +362,7 @@ func (r *citrixManagedCatalogResource) Update(ctx context.Context, req resource.
 	updateCatalogCapacityRequest = updateCatalogCapacityRequest.Body(catalogCapacity)
 
 	// Update Citrix Managed Catalog Capacity Settings
-	httpResp, err = citrixdaasclient.AddRequestData(updateCatalogCapacityRequest, r.client).Execute()
+	httpResp, err := citrixdaasclient.AddRequestData(updateCatalogCapacityRequest, r.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating Citrix Managed Catalog Capacity Settings: "+plan.Name.ValueString(),
@@ -361,7 +389,7 @@ func (r *citrixManagedCatalogResource) Update(ctx context.Context, req resource.
 	}
 
 	// Try getting the new Citrix Managed Catalog
-	catalog, httpResp, err = getManagedCatalogWithId(ctx, r.client, &resp.Diagnostics, catalogId, true)
+	catalog, _, err = getManagedCatalogWithId(ctx, r.client, &resp.Diagnostics, catalogId, true)
 	if err != nil {
 		return
 	}

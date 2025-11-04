@@ -3,12 +3,12 @@
 page_title: "citrix_amazon_workspaces_core_hypervisor Resource - citrix"
 subcategory: "CVAD"
 description: |-
-  Manages an Amazon WorkSpaces Core hypervisor. Note that this feature is in Tech Preview.
+  Manages an Amazon WorkSpaces Core hypervisor.
 ---
 
 # citrix_amazon_workspaces_core_hypervisor (Resource)
 
-Manages an Amazon WorkSpaces Core hypervisor. Note that this feature is in Tech Preview.
+Manages an Amazon WorkSpaces Core hypervisor.
 
 ## Example Usage
 

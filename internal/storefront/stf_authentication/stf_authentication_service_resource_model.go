@@ -9,6 +9,7 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"golang.org/x/exp/maps"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -29,6 +30,7 @@ type STFAuthenticationServiceResourceModel struct {
 	FriendlyName         types.String `tfsdk:"friendly_name"`
 	ClaimsFactoryName    types.String `tfsdk:"claims_factory_name"`
 	CitrixAGBasicOptions types.Object `tfsdk:"citrix_ag_basic_options"`
+	AuthServiceProtocol  types.Object `tfsdk:"auth_service_protocol"`
 }
 
 func (r *STFAuthenticationServiceResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, authService *citrixstorefront.STFAuthenticationServiceResponseModel) {
@@ -100,6 +102,7 @@ func (STFAuthenticationServiceResourceModel) GetSchema() schema.Schema {
 				Default:     stringdefault.StaticString("standardClaimsFactory"),
 			},
 			"citrix_ag_basic_options": CitrixAGBasicOptions{}.GetSchema(),
+			"auth_service_protocol":   AuthenticationServiceProtocol{}.GetSchema(),
 		},
 	}
 }
@@ -150,4 +153,58 @@ func (r *STFAuthenticationServiceResourceModel) RefreshCitrixAGBasicOptions(ctx 
 
 	refreshedAGBasicOptionsObject := util.TypedObjectToObjectValue(ctx, diagnostics, refreshedAGBasicOptions)
 	r.CitrixAGBasicOptions = refreshedAGBasicOptionsObject
+}
+
+func (r *STFAuthenticationServiceResourceModel) RefreshAuthServiceProtocol(ctx context.Context, diagnostics *diag.Diagnostics, protocols []string) {
+	refreshedProtocol := util.ObjectValueToTypedObject[AuthenticationServiceProtocol](ctx, diagnostics, r.AuthServiceProtocol)
+
+	planProtocols := util.StringListToStringArray(ctx, diagnostics, refreshedProtocol.Name)
+
+	remoteProtocolMap := make(map[string]bool)
+	for _, p := range protocols {
+		remoteProtocolMap[p] = true
+	}
+
+	resultProtocols := make([]string, 0)
+	for _, p := range planProtocols {
+		if remoteProtocolMap[p] {
+			resultProtocols = append(resultProtocols, p)
+			delete(remoteProtocolMap, p)
+		}
+	}
+
+	refreshedProtocol.Name = util.RefreshListValues(ctx, diagnostics, refreshedProtocol.Name, resultProtocols)
+
+	refreshedProtocolObject := util.TypedObjectToObjectValue(ctx, diagnostics, refreshedProtocol)
+	r.AuthServiceProtocol = refreshedProtocolObject
+}
+
+type AuthenticationServiceProtocol struct {
+	Name types.List `tfsdk:"name"`
+}
+
+// GetSchema returns the schema for AuthServiceProtocol.
+func (AuthenticationServiceProtocol) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "StoreFront --- Authentication Service Protocol.",
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			"name": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "Names of the Authentication Service Protocol to be added.",
+				Required:    true,
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
+			},
+		},
+	}
+}
+
+func (AuthenticationServiceProtocol) GetAttributes() map[string]schema.Attribute {
+	return AuthenticationServiceProtocol{}.GetSchema().Attributes
+}
+
+func (r *AuthenticationServiceProtocol) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
 }

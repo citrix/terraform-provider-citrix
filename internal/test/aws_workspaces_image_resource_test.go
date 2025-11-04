@@ -12,6 +12,10 @@ import (
 )
 
 func TestAWSWorkspacesImageResourcePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_AWS_WORKSPACES_IMAGE_NAME"); v == "" {
 		t.Fatal("TEST_AWS_WORKSPACES_IMAGE_NAME must be set for acceptance tests")
 	}

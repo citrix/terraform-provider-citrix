@@ -78,7 +78,7 @@ type ImageDefinitionModel struct {
 
 func (ImageDefinitionModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "CVAD --- Manages an image definition. **Note that this feature is in Tech Preview.**",
+		Description: "CVAD --- Manages an image definition.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The GUID identifier of the image definition.",

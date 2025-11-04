@@ -13,6 +13,10 @@ import (
 // TestTagResourcePreCheck validates the necessary env variable exist
 // in the testing environment
 func TestTagResourcePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_TAG_RESOURCE_NAME"); v == "" {
 		t.Fatal("TEST_TAG_RESOURCE_NAME must be set for acceptance tests")
 	}

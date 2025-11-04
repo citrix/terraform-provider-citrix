@@ -3,12 +3,12 @@
 page_title: "citrix_cloud_okta_identity_provider Data Source - citrix"
 subcategory: "Citrix Cloud"
 description: |-
-  Data source of a Citrix Cloud Okta Identity Provider instance. Note that this feature is in Tech Preview.
+  Data source of a Citrix Cloud Okta Identity Provider instance.
 ---
 
 # citrix_cloud_okta_identity_provider (Data Source)
 
-Data source of a Citrix Cloud Okta Identity Provider instance. Note that this feature is in Tech Preview.
+Data source of a Citrix Cloud Okta Identity Provider instance.
 
 ## Example Usage
 

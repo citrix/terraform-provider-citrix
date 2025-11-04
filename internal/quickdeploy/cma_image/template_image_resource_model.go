@@ -36,7 +36,7 @@ type CitrixManagedAzureImageResourceModel struct {
 
 func (CitrixManagedAzureImageResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "DaaS Quick Deploy - Citrix Managed Azure --- Manages an Citrix Managed Azure image.",
+		Description: "DaaS Quick Deploy - Citrix Managed Azure --- Manages an Citrix Managed Azure image. **Note that this feature is in Tech Preview.**",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the image.",

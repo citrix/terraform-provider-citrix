@@ -10,6 +10,10 @@ import (
 )
 
 func TestAwsWorkspacesDeploymentDataSourcePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 
 	if v := os.Getenv("TEST_AWS_WORKSPACES_DEPLOYMENT_DATA_SOURCE_GUID"); v == "" {
 		t.Fatal("TEST_AWS_WORKSPACES_DEPLOYMENT_DATA_SOURCE_GUID must be set for acceptance tests")

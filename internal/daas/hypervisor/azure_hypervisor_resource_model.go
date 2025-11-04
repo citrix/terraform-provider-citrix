@@ -189,25 +189,26 @@ func (r AzureHypervisorResourceModel) RefreshPropertyValues(ctx context.Context,
 	r.EnableAzureADDeviceManagement = types.BoolValue(false)
 
 	customPropertiesString := hypervisor.GetCustomProperties()
-	var customProperties []citrixorchestration.NameValueStringPairModel
-	err := json.Unmarshal([]byte(customPropertiesString), &customProperties)
-	if err != nil {
-		diagnostics.AddWarning("Error reading Azure Hypervisor custom properties", err.Error())
-		return r
-	}
-
-	for _, customProperty := range customProperties {
-		if customProperty.GetName() == EnableAzureADDeviceManagement_CustomProperty {
-			enabled, _ := strconv.ParseBool(customProperty.GetValue())
-			r.EnableAzureADDeviceManagement = types.BoolValue(enabled)
-		}
-		if customProperty.GetName() == ProxyHypervisorTrafficThroughConnector_CustomProperty {
-			proxy, _ := strconv.ParseBool(customProperty.GetValue())
-			r.ProxyHypervisorTrafficThroughConnector = types.BoolValue(proxy)
-		}
-		if customProperty.GetName() == AuthenticationMode_CustomProperty {
-			auth := (customProperty.GetValue())
-			r.AuthenticationMode = types.StringValue(auth)
+	if customPropertiesString != "" {
+		var customProperties []citrixorchestration.NameValueStringPairModel
+		err := json.Unmarshal([]byte(customPropertiesString), &customProperties)
+		if err == nil {
+			for _, customProperty := range customProperties {
+				if customProperty.GetName() == EnableAzureADDeviceManagement_CustomProperty {
+					enabled, _ := strconv.ParseBool(customProperty.GetValue())
+					r.EnableAzureADDeviceManagement = types.BoolValue(enabled)
+				}
+				if customProperty.GetName() == ProxyHypervisorTrafficThroughConnector_CustomProperty {
+					proxy, _ := strconv.ParseBool(customProperty.GetValue())
+					r.ProxyHypervisorTrafficThroughConnector = types.BoolValue(proxy)
+				}
+				if customProperty.GetName() == AuthenticationMode_CustomProperty {
+					auth := (customProperty.GetValue())
+					r.AuthenticationMode = types.StringValue(auth)
+				}
+			}
+		} else {
+			diagnostics.AddWarning("Error reading Azure Hypervisor custom properties", err.Error())
 		}
 	}
 

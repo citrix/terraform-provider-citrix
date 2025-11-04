@@ -3,12 +3,12 @@
 page_title: "citrix_quickdeploy_template_image Data Source - citrix"
 subcategory: "DaaS Quick Deploy - Citrix Managed Azure"
 description: |-
-  Data Source of an Citrix Managed Azure image.
+  Data Source of an Citrix Managed Azure image. Note that this feature is in Tech Preview.
 ---
 
 # citrix_quickdeploy_template_image (Data Source)
 
-Data Source of an Citrix Managed Azure image.
+Data Source of an Citrix Managed Azure image. **Note that this feature is in Tech Preview.**
 
 ## Example Usage
 

@@ -12,6 +12,10 @@ import (
 
 // TestStoreFrontServerDataSourcePreCheck validates the necessary env variable exist in the testing environment
 func TestStoreFrontServerDataSourcePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_STOREFRONT_SERVER_DATA_SOURCE_ID"); v == "" {
 		t.Fatal("TEST_STOREFRONT_SERVER_DATA_SOURCE_ID must be set for acceptance tests")
 	}

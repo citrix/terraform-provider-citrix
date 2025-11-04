@@ -1,6 +1,6 @@
 // Copyright © 2024. Citrix Systems, Inc.
 
-package wem_site
+package wem_configuration_set
 
 import (
 	"context"
@@ -33,7 +33,7 @@ func getSiteByName(ctx context.Context, client *citrixdaasclient.CitrixDaasClien
 	var siteConfig citrixwemservice.SiteModel
 
 	if err != nil {
-		err = fmt.Errorf("TransactionId: " + citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp) + "\nError message: " + util.ReadClientError(err))
+		err = fmt.Errorf("TransactionId: %s\nError message: %s", citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp), util.ReadClientError(err))
 		return siteConfig, err
 	}
 
@@ -55,7 +55,7 @@ func getSiteById(ctx context.Context, client *citrixdaasclient.CitrixDaasClient,
 	siteGetResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixwemservice.SiteModel](siteGetRequest, client)
 
 	if err != nil {
-		err = fmt.Errorf("TransactionId: " + citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp) + "\nError message: " + util.ReadClientError(err))
+		err = fmt.Errorf("TransactionId: %s\nError message: %s", citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp), util.ReadClientError(err))
 		return siteGetResponse, err
 	}
 
