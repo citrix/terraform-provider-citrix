@@ -650,7 +650,12 @@
 
         "TEST_SERVICE_ACCOUNT_AAD_TENANT_ID": "{Azure AD Tenant ID}",
         "TEST_SERVICE_ACCOUNT_AAD_APP_ID": "{Application Id of the Service Principal}",
-        "TEST_SERVICE_ACCOUNT_AAD_APP_SECRET": "{Application Secret of the Service Principal}"
+        "TEST_SERVICE_ACCOUNT_AAD_APP_SECRET": "{Application Secret of the Service Principal}",
+
+        // CMA Go Tests
+        "TEST_QUICKDEPLOY_CATALOG_NAME": "{Catalog Name for Catalog Service Catalog}",
+        "TEST_QUICKDEPLOY_IMAGE_NAME": "{Template Image Name}",
+        "TEST_QUICKDEPLOY_IMAGE_ID": "{Template Image ID}"
     },
     "go.testTimeout": "120m"
 }

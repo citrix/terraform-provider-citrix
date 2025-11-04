@@ -16,6 +16,10 @@ import (
 // in the testing environment
 
 func TestProviderPreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("CITRIX_CLIENT_ID"); v == "" {
 		t.Fatal("CITRIX_CLIENT_ID must be set for acceptance tests")
 	}
@@ -29,6 +33,10 @@ func TestProviderPreCheck(t *testing.T) {
 }
 
 func TestStorefrontProviderPreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("SF_COMPUTER_NAME"); v == "" {
 		t.Fatal("SF_COMPUTER_NAME must be set for acceptance tests")
 	}

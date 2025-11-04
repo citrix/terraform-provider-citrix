@@ -107,7 +107,7 @@ func (r *machineCatalogResource) Create(ctx context.Context, req resource.Create
 
 	// Add domain credential header
 	if (plan.ProvisioningType.ValueString() == string(citrixorchestration.PROVISIONINGTYPE_MCS) || plan.ProvisioningType.ValueString() == string(citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING)) && !provSchemeModel.MachineDomainIdentity.IsNull() {
-		machineDomainIdentityModel := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemeModel.MachineDomainIdentity)
+		machineDomainIdentityModel := util.ObjectValueToTypedObject[util.MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemeModel.MachineDomainIdentity)
 		if !machineDomainIdentityModel.ServiceAccount.IsNull() { // If service account is not provided, no need to create X-AdminCredential header since ServiceAccountId is being used
 			header := generateAdminCredentialHeader(machineDomainIdentityModel)
 			createMachineCatalogRequest = createMachineCatalogRequest.XAdminCredential(header)
@@ -793,7 +793,7 @@ func (r *machineCatalogResource) Delete(ctx context.Context, req resource.Delete
 			if !state.ProvisioningScheme.IsNull() {
 				// Add domain credential header
 				provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, state.ProvisioningScheme)
-				machineDomainIdentityModel := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemeModel.MachineDomainIdentity)
+				machineDomainIdentityModel := util.ObjectValueToTypedObject[util.MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemeModel.MachineDomainIdentity)
 				if !machineDomainIdentityModel.ServiceAccount.IsNull() { // If service account is not provided, no need to create X-AdminCredential header since ServiceAccountId is being used
 					header := generateAdminCredentialHeader(machineDomainIdentityModel)
 					deleteMachineCatalogRequest = deleteMachineCatalogRequest.XAdminCredential(header)
@@ -1135,7 +1135,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 			}
 
 			if !provSchemeModel.MachineDomainIdentity.IsNull() && provSchemeModel.IdentityType.ValueString() == string(citrixorchestration.IDENTITYTYPE_ACTIVE_DIRECTORY) {
-				machineDomainIdentityModel := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemeModel.MachineDomainIdentity)
+				machineDomainIdentityModel := util.ObjectValueToTypedObject[util.MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemeModel.MachineDomainIdentity)
 				if !machineDomainIdentityModel.Domain.IsUnknown() && machineDomainIdentityModel.Domain.IsNull() {
 					resp.Diagnostics.AddAttributeError(
 						path.Root("domain"),
@@ -1674,8 +1674,8 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 		if !provSchemePlan.MachineAccountCreationRules.IsNull() {
 			machineAccountCreationRulesPlan := util.ObjectValueToTypedObject[MachineAccountCreationRulesModel](ctx, &resp.Diagnostics, provSchemePlan.MachineAccountCreationRules)
 			machineAccountCreationRulesState := util.ObjectValueToTypedObject[MachineAccountCreationRulesModel](ctx, &resp.Diagnostics, provSchemeState.MachineAccountCreationRules)
-			machineDomainIdentityPlan := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemePlan.MachineDomainIdentity)
-			machineDomainIdentityState := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemeState.MachineDomainIdentity)
+			machineDomainIdentityPlan := util.ObjectValueToTypedObject[util.MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemePlan.MachineDomainIdentity)
+			machineDomainIdentityState := util.ObjectValueToTypedObject[util.MachineDomainIdentityModel](ctx, &resp.Diagnostics, provSchemeState.MachineDomainIdentity)
 
 			if machineDomainIdentityPlan.Ou != machineDomainIdentityState.Ou &&
 				provSchemePlan.NumTotalMachines.ValueInt64() <= provSchemeState.NumTotalMachines.ValueInt64() {

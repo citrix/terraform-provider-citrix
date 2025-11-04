@@ -11,6 +11,10 @@ import (
 )
 
 func TestGacSettingsPreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if service_url := os.Getenv("TEST_SETTINGS_CONFIG_SERVICE_URL"); service_url == "" {
 		t.Fatal("TEST_SETTINGS_CONFIG_SERVICE_URL must be set for acceptance tests")
 	}

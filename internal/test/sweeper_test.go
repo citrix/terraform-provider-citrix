@@ -25,6 +25,7 @@ func sharedClientForSweepers(ctx context.Context) *citrixclient.CitrixDaasClient
 	environment := os.Getenv("CITRIX_ENVIRONMENT")
 	customerId := os.Getenv("CITRIX_CUSTOMER_ID")
 	disableSslVerification := strings.EqualFold(os.Getenv("CITRIX_DISABLE_SSL_VERIFICATION"), "true")
+	catalog_service_host_name := os.Getenv("CITRIX_QUICK_DEPLOY_HOST_NAME")
 
 	if environment == "" {
 		environment = "Production" // default to production
@@ -95,6 +96,26 @@ func sharedClientForSweepers(ctx context.Context) *citrixclient.CitrixDaasClient
 		}
 	}
 
+	catalogServiceHostname := ""
+	if catalog_service_host_name != "" {
+		// If customer specified a quick create host name, use it
+		catalogServiceHostname = catalog_service_host_name
+	} else {
+		if environment == "Production" {
+			catalogServiceHostname = "api.cloud.com/catalogservice"
+		} else if environment == "Staging" {
+			catalogServiceHostname = "api.cloudburrito.com/catalogservice"
+		} else if environment == "Japan" {
+			catalogServiceHostname = "api.citrixcloud.jp/catalogservice"
+		} else if environment == "JapanStaging" {
+			catalogServiceHostname = "api.citrixcloudstaging.jp/catalogservice"
+		} else if environment == "Gov" {
+			catalogServiceHostname = "api.cloud.us/catalogservice"
+		} else if environment == "GovStaging" {
+			catalogServiceHostname = "api.cloudstaging.us/catalogservice"
+		}
+	}
+
 	userAgent := "citrix-terraform-provider/" + "gotester" + " (https://github.com/citrix/terraform-provider-citrix)"
 
 	// Initialize CVAD client
@@ -104,6 +125,11 @@ func sharedClientForSweepers(ctx context.Context) *citrixclient.CitrixDaasClient
 		client.InitializeCitrixCloudClients(ctx, ccUrl, hostname, middleware.MiddlewareAuthFunc, middleware.MiddlewareAuthWithCustomerIdHeaderFunc)
 	}
 	client.InitializeCitrixDaasClient(ctx, customerId, token, onPremises, apiGateway, disableSslVerification, &userAgent)
+
+	// Set Quick Deploy Client
+	if catalogServiceHostname != "" {
+		client.InitializeQuickDeployClient(ctx, catalogServiceHostname, middleware.MiddlewareAuthFunc)
+	}
 
 	return client
 }

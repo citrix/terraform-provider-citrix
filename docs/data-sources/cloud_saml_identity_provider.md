@@ -3,12 +3,12 @@
 page_title: "citrix_cloud_saml_identity_provider Data Source - citrix"
 subcategory: "Citrix Cloud"
 description: |-
-  Data Source of a SAML 2.0 Identity Provider instance. Note that this feature is in Tech Preview.
+  Data Source of a SAML 2.0 Identity Provider instance.
 ---
 
 # citrix_cloud_saml_identity_provider (Data Source)
 
-Data Source of a SAML 2.0 Identity Provider instance. Note that this feature is in Tech Preview.
+Data Source of a SAML 2.0 Identity Provider instance.
 
 ## Example Usage
 

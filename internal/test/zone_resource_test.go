@@ -49,6 +49,10 @@ func init() {
 }
 
 func TestZonePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	zoneInput := os.Getenv("TEST_ZONE_INPUT")
 	zoneDescription := os.Getenv("TEST_ZONE_DESCRIPTION")
 
@@ -58,6 +62,10 @@ func TestZonePreCheck(t *testing.T) {
 }
 
 func TestCloudZoneCreationPreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("CITRIX_CUSTOMER_ID"); v != "" && v != "CitrixOnPremises" {
 		rlName := os.Getenv("TEST_RESOURCE_LOCATION_NAME")
 		if rlName == "" {

@@ -224,7 +224,7 @@ func (ProvisioningSchemeModel) GetSchema() schema.SingleNestedAttribute {
 			"nutanix_machine_config":                NutanixMachineConfigModel{}.GetSchema(),
 			"openshift_machine_config":              OpenshiftMachineConfigModel{}.GetSchema(),
 			"scvmm_machine_config":                  SCVMMMachineConfigModel{}.GetSchema(),
-			"machine_domain_identity":               MachineDomainIdentityModel{}.GetSchema(),
+			"machine_domain_identity":               util.MachineDomainIdentityModel{}.GetSchema(),
 			"number_of_total_machines": schema.Int64Attribute{
 				Description: "Number of VDA machines allocated in the catalog." +
 					"\n\n~> **Please Note** When deleting machines, ensure machines that need to be deleted have no active sessions. For machines with `Static` allocation type, also ensure there are no assigned users." +
@@ -342,84 +342,6 @@ func (CustomPropertyModel) GetSchema() schema.NestedAttributeObject {
 
 func (CustomPropertyModel) GetAttributes() map[string]schema.Attribute {
 	return CustomPropertyModel{}.GetSchema().Attributes
-}
-
-type MachineDomainIdentityModel struct {
-	Domain                 types.String `tfsdk:"domain"`
-	Ou                     types.String `tfsdk:"domain_ou"`
-	ServiceAccountDomain   types.String `tfsdk:"service_account_domain"`
-	ServiceAccount         types.String `tfsdk:"service_account"`
-	ServiceAccountPassword types.String `tfsdk:"service_account_password"`
-	ServiceAccountId       types.String `tfsdk:"service_account_id"`
-}
-
-func (MachineDomainIdentityModel) GetSchema() schema.SingleNestedAttribute {
-	return schema.SingleNestedAttribute{
-		Description: "The domain identity for machines in the machine catalog." + "<br />" +
-			"Required when identity_type is set to `ActiveDirectory`",
-		Optional: true,
-		Attributes: map[string]schema.Attribute{
-			"domain": schema.StringAttribute{
-				Description: "The AD domain where machine accounts will be created. Specify this in FQDN format; for example, MyDomain.com.",
-				Optional:    true,
-				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.DomainFqdnRegex), "must be in FQDN format"),
-				},
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-			},
-			"domain_ou": schema.StringAttribute{
-				Description: "The organization unit that computer accounts will be created into.",
-				Optional:    true,
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-			},
-			"service_account_domain": schema.StringAttribute{
-				Description: "The domain name of the service account. Specify this in FQDN format; for example, MyServiceDomain.com." +
-					"\n\n~> **Please Note** Use this property if domain of the service account which is used to create the machine accounts resides in a domain different from what's specified in property `domain` where the machine accounts are created.",
-				Optional: true,
-				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.DomainFqdnRegex), "must be in FQDN format"),
-					stringvalidator.AlsoRequires(path.Expressions{
-						path.MatchRelative().AtParent().AtName("service_account"),
-					}...),
-				},
-			},
-			"service_account": schema.StringAttribute{
-				Description: "Service account for the domain. Only the username is required; do not include the domain name.",
-				Optional:    true,
-				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.NoPathRegex), "must not include domain name, only specify the username"),
-					stringvalidator.AlsoRequires(path.Expressions{
-						path.MatchRelative().AtParent().AtName("service_account_password"),
-					}...),
-					stringvalidator.ExactlyOneOf(path.Expressions{
-						path.MatchRelative().AtParent().AtName("service_account_id"),
-					}...),
-				},
-			},
-			"service_account_password": schema.StringAttribute{
-				Description: "Service account password for the domain.",
-				Optional:    true,
-				Sensitive:   true,
-				Validators: []validator.String{
-					stringvalidator.AlsoRequires(path.Expressions{
-						path.MatchRelative().AtParent().AtName("service_account"),
-					}...),
-				},
-			},
-			"service_account_id": schema.StringAttribute{
-				Description: "The service account Id to be used for managing the machine accounts.",
-				Optional:    true,
-			},
-		},
-	}
-}
-
-func (MachineDomainIdentityModel) GetAttributes() map[string]schema.Attribute {
-	return MachineDomainIdentityModel{}.GetSchema().Attributes
 }
 
 // MachineAccountCreationRulesModel maps the nested machine account creation rules resource schema data.

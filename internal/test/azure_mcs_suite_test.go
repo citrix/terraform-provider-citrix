@@ -18,6 +18,10 @@ import (
 // testHypervisorPreCheck validates the necessary env variable exist
 // in the testing environment
 func TestAzureMcsSuitePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	ctx := context.Background()
 	client := sharedClientForSweepers(ctx)
 

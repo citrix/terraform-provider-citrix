@@ -3,12 +3,12 @@
 page_title: "citrix_quickdeploy_template_image Resource - citrix"
 subcategory: "DaaS Quick Deploy - Citrix Managed Azure"
 description: |-
-  Manages an Citrix Managed Azure image.
+  Manages an Citrix Managed Azure image. Note that this feature is in Tech Preview.
 ---
 
 # citrix_quickdeploy_template_image (Resource)
 
-Manages an Citrix Managed Azure image.
+Manages an Citrix Managed Azure image. **Note that this feature is in Tech Preview.**
 
 ## Example Usage
 

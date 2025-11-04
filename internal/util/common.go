@@ -853,6 +853,10 @@ func GetQcsAwsWorkspacesWithMachineIdKey(remote citrixquickcreate.AwsEdcDeployme
 	return remote.GetMachineId()
 }
 
+func GetQcsAwsWorkspacesWithUsernameKey(remote citrixquickcreate.AwsEdcDeploymentMachine) string {
+	return strings.ToLower(remote.GetUsername())
+}
+
 func GetOrchestrationAutoscalePluginKey(remote citrixorchestration.AutoscaleGroupPluginModel) string {
 	return strconv.Itoa(int(remote.GetUid()))
 }
@@ -1251,7 +1255,7 @@ func RefreshUsersList(ctx context.Context, diags *diag.Diagnostics, usersSet typ
 // Helper function to fetch scope ids from scope names
 // </summary>
 func FetchScopeIdsByNames(ctx context.Context, diagnostics diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, scopeNames []string) ([]string, error) {
-	getScopesResponse, httpResp, err := FetchScopes(ctx, client)
+	getScopesResponse, httpResp, err := FetchScopes(ctx, client, &diagnostics)
 	if err != nil || getScopesResponse == nil {
 		diagnostics.AddError(
 			"Error fetch scope ids from names",
@@ -1262,7 +1266,7 @@ func FetchScopeIdsByNames(ctx context.Context, diagnostics diag.Diagnostics, cli
 	}
 
 	scopeNameIdMap := map[string]string{}
-	for _, scope := range getScopesResponse.Items {
+	for _, scope := range getScopesResponse {
 		scopeNameIdMap[scope.GetName()] = scope.GetId()
 	}
 
@@ -1278,7 +1282,7 @@ func FetchScopeIdsByNames(ctx context.Context, diagnostics diag.Diagnostics, cli
 // Helper function to fetch scope names from scope ids
 // </summary>
 func FetchScopeNamesByIds(ctx context.Context, diagnostics diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, scopeIds []string) ([]string, error) {
-	getScopesResponse, httpResp, err := FetchScopes(ctx, client)
+	getScopesResponse, httpResp, err := FetchScopes(ctx, client, &diagnostics)
 	if err != nil || getScopesResponse == nil {
 		diagnostics.AddError(
 			"Error fetch scope names from ids",
@@ -1289,7 +1293,7 @@ func FetchScopeNamesByIds(ctx context.Context, diagnostics diag.Diagnostics, cli
 	}
 
 	scopeIdNameMap := map[string]types.String{}
-	for _, scope := range getScopesResponse.Items {
+	for _, scope := range getScopesResponse {
 		scopeIdNameMap[scope.GetId()] = types.StringValue(scope.GetName())
 	}
 
@@ -1301,10 +1305,34 @@ func FetchScopeNamesByIds(ctx context.Context, diagnostics diag.Diagnostics, cli
 	return scopeNames, nil
 }
 
-func FetchScopes(ctx context.Context, client *citrixdaasclient.CitrixDaasClient) (*citrixorchestration.ScopeResponseModelCollection, *http.Response, error) {
+func FetchScopes(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) ([]citrixorchestration.ScopeResponseModel, *http.Response, error) {
 	getAdminScopesRequest := client.ApiClient.AdminAPIsDAAS.AdminGetAdminScopes(ctx)
-	getScopesResponse, httpResp, err := citrixdaasclient.AddRequestData(getAdminScopesRequest, client).Execute()
-	return getScopesResponse, httpResp, err
+	getAdminScopesRequest = getAdminScopesRequest.Limit(250)
+
+	scopeResponses := []citrixorchestration.ScopeResponseModel{}
+	continuationToken := ""
+	var httpResp *http.Response
+	var err error
+
+	for {
+		getAdminScopesRequest = getAdminScopesRequest.ContinuationToken(continuationToken)
+		getScopesResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ScopeResponseModelCollection](getAdminScopesRequest, client)
+		if err != nil {
+			diagnostics.AddError(
+				"Error reading Scopes",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+ReadClientError(err),
+			)
+			return scopeResponses, httpResp, err
+		}
+		scopeResponses = append(scopeResponses, getScopesResponse.GetItems()...)
+		if getScopesResponse.GetContinuationToken() == "" {
+			return scopeResponses, httpResp, nil
+		}
+		continuationToken = getScopesResponse.GetContinuationToken()
+	}
+
+	return scopeResponses, httpResp, err
 }
 
 func GetUsersUsingIdentity(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, users []string) ([]citrixorchestration.IdentityUserResponseModel, *http.Response, error) {
@@ -1374,7 +1402,7 @@ func VerifyIdentityUserListCompleteness(inputUserNames []string, remoteUsers []c
 	}
 
 	if len(missingUsers) > 0 {
-		return fmt.Errorf("The following users could not be found: " + strings.Join(missingUsers, ", "))
+		return fmt.Errorf("the following users could not be found: %s", strings.Join(missingUsers, ", "))
 	}
 
 	return nil

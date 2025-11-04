@@ -3,12 +3,12 @@
 page_title: "citrix_image_definition Resource - citrix"
 subcategory: "CVAD"
 description: |-
-  Manages an image definition. Note that this feature is in Tech Preview.
+  Manages an image definition.
 ---
 
 # citrix_image_definition (Resource)
 
-Manages an image definition. **Note that this feature is in Tech Preview.**
+Manages an image definition.
 
 ## Example Usage
 

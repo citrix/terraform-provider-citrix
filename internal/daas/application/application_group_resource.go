@@ -480,7 +480,7 @@ func validateAndReturnDeliveryGroups(ctx context.Context, client *citrixdaasclie
 		}
 
 		if deliveryGroup.GetSharingKind() != citrixorchestration.SHARINGKIND_SHARED {
-			err = fmt.Errorf("Delivery group " + value + " is incompatible. Delivery Group containing static assigned machines cannot be assigned to application groups.")
+			err = fmt.Errorf("Delivery group %s is incompatible. Delivery Group containing static assigned machines cannot be assigned to application groups.", value)
 			diagnostics.AddError(
 				"Error creating Application Group "+plan.Name.ValueString(),
 				err.Error(),

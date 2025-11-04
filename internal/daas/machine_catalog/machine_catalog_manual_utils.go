@@ -282,12 +282,11 @@ func addMachinesToManualCatalog(ctx context.Context, diagnostics *diag.Diagnosti
 	}
 
 	if successfulJobs < len(addMachinesList) {
-		errMsg := fmt.Sprintf("An error occurred while adding machine(s) to the Machine Catalog. %d of %d machines were added to the Machine Catalog.", successfulJobs, len(addMachinesList))
-		err = fmt.Errorf(errMsg)
+		err = fmt.Errorf("An error occurred while adding machine(s) to the Machine Catalog. %d of %d machines were added to the Machine Catalog.", successfulJobs, len(addMachinesList))
 		resp.Diagnostics.AddError(
 			"Error updating Machine Catalog "+catalogIdOrName,
 			"TransactionId: "+txId+
-				"\n"+errMsg,
+				"\n"+err.Error(),
 		)
 
 		return err

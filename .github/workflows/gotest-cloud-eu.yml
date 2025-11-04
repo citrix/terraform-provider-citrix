@@ -160,6 +160,9 @@ jobs:
           echo "TEST_IMAGE_DEFINITION_HYPERVISOR_POOL_ID_UPDATED=${{secrets.TEST_IMAGE_DEFINITION_HYPERVISOR_POOL_ID_UPDATED}}" >> $GITHUB_ENV
           echo "TEST_IMAGE_DEFINITION_RESOURCE_GROUP=${{secrets.TEST_IMAGE_DEFINITION_RESOURCE_GROUP}}" >> $GITHUB_ENV
           echo "TEST_IMAGE_DEFINITION_RESOURCE_GROUP_UPDATED=${{secrets.TEST_IMAGE_DEFINITION_RESOURCE_GROUP_UPDATED}}" >> $GITHUB_ENV
+          echo "TEST_QUICKDEPLOY_CATALOG_NAME=${{secrets.TEST_QUICKDEPLOY_CATALOG_NAME}}" >> $GITHUB_ENV
+          echo "TEST_QUICKDEPLOY_IMAGE_NAME=${{secrets.TEST_QUICKDEPLOY_IMAGE_NAME}}" >> $GITHUB_ENV
+          echo "TEST_QUICKDEPLOY_IMAGE_ID=${{secrets.TEST_QUICKDEPLOY_IMAGE_ID}}" >> $GITHUB_ENV
 
       # Test PreCheck
       - name: Test Precheck
@@ -173,3 +176,16 @@ jobs:
       - name: Sweep
         if: always()
         run: go test -v ./internal/test -run "^TestAzureMcs$" -timeout 1h -sweep-run "citrix_zone,citrix_image_definition,citrix_service_account,citrix_admin_folder,citrix_admin_role,citrix_admin_scope" -sweep="azure"
+
+      # Test CMA PreCheck
+      - name: Test Precheck
+        run: go test -v ./internal/test -run "^TestQuickDeployCatalogPreCheck$"
+
+      # Test CMA
+      - name: Test CMA
+        run: go test -v ./internal/test -run "^TestQuickDeployCatalogResource$" -timeout 1h
+      
+      # Sweep
+      - name: Sweep
+        if: always()
+        run: go test -v ./internal/test -run "^TestQuickDeployCatalogResource$" -timeout 1h -sweep-run "citrix_quickdeploy_catalog" -sweep="azure"

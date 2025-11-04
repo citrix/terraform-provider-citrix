@@ -43,6 +43,10 @@ func init() {
 // TestApplicationResourcePreCheck validates the necessary env variable exist
 // in the testing environment
 func TestApplicationResourcePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_APP_NAME"); v == "" {
 		t.Fatal("TEST_APP_NAME must be set for acceptance tests")
 	}

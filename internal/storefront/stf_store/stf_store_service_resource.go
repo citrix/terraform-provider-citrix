@@ -222,6 +222,27 @@ func (r *stfStoreServiceResource) Create(ctx context.Context, req resource.Creat
 		plan.RefreshLaunchOptions(ctx, &resp.Diagnostics, getResponse)
 	}
 
+	// Register Storefront Optimal Launch Gateways
+
+	if !plan.OptimalLaunchGateway.IsNull() {
+		optimalLaunch := util.ObjectValueToTypedObject[OptimalLaunchGateway](ctx, &resp.Diagnostics, plan.OptimalLaunchGateway)
+		err := r.registerOptimalLaunchGateway(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), optimalLaunch)
+		if err != nil {
+			return
+		}
+
+		// Get updated STFStoreService Optimal Launch Gateway
+		getResponse, err := getSTFStoreOptimalLaunchGateway(ctx, r.client, &diags, siteIdInt, plan.VirtualPath.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error fetching StoreFront Store Optimal Launch Gateway",
+				"Error message: "+err.Error(),
+			)
+			return
+		}
+		plan.RefreshOptimalLaunchGateway(ctx, &resp.Diagnostics, &getResponse)
+	}
+
 	// Create StoreFront Roaming Account
 
 	if !plan.RoamingAccount.IsNull() {
@@ -352,6 +373,17 @@ func (r *stfStoreServiceResource) Read(ctx context.Context, req resource.ReadReq
 		return
 	}
 	state.RefreshRoamingAccount(ctx, &resp.Diagnostics, getRoamingAccResponse)
+
+	// Fetch Optimal Launch Gateway
+	getOptimalLaunchResponse, err := getSTFStoreOptimalLaunchGateway(ctx, r.client, &diags, siteIdInt, state.VirtualPath.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error fetching StoreFront Store Optimal Launch Gateway",
+			"Error message: "+err.Error(),
+		)
+		return
+	}
+	state.RefreshOptimalLaunchGateway(ctx, &resp.Diagnostics, &getOptimalLaunchResponse)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -524,6 +556,43 @@ func (r *stfStoreServiceResource) Update(ctx context.Context, req resource.Updat
 
 		// Refresh Storefront StoreService Launch Options
 		plan.RefreshRoamingAccount(ctx, &resp.Diagnostics, getResponse)
+	}
+
+	// Update StoreFront Optimal Launch Gateways
+
+	if !plan.OptimalLaunchGateway.IsNull() {
+		optimalLaunchGateway := util.ObjectValueToTypedObject[OptimalLaunchGateway](ctx, &resp.Diagnostics, plan.OptimalLaunchGateway)
+
+		// Get Optimal Launch Gateways to see if they exist
+		existingOptimalLaunch, err := getSTFStoreOptimalLaunchGateway(ctx, r.client, &diags, siteIdInt, plan.VirtualPath.ValueString())
+		if err != nil {
+			return
+		}
+		// If they exist, Unregister them first, and then register the new ones
+		if existingOptimalLaunch.Name.IsSet() {
+
+			unregister_err := r.unregisterOptimalLaunchGateway(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), optimalLaunchGateway.GatewayName.ValueString())
+			if unregister_err != nil {
+				return
+			}
+
+		}
+
+		err = r.registerOptimalLaunchGateway(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), optimalLaunchGateway)
+		if err != nil {
+			return
+		}
+
+		// Get updated STFStoreService Optimal Launch Gateway
+		getResponse, err := getSTFStoreOptimalLaunchGateway(ctx, r.client, &diags, siteIdInt, plan.VirtualPath.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error fetching StoreFront Store Optimal Launch Gateway",
+				"Error message: "+err.Error(),
+			)
+			return
+		}
+		plan.RefreshOptimalLaunchGateway(ctx, &resp.Diagnostics, &getResponse)
 	}
 
 	diags = resp.State.Set(ctx, plan)
@@ -1092,4 +1161,81 @@ func (plan STFStoreServiceResourceModel) getStoreFarms(ctx context.Context, clie
 	}
 	return farmWithoutFarmName, err
 
+}
+
+func getSTFStoreOptimalLaunchGateway(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, siteIdInt int64, VirtualPath string) (citrixstorefront.STFStoreRegisteredOptimalLaunchGatewayResponseModel, error) {
+
+	// Generate getSTFStoreService body
+	getSTFStoreServiceBody := citrixstorefront.GetSTFStoreRequestModel{}
+	getSTFStoreServiceBody.SetSiteId(siteIdInt)
+	getSTFStoreServiceBody.SetVirtualPath(VirtualPath)
+
+	// Call the API
+	getResponse, err := client.StorefrontClient.StoreSF.STFStoreGetSTFStoreRegisteredOptimalLaunchGateway(ctx, getSTFStoreServiceBody).Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error fetching StoreFront Store Optimal Launch Gateway",
+			"Error message: "+err.Error(),
+		)
+		return citrixstorefront.STFStoreRegisteredOptimalLaunchGatewayResponseModel{}, err
+	}
+
+	return getResponse, nil
+}
+
+func (r *stfStoreServiceResource) registerOptimalLaunchGateway(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, siteIdInt int64, VirtualPath string, optimalLaunch OptimalLaunchGateway) error {
+
+	var registerBody citrixstorefront.RegisterSTFStoreOptimalLaunchGatewayRequestModel
+
+	// Generate registerOptimalLaunchGateway body
+
+	if !optimalLaunch.FarmName.IsNull() {
+		farmNames := util.StringListToStringArray(ctx, diagnostics, optimalLaunch.FarmName)
+		registerBody.SetFarmName(farmNames)
+	}
+
+	if !optimalLaunch.ZoneName.IsNull() {
+		zoneNames := util.StringListToStringArray(ctx, diagnostics, optimalLaunch.ZoneName)
+		registerBody.SetZoneName(zoneNames)
+	}
+
+	enabledOnDirectAccess := optimalLaunch.EnabledOnDirectAccess.ValueBool()
+
+	// Generate getSTFStoreService body
+	getSTFStoreServiceBody := citrixstorefront.GetSTFStoreRequestModel{}
+	getSTFStoreServiceBody.SetSiteId(siteIdInt)
+	getSTFStoreServiceBody.SetVirtualPath(VirtualPath)
+
+	// Call the API
+	_, err := client.StorefrontClient.StoreSF.STFStoreRegisterSTFStoreOptimalLaunchGateway(ctx, registerBody, getSTFStoreServiceBody, optimalLaunch.GatewayName.ValueString(), enabledOnDirectAccess).Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error registering StoreFront Store Optimal Launch Gateway",
+			"Error message: "+err.Error(),
+		)
+		return err
+	}
+
+	return nil
+}
+
+func (r *stfStoreServiceResource) unregisterOptimalLaunchGateway(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, siteIdInt int64, VirtualPath string, gatewayName string) error {
+
+	// Generate getSTFStoreService body
+	getSTFStoreServiceBody := citrixstorefront.GetSTFStoreRequestModel{}
+	getSTFStoreServiceBody.SetSiteId(siteIdInt)
+	getSTFStoreServiceBody.SetVirtualPath(VirtualPath)
+
+	// Call the API
+	_, err := client.StorefrontClient.StoreSF.STFStoreUnregisterSTFStoreOptimalLaunchGateway(ctx, gatewayName, getSTFStoreServiceBody).Execute()
+
+	if err != nil {
+		diagnostics.AddError(
+			"Error unregistering StoreFront Store Optimal Launch Gateway",
+			"Error message: "+err.Error(),
+		)
+		return err
+	}
+
+	return nil
 }

@@ -3,12 +3,12 @@
 page_title: "citrix_image_version Resource - citrix"
 subcategory: "CVAD"
 description: |-
-  Manages an image version. Note that this feature is in Tech Preview.
+  Manages an image version.
 ---
 
 # citrix_image_version (Resource)
 
-Manages an image version. **Note that this feature is in Tech Preview.**
+Manages an image version.
 
 ## Example Usage
 

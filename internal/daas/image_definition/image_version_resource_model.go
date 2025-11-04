@@ -211,7 +211,7 @@ type ImageVersionModel struct {
 
 func (ImageVersionModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "CVAD --- Manages an image version. **Note that this feature is in Tech Preview.**",
+		Description: "CVAD --- Manages an image version.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The id of the image version.",

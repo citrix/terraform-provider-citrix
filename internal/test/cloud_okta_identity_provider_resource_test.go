@@ -11,6 +11,10 @@ import (
 )
 
 func TestCCOktaIdpResourcePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if name := os.Getenv("TEST_CC_OKTA_IDP_NAME"); name == "" {
 		t.Fatal("TEST_CC_OKTA_IDP_NAME must be set for acceptance tests")
 	}

@@ -11,6 +11,10 @@ import (
 )
 
 func TestPvsPreCheck_Azure(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_PVS_FARM_NAME"); v == "" {
 		t.Fatal("TEST_PVS_FARM_NAME must be set for acceptance tests")
 	}

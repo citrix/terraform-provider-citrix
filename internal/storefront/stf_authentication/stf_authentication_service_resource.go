@@ -138,6 +138,33 @@ func (r *stfAuthenticationServiceResource) Create(ctx context.Context, req resou
 
 	}
 
+	if !plan.AuthServiceProtocol.IsNull() {
+		err = enableSTFAuthenticationServiceProtocol(ctx, &resp.Diagnostics, r.client, siteIdInt, plan)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error setting Authentication Service Protocol",
+				"Error message: "+err.Error(),
+			)
+			return
+		}
+		getAuthServiceProtocol, err := getSTFAuthenticationServiceProtocol(ctx, &resp.Diagnostics, r.client, siteIdInt, plan.VirtualPath.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error getting Authentication Service Protocol",
+				"Error message: "+err.Error(),
+			)
+			return
+		}
+
+		protocolNames := make([]string, 0)
+		for _, protocol := range *getAuthServiceProtocol {
+			if *protocol.Enabled.Get() {
+				protocolNames = append(protocolNames, *protocol.Name.Get())
+			}
+		}
+		plan.RefreshAuthServiceProtocol(ctx, &resp.Diagnostics, protocolNames)
+	}
+
 	getAuthServiceResponse, err := getSTFAuthenticationService(ctx, &resp.Diagnostics, r.client, plan)
 	if err != nil {
 		return
@@ -200,6 +227,23 @@ func (r *stfAuthenticationServiceResource) Read(ctx context.Context, req resourc
 	}
 
 	state.RefreshCitrixAGBasicOptions(ctx, &resp.Diagnostics, getCitrixAGBasicOptionsResponse)
+
+	getAuthServiceProtocol, err := getSTFAuthenticationServiceProtocol(ctx, &resp.Diagnostics, r.client, siteIdInt, state.VirtualPath.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error getting Authentication Service Protocol",
+			"Error message: "+err.Error(),
+		)
+		return
+	}
+
+	protocolNames := make([]string, 0)
+	for _, protocol := range *getAuthServiceProtocol {
+		if *protocol.Enabled.Get() {
+			protocolNames = append(protocolNames, *protocol.Name.Get())
+		}
+	}
+	state.RefreshAuthServiceProtocol(ctx, &resp.Diagnostics, protocolNames)
 
 	state.RefreshPropertyValues(ctx, &resp.Diagnostics, STFAuthenticationService)
 
@@ -302,6 +346,53 @@ func (r *stfAuthenticationServiceResource) Update(ctx context.Context, req resou
 
 		plan.RefreshCitrixAGBasicOptions(ctx, &resp.Diagnostics, getCitrixAGBasicOptionsResponse)
 
+	}
+
+	if !plan.AuthServiceProtocol.IsNull() {
+		getAuthProtocol, err := getSTFAuthenticationServiceProtocol(ctx, &resp.Diagnostics, r.client, siteIdInt, plan.VirtualPath.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error getting Authentication Service Protocol",
+				"Error message: "+err.Error(),
+			)
+			return
+		}
+
+		if getAuthProtocol != nil {
+			err = disableSTFAuthenticationServiceProtocol(ctx, &resp.Diagnostics, r.client, siteIdInt, plan)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error setting Authentication Service Protocol",
+					"Error message: "+err.Error(),
+				)
+				return
+			}
+		}
+
+		err = enableSTFAuthenticationServiceProtocol(ctx, &resp.Diagnostics, r.client, siteIdInt, plan)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error setting Authentication Service Protocol",
+				"Error message: "+err.Error(),
+			)
+			return
+		}
+		getAuthServiceProtocol, err := getSTFAuthenticationServiceProtocol(ctx, &resp.Diagnostics, r.client, siteIdInt, plan.VirtualPath.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error getting Authentication Service Protocol",
+				"Error message: "+err.Error(),
+			)
+			return
+		}
+
+		protocolNames := make([]string, 0)
+		for _, protocol := range *getAuthServiceProtocol {
+			if *protocol.Enabled.Get() {
+				protocolNames = append(protocolNames, *protocol.Name.Get())
+			}
+		}
+		plan.RefreshAuthServiceProtocol(ctx, &resp.Diagnostics, protocolNames)
 	}
 
 	getAuthServiceResponse, err := getSTFAuthenticationService(ctx, &resp.Diagnostics, r.client, plan)
@@ -489,4 +580,66 @@ func getCitrixAGBasicOptions(ctx context.Context, diagnostics *diag.Diagnostics,
 		return nil, err
 	}
 	return &citrixAGBasicOptionsResponse, nil
+}
+
+func getSTFAuthenticationServiceProtocol(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteIdInt int64, virtualPath string) (*[]citrixstorefront.STFAuthenticationServiceProtocolResponseModel, error) {
+
+	var getAuthServiceBody citrixstorefront.GetSTFAuthenticationServiceRequestModel
+
+	getAuthServiceBody.SetSiteId(siteIdInt)
+	getAuthServiceBody.SetVirtualPath(virtualPath)
+
+	getSTFAuthenticationServiceProtocolRequest := client.StorefrontClient.AuthenticationServiceSF.STFWebReceiverGetSTFAuthenticationProtocols(ctx, getAuthServiceBody)
+
+	authServiceProtocolResponse, err := getSTFAuthenticationServiceProtocolRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error fetching Authentication Service Protocol",
+			"Error message: "+err.Error(),
+		)
+		return nil, err
+	}
+	return &authServiceProtocolResponse, nil
+}
+
+func enableSTFAuthenticationServiceProtocol(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteIdInt int64, plan STFAuthenticationServiceResourceModel) error {
+	var getAuthServiceBody citrixstorefront.GetSTFAuthenticationServiceRequestModel
+	var setAuthServiceProtocolBody citrixstorefront.AddUpdateSTFAuthenticationServiceProtocolRequestModel
+	getAuthServiceBody.SetSiteId(siteIdInt)
+	getAuthServiceBody.SetVirtualPath(plan.VirtualPath.ValueString())
+
+	authServiceProtocol := util.ObjectValueToTypedObject[AuthenticationServiceProtocol](ctx, diagnostics, plan.AuthServiceProtocol)
+	setAuthServiceProtocolBody.SetProtocolsName(util.StringListToStringArray(ctx, diagnostics, authServiceProtocol.Name))
+
+	setAuthServiceProtocolRequest := client.StorefrontClient.AuthenticationServiceSF.STFWebReceiverEnableSTFAuthenticationProtocols(ctx, setAuthServiceProtocolBody, getAuthServiceBody)
+	err := setAuthServiceProtocolRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error enabling Authentication Service Protocol",
+			fmt.Sprintf("Failed to enable Authentication Service Protocol. Error Message: %s", err.Error()),
+		)
+		return err
+	}
+	return nil
+}
+
+func disableSTFAuthenticationServiceProtocol(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteIdInt int64, plan STFAuthenticationServiceResourceModel) error {
+	var getAuthServiceBody citrixstorefront.GetSTFAuthenticationServiceRequestModel
+	var setAuthServiceProtocolBody citrixstorefront.AddUpdateSTFAuthenticationServiceProtocolRequestModel
+	getAuthServiceBody.SetSiteId(siteIdInt)
+	getAuthServiceBody.SetVirtualPath(plan.VirtualPath.ValueString())
+
+	authServiceProtocol := util.ObjectValueToTypedObject[AuthenticationServiceProtocol](ctx, diagnostics, plan.AuthServiceProtocol)
+	setAuthServiceProtocolBody.SetProtocolsName(util.StringListToStringArray(ctx, diagnostics, authServiceProtocol.Name))
+
+	setAuthServiceProtocolRequest := client.StorefrontClient.AuthenticationServiceSF.STFWebReceiverDisableSTFAuthenticationProtocols(ctx, setAuthServiceProtocolBody, getAuthServiceBody)
+	err := setAuthServiceProtocolRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error disabling Authentication Service Protocol",
+			fmt.Sprintf("Failed to disable Authentication Service Protocol. Error Message: %s", err.Error()),
+		)
+		return err
+	}
+	return nil
 }

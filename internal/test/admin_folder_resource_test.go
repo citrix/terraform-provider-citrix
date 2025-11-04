@@ -44,6 +44,10 @@ func init() {
 // TestAdminFolderPreCheck validates the necessary env variable exist
 // in the testing environment
 func TestAdminFolderPreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_ADMIN_FOLDER_NAME"); v == "" {
 		t.Fatal("TEST_ADMIN_FOLDER_NAME must be set for acceptance tests")
 	}

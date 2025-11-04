@@ -49,6 +49,7 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/quickcreate/qcs_image"
 	"github.com/citrix/terraform-provider-citrix/internal/quickdeploy/cma_catalog"
 	"github.com/citrix/terraform-provider-citrix/internal/quickdeploy/cma_image"
+	cma_vnet_peering "github.com/citrix/terraform-provider-citrix/internal/quickdeploy/cma_onprem_network_connection"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_authentication"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_deployment"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_multi_site"
@@ -56,8 +57,8 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_store"
 	"github.com/citrix/terraform-provider-citrix/internal/storefront/stf_webreceiver"
 
+	wem_configuration_set "github.com/citrix/terraform-provider-citrix/internal/wem/wem_configuration_set"
 	"github.com/citrix/terraform-provider-citrix/internal/wem/wem_machine_ad_object"
-	"github.com/citrix/terraform-provider-citrix/internal/wem/wem_site"
 
 	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_folder"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/admin_scope"
@@ -951,7 +952,6 @@ func handleNetworkError(err error, resp *provider.ConfigureResponse) {
 		"An unexpected error occurred when creating the Citrix API client. \n\n"+
 			"Error: "+err.Error(),
 	)
-	return
 }
 
 // DataSources defines the data sources implemented in the provider.
@@ -1005,6 +1005,7 @@ func (p *citrixProvider) DataSources(_ context.Context) []func() datasource.Data
 		qcs_deployment.NewAwsWorkspacesDeploymentDataSource,
 		// QuickDeploy DataSources
 		cma_image.NewCitrixManagedAzureImageDataSource,
+		cma_vnet_peering.NewCitrixManagedAzureOnPremNetworkConnectionDataSource,
 		// CC Identity Provider Resources
 		cc_identity_providers.NewOktaIdentityProviderDataSource,
 		cc_identity_providers.NewGoogleIdentityProviderDataSource,
@@ -1012,7 +1013,7 @@ func (p *citrixProvider) DataSources(_ context.Context) []func() datasource.Data
 		// CC Resource Locations
 		resource_locations.NewResourceLocationsDataSource,
 		// WEM
-		wem_site.NewWemSiteDataSource,
+		wem_configuration_set.NewWemSiteDataSource,
 	}
 }
 
@@ -1098,7 +1099,7 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		cc_identity_providers.NewOktaIdentityProviderResource,
 		cc_identity_providers.NewSamlIdentityProviderResource,
 		// Wem Resources
-		wem_site.NewWemSiteServiceResource,
+		wem_configuration_set.NewWemSiteServiceResource,
 		wem_machine_ad_object.NewWemDirectoryResource,
 		// Add resource here
 	}

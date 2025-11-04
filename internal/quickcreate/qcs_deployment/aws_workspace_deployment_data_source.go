@@ -103,7 +103,7 @@ func getAwsWorkspacesDeploymentByName(ctx context.Context, client *citrixdaascli
 		}
 	}
 
-	err = fmt.Errorf("AWS WorkSpaces Deployment not found: " + deploymentName)
+	err = fmt.Errorf("AWS WorkSpaces Deployment not found: %s", deploymentName)
 	diagnostics.AddError(
 		"Error getting AWS WorkSpaces Deployment",
 		util.ReadQcsClientError(err),

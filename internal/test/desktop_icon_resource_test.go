@@ -11,6 +11,10 @@ import (
 // TestDesktopIconPreCheck validates the necessary env variable exist
 // in the testing environment
 func TestDesktopIconPreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_DESKTOP_ICON_RAW_DATA"); v == "" {
 		t.Fatal("TEST_DESKTOP_ICON_RAW_DATA must be set for acceptance tests")
 	}

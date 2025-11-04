@@ -45,6 +45,10 @@ func init() {
 }
 
 func TestServiceAccountPreCheck_AD(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_SERVICE_ACCOUNT_DISPLAY_NAME"); v == "" {
 		t.Fatal("TEST_SERVICE_ACCOUNT_DISPLAY_NAME must be set for acceptance tests")
 	}
@@ -66,6 +70,10 @@ func TestServiceAccountPreCheck_AD(t *testing.T) {
 }
 
 func TestServiceAccountPreCheck_AAD(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_SERVICE_ACCOUNT_DISPLAY_NAME"); v == "" {
 		t.Fatal("TEST_SERVICE_ACCOUNT_DISPLAY_NAME must be set for acceptance tests")
 	}

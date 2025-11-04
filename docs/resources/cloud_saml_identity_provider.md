@@ -3,12 +3,12 @@
 page_title: "citrix_cloud_saml_identity_provider Resource - citrix"
 subcategory: "Citrix Cloud"
 description: |-
-  Manages a SAML 2.0 Identity Provider instance. Note that this feature is in Tech Preview.
+  Manages a SAML 2.0 Identity Provider instance.
 ---
 
 # citrix_cloud_saml_identity_provider (Resource)
 
-Manages a SAML 2.0 Identity Provider instance. Note that this feature is in Tech Preview.
+Manages a SAML 2.0 Identity Provider instance.
 
 ## Example Usage
 

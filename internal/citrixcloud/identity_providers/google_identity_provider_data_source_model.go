@@ -22,7 +22,7 @@ type GoogleIdentityProviderDataSourceModel struct {
 func (GoogleIdentityProviderDataSourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		// This description is used by the documentation generator and the language server.
-		Description: "Citrix Cloud --- Data Source of a Citrix Cloud Google Cloud Identity Provider instance. Note that this feature is in Tech Preview.",
+		Description: "Citrix Cloud --- Data Source of a Citrix Cloud Google Cloud Identity Provider instance.",
 
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{

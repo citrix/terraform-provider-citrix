@@ -12,6 +12,10 @@ import (
 
 // TestWemSiteResourcePreCheck validates the necessary env variable exist in the testing environment
 func TestWemSiteResourcePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_WEM_SITE_RESOURCE_NAME"); v == "" {
 		t.Fatal("TEST_WEM_SITE_RESOURCE_NAME must be set for acceptance tests")
 	}

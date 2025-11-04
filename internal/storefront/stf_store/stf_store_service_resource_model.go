@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
@@ -50,6 +51,55 @@ type StoreFarm struct {
 	RestrictPoPs               types.String `tfsdk:"restrict_pops"`                  // Cloud deployments only otherwise ignored. Restricts GWaaS traffic to the specified POP.
 	FarmGuid                   types.String `tfsdk:"farm_guid"`                      // Cloud deployments only otherwise ignored. A tag indicating the scope of the farm.
 
+}
+
+// OptimalLaunchGateway represents preferred farm/zone options for launching via optimal gateway
+type OptimalLaunchGateway struct {
+	GatewayName           types.String `tfsdk:"gateway_name"`
+	FarmName              types.List   `tfsdk:"farm_name"`
+	ZoneName              types.List   `tfsdk:"zone_name"`
+	EnabledOnDirectAccess types.Bool   `tfsdk:"enabled_on_direct_access"`
+}
+
+func (OptimalLaunchGateway) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Optional:    true,
+		Description: "Optimal launch gateway selection for the Store",
+		Attributes: map[string]schema.Attribute{
+			"gateway_name": schema.StringAttribute{
+				Description: "The name of the Gateway.",
+				Required:    true,
+			},
+			"farm_name": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "List of farm names considered for optimal gateway.",
+				Optional:    true,
+				Computed:    true,
+			},
+			"enabled_on_direct_access": schema.BoolAttribute{
+				Description: "If true, enabled on direct access (internal network). Default is false.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+			"zone_name": schema.ListAttribute{
+				ElementType: types.StringType,
+				Description: "List of zone names considered for optimal gateway." +
+					"\n\n~> **Please Note** At least one of zone_name or farm_name must be specified.",
+				Optional: true,
+				Computed: true,
+				Validators: []validator.List{
+					listvalidator.AtLeastOneOf(
+						path.MatchRelative().AtParent().AtName("farm_name"),
+					),
+				},
+			},
+		},
+	}
+}
+
+func (OptimalLaunchGateway) GetAttributes() map[string]schema.Attribute {
+	return OptimalLaunchGateway{}.GetSchema().Attributes
 }
 
 func (StoreFarm) GetSchema() schema.NestedAttributeObject {
@@ -526,7 +576,18 @@ type STFStoreServiceResourceModel struct {
 	EnumerationOptions    types.Object `tfsdk:"enumeration_options"` // EnumerationOptions
 	LaunchOptions         types.Object `tfsdk:"launch_options"`      // LaunchOptions
 	FarmSettings          types.Object `tfsdk:"farm_settings"`
-	RoamingAccount        types.Object `tfsdk:"roaming_account"` // RoamingAccount
+	RoamingAccount        types.Object `tfsdk:"roaming_account"`        // RoamingAccount
+	OptimalLaunchGateway  types.Object `tfsdk:"optimal_launch_gateway"` // OptimalLaunchGateway
+}
+
+// GetAttributes implements util.ResourceModelWithAttributeMasking.
+func (plan *STFStoreServiceResourceModel) GetAttributes() map[string]schema.Attribute {
+	return STFStoreServiceResourceModel{}.GetSchema().Attributes
+}
+
+// GetAttributesNamesToMask implements util.ResourceModelWithAttributeMasking.
+func (plan *STFStoreServiceResourceModel) GetAttributesNamesToMask() map[string]bool {
+	return map[string]bool{}
 }
 
 // PNA maps the resource schema data.
@@ -591,6 +652,7 @@ func (r *STFStoreServiceResourceModel) RefreshPropertyValues(ctx context.Context
 		farmList = append(farmList, storefarm)
 	}
 	r.StoreFarm = util.TypedArrayToObjectList[StoreFarm](ctx, diagnostics, farmList)
+
 }
 
 func FarmTypeFromInt(farmTypeInt int64) string {
@@ -745,6 +807,26 @@ func (r *STFStoreServiceResourceModel) RefreshRoamingAccount(ctx context.Context
 	r.RoamingAccount = refreshedRoamingObject
 }
 
+func (r *STFStoreServiceResourceModel) RefreshOptimalLaunchGateway(ctx context.Context, diagnostics *diag.Diagnostics, optimal *citrixstorefront.STFStoreRegisteredOptimalLaunchGatewayResponseModel) {
+
+	// Populate OptimalLaunchGateway based on available farms and zones
+	refreshedOptimal := util.ObjectValueToTypedObject[OptimalLaunchGateway](ctx, diagnostics, r.OptimalLaunchGateway)
+
+	if !refreshedOptimal.FarmName.IsNull() {
+
+		refreshedOptimal.FarmName = util.RefreshListValues(ctx, diagnostics, refreshedOptimal.FarmName, optimal.Farms)
+	}
+	if !refreshedOptimal.ZoneName.IsNull() {
+
+		refreshedOptimal.ZoneName = util.RefreshListValues(ctx, diagnostics, refreshedOptimal.ZoneName, optimal.Zones)
+	}
+	if optimal.Name.IsSet() && optimal.Name.Get() != nil {
+		refreshedOptimal.GatewayName = types.StringValue(*optimal.Name.Get())
+	}
+
+	r.OptimalLaunchGateway = util.TypedObjectToObjectValue(ctx, diagnostics, refreshedOptimal)
+}
+
 func (STFStoreServiceResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "StoreFront --- StoreFront StoreService.",
@@ -808,11 +890,12 @@ func (STFStoreServiceResourceModel) GetSchema() schema.Schema {
 					listvalidator.SizeAtLeast(1),
 				},
 			},
-			"enumeration_options": EnumerationOptions{}.GetSchema(),
-			"pna":                 PNA{}.GetSchema(),
-			"launch_options":      LaunchOptions{}.GetSchema(),
-			"farm_settings":       FarmSettings{}.GetSchema(),
-			"roaming_account":     RoamingAccount{}.GetSchema(),
+			"enumeration_options":    EnumerationOptions{}.GetSchema(),
+			"pna":                    PNA{}.GetSchema(),
+			"launch_options":         LaunchOptions{}.GetSchema(),
+			"farm_settings":          FarmSettings{}.GetSchema(),
+			"roaming_account":        RoamingAccount{}.GetSchema(),
+			"optimal_launch_gateway": OptimalLaunchGateway{}.GetSchema(),
 		},
 	}
 }

@@ -10,6 +10,10 @@ import (
 )
 
 func TestAWSWorkspacesImageDataSourcePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_AWS_WORKSPACES_IMAGE_DATA_SOURCE_ID"); v == "" {
 		t.Fatal("TEST_AWS_WORKSPACES_IMAGE_DATA_SOURCE_ID must be set for acceptance tests")
 	}

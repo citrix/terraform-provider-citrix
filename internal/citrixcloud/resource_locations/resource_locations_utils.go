@@ -5,6 +5,7 @@ package resource_locations
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	resourcelocations "github.com/citrix/citrix-daas-rest-go/ccresourcelocations"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -16,14 +17,14 @@ func GetResourceLocation(ctx context.Context, client *citrixdaasclient.CitrixDaa
 	// Get resource location
 	getResourceLocationRequest := client.ResourceLocationsClient.LocationsDAAS.LocationsGet(ctx, resourceLocationId)
 	resourceLocation, httpResp, err := citrixdaasclient.ExecuteWithRetry[*resourcelocations.CitrixCloudServicesRegistryApiModelsLocationsResourceLocationModel](getResourceLocationRequest, client)
-	if httpResp.StatusCode == 403 {
+	if httpResp.StatusCode == http.StatusForbidden {
 		diagnostics.AddError(
 			"Error reading resource location with id: "+resourceLocationId,
 			"Terraform user does not have the Citrix Cloud Resource Location permission. This is required to manage DaaS Zones.",
 		)
 		return nil, err
 	}
-	if httpResp.StatusCode == 404 || resourceLocation == nil {
+	if httpResp.StatusCode == http.StatusNotFound || resourceLocation == nil {
 		diagnostics.AddError(
 			"Error reading resource location with id: "+resourceLocationId,
 			"Resource Location "+resourceLocationId+" not found. Ensure the resource location has been created manually or via terraform, then try again.",

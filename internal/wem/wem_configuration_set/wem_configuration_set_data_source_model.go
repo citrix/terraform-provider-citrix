@@ -1,6 +1,6 @@
 // Copyright © 2024. Citrix Systems, Inc.
 
-package wem_site
+package wem_configuration_set
 
 import (
 	"context"

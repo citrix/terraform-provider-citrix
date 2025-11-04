@@ -12,6 +12,10 @@ import (
 )
 
 func TestSTFUserFarmMappingResourcePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_STF_USER_FARM_MAPPING_NAME"); v == "" {
 		t.Fatal("TEST_STF_USER_FARM_MAPPING_NAME must be set for acceptance tests")
 	}

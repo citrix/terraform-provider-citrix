@@ -3,12 +3,12 @@
 page_title: "citrix_image_version Data Source - citrix"
 subcategory: "CVAD"
 description: |-
-  Data source an image version. Note that this feature is in Tech Preview.
+  Data source an image version.
 ---
 
 # citrix_image_version (Data Source)
 
-Data source an image version. **Note that this feature is in Tech Preview.**
+Data source an image version.
 
 ## Example Usage
 

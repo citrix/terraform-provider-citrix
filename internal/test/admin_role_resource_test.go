@@ -46,6 +46,10 @@ func init() {
 }
 
 func TestAdminRolePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if name := os.Getenv("TEST_ROLE_NAME"); name == "" {
 		t.Fatal("TEST_ROLE_NAME must be set for acceptance tests")
 	}

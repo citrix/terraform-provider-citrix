@@ -3,12 +3,12 @@
 page_title: "citrix_cloud_okta_identity_provider Resource - citrix"
 subcategory: "Citrix Cloud"
 description: |-
-  Manages a Citrix Cloud Okta Identity Provider instance. Note that this feature is in Tech Preview.
+  Manages a Citrix Cloud Okta Identity Provider instance.
 ---
 
 # citrix_cloud_okta_identity_provider (Resource)
 
-Manages a Citrix Cloud Okta Identity Provider instance. Note that this feature is in Tech Preview.
+Manages a Citrix Cloud Okta Identity Provider instance.
 
 ## Example Usage
 

@@ -15,6 +15,10 @@ import (
 // TestVdaDataSourcePreCheck validates the necessary env variable exist
 // in the testing environment
 func TestVdaDataSourcePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_VDA_DATASOURCE_MC_NAME"); v == "" {
 		t.Fatal("TEST_VDA_DATASOURCE_MC_NAME must be set for acceptance tests")
 	}

@@ -3,12 +3,12 @@
 page_title: "citrix_cloud_google_identity_provider Data Source - citrix"
 subcategory: "Citrix Cloud"
 description: |-
-  Data Source of a Citrix Cloud Google Cloud Identity Provider instance. Note that this feature is in Tech Preview.
+  Data Source of a Citrix Cloud Google Cloud Identity Provider instance.
 ---
 
 # citrix_cloud_google_identity_provider (Data Source)
 
-Data Source of a Citrix Cloud Google Cloud Identity Provider instance. Note that this feature is in Tech Preview.
+Data Source of a Citrix Cloud Google Cloud Identity Provider instance.
 
 ## Example Usage
 

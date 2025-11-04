@@ -1,12 +1,13 @@
 // Copyright © 2024. Citrix Systems, Inc.
 
-package wem_site
+package wem_configuration_set
 
 import (
 	"context"
 	"strconv"
 
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/citrix/citrix-daas-rest-go/devicemanagement"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -81,7 +82,7 @@ func (d *WemSiteDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		wemSiteNameOrId = data.Name.ValueString()
 		getWemSiteRequest = getWemSiteRequest.Name(data.Name.ValueString())
 	}
-	getWemSiteResponse, httpResp, err := citrixdaasclient.AddRequestData(getWemSiteRequest, d.client).Execute()
+	getWemSiteResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*devicemanagement.SiteQuery200Response](getWemSiteRequest, d.client)
 
 	if err != nil {
 		resp.Diagnostics.AddError(

@@ -251,7 +251,7 @@ func generateBatchApiHeaders(ctx context.Context, diagnostics *diag.Diagnostics,
 	}
 
 	if generateCredentialHeader && !provisioningSchemePlan.MachineDomainIdentity.IsNull() {
-		machineDomainIdentityModel := util.ObjectValueToTypedObject[MachineDomainIdentityModel](ctx, diagnostics, provisioningSchemePlan.MachineDomainIdentity)
+		machineDomainIdentityModel := util.ObjectValueToTypedObject[util.MachineDomainIdentityModel](ctx, diagnostics, provisioningSchemePlan.MachineDomainIdentity)
 		if !machineDomainIdentityModel.ServiceAccount.IsNull() { // // If service account is not provided, no need to create X-AdminCredential header since ServiceAccountId is being used
 			adminCredentialHeader := generateAdminCredentialHeader(machineDomainIdentityModel)
 			var header citrixorchestration.NameValueStringPairModel
@@ -318,12 +318,11 @@ func deleteMachinesFromCatalog(ctx context.Context, client *citrixdaasclient.Cit
 	}
 
 	if successfulJobs < len(machinesToDelete) {
-		errMsg := fmt.Sprintf("An error occurred while deleting machine(s) from Machine Catalog. %d of %d machines were deleted from the Machine Catalog.", successfulJobs, len(batchRequestItems))
-		err = fmt.Errorf(errMsg)
+		err = fmt.Errorf("An error occurred while deleting machine(s) from Machine Catalog. %d of %d machines were deleted from the Machine Catalog.", successfulJobs, len(batchRequestItems))
 		resp.Diagnostics.AddError(
 			"Error updating Machine Catalog "+catalogNameOrId,
 			"TransactionId: "+txId+
-				"\n"+errMsg,
+				"\n"+err.Error(),
 		)
 
 		return err
@@ -393,7 +392,7 @@ func verifyIdentityMachineListCompleteness(inputMachines []string, remoteMachine
 	}
 
 	if len(missingMachines) > 0 {
-		return fmt.Errorf("The following machines could not be found: " + strings.Join(missingMachines, ", "))
+		return fmt.Errorf("The following machines could not be found: %s", strings.Join(missingMachines, ", "))
 	}
 
 	return nil

@@ -34,6 +34,10 @@ func init() {
 }
 
 func TestAdminUserPreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if name := os.Getenv("TEST_ADMIN_USER_NAME"); name == "" {
 		t.Fatal("TEST_ADMIN_USER_NAME must be set for acceptance tests")
 	}

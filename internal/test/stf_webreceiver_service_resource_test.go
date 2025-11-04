@@ -14,6 +14,10 @@ import (
 // TestSTFWebReceiverServicePreCheck validates the necessary test API keys exist in the testing environment
 
 func TestSTFWebReceiverServicePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_STF_SITE_ID"); v == "" {
 		t.Fatal("TEST_STF_SITE_ID must be set for acceptance tests")
 	}

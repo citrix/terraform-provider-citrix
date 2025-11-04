@@ -11,6 +11,10 @@ import (
 )
 
 func TestCCGoogleIdpResourcePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_CC_GOOGLE_IDP_NAME"); v == "" {
 		t.Fatal("TEST_CC_GOOGLE_IDP_NAME must be set for acceptance tests")
 	}

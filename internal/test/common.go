@@ -70,6 +70,10 @@ func composeTestResourceTf(resources ...string) string {
 }
 
 func checkTestEnvironmentVariables(t *testing.T, envVarNames []string) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	for _, v := range envVarNames {
 		if os.Getenv(v) == "" {
 			t.Fatalf("%s must be set for acceptance tests", v)

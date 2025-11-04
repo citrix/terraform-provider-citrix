@@ -22,7 +22,7 @@ import (
 // <returns>DeploymentRegionModel object of the queried region</returns>
 func GetCmaRegion(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, regionValue string) *citrixquickdeploy.DeploymentRegionModel {
 	regionsRequest := client.QuickDeployClient.ManagedCapacityCMD.GetDeploymentRegions(ctx, client.ClientConfig.CustomerId, client.ClientConfig.SiteId)
-	regions, httpResp, err := citrixdaasclient.AddRequestData(regionsRequest, client).Execute()
+	regions, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickdeploy.DeploymentRegionsModel](regionsRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error getting Citrix Managed Azure regions",
@@ -95,7 +95,7 @@ func GetTemplateImageWithId(ctx context.Context, client *citrixdaasclient.Citrix
 // <returns>AzureSubscriptionOverview object of the queried Citrix Managed subscription</returns>
 func GetCitrixManagedSubscriptionWithName(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, subscriptionName string) *citrixquickdeploy.AzureSubscriptionOverview {
 	getSubscriptionReq := client.QuickDeployClient.AzureSubscriptionsCMD.GetSubscriptions(ctx, client.ClientConfig.CustomerId, client.ClientConfig.SiteId)
-	subscriptionResp, httpResp, err := citrixdaasclient.AddRequestData(getSubscriptionReq, client).Execute()
+	subscriptionResp, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickdeploy.AzureSubscriptionsModel](getSubscriptionReq, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error getting Citrix Managed Azure subscription: "+subscriptionName,
@@ -118,4 +118,26 @@ func GetCitrixManagedSubscriptionWithName(ctx context.Context, client *citrixdaa
 	)
 
 	return nil
+}
+
+// <summary>
+// Helper function to Get Citrix Managed Azure On-Prem Connection with name
+// </summary>
+// <param name="ctx">Context from caller</param>
+// <param name="client">Citrix DaaS client from provider context</param>
+// <param name="diagnostics">Terraform diagnostics from context</param>
+// <param name="subscriptionName">Name of the Citrix Managed Azure On-Prem Connection (VNet Peering or Azure VPN)</param>
+// <returns>AzureSubscriptionOverview object of the queried Citrix Managed Azure On-Prem Connection</returns>
+func GetCitrixManagedOnPremConnectionWithName(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, name string) (*citrixquickdeploy.OnPremConnectionModel, error) {
+	getOnPremConnection := client.QuickDeployClient.ManagedCapacityCMD.GetOnPremConnections(ctx, client.ClientConfig.CustomerId, client.ClientConfig.SiteId)
+	onPremConnections, _, err := citrixdaasclient.ExecuteWithRetry[*citrixquickdeploy.OnPremConnectionsModel](getOnPremConnection, client)
+	if err != nil {
+		return nil, err
+	}
+	for _, onPremConnection := range onPremConnections.GetItems() {
+		if strings.EqualFold(onPremConnection.GetName(), name) {
+			return &onPremConnection, nil
+		}
+	}
+	return nil, nil
 }

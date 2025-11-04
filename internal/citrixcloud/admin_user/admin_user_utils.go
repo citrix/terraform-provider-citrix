@@ -73,7 +73,7 @@ func getAdminUser(ctx context.Context, client *citrixdaasclient.CitrixDaasClient
 		// Execute the request with retry logic
 		adminUsersResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*ccadmins.AdministratorsResult](fetchAdminUsersRequest, client)
 		if err != nil {
-			err = fmt.Errorf("TransactionId: " + citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp) + "\nError message: " + util.ReadClientError(err))
+			err = fmt.Errorf("TransactionId: %s\nError message: %s", citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp), util.ReadClientError(err))
 			return adminUser, err
 		}
 
@@ -121,7 +121,7 @@ func getAdminUserPolicies(ctx context.Context, diagnostics *diag.Diagnostics, cl
 func fetchAdminPoliciesWithRetry(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, adminUserResourceModel CCAdminUserResourceModel) ([]ccadmins.AdministratorAccessPolicyModel, error) {
 	adminId, err := getAdminIdFromAuthToken(client)
 	if err != nil {
-		err = fmt.Errorf("Unable to verify access of the admin user\n" + err.Error())
+		err = fmt.Errorf("Unable to verify access of the admin user\n%s", err.Error())
 		return nil, err
 	}
 
@@ -159,7 +159,7 @@ func fetchAdminPoliciesWithRetry(ctx context.Context, diagnostics *diag.Diagnost
 	}
 
 	if err != nil {
-		err = fmt.Errorf("error fetching admin policy access models\n" + err.Error())
+		err = fmt.Errorf("error fetching admin policy access models\n%s", err.Error())
 		return nil, err
 	}
 
@@ -254,7 +254,7 @@ func getAccessPolicies(ctx context.Context, client *citrixdaasclient.CitrixDaasC
 	getAccessPoliciesRequest := client.CCAdminsClient.AdministratorsAPI.GetAdministratorAccess(ctx, adminId)
 	accessPoliciesResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*ccadmins.AdministratorAccessModel](getAccessPoliciesRequest, client)
 	if err != nil {
-		err = fmt.Errorf("TransactionId: " + citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp) + "\nError message: " + util.ReadClientError(err))
+		err = fmt.Errorf("TransactionId: %s\nError message: %s", citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp), util.ReadClientError(err))
 		return accessPoliciesResponse, err
 	}
 	return accessPoliciesResponse, nil

@@ -11,6 +11,10 @@ import (
 // TestApplicationGroupResourcePreCheck validates the necessary env variable exist
 // in the testing environment
 func TestApplicationGroupResourcePreCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_APP_GROUP_NAME"); v == "" {
 		t.Fatal("TEST_APP_GROUP_NAME must be set for acceptance tests")
 	}

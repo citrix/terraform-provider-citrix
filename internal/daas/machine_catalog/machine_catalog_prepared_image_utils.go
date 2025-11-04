@@ -91,8 +91,7 @@ func validateImageVersion(ctx context.Context, diagnostics *diag.Diagnostics, cl
 						} else {
 							diskEncryptionSet := util.ObjectValueToTypedObject[util.AzureDiskEncryptionSetModel](ctx, diagnostics, azureMachineConfig.DiskEncryptionSet)
 							if !strings.EqualFold(diskEncryptionSet.DiskEncryptionSetName.ValueString(), desName) || !strings.EqualFold(diskEncryptionSet.DiskEncryptionSetResourceGroup.ValueString(), desResourceGroup) {
-								err := fmt.Errorf("disk_encryption_set " + diskEncryptionSet.DiskEncryptionSetResourceGroup.ValueString() + "/" + diskEncryptionSet.DiskEncryptionSetName.ValueString() +
-									" does not match the disk encryption set configured in the prepared image: " + desResourceGroup + "/" + desName)
+								err := fmt.Errorf("disk_encryption_set %s/%s does not match the disk encryption set configured in the prepared image: %s/%s", diskEncryptionSet.DiskEncryptionSetResourceGroup.ValueString(), diskEncryptionSet.DiskEncryptionSetName.ValueString(), desResourceGroup, desName)
 								diagnostics.AddError(
 									"Error validating `azure_machine_config`",
 									err.Error(),

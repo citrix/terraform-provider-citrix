@@ -4,11 +4,14 @@ package qcs_deployment
 import (
 	"context"
 	"regexp"
+	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixquickcreate"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
+	"github.com/citrix/terraform-provider-citrix/internal/util/planmodifiers"
 	"github.com/citrix/terraform-provider-citrix/internal/validators"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -94,6 +97,10 @@ type AwsWorkspacesDeploymentWorkspaceModel struct {
 }
 
 func (r AwsWorkspacesDeploymentWorkspaceModel) GetKey() string {
+	// For user-assigned workspaces, return the username. For user decoupled workspaces, return the machine ID
+	if !r.Username.IsNull() {
+		return strings.ToLower(r.Username.ValueString())
+	}
 	return r.MachineId.ValueString()
 }
 
@@ -134,28 +141,28 @@ func (AwsWorkspacesDeploymentWorkspaceModel) GetSchema() schema.NestedAttributeO
 				Description: "Id of the AWS WorkSpaces machine.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					planmodifiers.UseStateIfUnknownAndStateValueExists(),
 				},
 			},
 			"machine_id": schema.StringAttribute{
 				Description: "Id of the machine.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					planmodifiers.UseStateIfUnknownAndStateValueExists(),
 				},
 			},
 			"machine_name": schema.StringAttribute{
 				Description: "Name of the machine.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					planmodifiers.UseStateIfUnknownAndStateValueExists(),
 				},
 			},
 			"broker_machine_id": schema.StringAttribute{
 				Description: "GUID identifier of the machine.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					planmodifiers.UseStateIfUnknownAndStateValueExists(),
 				},
 			},
 		},
@@ -177,7 +184,7 @@ func (workspace AwsWorkspacesDeploymentWorkspaceModel) RefreshListItem(ctx conte
 
 	if desktop.GetUsername() == "" {
 		workspace.Username = types.StringNull()
-	} else {
+	} else if !strings.EqualFold(workspace.Username.ValueString(), desktop.GetUsername()) {
 		workspace.Username = types.StringValue(desktop.GetUsername())
 	}
 
@@ -344,6 +351,9 @@ func (AwsWorkspacesDeploymentResourceModel) GetSchema() schema.Schema {
 				Description:  "Set of workspaces with assigned users.",
 				Optional:     true,
 				NestedObject: AwsWorkspacesDeploymentWorkspaceModel{}.GetSchema(),
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+				},
 			},
 		},
 	}
@@ -395,7 +405,12 @@ func (r AwsWorkspacesDeploymentResourceModel) RefreshPropertyValues(ctx context.
 
 	r.UserDecoupledWorkspaces = types.BoolValue(deployment.GetUserDecoupledWorkspaces())
 
-	r.Workspaces = util.RefreshListValueProperties[AwsWorkspacesDeploymentWorkspaceModel, citrixquickcreate.AwsEdcDeploymentMachine](ctx, diagnostics, r.Workspaces, deployment.GetWorkspaces(), util.GetQcsAwsWorkspacesWithMachineIdKey)
+	clientKey := util.GetQcsAwsWorkspacesWithUsernameKey
+	if deployment.GetUserDecoupledWorkspaces() {
+		clientKey = util.GetQcsAwsWorkspacesWithMachineIdKey
+	}
+
+	r.Workspaces = util.RefreshListValueProperties[AwsWorkspacesDeploymentWorkspaceModel, citrixquickcreate.AwsEdcDeploymentMachine](ctx, diagnostics, r.Workspaces, deployment.GetWorkspaces(), clientKey)
 
 	return r
 }

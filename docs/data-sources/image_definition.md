@@ -3,12 +3,12 @@
 page_title: "citrix_image_definition Data Source - citrix"
 subcategory: "CVAD"
 description: |-
-  Data source of an image definition. Note that this feature is in Tech Preview.
+  Data source of an image definition.
 ---
 
 # citrix_image_definition (Data Source)
 
-Data source of an image definition. **Note that this feature is in Tech Preview.**
+Data source of an image definition.
 
 ## Example Usage
 

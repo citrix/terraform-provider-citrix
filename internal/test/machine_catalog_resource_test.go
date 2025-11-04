@@ -75,6 +75,10 @@ func init() {
 }
 
 func TestMachineCatalogPreCheck_Azure(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_MC_NAME"); v == "" {
 		t.Fatal("TEST_MC_NAME must be set for acceptance tests")
 	}
@@ -305,6 +309,10 @@ func TestHybridAzureADMachineCatalogResourceAzure(t *testing.T) {
 }
 
 func TestMachineCatalogPreCheck_AzureAd(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_MC_NAME"); v == "" {
 		t.Fatal("TEST_MC_NAME must be set for acceptance tests")
 	}
@@ -408,6 +416,10 @@ func TestAzureADMachineCatalogResourceAzure(t *testing.T) {
 }
 
 func TestMachineCatalogPreCheck_Workgroup(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_MC_NAME"); v == "" {
 		t.Fatal("TEST_MC_NAME must be set for acceptance tests")
 	}
@@ -500,6 +512,10 @@ func TestWorkgroupMachineCatalogResourceAzure(t *testing.T) {
 }
 
 func TestMachineCatalogPreCheck_GCP(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_MC_NAME_GCP"); v == "" {
 		t.Fatal("TEST_MC_NAME_GCP must be set for acceptance tests")
 	}
@@ -597,6 +613,10 @@ func TestMachineCatalogResourceGCP(t *testing.T) {
 }
 
 func TestMachineCatalogPreCheck_Vsphere(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_MC_NAME_VSPHERE"); v == "" {
 		t.Fatal("TEST_MC_NAME_VSPHERE must be set for acceptance tests")
 	}
@@ -684,6 +704,10 @@ func TestMachineCatalogResourceVsphere(t *testing.T) {
 }
 
 func TestMachineCatalogPreCheck_Xenserver(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_MC_NAME_XENSERVER"); v == "" {
 		t.Fatal("TEST_MC_NAME_XENSERVER must be set for acceptance tests")
 	}
@@ -771,6 +795,10 @@ func TestMachineCatalogResourceXenserver(t *testing.T) {
 }
 
 func TestMachineCatalogPreCheck_Nutanix(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_MC_NAME_NUTANIX"); v == "" {
 		t.Fatal("TEST_MC_NAME_NUTANIX must be set for acceptance tests")
 	}
@@ -864,6 +892,10 @@ func TestMachineCatalogResourceNutanix(t *testing.T) {
 }
 
 func TestMachineCatalogPreCheck_SCVMM(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_MC_NAME_SCVMM"); v == "" {
 		t.Fatal("TEST_MC_NAME_SCVMM must be set for acceptance tests")
 	}
@@ -962,6 +994,10 @@ func TestMachineCatalogResourceSCVMM(t *testing.T) {
 }
 
 func TestMachineCatalogPreCheck_Aws_Ec2(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_MC_NAME_AWS_EC2"); v == "" {
 		t.Fatal("TEST_MC_NAME_AWS_EC2 must be set for acceptance tests")
 	}
@@ -1054,6 +1090,10 @@ func TestMachineCatalogResourceAwsEc2(t *testing.T) {
 }
 
 func TestMachineCatalogPreCheck_Manual_Power_Managed_Azure(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_MC_NAME_MANUAL"); v == "" {
 		t.Fatal("TEST_MC_NAME_MANUAL must be set for acceptance tests")
 	}
@@ -1118,6 +1158,10 @@ func TestMachineCatalogResource_Manual_Power_Managed_Azure(t *testing.T) {
 }
 
 func TestMachineCatalogPreCheck_Manual_Power_Managed_GCP(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_MC_NAME_MANUAL"); v == "" {
 		t.Fatal("TEST_MC_NAME_MANUAL must be set for acceptance tests")
 	}
@@ -1182,6 +1226,10 @@ func TestMachineCatalogResource_Manual_Power_Managed_GCP(t *testing.T) {
 }
 
 func TestMachineCatalogPreCheck_Manual_Power_Managed_Vsphere(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_MC_NAME_MANUAL"); v == "" {
 		t.Fatal("TEST_MC_NAME_MANUAL must be set for acceptance tests")
 	}
@@ -1246,6 +1294,10 @@ func TestMachineCatalogResource_Manual_Power_Managed_Vsphere(t *testing.T) {
 }
 
 func TestMachineCatalogPreCheck_Manual_Power_Managed_Xenserver(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_MC_NAME_MANUAL"); v == "" {
 		t.Fatal("TEST_MC_NAME_MANUAL must be set for acceptance tests")
 	}
@@ -1304,6 +1356,10 @@ func TestMachineCatalogResource_Manual_Power_Managed_Xenserver(t *testing.T) {
 }
 
 func TestMachineCatalogPreCheck_Manual_Power_Managed_Nutanix(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_MC_NAME_MANUAL"); v == "" {
 		t.Fatal("TEST_MC_NAME_MANUAL must be set for acceptance tests")
 	}
@@ -1362,6 +1418,10 @@ func TestMachineCatalogResource_Manual_Power_Managed_Nutanix(t *testing.T) {
 }
 
 func TestMachineCatalogPreCheck_Manual_Power_Managed_SCVMM(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_MC_NAME_MANUAL"); v == "" {
 		t.Fatal("TEST_MC_NAME_MANUAL must be set for acceptance tests")
 	}
@@ -1423,6 +1483,10 @@ func TestMachineCatalogResource_Manual_Power_Managed_SCVMM(t *testing.T) {
 }
 
 func TestMachineCatalogPreCheck_Manual_Power_Managed_AWS_EC2(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_MC_NAME_MANUAL_AWS_EC2"); v == "" {
 		t.Fatal("TEST_MC_NAME_MANUAL_AWS_EC2 must be set for acceptance tests")
 	}
@@ -1484,6 +1548,10 @@ func TestMachineCatalogResource_Manual_Power_Managed_Aws_Ec2(t *testing.T) {
 }
 
 func TestMachineCatalogPreCheck_Manual_Non_Power_Managed(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_MC_NAME_MANUAL"); v == "" {
 		t.Fatal("TEST_MC_NAME_MANUAL must be set for acceptance tests")
 	}
@@ -1540,6 +1608,10 @@ func TestMachineCatalogResource_Manual_Non_Power_Managed(t *testing.T) {
 }
 
 func TestMachineCatalogPreCheck_RemotePC(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
 	if v := os.Getenv("TEST_MC_NAME_REMOTE_PC"); v == "" {
 		t.Fatal("TEST_MC_NAME_REMOTE_PC must be set for acceptance tests")
 	}
