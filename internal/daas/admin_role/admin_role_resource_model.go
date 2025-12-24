@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package admin_role
 
@@ -32,7 +32,6 @@ type AdminRoleModel struct {
 }
 
 func (r AdminRoleModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, adminRole *citrixorchestration.RoleResponseModel) AdminRoleModel {
-
 	// Overwrite admin role with refreshed state
 	r.Id = types.StringValue(adminRole.GetId())
 	r.Name = types.StringValue(adminRole.GetName())

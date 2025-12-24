@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package test
 
@@ -31,17 +31,9 @@ func TestAzureMcsSuitePreCheck(t *testing.T) {
 
 	isDDCVersionSupportedForPolicy := util.CheckProductVersion(client, &diag, 120, 118, 7, 41, "", "")
 	customerId := os.Getenv("CITRIX_CUSTOMER_ID")
-	isOnPremises := true
-	if customerId != "" && customerId != "CitrixOnPremises" {
-		// Tests being run in cloud env
-		isOnPremises = false
-	}
-	isPre2407AndOnPremises := false
-	if isOnPremises && !isDDCVersionSupportedForCatalogAndDelGrp {
-		// Tests being run in on-premises environment with CVAD version < 2407
-		isPre2407AndOnPremises = true
-	}
-
+	isOnPremises := customerId == "" || customerId == "CitrixOnPremises"
+	// Tests being run in on-premises environment with CVAD version < 2407
+	isPre2407AndOnPremises := isOnPremises && !isDDCVersionSupportedForCatalogAndDelGrp
 	TestProviderPreCheck(t)
 	TestHypervisorPreCheck_Azure(t)
 	TestHypervisorResourcePoolPreCheck_Azure(t)
@@ -79,22 +71,12 @@ func TestAzureMcs(t *testing.T) {
 	isDDCVersionSupportedForCatalogAndDelGrp := util.CheckProductVersion(client, &diag, 120, 120, 7, 42, "", "")
 
 	customerId := os.Getenv("CITRIX_CUSTOMER_ID")
-	isOnPremises := true
-	if customerId != "" && customerId != "CitrixOnPremises" {
-		// Tests being run in cloud env
-		isOnPremises = false
-	}
-	isPre2407AndOnPremises := false
-	if isOnPremises && !isDDCVersionSupportedForCatalogAndDelGrp {
-		// Tests being run in on-premises environment with CVAD version < 2407
-		isPre2407AndOnPremises = true
-	}
+	isOnPremises := customerId == "" || customerId == "CitrixOnPremises"
+	// Tests being run in on-premises environment with CVAD version < 2407
+	isPre2407AndOnPremises := isOnPremises && !isDDCVersionSupportedForCatalogAndDelGrp
 	gotestContext := os.Getenv("GOTEST_CONTEXT")
-	isGitHubAction := false
-	if gotestContext != "" && gotestContext == "github" {
-		// Tests being run in GitHub Action
-		isGitHubAction = true
-	}
+	// Tests being run in GitHub Action
+	isGitHubAction := gotestContext != "" && gotestContext == "github"
 
 	zoneInput := os.Getenv("TEST_ZONE_INPUT_AZURE")
 	zoneDescription := os.Getenv("TEST_ZONE_DESCRIPTION")

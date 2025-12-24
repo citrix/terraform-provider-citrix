@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package hypervisor_resource_pool
 
@@ -77,7 +77,7 @@ func (r *scvmmHypervisorResourcePoolResource) Configure(_ context.Context, req r
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 func (r *scvmmHypervisorResourcePoolResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
@@ -473,7 +473,7 @@ func (plan SCVMMHypervisorResourcePoolResourceModel) GetStorageList(ctx context.
 		}
 	}
 	storageNames := util.ConvertBaseStringArrayToPrimitiveStringArray(storage)
-	storages, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, hostXdPath, util.StorageResourceType, storageNames, hypervisor.GetConnectionType(), hypervisor.GetPluginId())
+	storages, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, hostXdPath, util.StorageResourceType, storageNames, hypervisor.GetConnectionType(), hypervisor.GetPluginId(), false)
 
 	if len(storage) > 0 && len(storages) == 0 {
 		errDetail := "No storage found for the given storage names"
@@ -495,7 +495,7 @@ func (plan SCVMMHypervisorResourcePoolResourceModel) GetStorageList(ctx context.
 		}
 	}
 	tempStorageNames := util.ConvertBaseStringArrayToPrimitiveStringArray(tempStorage)
-	tempStorages, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, hostXdPath, util.StorageResourceType, tempStorageNames, hypervisor.GetConnectionType(), hypervisor.GetPluginId())
+	tempStorages, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, hostXdPath, util.StorageResourceType, tempStorageNames, hypervisor.GetConnectionType(), hypervisor.GetPluginId(), false)
 
 	if len(tempStorage) > 0 && len(tempStorages) == 0 {
 		errDetail := "No storage found for the given temporary storage names"
@@ -521,7 +521,7 @@ func (plan SCVMMHypervisorResourcePoolResourceModel) GetNetworksList(ctx context
 	}
 
 	networkNames := util.StringListToStringArray(ctx, diags, plan.Networks)
-	networks, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, hostXdPath, util.NetworkResourceType, networkNames, hypervisorConnectionType, hypervisor.GetPluginId())
+	networks, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, hostXdPath, util.NetworkResourceType, networkNames, hypervisorConnectionType, hypervisor.GetPluginId(), false)
 	if len(networks) == 0 {
 		errDetail := "No network found for the given network names"
 		if err != nil {

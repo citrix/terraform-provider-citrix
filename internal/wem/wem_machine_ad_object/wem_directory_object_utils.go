@@ -1,3 +1,5 @@
+// Copyright © 2025. Citrix Systems, Inc.
+
 package wem_machine_ad_object
 
 import (
@@ -14,7 +16,7 @@ import (
 func readDirectoryObject(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, machineADObjectId string) (*citrixwemservice.MachineModel, error) {
 	idInt64, err := strconv.ParseInt(machineADObjectId, 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("invalid WEM Directory object ID: %v", err)
+		return nil, fmt.Errorf("invalid WEM Directory object ID: %w", err)
 	}
 	machineADObjectQueryRequest := client.WemClient.MachineADObjectDAAS.AdObjectQueryById(ctx, idInt64)
 	machineADObjectQueryResponse, _, err := util.ReadResource[*citrixwemservice.MachineModel](machineADObjectQueryRequest, ctx, client, resp, "Catalog Directory Object", machineADObjectId)
@@ -42,7 +44,7 @@ func getMachineADObjectBySid(ctx context.Context, client *citrixdaasclient.Citri
 func getMachineADObjectById(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, machineADObjectId string) (*citrixwemservice.MachineModel, error) {
 	idInt64, err := strconv.ParseInt(machineADObjectId, 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("invalid WEM Directory object ID: %v", err)
+		return nil, fmt.Errorf("invalid WEM Directory object ID: %w", err)
 	}
 	machineADObjectQueryRequest := client.WemClient.MachineADObjectDAAS.AdObjectQueryById(ctx, idInt64)
 	machineADObjectQueryResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixwemservice.MachineModel](machineADObjectQueryRequest, client)

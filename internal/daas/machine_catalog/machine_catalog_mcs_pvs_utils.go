@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package machine_catalog
 
@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,7 +22,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"golang.org/x/exp/slices"
 )
 
 var MappedCustomProperties = map[string]string{
@@ -44,7 +44,7 @@ var MappedCustomProperties = map[string]string{
 
 func getProvSchemeForCreateCatalog(plan MachineCatalogResourceModel, ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, isOnPremises bool, provisioningType *citrixorchestration.ProvisioningType) (*citrixorchestration.CreateMachineCatalogProvisioningSchemeRequestModel, error) {
 	provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, diagnostics, plan.ProvisioningScheme)
-	if !checkIfProvSchemeIsCloudOnly(ctx, diagnostics, provSchemeModel, isOnPremises) {
+	if !checkIfProvSchemeIsCloudOnly(diagnostics, provSchemeModel, isOnPremises) {
 		return nil, fmt.Errorf("identity type %s is not supported in OnPremises environment. ", provSchemeModel.IdentityType.ValueString())
 	}
 
@@ -158,10 +158,11 @@ func setProvSchemePropertiesForCreateCatalog(ctx context.Context, client *citrix
 			provisioningScheme.SetCustomProperties(customProperties)
 		}
 
-		if *provisioningType == citrixorchestration.PROVISIONINGTYPE_MCS {
+		switch *provisioningType { //nolint: exhaustive // only MCS and PVS supported
+		case citrixorchestration.PROVISIONINGTYPE_MCS:
 			err = setProvisioningSchemeForCreateAzureMcsCatalog(ctx, client, azureMachineConfigModel, diag, &provisioningScheme, hypervisor, hypervisorResourcePool)
-		} else if *provisioningType == citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING {
-			err = setProvisioningSchemeForCreateAzurePvsCatalog(ctx, azureMachineConfigModel, diag, &provisioningScheme)
+		case citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING:
+			setProvisioningSchemeForCreateAzurePvsCatalog(ctx, azureMachineConfigModel, diag, &provisioningScheme)
 		}
 
 		if err != nil {
@@ -347,7 +348,7 @@ func setProvSchemePropertiesForCreateCatalog(ctx context.Context, client *citrix
 
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
 		gcpMachineConfig := util.ObjectValueToTypedObject[GcpMachineConfigModel](ctx, diag, provisioningSchemePlan.GcpMachineConfig)
-		imagePath := ""
+		var imagePath string
 		var httpResp *http.Response
 		var err error
 		snapshot := gcpMachineConfig.MachineSnapshot.ValueString()
@@ -630,7 +631,6 @@ func setProvisioningSchemeForCreateAzureMcsCatalog(ctx context.Context, client *
 		masterImage := azureMasterImageModel.MasterImage.ValueString()
 		storageAccount := azureMasterImageModel.StorageAccount.ValueString()
 		container := azureMasterImageModel.Container.ValueString()
-		err := error(nil)
 		imagePath, err := util.BuildAzureMasterImagePath(ctx, client, diagnostics, azureMasterImageModel.GalleryImage, sharedSubscription, resourceGroup, storageAccount, container, masterImage, hypervisor.GetName(), hypervisorResourcePool.GetName(), "Error creating Machine Catalog")
 		if err != nil {
 			return err
@@ -655,12 +655,10 @@ func setProvisioningSchemeForCreateAzureMcsCatalog(ctx context.Context, client *
 	return nil
 }
 
-func setProvisioningSchemeForCreateAzurePvsCatalog(ctx context.Context, azureMachineConfigModel AzureMachineConfigModel, diagnostics *diag.Diagnostics, provisioningScheme *citrixorchestration.CreateMachineCatalogProvisioningSchemeRequestModel) error {
+func setProvisioningSchemeForCreateAzurePvsCatalog(ctx context.Context, azureMachineConfigModel AzureMachineConfigModel, diagnostics *diag.Diagnostics, provisioningScheme *citrixorchestration.CreateMachineCatalogProvisioningSchemeRequestModel) {
 	pvsConfigurationModel := util.ObjectValueToTypedObject[AzurePvsConfigurationModel](ctx, diagnostics, azureMachineConfigModel.AzurePvsConfiguration)
 	provisioningScheme.SetPVSSite(pvsConfigurationModel.PvsSiteId.ValueString())
 	provisioningScheme.SetPVSVDisk(pvsConfigurationModel.PvsVdiskId.ValueString())
-
-	return nil
 }
 
 func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan ProvisioningSchemeModel, body citrixorchestration.UpdateMachineCatalogRequestModel, ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, provisioningType *citrixorchestration.ProvisioningType) (citrixorchestration.UpdateMachineCatalogRequestModel, error) {
@@ -887,7 +885,7 @@ func deleteMachinesFromMcsPvsCatalog(ctx context.Context, client *citrixdaasclie
 		// Priority 1: Machine has no delivery group associated. This is the highest priority for deletion.
 		if !machine.GetDeliveryGroup().Id.IsSet() {
 			priority = 1
-		} else if machine.GetInMaintenanceMode() == true {
+		} else if machine.GetInMaintenanceMode() {
 			// Priority 2: Machine is currently in maintenance mode.
 			priority = 2
 		} else if machine.GetSessionCount() == 0 {
@@ -1000,7 +998,7 @@ func addMachinesToMcsPvsCatalog(ctx context.Context, client *citrixdaasclient.Ci
 		}
 	}
 	if len(availableMachineAccounts) > int(addMachinesCount) {
-		for i := 0; i < int(addMachinesCount); i++ {
+		for i := range int(addMachinesCount) {
 			batchRequestItem, err := constructAddMachineWithADAccountRequestBatchItem(&resp.Diagnostics, client, relativeUrl, batchApiHeaders, catalogName, i, availableMachineAccounts)
 			if err != nil {
 				return err
@@ -1009,7 +1007,7 @@ func addMachinesToMcsPvsCatalog(ctx context.Context, client *citrixdaasclient.Ci
 		}
 	} else {
 		addMachinesWithRuleCount := addMachinesCount - int32(len(availableMachineAccounts))
-		for i := 0; i < len(availableMachineAccounts); i++ {
+		for i := range availableMachineAccounts {
 			batchRequestItem, err := constructAddMachineWithADAccountRequestBatchItem(&resp.Diagnostics, client, relativeUrl, batchApiHeaders, catalogName, i, availableMachineAccounts)
 			if err != nil {
 				return err
@@ -1017,7 +1015,7 @@ func addMachinesToMcsPvsCatalog(ctx context.Context, client *citrixdaasclient.Ci
 			batchRequestItems = append(batchRequestItems, batchRequestItem)
 		}
 
-		for i := 0; i < int(addMachinesWithRuleCount); i++ {
+		for i := range int(addMachinesWithRuleCount) {
 			var batchRequestItem citrixorchestration.BatchRequestItemModel
 			batchRequestItem.SetMethod(http.MethodPost)
 			batchRequestItem.SetReference(strconv.Itoa(i))
@@ -1144,7 +1142,6 @@ func updateMemoryAndCpuCount(ctx context.Context, client *citrixdaasclient.Citri
 }
 
 func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, catalog *citrixorchestration.MachineCatalogDetailResponseModel, plan MachineCatalogResourceModel, provisioningType *citrixorchestration.ProvisioningType, maxTimeoutInMinutes int32) error {
-
 	catalogName := catalog.GetName()
 	catalogId := catalog.GetId()
 
@@ -1192,7 +1189,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
 		azureMachineConfigModel := util.ObjectValueToTypedObject[AzureMachineConfigModel](ctx, &resp.Diagnostics, provisioningSchemePlan.AzureMachineConfig)
 		azureMachineProfile := azureMachineConfigModel.MachineProfile
-		if !(*provisioningType == citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING) {
+		if *provisioningType != citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING {
 			if !azureMachineConfigModel.AzureMasterImage.IsNull() {
 				azureMasterImageModel := util.ObjectValueToTypedObject[AzureMasterImageModel](ctx, &resp.Diagnostics, azureMachineConfigModel.AzureMasterImage)
 				sharedSubscription := azureMasterImageModel.SharedSubscription.ValueString()
@@ -1276,7 +1273,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 				if err != nil {
 					return err
 				}
-				preparedImageUseSharedGallery = IsAzureImageDefinitionUsingSharedImageGallery(imageDefinitionResp)
+				preparedImageUseSharedGallery = IsAzureImageDefinitionUsingSharedImageGallery(&resp.Diagnostics, imageDefinitionResp)
 			}
 
 			// Set reboot options if configured
@@ -1602,8 +1599,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 	}
 
 	// Updating image is not supported for PVSStreaming catalog
-	if !(*provisioningType == citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING) {
-
+	if *provisioningType != citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING {
 		replicaRatio, replicaMaximum, useSharedGallery := setComputeGalleryValues(customProps)
 
 		updateReplicaRatio, updateReplicaMaximum, updateUseSharedGallery := setComputeGalleryValues(updateCustomProperties)
@@ -1710,7 +1706,10 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Con
 	switch *connectionType {
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM:
 		azureMachineConfigModel := util.ObjectValueToTypedObject[AzureMachineConfigModel](ctx, diagnostics, provSchemeModel.AzureMachineConfig)
-		provisioningType, _ := citrixorchestration.NewProvisioningTypeFromValue(r.ProvisioningType.ValueString())
+		provisioningType, err := citrixorchestration.NewProvisioningTypeFromValue(r.ProvisioningType.ValueString())
+		if err != nil {
+			diagnostics.AddError("Error parsing provisioning type", err.Error())
+		}
 		azureMachineConfigModel.RefreshProperties(ctx, diagnostics, *catalog, provisioningType)
 		provSchemeModel.AzureMachineConfig = util.TypedObjectToObjectValue(ctx, diagnostics, azureMachineConfigModel)
 		for _, stringPair := range customProperties {
@@ -1971,7 +1970,7 @@ func parseCustomPropertiesToClientModel(ctx context.Context, diagnostics *diag.D
 					if err != nil {
 						return nil, err
 					}
-					preparedImageUseSharedGallery = IsAzureImageDefinitionUsingSharedImageGallery(imageDefinitionResp)
+					preparedImageUseSharedGallery = IsAzureImageDefinitionUsingSharedImageGallery(diagnostics, imageDefinitionResp)
 				}
 
 				*res = appendUseAzureComputeGalleryCustomProperties(ctx, diagnostics, *res, azureMachineConfigModel, preparedImageUseSharedGallery)
@@ -1990,7 +1989,7 @@ func parseCustomPropertiesToClientModel(ctx context.Context, diagnostics *diag.D
 			util.AppendNameValueStringPair(res, "Zones", strings.Join(availability_zones, ","))
 		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
-		gcpMachineConfig := util.ObjectValueToTypedObject[GcpMachineConfigModel](context.Background(), nil, provisioningScheme.GcpMachineConfig)
+		gcpMachineConfig := util.ObjectValueToTypedObject[GcpMachineConfigModel](ctx, nil, provisioningScheme.GcpMachineConfig)
 		if !provisioningScheme.AvailabilityZones.IsNull() {
 			availability_zones := util.StringListToStringArray(ctx, diagnostics, provisioningScheme.AvailabilityZones)
 			util.AppendNameValueStringPair(res, "CatalogZones", strings.Join(availability_zones, ","))
@@ -1999,7 +1998,7 @@ func parseCustomPropertiesToClientModel(ctx context.Context, diagnostics *diag.D
 			util.AppendNameValueStringPair(res, "StorageType", gcpMachineConfig.StorageType.ValueString())
 		}
 		if !gcpMachineConfig.WritebackCache.IsNull() {
-			writebackCacheModel := util.ObjectValueToTypedObject[GcpWritebackCacheModel](context.Background(), nil, gcpMachineConfig.WritebackCache)
+			writebackCacheModel := util.ObjectValueToTypedObject[GcpWritebackCacheModel](ctx, nil, gcpMachineConfig.WritebackCache)
 			if !writebackCacheModel.WBCDiskStorageType.IsNull() {
 				util.AppendNameValueStringPair(res, "WBCDiskStorageType", writebackCacheModel.WBCDiskStorageType.ValueString())
 			}
@@ -2044,7 +2043,7 @@ func getOnPremImage(ctx context.Context, client *citrixdaasclient.CitrixDaasClie
 		queryPath = queryPath + fmt.Sprintf("%s.vm", image)
 		snapshotSegments := strings.Split(snapshot, "/")
 		snapshotName := snapshotSegments[len(snapshotSegments)-1]
-		for i := 0; i < len(snapshotSegments)-1; i++ {
+		for i := range len(snapshotSegments) - 1 {
 			queryPath = queryPath + "\\" + snapshotSegments[i] + ".snapshot"
 		}
 
@@ -2351,7 +2350,14 @@ func getBackupVmConfigurationUsingSecondaryVmSizes(ctx context.Context, diag *di
 				for _, data := range serviceOfferingData {
 					if strings.EqualFold(data.GetName(), util.MachineCatalogServiceOfferingSupportedInstanceMarketTypes) {
 						var supportedInstanceMarketTypes []string
-						json.Unmarshal([]byte(data.GetValue()), &supportedInstanceMarketTypes)
+						err := json.Unmarshal([]byte(data.GetValue()), &supportedInstanceMarketTypes)
+						if err != nil {
+							diag.AddError(
+								"Error parsing supported instance market types",
+								err.Error(),
+							)
+							return nil, err
+						}
 						if slices.ContainsFunc(supportedInstanceMarketTypes, func(v string) bool {
 							return strings.EqualFold(v, util.MachineCatalogBackupVmConfigurationTypeSpot)
 						}) {

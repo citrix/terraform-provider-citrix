@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package admin_user
 
@@ -52,7 +52,7 @@ func (r *adminUserResource) Configure(_ context.Context, req resource.ConfigureR
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -96,10 +96,8 @@ func (r *adminUserResource) Create(ctx context.Context, req resource.CreateReque
 		)
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Admin "+plan.DomainName.ValueString()+"\\"+plan.Name.ValueString(), &resp.Diagnostics, 5)
-	if err != nil {
-		// Error has been added to diagnostics. Do not return since we need to mark the resource as tainted in the state
-	}
+	//nolint:errcheck // Errors added to diagnostics, continue so resource gets marked as tainted
+	_ = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Admin "+plan.DomainName.ValueString()+"\\"+plan.Name.ValueString(), &resp.Diagnostics, 5)
 
 	// Try getting the new admin user from remote
 	adminUser, err := getAdminIfExists(ctx, r.client, &resp.Diagnostics, plan.DomainName.ValueString(), plan.Name.ValueString())
@@ -248,7 +246,6 @@ func (r *adminUserResource) ImportState(ctx context.Context, req resource.Import
 }
 
 func getAdminUser(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, adminUserFqdnOrId string) (*citrixorchestration.AdministratorResponseModel, error) {
-
 	// Get admin user
 	getAdminUserRequest := client.ApiClient.AdminAPIsDAAS.AdminGetAdminAdministrator(ctx, adminUserFqdnOrId)
 	adminUser, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.AdministratorResponseModel](getAdminUserRequest, client)
@@ -283,7 +280,6 @@ func getAdminIfExists(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 	)
 
 	return nil, err
-
 }
 
 func getAllAdminUsers(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) ([]citrixorchestration.AdministratorResponseModel, error) {

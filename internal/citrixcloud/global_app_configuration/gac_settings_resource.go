@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package global_app_configuration
 
@@ -52,7 +52,7 @@ func (r *gacSettingsResource) Configure(_ context.Context, req resource.Configur
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -267,7 +267,6 @@ func (r *gacSettingsResource) Delete(ctx context.Context, req resource.DeleteReq
 			return
 		}
 	}
-
 }
 
 func (r *gacSettingsResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -278,7 +277,7 @@ func (r *gacSettingsResource) ImportState(ctx context.Context, req resource.Impo
 func getSettingsConfiguration(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, serviceUrl string, isTestChannel bool) (*globalappconfiguration.GetAllSettingResponse, error) {
 	encodedServiceUrl := b64.StdEncoding.EncodeToString([]byte(serviceUrl))
 	if isTestChannel {
-		getSettingsForChannelRequest := client.GacClient.SettingsDAAS.RetrieveSettingsForChannel(ctx, util.GacAppName, util.GacTestChannelShortName, encodedServiceUrl)
+		getSettingsForChannelRequest := client.GacClient.SettingsDAAS.RetrieveSettingsForChannel(ctx, util.GacAppName, encodedServiceUrl, util.GacTestChannelShortName)
 		getSettingsResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*globalappconfiguration.GetAllSettingResponse](getSettingsForChannelRequest, client)
 		if err != nil {
 			diagnostics.AddError(
@@ -287,7 +286,7 @@ func getSettingsConfiguration(ctx context.Context, client *citrixdaasclient.Citr
 					"\nError message: "+util.ReadGacError(err),
 			)
 		}
-		return getSettingsResponse, nil
+		return getSettingsResponse, err
 	} else {
 		getSettingsRequest := client.GacClient.SettingsDAAS.RetrieveSettingsForURL(ctx, util.GacAppName, encodedServiceUrl)
 		getSettingsResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*globalappconfiguration.GetAllSettingResponse](getSettingsRequest, client)
@@ -298,7 +297,7 @@ func getSettingsConfiguration(ctx context.Context, client *citrixdaasclient.Citr
 					"\nError message: "+util.ReadGacError(err),
 			)
 		}
-		return getSettingsResponse, nil
+		return getSettingsResponse, err
 	}
 }
 
@@ -444,7 +443,10 @@ func CreateCategorySettingsForWindows(ctx context.Context, diagnostics *diag.Dia
 			localAppAllowList := util.ObjectSetToTypedArray[LocalAppAllowListModel](ctx, diagnostics, windowsSetting.LocalAppAllowList)
 			for _, localApp := range localAppAllowList {
 				var localAppAllowListGoItem LocalAppAllowListModel_Go
-				ConvertStruct(localApp, &localAppAllowListGoItem)
+				if err := ConvertStruct(localApp, &localAppAllowListGoItem); err != nil {
+					diagnostics.AddError("Failed to convert local app allow list item", err.Error())
+					continue
+				}
 				localAppAllowListGo = append(localAppAllowListGo, localAppAllowListGoItem)
 			}
 			categorySetting.SetValue(localAppAllowListGo)
@@ -460,7 +462,10 @@ func CreateCategorySettingsForWindows(ctx context.Context, diagnostics *diag.Dia
 			extensionInstallAllowList := util.ObjectSetToTypedArray[ExtensionInstallAllowListModel](ctx, diagnostics, windowsSetting.ExtensionInstallAllowList)
 			for _, extensionInstall := range extensionInstallAllowList {
 				var extensionInstallAllowListGoItem ExtensionInstallAllowListModel_Go
-				ConvertStruct(extensionInstall, &extensionInstallAllowListGoItem)
+				if err := ConvertStruct(extensionInstall, &extensionInstallAllowListGoItem); err != nil {
+					diagnostics.AddError("Failed to convert extension install allow list item", err.Error())
+					continue
+				}
 				extensionInstallAllowListGo = append(extensionInstallAllowListGo, extensionInstallAllowListGoItem)
 			}
 			categorySetting.SetValue(extensionInstallAllowListGo)
@@ -509,7 +514,10 @@ func CreateCategorySettingsForLinux(ctx context.Context, diagnostics *diag.Diagn
 			extensionInstallAllowList := util.ObjectSetToTypedArray[ExtensionInstallAllowListModel](ctx, diagnostics, linuxSetting.ExtensionInstallAllowList)
 			for _, extensionInstall := range extensionInstallAllowList {
 				var extensionInstallAllowListGoItem ExtensionInstallAllowListModel_Go
-				ConvertStruct(extensionInstall, &extensionInstallAllowListGoItem)
+				if err := ConvertStruct(extensionInstall, &extensionInstallAllowListGoItem); err != nil {
+					diagnostics.AddError("Failed to convert extension install allow list item", err.Error())
+					continue
+				}
 				extensionInstallAllowListGo = append(extensionInstallAllowListGo, extensionInstallAllowListGoItem)
 			}
 			categorySetting.SetValue(extensionInstallAllowListGo)
@@ -647,7 +655,10 @@ func CreateCategorySettingsForMacos(ctx context.Context, diagnostics *diag.Diagn
 			extensionInstallAllowList := util.ObjectSetToTypedArray[ExtensionInstallAllowListModel](ctx, diagnostics, macosSetting.ExtensionInstallAllowList)
 			for _, extensionInstall := range extensionInstallAllowList {
 				var extensionInstallAllowListGoItem ExtensionInstallAllowListModel_Go
-				ConvertStruct(extensionInstall, &extensionInstallAllowListGoItem)
+				if err := ConvertStruct(extensionInstall, &extensionInstallAllowListGoItem); err != nil {
+					diagnostics.AddError("Failed to convert extension install allow list item", err.Error())
+					continue
+				}
 				extensionInstallAllowListGo = append(extensionInstallAllowListGo, extensionInstallAllowListGoItem)
 			}
 			categorySetting.SetValue(extensionInstallAllowListGo)

@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package hypervisor
 
@@ -58,7 +58,7 @@ func (r *azureHypervisorResource) Configure(_ context.Context, req resource.Conf
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -118,7 +118,15 @@ func (r *azureHypervisorResource) Create(ctx context.Context, req resource.Creat
 	enableAuthenticationMode.SetValue(plan.AuthenticationMode.ValueString())
 	customProperties = append(customProperties, enableAuthenticationMode)
 
-	customPropertyString, _ := json.Marshal(customProperties)
+	customPropertyString, err := json.Marshal(customProperties)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error creating Hypervisor",
+			"Hypervisor "+plan.Name.ValueString()+" failed to be created. Could not marshal custom properties.\n"+
+				"Error message: "+err.Error(),
+		)
+		return
+	}
 	connectionDetails.SetCustomProperties(string(customPropertyString))
 
 	// Generate API request body from plan
@@ -282,7 +290,15 @@ func (r *azureHypervisorResource) Update(ctx context.Context, req resource.Updat
 		updatedCustomProperties = append(updatedCustomProperties, &enableAuthenticationMode)
 	}
 
-	customPropertiesByte, _ := json.Marshal(updatedCustomProperties)
+	customPropertiesByte, err := json.Marshal(updatedCustomProperties)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating Hypervisor",
+			"Hypervisor "+plan.Name.ValueString()+" failed to be updated. Could not marshal custom properties.\n"+
+				"Error message: "+err.Error(),
+		)
+		return
+	}
 	editHypervisorRequestBody.SetCustomProperties(string(customPropertiesByte))
 
 	// Fetch updated hypervisor from GetHypervisor
@@ -345,6 +361,7 @@ func getMetadataForAzureRmHypervisor(plan AzureHypervisorResourceModel) []citrix
 		secretExpirationDate = secretExpirationDate + " 23:59:59"
 	}
 
+	//nolint:errcheck // Best-effort parsing; defaults to zero time on error
 	parsedTime, _ := time.Parse(time.DateTime, secretExpirationDate)
 	secretExpirationDateInUnix := parsedTime.UnixMilli()
 	secretExpirationDateMetada := citrixorchestration.NameValueStringPairModel{}

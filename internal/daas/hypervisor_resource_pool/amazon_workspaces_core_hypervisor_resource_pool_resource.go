@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package hypervisor_resource_pool
 
@@ -51,7 +51,7 @@ func (r *amazonWorkSpacesCoreHypervisorResourcePoolResource) Configure(_ context
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 func (r *amazonWorkSpacesCoreHypervisorResourcePoolResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -96,7 +96,7 @@ func (r *amazonWorkSpacesCoreHypervisorResourcePoolResource) Create(ctx context.
 	resourcePoolDetails.SetVirtualPrivateCloud(vpcPath)
 	availabilityZonePath := fmt.Sprintf("%s/%s.availabilityzone", vpcPath, plan.AvailabilityZone.ValueString())
 	resourcePoolDetails.SetAvailabilityZone(availabilityZonePath)
-	planSubnet := util.StringListToStringArray(ctx, &diags, plan.Subnets)
+	planSubnet := util.StringListToStringArray(ctx, &resp.Diagnostics, plan.Subnets)
 	subnets, err := getHypervisorResourcePoolSubnets(ctx, r.client, &resp.Diagnostics, hypervisorId, availabilityZonePath, planSubnet, hypervisorConnectionType)
 	if err != nil {
 		// Directly return. Error logs have been populated in common function
@@ -114,7 +114,7 @@ func (r *amazonWorkSpacesCoreHypervisorResourcePoolResource) Create(ctx context.
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(ctx, &diags, resourcePool)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, resourcePool)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -122,7 +122,6 @@ func (r *amazonWorkSpacesCoreHypervisorResourcePoolResource) Create(ctx context.
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 func (r *amazonWorkSpacesCoreHypervisorResourcePoolResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -145,7 +144,7 @@ func (r *amazonWorkSpacesCoreHypervisorResourcePoolResource) Read(ctx context.Co
 	}
 
 	// Override with refreshed state
-	state = state.RefreshPropertyValues(ctx, &diags, resourcePool)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, resourcePool)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -153,7 +152,6 @@ func (r *amazonWorkSpacesCoreHypervisorResourcePoolResource) Read(ctx context.Co
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 func (r *amazonWorkSpacesCoreHypervisorResourcePoolResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -178,7 +176,7 @@ func (r *amazonWorkSpacesCoreHypervisorResourcePoolResource) Update(ctx context.
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_AMAZON_WORK_SPACES_CORE)
 	editHypervisorResourcePool.SetVmTagging(plan.VmTagging.ValueBool())
 
-	planSubnet := util.StringListToStringArray(ctx, &diags, plan.Subnets)
+	planSubnet := util.StringListToStringArray(ctx, &resp.Diagnostics, plan.Subnets)
 	availabilityZonePath := fmt.Sprintf("%s.virtualprivatecloud/%s.availabilityzone", plan.Vpc.ValueString(), plan.AvailabilityZone.ValueString())
 	subnets, err := getHypervisorResourcePoolSubnets(ctx, r.client, &resp.Diagnostics, plan.Hypervisor.ValueString(), availabilityZonePath, planSubnet, citrixorchestration.HYPERVISORCONNECTIONTYPE_AMAZON_WORK_SPACES_CORE)
 	if err != nil {
@@ -195,7 +193,7 @@ func (r *amazonWorkSpacesCoreHypervisorResourcePoolResource) Update(ctx context.
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(ctx, &diags, updatedResourcePool)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, updatedResourcePool)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -203,7 +201,6 @@ func (r *amazonWorkSpacesCoreHypervisorResourcePoolResource) Update(ctx context.
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 func (r *amazonWorkSpacesCoreHypervisorResourcePoolResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -264,7 +261,6 @@ func (r *amazonWorkSpacesCoreHypervisorResourcePoolResource) ImportState(ctx con
 		"Error importing Hypervisor Resource Pool",
 		fmt.Sprintf("Hypervisor Resource Pool with ID %q not found", req.ID),
 	)
-
 }
 
 func (r *amazonWorkSpacesCoreHypervisorResourcePoolResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

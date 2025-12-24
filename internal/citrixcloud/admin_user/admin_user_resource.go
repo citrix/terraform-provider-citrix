@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package cc_admin_user
 
@@ -53,7 +53,7 @@ func (r *ccAdminUserResource) Configure(_ context.Context, req resource.Configur
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -361,7 +361,6 @@ func (r *ccAdminUserResource) ValidateConfig(ctx context.Context, req resource.V
 	}
 
 	if data.Type.ValueString() == string(ccadmins.ADMINISTRATORTYPE_ADMINISTRATOR_USER) {
-
 		if !data.Email.IsUnknown() && data.Email.IsNull() {
 			resp.Diagnostics.AddError(
 				"Error validating email",
@@ -389,7 +388,6 @@ func (r *ccAdminUserResource) ValidateConfig(ctx context.Context, req resource.V
 	}
 
 	if data.Type.ValueString() == string(ccadmins.ADMINISTRATORTYPE_ADMINISTRATOR_GROUP) {
-
 		if !data.Email.IsNull() {
 			resp.Diagnostics.AddError(
 				"Error validating email",

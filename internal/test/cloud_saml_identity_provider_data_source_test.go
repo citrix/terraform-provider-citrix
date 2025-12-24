@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package test
 
 import (
@@ -30,11 +31,7 @@ func TestCCSamlIdpDataSourcePreCheck(t *testing.T) {
 
 func TestCCSamlIdpDataSource(t *testing.T) {
 	customerId := os.Getenv("CITRIX_CUSTOMER_ID")
-	isOnPremises := true
-	if customerId != "" && customerId != "CitrixOnPremises" {
-		// Tests being run in cloud env
-		isOnPremises = false
-	}
+	isOnPremises := customerId == "" || customerId == "CitrixOnPremises"
 
 	id := os.Getenv("TEST_CC_SAML_IDP_DATA_SOURCE_ID")
 	name := os.Getenv("TEST_CC_SAML_IDP_DATA_SOURCE_NAME")

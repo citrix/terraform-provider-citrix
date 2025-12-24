@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package qcs_account
 
 import (
@@ -41,7 +42,7 @@ func (r *AwsWorkspacesCloudFormationDataSource) Configure(_ context.Context, req
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Read refreshes the Terraform state with the latest data.
@@ -81,7 +82,6 @@ func getAwsWorkspacesCloudFormationTemplate(ctx context.Context, client *citrixd
 
 	getTemplateRequest := client.QuickCreateClient.AccountQCS.GetCustomerAccountResourcesAsync(ctx, client.ClientConfig.CustomerId)
 	getTemplateRequest = getTemplateRequest.Body(getTemplateRequestBody)
-	getTemplateRequest.Execute()
 	accountResource, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickcreate.AccountResources](getTemplateRequest, client)
 	if err != nil {
 		return nil, err

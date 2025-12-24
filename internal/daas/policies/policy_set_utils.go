@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package policies
 
@@ -41,7 +41,7 @@ func GetPolicySet(ctx context.Context, client *citrixdaasclient.CitrixDaasClient
 	if err != nil {
 		// Check if this is a 404 Not Found error - return a specific error that can be handled by the caller
 		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
-			return nil, fmt.Errorf("%w: %v", util.ErrPolicySetNotFound, err)
+			return nil, fmt.Errorf("%w: %w", util.ErrPolicySetNotFound, err)
 		}
 
 		diagnostics.AddError(
@@ -203,14 +203,20 @@ func constructPolicyFilterRequests(ctx context.Context, diagnostics *diag.Diagno
 
 	if !policy.BranchRepeaterFilter.IsNull() {
 		branchRepeaterFilter := util.ObjectValueToTypedObject[BranchRepeaterFilterModel](ctx, diagnostics, policy.BranchRepeaterFilter)
-		branchRepeaterFilterRequest, _ := branchRepeaterFilter.GetFilterRequest(diagnostics, serverValue)
+		branchRepeaterFilterRequest, err := branchRepeaterFilter.GetFilterRequest(diagnostics, serverValue)
+		if err != nil {
+			return filterRequests, err
+		}
 		filterRequests = append(filterRequests, branchRepeaterFilterRequest)
 	}
 
 	if !policy.ClientIPFilters.IsNull() && len(policy.ClientIPFilters.Elements()) > 0 {
 		clientIpFilters := util.ObjectSetToTypedArray[ClientIPFilterModel](ctx, diagnostics, policy.ClientIPFilters)
 		for _, clientIpFilter := range clientIpFilters {
-			filterRequest, _ := clientIpFilter.GetFilterRequest(diagnostics, serverValue)
+			filterRequest, err := clientIpFilter.GetFilterRequest(diagnostics, serverValue)
+			if err != nil {
+				return filterRequests, err
+			}
 			filterRequests = append(filterRequests, filterRequest)
 		}
 	}
@@ -218,7 +224,10 @@ func constructPolicyFilterRequests(ctx context.Context, diagnostics *diag.Diagno
 	if !policy.ClientNameFilters.IsNull() && len(policy.ClientNameFilters.Elements()) > 0 {
 		clientNameFilters := util.ObjectSetToTypedArray[ClientNameFilterModel](ctx, diagnostics, policy.ClientNameFilters)
 		for _, clientNameFilter := range clientNameFilters {
-			filterRequest, _ := clientNameFilter.GetFilterRequest(diagnostics, serverValue)
+			filterRequest, err := clientNameFilter.GetFilterRequest(diagnostics, serverValue)
+			if err != nil {
+				return filterRequests, err
+			}
 			filterRequests = append(filterRequests, filterRequest)
 		}
 	}
@@ -226,7 +235,10 @@ func constructPolicyFilterRequests(ctx context.Context, diagnostics *diag.Diagno
 	if !policy.ClientPlatformFilters.IsNull() && len(policy.ClientPlatformFilters.Elements()) > 0 {
 		clientPlatformFilters := util.ObjectSetToTypedArray[ClientPlatformFilterModel](ctx, diagnostics, policy.ClientPlatformFilters)
 		for _, clientPlatformFilter := range clientPlatformFilters {
-			filterRequest, _ := clientPlatformFilter.GetFilterRequest(diagnostics, serverValue)
+			filterRequest, err := clientPlatformFilter.GetFilterRequest(diagnostics, serverValue)
+			if err != nil {
+				return filterRequests, err
+			}
 			filterRequests = append(filterRequests, filterRequest)
 		}
 	}
@@ -246,7 +258,10 @@ func constructPolicyFilterRequests(ctx context.Context, diagnostics *diag.Diagno
 	if !policy.DeliveryGroupTypeFilters.IsNull() && len(policy.DeliveryGroupTypeFilters.Elements()) > 0 {
 		deliveryGroupTypeFilters := util.ObjectSetToTypedArray[DeliveryGroupTypeFilterModel](ctx, diagnostics, policy.DeliveryGroupTypeFilters)
 		for _, deliveryGroupTypeFilter := range deliveryGroupTypeFilters {
-			filterRequest, _ := deliveryGroupTypeFilter.GetFilterRequest(diagnostics, serverValue)
+			filterRequest, err := deliveryGroupTypeFilter.GetFilterRequest(diagnostics, serverValue)
+			if err != nil {
+				return filterRequests, err
+			}
 			filterRequests = append(filterRequests, filterRequest)
 		}
 	}
@@ -265,7 +280,10 @@ func constructPolicyFilterRequests(ctx context.Context, diagnostics *diag.Diagno
 	if !policy.OuFilters.IsNull() && len(policy.OuFilters.Elements()) > 0 {
 		ouFilters := util.ObjectSetToTypedArray[OuFilterModel](ctx, diagnostics, policy.OuFilters)
 		for _, ouFilter := range ouFilters {
-			filterRequest, _ := ouFilter.GetFilterRequest(diagnostics, serverValue)
+			filterRequest, err := ouFilter.GetFilterRequest(diagnostics, serverValue)
+			if err != nil {
+				return filterRequests, err
+			}
 			filterRequests = append(filterRequests, filterRequest)
 		}
 	}
@@ -273,7 +291,10 @@ func constructPolicyFilterRequests(ctx context.Context, diagnostics *diag.Diagno
 	if !policy.UserFilters.IsNull() && len(policy.UserFilters.Elements()) > 0 {
 		userFilters := util.ObjectSetToTypedArray[UserFilterModel](ctx, diagnostics, policy.UserFilters)
 		for _, userFilter := range userFilters {
-			filterRequest, _ := userFilter.GetFilterRequest(diagnostics, serverValue)
+			filterRequest, err := userFilter.GetFilterRequest(diagnostics, serverValue)
+			if err != nil {
+				return filterRequests, err
+			}
 			filterRequests = append(filterRequests, filterRequest)
 		}
 	}
@@ -826,7 +847,6 @@ func getGpoUserSettingDefinitions(ctx context.Context, diagnostics *diag.Diagnos
 	getSettingDefinitionsRequest = getSettingDefinitionsRequest.IsLean(true)
 	getSettingDefinitionsRequest = getSettingDefinitionsRequest.Limit(-1)
 	getSettingDefinitionsRequest = getSettingDefinitionsRequest.IsUserSetting(true)
-	getSettingDefinitionsRequest.Execute()
 	settingResp, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.SettingDefinitionEnvelope](getSettingDefinitionsRequest, client)
 	if err != nil {
 		diagnostics.AddError(
@@ -844,7 +864,6 @@ func GetGpoBooleanSettingDefaultValueMap(ctx context.Context, diagnostics *diag.
 	getSettingDefinitionsRequest := client.ApiClient.GpoDAAS.GpoGetSettingDefinitions(ctx)
 	getSettingDefinitionsRequest = getSettingDefinitionsRequest.IsLean(true)
 	getSettingDefinitionsRequest = getSettingDefinitionsRequest.Limit(-1)
-	getSettingDefinitionsRequest.Execute()
 	settingResp, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.SettingDefinitionEnvelope](getSettingDefinitionsRequest, client)
 	if err != nil {
 		diagnostics.AddError(

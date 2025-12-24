@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package admin_user
 
@@ -70,7 +70,6 @@ func (RightsModel) GetAttributes() map[string]schema.Attribute {
 }
 
 func (r AdminUserResourceModel) refreshRights(ctx context.Context, diagnostics *diag.Diagnostics, rightsFromRemote []citrixorchestration.AdministratorRightResponseModel) []RightsModel {
-
 	type RemoteRightsTracker struct {
 		RoleName  types.String
 		ScopeName types.String

@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package application
 
@@ -49,7 +49,7 @@ func (r *applicationIconResource) Configure(_ context.Context, req resource.Conf
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Schema returns the resource schema.
@@ -133,7 +133,6 @@ func (r *applicationIconResource) Create(ctx context.Context, req resource.Creat
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 func (r *applicationIconResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -162,7 +161,6 @@ func (r *applicationIconResource) Read(ctx context.Context, req resource.ReadReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 func (r *applicationIconResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -232,7 +230,6 @@ func GetAllExistingIcons(ctx context.Context, client *citrixdaasclient.CitrixDaa
 		}
 		continuationToken = responseModel.GetContinuationToken()
 	}
-
 }
 
 func (r *applicationIconResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {

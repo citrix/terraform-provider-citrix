@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package application
 
@@ -438,7 +438,6 @@ func (r ApplicationResourceModel) RefreshPropertyValues(ctx context.Context, dia
 }
 
 func (r ApplicationResourceModel) updatePlanWithInstalledAppProperties(ctx context.Context, diagnostics *diag.Diagnostics, application *citrixorchestration.ApplicationDetailResponseModel) types.Object {
-
 	var installedAppProperties = InstalledAppResponseModel{}
 
 	installedAppProperties.CommandLineExecutable = types.StringValue(application.InstalledAppProperties.GetCommandLineExecutable())

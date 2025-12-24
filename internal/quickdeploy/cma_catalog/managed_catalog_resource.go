@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package cma_catalog
 
 import (
@@ -52,7 +53,7 @@ func (r *citrixManagedCatalogResource) Configure(_ context.Context, req resource
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Create is the implementation of the Create method in the resource.ResourceWithValidateConfig interface.
@@ -179,7 +180,15 @@ func (r *citrixManagedCatalogResource) Create(ctx context.Context, req resource.
 	// Get Catalog ID from name
 	catalogId := ""
 	getManagedCatalogsRequest := r.client.QuickDeployClient.CatalogCMD.GetCustomerManagedCatalogs(ctx, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId)
-	catalogs, httpResp, _ := citrixdaasclient.ExecuteWithRetry[*citrixquickdeploy.CustomerManagedCatalogOverviewsModel](getManagedCatalogsRequest, r.client)
+	catalogs, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickdeploy.CustomerManagedCatalogOverviewsModel](getManagedCatalogsRequest, r.client)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error fetching Citrix Managed Catalogs",
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+err.Error(),
+		)
+		return
+	}
 	for _, catalog := range catalogs.GetItems() {
 		if catalog.GetName() == plan.Name.ValueString() {
 			catalogId = catalog.GetId()
@@ -591,11 +600,8 @@ func waitForCatalogDeployCompletion(ctx context.Context, client *citrixdaasclien
 	startTime := time.Now()
 
 	var catalog *citrixquickdeploy.CatalogOverview
-	for {
+	for time.Since(startTime) <= time.Minute*time.Duration(60) {
 		// Set create timeout to 60 minutes
-		if time.Since(startTime) > time.Minute*time.Duration(60) {
-			break
-		}
 
 		// Sleep ahead of getting the image to account for the time of resource group creation
 		time.Sleep(time.Second * time.Duration(30))
@@ -619,11 +625,8 @@ func waitForCatalogDeleteCompletion(ctx context.Context, client *citrixdaasclien
 	// default polling to every 30 seconds
 	startTime := time.Now()
 
-	for {
+	for time.Since(startTime) <= time.Minute*time.Duration(30) {
 		// Set deletion timeout to 30 minutes
-		if time.Since(startTime) > time.Minute*time.Duration(30) {
-			break
-		}
 
 		// Sleep ahead of getting the image to account for the time of resource group creation
 		time.Sleep(time.Second * time.Duration(30))

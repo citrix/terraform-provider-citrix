@@ -1,3 +1,5 @@
+// Copyright © 2025. Citrix Systems, Inc.
+
 package autoscale_plugin_template
 
 import (
@@ -29,7 +31,7 @@ func (r *AutoscalePluginTemplateDataSource) Configure(_ context.Context, req dat
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Metadata implements datasource.DataSource.

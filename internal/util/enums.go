@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package util
 
 import (
@@ -83,6 +84,10 @@ func ComputeTypeEnumToString(os quickcreateservice.AwsEdcWorkspaceCompute) strin
 		return "GRAPHICS"
 	case quickcreateservice.AWSEDCWORKSPACECOMPUTE_GRAPHICSPRO:
 		return "GRAPHICSPRO"
+	case quickcreateservice.AWSEDCWORKSPACECOMPUTE_GRAPHICS_G4_DN:
+		return "GRAPHICS_G4DN"
+	case quickcreateservice.AWSEDCWORKSPACECOMPUTE_GRAPHICSPRO_G4_DN:
+		return "GRAPHICSPRO_G4DN"
 	default:
 		return ""
 	}
@@ -94,6 +99,8 @@ func RunningModeEnumToString(os quickcreateservice.AwsEdcWorkspaceRunningMode) s
 		return "ALWAYS_ON"
 	case quickcreateservice.AWSEDCWORKSPACERUNNINGMODE_MANUAL:
 		return "MANUAL"
+	case quickcreateservice.AWSEDCWORKSPACERUNNINGMODE_AUTO_STOP:
+		return "AUTO_STOP"
 	default:
 		return ""
 	}

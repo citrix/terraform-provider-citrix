@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package policy_filters
 
@@ -108,7 +108,11 @@ func (filter DeliveryGroupFilterModel) GetFilterRequest(diagnostics *diag.Diagno
 
 func (r DeliveryGroupFilterModel) RefreshPropertyValues(ctx context.Context, diags *diag.Diagnostics, filter citrixorchestration.FilterResponse) DeliveryGroupFilterModel {
 	var uuidFilterData util.PolicyFilterUuidDataClientModel
-	_ = json.Unmarshal([]byte(filter.GetFilterData()), &uuidFilterData)
+	err := json.Unmarshal([]byte(filter.GetFilterData()), &uuidFilterData)
+	if err != nil {
+		diags.AddError("Error parsing filter data", err.Error())
+		return r
+	}
 
 	r.Id = types.StringValue(filter.GetFilterGuid())
 	r.PolicyId = types.StringValue(filter.GetPolicyGuid())

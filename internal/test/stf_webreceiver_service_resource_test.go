@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package test
 
@@ -148,7 +148,6 @@ func BuildSTFWebReceiverServiceResource(t *testing.T, webreceiverService string)
 	virtualPath := os.Getenv("TEST_STF_WEBRECEIVER_VIRTUAL_PATH")
 
 	return fmt.Sprintf(webreceiverService, siteId, virtualPath)
-
 }
 
 func generateImportStateId_STFWebReceiverService(state *terraform.State) (string, error) {

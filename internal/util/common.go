@@ -1,10 +1,11 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package util
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -344,7 +345,8 @@ func IsValidUUID(u string) bool {
 // <param name="err">Generic error returned from citrix-daas-rest-go</param>
 // <returns>Inner error message</returns>
 func ReadClientError(err error) string {
-	genericOpenApiError, ok := err.(*citrixorchestration.GenericOpenAPIError)
+	genericOpenApiError := &citrixorchestration.GenericOpenAPIError{}
+	ok := errors.As(err, &genericOpenApiError)
 	if !ok {
 		return err.Error()
 	}
@@ -362,7 +364,8 @@ func ReadClientError(err error) string {
 }
 
 func ReadGacError(err error) string {
-	genericOpenApiError, ok := err.(*globalappconfiguration.GenericOpenAPIError)
+	genericOpenApiError := &globalappconfiguration.GenericOpenAPIError{}
+	ok := errors.As(err, &genericOpenApiError)
 	if !ok {
 		return err.Error()
 	}
@@ -380,7 +383,8 @@ func ReadGacError(err error) string {
 }
 
 func ReadQcsClientError(err error) string {
-	genericOpenApiError, ok := err.(*citrixquickcreate.GenericOpenAPIError)
+	genericOpenApiError := &citrixquickcreate.GenericOpenAPIError{}
+	ok := errors.As(err, &genericOpenApiError)
 	if !ok {
 		return err.Error()
 	}
@@ -400,7 +404,8 @@ func ReadQcsClientError(err error) string {
 }
 
 func ReadCatalogServiceClientError(err error) string {
-	genericOpenApiError, ok := err.(*citrixquickdeploy.GenericOpenAPIError)
+	genericOpenApiError := &citrixquickdeploy.GenericOpenAPIError{}
+	ok := errors.As(err, &genericOpenApiError)
 	if !ok {
 		return err.Error()
 	}
@@ -440,7 +445,7 @@ func GetIdsForOrchestrationObjects[objType any](slice []objType) []string {
 	val := reflect.ValueOf(slice)
 	ids := []string{}
 
-	for i := 0; i < val.Len(); i++ {
+	for i := range val.Len() {
 		elem := val.Index(i)
 		if elem.Kind() == reflect.Ptr {
 			elem = elem.Elem()
@@ -545,9 +550,9 @@ func ReadResource[ResponseType any](request any, ctx context.Context, client *ci
 		}
 	}
 	if err != nil && resp != nil {
-		body, _ := io.ReadAll(httpResp.Body)
+		body, _ := io.ReadAll(httpResp.Body) //nolint:errcheck // Best-effort reading of error response, we are already in an error handler
 		httpErrorBody := HttpErrorBody{}
-		json.Unmarshal(body, &httpErrorBody)
+		_ = json.Unmarshal(body, &httpErrorBody) //nolint:errcheck // Best-effort parsing of error response body, we are already in an error handler
 		if httpResp.StatusCode == http.StatusNotFound {
 			resp.Diagnostics.AddWarning(
 				fmt.Sprintf("%s not found", resourceType),
@@ -556,7 +561,6 @@ func ReadResource[ResponseType any](request any, ctx context.Context, client *ci
 
 			resp.State.RemoveResource(ctx)
 		} else if httpResp.StatusCode == http.StatusInternalServerError && httpErrorBody.Detail == "Object does not exist." {
-
 			resp.Diagnostics.AddWarning(
 				fmt.Sprintf("%s not found", resourceType),
 				fmt.Sprintf("%s %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", resourceType, resourceIdOrName),
@@ -564,7 +568,6 @@ func ReadResource[ResponseType any](request any, ctx context.Context, client *ci
 
 			resp.State.RemoveResource(ctx)
 		} else if httpResp.StatusCode == http.StatusBadRequest && httpErrorBody.ErrorMessage == "Cannot find this administrator "+resourceIdOrName {
-
 			resp.Diagnostics.AddWarning(
 				fmt.Sprintf("%s not found", resourceType),
 				fmt.Sprintf("%s %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", resourceType, resourceIdOrName),
@@ -609,7 +612,7 @@ func (e *JobError) Error() string {
 // <param name="diagnostics">Terraform diagnostics from context</param>
 // <param name="maxTimeout">Maximum timeout threashold for job status polling</param>
 // <returns>Error if job polling failed or job itself ended in failed state</returns>
-func ProcessAsyncJobResponse(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int32) (err error) {
+func ProcessAsyncJobResponse(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int32) error {
 	return ProcessAsyncJobResponseWithAddToDiagsOption(ctx, client, jobResp, errContext, diagnostics, maxTimeout, true)
 }
 
@@ -624,7 +627,7 @@ func ProcessAsyncJobResponse(ctx context.Context, client *citrixdaasclient.Citri
 // <param name="maxTimeout">Maximum timeout threashold for job status polling</param>
 // <param name="addToDiagnostics">Indicates whether error will be added to diagnostics</param>
 // <returns>Error if job polling failed or job itself ended in failed state</returns>
-func ProcessAsyncJobResponseWithAddToDiagsOption(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int32, addToDiagnostics bool) (err error) {
+func ProcessAsyncJobResponseWithAddToDiagsOption(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int32, addToDiagnostics bool) error {
 	txId := citrixdaasclient.GetTransactionIdFromHttpResponse(jobResp)
 
 	jobId := citrixdaasclient.GetJobIdFromHttpResponse(*jobResp)
@@ -750,8 +753,8 @@ func GetAsyncJobResultWithAddToDiagsOption[ResponseType any](ctx context.Context
 	res, _, err := citrixdaasclient.AddRequestData(ss, client).Execute()
 
 	if err == nil {
-		_ = json.Unmarshal([]byte(res), &response)
-		return response, nil
+		err = json.Unmarshal([]byte(res), &response)
+		return response, err
 	}
 
 	return response, err
@@ -784,7 +787,7 @@ type RefreshableListItemWithAttributes[clientType any] interface {
 	GetKey() string
 
 	// Refreshes the item with the client model and returns the updated item
-	RefreshListItem(context.Context, *diag.Diagnostics, clientType) ResourceModelWithAttributes
+	RefreshListItem(ctx context.Context, diag *diag.Diagnostics, t clientType) ResourceModelWithAttributes
 
 	// Has to implement the ModelWithAttributes interface for conversion back to a Terraform model
 	ResourceModelWithAttributes
@@ -897,14 +900,23 @@ func refreshListProperties[tfType RefreshableListItemWithAttributes[clientType],
 		index, exists := stateItems[clientKey]
 		if exists {
 			tfItem := state[index]
-			newState[index] = tfItem.RefreshListItem(ctx, diagnostics, clientItem).(tfType)
+			refreshedItem := tfItem.RefreshListItem(ctx, diagnostics, clientItem)
+			if typedItem, ok := refreshedItem.(tfType); ok {
+				newState[index] = typedItem
+			} else {
+				diagnostics.AddError("Type assertion failed", "RefreshListItem did not return expected type")
+			}
 		} else {
 			var tfStructItem tfType
 			if attributeMap, err := ResourceAttributeMapFromObject(tfStructItem); err == nil {
 				// start with the null object to populate all nested lists/objects as null
 				tfStructItem = defaultObjectFromObjectValue[tfType](ctx, types.ObjectNull(attributeMap))
-				newStateItem := tfStructItem.RefreshListItem(ctx, diagnostics, clientItem).(tfType)
-				newState = append(newState, newStateItem)
+				refreshedItem := tfStructItem.RefreshListItem(ctx, diagnostics, clientItem)
+				if newStateItem, ok := refreshedItem.(tfType); ok {
+					newState = append(newState, newStateItem)
+				} else {
+					diagnostics.AddError("Type assertion failed", "RefreshListItem did not return expected type")
+				}
 			} else {
 				diagnostics.AddWarning("Error when creating empty "+reflect.TypeOf(tfStructItem).String(), err.Error())
 			}
@@ -989,7 +1001,7 @@ func PanicHandler(diagnostics *diag.Diagnostics) {
 		fileContents := fmt.Sprintf("%s\n\n%s", f.Name(), debug.Stack())
 		file, err := os.CreateTemp("", "citrix_provider_crash_stack.*.txt")
 		if err == nil {
-			defer file.Close()
+			defer file.Close() //nolint:errcheck // Error not actionable in defer
 			_, err := file.WriteString(fileContents)
 			if err == nil {
 				msg += "\n\nPlease report this issue to the project maintainers and include this file if present: " + file.Name()
@@ -1173,7 +1185,7 @@ func RefreshUsersList(ctx context.Context, diags *diag.Diagnostics, usersSet typ
 	res := []string{}
 	users := StringSetToStringArray(ctx, diags, usersSet)
 	for _, user := range users {
-		samRegex, _ := regexp.Compile(SamRegex)
+		samRegex, _ := regexp.Compile(SamRegex) //nolint:errcheck // SamRegex is a constant, compile will not fail
 		if samRegex.MatchString(user) {
 			index, exists := samNamesMap[strings.ToLower(user)]
 			if !exists {
@@ -1197,7 +1209,7 @@ func RefreshUsersList(ctx context.Context, diags *diag.Diagnostics, usersSet typ
 			continue
 		}
 
-		upnRegex, _ := regexp.Compile(UpnRegex)
+		upnRegex, _ := regexp.Compile(UpnRegex) //nolint:errcheck // UpnRegex is a constant, compile will not fail
 		if upnRegex.MatchString(user) {
 			index, exists := upnMap[strings.ToLower(user)]
 			if !exists {
@@ -1219,7 +1231,7 @@ func RefreshUsersList(ctx context.Context, diags *diag.Diagnostics, usersSet typ
 			}
 		}
 
-		sidRegex, _ := regexp.Compile(ActiveDirectorySidRegex)
+		sidRegex, _ := regexp.Compile(ActiveDirectorySidRegex) //nolint:errcheck // ActiveDirectorySidRegex is a constant, compile will not fail
 		if sidRegex.MatchString(user) {
 			index, exists := sidMap[strings.ToLower(user)]
 			if !exists {
@@ -1311,8 +1323,6 @@ func FetchScopes(ctx context.Context, client *citrixdaasclient.CitrixDaasClient,
 
 	scopeResponses := []citrixorchestration.ScopeResponseModel{}
 	continuationToken := ""
-	var httpResp *http.Response
-	var err error
 
 	for {
 		getAdminScopesRequest = getAdminScopesRequest.ContinuationToken(continuationToken)
@@ -1331,32 +1341,38 @@ func FetchScopes(ctx context.Context, client *citrixdaasclient.CitrixDaasClient,
 		}
 		continuationToken = getScopesResponse.GetContinuationToken()
 	}
-
-	return scopeResponses, httpResp, err
 }
 
 func GetUsersUsingIdentity(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, users []string) ([]citrixorchestration.IdentityUserResponseModel, *http.Response, error) {
 	allUsersFromIdentity := []citrixorchestration.IdentityUserResponseModel{}
+	var httpResp *http.Response
+	var azureAdUsers *citrixorchestration.IdentityUserResponseModelCollection
+	var adUsers *citrixorchestration.IdentityUserResponseModelCollection
+	var err error
 
+	usersChunks := ChunkSlice(users, 25)
 	getIncludedUsersRequest := client.ApiClient.IdentityAPIsDAAS.IdentityGetUsers(ctx)
-	getIncludedUsersRequest = getIncludedUsersRequest.User(users).UserType(citrixorchestration.IDENTITYUSERTYPE_ALL)
-	adUsers, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.IdentityUserResponseModelCollection](getIncludedUsersRequest, client)
 
-	if err != nil {
-		return allUsersFromIdentity, httpResp, err
-	}
-
-	allUsersFromIdentity = append(allUsersFromIdentity, adUsers.GetItems()...)
-
-	if len(allUsersFromIdentity) < len(users) {
-		getIncludedUsersRequest = getIncludedUsersRequest.User(users).UserType(citrixorchestration.IDENTITYUSERTYPE_ALL).Provider(citrixorchestration.IDENTITYPROVIDERTYPE_ALL)
-		azureAdUsers, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.IdentityUserResponseModelCollection](getIncludedUsersRequest, client)
+	for _, usersChunk := range usersChunks {
+		getIncludedUsersRequest = getIncludedUsersRequest.User(usersChunk).UserType(citrixorchestration.IDENTITYUSERTYPE_ALL)
+		adUsers, httpResp, err = citrixdaasclient.ExecuteWithRetry[*citrixorchestration.IdentityUserResponseModelCollection](getIncludedUsersRequest, client)
 
 		if err != nil {
 			return allUsersFromIdentity, httpResp, err
 		}
 
-		allUsersFromIdentity = append(allUsersFromIdentity, azureAdUsers.GetItems()...)
+		allUsersFromIdentity = append(allUsersFromIdentity, adUsers.GetItems()...)
+
+		if len(allUsersFromIdentity) < len(usersChunk) {
+			getIncludedUsersRequest = getIncludedUsersRequest.User(usersChunk).UserType(citrixorchestration.IDENTITYUSERTYPE_ALL).Provider(citrixorchestration.IDENTITYPROVIDERTYPE_ALL)
+			azureAdUsers, httpResp, err = citrixdaasclient.ExecuteWithRetry[*citrixorchestration.IdentityUserResponseModelCollection](getIncludedUsersRequest, client)
+
+			if err != nil {
+				return allUsersFromIdentity, httpResp, err
+			}
+
+			allUsersFromIdentity = append(allUsersFromIdentity, azureAdUsers.GetItems()...)
+		}
 	}
 
 	err = VerifyIdentityUserListCompleteness(users, allUsersFromIdentity)
@@ -1420,7 +1436,6 @@ func GetConfigValuesForSchema(ctx context.Context, diags *diag.Diagnostics, m Re
 }
 
 func GetConfigValuesForObject(ctx context.Context, diags *diag.Diagnostics, obj types.Object, sensitiveFields map[string]bool) map[string]interface{} {
-
 	// Get the attributes for the object
 	attributes := obj.Attributes()
 	configValues := make(map[string]interface{})
@@ -1430,47 +1445,80 @@ func GetConfigValuesForObject(ctx context.Context, diags *diag.Diagnostics, obj 
 			continue
 		}
 
-		configValues[name] = GetAttributeValues(ctx, diags, attribute, sensitiveFields)
+		configValues[name] = getAttributeValues(ctx, diags, attribute, sensitiveFields)
 	}
 	return configValues
 }
 
 func GetConfigValuesForMap(ctx context.Context, diags *diag.Diagnostics, configMap types.Map) map[string]interface{} {
-
 	if configMap.IsNull() || configMap.IsUnknown() {
 		return nil
 	}
 	configValues := make(map[string]interface{})
 	for name, value := range configMap.Elements() {
-		configValues[name] = GetAttributeValues(ctx, diags, value, map[string]bool{})
+		configValues[name] = getAttributeValues(ctx, diags, value, map[string]bool{})
 	}
 	return configValues
 }
 
-func GetAttributeValues(ctx context.Context, diags *diag.Diagnostics, attribute attr.Value, sensitiveFields map[string]bool) interface{} {
+func getAttributeValues(ctx context.Context, diags *diag.Diagnostics, attribute attr.Value, sensitiveFields map[string]bool) interface{} {
 	refVal := reflect.ValueOf(attribute)
 	switch attribute.(type) {
 	case types.String:
-		return refVal.Interface().(types.String).ValueString()
+		if strVal, ok := refVal.Interface().(types.String); ok {
+			return strVal.ValueString()
+		}
+		diags.AddError("Type assertion failed", "Failed to convert to types.String")
+		return ""
 	case types.Bool:
-		return refVal.Interface().(types.Bool).ValueBool()
+		if boolVal, ok := refVal.Interface().(types.Bool); ok {
+			return boolVal.ValueBool()
+		}
+		diags.AddError("Type assertion failed", "Failed to convert to types.Bool")
+		return false
 	case types.Int64:
-		return refVal.Interface().(types.Int64).ValueInt64()
+		if intVal, ok := refVal.Interface().(types.Int64); ok {
+			return intVal.ValueInt64()
+		}
+		diags.AddError("Type assertion failed", "Failed to convert to types.Int64")
+		return 0
 	case types.Int32:
-		return refVal.Interface().(types.Int32).ValueInt32()
+		if intVal, ok := refVal.Interface().(types.Int32); ok {
+			return intVal.ValueInt32()
+		}
+		diags.AddError("Type assertion failed", "Failed to convert to types.Int32")
+		return 0
 	case types.Float64:
-		return refVal.Interface().(types.Float64).ValueFloat64()
+		if floatVal, ok := refVal.Interface().(types.Float64); ok {
+			return floatVal.ValueFloat64()
+		}
+		diags.AddError("Type assertion failed", "Failed to convert to types.Float64")
+		return 0.0
 	case types.Float32:
-		return refVal.Interface().(types.Float32).ValueFloat32()
+		if floatVal, ok := refVal.Interface().(types.Float32); ok {
+			return floatVal.ValueFloat32()
+		}
+		diags.AddError("Type assertion failed", "Failed to convert to types.Float32")
+		return 0.0
 	case types.List:
-		reflectedList := refVal.Interface().(types.List)
+		reflectedList, ok := refVal.Interface().(types.List)
+
+		if !ok {
+			diags.AddError("Type assertion failed", "Failed to convert to types.List")
+
+			return nil
+		}
 		reflectedElementType := reflect.TypeOf(reflectedList.ElementType(ctx))
 		if reflectedElementType.String() == "basetypes.StringType" {
 			return StringListToStringArray(ctx, diags, reflectedList)
 		} else if reflectedElementType.String() == "basetypes.ObjectType" {
 			objectList := make([]map[string]interface{}, 0)
 			for _, item := range reflectedList.Elements() {
-				objectList = append(objectList, GetConfigValuesForObject(ctx, diags, item.(types.Object), sensitiveFields))
+				if objVal, ok := item.(types.Object); ok {
+					objectList = append(objectList, GetConfigValuesForObject(ctx, diags, objVal, sensitiveFields))
+				} else {
+					diags.AddError("Type assertion failed", "Failed to convert list item to types.Object")
+				}
 			}
 			return objectList
 		} else {
@@ -1478,14 +1526,22 @@ func GetAttributeValues(ctx context.Context, diags *diag.Diagnostics, attribute 
 			return nil
 		}
 	case types.Set:
-		reflectedSet := refVal.Interface().(types.Set)
+		reflectedSet, ok := refVal.Interface().(types.Set)
+		if !ok {
+			diags.AddError("Type assertion failed", "Failed to convert to types.Set")
+			return nil
+		}
 		reflectedElementType := reflect.TypeOf(reflectedSet.ElementType(ctx))
 		if reflectedElementType.String() == "basetypes.StringType" {
 			return StringSetToStringArray(ctx, diags, reflectedSet)
 		} else if reflectedElementType.String() == "basetypes.ObjectType" {
 			objectList := make([]map[string]interface{}, 0)
 			for _, item := range reflectedSet.Elements() {
-				objectList = append(objectList, GetConfigValuesForObject(ctx, diags, item.(types.Object), sensitiveFields))
+				if objVal, ok := item.(types.Object); ok {
+					objectList = append(objectList, GetConfigValuesForObject(ctx, diags, objVal, sensitiveFields))
+				} else {
+					diags.AddError("Type assertion failed", "Failed to convert list item to types.Object")
+				}
 			}
 			return objectList
 		} else {
@@ -1493,14 +1549,22 @@ func GetAttributeValues(ctx context.Context, diags *diag.Diagnostics, attribute 
 			return nil
 		}
 	case types.Map: // Revisit this once schema uses Maps
-		reflectedMap := refVal.Interface().(types.Map)
+		reflectedMap, ok := refVal.Interface().(types.Map)
+		if !ok {
+			diags.AddError("Type assertion failed", "Failed to convert to types.Map")
+			return nil
+		}
 		reflectedValueType := reflect.TypeOf(reflectedMap.ElementType(ctx))
 		if reflectedValueType.String() == "basetypes.StringType" || reflectedValueType.String() == "basetypes.Int64Type" || reflectedValueType.String() == "basetypes.Float64Type" || reflectedValueType.String() == "basetypes.BoolType" {
 			return GetConfigValuesForMap(ctx, diags, reflectedMap)
 		} else if reflectedValueType.String() == "basetypes.ObjectType" {
 			objectList := make(map[string]interface{})
 			for key, item := range reflectedMap.Elements() {
-				objectList[key] = GetConfigValuesForObject(ctx, diags, item.(types.Object), sensitiveFields)
+				if objVal, ok := item.(types.Object); ok {
+					objectList[key] = GetConfigValuesForObject(ctx, diags, objVal, sensitiveFields)
+				} else {
+					diags.AddError("Type assertion failed", "Failed to convert map item to types.Object")
+				}
 			}
 			return objectList
 		} else {
@@ -1509,7 +1573,11 @@ func GetAttributeValues(ctx context.Context, diags *diag.Diagnostics, attribute 
 		}
 
 	case types.Object:
-		return GetConfigValuesForObject(ctx, diags, refVal.Interface().(types.Object), sensitiveFields)
+		if objVal, ok := refVal.Interface().(types.Object); ok {
+			return GetConfigValuesForObject(ctx, diags, objVal, sensitiveFields)
+		}
+		diags.AddError("Type assertion failed", "Failed to convert to types.Object")
+		return nil
 	default:
 		// Unknown type
 		diags.AddWarning("Invalid Attribute Type", "Attribute type not supported: "+reflect.TypeOf(attribute).String())
@@ -1520,7 +1588,6 @@ func GetAttributeValues(ctx context.Context, diags *diag.Diagnostics, attribute 
 func GetSensitiveFieldsForAttribute(ctx context.Context, diags *diag.Diagnostics, attributes map[string]schema.Attribute) map[string]bool {
 	sensitiveFields := map[string]bool{}
 	for name, attribute := range attributes {
-
 		fieldsMap, isSensitive := CheckIfFieldIsSensitive(ctx, diags, attribute)
 		if isSensitive {
 			if fieldsMap != nil {
@@ -1536,7 +1603,6 @@ func GetSensitiveFieldsForAttribute(ctx context.Context, diags *diag.Diagnostics
 }
 
 func CheckIfFieldIsSensitive(ctx context.Context, diags *diag.Diagnostics, attribute schema.Attribute) (map[string]bool, bool) {
-
 	// If root attribute is sensitive, return true.
 	if attribute.IsSensitive() {
 		return nil, true
@@ -1582,11 +1648,7 @@ func PollQcsTask(ctx context.Context, client *citrixdaasclient.CitrixDaasClient,
 	var httpResp *http.Response
 	var err error
 
-	for {
-		if time.Since(startTime) > time.Second*time.Duration(maxWaitTimeSeconds) {
-			break
-		}
-
+	for time.Since(startTime) <= time.Second*time.Duration(maxWaitTimeSeconds) {
 		taskResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickcreate.GetTaskAsync200Response](getTaskRequest, client)
 		if err != nil {
 			diagnostics.AddError(
@@ -1683,17 +1745,14 @@ func PollZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, zo
 
 	var zone *citrixorchestration.ZoneDetailResponseModel
 	var err error
-	for {
+	for time.Since(startTime) <= time.Minute*time.Duration(8) {
 		// Zone sync should be completed within 8 minutes
-		if time.Since(startTime) > time.Minute*time.Duration(8) {
-			break
-		}
 
 		zone, httpResp, err := citrixdaasclient.AddRequestData(getZoneRequest, client).Execute()
 		if isZoneBeingDeleted {
 			if httpResp.StatusCode == http.StatusNotFound {
 				// Zone deletion completed. Return nil
-				return nil, nil
+				return nil, nil //nolint:nilnil // Explicitly returning nil for both values to indicate successful deletion
 			}
 		} else {
 			if err == nil {
@@ -1711,6 +1770,23 @@ func PollZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, zo
 	}
 
 	return zone, err
+}
+
+// ChunkSlice divides a slice into chunks of a given size.
+func ChunkSlice[T any](s []T, chunkSize int) [][]T {
+	if chunkSize <= 0 {
+		return nil
+	}
+
+	var chunks [][]T
+	for i := 0; i < len(s); i += chunkSize {
+		end := i + chunkSize
+		if end > len(s) {
+			end = len(s)
+		}
+		chunks = append(chunks, s[i:end])
+	}
+	return chunks
 }
 
 var AllowedTimeZoneValues = []string{

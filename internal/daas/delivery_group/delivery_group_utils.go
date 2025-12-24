@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package delivery_group
 
@@ -206,7 +206,7 @@ func validatePowerManagementSettings(ctx context.Context, diags *diag.Diagnostic
 	return true, ""
 }
 
-func validateAndReturnMachineCatalogSessionSupport(ctx context.Context, client citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, dgMachineCatalogs []DeliveryGroupMachineCatalogModel, addErrorIfCatalogNotFound bool) (machineCatalogProperties AssociatedMachineCatalogProperties, err error) {
+func validateAndReturnMachineCatalogSessionSupport(ctx context.Context, client citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, dgMachineCatalogs []DeliveryGroupMachineCatalogModel, addErrorIfCatalogNotFound bool) (AssociatedMachineCatalogProperties, error) {
 	var provisioningType *citrixorchestration.ProvisioningType
 	var sessionSupport citrixorchestration.SessionSupport
 	var allocationType citrixorchestration.AllocationType
@@ -214,6 +214,7 @@ func validateAndReturnMachineCatalogSessionSupport(ctx context.Context, client c
 	var associatedMachineCatalogProperties AssociatedMachineCatalogProperties
 	isPowerManaged := false
 	isRemotePc := false
+	var err error
 	for _, dgMachineCatalog := range dgMachineCatalogs {
 		catalogId := dgMachineCatalog.MachineCatalog.ValueString()
 		if catalogId == "" {
@@ -393,7 +394,6 @@ func addRemoveMachinesFromDeliveryGroup(ctx context.Context, client *citrixdaasc
 
 	requestedAssociatedMachineCatalogsMap := map[string]bool{}
 	for _, associatedMachineCatalog := range util.ObjectSetToTypedArray[DeliveryGroupMachineCatalogModel](ctx, diagnostics, plan.AssociatedMachineCatalogs) {
-
 		requestedAssociatedMachineCatalogsMap[associatedMachineCatalog.MachineCatalog.ValueString()] = true
 
 		associatedMachineCatalogId := associatedMachineCatalog.MachineCatalog.ValueString()
@@ -459,12 +459,28 @@ func validatePowerTimeSchemes(ctx context.Context, diagnostics *diag.Diagnostics
 			timeRanges := strings.Split(schedule.TimeRange.ValueString(), "-")
 
 			startTimes := strings.Split(timeRanges[0], ":")
-			startHour, _ := strconv.Atoi(startTimes[0])
-			startMinutes, _ := strconv.Atoi(startTimes[1])
+			startHour, err := strconv.Atoi(startTimes[0])
+			if err != nil {
+				diagnostics.AddAttributeError(path.Root("time_range"), "Invalid Time Format", fmt.Sprintf("Failed to parse start hour: %s", err.Error()))
+				continue
+			}
+			startMinutes, err := strconv.Atoi(startTimes[1])
+			if err != nil {
+				diagnostics.AddAttributeError(path.Root("time_range"), "Invalid Time Format", fmt.Sprintf("Failed to parse start minutes: %s", err.Error()))
+				continue
+			}
 
 			endTimes := strings.Split(timeRanges[1], ":")
-			endHour, _ := strconv.Atoi(endTimes[0])
-			endMinutes, _ := strconv.Atoi(endTimes[1])
+			endHour, err := strconv.Atoi(endTimes[0])
+			if err != nil {
+				diagnostics.AddAttributeError(path.Root("time_range"), "Invalid Time Format", fmt.Sprintf("Failed to parse end hour: %s", err.Error()))
+				continue
+			}
+			endMinutes, err := strconv.Atoi(endTimes[1])
+			if err != nil {
+				diagnostics.AddAttributeError(path.Root("time_range"), "Invalid Time Format", fmt.Sprintf("Failed to parse end minutes: %s", err.Error()))
+				continue
+			}
 
 			if endHour == 0 && endMinutes == 0 {
 				endHour = 24
@@ -487,7 +503,6 @@ func validatePowerTimeSchemes(ctx context.Context, diagnostics *diag.Diagnostics
 			}
 
 			for i := startHour; i < endHour; i++ {
-
 				if i == startHour && hoursArray[i] && hoursPoolSizeArray[i] == int(schedule.PoolSize.ValueInt64()) {
 					diagnostics.AddAttributeError(
 						path.Root("time_range"),
@@ -537,7 +552,7 @@ func validatePowerTimeSchemes(ctx context.Context, diagnostics *diag.Diagnostics
 				hoursPoolSizeArray[i] = int(schedule.PoolSize.ValueInt64())
 			}
 
-			if endMinutes == 30 {
+			if endMinutes == 30 && endHour < 24 {
 				if minutesArray[endHour] && minutesPoolSizeArray[endHour] == int(schedule.PoolSize.ValueInt64()) {
 					diagnostics.AddAttributeError(
 						path.Root("time_range"),
@@ -587,7 +602,6 @@ func validateRebootSchedules(ctx context.Context, diagnostics *diag.Diagnostics,
 					"Day in month must be specified for monthly reboot schedule.",
 				)
 			}
-
 		}
 
 		if rebootSchedule.UseNaturalRebootSchedule.ValueBool() {
@@ -608,7 +622,6 @@ func validateRebootSchedules(ctx context.Context, diagnostics *diag.Diagnostics,
 				)
 				return
 			}
-
 		} else {
 			if rebootSchedule.RebootDurationMinutes.IsNull() {
 				diagnostics.AddAttributeError(
@@ -622,7 +635,10 @@ func validateRebootSchedules(ctx context.Context, diagnostics *diag.Diagnostics,
 
 		if !rebootSchedule.DeliveryGroupRebootNotificationToUsers.IsNull() {
 			notification := util.ObjectValueToTypedObject[DeliveryGroupRebootNotificationToUsers](ctx, diagnostics, rebootSchedule.DeliveryGroupRebootNotificationToUsers)
-			if !notification.NotificationDurationMinutes.IsNull() && !notification.NotificationRepeatEvery5Minutes.IsNull() &&
+			if !notification.NotificationDurationMinutes.IsUnknown() &&
+				!notification.NotificationDurationMinutes.IsNull() &&
+				!notification.NotificationRepeatEvery5Minutes.IsUnknown() &&
+				!notification.NotificationRepeatEvery5Minutes.IsNull() &&
 				notification.NotificationDurationMinutes.ValueInt64() != 15 {
 				diagnostics.AddAttributeError(
 					path.Root("notification_repeat_every_5_minutes"),
@@ -745,11 +761,12 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 	body.SetDesktops(deliveryGroupDesktopsArray)
 	body.SetDefaultDesktopPublishedName(plan.Name.ValueString())
 	body.SetSimpleAccessPolicy(simpleAccessPolicy)
-	if associatedMachineCatalogProperties.IdentityType == citrixorchestration.IDENTITYTYPE_AZURE_AD {
+	switch associatedMachineCatalogProperties.IdentityType { //nolint: exhaustive // only 3 identity types supported
+	case citrixorchestration.IDENTITYTYPE_AZURE_AD:
 		body.SetMachineLogOnType(citrixorchestration.MACHINELOGONTYPE_AZURE_AD)
-	} else if associatedMachineCatalogProperties.IdentityType == citrixorchestration.IDENTITYTYPE_WORKGROUP {
+	case citrixorchestration.IDENTITYTYPE_WORKGROUP:
 		body.SetMachineLogOnType(citrixorchestration.MACHINELOGONTYPE_LOCAL_MAPPED_ACCOUNT)
-	} else {
+	default:
 		body.SetMachineLogOnType(citrixorchestration.MACHINELOGONTYPE_ACTIVE_DIRECTORY)
 	}
 
@@ -1314,7 +1331,6 @@ func parseDeliveryGroupRebootScheduleToClientModel(ctx context.Context, diags *d
 	}
 
 	return res
-
 }
 
 func (schedule DeliveryGroupRebootSchedule) RefreshListItem(ctx context.Context, diags *diag.Diagnostics, rebootSchedule citrixorchestration.RebootScheduleResponseModel) util.ResourceModelWithAttributes {
@@ -1591,7 +1607,7 @@ func verifyUsersAndParseDeliveryGroupDesktopsToClientModel(ctx context.Context, 
 			includedUsersFilterEnabled = true
 			includedUsers := util.StringSetToStringArray(ctx, diagnostics, users.AllowList)
 
-			// Call identity to make sure users exist. Extract the Ids from the reponse
+			// Call identity to make sure users exist. Extract the Ids from the response
 			includedUserIds, httpResp, err = util.GetUserIdsUsingIdentity(ctx, client, includedUsers)
 			if err != nil {
 				diagnostics.AddError(
@@ -1876,7 +1892,7 @@ func (r DeliveryGroupResourceModel) updatePlanWithAutoscaleSettings(ctx context.
 		return r
 	}
 
-	autoscale := util.ObjectValueToTypedObject[DeliveryGroupPowerManagementSettings](context.Background(), nil, r.AutoscaleSettings)
+	autoscale := util.ObjectValueToTypedObject[DeliveryGroupPowerManagementSettings](ctx, nil, r.AutoscaleSettings)
 	autoscale.AutoscaleEnabled = types.BoolValue(deliveryGroup.GetAutoScaleEnabled())
 
 	if deliveryGroup.RestrictAutoscaleTag != nil {
@@ -2534,8 +2550,8 @@ func (r *deliveryGroupResource) updateDeliveryGroupState(ctx context.Context, re
 
 	if r.client.AuthConfig.OnPremises {
 		// DDC 2402 LTSR has a bug where UPN is not returned for AD users. Call Identity API to fetch details for users
+		//nolint:errcheck // Errors added to diagnostics, continue so resource gets marked as tainted
 		deliveryGroup, deliveryGroupDesktops, _ = updateDeliveryGroupAndDesktopUsers(ctx, r.client, &resp.Diagnostics, deliveryGroup, deliveryGroupDesktops)
-		// Do not return if there is an error. We need to set the resource in the state so that tf knows about the resource and marks it tainted (diagnostics already has the error)
 	}
 
 	tags := getDeliveryGroupTags(ctx, &resp.Diagnostics, r.client, deliveryGroupId)
@@ -2582,7 +2598,23 @@ func updateAutoscalePlugin(ctx context.Context, client *citrixdaasclient.CitrixD
 	}
 
 	// create, update and delete autoscale plugins. Ignore errors so we can continue and set the state. Errors are already added to diagnostics.
-	deleteDeliveryGroupAutoscalePlugins(ctx, client, diagnostics, deliveryGroupId, autoscalePluginsToBeDeleted)
-	updateDeliveryGroupAutoscalePlugins(ctx, client, diagnostics, deliveryGroupId, autoscalePluginsToBeUpdated)
-	createDeliveryGroupAutoscalePlugins(ctx, client, diagnostics, deliveryGroupId, autoscalePluginsToBeCreated)
+	_ = deleteDeliveryGroupAutoscalePlugins(ctx, client, diagnostics, deliveryGroupId, autoscalePluginsToBeDeleted) //nolint:errcheck // Errors added to diagnostics
+	_ = updateDeliveryGroupAutoscalePlugins(ctx, client, diagnostics, deliveryGroupId, autoscalePluginsToBeUpdated) //nolint:errcheck // Errors added to diagnostics
+	_ = createDeliveryGroupAutoscalePlugins(ctx, client, diagnostics, deliveryGroupId, autoscalePluginsToBeCreated) //nolint:errcheck // Errors added to diagnostics
+}
+
+func validateDeliveryGroupMachineCatalogMachineCount(diagnostics *diag.Diagnostics, catalogs []DeliveryGroupMachineCatalogModel, action string) error {
+	if len(catalogs) > 0 {
+		for _, machineCatalog := range catalogs {
+			if machineCatalog.MachineCount.ValueInt64() < 1 {
+				err := fmt.Errorf("`machine_count` of the associated catalog %s cannot be less than 1", machineCatalog.MachineCatalog.ValueString())
+				diagnostics.AddError(
+					fmt.Sprintf("Error %s Delivery Group", action),
+					err.Error(),
+				)
+				return err
+			}
+		}
+	}
+	return nil
 }

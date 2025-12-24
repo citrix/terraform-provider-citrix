@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package policy_set_resource
 
@@ -313,7 +313,7 @@ func (r *policySetV2Resource) Configure(_ context.Context, req resource.Configur
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 func (r *policySetV2Resource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -346,8 +346,7 @@ func (r *policySetV2Resource) ModifyPlan(ctx context.Context, req resource.Modif
 	// Validate DDC Version
 	errorSummary := "Error managing Policy Set"
 	feature := "Policy Set resource"
-	isDdcVersionSupported := util.CheckProductVersion(r.client, &resp.Diagnostics, 120, 118, 7, 41, errorSummary, feature)
-	if !isDdcVersionSupported {
+	if !util.CheckProductVersion(r.client, &resp.Diagnostics, 120, 118, 7, 41, errorSummary, feature) {
 		return
 	}
 }

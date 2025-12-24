@@ -1,13 +1,14 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package stf_authentication
 
 import (
 	"context"
+	"maps"
+	"slices"
 
 	citrixstorefront "github.com/citrix/citrix-daas-rest-go/citrixstorefront/models"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
-	"golang.org/x/exp/maps"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -49,7 +50,7 @@ func (r *STFAuthenticationServiceResourceModel) RefreshPropertyValues(ctx contex
 	claimsFactoryNamesMap[*authSettings.CitrixFederationAuthentication.ClaimsFactoryName.Get()] = true
 	claimsFactoryNamesMap[*authSettings.SamlForms.ClaimsFactoryName.Get()] = true
 
-	claimsFactoryNamesMapKeys := maps.Keys(claimsFactoryNamesMap)
+	claimsFactoryNamesMapKeys := slices.Collect(maps.Keys(claimsFactoryNamesMap))
 	if len(claimsFactoryNamesMapKeys) != 1 {
 		diagnostics.AddError(
 			"Error refreshing STFAuthenticationService",
@@ -58,7 +59,6 @@ func (r *STFAuthenticationServiceResourceModel) RefreshPropertyValues(ctx contex
 		return
 	}
 	r.ClaimsFactoryName = types.StringValue(claimsFactoryNamesMapKeys[0])
-
 }
 
 func (STFAuthenticationServiceResourceModel) GetSchema() schema.Schema {

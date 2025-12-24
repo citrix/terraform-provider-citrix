@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package machine_catalog
 
@@ -199,7 +199,6 @@ func getMachinesForManualCatalogs(ctx context.Context, diagnostics *diag.Diagnos
 }
 
 func deleteMachinesFromManualCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, deleteMachinesList map[string]bool, catalogNameOrId string) error {
-
 	if len(deleteMachinesList) < 1 {
 		// nothing to delete
 		return nil
@@ -221,7 +220,6 @@ func deleteMachinesFromManualCatalog(ctx context.Context, client *citrixdaasclie
 }
 
 func addMachinesToManualCatalog(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, addMachinesList []MachineAccountsModel, catalogIdOrName string) error {
-
 	if len(addMachinesList) < 1 {
 		// no machines to add
 		return nil
@@ -251,7 +249,7 @@ func addMachinesToManualCatalog(ctx context.Context, diagnostics *diag.Diagnosti
 
 	batchRequestItems := []citrixorchestration.BatchRequestItemModel{}
 	relativeUrl := fmt.Sprintf("/MachineCatalogs/%s/Machines", catalogIdOrName)
-	for i := 0; i < len(addMachinesRequest); i++ {
+	for i := range addMachinesRequest {
 		addMachineRequestStringBody, err := util.ConvertToString(addMachinesRequest[i])
 		if err != nil {
 			resp.Diagnostics.AddError(

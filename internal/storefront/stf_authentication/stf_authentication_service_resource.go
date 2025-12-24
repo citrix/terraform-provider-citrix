@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package stf_authentication
 
@@ -63,7 +63,7 @@ func (r *stfAuthenticationServiceResource) Configure(_ context.Context, req reso
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Schema defines the schema for the resource.
@@ -135,7 +135,6 @@ func (r *stfAuthenticationServiceResource) Create(ctx context.Context, req resou
 		}
 
 		plan.RefreshCitrixAGBasicOptions(ctx, &resp.Diagnostics, getCitrixAGBasicOptionsResponse)
-
 	}
 
 	if !plan.AuthServiceProtocol.IsNull() {
@@ -167,6 +166,10 @@ func (r *stfAuthenticationServiceResource) Create(ctx context.Context, req resou
 
 	getAuthServiceResponse, err := getSTFAuthenticationService(ctx, &resp.Diagnostics, r.client, plan)
 	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error retrieving StoreFront Authentication Service after creation",
+			"Error message: "+err.Error(),
+		)
 		return
 	}
 
@@ -195,15 +198,18 @@ func (r *stfAuthenticationServiceResource) Read(ctx context.Context, req resourc
 
 	STFAuthenticationService, err := getSTFAuthenticationService(ctx, &resp.Diagnostics, r.client, state)
 	if err != nil {
-		return
-	}
-
-	if STFAuthenticationService == nil {
-		resp.Diagnostics.AddWarning(
-			"StoreFront Authentication Service not found",
-			"StoreFront Authentication Service was not found and will be removed from the state file. An apply action will result in the creation of a new resource.",
-		)
-		resp.State.RemoveResource(ctx)
+		if strings.EqualFold(err.Error(), util.NOT_EXIST) {
+			resp.Diagnostics.AddWarning(
+				"StoreFront Authentication Service not found",
+				"StoreFront Authentication Service was not found and will be removed from the state file. An apply action will result in the creation of a new resource.",
+			)
+			resp.State.RemoveResource(ctx)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error fetching state of StoreFront Authentication Service ",
+				"Error message: "+err.Error(),
+			)
+		}
 		return
 	}
 
@@ -345,7 +351,6 @@ func (r *stfAuthenticationServiceResource) Update(ctx context.Context, req resou
 		}
 
 		plan.RefreshCitrixAGBasicOptions(ctx, &resp.Diagnostics, getCitrixAGBasicOptionsResponse)
-
 	}
 
 	if !plan.AuthServiceProtocol.IsNull() {
@@ -396,8 +401,11 @@ func (r *stfAuthenticationServiceResource) Update(ctx context.Context, req resou
 	}
 
 	getAuthServiceResponse, err := getSTFAuthenticationService(ctx, &resp.Diagnostics, r.client, plan)
-
 	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error getting StoreFront Authentication Service",
+			"Error message: "+err.Error(),
+		)
 		return
 	}
 
@@ -441,8 +449,14 @@ func (r *stfAuthenticationServiceResource) Delete(ctx context.Context, req resou
 	}
 
 	// Get refreshed STFDeployment, if no STFDeployment found, return
-	deployment, err := stf_deployment.GetSTFDeployment(ctx, r.client, &resp.Diagnostics, state.SiteId.ValueStringPointer())
-	if err != nil || deployment == nil {
+	_, err := stf_deployment.GetSTFDeployment(ctx, r.client, &resp.Diagnostics, state.SiteId.ValueStringPointer())
+	if err != nil {
+		if !strings.EqualFold(err.Error(), util.NOT_EXIST) {
+			resp.Diagnostics.AddError(
+				"Error fetching StoreFront Deployment during Authentication Service deletion",
+				"Error message: "+err.Error(),
+			)
+		}
 		return
 	}
 
@@ -510,14 +524,7 @@ func getSTFAuthenticationService(ctx context.Context, diagnostics *diag.Diagnost
 	// Get refreshed STFAuthenticationService properties from Orchestration
 	STFAuthenticationService, err := getSTFAuthenticationServiceRequest.Execute()
 	if err != nil {
-		if strings.EqualFold(err.Error(), util.NOT_EXIST) {
-			return nil, nil
-		}
-		diagnostics.AddError(
-			"Error fetching state of StoreFront Authentication Service ",
-			"Error message: "+err.Error(),
-		)
-		return &STFAuthenticationService, err
+		return nil, err
 	}
 	return &STFAuthenticationService, nil
 }
@@ -583,7 +590,6 @@ func getCitrixAGBasicOptions(ctx context.Context, diagnostics *diag.Diagnostics,
 }
 
 func getSTFAuthenticationServiceProtocol(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteIdInt int64, virtualPath string) (*[]citrixstorefront.STFAuthenticationServiceProtocolResponseModel, error) {
-
 	var getAuthServiceBody citrixstorefront.GetSTFAuthenticationServiceRequestModel
 
 	getAuthServiceBody.SetSiteId(siteIdInt)

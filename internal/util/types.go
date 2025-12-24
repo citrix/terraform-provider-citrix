@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package util
 
@@ -44,7 +44,10 @@ var defaultObjectCache sync.Map
 func ResourceAttributeMapFromObject(m ResourceModelWithAttributes) (map[string]attr.Type, error) {
 	keyName := reflect.TypeOf(m).String()
 	if attributes, ok := attributeMapCache.Load(keyName); ok {
-		return attributes.(map[string]attr.Type), nil
+		if attrMap, ok := attributes.(map[string]attr.Type); ok {
+			return attrMap, nil
+		}
+		return nil, fmt.Errorf("cached value is not of type map[string]attr.Type")
 	}
 
 	// not doing an extra sync/double checked lock because generating the attribute map is pretty quick
@@ -64,7 +67,10 @@ func ResourceAttributeMapFromObject(m ResourceModelWithAttributes) (map[string]a
 func DataSourceAttributeMapFromObject(m DataSourceModelWithAttributes) (map[string]attr.Type, error) {
 	keyName := reflect.TypeOf(m).String()
 	if attributes, ok := attributeMapCache.Load(keyName); ok {
-		return attributes.(map[string]attr.Type), nil
+		if attrMap, ok := attributes.(map[string]attr.Type); ok {
+			return attrMap, nil
+		}
+		return nil, fmt.Errorf("cached value is not of type map[string]attr.Type")
 	}
 
 	// not doing an extra sync/double checked lock because generating the attribute map is pretty quick
@@ -229,14 +235,17 @@ func defaultObjectFromObjectValue[objTyp any](ctx context.Context, v types.Objec
 	var temp objTyp
 	keyName := reflect.TypeOf(temp).String()
 	if defaultObject, ok := defaultObjectCache.Load(keyName); ok {
-		return defaultObject.(objTyp)
+		if typedObj, ok := defaultObject.(objTyp); ok {
+			return typedObj
+		}
+		// Type assertion failed, continue to refresh the cache
 	}
 
 	// not doing an extra sync/double checked lock because generating the default object is pretty quick
 	// Use reflect to build a top level map from tfsdk:field_name to the reflect field value
 	attributeByTag := map[string]reflect.Value{}
 	val := reflect.ValueOf(&temp).Elem()
-	for i := 0; i < val.NumField(); i++ {
+	for i := range val.NumField() {
 		field := val.Type().Field(i)
 		if tag, ok := field.Tag.Lookup("tfsdk"); ok {
 			attributeByTag[tag] = val.Field(i)
@@ -681,7 +690,10 @@ func TypeBoolToString(from types.Bool) string {
 // </summary>
 // <param name="from">Boolean value in string</param>
 // <returns>Boolean value in terraform types.Bool</returns>
-func StringToTypeBool(from string) types.Bool {
-	result, _ := strconv.ParseBool(from)
-	return types.BoolValue(result)
+func StringToTypeBool(from string) (types.Bool, error) {
+	result, err := strconv.ParseBool(from)
+	if err != nil {
+		return types.BoolNull(), err
+	}
+	return types.BoolValue(result), nil
 }

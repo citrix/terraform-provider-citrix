@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package hypervisor
 
@@ -53,7 +53,7 @@ func (r *openshiftHypervisorResource) Configure(_ context.Context, req resource.
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -75,9 +75,9 @@ func (r *openshiftHypervisorResource) Create(ctx context.Context, req resource.C
 	connectionDetails.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT)
 	connectionDetails.SetUserName(OpenShiftUsername)
 	connectionDetails.SetPassword(plan.ServiceAccountToken.ValueString())
-	sslThumbprints := util.StringListToStringArray(ctx, &diags, plan.SslThumbprints)
+	sslThumbprints := util.StringListToStringArray(ctx, &resp.Diagnostics, plan.SslThumbprints)
 	connectionDetails.SetSslThumbprints(sslThumbprints)
-	addresses := util.StringListToStringArray(ctx, &diags, plan.Addresses)
+	addresses := util.StringListToStringArray(ctx, &resp.Diagnostics, plan.Addresses)
 	connectionDetails.SetAddresses(addresses)
 
 	connectionDetails.SetMaxAbsoluteActiveActions(int32(plan.MaxAbsoluteActiveActions.ValueInt64()))
@@ -173,7 +173,7 @@ func (r *openshiftHypervisorResource) Update(ctx context.Context, req resource.U
 	editHypervisorRequestBody.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT)
 	editHypervisorRequestBody.SetPassword(plan.ServiceAccountToken.ValueString())
 
-	addresses := util.StringListToStringArray(ctx, &diags, plan.Addresses)
+	addresses := util.StringListToStringArray(ctx, &resp.Diagnostics, plan.Addresses)
 	editHypervisorRequestBody.SetAddresses(addresses)
 
 	editHypervisorRequestBody.SetMaxAbsoluteActiveActions(int32(plan.MaxAbsoluteActiveActions.ValueInt64()))
@@ -193,7 +193,7 @@ func (r *openshiftHypervisorResource) Update(ctx context.Context, req resource.U
 	}
 
 	// Update resource state with updated property values
-	plan = plan.RefreshPropertyValues(ctx, &diags, updatedHypervisor)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, updatedHypervisor)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

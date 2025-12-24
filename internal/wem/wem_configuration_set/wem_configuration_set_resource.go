@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package wem_configuration_set
 
@@ -41,7 +41,7 @@ func (w *wemSiteServiceResource) Configure(_ context.Context, req resource.Confi
 	if req.ProviderData == nil {
 		return
 	}
-	w.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	w.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // NewWemSiteServiceResource is a helper function to simplify the provider implementation.

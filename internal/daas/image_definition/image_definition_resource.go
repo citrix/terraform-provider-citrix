@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package image_definition
 
@@ -46,7 +46,7 @@ func (r *ImageDefinitionResource) Configure(_ context.Context, req resource.Conf
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Schema defines the schema for the data source.
@@ -126,10 +126,9 @@ func (r *ImageDefinitionResource) Create(ctx context.Context, req resource.Creat
 		if createTimeout == 0 {
 			createTimeout = getImageDefinitionTimeoutConfigs().CreateDefault
 		}
-		err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Image Definition", &resp.Diagnostics, createTimeout)
-		if err != nil {
-			// Error has been added to diagnostics. Do not return since we need to mark the resource as tainted in the state
-		}
+
+		//nolint:errcheck // Errors added to diagnostics, continue so resource gets marked as tainted
+		_ = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error creating Image Definition", &resp.Diagnostics, createTimeout)
 	}
 
 	imageDefinitionResp, err := GetImageDefinition(ctx, r.client, &resp.Diagnostics, plan.Name.ValueString())
@@ -474,5 +473,4 @@ func getImageVersions(ctx context.Context, diagnostics *diag.Diagnostics, client
 		}
 		continuationToken = responseModel.GetContinuationToken()
 	}
-
 }

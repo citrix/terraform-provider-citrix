@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package test
 
@@ -147,7 +147,7 @@ func adminRoleSweeper(ctx context.Context, adminRoleName string, client *citrixc
 			// Resource does not exist in remote, no need to delete
 			return nil
 		}
-		return fmt.Errorf("Error getting admin role: %s", err)
+		return fmt.Errorf("Error getting admin role: %w", err)
 	}
 	deleteAdminRoleRequest := client.ApiClient.AdminAPIsDAAS.AdminDeleteAdminRole(ctx, adminRole.GetId())
 	httpResp, err = citrixclient.AddRequestData(deleteAdminRoleRequest, client).Execute()

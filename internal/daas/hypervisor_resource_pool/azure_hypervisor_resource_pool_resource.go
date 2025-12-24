@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package hypervisor_resource_pool
 
@@ -51,7 +51,7 @@ func (r *azureHypervisorResourcePoolResource) Configure(_ context.Context, req r
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 func (r *azureHypervisorResourcePoolResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -122,7 +122,7 @@ func (r *azureHypervisorResourcePoolResource) Create(ctx context.Context, req re
 		)
 		return
 	}
-	planSubnet := util.StringListToStringArray(ctx, &diags, plan.Subnets)
+	planSubnet := util.StringListToStringArray(ctx, &resp.Diagnostics, plan.Subnets)
 	availabilityZonePath := fmt.Sprintf("%s/virtualprivatecloud.folder/%s", regionPath, vnetPath)
 	subnets, err := getHypervisorResourcePoolSubnets(ctx, r.client, &resp.Diagnostics, hypervisorId, availabilityZonePath, planSubnet, hypervisorConnectionType)
 	if err != nil {
@@ -140,7 +140,7 @@ func (r *azureHypervisorResourcePoolResource) Create(ctx context.Context, req re
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(ctx, &diags, resourcePool)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, resourcePool)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -148,7 +148,6 @@ func (r *azureHypervisorResourcePoolResource) Create(ctx context.Context, req re
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 func (r *azureHypervisorResourcePoolResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -171,7 +170,7 @@ func (r *azureHypervisorResourcePoolResource) Read(ctx context.Context, req reso
 	}
 
 	// Override with refreshed state
-	state = state.RefreshPropertyValues(ctx, &diags, resourcePool)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, resourcePool)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -179,7 +178,6 @@ func (r *azureHypervisorResourcePoolResource) Read(ctx context.Context, req reso
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 func (r *azureHypervisorResourcePoolResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -204,7 +202,7 @@ func (r *azureHypervisorResourcePoolResource) Update(ctx context.Context, req re
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM)
 	editHypervisorResourcePool.SetVmTagging(plan.VmTagging.ValueBool())
 
-	planSubnet := util.StringListToStringArray(ctx, &diags, plan.Subnets)
+	planSubnet := util.StringListToStringArray(ctx, &resp.Diagnostics, plan.Subnets)
 	regionPath := fmt.Sprintf("%s.region", plan.Region.ValueString())
 	resourceGroupPath := fmt.Sprintf("%s.resourcegroup", plan.VirtualNetworkResourceGroup.ValueString())
 	vnetPath := fmt.Sprintf("%s.virtualprivatecloud", plan.VirtualNetwork.ValueString())
@@ -224,7 +222,7 @@ func (r *azureHypervisorResourcePoolResource) Update(ctx context.Context, req re
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(ctx, &diags, updatedResourcePool)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, updatedResourcePool)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -232,7 +230,6 @@ func (r *azureHypervisorResourcePoolResource) Update(ctx context.Context, req re
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 func (r *azureHypervisorResourcePoolResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package hypervisor_resource_pool
 
@@ -111,7 +111,6 @@ func (XenserverHypervisorResourcePoolResourceModel) GetAttributesNamesToMask() m
 }
 
 func (r XenserverHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) XenserverHypervisorResourcePoolResourceModel {
-
 	r.Id = types.StringValue(resourcePool.GetId())
 	r.Name = types.StringValue(resourcePool.GetName())
 

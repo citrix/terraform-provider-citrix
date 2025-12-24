@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package test
 
 import (
@@ -13,7 +14,6 @@ func TestAwsWorkspacesDeploymentDataSourcePreCheck(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping acceptance test")
 	}
-
 
 	if v := os.Getenv("TEST_AWS_WORKSPACES_DEPLOYMENT_DATA_SOURCE_GUID"); v == "" {
 		t.Fatal("TEST_AWS_WORKSPACES_DEPLOYMENT_DATA_SOURCE_GUID must be set for acceptance tests")
@@ -34,11 +34,7 @@ func TestAwsWorkspacesDeploymentDataSourcePreCheck(t *testing.T) {
 
 func TestAwsWorkspacesDeploymentDataSource(t *testing.T) {
 	customerId := os.Getenv("CITRIX_CUSTOMER_ID")
-	isOnPremises := true
-	if customerId != "" && customerId != "CitrixOnPremises" {
-		// Tests being run in cloud env
-		isOnPremises = false
-	}
+	isOnPremises := customerId == "" || customerId == "CitrixOnPremises"
 
 	id := os.Getenv("TEST_AWS_WORKSPACES_DEPLOYMENT_DATA_SOURCE_GUID")
 	name := os.Getenv("TEST_AWS_WORKSPACES_DEPLOYMENT_DATA_SOURCE_NAME")

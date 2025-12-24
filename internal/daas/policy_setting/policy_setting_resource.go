@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package policy_setting
 
@@ -52,7 +52,7 @@ func (r *policySettingResource) Configure(_ context.Context, req resource.Config
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 func (r *policySettingResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -67,6 +67,9 @@ func (r *policySettingResource) Create(ctx context.Context, req resource.CreateR
 	}
 
 	settingRequest, err := buildSettingRequest(ctx, r.client, &resp.Diagnostics, plan, "creating")
+	if err != nil {
+		return // error already added to diagnostics
+	}
 	createPolicySettingReq := r.client.ApiClient.GpoDAAS.GpoCreateGpoSetting(ctx)
 	createPolicySettingReq = createPolicySettingReq.SettingRequest(settingRequest)
 	createPolicySettingReq = createPolicySettingReq.PolicyGuid(plan.PolicyId.ValueString())
@@ -288,7 +291,7 @@ func getPolicySetting(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 	if err != nil {
 		// Check if this is a 404 Not Found error - return a specific error that can be handled by the caller
 		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
-			return nil, fmt.Errorf("%w: %v", util.ErrPolicySettingNotFound, err)
+			return nil, fmt.Errorf("%w: %w", util.ErrPolicySettingNotFound, err)
 		}
 
 		diagnostics.AddError(
@@ -304,11 +307,14 @@ func getPolicySetting(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 
 func updatePolicySetting(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policySetting PolicySettingModel) error {
 	settingRequest, err := buildSettingRequest(ctx, client, diagnostics, policySetting, "updating")
-	editPolicySettingRequest := client.ApiClient.GpoDAAS.GpoUpdateGpoSetting(ctx, policySetting.Id.ValueString())
-	editPolicySettingRequest = editPolicySettingRequest.SettingRequest(settingRequest)
+	if err != nil {
+		return err
+	}
+	updatePolicySettingRequest := client.ApiClient.GpoDAAS.GpoUpdateGpoSetting(ctx, policySetting.Id.ValueString())
+	updatePolicySettingRequest = updatePolicySettingRequest.SettingRequest(settingRequest)
 
 	// Update policy setting
-	httpResp, err := citrixdaasclient.AddRequestData(editPolicySettingRequest, client).Execute()
+	httpResp, err := citrixdaasclient.AddRequestData(updatePolicySettingRequest, client).Execute()
 	if err != nil {
 		diagnostics.AddError(
 			"Error Updating Policy Setting "+policySetting.Id.ValueString(),

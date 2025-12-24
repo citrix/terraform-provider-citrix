@@ -14,6 +14,7 @@ This folder contains examples of how to configure Citrix environments in various
     - [Non-domain joined MCS](#non-domain-joined-mcs)
     - [Quick Deploy](#quick-deploy)
     - [Basic Policy Set](#basic-policy-set)
+    - [Policy Setting Examples](#policy-setting-examples)
 
 ## Deployment guides
 Complete steps from start to finish for a variety of senarios from [Citrix Tech Zone](https://community.citrix.com/tech-zone/automation/):
@@ -82,3 +83,9 @@ Examples of resources related to a policy set. This includes the policy set, pol
 - Policies are linked to a policy set, they can be enabled or disabled.
 - Policy settings and policy filters are detailed configurations of a policy. Each setting or filter can only be associated with a single policy.
 - The priorities of policies with in a policy set are defined my the policy priority resource.
+
+### Policy Setting Examples
+
+Examples of how to configure specific policy settings. Each example demonstrates the proper syntax and value format for a particular policy setting.
+
+Currently available examples: [policy_setting_examples](https://github.com/citrix/terraform-provider-citrix/tree/main/examples/policy_setting_examples)

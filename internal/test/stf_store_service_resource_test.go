@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package test
 
@@ -136,7 +136,6 @@ func BuildSTFStoreServiceResource(t *testing.T, storeService string) string {
 	virtualPath := os.Getenv("TEST_STF_STORE_VIRTUAL_PATH")
 
 	return fmt.Sprintf(storeService, siteId, virtualPath)
-
 }
 
 func generateImportStateId_STFStoreService(state *terraform.State) (string, error) {

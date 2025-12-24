@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package image_definition
 
@@ -226,7 +226,10 @@ func (r ImageDefinitionModel) RefreshPropertyValues(ctx context.Context, diagnos
 				if property.GetName() == "ResourceGroups" {
 					model.ResourceGroup = types.StringValue(property.GetValue())
 				} else if property.GetName() == "UseSharedImageGallery" {
-					model.UseImageGallery = util.StringToTypeBool(property.GetValue())
+					model.UseImageGallery, err = util.StringToTypeBool(property.GetValue())
+					if err != nil {
+						diagnostics.AddError("Error parsing UseSharedImageGallery to bool", err.Error())
+					}
 				} else if property.GetName() == "ImageGallery" {
 					model.ImageGalleryName = types.StringValue(property.GetValue())
 				}

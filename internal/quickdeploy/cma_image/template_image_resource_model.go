@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package cma_image
 
 import (
@@ -6,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixquickdeploy"
-	catalogservice "github.com/citrix/citrix-daas-rest-go/citrixquickdeploy"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -145,7 +145,7 @@ func (CitrixManagedAzureImageResourceModel) GetAttributesNamesToMask() map[strin
 	return map[string]bool{}
 }
 
-func (r CitrixManagedAzureImageResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, image *catalogservice.TemplateImageDetails, region *catalogservice.DeploymentRegionModel) CitrixManagedAzureImageResourceModel {
+func (r CitrixManagedAzureImageResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, image *citrixquickdeploy.TemplateImageDetails, region *citrixquickdeploy.DeploymentRegionModel) CitrixManagedAzureImageResourceModel {
 	r.Id = types.StringValue(image.GetId())
 	r.Name = types.StringValue(image.GetName())
 	r.Notes = types.StringValue(image.GetNotes())

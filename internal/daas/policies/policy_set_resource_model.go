@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package policies
 
@@ -372,11 +372,19 @@ func (r PolicySetModel) RefreshPropertyValues(ctx context.Context, diags *diag.D
 			}
 
 			if isResource {
-				attributes, _ := util.ResourceAttributeMapFromObject(BranchRepeaterFilterModel{})
-				policyModel.BranchRepeaterFilter = types.ObjectNull(attributes)
+				attributes, err := util.ResourceAttributeMapFromObject(BranchRepeaterFilterModel{})
+				if err != nil {
+					diags.AddError("Failed to get BranchRepeaterFilterModel attributes", err.Error())
+				} else {
+					policyModel.BranchRepeaterFilter = types.ObjectNull(attributes)
+				}
 			} else {
-				attributes, _ := util.DataSourceAttributeMapFromObject(BranchRepeaterFilterModel{})
-				policyModel.BranchRepeaterFilter = types.ObjectNull(attributes)
+				attributes, err := util.DataSourceAttributeMapFromObject(BranchRepeaterFilterModel{})
+				if err != nil {
+					diags.AddError("Failed to get BranchRepeaterFilterModel attributes", err.Error())
+				} else {
+					policyModel.BranchRepeaterFilter = types.ObjectNull(attributes)
+				}
 			}
 
 			var accessControlFilters, branchRepeaterFilters, clientIpFilters, clientNameFilters, clientPlatformFilters, desktopGroupFilters, desktopKindFilters, desktopTagFilters, ouFilters, userFilters = ParsePolicyFilters(ctx, diags, policy)
@@ -451,12 +459,19 @@ func ParsePolicyFilters(ctx context.Context, diags *diag.Diagnostics, policy cit
 	var userFilters []UserFilterModel
 	if policy.GetFilters() != nil && len(policy.GetFilters()) != 0 {
 		for _, filter := range policy.GetFilters() {
-
 			var uuidFilterData util.PolicyFilterUuidDataClientModel
-			_ = json.Unmarshal([]byte(filter.GetFilterData()), &uuidFilterData)
+			err := json.Unmarshal([]byte(filter.GetFilterData()), &uuidFilterData)
+			if err != nil {
+				diags.AddError("Error parsing filter data", err.Error())
+				return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
+			}
 
 			var gatewayFilterData util.PolicyFilterGatewayDataClientModel
-			_ = json.Unmarshal([]byte(filter.GetFilterData()), &gatewayFilterData)
+			err = json.Unmarshal([]byte(filter.GetFilterData()), &gatewayFilterData)
+			if err != nil {
+				diags.AddError("Error parsing filter data", err.Error())
+				return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
+			}
 
 			filterType := filter.GetFilterType()
 			switch filterType {

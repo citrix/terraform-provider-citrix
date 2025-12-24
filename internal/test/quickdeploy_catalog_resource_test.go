@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package test
 
@@ -189,7 +189,7 @@ func quickdeployCatalogSweeper(ctx context.Context, catalogName string, client *
 			// Resource does not exist in remote, no need to delete
 			return nil
 		}
-		return fmt.Errorf("Error getting machine catalog: %s", err)
+		return fmt.Errorf("Error getting machine catalog: %w", err)
 	}
 
 	// Get Catalog ID from name

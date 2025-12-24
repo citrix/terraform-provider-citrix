@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package stf_store
 
 import (
@@ -47,7 +48,7 @@ func (r *stfXenappDefaultStoreResource) Configure(_ context.Context, req resourc
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 func (*stfXenappDefaultStoreResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -114,7 +115,6 @@ func (r *stfXenappDefaultStoreResource) Create(ctx context.Context, req resource
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 // Read refreshes the Terraform state with the latest data.

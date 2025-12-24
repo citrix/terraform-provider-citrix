@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package hypervisor_resource_pool
 
@@ -50,7 +50,7 @@ func (r *nutanixHypervisorResourcePoolResource) Configure(_ context.Context, req
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 func (r *nutanixHypervisorResourcePoolResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -100,7 +100,7 @@ func (r *nutanixHypervisorResourcePoolResource) Create(ctx context.Context, req 
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(ctx, &diags, resourcePool)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, resourcePool)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -131,7 +131,7 @@ func (r *nutanixHypervisorResourcePoolResource) Read(ctx context.Context, req re
 	}
 
 	// Override with refreshed state
-	state = state.RefreshPropertyValues(ctx, &diags, resourcePool)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, resourcePool)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -198,7 +198,7 @@ func (r *nutanixHypervisorResourcePoolResource) Update(ctx context.Context, req 
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(ctx, &diags, resourcePool)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, resourcePool)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -206,7 +206,6 @@ func (r *nutanixHypervisorResourcePoolResource) Update(ctx context.Context, req 
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 func (r *nutanixHypervisorResourcePoolResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -308,7 +307,7 @@ func (plan NutanixHypervisorResourcePoolResourceModel) GetNetworksList(ctx conte
 	}
 
 	networkNames := util.StringListToStringArray(ctx, diags, plan.Networks)
-	networks, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, "", util.NetworkResourceType, networkNames, hypervisorConnectionType, pluginId)
+	networks, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, "", util.NetworkResourceType, networkNames, hypervisorConnectionType, pluginId, false)
 	if len(networks) == 0 {
 		errDetail := "No network found for the given network names"
 		if err != nil {

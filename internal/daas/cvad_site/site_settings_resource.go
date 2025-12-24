@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package cvad_site
 
 import (
@@ -46,7 +47,7 @@ func (r *siteSettingsResource) Configure(_ context.Context, req resource.Configu
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 	// Remove Site ID from the URL
 	configuredURL := r.client.ApiClient.GetConfig().Servers[0].URL
 	updatedUrl := strings.ReplaceAll(configuredURL, fmt.Sprintf("/%s/%s", r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId), "/"+r.client.ClientConfig.CustomerId)
@@ -264,8 +265,7 @@ func getMultipleRemotePCAssignmentsSetting(ctx context.Context, client *citrixda
 }
 
 func updateAndReturnSiteSettings(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, plan SiteSettingsModel) (*citrixorchestration.SiteSettingsResponseModel, bool, error) {
-
-	validateOnPremSiteSettings(ctx, client, diagnostics, plan)
+	validateOnPremSiteSettings(client, diagnostics, plan)
 	if diagnostics.HasError() {
 		err := fmt.Errorf("Error validating Site Settings configuration")
 		return nil, false, err
@@ -377,7 +377,7 @@ func updateAndReturnSiteSettings(ctx context.Context, client *citrixdaasclient.C
 	return siteSettings, multipleRemotePCAssignments, nil
 }
 
-func validateOnPremSiteSettings(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, plan SiteSettingsModel) {
+func validateOnPremSiteSettings(client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, plan SiteSettingsModel) {
 	if !client.AuthConfig.OnPremises {
 		if !plan.ConsoleInactivityTimeoutMinutes.IsNull() {
 			diagnostics.AddAttributeError(

@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package hypervisor
 
@@ -176,7 +176,11 @@ func (r AmazonWorkSpacesCoreHypervisorResourceModel) RefreshPropertyValues(ctx c
 		if err == nil {
 			for _, customProperty := range customProperties {
 				if customProperty.GetName() == UseSystemProxyForHypervisorTrafficOnConnectors_CustomProperty {
-					proxy, _ := strconv.ParseBool(customProperty.GetValue())
+					proxy, err := strconv.ParseBool(customProperty.GetValue())
+					if err != nil {
+						diagnostics.AddError("Error parsing "+customProperty.GetName()+" to bool", err.Error())
+						return r
+					}
 					r.UseSystemProxyForHypervisorTrafficOnConnectors = types.BoolValue(proxy)
 				}
 			}

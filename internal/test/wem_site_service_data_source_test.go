@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package test
 
 import (
@@ -14,7 +15,6 @@ func TestWemSiteDataSourcePreCheck(t *testing.T) {
 		t.Skip("skipping acceptance test")
 	}
 
-
 	if v := os.Getenv("TEST_WEM_SITE_DATA_SOURCE_ID"); v == "" {
 		t.Fatal("TEST_WEM_SITE_DATA_SOURCE_ID must be set for acceptance tests")
 	}
@@ -28,11 +28,7 @@ func TestWemSiteDataSourcePreCheck(t *testing.T) {
 
 func TestWemSiteDataSource(t *testing.T) {
 	customerId := os.Getenv("CITRIX_CUSTOMER_ID")
-	isOnPremises := true
-	if customerId != "" && customerId != "CitrixOnPremises" {
-		// Tests being run in cloud env
-		isOnPremises = false
-	}
+	isOnPremises := customerId == "" || customerId == "CitrixOnPremises"
 
 	id := os.Getenv("TEST_WEM_SITE_DATA_SOURCE_ID")
 	name := os.Getenv("TEST_WEM_SITE_DATA_SOURCE_NAME")

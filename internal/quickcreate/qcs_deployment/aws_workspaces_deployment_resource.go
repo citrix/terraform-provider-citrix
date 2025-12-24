@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package qcs_deployment
 
 import (
@@ -54,7 +55,7 @@ func (r *awsWorkspacesDeploymentResource) Configure(_ context.Context, req resou
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -287,7 +288,7 @@ func (r *awsWorkspacesDeploymentResource) Update(ctx context.Context, req resour
 	}
 
 	// 3. Remove workspaces in state that are not in remote. Plan will recreate them
-	deploymentInState := removeWorkspacesInStateNotInRemote(ctx, &resp.Diagnostics, r.client, deployment, state)
+	deploymentInState := removeWorkspacesInStateNotInRemote(ctx, &resp.Diagnostics, deployment, state)
 	diags = resp.State.Set(ctx, deploymentInState)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -307,7 +308,7 @@ func (r *awsWorkspacesDeploymentResource) Update(ctx context.Context, req resour
 		return
 	}
 
-	// Fetch the latest remote configruation
+	// Fetch the latest remote configurations
 	deployment, _, err = getAwsWorkspacesDeploymentUsingId(ctx, r.client, &resp.Diagnostics, plan.Id.ValueString(), true)
 	if err != nil {
 		return
@@ -342,7 +343,7 @@ func (r *awsWorkspacesDeploymentResource) Update(ctx context.Context, req resour
 		}
 	}
 
-	// Fetch the latest remote configruation and update state
+	// Fetch the latest remote configurations and update state
 	deployment, _, err = getAwsWorkspacesDeploymentUsingId(ctx, r.client, &resp.Diagnostics, plan.Id.ValueString(), true)
 	if err != nil {
 		return
@@ -853,7 +854,7 @@ func deleteAwsWorkspaceMachines(ctx context.Context, diagnostics *diag.Diagnosti
 	return nil
 }
 
-func removeWorkspacesInStateNotInRemote(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, deployment *citrixquickcreate.AwsEdcDeployment, deploymentInState AwsWorkspacesDeploymentResourceModel) AwsWorkspacesDeploymentResourceModel {
+func removeWorkspacesInStateNotInRemote(ctx context.Context, diagnostics *diag.Diagnostics, deployment *citrixquickcreate.AwsEdcDeployment, deploymentInState AwsWorkspacesDeploymentResourceModel) AwsWorkspacesDeploymentResourceModel {
 	workspacesInState := util.ObjectListToTypedArray[AwsWorkspacesDeploymentWorkspaceModel](ctx, diagnostics, deploymentInState.Workspaces)
 	workspacesInRemote := map[string]bool{}
 	for _, workspace := range deployment.GetWorkspaces() {
@@ -867,7 +868,7 @@ func removeWorkspacesInStateNotInRemote(ctx context.Context, diagnostics *diag.D
 		}
 	}
 
-	deploymentInState.Workspaces = util.TypedArrayToObjectList[AwsWorkspacesDeploymentWorkspaceModel](ctx, diagnostics, finalWorkspacesInState)
+	deploymentInState.Workspaces = util.TypedArrayToObjectList(ctx, diagnostics, finalWorkspacesInState)
 	return deploymentInState
 }
 

@@ -86,6 +86,7 @@ resource "citrix_stf_store_service" "example-stf-store-service" {
 - `authentication_service_virtual_path` (String) The Virtual Path of the StoreFront Authentication Service to use for authenticating users.
 - `enumeration_options` (Attributes) Enumeration options for the Store (see [below for nested schema](#nestedatt--enumeration_options))
 - `farm_settings` (Attributes) Store farm configuration settings for the Store. (see [below for nested schema](#nestedatt--farm_settings))
+- `fas_resilience_config` (Attributes) FAS Resilience configuration for the Store (see [below for nested schema](#nestedatt--fas_resilience_config))
 - `friendly_name` (String) The friendly name of the Store
 - `launch_options` (Attributes) Launch options for the Store (see [below for nested schema](#nestedatt--launch_options))
 - `load_balance` (Boolean) Whether the Store is load balanced.
@@ -152,6 +153,19 @@ Optional:
 - `leasing_status_expiry_pending` (String) Period of time before retrying a XenDesktop 7 and greater farm in pending leasing mode in timestamp format, which must be in `dd.hh:mm:ss` format with 0's trimmed. Defaults to `0.0:3:0.
 - `pooled_sockets` (Boolean) Use pooled sockets so that StoreFront maintains a pool of sockets. Default value is false.
 - `server_communication_attempts` (Number) Number of server connection attempts before failure. Default value is 1.
+
+
+<a id="nestedatt--fas_resilience_config"></a>
+### Nested Schema for `fas_resilience_config`
+
+Required:
+
+- `enabled` (Boolean) Whether FAS Resilience is enabled for the Store. Default is true.
+
+Optional:
+
+- `duration_of_break_in_minutes` (Number) Duration of the break in minutes. Default is 5.
+- `number_of_exceptions_before_break` (Number) Number of exceptions before breaking the FAS connection. Default is 3.
 
 
 <a id="nestedatt--launch_options"></a>

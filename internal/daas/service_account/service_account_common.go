@@ -4,6 +4,7 @@ package service_account
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
@@ -40,5 +41,5 @@ func GetServiceAccountUsingAccountId(ctx context.Context, client *citrixdaasclie
 			"\nError message: Service Account with accountId "+accountId+" not found",
 	)
 
-	return nil, nil
+	return nil, fmt.Errorf("service account with accountId %s not found", accountId)
 }

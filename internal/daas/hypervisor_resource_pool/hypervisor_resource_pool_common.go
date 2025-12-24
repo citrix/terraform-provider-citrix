@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package hypervisor_resource_pool
 
@@ -122,7 +122,7 @@ func ReadHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.Ci
 }
 
 func getHypervisorResourcePoolSubnets(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId, folderPath string, subnets []string, connectionType citrixorchestration.HypervisorConnectionType) ([]string, error) {
-	remoteSubnets, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, folderPath, util.NetworkResourceType, subnets, connectionType, "")
+	remoteSubnets, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diagnostics, hypervisorId, folderPath, util.NetworkResourceType, subnets, connectionType, "", false)
 	if err != nil {
 		diagnostics.AddError(
 			"Error creating Hypervisor Resource Pool for "+string(connectionType),
@@ -156,14 +156,19 @@ func waitForProvImagesPendingDelete(ctx context.Context, client *citrixdaasclien
 	var totalImpactedCatalogs int32
 
 	for time.Now().Before(deadline) {
-		poolDeleteRequest := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorResourcePoolDeletePreview(ctx, hypervisorId, resourcePoolId)
-		poolDeleteResponseModel, httpResp, err := citrixdaasclient.AddRequestData(poolDeleteRequest, client).Execute()
+		poolDeleteRequest := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorResourcePoolDeletePreview(ctx, hypervisorId, resourcePoolId).Async(true)
+		_, httpResp, err := citrixdaasclient.AddRequestData(poolDeleteRequest, client).Execute()
 		if err != nil {
 			diagnostics.AddError(
 				"Error fetching resource pool delete preview",
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadClientError(err),
 			)
+			return err
+		}
+
+		poolDeleteResponseModel, err := util.GetAsyncJobResult[*citrixorchestration.HypervisorDeletePreviewResponseModel](ctx, client, httpResp, "Error fetching resource pool delete preview", diagnostics, 5)
+		if err != nil {
 			return err
 		}
 
@@ -241,5 +246,4 @@ func waitForProvImagesPendingDelete(ctx context.Context, client *citrixdaasclien
 		details,
 	)
 	return fmt.Errorf("timed out after %d minutes waiting for Machine Catalogs, image definitions, and related resources to be deleted from resource pool %s", timeoutMinutes, resourcePoolId)
-
 }

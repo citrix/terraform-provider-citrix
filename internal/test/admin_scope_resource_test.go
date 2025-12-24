@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package test
 
@@ -125,7 +125,7 @@ func adminScopeSweeper(ctx context.Context, adminScopeName string, client *citri
 			// Resource does not exist in remote, no need to delete
 			return nil
 		}
-		return fmt.Errorf("Error getting admin scope: %s", err)
+		return fmt.Errorf("Error getting admin scope: %w", err)
 	}
 	deleteAdminScopeRequest := client.ApiClient.AdminAPIsDAAS.AdminDeleteAdminScope(ctx, adminScope.GetId())
 	httpResp, err = citrixclient.AddRequestData(deleteAdminScopeRequest, client).Execute()

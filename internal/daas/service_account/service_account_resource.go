@@ -45,7 +45,7 @@ func (r *serviceAccountResource) Configure(_ context.Context, req resource.Confi
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 func (r *serviceAccountResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -95,11 +95,11 @@ func (r *serviceAccountResource) Create(ctx context.Context, req resource.Create
 	serviceAccountRequestModel.SetScopes(util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes))
 
 	createServiceAccountRequest := r.client.ApiClient.IdentityAPIsDAAS.IdentityCreateServiceAccount(ctx)
-	serviceAccountResponse := &citrixorchestration.ServiceAccountResponseModel{}
-	httpResp := &http.Response{}
 
-	// Check if the Cloud DDC version is supported for async operation
-	isDdcVersionSupported := r.client.ClientConfig.OrchestrationApiVersion >= util.DDCVersion125 && !r.client.AuthConfig.OnPremises
+	// Check if the Cloud DDC version or the On-Prem DDC Version (for CVAD version >=2511) is supported for async operation
+	isDdcVersionSupported := r.client.ClientConfig.OrchestrationApiVersion >= util.DDCVersion125
+	var httpResp *http.Response
+	var serviceAccountResponse *citrixorchestration.ServiceAccountResponseModel
 	if isDdcVersionSupported {
 		createServiceAccountRequest = createServiceAccountRequest.CreateServiceAccountRequestModel(serviceAccountRequestModel).Async(true)
 		_, httpResp, err = citrixdaasclient.AddRequestData(createServiceAccountRequest, r.client).Execute()
@@ -114,7 +114,7 @@ func (r *serviceAccountResource) Create(ctx context.Context, req resource.Create
 		}
 
 		// Process the async job response
-		err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, errorMessage, &diags, 10)
+		err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, errorMessage, &resp.Diagnostics, 10)
 		if err != nil {
 			return
 		}
@@ -124,7 +124,6 @@ func (r *serviceAccountResource) Create(ctx context.Context, req resource.Create
 		if err != nil {
 			return
 		}
-
 	} else {
 		createServiceAccountRequest = createServiceAccountRequest.CreateServiceAccountRequestModel(serviceAccountRequestModel)
 		serviceAccountResponse, httpResp, err = citrixdaasclient.AddRequestData(createServiceAccountRequest, r.client).Execute()
@@ -243,7 +242,6 @@ func (r *serviceAccountResource) Update(ctx context.Context, req resource.Update
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 // Delete implements resource.Resource.
@@ -338,7 +336,7 @@ func (r *serviceAccountResource) ModifyPlan(ctx context.Context, req resource.Mo
 			if slices.ContainsFunc(scopeIds, func(scopeId string) bool {
 				return strings.EqualFold(scope.GetId(), scopeId)
 			}) {
-				// Check if the scope provided in the plan is a built-in scope adn throw an error if it is
+				// Check if the scope provided in the plan is a built-in scope and throw an error if it is
 				if scope.GetIsBuiltIn() {
 					resp.Diagnostics.AddError(
 						"Error applying scopes",

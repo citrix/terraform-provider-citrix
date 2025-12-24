@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package cc_identity_providers
 
 import (
@@ -55,7 +56,7 @@ func (r *SamlIdentityProviderResource) Configure(_ context.Context, req resource
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 	r.idpType = string(citrixcws.CWSIDENTITYPROVIDERTYPE_SAML)
 }
 
@@ -95,7 +96,7 @@ func (r *SamlIdentityProviderResource) Create(ctx context.Context, req resource.
 		return
 	}
 	// Add defer to close the certFile after the function completes or errors out
-	defer certFile.Close()
+	defer certFile.Close() //nolint:errcheck // Error not actionable in defer
 	certFileName := filepath.Base(plan.CertFilePath.ValueString())
 
 	// Validate Saml Certificate

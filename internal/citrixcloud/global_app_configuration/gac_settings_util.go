@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package global_app_configuration
 
@@ -20,8 +20,8 @@ import (
 
 // region BookMarkValueModel
 type BookMarkValueModel struct {
-	Name types.String `tfsdk:"name" json:"name"`
-	Url  types.String `tfsdk:"url" json:"url"`
+	Name types.String `json:"name" tfsdk:"name"`
+	Url  types.String `json:"url"  tfsdk:"url"`
 }
 
 type BookMarkValueModel_Go struct {
@@ -214,7 +214,7 @@ func ConvertStruct(src interface{}, dst interface{}) error {
 
 	dstElem := dstVal.Elem()
 
-	for i := 0; i < srcVal.NumField(); i++ {
+	for i := range srcVal.NumField() {
 		srcField := srcVal.Field(i)
 		if !dstElem.IsValid() {
 			return fmt.Errorf("destination element is invalid")
@@ -234,7 +234,6 @@ func ConvertStruct(src interface{}, dst interface{}) error {
 				// Call the method and get the first return value
 				result := method.Call(nil)[0]
 				// Convert the result to a string
-				fmt.Println(result.String()) // Output: Hello, World!
 				dstField.SetString(result.String())
 			} else if srcField.Type().ConvertibleTo(dstField.Type()) {
 				dstField.Set(srcField.Convert(dstField.Type()))
@@ -261,7 +260,7 @@ func ConvertStructReverse(src interface{}, dst interface{}) error {
 	srcElem := srcVal.Elem()
 	dstElem := dstVal.Elem()
 
-	for i := 0; i < srcElem.NumField(); i++ {
+	for i := range srcElem.NumField() {
 		srcField := srcElem.Field(i)
 		fieldName := srcElem.Type().Field(i).Name
 		dstField := dstElem.FieldByName(fieldName)
@@ -271,7 +270,10 @@ func ConvertStructReverse(src interface{}, dst interface{}) error {
 				dstField.Set(reflect.ValueOf(types.StringValue(srcField.String())))
 			} else if srcField.Type() == reflect.TypeOf([]string{}) && dstField.Type() == reflect.TypeOf(types.List{}) {
 				// Convert []string to types.List
-				stringList := srcField.Interface().([]string)
+				stringList, ok := srcField.Interface().([]string)
+				if !ok {
+					return fmt.Errorf("failed to convert field to []string")
+				}
 				listValue := make([]attr.Value, len(stringList))
 				for i, v := range stringList {
 					listValue[i] = types.StringValue(v)
@@ -293,16 +295,25 @@ func ConvertStructReverse(src interface{}, dst interface{}) error {
 func GACSettingsUpdate[tfType any, goType any](ctx context.Context, diagnostics *diag.Diagnostics, ls interface{}) []tfType {
 	listGoType := make([]goType, 0, reflect.ValueOf(ls).Len())
 	sliceValue := reflect.ValueOf(ls)
-	for i := 0; i < sliceValue.Len(); i++ {
+	for i := range sliceValue.Len() {
 		element := sliceValue.Index(i).Interface()
 		goTypeInstance := new(goType)
 		mapElement, _ := element.(map[string]interface{})
-		if i == 0 && !verifyStruct(mapElement, goTypeInstance) { //only verify once the struct
+		if i == 0 { //only verify once the struct
+			if ok, err := verifyStruct(mapElement, goTypeInstance); !ok || err != nil {
+				diagnostics.AddWarning("GAC Settings Update: Structure verification failed", err.Error())
+				return nil
+			}
+		}
+		elementJSON, err := json.Marshal(element)
+		if err != nil {
+			diagnostics.AddWarning("GAC Settings Update: JSON Marshal failed", err.Error())
 			return nil
 		}
-		elementJSON, _ := json.Marshal(element)
+
 		var app goType
-		if err := json.Unmarshal(elementJSON, &app); err != nil {
+		if err = json.Unmarshal(elementJSON, &app); err != nil {
+			diagnostics.AddWarning("GAC Settings Update: JSON Unmarshal failed", err.Error())
 			return nil
 		}
 		listGoType = append(listGoType, app)
@@ -311,16 +322,19 @@ func GACSettingsUpdate[tfType any, goType any](ctx context.Context, diagnostics 
 	if len(listGoType) > 0 {
 		for _, app := range listGoType {
 			var allowListItem tfType
-			ConvertStructReverse(&app, &allowListItem)
+			if err := ConvertStructReverse(&app, &allowListItem); err != nil {
+				diagnostics.AddError("GAC Settings Update: Conversion failed", err.Error())
+				continue
+			}
 			listTFType = append(listTFType, allowListItem)
 		}
 	}
 	return listTFType
 }
 
-func verifyStruct(mapData map[string]interface{}, goType interface{}) bool {
+func verifyStruct(mapData map[string]interface{}, goType interface{}) (bool, error) {
 	val := reflect.ValueOf(goType).Elem()
-	for i := 0; i < val.NumField(); i++ {
+	for i := range val.NumField() {
 		field := val.Type().Field(i)
 		fieldName := field.Tag.Get("json")
 		if fieldName == "" {
@@ -328,18 +342,16 @@ func verifyStruct(mapData map[string]interface{}, goType interface{}) bool {
 		}
 		mapValue, ok := mapData[fieldName]
 		if !ok {
-			fmt.Printf("Field %s not found in map\n", fieldName)
-			return false
+			return false, fmt.Errorf("field %s not found in map", fieldName)
 		}
 		if fieldName == "allowedOrigins" && field.Type == reflect.TypeOf([]string{}) && reflect.TypeOf(mapValue) == reflect.TypeOf([]interface{}{}) {
 			continue
 		}
 		if reflect.TypeOf(mapValue) != field.Type {
-			fmt.Printf("Type mismatch for field %s: expected %s, got %s\n", fieldName, field.Type, reflect.TypeOf(mapValue))
-			return false
+			return false, fmt.Errorf("Type mismatch for field %s: expected %s, got %s\n", fieldName, field.Type, reflect.TypeOf(mapValue))
 		}
 	}
-	return true
+	return true, nil
 }
 
 func WindowsSettingsDefaultValues(ctx context.Context, diagnostics *diag.Diagnostics, windowsSetting *WindowsSettings) {
@@ -445,5 +457,4 @@ func LinuxSettingsDefaultValues(ctx context.Context, diagnostics *diag.Diagnosti
 		return
 	}
 	linuxSetting.ExtensionInstallAllowList = types.SetNull(types.ObjectType{AttrTypes: installAllowListAttributesMap})
-
 }

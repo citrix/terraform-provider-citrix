@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package validators
 
@@ -166,7 +166,6 @@ func TestIPFilterValidator(t *testing.T) {
 	}
 
 	for name, test := range tests {
-
 		t.Run(fmt.Sprintf("ValidateIPFilter - %s", name), func(t *testing.T) {
 			t.Parallel()
 			request := validator.StringRequest{

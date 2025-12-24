@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package qcs_image
 
 import (
@@ -51,7 +52,7 @@ func (r *awsWorkspacesImageResource) Configure(_ context.Context, req resource.C
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Create is the implementation of the Create method in the resource.ResourceWithValidateConfig interface.
@@ -270,11 +271,7 @@ func waitForImageImportCompletion(ctx context.Context, client *citrixdaasclient.
 	startTime := time.Now()
 	imageId := image.GetImageId()
 
-	for {
-		if time.Since(startTime) > time.Minute*time.Duration(120) {
-			break
-		}
-
+	for time.Since(startTime) <= time.Minute*time.Duration(120) {
 		image, httpResp, err := getAwsWorkspacesImageWithId(ctx, client, diagnostics, image.GetAccountId(), imageId, false)
 		if err != nil {
 			return nil, httpResp, err

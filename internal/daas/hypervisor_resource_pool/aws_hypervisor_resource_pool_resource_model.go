@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package hypervisor_resource_pool
 
@@ -100,7 +100,6 @@ func (AwsHypervisorResourcePoolResourceModel) GetAttributesNamesToMask() map[str
 }
 
 func (r AwsHypervisorResourcePoolResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) AwsHypervisorResourcePoolResourceModel {
-
 	r.Id = types.StringValue(resourcePool.GetId())
 	r.Name = types.StringValue(resourcePool.GetName())
 

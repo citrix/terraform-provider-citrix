@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package policy_filters
 
@@ -122,12 +122,11 @@ func ParsePolicyFilters(ctx context.Context, diags *diag.Diagnostics, policy cit
 	var userFilters []UserFilterModel
 	if policy.GetFilters() != nil && len(policy.GetFilters()) != 0 {
 		for _, filter := range policy.GetFilters() {
-
 			var uuidFilterData util.PolicyFilterUuidDataClientModel
-			_ = json.Unmarshal([]byte(filter.GetFilterData()), &uuidFilterData)
+			_ = json.Unmarshal([]byte(filter.GetFilterData()), &uuidFilterData) //nolint:errcheck // uuid filter is optional
 
 			var gatewayFilterData util.PolicyFilterGatewayDataClientModel
-			_ = json.Unmarshal([]byte(filter.GetFilterData()), &gatewayFilterData)
+			_ = json.Unmarshal([]byte(filter.GetFilterData()), &gatewayFilterData) //nolint:errcheck // gateway filter is optional
 
 			filterType := filter.GetFilterType()
 			switch filterType {

@@ -112,10 +112,13 @@ resource "citrix_stf_webreceiver_service" "example-stf-webreceiver-service"{
 
 ### Optional
 
+- `app_protection` (Boolean) Enable App Protection.  Defaults to `false`.
 - `application_shortcuts` (Attributes) Application shortcuts configurations for the WebReceiver. (see [below for nested schema](#nestedatt--application_shortcuts))
 - `authentication_manager` (Attributes) WebReceiver Authentication Manager client options. (see [below for nested schema](#nestedatt--authentication_manager))
 - `authentication_methods` (Set of String) The authentication methods supported by the WebReceiver.
+- `blocking_notification` (Attributes) Blocking Notification settings for the WebReceiver. (see [below for nested schema](#nestedatt--blocking_notification))
 - `communication` (Attributes) Communication settings used for the WebReceiver proxy. (see [below for nested schema](#nestedatt--communication))
+- `discovery_service` (Attributes) Discovery Service settings for the WebReceiver. (see [below for nested schema](#nestedatt--discovery_service))
 - `friendly_name` (String) The friendly name of the WebReceiver
 - `plugin_assistant` (Attributes) Pluin Assistant configuration for the WebReceiver. (see [below for nested schema](#nestedatt--plugin_assistant))
 - `resources_service` (Attributes) Resources Service settings for the WebReceiver. (see [below for nested schema](#nestedatt--resources_service))
@@ -151,6 +154,21 @@ Read-Only:
 - `logoff_url` (String) The URL to log off the Citrix Receiver for Web session. Defaults to `Authentication/Logoff`.
 
 
+<a id="nestedatt--blocking_notification"></a>
+### Nested Schema for `blocking_notification`
+
+Required:
+
+- `body` (String) Body text of the Blocking Notification.
+- `button` (String) Text for the action button of the Blocking Notification.
+- `title` (String) Title of the Blocking Notification.
+
+Optional:
+
+- `enabled` (Boolean) Whether to enable Blocking Notification. Defaults to `false`.
+- `frequency` (String) Frequency of displaying the Blocking Notification. Available values are `FirstLogin`, `EveryDay`, `Every7Days`, and `Every30Days`. Defaults to `FirstLogin`
+
+
 <a id="nestedatt--communication"></a>
 ### Nested Schema for `communication`
 
@@ -163,6 +181,14 @@ Optional:
 - `proxy_port` (Number) The port to use for the communications proxy. Defaults to `8888`.
 - `proxy_process_name` (String) The name of the process acting as proxy. Defaults to `Fiddler`.
 - `timeout` (String) Timeout value for communicating with StoreFront in `dd.hh:mm:ss` format with 0's trimmed. Defaults to `0.0:3:0`.
+
+
+<a id="nestedatt--discovery_service"></a>
+### Nested Schema for `discovery_service`
+
+Optional:
+
+- `run_discovery_at_start` (Boolean) Whether to run the Discovery Service at start. Defaults to `true`.
 
 
 <a id="nestedatt--plugin_assistant"></a>
@@ -214,7 +240,7 @@ Optional:
 
 - `app_shortcuts` (Attributes) App shortcuts configuration for the WebReceiver. (see [below for nested schema](#nestedatt--user_interface--app_shortcuts))
 - `auto_launch_desktop` (Boolean) Whether to auto-launch desktop at login if there is only one desktop available for the user. Defaults to `true`.
-- `category_view_collapsed` (Boolean) Collapse the category view so that only the immediate contents of the selected category/sub-catagory are displayed. Defaults to `false`.
+- `category_view_collapsed` (Boolean) Collapse the category view so that only the immediate contents of the selected category/sub-category are displayed. Defaults to `false`.
 - `enable_apps_folder_view` (Boolean) Allows the user to turn off folder view when in a locked-down store or unauthenticated store. Defaults to `true`.
 - `move_app_to_uncategorized` (Boolean) Move uncategorized apps into a folder named ‘Uncategorized’ when the category view is collapsed. Defaults to `true`.
 - `multi_click_timeout` (Number) The time period in seconds for which the spinner control is displayed, after the user clicks on the App/Desktop icon within Receiver for Web. Defaults to `3`.

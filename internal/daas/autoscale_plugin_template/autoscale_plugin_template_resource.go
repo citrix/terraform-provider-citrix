@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package autoscale_plugin_template
 
@@ -42,7 +42,7 @@ func (r *autoscalePluginTemplateResource) Configure(_ context.Context, req resou
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Metadata implements resource.ResourceWithImportState.
@@ -98,7 +98,10 @@ func (r *autoscalePluginTemplateResource) ModifyPlan(ctx context.Context, req re
 
 	if req.State.Raw.IsNull() {
 		// For create, we want to check if the autoscale plugin template already exists
-		autoscalePluginTemplate, _ := getAutoscalePluginTemplate(ctx, r.client, nil, plan.Type.ValueString(), plan.Name.ValueString())
+		autoscalePluginTemplate, err := getAutoscalePluginTemplate(ctx, r.client, nil, plan.Type.ValueString(), plan.Name.ValueString())
+		if err != nil {
+			return // error added to diagnostics
+		}
 		if autoscalePluginTemplate != nil {
 			resp.Diagnostics.AddError(
 				"Error creating Autoscale Plugin Template",
@@ -118,7 +121,10 @@ func (r *autoscalePluginTemplateResource) ModifyPlan(ctx context.Context, req re
 
 	if !strings.EqualFold(state.Name.ValueString(), plan.Name.ValueString()) {
 		// If the name is changed, we need to check if the new name already exists
-		autoscalePluginTemplate, _ := getAutoscalePluginTemplate(ctx, r.client, nil, plan.Type.ValueString(), plan.Name.ValueString())
+		autoscalePluginTemplate, err := getAutoscalePluginTemplate(ctx, r.client, nil, plan.Type.ValueString(), plan.Name.ValueString())
+		if err != nil {
+			return // error added to diagnostics
+		}
 		if autoscalePluginTemplate != nil {
 			resp.Diagnostics.AddError(
 				"Error updating Autoscale Plugin Template",

@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package stf_deployment
 
 import (
@@ -7,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/citrix/citrix-daas-rest-go/citrixstorefront/models"
 	citrixstorefront "github.com/citrix/citrix-daas-rest-go/citrixstorefront/models"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
@@ -101,7 +101,7 @@ func (r *stfDeploymentResource) Configure(_ context.Context, req resource.Config
 	if req.ProviderData == nil {
 		return
 	}
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -146,7 +146,8 @@ func (r *stfDeploymentResource) Create(ctx context.Context, req resource.CreateR
 
 	var gateway []citrixstorefront.STFRoamingGatewayResponseModel
 	if !plan.RoamingGateway.IsNull() {
-		setRoamingGateway(ctx, r.client, &resp.Diagnostics, gateway, plan)
+		//nolint:errcheck // Errors added to diagnostics, continue so resource gets marked as tainted
+		_ = setRoamingGateway(ctx, r.client, &resp.Diagnostics, gateway, plan)
 
 		gateway, err = getRoamingGateway(ctx, r.client, &resp.Diagnostics, plan)
 		if err != nil {
@@ -169,7 +170,7 @@ func (r *stfDeploymentResource) Create(ctx context.Context, req resource.CreateR
 			)
 		}
 
-		getRoamingBeaconInternalResponse, err = getRoamingBeaconInternal(ctx, r.client, &resp.Diagnostics, plan)
+		getRoamingBeaconInternalResponse, err = getRoamingBeaconInternal(ctx, r.client, &resp.Diagnostics)
 
 		if err != nil {
 			resp.Diagnostics.AddError(
@@ -178,7 +179,7 @@ func (r *stfDeploymentResource) Create(ctx context.Context, req resource.CreateR
 			)
 		}
 
-		getRoamingBeaconExternalResponse, err = getRoamingBeaconExternal(ctx, r.client, &resp.Diagnostics, plan)
+		getRoamingBeaconExternalResponse, err = getRoamingBeaconExternal(ctx, r.client, &resp.Diagnostics)
 
 		if err != nil {
 			resp.Diagnostics.AddError(
@@ -211,14 +212,19 @@ func (r *stfDeploymentResource) Read(ctx context.Context, req resource.ReadReque
 
 	deployment, err := GetSTFDeployment(ctx, r.client, &resp.Diagnostics, state.SiteId.ValueStringPointer())
 	if err != nil {
+		if strings.EqualFold(err.Error(), util.NOT_EXIST) {
+			resp.Diagnostics.AddWarning(
+				"StoreFront Deployment not found",
+				"StoreFront Deployment was not found and will be removed from the state file. An apply action will result in the creation of a new resource.",
+			)
+			resp.State.RemoveResource(ctx)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error reading StoreFront Deployment",
+				"Error message: "+err.Error(),
+			)
+		}
 		return
-	}
-	if deployment == nil {
-		resp.Diagnostics.AddWarning(
-			"StoreFront Deployment not found",
-			"StoreFront Deployment was not found and will be removed from the state file. An apply action will result in the creation of a new resource.",
-		)
-		resp.State.RemoveResource(ctx)
 	}
 
 	gateway, err := getRoamingGateway(ctx, r.client, &resp.Diagnostics, state)
@@ -232,7 +238,7 @@ func (r *stfDeploymentResource) Read(ctx context.Context, req resource.ReadReque
 	var getRoamingBeaconInternalResponse *citrixstorefront.GetSTFRoamingInternalBeaconResponseModel
 	var getRoamingBeaconExternalResponse *citrixstorefront.GetSTFRoamingExternalBeaconResponseModel
 
-	getRoamingBeaconInternalResponse, err = getRoamingBeaconInternal(ctx, r.client, &resp.Diagnostics, state)
+	getRoamingBeaconInternalResponse, err = getRoamingBeaconInternal(ctx, r.client, &resp.Diagnostics)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error fetching Internal Roaming Beacon",
@@ -240,7 +246,7 @@ func (r *stfDeploymentResource) Read(ctx context.Context, req resource.ReadReque
 		)
 	}
 
-	getRoamingBeaconExternalResponse, err = getRoamingBeaconExternal(ctx, r.client, &resp.Diagnostics, state)
+	getRoamingBeaconExternalResponse, err = getRoamingBeaconExternal(ctx, r.client, &resp.Diagnostics)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error fetching External Roaming Beacon",
@@ -270,8 +276,12 @@ func (r *stfDeploymentResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	// Get refreshed STFDeployment
-	deployment, err := GetSTFDeployment(ctx, r.client, &resp.Diagnostics, plan.SiteId.ValueStringPointer())
-	if err != nil || deployment == nil {
+	_, err := GetSTFDeployment(ctx, r.client, &resp.Diagnostics, plan.SiteId.ValueStringPointer())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error fetching StoreFront Deployment during update",
+			"Error message: "+err.Error(),
+		)
 		return
 	}
 
@@ -312,20 +322,15 @@ func (r *stfDeploymentResource) Update(ctx context.Context, req resource.UpdateR
 	req.State.Get(ctx, &state)
 	existingGateways, err := getRoamingGateway(ctx, r.client, &resp.Diagnostics, state)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error fetching existing Gateways",
-			"Error message: "+err.Error(),
-		)
+		return // error already added to diagnostics
 	}
-	setRoamingGateway(ctx, r.client, &resp.Diagnostics, existingGateways, plan)
-
-	gateways, err := getRoamingGateway(ctx, r.client, &resp.Diagnostics, plan)
+	err = setRoamingGateway(ctx, r.client, &resp.Diagnostics, existingGateways, plan)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error getting updated StoreFront Roaming Gateway ",
-			"Error message: "+err.Error(),
-		)
+		return // error already added to diagnostics
 	}
+
+	//nolint:errcheck // Errors added to diagnostics, continue so resource gets marked as tainted
+	gateways, _ := getRoamingGateway(ctx, r.client, &resp.Diagnostics, plan)
 
 	// Update resource state with updated property values
 	var getRoamingBeaconInternalResponse *citrixstorefront.GetSTFRoamingInternalBeaconResponseModel
@@ -339,7 +344,7 @@ func (r *stfDeploymentResource) Update(ctx context.Context, req resource.UpdateR
 			)
 		}
 
-		getRoamingBeaconInternalResponse, err = getRoamingBeaconInternal(ctx, r.client, &resp.Diagnostics, plan)
+		getRoamingBeaconInternalResponse, err = getRoamingBeaconInternal(ctx, r.client, &resp.Diagnostics)
 
 		if err != nil {
 			resp.Diagnostics.AddError(
@@ -348,7 +353,7 @@ func (r *stfDeploymentResource) Update(ctx context.Context, req resource.UpdateR
 			)
 		}
 
-		getRoamingBeaconExternalResponse, err = getRoamingBeaconExternal(ctx, r.client, &resp.Diagnostics, plan)
+		getRoamingBeaconExternalResponse, err = getRoamingBeaconExternal(ctx, r.client, &resp.Diagnostics)
 
 		if err != nil {
 			resp.Diagnostics.AddError(
@@ -378,8 +383,14 @@ func (r *stfDeploymentResource) Delete(ctx context.Context, req resource.DeleteR
 	}
 
 	// Check if STFDeployment exists
-	deployment, err := GetSTFDeployment(ctx, r.client, &resp.Diagnostics, state.SiteId.ValueStringPointer())
-	if err != nil || deployment == nil {
+	_, err := GetSTFDeployment(ctx, r.client, &resp.Diagnostics, state.SiteId.ValueStringPointer())
+	if err != nil {
+		if !strings.EqualFold(err.Error(), util.NOT_EXIST) {
+			resp.Diagnostics.AddError(
+				"Error fetching state of StoreFront Deployment ",
+				"Error message: "+err.Error(),
+			)
+		}
 		return
 	}
 
@@ -478,10 +489,7 @@ func GetSTFDeployment(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 	// Get refreshed STFDeployment properties from Orchestration
 	STFDeployment, err := getSTFDeploymentRequest.Execute()
 	if err != nil {
-		if strings.EqualFold(err.Error(), util.NOT_EXIST) {
-			return nil, nil
-		}
-		return &STFDeployment, err
+		return nil, err
 	}
 	return &STFDeployment, nil
 }
@@ -513,7 +521,7 @@ func getRoamingGateway(ctx context.Context, client *citrixdaasclient.CitrixDaasC
 	return remoteRoamingGateway, err
 }
 
-func getRoamingBeaconInternal(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, plan STFDeploymentResourceModel) (*citrixstorefront.GetSTFRoamingInternalBeaconResponseModel, error) {
+func getRoamingBeaconInternal(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) (*citrixstorefront.GetSTFRoamingInternalBeaconResponseModel, error) {
 	// Get the Internal IPs
 	getRoamingIntBeaconRequest := client.StorefrontClient.RoamingSF.GetRoamingInternalBeacon(ctx)
 	remoteRoamingInternalBeacon, err := getRoamingIntBeaconRequest.Execute()
@@ -524,10 +532,10 @@ func getRoamingBeaconInternal(ctx context.Context, client *citrixdaasclient.Citr
 			"Error message: "+err.Error(),
 		)
 	}
-	return &remoteRoamingInternalBeacon, nil
+	return &remoteRoamingInternalBeacon, err
 }
 
-func getRoamingBeaconExternal(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, plan STFDeploymentResourceModel) (*citrixstorefront.GetSTFRoamingExternalBeaconResponseModel, error) {
+func getRoamingBeaconExternal(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) (*citrixstorefront.GetSTFRoamingExternalBeaconResponseModel, error) {
 	// Get the External IPs
 	getRoamingExtBeaconRequest := client.StorefrontClient.RoamingSF.GetRoamingExternalBeacon(ctx)
 	remoteRoamingExternalBeacon, err := getRoamingExtBeaconRequest.Execute()
@@ -538,7 +546,7 @@ func getRoamingBeaconExternal(ctx context.Context, client *citrixdaasclient.Citr
 			"Error message: "+err.Error(),
 		)
 	}
-	return &remoteRoamingExternalBeacon, nil
+	return &remoteRoamingExternalBeacon, err
 }
 
 func setRoamingBeacon(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, plan STFDeploymentResourceModel) error {
@@ -584,7 +592,7 @@ func buildRoamingGatewayBody(roamingGatewayPlan RoamingGateway) citrixstorefront
 		addRoamingGatewayBody.SetName(roamingGatewayPlan.Name.ValueString())
 	}
 	if !roamingGatewayPlan.LogonType.IsNull() {
-		includedLogonType, err := models.NewLogonTypeFromValue(roamingGatewayPlan.LogonType.ValueString())
+		includedLogonType, err := citrixstorefront.NewLogonTypeFromValue(roamingGatewayPlan.LogonType.ValueString())
 		if err != nil {
 			diagnostics.AddError(
 				"Error updating Logon Type",
@@ -636,7 +644,6 @@ func buildRoamingGatewayBody(roamingGatewayPlan RoamingGateway) citrixstorefront
 		addRoamingGatewayBody.SetStasUseLoadBalancing(roamingGatewayPlan.StasUseLoadBalancing.ValueBool())
 	}
 	return addRoamingGatewayBody
-
 }
 
 func setRoamingGateway(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, existingGateways []citrixstorefront.STFRoamingGatewayResponseModel, plan STFDeploymentResourceModel) error {
@@ -728,7 +735,7 @@ func setRoamingGateway(ctx context.Context, client *citrixdaasclient.CitrixDaasC
 
 			setRoamingGatewayBody.SetName(gateway.Name.ValueString())
 			if !gateway.LogonType.IsNull() {
-				includedLogonType, err := models.NewLogonTypeFromValue(gateway.LogonType.ValueString())
+				includedLogonType, err := citrixstorefront.NewLogonTypeFromValue(gateway.LogonType.ValueString())
 				if err != nil {
 					diagnostics.AddError(
 						"Error updating Logon Type",

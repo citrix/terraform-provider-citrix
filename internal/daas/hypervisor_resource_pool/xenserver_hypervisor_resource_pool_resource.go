@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package hypervisor_resource_pool
 
@@ -53,7 +53,7 @@ func (r *xenserverHypervisorResourcePoolResource) Configure(_ context.Context, r
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 func (r *xenserverHypervisorResourcePoolResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -119,7 +119,6 @@ func (r *xenserverHypervisorResourcePoolResource) Create(ctx context.Context, re
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 func (r *xenserverHypervisorResourcePoolResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -150,7 +149,6 @@ func (r *xenserverHypervisorResourcePoolResource) Read(ctx context.Context, req 
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 func (r *xenserverHypervisorResourcePoolResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -247,7 +245,6 @@ func (r *xenserverHypervisorResourcePoolResource) Update(ctx context.Context, re
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 func (r *xenserverHypervisorResourcePoolResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -308,7 +305,6 @@ func (r *xenserverHypervisorResourcePoolResource) ImportState(ctx context.Contex
 		"Error importing Hypervisor Resource Pool",
 		fmt.Sprintf("Hypervisor Resource Pool with ID %q not found", req.ID),
 	)
-
 }
 
 func (r *xenserverHypervisorResourcePoolResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -356,7 +352,7 @@ func (plan XenserverHypervisorResourcePoolResourceModel) GetStorageList(ctx cont
 	storageNames := util.ConvertBaseStringArrayToPrimitiveStringArray(storage)
 	hypervisorId := hypervisor.GetId()
 	hypervisorConnectionType := hypervisor.GetConnectionType()
-	storages, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, "", util.StorageResourceType, storageNames, hypervisorConnectionType, hypervisor.GetPluginId())
+	storages, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, "", util.StorageResourceType, storageNames, hypervisorConnectionType, hypervisor.GetPluginId(), true)
 
 	if len(storage) > 0 && len(storages) == 0 {
 		errDetail := "No storage found for the given storage names"
@@ -378,7 +374,7 @@ func (plan XenserverHypervisorResourcePoolResourceModel) GetStorageList(ctx cont
 		}
 	}
 	tempStorageNames := util.ConvertBaseStringArrayToPrimitiveStringArray(tempStorage)
-	tempStorages, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, "", util.StorageResourceType, tempStorageNames, hypervisorConnectionType, hypervisor.GetPluginId())
+	tempStorages, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, "", util.StorageResourceType, tempStorageNames, hypervisorConnectionType, hypervisor.GetPluginId(), true)
 	if len(tempStorage) > 0 && len(tempStorages) == 0 {
 		errDetail := "No storage found for the given temporary storage names"
 		if err != nil {
@@ -403,7 +399,7 @@ func (plan XenserverHypervisorResourcePoolResourceModel) GetNetworksList(ctx con
 	}
 
 	networkNames := util.StringListToStringArray(ctx, diags, plan.Networks)
-	networks, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, "", util.NetworkResourceType, networkNames, hypervisorConnectionType, hypervisor.GetPluginId())
+	networks, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, "", util.NetworkResourceType, networkNames, hypervisorConnectionType, hypervisor.GetPluginId(), false)
 	if len(networks) == 0 {
 		errDetail := "No network found for the given network names"
 		if err != nil {

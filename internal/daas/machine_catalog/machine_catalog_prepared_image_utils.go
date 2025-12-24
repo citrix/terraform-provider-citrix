@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package machine_catalog
 
@@ -63,7 +63,11 @@ func validateImageVersion(ctx context.Context, diagnostics *diag.Diagnostics, cl
 					customProperties := imgDefinitionConn[0].GetCustomProperties()
 					for _, property := range customProperties {
 						if property.GetName() == "UseSharedImageGallery" {
-							preparedImageUseSharedGallery, _ = strconv.ParseBool(property.GetValue())
+							preparedImageUseSharedGallery, err = strconv.ParseBool(property.GetValue())
+							if err != nil {
+								diagnostics.AddError("Error parsing UseSharedImageGallery property", err.Error())
+								return err
+							}
 						}
 					}
 					if preparedImageUseSharedGallery && !azureMachineConfig.UseAzureComputeGallery.IsNull() {

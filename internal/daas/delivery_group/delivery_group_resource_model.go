@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package delivery_group
 
@@ -54,7 +54,7 @@ func (DeliveryGroupMachineCatalogModel) GetSchema() schema.NestedAttributeObject
 				Description: "The number of machines to assign from the machine catalog to the delivery group.",
 				Required:    true,
 				Validators: []validator.Int64{
-					int64validator.AtLeast(1),
+					int64validator.AtLeast(0),
 				},
 			},
 		},
@@ -1485,7 +1485,6 @@ func (DeliveryGroupResourceModel) GetAttributes() map[string]schema.Attribute {
 }
 
 func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixclient.CitrixDaasClient, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, dgDesktops *citrixorchestration.DesktopResponseModelCollection, dgPowerTimeSchemes *citrixorchestration.PowerTimeSchemeResponseModelCollection, dgMachines []citrixorchestration.MachineResponseModel, dgRebootSchedule *citrixorchestration.RebootScheduleResponseModelCollection, deliveryGroupAutoscalePlugins *citrixorchestration.AutoscaleGroupPluginModelCollection, tags []string) DeliveryGroupResourceModel {
-
 	// Set required values
 	r.Id = types.StringValue(deliveryGroup.GetId())
 	r.Name = types.StringValue(deliveryGroup.GetName())

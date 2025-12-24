@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package machine_catalog
 
@@ -17,7 +17,6 @@ func getRemotePcEnrollmentScopes(ctx context.Context, diagnostics *diag.Diagnost
 	if !plan.RemotePcOus.IsNull() {
 		remotePcOus := util.ObjectListToTypedArray[RemotePcOuModel](ctx, diagnostics, plan.RemotePcOus)
 		for _, ou := range remotePcOus {
-
 			getIdentityContainer := client.ApiClient.IdentityAPIsDAAS.IdentityGetContainer(ctx, ou.OUName.ValueString())
 			identityContainer, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.IdentityContainerResponseModel](getIdentityContainer, client)
 

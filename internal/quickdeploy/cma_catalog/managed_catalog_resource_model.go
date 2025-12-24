@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package cma_catalog
 
 import (
@@ -8,7 +9,6 @@ import (
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/citrix-daas-rest-go/citrixquickdeploy"
-	catalogservice "github.com/citrix/citrix-daas-rest-go/citrixquickdeploy"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
@@ -400,7 +400,7 @@ func (OnPremConnectivityModel) GetAttributes() map[string]schema.Attribute {
 	return OnPremConnectivityModel{}.GetSchema().Attributes
 }
 
-func (r CitrixManagedCatalogResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, catalog *citrixquickdeploy.CatalogOverview, capacity *citrixquickdeploy.CatalogCapacitySettingsModel, region *catalogservice.DeploymentRegionModel) CitrixManagedCatalogResourceModel {
+func (r CitrixManagedCatalogResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, catalog *citrixquickdeploy.CatalogOverview, capacity *citrixquickdeploy.CatalogCapacitySettingsModel, region *citrixquickdeploy.DeploymentRegionModel) CitrixManagedCatalogResourceModel {
 	r.Id = types.StringValue(catalog.GetId())
 	r.Name = types.StringValue(catalog.GetName())
 	sessionSupport := catalog.GetSessionSupport()
@@ -456,7 +456,7 @@ func (r CitrixManagedCatalogResourceModel) updatePlanWithPowerSchedule(ctx conte
 	powerSchedule.OffPeakDisconnectedSessionAction = types.StringValue(string(scaleSettings.GetOffPeakDisconnectedSessionAction()))
 	powerSchedule.PeakStartTime = types.Int64Value(int64(scaleSettings.GetPeakStartTime()))
 	powerSchedule.PeakEndTime = types.Int64Value(int64(scaleSettings.GetPeakEndTime()))
-	powerSchedule.PeakTimeZoneId = types.StringValue(string(scaleSettings.GetPeakTimeZoneId()))
+	powerSchedule.PeakTimeZoneId = types.StringValue(scaleSettings.GetPeakTimeZoneId())
 	powerSchedule.PowerOffDelay = types.Int64Value(int64(scaleSettings.GetPowerOffDelay()))
 
 	weekdayString := scaleSettings.GetWeekdaysString()
@@ -483,13 +483,4 @@ func (r CitrixManagedCatalogResourceModel) updatePlanWithOnPremConnectivity(ctx 
 
 	r.OnPremConnectivity = util.TypedObjectToObjectValue(ctx, diagnostics, onPremConnectivity)
 	return r
-}
-
-func getTimeSchemeDayValue(v string) citrixorchestration.TimeSchemeDays {
-	timeSchemeDay, err := citrixorchestration.NewTimeSchemeDaysFromValue(v)
-	if err != nil {
-		return citrixorchestration.TIMESCHEMEDAYS_UNKNOWN
-	}
-
-	return *timeSchemeDay
 }

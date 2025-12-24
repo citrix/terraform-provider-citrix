@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package hypervisor
 
@@ -43,7 +43,7 @@ func (r *hpeMoonshotHypervisorResource) Configure(_ context.Context, req resourc
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Schema implements resource.Resource.
@@ -86,11 +86,11 @@ func (r *hpeMoonshotHypervisorResource) Create(ctx context.Context, req resource
 	}
 	connectionDetails.SetPasswordFormat(*pwdFormat)
 
-	addresses := util.StringListToStringArray(ctx, &diags, plan.Addresses)
+	addresses := util.StringListToStringArray(ctx, &resp.Diagnostics, plan.Addresses)
 	connectionDetails.SetAddresses(addresses)
 
 	if !plan.SslThumbprints.IsNull() {
-		sslThumbprints := util.StringListToStringArray(ctx, &diags, plan.SslThumbprints)
+		sslThumbprints := util.StringListToStringArray(ctx, &resp.Diagnostics, plan.SslThumbprints)
 		connectionDetails.SetSslThumbprints(sslThumbprints)
 	}
 
@@ -114,7 +114,7 @@ func (r *hpeMoonshotHypervisorResource) Create(ctx context.Context, req resource
 	}
 
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(ctx, &diags, hypervisor)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, hypervisor)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -152,7 +152,7 @@ func (r *hpeMoonshotHypervisorResource) Read(ctx context.Context, req resource.R
 	}
 
 	// Overwrite hypervisor with refreshed state
-	state = state.RefreshPropertyValues(ctx, &diags, hypervisor)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, hypervisor)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -197,7 +197,7 @@ func (r *hpeMoonshotHypervisorResource) Update(ctx context.Context, req resource
 	}
 	editHypervisorRequestBody.SetPasswordFormat(*pwdFormat)
 
-	addresses := util.StringListToStringArray(ctx, &diags, plan.Addresses)
+	addresses := util.StringListToStringArray(ctx, &resp.Diagnostics, plan.Addresses)
 	editHypervisorRequestBody.SetAddresses(addresses)
 
 	editHypervisorRequestBody.SetMaxAbsoluteActiveActions(int32(plan.MaxAbsoluteActiveActions.ValueInt64()))
@@ -217,7 +217,7 @@ func (r *hpeMoonshotHypervisorResource) Update(ctx context.Context, req resource
 	}
 
 	// Update resource state with updated property values
-	plan = plan.RefreshPropertyValues(ctx, &diags, updatedHypervisor)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, updatedHypervisor)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

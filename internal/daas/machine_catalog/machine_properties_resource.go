@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package machine_catalog
 
@@ -48,7 +48,7 @@ func (r *MachinePropertiesResource) Configure(_ context.Context, req resource.Co
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Schema defines the schema for the data source.
@@ -67,10 +67,13 @@ func (r *MachinePropertiesResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
-	validateMachineAndMachineCatalogExistence(ctx, r.client, &resp.Diagnostics, plan)
+	err := validateMachineAndMachineCatalogExistence(ctx, r.client, &resp.Diagnostics, plan)
+	if err != nil {
+		return // error already added to diagnostics
+	}
 
 	machineName := strings.ReplaceAll(plan.Name.ValueString(), "\\", "|")
-	err := setMachineTags(ctx, r.client, &resp.Diagnostics, machineName, plan.Tags, "managing tags for")
+	err = setMachineTags(ctx, r.client, &resp.Diagnostics, machineName, plan.Tags, "managing tags for")
 	if err != nil {
 		return
 	}
@@ -107,7 +110,10 @@ func (r *MachinePropertiesResource) Read(ctx context.Context, req resource.ReadR
 		return
 	}
 
-	validateMachineAndMachineCatalogExistence(ctx, r.client, &resp.Diagnostics, state)
+	err := validateMachineAndMachineCatalogExistence(ctx, r.client, &resp.Diagnostics, state)
+	if err != nil {
+		return // error already added to diagnostics
+	}
 
 	machineName := strings.ReplaceAll(state.Name.ValueString(), "\\", "|")
 	// Get refreshed admin properties from Orchestration
@@ -142,10 +148,13 @@ func (r *MachinePropertiesResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
-	validateMachineAndMachineCatalogExistence(ctx, r.client, &resp.Diagnostics, plan)
+	err := validateMachineAndMachineCatalogExistence(ctx, r.client, &resp.Diagnostics, plan)
+	if err != nil {
+		return // error already added to diagnostics
+	}
 
 	machineName := strings.ReplaceAll(plan.Name.ValueString(), "\\", "|")
-	err := setMachineTags(ctx, r.client, &resp.Diagnostics, machineName, plan.Tags, "updating tags for")
+	err = setMachineTags(ctx, r.client, &resp.Diagnostics, machineName, plan.Tags, "updating tags for")
 	if err != nil {
 		return
 	}

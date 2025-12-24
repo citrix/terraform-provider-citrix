@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package cc_identity_providers
 
 import (
@@ -52,7 +53,7 @@ func (r *OktaIdentityProviderResource) Configure(_ context.Context, req resource
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 	r.idpType = string(citrixcws.CWSIDENTITYPROVIDERTYPE_OKTA)
 }
 
