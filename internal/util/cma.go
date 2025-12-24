@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package util
 
 import (
@@ -139,5 +140,5 @@ func GetCitrixManagedOnPremConnectionWithName(ctx context.Context, client *citri
 			return &onPremConnection, nil
 		}
 	}
-	return nil, nil
+	return nil, fmt.Errorf("Citrix Managed Azure On-Prem Connection with name %s not found", name)
 }

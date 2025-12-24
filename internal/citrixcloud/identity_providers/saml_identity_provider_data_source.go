@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package cc_identity_providers
 
 import (
@@ -38,7 +39,7 @@ func (d *SamlIdentityProviderDataSource) Configure(ctx context.Context, req data
 		return
 	}
 
-	d.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	d.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 	d.idpType = string(citrixcws.CWSIDENTITYPROVIDERTYPE_SAML)
 }
 

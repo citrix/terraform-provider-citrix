@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package test
 
@@ -59,11 +59,7 @@ func TestAWSWorkspacesImageResourcePreCheck(t *testing.T) {
 
 func TestAWSWorkspacesImageResource(t *testing.T) {
 	customerId := os.Getenv("CITRIX_CUSTOMER_ID")
-	isOnPremises := true
-	if customerId != "" && customerId != "CitrixOnPremises" {
-		// Tests being run in cloud env
-		isOnPremises = false
-	}
+	isOnPremises := customerId == "" || customerId == "CitrixOnPremises"
 
 	name := os.Getenv("TEST_AWS_WORKSPACES_IMAGE_NAME")
 	amazonImageId := os.Getenv("TEST_AWS_WORKSPACES_AWS_IMAGE_ID")

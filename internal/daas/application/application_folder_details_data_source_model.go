@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package application
 
@@ -177,7 +177,6 @@ func (InstalledAppResponseModel) GetDataSourceAttributes() map[string]schema.Att
 }
 
 func (r ApplicationFolderDetailsDataSourceModel) RefreshPropertyValues(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, apps *citrixorchestration.ApplicationResponseModelCollection) ApplicationFolderDetailsDataSourceModel {
-
 	var res []ApplicationResourceModel
 	for _, app := range apps.GetItems() {
 		appDetail, err := getApplication(ctx, client, diagnostics, app.GetId())
@@ -282,10 +281,6 @@ func (r ApplicationFolderDetailsDataSourceModel) getInstalledAppProperties(ctx c
 		WorkingDirectory:      types.StringValue(app.GetInstalledAppProperties().WorkingDirectory),
 	}
 	return util.TypedObjectToObjectValue(ctx, diagnostics, installedAppResponse)
-}
-
-func (r ApplicationFolderDetailsDataSourceModel) getDeliveryGroups(ctx context.Context, diagnostics *diag.Diagnostics, app citrixorchestration.ApplicationResponseModel) types.List {
-	return util.StringArrayToStringList(ctx, diagnostics, app.AssociatedDeliveryGroupUuids)
 }
 
 func (DeliveryGroupPriorityModel) GetDataSourceSchema() schema.NestedAttributeObject {

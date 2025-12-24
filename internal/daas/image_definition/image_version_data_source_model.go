@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package image_definition
 
@@ -294,8 +294,8 @@ func (r ImageVersionModel) RefreshDataSourcePropertyValues(ctx context.Context, 
 	case util.AWS_FACTORY_NAME:
 		awsEc2ImageSpecs := AwsEc2ImageSpecsDataSourceModel{}
 
-		machineProfile, err := refreshAwsEc2ImageVersionMachineProfile(ctx, diagnostics, false, imageScheme)
-		if err == nil {
+		machineProfile := refreshAwsEc2ImageVersionMachineProfile(ctx, diagnostics, false, imageScheme)
+		if !machineProfile.IsNull() {
 			awsEc2ImageSpecs.MachineProfile = machineProfile
 		}
 

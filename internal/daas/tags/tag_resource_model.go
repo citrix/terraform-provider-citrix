@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package tags
 
 import (
@@ -64,7 +65,7 @@ func (TagResourceModel) GetSchema() schema.Schema {
 						),
 						validator.String(
 							stringvalidator.NoneOf(
-								string(util.AllScopeId),
+								util.AllScopeId,
 							),
 						),
 					),
@@ -104,7 +105,6 @@ func (TagResourceModel) GetAttributesNamesToMask() map[string]bool {
 }
 
 func (r TagResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixclient.CitrixDaasClient, tag *citrixorchestration.TagDetailResponseModel) TagResourceModel {
-
 	r.Id = types.StringValue(tag.GetId())
 	r.Name = types.StringValue(tag.GetName())
 	r.Description = types.StringValue(tag.GetDescription())

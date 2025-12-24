@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package cc_identity_providers
 
 import (
@@ -331,7 +332,6 @@ func (SamlIdentityProviderModel) GetAttributes() map[string]schema.Attribute {
 }
 
 func (r SamlIdentityProviderModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, isResource bool, samlIdp *citrixcws.IdpStatusModel, samlConfig *citrixcws.SamlConfigModel) SamlIdentityProviderModel {
-
 	// Overwrite SAML 2.0 Identity Provider Resource with refreshed state
 	r.Id = types.StringValue(samlIdp.GetIdpInstanceId())
 	r.Name = types.StringValue(samlIdp.GetIdpNickname())
@@ -343,10 +343,7 @@ func (r SamlIdentityProviderModel) RefreshPropertyValues(ctx context.Context, di
 
 	r.EntityId = types.StringValue(samlConfig.GetSamlEntityId())
 
-	useScopedEntityId := false
-	if samlConfig.GetSamlSpEntityIdSuffix() != "" {
-		useScopedEntityId = true
-	}
+	useScopedEntityId := samlConfig.GetSamlSpEntityIdSuffix() != ""
 	r.UseScopedEntityId = types.BoolValue(useScopedEntityId)
 
 	if samlConfig == nil {

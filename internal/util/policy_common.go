@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package util
 
@@ -10,13 +10,13 @@ import "errors"
 var (
 	// ErrPolicyNotFound is returned when a policy is not found
 	ErrPolicyNotFound = errors.New("policy not found")
-	
+
 	// ErrPolicyFilterNotFound is returned when a policy filter is not found
 	ErrPolicyFilterNotFound = errors.New("policy filter not found")
-	
+
 	// ErrPolicySettingNotFound is returned when a policy setting is not found
 	ErrPolicySettingNotFound = errors.New("policy setting not found")
-	
+
 	// ErrPolicySetNotFound is returned when a policy set is not found
 	ErrPolicySetNotFound = errors.New("policy set not found")
 )

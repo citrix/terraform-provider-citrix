@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package util
 
 import (
@@ -694,10 +695,7 @@ func (AwsMachineProfileModel) GetDataSourceAttributes() map[string]dataSourceSch
 }
 
 func HandleMachineProfileForAwsMcsPvsCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diag *diag.Diagnostics, hypervisorName string, resourcePoolName string, machineProfile AwsMachineProfileModel, errorTitle string) (string, error) {
-	isUsingImageTemplate := false
-	if machineProfile.VmName.IsNull() || machineProfile.VmName.IsUnknown() {
-		isUsingImageTemplate = true
-	}
+	isUsingImageTemplate := machineProfile.VmName.IsNull() || machineProfile.VmName.IsUnknown()
 
 	if isUsingImageTemplate {
 		launchTemplateName := machineProfile.LaunchTemplateName.ValueString()
@@ -739,10 +737,7 @@ func HandleMachineProfileForAwsMcsPvsCatalog(ctx context.Context, client *citrix
 }
 
 func HandleMachineProfileForAmazonWorkspacesCoreMcsCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diag *diag.Diagnostics, hypervisorName string, resourcePoolName string, machineProfile AmazonWorkspacesCoreMachineProfileModel, errorTitle string) (string, error) {
-	isUsingImageTemplate := false
-	if machineProfile.VmName.IsNull() || machineProfile.VmName.IsUnknown() {
-		isUsingImageTemplate = true
-	}
+	isUsingImageTemplate := machineProfile.VmName.IsNull() || machineProfile.VmName.IsUnknown()
 
 	if isUsingImageTemplate {
 		launchTemplateName := machineProfile.LaunchTemplateName.ValueString()
@@ -995,8 +990,8 @@ func ParseNetworkMappingToClientModel(networkMappings []NetworkMappingModel, res
 func BuildAzureMasterImagePath(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, galleryImage types.Object, sharedSubscription string, resourceGroup string, storageAccount string, storageContainer string, masterImage string, hypervisor string, hypervisorResourcePool string, errorTitle string) (string, error) {
 	imagePath := ""
 	imageBasePath := "image.folder"
-	queryPath := ""
-	err := error(nil)
+	var queryPath string
+	var err error
 	var httpResp *http.Response
 	if sharedSubscription != "" {
 		imageBasePath = fmt.Sprintf("image.folder\\%s.sharedsubscription", sharedSubscription)

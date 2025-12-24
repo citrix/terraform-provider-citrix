@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package policy_resource
 
@@ -42,7 +42,7 @@ func (d *policyDataSource) Configure(ctx context.Context, req datasource.Configu
 		return
 	}
 
-	d.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	d.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 func (d *policyDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {

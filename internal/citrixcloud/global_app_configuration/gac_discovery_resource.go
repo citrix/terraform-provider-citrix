@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package global_app_configuration
 
@@ -50,7 +50,7 @@ func (r *gacDiscoveryResource) Configure(_ context.Context, req resource.Configu
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -259,7 +259,6 @@ func (r *gacDiscoveryResource) Delete(ctx context.Context, req resource.DeleteRe
 		)
 		return
 	}
-
 }
 
 func (r *gacDiscoveryResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

@@ -4,14 +4,14 @@ page_title: "citrix_policy_setting Resource - citrix"
 subcategory: "CVAD"
 description: |-
   Manages an instance of the Policy Setting.
-  -> Please Note For detailed information about policy settings, please refer to this document https://github.com/citrix/terraform-provider-citrix/blob/main/internal/daas/policies/policy_set_resource.md.
+  -> Please Note For detailed information about policy settings, please refer to this document https://github.com/citrix/terraform-provider-citrix/blob/main/internal/daas/policies/policy_set_resource.md. For example Terraform configurations for policy settings with complex values, please refer to the policy_setting_examples https://github.com/citrix/terraform-provider-citrix/tree/main/examples/policy_setting_examples directory.
 ---
 
 # citrix_policy_setting (Resource)
 
 Manages an instance of the Policy Setting.
 
- -> **Please Note** For detailed information about policy settings, please refer to [this document](https://github.com/citrix/terraform-provider-citrix/blob/main/internal/daas/policies/policy_set_resource.md).
+ -> **Please Note** For detailed information about policy settings, please refer to [this document](https://github.com/citrix/terraform-provider-citrix/blob/main/internal/daas/policies/policy_set_resource.md). For example Terraform configurations for policy settings with complex values, please refer to the [policy_setting_examples](https://github.com/citrix/terraform-provider-citrix/tree/main/examples/policy_setting_examples) directory.
 
 ## Example Usage
 

@@ -6,6 +6,7 @@ This documentation will guide you through the process of setting up your dev env
 - [Plugin for Terraform Provider for Citrix® Developer Guide](#plugin-for-terraform-provider-for-citrix-developer-guide)
   - [Table of Contents](#table-of-contents)
   - [Install Dependencies](#install-dependencies)
+  - [Building the Provider](#building-the-provider)
   - [Load project in VSCode for Go Development](#load-project-in-vscode-for-go-development)
   - [Debugging Provider code in VSCode](#debugging-provider-code-in-vscode)
     - [Add VSCode Launch Configuration](#add-vscode-launch-configuration)
@@ -15,7 +16,7 @@ This documentation will guide you through the process of setting up your dev env
   - [Updating the examples](#updating-the-examples)
   - [Handling Terraform lists, sets, and nested objects](#handling-terraform-lists-sets-and-nested-objects)
     - [Converting to Go native types](#converting-to-go-native-types)
-    - [Initalizing Terraform types](#initalizing-terraform-types)
+    - [Initializing Terraform types](#initializing-terraform-types)
     - [Preserving order in lists](#preserving-order-in-lists)
   - [Regenerate the documentation](#regenerate-the-documentation)
   - [Running the tests](#running-the-tests)
@@ -29,10 +30,37 @@ This documentation will guide you through the process of setting up your dev env
   - [Error: Value Conversion Error](#error-value-conversion-error)
 
 ## Install Dependencies
-* Install Go on your local system: https://go.dev/doc/install
-  * `choco install golang`
-* Install latest version of Terraform (installing via Chocolatey recommended)
-  * `choco install terraform`
+
+Install Go, Terraform, Make, and golangci-lint.
+
+**Windows (using Chocolatey):**
+```powershell
+choco install -y golang terraform make golangci-lint
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt-get install -y golang-go terraform make
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+```
+
+## Building the Provider
+The default [make](./GNUmakefile) target runs a complete build pipeline:
+
+```bash
+make
+```
+
+This will format the code, run the linter, build, test, and generate the docs.
+
+You can also run individual targets:
+```bash
+make fmt        # format
+make lint       # linter
+make build      # compile
+make test       # test
+make generate   # regenerate docs
+```
 
 ## Load project in VSCode for Go Development
 Visual Studio Code requires the `Go` extension to be able to load go projects, resolve internal references and even cross package references. Once the `Go` extension is installed, you should be able to load `terraform-provider-citrix` in VSCode. `Go` plugin requires the `go.mod` file to be in the root work directory when you load the project.
@@ -83,7 +111,7 @@ Start a PowerShell session for running your terraform cli for debugging, and cop
 
     $env:TF_REATTACH_PROVIDERS='{"registry.terraform.io/citrix/citrix":{"Protocol":"grpc","ProtocolVersion":6,"Pid":38724,"Test":true,"Addr":{"Network":"tcp","String":"127.0.0.1:54834"}}}'
 
-Now you are good to run terraform jobs to debug the provider code. Make sure to re-attach the provider server everytime you restart the debugger as the port can change per debugging session.
+Now you are good to run terraform jobs to debug the provider code. Make sure to re-attach the provider server every time you restart the debugger as the port can change per debugging session.
 
 ## Debugging with citrix-daas-rest-go client code in Visual Studio Code
 
@@ -127,7 +155,7 @@ In order to reduce errors this project has introduced a system to convert betwee
 
 In order to use the first 9 of these methods, the struct `T` needs to implement the [ResourceModelWithAttributes](internal/util/types.go) or [DataSourceModelWithAttributes](internal/util/types.go) interface which is ultimately populated from the attribute's Schema. This gives the Terraform type system the necessary information to populate a `types.Object` or `types.List` with a nested object.
 
-### Initalizing Terraform types
+### Initializing Terraform types
 When dealing with a struct that contains nested `types.List/Set/Object`, it is important to never work with an empty struct, but instead start with one that has all of the nested objects initialized to Terraform's `ListNull/SetNull/ObjectNull`. There are helpers to assist with this:
 ```
 // Do not do this:
@@ -162,9 +190,28 @@ This project uses [terraform-plugin-docs](https://github.com/hashicorp/terraform
 ➥ go generate ./...
 ```
 
-## Running the tests
+## Running the unit tests
 
-Before running the tests, you need to provide values for environment variables required by the test files. 
+Unit tests are fast, don't require external services, and can be run frequently during development. Use the `-short` flag to skip acceptance tests:
+
+```bash
+# Run all unit tests across the codebase
+➥ cd {Root of repo}/terraform-provider-citrix
+➥ go test -short ./...
+
+# Run unit tests for specific packages
+➥ go test -short ./internal/daas/zone/
+➥ go test -short ./internal/validators/
+
+# With verbose output
+➥ go test -short -v ./...
+```
+
+The `-short` parameter sets `testing.Short()` which is evaluated in the acceptance test `PreCheck` functions and the `checkTestEnvironmentVariables` helper. If set the acceptance tests will be skipped. This is the standard Go convention for separating fast unit tests from slow integration/acceptance tests.
+
+## Running the acceptance tests
+
+Before running the acceptance tests, you need to provide values for environment variables required by the test files. 
 The environment parameters that need to be specified can be found in the following template files:
 1. To Run Tests for the Cloud Environment: `settings.cloud.example.json`
 2. To Run Tests for the On-Premise environment: `settings.onprem.example.json`
@@ -184,7 +231,15 @@ To navigate to `settings.json` file, follow the steps below:
 ➥ cd {Root of repo}/terraform-provider-citrix
 ➥ $env:TF_ACC = 1
 ➥ go test -count=1 -run='<function name of resource to test (eg TestZoneResource)>' -v ./internal/test
+
+# Run all acceptance tests
+➥ go test -v ./internal/test
+
+# Run ALL tests (unit + acceptance) across the entire codebase
+➥ go test ./...
 ```
+
+**Note:** Do not use the `-short` flag when running acceptance tests, as it will cause them to be skipped.
 
 ## Commonly faced errors
 ```powershell
@@ -263,6 +318,6 @@ When using our custom types system (see the `Handling Terraform lists/sets and n
 │ Path: image_update_reboot_options
 ```
 
-If `Received framework type from provider logic` looks empty, that means that an attribute map was not used to create the object. See the `Initalizing Terraform types` section on how to properly initialize an empty object.
+If `Received framework type from provider logic` looks empty, that means that an attribute map was not used to create the object. See the `Initializing Terraform types` section on how to properly initialize an empty object.
 
-Otherwise the expected framework type and received framework type may closely match. Find where they differ and that is likely an attribute that is not being set, similiar to the `inconsistent result after apply/single attribute` section above.
+Otherwise the expected framework type and received framework type may closely match. Find where they differ and that is likely an attribute that is not being set, similar to the `inconsistent result after apply/single attribute` section above.

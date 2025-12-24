@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package global_app_configuration
 
@@ -62,7 +62,6 @@ func (GACDiscoveryResourceModel) GetAttributesNamesToMask() map[string]bool {
 }
 
 func (r GACDiscoveryResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, discoveryRecordModel globalappconfiguration.DiscoveryRecordModel) GACDiscoveryResourceModel {
-
 	r.Domain = types.StringValue(discoveryRecordModel.Domain.GetName())
 
 	var sURLs []string

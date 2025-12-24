@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package policy_setting
 
@@ -35,7 +35,7 @@ type PolicySettingModel struct {
 func (PolicySettingModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "CVAD --- Manages an instance of the Policy Setting." +
-			"\n\n -> **Please Note** For detailed information about policy settings, please refer to [this document](https://github.com/citrix/terraform-provider-citrix/blob/main/internal/daas/policies/policy_set_resource.md).",
+			"\n\n -> **Please Note** For detailed information about policy settings, please refer to [this document](https://github.com/citrix/terraform-provider-citrix/blob/main/internal/daas/policies/policy_set_resource.md). For example Terraform configurations for policy settings with complex values, please refer to the [policy_setting_examples](https://github.com/citrix/terraform-provider-citrix/tree/main/examples/policy_setting_examples) directory.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "Id of the policy setting.",

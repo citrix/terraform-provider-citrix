@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package machine_catalog
 
@@ -20,7 +20,6 @@ type PvsDataSourceModel struct {
 }
 
 func (r PvsDataSourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, pvsSiteId string, pvsVdiskId string) PvsDataSourceModel {
-
 	r.SiteId = types.StringValue(pvsSiteId)
 	r.VdiskId = types.StringValue(pvsVdiskId)
 

@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package policy_filters
 
@@ -120,7 +120,11 @@ func (filter AccessControlFilterModel) GetFilterRequest(diagnostics *diag.Diagno
 
 func (r AccessControlFilterModel) RefreshPropertyValues(ctx context.Context, diags *diag.Diagnostics, filter citrixorchestration.FilterResponse) AccessControlFilterModel {
 	var gatewayFilterData util.PolicyFilterGatewayDataClientModel
-	_ = json.Unmarshal([]byte(filter.GetFilterData()), &gatewayFilterData)
+	err := json.Unmarshal([]byte(filter.GetFilterData()), &gatewayFilterData)
+	if err != nil {
+		diags.AddError("Error parsing filter data", err.Error())
+		return r
+	}
 	r.Id = types.StringValue(filter.GetFilterGuid())
 	r.PolicyId = types.StringValue(filter.GetPolicyGuid())
 	r.Allowed = types.BoolValue(filter.GetIsAllowed())

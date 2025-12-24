@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package zone
 
@@ -52,7 +52,7 @@ func (r *zoneResource) Configure(_ context.Context, req resource.ConfigureReques
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Create creates the resource and sets the initial Terraform state.

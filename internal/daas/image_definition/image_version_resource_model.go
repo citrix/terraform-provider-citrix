@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package image_definition
 
@@ -401,14 +401,14 @@ func (r ImageVersionModel) RefreshPropertyValues(ctx context.Context, diagnostic
 		awsEc2ImageSpecs.AmiName = types.StringValue(strings.Split(masterImage.GetName(), " (ami-")[0])
 		awsEc2ImageSpecs.AmiId = types.StringValue(strings.TrimSuffix((strings.Split(masterImage.GetName(), " (")[1]), ")"))
 
-		updatedMachineProfile, err := refreshAwsEc2ImageVersionMachineProfile(ctx, diagnostics, true, imageScheme)
-		if err == nil {
+		updatedMachineProfile := refreshAwsEc2ImageVersionMachineProfile(ctx, diagnostics, true, imageScheme)
+		if updatedMachineProfile.IsNull() {
 			awsEc2ImageSpecs.MachineProfile = updatedMachineProfile
 		}
 
 		rawServiceOffering := strings.TrimSuffix(imageScheme.GetServiceOffering(), ".serviceoffering")
 		if serviceOfferingObject, httpResp, err := util.GetSingleResourceFromHypervisorWithNoCacheRetry(ctx, client, diagnostics, hypervisor.GetId(), resourcePool.GetId(), "", rawServiceOffering, util.ServiceOfferingResourceType, ""); err == nil {
-			awsEc2ImageSpecs.ServiceOffering = types.StringValue(serviceOfferingObject.GetId())
+			awsEc2ImageSpecs.ServiceOffering = types.StringValue(strings.ToLower(serviceOfferingObject.GetId()))
 		} else {
 			diagnostics.AddError(
 				"Error updating AWS image version",
@@ -433,7 +433,16 @@ func (r ImageVersionModel) RefreshPropertyValues(ctx context.Context, diagnostic
 		}
 
 		if imageScheme.GetServiceOffering() != "" {
-			amazonWorkspacesCoreImageSpecs.ServiceOffering = types.StringValue(strings.TrimSuffix(imageScheme.GetServiceOffering(), ".serviceoffering"))
+			rawServiceOffering := strings.TrimSuffix(imageScheme.GetServiceOffering(), ".serviceoffering")
+			if serviceOfferingObject, httpResp, err := util.GetSingleResourceFromHypervisorWithNoCacheRetry(ctx, client, diagnostics, hypervisor.GetId(), resourcePool.GetId(), "", rawServiceOffering, util.ServiceOfferingResourceType, ""); err == nil {
+				amazonWorkspacesCoreImageSpecs.ServiceOffering = types.StringValue(strings.ToLower(serviceOfferingObject.GetId()))
+			} else {
+				diagnostics.AddError(
+					"Error updating AWS image version",
+					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+						fmt.Sprintf("\nFailed to resolve AWS service offering %s, error: %s", rawServiceOffering, err.Error()),
+				)
+			}
 		}
 		r.AmazonWorkspacesCoreImageSpecs = util.TypedObjectToObjectValue(ctx, diagnostics, amazonWorkspacesCoreImageSpecs)
 	default:
@@ -518,17 +527,14 @@ func refreshAzureImageVersionMachineProfile(ctx context.Context, diagnostics *di
 	}
 }
 
-func refreshAwsEc2ImageVersionMachineProfile(ctx context.Context, diagnostics *diag.Diagnostics, isResource bool, imageScheme citrixorchestration.ImageSchemeResponseModel) (types.Object, error) {
-	var machineProfileToReturn types.Object
+func refreshAwsEc2ImageVersionMachineProfile(ctx context.Context, diagnostics *diag.Diagnostics, isResource bool, imageScheme citrixorchestration.ImageSchemeResponseModel) types.Object {
 	machineProfile := imageScheme.GetMachineProfile()
 	machineProfileModel := util.ParseAwsMachineProfileResponseToModel(machineProfile)
 	if isResource {
-		machineProfileToReturn = util.TypedObjectToObjectValue(ctx, diagnostics, machineProfileModel)
+		return util.TypedObjectToObjectValue(ctx, diagnostics, machineProfileModel)
 	} else {
-		machineProfileToReturn = util.DataSourceTypedObjectToObjectValue(ctx, diagnostics, machineProfileModel)
+		return util.DataSourceTypedObjectToObjectValue(ctx, diagnostics, machineProfileModel)
 	}
-	return machineProfileToReturn, nil
-
 }
 
 func refreshAmazonWSCImageVersionMachineProfile(ctx context.Context, diagnostics *diag.Diagnostics, isResource bool, imageScheme citrixorchestration.ImageSchemeResponseModel) (types.Object, error) {

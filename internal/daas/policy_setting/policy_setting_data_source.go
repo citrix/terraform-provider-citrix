@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package policy_setting
 
@@ -42,7 +42,7 @@ func (d *policySettingDataSource) Configure(ctx context.Context, req datasource.
 		return
 	}
 
-	d.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	d.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 func (d *policySettingDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -88,6 +88,9 @@ func (d *policySettingDataSource) Read(ctx context.Context, req datasource.ReadR
 	}
 
 	settingsDefinition, err := getSettingsDefinitions(ctx, d.client, &resp.Diagnostics, policySetting.GetSettingName())
+	if err != nil {
+		return // error already added to diagnostics
+	}
 
 	// Refresh values
 	data = data.RefreshPropertyValues(policySetting, settingsDefinition)

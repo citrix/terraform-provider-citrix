@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package hypervisor
 
@@ -52,7 +52,7 @@ func (r *amazonWorkSpacesCoreHypervisorResource) Configure(_ context.Context, re
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -93,7 +93,15 @@ func (r *amazonWorkSpacesCoreHypervisorResource) Create(ctx context.Context, req
 	UseSystemProxyForHypervisorTrafficOnConnectors.SetValue(strconv.FormatBool(plan.UseSystemProxyForHypervisorTrafficOnConnectors.ValueBool()))
 	customProperties = append(customProperties, UseSystemProxyForHypervisorTrafficOnConnectors)
 
-	customPropertyString, _ := json.Marshal(customProperties)
+	customPropertyString, err := json.Marshal(customProperties)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error creating Hypervisor",
+			"Hypervisor "+plan.Name.ValueString()+" failed to be created. Could not marshal custom properties.\n"+
+				"Error message: "+err.Error(),
+		)
+		return
+	}
 	connectionDetails.SetCustomProperties(string(customPropertyString))
 
 	// Generate API request body from plan
@@ -233,7 +241,15 @@ func (r *amazonWorkSpacesCoreHypervisorResource) Update(ctx context.Context, req
 		updatedCustomProperties = append(updatedCustomProperties, &useSystemProxyForHypervisorTrafficOnConnectors)
 	}
 
-	customPropertiesByte, _ := json.Marshal(updatedCustomProperties)
+	customPropertiesByte, err := json.Marshal(updatedCustomProperties)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating Hypervisor",
+			"Hypervisor "+plan.Name.ValueString()+" failed to be updated. Could not marshal custom properties.\n"+
+				"Error message: "+err.Error(),
+		)
+		return
+	}
 	editHypervisorRequestBody.SetCustomProperties(string(customPropertiesByte))
 
 	// Patch hypervisor

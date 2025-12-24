@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package machine_catalog
 
@@ -57,7 +57,7 @@ func (r *machineCatalogResource) Configure(_ context.Context, req resource.Confi
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -360,8 +360,10 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		// For manual, compare state and plan to find machines to add and delete
 		addMachinesList, deleteMachinesMap := createAddAndRemoveMachinesListForManualCatalogs(ctx, &resp.Diagnostics, state, plan)
 
-		addMachinesToManualCatalog(ctx, &resp.Diagnostics, r.client, resp, addMachinesList, catalogId)
-		deleteMachinesFromManualCatalog(ctx, r.client, resp, deleteMachinesMap, catalogId)
+		//nolint:errcheck // Errors added to diagnostics, continue so resource gets marked as tainted
+		_ = addMachinesToManualCatalog(ctx, &resp.Diagnostics, r.client, resp, addMachinesList, catalogId)
+		//nolint:errcheck // Errors added to diagnostics, continue so resource gets marked as tainted
+		_ = deleteMachinesFromManualCatalog(ctx, r.client, resp, deleteMachinesMap, catalogId)
 	} else {
 		planProvSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
 		stateProvSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, state.ProvisioningScheme)
@@ -667,6 +669,24 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		}
 	}
 
+	simplifiedCatalogResp, err := util.GetMachineCatalogWithFieldsOverride(ctx, r.client, &resp.Diagnostics, catalogId, false, "Id,Name,Zone")
+	if err != nil {
+		return
+	}
+	catalogZone := simplifiedCatalogResp.GetZone()
+	if catalogZone.GetId() != plan.Zone.ValueString() {
+		catalogItems := []citrixorchestration.ZonedItemRequestModel{}
+		catalogItems = append(catalogItems, citrixorchestration.ZonedItemRequestModel{
+			Id:       catalogId,
+			Name:     simplifiedCatalogResp.GetName(),
+			ItemType: citrixorchestration.ZONABLEITEMTYPE_MACHINE_CATALOG,
+		})
+		err = util.MoveItemsToZone(ctx, r.client, &resp.Diagnostics, plan.Zone.ValueString(), catalogItems)
+		if err != nil {
+			return
+		}
+	}
+
 	// Fetch updated machine catalog from GetMachineCatalog.
 	catalog, err = util.GetMachineCatalog(ctx, r.client, &resp.Diagnostics, catalogId, true)
 	if err != nil {
@@ -771,12 +791,8 @@ func (r *machineCatalogResource) Delete(ctx context.Context, req resource.Delete
 	catalogName := state.Name.ValueString()
 	deleteMachineCatalogRequest := r.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsDeleteMachineCatalog(ctx, catalogId)
 	deleteAccountOption := getMachineAccountDeleteOptionValue(state.DeleteMachineAccounts.ValueString())
-	// Set default delete VM option to true for MCS and PVS Streaming
-	deleteVmOption := true
-	// Set delete VM option to false for manual provisioning type
-	if catalog.GetProvisioningType() == citrixorchestration.PROVISIONINGTYPE_MANUAL {
-		deleteVmOption = false
-	}
+	// Set delete VM option based on provisioning type (true for MCS/PVS Streaming, false for manual)
+	deleteVmOption := catalog.GetProvisioningType() != citrixorchestration.PROVISIONINGTYPE_MANUAL
 
 	// Override delete VM option with user specified value
 	if !state.DeleteVirtualMachines.IsNull() {
@@ -1173,6 +1189,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 						errMsg = "starts_with must contain only numbers without any spaces."
 					}
 
+					//nolint:errcheck // Regex pattern validated elsewhere
 					if match, _ := regexp.MatchString(regexToMatch, startsWith); !match {
 						resp.Diagnostics.AddAttributeError(
 							path.Root("starts_with"),
@@ -1308,7 +1325,6 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 					fmt.Sprintf("Expected writeback_cache to be configured when value of provisioning_type is %s.", provisioningTypePvsStreaming),
 				)
 			} else {
-
 				azureWbcModel := util.ObjectValueToTypedObject[AzureWritebackCacheModel](ctx, &resp.Diagnostics, azureMachineConfigModel.WritebackCache)
 				if !azureWbcModel.PersistWBC.IsUnknown() && (azureWbcModel.PersistWBC.IsNull() || !azureWbcModel.PersistWBC.ValueBool()) {
 					resp.Diagnostics.AddAttributeError(
@@ -1326,7 +1342,6 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 					)
 				}
 			}
-
 		}
 
 		if !data.MachineAccounts.IsNull() {
@@ -1344,7 +1359,6 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 				fmt.Sprintf("Remote PC access catalog cannot be created when provisioning_type is %s.", provisioningTypePvsStreaming),
 			)
 		}
-
 	} else if data.ProvisioningType.ValueString() == provisioningTypeManual && data.RemotePcPowerManagementHypervisor.IsNull() {
 		// Manual provisioning type
 		if !data.IsPowerManaged.IsUnknown() && data.IsPowerManaged.IsNull() {
@@ -1598,7 +1612,6 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 		!plan.ProvisioningType.IsUnknown() && !plan.ProvisioningType.IsNull() &&
 		!plan.SessionSupport.IsUnknown() && !plan.SessionSupport.IsNull() &&
 		!plan.AllocationType.IsUnknown() && !plan.AllocationType.IsNull() {
-
 		provisioningType := plan.ProvisioningType.ValueString()
 		persistChanges := citrixorchestration.PERSISTCHANGES_DISCARD
 		if provisioningType == string(citrixorchestration.PROVISIONINGTYPE_MANUAL) ||
@@ -1679,7 +1692,6 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 
 			if machineDomainIdentityPlan.Ou != machineDomainIdentityState.Ou &&
 				provSchemePlan.NumTotalMachines.ValueInt64() <= provSchemeState.NumTotalMachines.ValueInt64() {
-
 				resp.Diagnostics.AddError(
 					"Error updating Machine Catalog "+state.Name.ValueString(),
 					"Machine Catalog OU can only be updated when adding machines.",

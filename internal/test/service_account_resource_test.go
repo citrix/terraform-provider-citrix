@@ -89,7 +89,6 @@ func TestServiceAccountPreCheck_AAD(t *testing.T) {
 }
 
 func TestServiceAccountAD(t *testing.T) {
-
 	displayName := os.Getenv("TEST_SERVICE_ACCOUNT_DISPLAY_NAME")
 	adDomainName := os.Getenv("TEST_SERVICE_ACCOUNT_AD_DOMAIN_NAME")
 
@@ -134,7 +133,6 @@ func TestServiceAccountAD(t *testing.T) {
 }
 
 func TestServiceAccountAAD(t *testing.T) {
-
 	displayName := os.Getenv("TEST_SERVICE_ACCOUNT_DISPLAY_NAME")
 	tenantId := os.Getenv("TEST_SERVICE_ACCOUNT_AAD_TENANT_ID")
 	appId := os.Getenv("TEST_SERVICE_ACCOUNT_AAD_APP_ID")
@@ -246,7 +244,7 @@ func serviceAccountSweeper(ctx context.Context, client *citrixclient.CitrixDaasC
 	getServiceAccountsRequest := client.ApiClient.IdentityAPIsDAAS.IdentityGetServiceAccounts(ctx)
 	serviceAccountsResponse, _, err := citrixclient.ExecuteWithRetry[*citrixorchestration.ServiceAccountResponseModelCollection](getServiceAccountsRequest, client)
 	if err != nil {
-		return fmt.Errorf("Error getting service accounts: %s", err)
+		return fmt.Errorf("Error getting service accounts: %w", err)
 	}
 
 	serviceAccounts := serviceAccountsResponse.GetItems()

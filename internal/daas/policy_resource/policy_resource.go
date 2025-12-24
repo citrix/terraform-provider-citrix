@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package policy_resource
 
@@ -52,7 +52,7 @@ func (r *policyResource) Configure(_ context.Context, req resource.ConfigureRequ
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 func (r *policyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -280,7 +280,7 @@ func GetPolicy(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, d
 	if err != nil {
 		// Check if this is a 404 Not Found error - return a specific error that can be handled by the caller
 		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
-			return nil, fmt.Errorf("%w: %v", util.ErrPolicyNotFound, err)
+			return nil, fmt.Errorf("%w: %w", util.ErrPolicyNotFound, err)
 		}
 
 		diagnostics.AddError(

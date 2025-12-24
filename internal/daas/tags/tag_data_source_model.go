@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package tags
 
 import (
@@ -82,7 +83,6 @@ func (TagDataSourceModel) GetAttributes() map[string]schema.Attribute {
 }
 
 func (r TagDataSourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, tag *citrixorchestration.TagDetailResponseModel) TagDataSourceModel {
-
 	r.Id = types.StringValue(tag.GetId())
 	r.Name = types.StringValue(tag.GetName())
 	r.Description = types.StringValue(tag.GetDescription())

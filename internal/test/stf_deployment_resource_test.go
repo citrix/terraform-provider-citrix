@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package test
 
@@ -24,7 +24,6 @@ func TestSTFDeploymentPreCheck(t *testing.T) {
 	if v := os.Getenv("TEST_STF_SITE_ID_UPDATED"); v == "" {
 		t.Fatal("TEST_STF_SITE_ID_UPDATED must be set for acceptance tests")
 	}
-
 }
 
 func TestSTFDeploymentResourceWithProperties(t *testing.T) {
@@ -102,7 +101,6 @@ func TestSTFDeploymentResourceWithProperties(t *testing.T) {
 			},
 		},
 	})
-
 }
 
 func BuildSTFDeploymentResource(t *testing.T, deployment string, siteId string) string {

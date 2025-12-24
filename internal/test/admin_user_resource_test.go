@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package test
 
@@ -48,11 +48,7 @@ func TestAdminUserPreCheck(t *testing.T) {
 
 func TestAdminUserResource(t *testing.T) {
 	customerId := os.Getenv("CITRIX_CUSTOMER_ID")
-	isOnPremises := true
-	if customerId != "" && customerId != "CitrixOnPremises" {
-		// Tests being run in cloud env
-		isOnPremises = false
-	}
+	isOnPremises := customerId == "" || customerId == "CitrixOnPremises"
 	zoneInput := os.Getenv("TEST_ZONE_INPUT_AZURE")
 	userName := os.Getenv("TEST_ADMIN_USER_NAME")
 	userDomainName := os.Getenv("TEST_ADMIN_USER_DOMAIN")
@@ -186,7 +182,7 @@ func adminUserSweeper(ctx context.Context, adminUserName string, client *citrixc
 			// Resource does not exist in remote, no need to delete
 			return nil
 		}
-		return fmt.Errorf("Error getting admin user: %s", err)
+		return fmt.Errorf("Error getting admin user: %w", err)
 	}
 	userDetails := adminUser.GetUser()
 	deleteAdminUserRequest := client.ApiClient.AdminAPIsDAAS.AdminDeleteAdminAdministrator(ctx, userDetails.GetSid())

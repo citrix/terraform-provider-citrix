@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package stf_webreceiver
 
 import (
@@ -63,7 +64,7 @@ func (r *stfWebReceiverResource) Configure(_ context.Context, req resource.Confi
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Schema defines the schema for the resource.
@@ -207,7 +208,6 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 			)
 			return
 		}
-
 	}
 
 	// Refresh the authentication methods
@@ -227,7 +227,6 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 
 	//Refresh Plugin Assistant
 	if !plan.PluginAssistant.IsNull() {
-
 		getPlugInAssistantRequest := r.client.StorefrontClient.WebReceiverSF.STFWebReceiverPluginAssistantGet(ctx, getWebReceiverRequestBody)
 		assistant, err := getPlugInAssistantRequest.Execute()
 		if err != nil {
@@ -298,6 +297,32 @@ func (r *stfWebReceiverResource) Create(ctx context.Context, req resource.Create
 		plan.RefreshWebReceiverSiteStyle(ctx, &resp.Diagnostics, &sitestyle)
 	}
 
+	if !plan.DiscoveryService.IsNull() {
+		discoveryServiceResponse, err := setAndGetSTFWebReceiverDiscoveryService(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.DiscoveryService)
+		if err != nil {
+			return
+		}
+		plan.RefreshDiscoveryService(ctx, &resp.Diagnostics, &discoveryServiceResponse)
+	}
+
+	appProtectionString := "Off"
+	if plan.AppProtection.ValueBool() {
+		appProtectionString = "On"
+	}
+	appProtectionResponse, err := setAndGetSTFWebReceiverAppProtection(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), appProtectionString)
+	if err != nil {
+		return
+	}
+	plan.RefreshAppProtection(ctx, &resp.Diagnostics, &appProtectionResponse)
+
+	if !plan.BlockingNotification.IsNull() {
+		blockingNotificationResponse, err := setAndGetSTFWebReceiverBlockingNotification(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.BlockingNotification)
+		if err != nil {
+			return
+		}
+		plan.RefreshBlockingNotification(ctx, &resp.Diagnostics, &blockingNotificationResponse)
+	}
+
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -320,15 +345,18 @@ func (r *stfWebReceiverResource) Read(ctx context.Context, req resource.ReadRequ
 
 	STFWebReceiver, err := getSTFWebReceiver(ctx, r.client, &resp.Diagnostics, state)
 	if err != nil {
-		return
-	}
-
-	if STFWebReceiver == nil {
-		resp.Diagnostics.AddWarning(
-			"StoreFront Web Receiver Service not found",
-			"StoreFront Web Receiver Service was not found and will be removed from the state file. An apply action will result in the creation of a new resource.",
-		)
-		resp.State.RemoveResource(ctx)
+		if strings.EqualFold(err.Error(), util.NOT_EXIST) {
+			resp.Diagnostics.AddWarning(
+				"StoreFront Web Receiver Service not found",
+				"StoreFront Web Receiver Service was not found and will be removed from the state file. An apply action will result in the creation of a new resource.",
+			)
+			resp.State.RemoveResource(ctx)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error reading StoreFront WebReceiver",
+				"Error message: "+err.Error(),
+			)
+		}
 		return
 	}
 
@@ -404,6 +432,23 @@ func (r *stfWebReceiverResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 	state.RefreshWebReceiverSiteStyle(ctx, &resp.Diagnostics, &siteStyle)
+
+	discoveryService, err := getWebReceiverDiscoveryService(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
+	if err != nil {
+		return
+	}
+	state.RefreshDiscoveryService(ctx, &resp.Diagnostics, &discoveryService)
+
+	appProtection, err := getWebReceiverAppProtection(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
+	if err != nil {
+		return
+	}
+	state.RefreshAppProtection(ctx, &resp.Diagnostics, &appProtection)
+	blockingNotification, err := getWebReceiverBlockingNotification(ctx, &resp.Diagnostics, r.client, state.SiteId.ValueString(), state.VirtualPath.ValueString())
+	if err != nil {
+		return
+	}
+	state.RefreshBlockingNotification(ctx, &resp.Diagnostics, &blockingNotification)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -550,6 +595,32 @@ func (r *stfWebReceiverResource) Update(ctx context.Context, req resource.Update
 		plan.RefreshWebReceiverSiteStyle(ctx, &resp.Diagnostics, &sitestyle)
 	}
 
+	if !plan.DiscoveryService.IsNull() {
+		discoveryServiceResponse, err := setAndGetSTFWebReceiverDiscoveryService(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.DiscoveryService)
+		if err != nil {
+			return
+		}
+		plan.RefreshDiscoveryService(ctx, &resp.Diagnostics, &discoveryServiceResponse)
+	}
+
+	appProtectionString := "Off"
+	if plan.AppProtection.ValueBool() {
+		appProtectionString = "On"
+	}
+	appProtectionResponse, err := setAndGetSTFWebReceiverAppProtection(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), appProtectionString)
+	if err != nil {
+		return
+	}
+	plan.RefreshAppProtection(ctx, &resp.Diagnostics, &appProtectionResponse)
+
+	if !plan.BlockingNotification.IsNull() {
+		blockingNotificationResponse, err := setAndGetSTFWebReceiverBlockingNotification(ctx, &resp.Diagnostics, r.client, plan.SiteId.ValueString(), plan.VirtualPath.ValueString(), plan.BlockingNotification)
+		if err != nil {
+			return
+		}
+		plan.RefreshBlockingNotification(ctx, &resp.Diagnostics, &blockingNotificationResponse)
+	}
+
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -584,8 +655,14 @@ func (r *stfWebReceiverResource) Delete(ctx context.Context, req resource.Delete
 	}
 
 	// Get refreshed STFDeployment, if no STFDeployment found, return
-	deployment, err := stf_deployment.GetSTFDeployment(ctx, r.client, &resp.Diagnostics, state.SiteId.ValueStringPointer())
-	if err != nil || deployment == nil {
+	_, err := stf_deployment.GetSTFDeployment(ctx, r.client, &resp.Diagnostics, state.SiteId.ValueStringPointer())
+	if err != nil {
+		if !strings.EqualFold(err.Error(), util.NOT_EXIST) {
+			resp.Diagnostics.AddError(
+				"Error deleting StoreFront WebReceiver ",
+				"Error message: "+err.Error(),
+			)
+		}
 		return
 	}
 
@@ -677,10 +754,7 @@ func getSTFWebReceiver(ctx context.Context, client *citrixdaasclient.CitrixDaasC
 	// Get refreshed STFWebReceiver properties from Orchestration
 	STFWebReceiver, err := getSTFWebReceiverRequest.Execute()
 	if err != nil {
-		if strings.EqualFold(err.Error(), util.NOT_EXIST) {
-			return nil, nil
-		}
-		return &STFWebReceiver, err
+		return nil, err
 	}
 	return &STFWebReceiver, nil
 }
@@ -1055,4 +1129,127 @@ func setAndGetSTFWebReceiverSiteStyle(ctx context.Context, diagnostics *diag.Dia
 
 	siteStyleResponse, err := getSTFWebReceiverSiteStyle(ctx, diagnostics, client, siteId, virtualPath)
 	return siteStyleResponse, err
+}
+
+func setAndGetSTFWebReceiverDiscoveryService(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteId string, virtualPath string, discoveryService basetypes.ObjectValue) (citrixstorefront.STFWebReceiverDiscoveryServiceResponseModel, error) {
+	getWebReceiverRequestBody, err := constructGetWebReceiverRequestBody(diagnostics, siteId, virtualPath)
+	if err != nil {
+		return citrixstorefront.STFWebReceiverDiscoveryServiceResponseModel{}, err
+	}
+	plannedDiscoveryService := util.ObjectValueToTypedObject[DiscoveryService](ctx, diagnostics, discoveryService)
+
+	var setDiscoveryServiceBody citrixstorefront.SetWebReceiverDiscoveryRequestModel
+	setDiscoveryServiceBody.SetRunDiscoveryAtStart(plannedDiscoveryService.RunDiscoveryAtStart.ValueBool())
+
+	siteStyleRequest := client.StorefrontClient.WebReceiverSF.STFWebReceiverSetSTFWebReceiverDiscoveryService(ctx, setDiscoveryServiceBody, getWebReceiverRequestBody)
+	err = siteStyleRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error setting Discovery Service for the StoreFront WebReceiver",
+			"Error message: "+err.Error(),
+		)
+		return citrixstorefront.STFWebReceiverDiscoveryServiceResponseModel{}, err
+	}
+
+	discoveryServiceResponse, err := getWebReceiverDiscoveryService(ctx, diagnostics, client, siteId, virtualPath)
+	return discoveryServiceResponse, err
+}
+
+func getWebReceiverDiscoveryService(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteId string, virtualPath string) (citrixstorefront.STFWebReceiverDiscoveryServiceResponseModel, error) {
+	getWebReceiverRequestBody, err := constructGetWebReceiverRequestBody(diagnostics, siteId, virtualPath)
+	if err != nil {
+		return citrixstorefront.STFWebReceiverDiscoveryServiceResponseModel{}, err
+	}
+	getDiscoveryServiceRequest := client.StorefrontClient.WebReceiverSF.STFWebReceiverGetSTFWebReceiverDiscoveryService(ctx, getWebReceiverRequestBody)
+	discoveryServiceResponse, err := getDiscoveryServiceRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error fetching StoreFront WebReceiver Discovery Service",
+			"Error Message: "+err.Error(),
+		)
+	}
+	return discoveryServiceResponse, err
+}
+
+func setAndGetSTFWebReceiverAppProtection(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteId string, virtualPath string, appProtection string) (citrixstorefront.GetWebReceiverAppProtectionResponseModel, error) {
+	getWebReceiverRequestBody, err := constructGetWebReceiverRequestBody(diagnostics, siteId, virtualPath)
+	if err != nil {
+		return citrixstorefront.GetWebReceiverAppProtectionResponseModel{}, err
+	}
+	var setAppProtectionBody citrixstorefront.SetWebReceiverAppProtectionRequestModel
+	setAppProtectionBody.SetEnabled(appProtection)
+
+	appProtectionRequest := client.StorefrontClient.WebReceiverSF.STFWebReceiverSetSTFWebReceiverAppProtection(ctx, setAppProtectionBody, getWebReceiverRequestBody)
+	err = appProtectionRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error setting App Protection for the StoreFront WebReceiver",
+			"Error message: "+err.Error(),
+		)
+		return citrixstorefront.GetWebReceiverAppProtectionResponseModel{}, err
+	}
+	appProtectionResponse, err := getWebReceiverAppProtection(ctx, diagnostics, client, siteId, virtualPath)
+	return appProtectionResponse, err
+}
+
+func getWebReceiverAppProtection(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteId string, virtualPath string) (citrixstorefront.GetWebReceiverAppProtectionResponseModel, error) {
+	getWebReceiverRequestBody, err := constructGetWebReceiverRequestBody(diagnostics, siteId, virtualPath)
+	if err != nil {
+		return citrixstorefront.GetWebReceiverAppProtectionResponseModel{}, err
+	}
+	getAppProtectionRequest := client.StorefrontClient.WebReceiverSF.STFWebReceiverGetSTFWebReceiverAppProtection(ctx, getWebReceiverRequestBody)
+	appProtectionResponse, err := getAppProtectionRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error fetching StoreFront WebReceiver App Protection",
+			"Error Message: "+err.Error(),
+		)
+	}
+	return appProtectionResponse, err
+}
+
+func setAndGetSTFWebReceiverBlockingNotification(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteId string, virtualPath string, blockingNotification basetypes.ObjectValue) (citrixstorefront.STFWebReceiverBlockingNotificationResponse, error) {
+	getWebReceiverRequestBody, err := constructGetWebReceiverRequestBody(diagnostics, siteId, virtualPath)
+	if err != nil {
+		return citrixstorefront.STFWebReceiverBlockingNotificationResponse{}, err
+	}
+	plannedBlockingNotification := util.ObjectValueToTypedObject[BlockingNotification](ctx, diagnostics, blockingNotification)
+	var setBlockingNotificationBody citrixstorefront.SetWebReceiverBlockingNotificationRequestModel
+	setBlockingNotificationBody.SetEnabled(plannedBlockingNotification.Enabled.ValueBool())
+
+	setBlockingNotificationBody.SetTitle(plannedBlockingNotification.Title.ValueString())
+
+	setBlockingNotificationBody.SetBody(plannedBlockingNotification.Body.ValueString())
+
+	setBlockingNotificationBody.SetButton(plannedBlockingNotification.Button.ValueString())
+
+	setBlockingNotificationBody.SetFrequency(plannedBlockingNotification.Frequency.ValueString())
+
+	blockingNotificationRequest := client.StorefrontClient.WebReceiverSF.STFWebReceiverSetSTFWebReceiverBlockingNotification(ctx, getWebReceiverRequestBody, setBlockingNotificationBody)
+	err = blockingNotificationRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error setting Blocking Notification for the StoreFront WebReceiver",
+			"Error message: "+err.Error(),
+		)
+		return citrixstorefront.STFWebReceiverBlockingNotificationResponse{}, err
+	}
+	blockingNotificationResponse, err := getWebReceiverBlockingNotification(ctx, diagnostics, client, siteId, virtualPath)
+	return blockingNotificationResponse, err
+}
+
+func getWebReceiverBlockingNotification(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, siteId string, virtualPath string) (citrixstorefront.STFWebReceiverBlockingNotificationResponse, error) {
+	getWebReceiverRequestBody, err := constructGetWebReceiverRequestBody(diagnostics, siteId, virtualPath)
+	if err != nil {
+		return citrixstorefront.STFWebReceiverBlockingNotificationResponse{}, err
+	}
+	getBlockingNotificationRequest := client.StorefrontClient.WebReceiverSF.STFWebReceiverGetSTFWebReceiverBlockingNotification(ctx, getWebReceiverRequestBody)
+	blockingNotificationResponse, err := getBlockingNotificationRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error fetching StoreFront WebReceiver Blocking Notification",
+			"Error Message: "+err.Error(),
+		)
+	}
+	return blockingNotificationResponse, err
 }

@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package cc_identity_providers
 
 import (
@@ -197,9 +198,11 @@ func deleteIdentityProvider(ctx context.Context, diagnostics *diag.Diagnostics, 
 	if err != nil {
 		errBody := ""
 		if httpResp != nil && httpResp.Body != nil {
-			body, _ := io.ReadAll(httpResp.Body)
-			defer httpResp.Body.Close()
-			errBody = fmt.Sprintf("\nError body: %s", string(body))
+			body, readErr := io.ReadAll(httpResp.Body)
+			defer httpResp.Body.Close() //nolint:errcheck // Error not actionable in defer
+			if readErr == nil {
+				errBody = fmt.Sprintf("\nError body: %s", string(body))
+			}
 		}
 
 		if httpResp.StatusCode == http.StatusBadRequest && strings.Contains(errBody, "it is the currently selected authentication method") {

@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package test
 
 import (
@@ -33,11 +34,7 @@ func TestAWSWorkspacesDirectoryConnectionDataSourcePreCheck(t *testing.T) {
 
 func TestAWSWorkspacesDirectoryConnectionDataSource(t *testing.T) {
 	customerId := os.Getenv("CITRIX_CUSTOMER_ID")
-	isOnPremises := true
-	if customerId != "" && customerId != "CitrixOnPremises" {
-		// Tests being run in cloud env
-		isOnPremises = false
-	}
+	isOnPremises := customerId == "" || customerId == "CitrixOnPremises"
 
 	directoryConnectionId := os.Getenv("TEST_AWS_WORKSPACES_DIRECTORY_CONNECTION_DATA_SOURCE_ID")
 	directoryConnectionName := os.Getenv("TEST_AWS_WORKSPACES_DIRECTORY_CONNECTION_DATA_SOURCE_NAME")

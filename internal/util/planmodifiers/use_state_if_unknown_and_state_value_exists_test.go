@@ -1,3 +1,5 @@
+// Copyright © 2025. Citrix Systems, Inc.
+
 package planmodifiers_test
 
 import (

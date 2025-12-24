@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package delivery_group
 
@@ -48,7 +48,7 @@ func (r *deliveryGroupResource) Configure(_ context.Context, req resource.Config
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Schema defines the schema for the resource.
@@ -68,6 +68,10 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 
 	// Get machine catalogs and verify all of them have the same session support
 	associatedMachineCatalogs := util.ObjectSetToTypedArray[DeliveryGroupMachineCatalogModel](ctx, &resp.Diagnostics, plan.AssociatedMachineCatalogs)
+	err := validateDeliveryGroupMachineCatalogMachineCount(&resp.Diagnostics, associatedMachineCatalogs, "creating")
+	if err != nil {
+		return
+	}
 	associatedMachineCatalogProperties, err := validateAndReturnMachineCatalogSessionSupport(ctx, *r.client, &resp.Diagnostics, associatedMachineCatalogs, true)
 	if err != nil {
 		return
@@ -220,7 +224,6 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 
 	// Assign users to machines
 	if !plan.AssignMachinesToUsers.IsNull() {
-
 		// Validate to make sure there are no duplicates
 		assignMachinesToUsersMap := map[string][]string{}
 		assignMachinesToUsers := util.ObjectListToTypedArray[DeliveryGroupAssignMachinesToUsersModel](ctx, &resp.Diagnostics, plan.AssignMachinesToUsers)
@@ -388,6 +391,12 @@ func (r *deliveryGroupResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
+	associatedMachineCatalogs := util.ObjectSetToTypedArray[DeliveryGroupMachineCatalogModel](ctx, &resp.Diagnostics, plan.AssociatedMachineCatalogs)
+	err = validateDeliveryGroupMachineCatalogMachineCount(&resp.Diagnostics, associatedMachineCatalogs, "updating")
+	if err != nil {
+		return
+	}
+
 	// Add or remove machines first
 	err = addRemoveMachinesFromDeliveryGroup(ctx, r.client, &resp.Diagnostics, deliveryGroupId, plan)
 
@@ -461,8 +470,8 @@ func (r *deliveryGroupResource) Update(ctx context.Context, req resource.UpdateR
 
 	if r.client.AuthConfig.OnPremises {
 		// DDC 2402 LTSR has a bug where UPN is not returned for AD users. Call Identity API to fetch details for users
+		//nolint:errcheck // Errors added to diagnostics, continue so resource gets marked as tainted
 		updatedDeliveryGroup, deliveryGroupDesktops, _ = updateDeliveryGroupAndDesktopUsers(ctx, r.client, &resp.Diagnostics, updatedDeliveryGroup, deliveryGroupDesktops)
-		// Do not return if there is an error. We need to set the resource in the state so that tf knows about the resource and marks it tainted (diagnostics already has the error)
 	}
 
 	tags := getDeliveryGroupTags(ctx, &resp.Diagnostics, r.client, deliveryGroupId)
@@ -671,7 +680,6 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 
 	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
 	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
-
 }
 
 func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
@@ -909,9 +917,7 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 	if !plan.AutoscalePlugins.IsNull() {
 		errorSummary := fmt.Sprintf("Error %s Delivery Group", operation)
 		feature := "Autoscale plugins for Delivery Groups"
-		isFeatureSupportedForCurrentDDC := util.CheckProductVersion(r.client, &resp.Diagnostics, 125, 124, 7, 44, errorSummary, feature)
-
-		if !isFeatureSupportedForCurrentDDC {
+		if !util.CheckProductVersion(r.client, &resp.Diagnostics, 125, 124, 7, 44, errorSummary, feature) {
 			return
 		}
 	}

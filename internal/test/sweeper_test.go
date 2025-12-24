@@ -1,3 +1,5 @@
+// Copyright © 2025. Citrix Systems, Inc.
+
 package test
 
 import (
@@ -35,35 +37,34 @@ func sharedClientForSweepers(ctx context.Context) *citrixclient.CitrixDaasClient
 		customerId = "CitrixOnPremises"
 	}
 
-	onPremises := false
-	if customerId == "CitrixOnPremises" {
-		onPremises = true
-	}
+	onPremises := customerId == "CitrixOnPremises"
 
 	apiGateway := true
 	ccUrl := ""
 	if !onPremises {
-		if environment == "Production" {
+		switch environment {
+		case "Production":
 			ccUrl = "api.cloud.com"
-		} else if environment == "Staging" {
+		case "Staging":
 			ccUrl = "api.cloudburrito.com"
-		} else if environment == "Japan" {
+		case "Japan":
 			ccUrl = "api.citrixcloud.jp"
-		} else if environment == "JapanStaging" {
+		case "JapanStaging":
 			ccUrl = "api.citrixcloudstaging.jp"
-		} else if environment == "Gov" {
+		case "Gov":
 			ccUrl = fmt.Sprintf("registry.citrixworkspacesapi.us/%s", customerId)
-		} else if environment == "GovStaging" {
+		case "GovStaging":
 			ccUrl = fmt.Sprintf("registry.ctxwsstgapi.us/%s", customerId)
 		}
 		if hostname == "" {
-			if environment == "Gov" {
+			switch environment {
+			case "Gov":
 				hostname = fmt.Sprintf("%s.xendesktop.us", customerId)
 				apiGateway = false
-			} else if environment == "GovStaging" {
+			case "GovStaging":
 				hostname = fmt.Sprintf("%s.xdstaging.us", customerId)
 				apiGateway = false
-			} else {
+			default:
 				hostname = ccUrl
 			}
 		} else if !strings.HasPrefix(hostname, "api.") {
@@ -72,26 +73,27 @@ func sharedClientForSweepers(ctx context.Context) *citrixclient.CitrixDaasClient
 		}
 	}
 
-	authUrl := ""
+	var authUrl string
 	isGov := false
 	if onPremises {
 		authUrl = fmt.Sprintf("https://%s/citrix/orchestration/api/tokens", hostname)
 	} else {
-		if environment == "Production" {
+		switch environment {
+		case "Production":
 			authUrl = fmt.Sprintf("https://api.cloud.com/cctrustoauth2/%s/tokens/clients", customerId)
-		} else if environment == "Staging" {
+		case "Staging":
 			authUrl = fmt.Sprintf("https://api.cloudburrito.com/cctrustoauth2/%s/tokens/clients", customerId)
-		} else if environment == "Japan" {
+		case "Japan":
 			authUrl = fmt.Sprintf("https://api.citrixcloud.jp/cctrustoauth2/%s/tokens/clients", customerId)
-		} else if environment == "JapanStaging" {
+		case "JapanStaging":
 			authUrl = fmt.Sprintf("https://api.citrixcloudstaging.jp/cctrustoauth2/%s/tokens/clients", customerId)
-		} else if environment == "Gov" {
+		case "Gov":
 			authUrl = fmt.Sprintf("https://trust.citrixworkspacesapi.us/%s/tokens/clients", customerId)
 			isGov = true
-		} else if environment == "GovStaging" {
+		case "GovStaging":
 			authUrl = fmt.Sprintf("https://trust.ctxwsstgapi.us/%s/tokens/clients", customerId)
 			isGov = true
-		} else {
+		default:
 			authUrl = fmt.Sprintf("https://%s/cctrustoauth2/%s/tokens/clients", hostname, customerId)
 		}
 	}
@@ -101,17 +103,18 @@ func sharedClientForSweepers(ctx context.Context) *citrixclient.CitrixDaasClient
 		// If customer specified a quick create host name, use it
 		catalogServiceHostname = catalog_service_host_name
 	} else {
-		if environment == "Production" {
+		switch environment {
+		case "Production":
 			catalogServiceHostname = "api.cloud.com/catalogservice"
-		} else if environment == "Staging" {
+		case "Staging":
 			catalogServiceHostname = "api.cloudburrito.com/catalogservice"
-		} else if environment == "Japan" {
+		case "Japan":
 			catalogServiceHostname = "api.citrixcloud.jp/catalogservice"
-		} else if environment == "JapanStaging" {
+		case "JapanStaging":
 			catalogServiceHostname = "api.citrixcloudstaging.jp/catalogservice"
-		} else if environment == "Gov" {
+		case "Gov":
 			catalogServiceHostname = "api.cloud.us/catalogservice"
-		} else if environment == "GovStaging" {
+		case "GovStaging":
 			catalogServiceHostname = "api.cloudstaging.us/catalogservice"
 		}
 	}
@@ -120,11 +123,13 @@ func sharedClientForSweepers(ctx context.Context) *citrixclient.CitrixDaasClient
 
 	// Initialize CVAD client
 	client := &citrixclient.CitrixDaasClient{}
+	//nolint:errcheck // Test setup, errors not critical
 	token, _, _ := client.SetupCitrixClientsContext(ctx, authUrl, ccUrl, hostname, customerId, clientId, clientSecret, onPremises, apiGateway, isGov, disableSslVerification, &userAgent, environment, middleware.MiddlewareAuthFunc, middleware.MiddlewareAuthWithCustomerIdHeaderFunc)
 	if !onPremises {
 		client.InitializeCitrixCloudClients(ctx, ccUrl, hostname, middleware.MiddlewareAuthFunc, middleware.MiddlewareAuthWithCustomerIdHeaderFunc)
 	}
-	client.InitializeCitrixDaasClient(ctx, customerId, token, onPremises, apiGateway, disableSslVerification, &userAgent)
+	//nolint:errcheck // Test setup, errors not critical
+	_, _ = client.InitializeCitrixDaasClient(ctx, customerId, token, onPremises, apiGateway, disableSslVerification, &userAgent)
 
 	// Set Quick Deploy Client
 	if catalogServiceHostname != "" {

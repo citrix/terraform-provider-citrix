@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package stf_multi_site
 
 import (
@@ -173,7 +174,7 @@ func (r *STFUserFarmMappingResourceModel) RefreshPropertyValues(ctx context.Cont
 	r.Name = types.StringValue(*result.Name.Get())
 	r.VirtualPath = types.StringValue(*result.VirtualPath.Get())
 
-	if result.GroupMembers != nil && len(result.GroupMembers) > 0 && strings.ToLower(*result.GroupMembers[0].GroupName.Get()) != "everyone" && strings.ToLower(*result.GroupMembers[0].AccountSid.Get()) != "everyone" {
+	if len(result.GroupMembers) > 0 && strings.ToLower(*result.GroupMembers[0].GroupName.Get()) != "everyone" && strings.ToLower(*result.GroupMembers[0].AccountSid.Get()) != "everyone" {
 		updatedGroupMembers := util.RefreshListValueProperties[UserFarmMappingGroup, citrixstorefront.STFGroupMemberResponseModel](ctx, diagnostics, r.GroupMembers, result.GroupMembers, util.GetSTFGroupMemberKey)
 		r.GroupMembers = updatedGroupMembers
 	} else {
@@ -185,7 +186,7 @@ func (r *STFUserFarmMappingResourceModel) RefreshPropertyValues(ctx context.Cont
 	}
 
 	updatedEquivalentFarmSets := util.TypedArrayToObjectList[EquivalentFarmSet](ctx, diagnostics, []EquivalentFarmSet{})
-	if result.FarmSets != nil && len(result.FarmSets) > 0 {
+	if len(result.FarmSets) > 0 {
 		updatedEquivalentFarmSets = util.RefreshListValueProperties[EquivalentFarmSet, citrixstorefront.STFFarmSetResponseModel](ctx, diagnostics, r.EquivalentFarmSets, result.FarmSets, util.GetSTFFarmSetKey)
 	}
 	r.EquivalentFarmSets = updatedEquivalentFarmSets

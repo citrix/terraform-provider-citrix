@@ -1,3 +1,5 @@
+// Copyright © 2025. Citrix Systems, Inc.
+
 package wem_machine_ad_object
 
 import (

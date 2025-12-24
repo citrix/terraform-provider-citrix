@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package hypervisor
 
@@ -195,11 +195,18 @@ func (r AzureHypervisorResourceModel) RefreshPropertyValues(ctx context.Context,
 		if err == nil {
 			for _, customProperty := range customProperties {
 				if customProperty.GetName() == EnableAzureADDeviceManagement_CustomProperty {
-					enabled, _ := strconv.ParseBool(customProperty.GetValue())
+					enabled, err := strconv.ParseBool(customProperty.GetValue())
+					if err != nil {
+						diagnostics.AddError("Error parsing "+customProperty.GetName()+" to bool", err.Error())
+					}
 					r.EnableAzureADDeviceManagement = types.BoolValue(enabled)
 				}
 				if customProperty.GetName() == ProxyHypervisorTrafficThroughConnector_CustomProperty {
-					proxy, _ := strconv.ParseBool(customProperty.GetValue())
+					proxy, err := strconv.ParseBool(customProperty.GetValue())
+					if err != nil {
+						diagnostics.AddError("Error parsing "+customProperty.GetName()+" to bool", err.Error())
+						return r
+					}
 					r.ProxyHypervisorTrafficThroughConnector = types.BoolValue(proxy)
 				}
 				if customProperty.GetName() == AuthenticationMode_CustomProperty {

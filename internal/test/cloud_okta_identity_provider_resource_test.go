@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package test
 
@@ -56,11 +56,7 @@ func TestCCOktaIdpResourcePreCheck(t *testing.T) {
 
 func TestCCOktaIdpResource(t *testing.T) {
 	customerId := os.Getenv("CITRIX_CUSTOMER_ID")
-	isOnPremises := true
-	if customerId != "" && customerId != "CitrixOnPremises" {
-		// Tests being run in cloud env
-		isOnPremises = false
-	}
+	isOnPremises := customerId == "" || customerId == "CitrixOnPremises"
 
 	name := os.Getenv("TEST_CC_OKTA_IDP_NAME")
 	okta_domain := os.Getenv("TEST_CC_OKTA_IDP_DOMAIN")

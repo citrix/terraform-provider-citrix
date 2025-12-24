@@ -1,3 +1,5 @@
+// Copyright © 2025. Citrix Systems, Inc.
+
 package wem_machine_ad_object
 
 import (
@@ -52,7 +54,7 @@ func (w *wemDirectoryResource) Configure(_ context.Context, req resource.Configu
 	if req.ProviderData == nil {
 		return
 	}
-	w.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	w.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Schema implements resource.Resource.
@@ -87,7 +89,7 @@ func (w *wemDirectoryResource) Create(ctx context.Context, req resource.CreateRe
 
 	// Supporting only catalog as machine-level AD objects in WEM
 	machineCatalogId := plan.CatalogId.ValueString()
-	catalog, err := util.GetMachineCatalog(ctx, w.client, &diags, machineCatalogId, true)
+	catalog, err := util.GetMachineCatalog(ctx, w.client, &resp.Diagnostics, machineCatalogId, true)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading machine catalog",
@@ -223,7 +225,7 @@ func (w *wemDirectoryResource) Update(ctx context.Context, req resource.UpdateRe
 
 	// Supporting only catalog as machine-level AD objects in WEM
 	machineCatalogId := plan.CatalogId.ValueString()
-	catalog, err := util.GetMachineCatalog(ctx, w.client, &diags, machineCatalogId, true)
+	catalog, err := util.GetMachineCatalog(ctx, w.client, &resp.Diagnostics, machineCatalogId, true)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading machine catalog",

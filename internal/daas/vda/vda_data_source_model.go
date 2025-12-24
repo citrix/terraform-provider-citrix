@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package vda
 
@@ -81,7 +81,6 @@ func (VdaModel) GetSchema() schema.NestedAttributeObject {
 }
 
 func (r VdaDataSourceModel) RefreshPropertyValues(vdas []citrixorchestration.MachineResponseModel) VdaDataSourceModel {
-
 	res := []VdaModel{}
 	for _, model := range vdas {
 		machineName := model.GetName()

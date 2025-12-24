@@ -92,6 +92,8 @@ resource "citrix_policy_priority" "policy_priority" {
 
 * Please refer to [Available Policy Settings](#available-policy-settings) for more details on policy settings
 
+* For specific policy setting examples, see the [policy_setting_examples](https://github.com/citrix/terraform-provider-citrix/tree/main/examples/policy_setting_examples) directory. Each policy setting that supports examples includes a link to its corresponding example file.
+
 ## Available Policy Filters
 
 ### Access Control
@@ -581,6 +583,9 @@ jsonencode([
 ])
 ```
 
+Example:
+[allowed_urls_to_be_redirected_to_client.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/allowed_urls_to_be_redirected_to_client.tf)
+
 ### Allowed URLs to be redirected to VDA
 Description: 
 ```
@@ -604,6 +609,9 @@ jsonencode([
     ...
 ])
 ```
+
+Example:
+[allowed_urls_to_be_redirected_to_vda.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/allowed_urls_to_be_redirected_to_vda.tf)
 
 ### Always cache
 Description: 
@@ -1148,6 +1156,9 @@ jsonencode([
 ])
 ```
 
+Example:
+[browser_content_redirection_acl_configuration.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/browser_content_redirection_acl_configuration.tf)
+
 ### Browser content redirection authentication sites
 Description: 
 ```
@@ -1194,6 +1205,9 @@ jsonencode([
     ...
 ])
 ```
+
+Example:
+[browser_content_redirection_authentication_sites.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/browser_content_redirection_authentication_sites.tf)
 
 ### Browser content redirection block list configuration
 Description: 
@@ -1243,6 +1257,9 @@ jsonencode([
     ...
 ])
 ```
+
+Example:
+[browser_content_redirection_block_list_configuration.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/browser_content_redirection_block_list_configuration.tf)
 
 ### Browser content redirection integrated Windows authentication support
 Description: 
@@ -1408,6 +1425,9 @@ jsonencode([
 ])
 ```
 
+Example:
+[citrix_cloud_connectors.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/citrix_cloud_connectors.tf)
+
 ### Client audio redirection
 Description: 
 ```
@@ -1530,6 +1550,9 @@ jsonencode([
     ...
 ])
 ```
+
+Example:
+[client_clipboard_write_allowed_formats.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/client_clipboard_write_allowed_formats.tf)
 
 ### Client COM port redirection
 Description: 
@@ -1890,6 +1913,9 @@ jsonencode([
 ])
 ```
 
+Example:
+[client_usb_device_optimization_rules.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/client_usb_device_optimization_rules.tf)
+
 ### Client USB device redirection
 Description: 
 ```
@@ -2082,6 +2108,9 @@ jsonencode([
     ...
 ])
 ```
+
+Example:
+[client_usb_device_redirection_rules_version_2.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/client_usb_device_redirection_rules_version_2.tf)
 
 ### Client USB Plug and Play device redirection
 Description: 
@@ -2376,6 +2405,7 @@ If this setting is not configured here or in the .ini file, all user groups are 
 
 Setting Name: `CPUserGroups_Part`
 
+Setting Value:
 ```
 jsonencode([
     {User_Group_1},
@@ -2383,6 +2413,9 @@ jsonencode([
     ...
 ])
 ```
+
+Example:
+[cross_platform_settings_user_groups.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/cross_platform_settings_user_groups.tf)
 
 ### Customer Experience Improvement Program
 Description: 
@@ -2629,6 +2662,9 @@ jsonencode([
     ...
 ])
 ```
+
+Example:
+[directories_to_synchronize.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/directories_to_synchronize.tf)
 
 ### Disable automatic configuration
 Description: 
@@ -3576,6 +3612,9 @@ jsonencode([
 ])
 ```
 
+Example:
+[excluded_groups.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/excluded_groups.tf)
+
 ### Exclusion list
 Description: 
 ```
@@ -3611,6 +3650,9 @@ jsonencode([
 ])
 ```
 
+Example:
+[exclusion_list.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/exclusion_list.tf)
+
 ### Exclusion list - directories
 Description: 
 ```
@@ -3644,6 +3686,9 @@ jsonencode([
     ...
 ])
 ```
+
+Example:
+[exclusion_list_directories.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/exclusion_list_directories.tf)
 
 ### Exclusion list - files
 Description: 
@@ -3682,6 +3727,9 @@ jsonencode([
     ...
 ])
 ```
+
+Example:
+[exclusion_list_files.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/exclusion_list_files.tf)
 
 ### Extra color compression
 Description: 
@@ -3892,6 +3940,9 @@ jsonencode([
 ])
 ```
 
+Example:
+[files_to_exclude_from_the_shared_store.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/files_to_exclude_from_the_shared_store.tf)
+
 ### Files to exclude in profile container
 Description: 
 ```
@@ -3928,6 +3979,9 @@ jsonencode([
 ])
 ```
 
+Example:
+[files_to_exclude_in_profile_container.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/files_to_exclude_in_profile_container.tf)
+
 ### Files to include in profile container
 Description: 
 ```
@@ -3963,6 +4017,9 @@ jsonencode([
     ...
 ])
 ```
+
+Example:
+[files_to_include_in_profile_container.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/files_to_include_in_profile_container.tf)
 
 ### Files to include in the shared store for deduplication
 Description: 
@@ -4011,6 +4068,9 @@ jsonencode([
 ])
 ```
 
+Example:
+[files_to_include_in_the_shared_store_for_deduplication.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/files_to_include_in_the_shared_store_for_deduplication.tf)
+
 ### Files to synchronize
 Description: 
 ```
@@ -4050,6 +4110,9 @@ jsonencode([
     ...
 ])
 ```
+
+Example:
+[files_to_synchronize.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/files_to_synchronize.tf)
 
 ### Final force logoff message box body text
 Description: 
@@ -4107,6 +4170,9 @@ jsonencode([
 ])
 ```
 
+Example:
+[folders_to_exclude_in_profile_container.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/folders_to_exclude_in_profile_container.tf)
+
 ### Folders to include in profile container
 Description: 
 ```
@@ -4136,6 +4202,9 @@ jsonencode([
 ])
 ```
 
+Example:
+[folders_to_include_in_profile_container.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/folders_to_include_in_profile_container.tf)
+
 ### Folders to mirror
 Description: 
 ```
@@ -4154,6 +4223,9 @@ jsonencode([
     ...
 ])
 ```
+
+Example:
+[folders_to_mirror.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/folders_to_mirror.tf)
 
 ### Force logoff grace period
 Description: 
@@ -4293,6 +4365,9 @@ jsonencode([
     ...
 ])
 ```
+
+Example:
+[groups_using_customized_user_layer_size.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/groups_using_customized_user_layer_size.tf)
 
 ### HDX adaptive transport
 Description: 
@@ -4754,6 +4829,10 @@ jsonencode([
     "Software\Adobe"
 ])
 ```
+
+Example:
+[inclusion_list.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/inclusion_list.tf)
+
 ### Large File Handling List - Files to be created as symbolic links
 Description: 
 ```
@@ -4778,6 +4857,9 @@ jsonencode([
     ...
 ])
 ```
+
+Example:
+[large_file_handling_list_files_to_be_created_as_symbolic_links.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/large_file_handling_list_files_to_be_created_as_symbolic_links.tf)
 
 ### Launch touch-optimized desktop
 Description: 
@@ -5426,6 +5508,9 @@ Setting Name: `MultiStreamAssignment`
 
 Setting Value: `{Channel Name 1},{Assignment 1};{Channel Name 2},{Assignment 2};...`
 
+Example:
+[multi_stream_virtual_channel_stream_assignment.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/multi_stream_virtual_channel_stream_assignment.tf)
+
 Setting Value Explanation:
 Channel Name | Description | Default Stream Assignment
 --|--|--
@@ -5608,6 +5693,9 @@ jsonencode([
     ...
 ])
 ```
+
+Example:
+[onedrive_container_list_of_onedrive_folders.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/onedrive_container_list_of_onedrive_folders.tf)
 
 ### Optimization for Windows Media multimedia redirection over WAN
 Description:
@@ -5922,6 +6010,8 @@ jsonencode([
 ])
 ```
 
+Example:
+[posture_check_for_citrix_workspace_app.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/posture_check_for_citrix_workspace_app.tf)
 
 ### Preferred color depth for simple graphics
 Description:
@@ -6015,6 +6105,9 @@ Use individual 'Default printers' and 'Session printers' settings to set default
 
 Setting Name: `PrinterAssignments`
 
+Example:
+[printer_assignments.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/printer_assignments.tf)
+
 ### Printer auto-creation event log preference
 Description:
 ```
@@ -6055,6 +6148,9 @@ jsonencode([
     "Printer Driver Allowed,Allow",
 ])
 ""
+
+Example:
+[printer_driver_mapping_and_compatibility.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/printer_driver_mapping_and_compatibility.tf)
 
 Action Value Mapping:
 Action Value | Comment
@@ -6197,6 +6293,8 @@ jsonencode([
 ])
 ```
 
+Example:
+[processed_groups.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/processed_groups.tf)
 
 ### Profile container
 Description:
@@ -6330,6 +6428,8 @@ jsonencode([
 ])
 ```
 
+Example:
+[profile_streaming_exclusion_list_directories.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/profile_streaming_exclusion_list_directories.tf)
 
 ### Read-only client drive access
 Description:
@@ -6777,6 +6877,8 @@ jsonencode([
 ])
 ```
 
+Example:
+[replicate_user_stores_paths_to_replicate_a_user_store.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/replicate_user_stores_paths_to_replicate_a_user_store.tf)
 
 ### Restore Desktop OS time zone on session disconnect or logoff
 Description:
@@ -6996,6 +7098,9 @@ jsonencode([
 ])
 ```
 
+Example:
+[session_clipboard_write_allowed_formats.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/session_clipboard_write_allowed_formats.tf)
+
 ### Session connection timer
 Description:
 ```
@@ -7125,6 +7230,9 @@ jsonencode([
 ])
 ```
 
+Example:
+[session_printers.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/session_printers.tf)
+
 
 ### Session reliability connections
 Description:
@@ -7217,6 +7325,9 @@ If this setting is configured neither here nor in the .ini file, no priority ord
 Setting Name: `OrderedGroups_Part`
 
 Setting Value: `{UserGroup1};{UserGroup2};...`
+
+Example:
+[set_priority_order_for_user_groups.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/set_priority_order_for_user_groups.tf)
 
 
 ### Source for creating cross-platform settings
@@ -7409,6 +7520,8 @@ jsonencode([
 ])
 ```
 
+Example:
+[streamed_user_profile_groups.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/streamed_user_profile_groups.tf)
 
 ### Tablet mode toggle
 Description:
@@ -7602,6 +7715,9 @@ jsonencode([
 ])
 ```
 
+Example:
+[universal_driver_preference.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/universal_driver_preference.tf)
+
 ### Universal print driver usage
 Description:
 ```
@@ -7731,6 +7847,9 @@ jsonencode([
 ])
 ```
 
+Example:
+[universal_print_servers_for_load_balancing.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/universal_print_servers_for_load_balancing.tf)
+
 ### Universal Print Servers out-of-service threshold
 Description:
 ```
@@ -7790,6 +7909,8 @@ Setting Name: `UPDCompressionDefaults`
 
 Setting Value: `ImageCompression={ReducedQuality | StandardQuality | HighQuality | BestQuality}, HeavyweightCompression={True | False}, ImageCaching={True | False}, FontCaching={True | False}, AllowNonAdminsToModify={True | False}`
 
+Example:
+[universal_printing_optimization_defaults.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/universal_printing_optimization_defaults.tf)
 
 ### Universal printing preview preference
 Description:
@@ -7851,6 +7972,9 @@ jsonencode([
 ])
 ```
 
+Example:
+[url_redirection_black_list.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/url_redirection_black_list.tf)
+
 ### URL redirection white list
 Description:
 ```
@@ -7867,6 +7991,9 @@ jsonencode([
     ...
 ])
 ```
+
+Example:
+[url_redirection_white_list.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/url_redirection_white_list.tf)
 
 ### Use asynchronous writes
 Description:
@@ -7975,6 +8102,9 @@ jsonencode([
     ...
 ])
 ```
+
+Example:
+[user_layer_exclusions.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/user_layer_exclusions.tf)
 
 ### User layer repository path
 Description:
@@ -8097,6 +8227,9 @@ jsonencode([
 ])
 ```
 
+Example:
+[virtual_channel_allow_list.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/virtual_channel_allow_list.tf)
+
 ### Virtual channel allow list log throttling
 Description:
 ```
@@ -8150,6 +8283,9 @@ jsonencode([
     ...
 ])
 ```
+
+Example:
+[virtual_ip_virtual_loopback_programs_list.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/virtual_ip_virtual_loopback_programs_list.tf)
 
 ### Visual quality
 Description:

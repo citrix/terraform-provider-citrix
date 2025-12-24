@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package machine_catalog
 
@@ -526,6 +526,7 @@ func (XenserverMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 				Description: "The Snapshot of the virtual machine specified in `master_image_vm`. Specify the relative path of the snapshot. Eg: snaphost-1/snapshot-2/snapshot-3. This property is case sensitive.",
 				Optional:    true,
 				Computed:    true,
+				Default:     stringdefault.StaticString(""),
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -1382,6 +1383,7 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 	isUseSharedImageGallerySet := false
 	isUseEphemeralOsDiskSet := false
 	for _, stringPair := range customProperties {
+		var err error
 		switch stringPair.GetName() {
 		case "StorageType":
 			if !isUseEphemeralOsDiskSet {
@@ -1392,17 +1394,17 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 				mc.StorageType = types.StringValue(stringPair.GetValue())
 			}
 		case "UseManagedDisks":
-			mc.UseManagedDisks = util.StringToTypeBool(stringPair.GetValue())
+			mc.UseManagedDisks, err = util.StringToTypeBool(stringPair.GetValue())
 		case "ResourceGroups":
 			mc.VdaResourceGroup = types.StringValue(stringPair.GetValue())
 		case "WBCDiskStorageType":
 			azureWbcModel.WBCDiskStorageType = types.StringValue(stringPair.GetValue())
 		case "PersistWBC":
-			azureWbcModel.PersistWBC = util.StringToTypeBool(stringPair.GetValue())
+			azureWbcModel.PersistWBC, err = util.StringToTypeBool(stringPair.GetValue())
 		case "PersistOsDisk":
-			azureWbcModel.PersistOsDisk = util.StringToTypeBool(stringPair.GetValue())
+			azureWbcModel.PersistOsDisk, err = util.StringToTypeBool(stringPair.GetValue())
 		case "PersistVm":
-			azureWbcModel.PersistVm = util.StringToTypeBool(stringPair.GetValue())
+			azureWbcModel.PersistVm, err = util.StringToTypeBool(stringPair.GetValue())
 		case "StorageTypeAtShutdown":
 			if !strings.EqualFold(stringPair.GetValue(), "") {
 				// Only overwrite StorageCostSaving to true when the value is present and is not empty
@@ -1430,7 +1432,10 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 				isUseSharedImageGallerySet = true
 				azureComputeGallerySettingsModel := util.ObjectValueToTypedObject[AzureComputeGallerySettings](ctx, diagnostics, mc.UseAzureComputeGallery)
 
-				replicaRatio, _ := strconv.Atoi(stringPair.GetValue())
+				replicaRatio, err := strconv.Atoi(stringPair.GetValue())
+				if err != nil {
+					break
+				}
 				azureComputeGallerySettingsModel.ReplicaRatio = types.Int64Value(int64(replicaRatio))
 				mc.UseAzureComputeGallery = util.TypedObjectToObjectValue(ctx, diagnostics, azureComputeGallerySettingsModel)
 			}
@@ -1438,7 +1443,10 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 			if stringPair.GetValue() != "" {
 				isUseSharedImageGallerySet = true
 				azureComputeGallerySettingsModel := util.ObjectValueToTypedObject[AzureComputeGallerySettings](ctx, diagnostics, mc.UseAzureComputeGallery)
-				replicaMaximum, _ := strconv.Atoi(stringPair.GetValue())
+				replicaMaximum, err := strconv.Atoi(stringPair.GetValue())
+				if err != nil {
+					break
+				}
 				azureComputeGallerySettingsModel.ReplicaMaximum = types.Int64Value(int64(replicaMaximum))
 				mc.UseAzureComputeGallery = util.TypedObjectToObjectValue(ctx, diagnostics, azureComputeGallerySettingsModel)
 			}
@@ -1473,6 +1481,9 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 				}
 			}
 		default:
+		}
+		if err != nil {
+			diagnostics.AddError("Error parsing value for custom property "+stringPair.GetName(), err.Error())
 		}
 	}
 
@@ -1678,16 +1689,20 @@ func (mc *GcpMachineConfigModel) RefreshProperties(ctx context.Context, diagnost
 	//Refresh custom properties
 	customProperties := provScheme.GetCustomProperties()
 	for _, stringPair := range customProperties {
+		var err error
 		switch stringPair.GetName() {
 		case "StorageType":
 			mc.StorageType = types.StringValue(stringPair.GetValue())
 		case "WBCDiskStorageType":
 			writebackCache.WBCDiskStorageType = types.StringValue(stringPair.GetValue())
 		case "PersistWBC":
-			writebackCache.PersistWBC = util.StringToTypeBool(stringPair.GetValue())
+			writebackCache.PersistWBC, err = util.StringToTypeBool(stringPair.GetValue())
 		case "PersistOsDisk":
-			writebackCache.PersistOsDisk = util.StringToTypeBool(stringPair.GetValue())
+			writebackCache.PersistOsDisk, err = util.StringToTypeBool(stringPair.GetValue())
 		default:
+		}
+		if err != nil {
+			diagnostics.AddError("Error parsing value for custom property "+stringPair.GetName(), err.Error())
 		}
 	}
 	mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, writebackCache)
@@ -1769,7 +1784,9 @@ func (mc *XenserverMachineConfigModel) RefreshProperties(ctx context.Context, di
 
 	masterImage, imageSnapshot, _ := parseOnPremImagePath(catalog)
 	mc.MasterImageVm = types.StringValue(masterImage)
-	mc.ImageSnapshot = types.StringValue(imageSnapshot)
+	if !mc.ImageSnapshot.IsNull() && mc.ImageSnapshot.ValueString() != "" {
+		mc.ImageSnapshot = types.StringValue(imageSnapshot)
+	}
 
 	// Refresh Master Image Note
 	currentDiskImage := provScheme.GetCurrentDiskImage()
@@ -1881,7 +1898,7 @@ func (mc *SCVMMMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 	mc.UseFullDiskCloneProvisioning = types.BoolValue(provScheme.GetUseFullDiskCloneProvisioning())
 }
 
-func parseOnPremImagePath(catalog citrixorchestration.MachineCatalogDetailResponseModel) (masterImage, imageSnapshot string, resourcePoolPath string) {
+func parseOnPremImagePath(catalog citrixorchestration.MachineCatalogDetailResponseModel) (string, string, string) {
 	provScheme := catalog.GetProvisioningScheme()
 	currentDiskImage := provScheme.GetCurrentDiskImage()
 	currentImage := currentDiskImage.GetImage()
@@ -1898,6 +1915,7 @@ func parseOnPremImagePath(catalog citrixorchestration.MachineCatalogDetailRespon
 	*/
 
 	// Find the last index of ".resourcepool"
+	resourcePoolPath := ""
 	lastResourcePoolIndex := strings.LastIndex(relativePath, ".resourcepool")
 	if lastResourcePoolIndex != -1 {
 		// Extract the resource pool path
@@ -1914,11 +1932,11 @@ func parseOnPremImagePath(catalog citrixorchestration.MachineCatalogDetailRespon
 		return "", "", ""
 	}
 	// Extract the master image name and trim the ".vm"
-	masterImage = relativePath[:vmIndex]
+	masterImage := relativePath[:vmIndex]
 
 	// Extract the snapshot part of the path
 	snapshotPath := relativePath[vmIndex+len(".vm/"):]
-	imageSnapshot = strings.ReplaceAll(snapshotPath, ".snapshot", "")
+	imageSnapshot := strings.ReplaceAll(snapshotPath, ".snapshot", "")
 
 	return masterImage, imageSnapshot, resourcePoolPath
 }

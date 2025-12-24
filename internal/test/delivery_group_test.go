@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package test
 
@@ -341,11 +341,8 @@ resource "citrix_delivery_group" "testDeliveryGroup" {
 
 func BuildDeliveryGroupResource(t *testing.T, deliveryGroup string, deliveryType string) string {
 	name := os.Getenv("TEST_DG_NAME")
-	isOnPremises := true
 	customerId := os.Getenv("CITRIX_CUSTOMER_ID")
-	if customerId != "" && customerId != "CitrixOnPremises" {
-		isOnPremises = false
-	}
+	isOnPremises := customerId == "" || customerId == "CitrixOnPremises"
 
 	deliveryTypeString := ""
 	if deliveryType != "" {
@@ -357,7 +354,6 @@ func BuildDeliveryGroupResource(t *testing.T, deliveryGroup string, deliveryType
 	} else {
 		return BuildDesktopIconResource(t, testDesktopIconResource) + fmt.Sprintf(deliveryGroup, name, deliveryTypeString, "default_desktop_icon = citrix_desktop_icon.testDesktopIcon.id")
 	}
-
 }
 
 func BuildDeliveryGroupResourceWithZeroCatalogs(t *testing.T, deliveryGroup string) string {
@@ -372,7 +368,7 @@ func deliveryGroupSweeper(ctx context.Context, deliveryGroupName string, client 
 			// Resource does not exist in remote, no need to delete
 			return nil
 		}
-		return fmt.Errorf("Error getting delivery group: %s", err)
+		return fmt.Errorf("Error getting delivery group: %w", err)
 	}
 	deleteDeliveryGroupRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsDeleteDeliveryGroup(ctx, deliveryGroup.GetId())
 	httpResp, err = citrixclient.AddRequestData(deleteDeliveryGroupRequest, client).Execute()

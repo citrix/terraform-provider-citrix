@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package test
 
@@ -75,13 +75,8 @@ func TestCloudZoneCreationPreCheck(t *testing.T) {
 }
 
 func TestZoneResource(t *testing.T) {
-
 	customerId := os.Getenv("CITRIX_CUSTOMER_ID")
-	isOnPremises := true
-	if customerId != "" && customerId != "CitrixOnPremises" {
-		// Tests being run in cloud env
-		isOnPremises = false
-	}
+	isOnPremises := customerId == "" || customerId == "CitrixOnPremises"
 
 	zoneInput := os.Getenv("TEST_ZONE_INPUT")
 	rlName := os.Getenv("TEST_RESOURCE_LOCATION_NAME")
@@ -264,7 +259,7 @@ func zoneSweeper(ctx context.Context, zoneName string, client *citrixclient.Citr
 			// Resource does not exist in remote, no need to delete
 			return nil
 		}
-		return fmt.Errorf("error getting zone: %s", err)
+		return fmt.Errorf("error getting zone: %w", err)
 	}
 	deleteZoneRequest := client.ApiClient.ZonesAPIsDAAS.ZonesDeleteZone(ctx, zone.GetId())
 	httpResp, err = citrixclient.AddRequestData(deleteZoneRequest, client).Execute()

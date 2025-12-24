@@ -1,3 +1,5 @@
+// Copyright © 2025. Citrix Systems, Inc.
+
 package test
 
 import (
@@ -244,7 +246,7 @@ func adminFolderSweeper(ctx context.Context, adminFolderName string, client *cit
 			// Resource does not exist in remote, no need to delete
 			return nil
 		}
-		return fmt.Errorf("Error getting admin folder: %s", err)
+		return fmt.Errorf("Error getting admin folder: %w", err)
 	}
 	deleteAdminFolderRequest := client.ApiClient.AdminFoldersAPIsDAAS.AdminFoldersDeleteAdminFolder(ctx, adminFolder.GetId())
 	httpResp, err = citrixclient.AddRequestData(deleteAdminFolderRequest, client).Execute()

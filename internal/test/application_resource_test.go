@@ -1,3 +1,5 @@
+// Copyright © 2025. Citrix Systems, Inc.
+
 package test
 
 import (
@@ -367,7 +369,7 @@ func applicationSweeper(ctx context.Context, appName string, client *citrixclien
 			// Resource does not exist in remote, no need to delete
 			return nil
 		}
-		return fmt.Errorf("Error getting application: %s", err)
+		return fmt.Errorf("Error getting application: %w", err)
 	}
 	deleteApplicationRequest := client.ApiClient.ApplicationsAPIsDAAS.ApplicationsDeleteApplication(ctx, application.GetId())
 	httpResp, err = citrixclient.AddRequestData(deleteApplicationRequest, client).Execute()

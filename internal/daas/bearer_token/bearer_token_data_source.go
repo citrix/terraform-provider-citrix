@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package bearer_token
 
@@ -38,7 +38,7 @@ func (d *BearerTokenDataSource) Configure(ctx context.Context, req datasource.Co
 		return
 	}
 
-	d.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	d.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 func (d *BearerTokenDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -82,5 +82,4 @@ func (d *BearerTokenDataSource) Read(ctx context.Context, req datasource.ReadReq
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
-
 }

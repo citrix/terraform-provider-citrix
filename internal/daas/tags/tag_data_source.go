@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package tags
 
 import (
@@ -37,7 +38,7 @@ func (d *TagDataSource) Configure(ctx context.Context, req datasource.ConfigureR
 		return
 	}
 
-	d.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	d.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 func (d *TagDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {

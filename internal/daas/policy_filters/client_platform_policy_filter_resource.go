@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package policy_filters
 
@@ -48,7 +48,7 @@ func (r *clientPlatformFilterResource) Configure(_ context.Context, req resource
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 func (r *clientPlatformFilterResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -186,8 +186,7 @@ func (r *clientPlatformFilterResource) ModifyPlan(ctx context.Context, req resou
 		return
 	}
 
-	isDdcVersionSupported := util.CheckProductVersion(r.client, &resp.Diagnostics, 124, 124, 7, 44, "Error managing Client Platform policy filter", "Client Platform policy filter resource")
-	if !isDdcVersionSupported {
+	if !util.CheckProductVersion(r.client, &resp.Diagnostics, 124, 124, 7, 44, "Error managing Client Platform policy filter", "Client Platform policy filter resource") {
 		return
 	}
 }

@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package hypervisor
 
@@ -43,7 +43,7 @@ func (r *remotePCWakeOnLANHypervisorResource) Configure(_ context.Context, req r
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Schema implements resource.Resource.
@@ -100,7 +100,7 @@ func (r *remotePCWakeOnLANHypervisorResource) Create(ctx context.Context, req re
 	}
 
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(ctx, &diags, hypervisor)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, hypervisor)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -140,7 +140,7 @@ func (r *remotePCWakeOnLANHypervisorResource) Read(ctx context.Context, req reso
 	}
 
 	// Map response body to schema and populate Computed attribute values
-	state = state.RefreshPropertyValues(ctx, &diags, hypervisor)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, hypervisor)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, state)

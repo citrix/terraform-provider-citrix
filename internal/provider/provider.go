@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package provider
 
@@ -74,6 +74,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
@@ -310,13 +311,17 @@ type registryResponse struct {
 	Versions []string `json:"versions"`
 }
 
-func getVersionFromTerraformRegistry() (string, error) {
-	httpResp, err := http.Get("https://registry.terraform.io/v1/providers/citrix/citrix")
+func getVersionFromTerraformRegistry(ctx context.Context) (string, error) {
+	localVarRequest, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://registry.terraform.io/v1/providers/citrix/citrix", nil)
 	if err != nil {
 		return "", err
 	}
-	defer httpResp.Body.Close()
-	if httpResp.StatusCode != 200 {
+	httpResp, err := http.DefaultClient.Do(localVarRequest)
+	if err != nil {
+		return "", err
+	}
+	defer httpResp.Body.Close() //nolint:errcheck // Error not actionable in defer
+	if httpResp.StatusCode != http.StatusOK {
 		return "", err
 	}
 
@@ -344,7 +349,7 @@ func getVersionFromTerraformRegistry() (string, error) {
 }
 
 // best effort version check, if anything goes wrong just bail out
-func (p *citrixProvider) versionCheck(resp *provider.ConfigureResponse) {
+func (p *citrixProvider) versionCheck(ctx context.Context, diagnostics *diag.Diagnostics) {
 	if !semver.IsValid("v" + p.version) {
 		return
 	}
@@ -352,7 +357,7 @@ func (p *citrixProvider) versionCheck(resp *provider.ConfigureResponse) {
 	var registryVersion string
 	updateVersionFile := false
 
-	versionCheckFilePath := filepath.Join(os.TempDir(), "citrix_provider_version_check.txt")
+	versionCheckFilePath := filepath.Clean(filepath.Join(os.TempDir(), "citrix_provider_version_check.txt"))
 	info, err := os.Stat(versionCheckFilePath)
 	if err == nil && info != nil && time.Now().Before(info.ModTime().Add(time.Hour*time.Duration(24))) {
 		// use cached version for version check
@@ -362,7 +367,7 @@ func (p *citrixProvider) versionCheck(resp *provider.ConfigureResponse) {
 		}
 		registryVersion = string(txt)
 	} else {
-		registryVersion, err = getVersionFromTerraformRegistry()
+		registryVersion, err = getVersionFromTerraformRegistry(ctx)
 		if err != nil {
 			return
 		}
@@ -370,13 +375,13 @@ func (p *citrixProvider) versionCheck(resp *provider.ConfigureResponse) {
 	}
 
 	if semver.Compare("v"+registryVersion, "v"+p.version) > 0 {
-		resp.Diagnostics.AddWarning(
+		diagnostics.AddWarning(
 			"New version of the citrix/citrix provider is available",
 			fmt.Sprintf("Please update the provider version in terraform configuration to >=%s and then run `terraform init --upgrade` to get the latest version.", registryVersion))
 	}
 
 	if updateVersionFile {
-		err = os.WriteFile(versionCheckFilePath, []byte(registryVersion), 0660)
+		err = os.WriteFile(versionCheckFilePath, []byte(registryVersion), 0600)
 		if err != nil {
 			return
 		}
@@ -390,7 +395,7 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	tflog.Info(ctx, "Configuring Citrix Cloud client")
 	defer util.PanicHandler(&resp.Diagnostics)
 
-	p.versionCheck(resp)
+	p.versionCheck(ctx, &resp.Diagnostics)
 
 	// Retrieve provider data from configuration
 	var config citrixProviderModel
@@ -509,7 +514,6 @@ func (p *citrixProvider) Configure(ctx context.Context, req provider.ConfigureRe
 			if resp.Diagnostics.HasError() {
 				return
 			}
-
 		}
 
 		validateAndInitializeDaaSClient(ctx, resp, client, clientId, clientSecret, hostname, environment, wemHostName, wemRegion, customerId, quick_create_host_name, catalog_service_host_name, p.version, wemOnPremHostName, wem_admin_username, wem_admin_password, disableSslVerification, disableDaasClient, wem_disable_ssl_verification)
@@ -672,27 +676,29 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 	apiGateway := true
 	ccUrl := ""
 	if !onPremises {
-		if environment == "Production" {
+		switch environment {
+		case "Production":
 			ccUrl = "api.cloud.com"
-		} else if environment == "Staging" {
+		case "Staging":
 			ccUrl = "api.cloudburrito.com"
-		} else if environment == "Japan" {
+		case "Japan":
 			ccUrl = "api.citrixcloud.jp"
-		} else if environment == "JapanStaging" {
+		case "JapanStaging":
 			ccUrl = "api.citrixcloudstaging.jp"
-		} else if environment == "Gov" {
+		case "Gov":
 			ccUrl = fmt.Sprintf("registry.citrixworkspacesapi.us/%s", customerId)
-		} else if environment == "GovStaging" {
+		case "GovStaging":
 			ccUrl = fmt.Sprintf("registry.ctxwsstgapi.us/%s", customerId)
 		}
 		if hostname == "" {
-			if environment == "Gov" {
+			switch environment {
+			case "Gov":
 				hostname = fmt.Sprintf("%s.xendesktop.us", customerId)
 				apiGateway = false
-			} else if environment == "GovStaging" {
+			case "GovStaging":
 				hostname = fmt.Sprintf("%s.xdstaging.us", customerId)
 				apiGateway = false
-			} else {
+			default:
 				hostname = ccUrl
 			}
 		} else if !strings.HasPrefix(hostname, "api.") {
@@ -701,26 +707,27 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 		}
 	}
 
-	authUrl := ""
+	var authUrl string
 	isGov := false
 	if onPremises {
 		authUrl = fmt.Sprintf("https://%s/citrix/orchestration/api/tokens", hostname)
 	} else {
-		if environment == "Production" {
+		switch environment {
+		case "Production":
 			authUrl = fmt.Sprintf("https://api.cloud.com/cctrustoauth2/%s/tokens/clients", customerId)
-		} else if environment == "Staging" {
+		case "Staging":
 			authUrl = fmt.Sprintf("https://api.cloudburrito.com/cctrustoauth2/%s/tokens/clients", customerId)
-		} else if environment == "Japan" {
+		case "Japan":
 			authUrl = fmt.Sprintf("https://api.citrixcloud.jp/cctrustoauth2/%s/tokens/clients", customerId)
-		} else if environment == "JapanStaging" {
+		case "JapanStaging":
 			authUrl = fmt.Sprintf("https://api.citrixcloudstaging.jp/cctrustoauth2/%s/tokens/clients", customerId)
-		} else if environment == "Gov" {
+		case "Gov":
 			authUrl = fmt.Sprintf("https://trust.citrixworkspacesapi.us/%s/tokens/clients", customerId)
 			isGov = true
-		} else if environment == "GovStaging" {
+		case "GovStaging":
 			authUrl = fmt.Sprintf("https://trust.ctxwsstgapi.us/%s/tokens/clients", customerId)
 			isGov = true
-		} else {
+		default:
 			authUrl = fmt.Sprintf("https://%s/cctrustoauth2/%s/tokens/clients", hostname, customerId)
 		}
 	}
@@ -730,17 +737,18 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 		// If customer specified a quick create host name, use it
 		quickCreateHostname = quick_create_host_name
 	} else {
-		if environment == "Production" {
+		switch environment {
+		case "Production":
 			quickCreateHostname = "api.cloud.com/quickcreateservice"
-		} else if environment == "Staging" {
+		case "Staging":
 			quickCreateHostname = "api.cloudburrito.com/quickcreateservice"
-		} else if environment == "Japan" {
+		case "Japan":
 			quickCreateHostname = "api.citrixcloud.jp/quickcreateservice"
-		} else if environment == "JapanStaging" {
+		case "JapanStaging":
 			quickCreateHostname = "api.citrixcloudstaging.jp/quickcreateservice"
-		} else if environment == "Gov" {
+		case "Gov":
 			quickCreateHostname = "api.cloud.us/quickcreateservice"
-		} else if environment == "GovStaging" {
+		case "GovStaging":
 			quickCreateHostname = "api.cloudstaging.us/quickcreateservice"
 		}
 	}
@@ -750,48 +758,52 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 		// If customer specified a quick create host name, use it
 		catalogServiceHostname = catalog_service_host_name
 	} else {
-		if environment == "Production" {
+		switch environment {
+		case "Production":
 			catalogServiceHostname = "api.cloud.com/catalogservice"
-		} else if environment == "Staging" {
+		case "Staging":
 			catalogServiceHostname = "api.cloudburrito.com/catalogservice"
-		} else if environment == "Japan" {
+		case "Japan":
 			catalogServiceHostname = "api.citrixcloud.jp/catalogservice"
-		} else if environment == "JapanStaging" {
+		case "JapanStaging":
 			catalogServiceHostname = "api.citrixcloudstaging.jp/catalogservice"
-		} else if environment == "Gov" {
+		case "Gov":
 			catalogServiceHostname = "api.cloud.us/catalogservice"
-		} else if environment == "GovStaging" {
+		case "GovStaging":
 			catalogServiceHostname = "api.cloudstaging.us/catalogservice"
 		}
 	}
 
 	cwsHostName := ""
-	if environment == "Production" {
+	switch environment {
+	case "Production":
 		cwsHostName = "cws.citrixworkspacesapi.net"
-	} else if environment == "Staging" {
+	case "Staging":
 		cwsHostName = "cws.ctxwsstgapi.net"
-	} else if environment == "Japan" {
+	case "Japan":
 		cwsHostName = "cws.citrixworkspacesapi.jp"
-	} else if environment == "JapanStaging" {
+	case "JapanStaging":
 		cwsHostName = "cws.citrixstagingapi.jp"
-	} else if environment == "Gov" {
+	case "Gov":
 		cwsHostName = "cws.citrixworkspacesapi.us"
-	} else if environment == "GovStaging" {
+	case "GovStaging":
 		cwsHostName = "cws.ctxwsstgapi.us"
 	}
 
 	if wemHostName == "" && wemAuthUrl == "" {
-		if environment == "Production" {
-			if wemRegion == "EU" {
+		switch environment {
+		case "Production":
+			switch wemRegion {
+			case "EU":
 				wemHostName = "eu-api.wem.cloud.com"
-			} else if wemRegion == "APS" {
+			case "APS":
 				wemHostName = "aps-api.wem.cloud.com"
-			} else {
+			default:
 				wemHostName = "api.wem.cloud.com"
 			}
-		} else if environment == "Japan" {
+		case "Japan":
 			wemHostName = "jp-api.wem.citrixcloud.jp"
-		} else if environment == "Staging" {
+		case "Staging":
 			wemHostName = "api.wem.cloudburrito.com"
 		}
 	}
@@ -835,7 +847,7 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 	// Setup the Citrix API Client
 	token, httpResp, err := client.SetupCitrixClientsContext(ctx, authUrl, ccUrl, hostname, customerId, clientId, clientSecret, onPremises, apiGateway, isGov, disableSslVerification, &userAgent, environment, middleware.MiddlewareAuthFunc, middleware.MiddlewareAuthWithCustomerIdHeaderFunc)
 	if err != nil {
-		if httpResp != nil && httpResp.StatusCode == 401 {
+		if httpResp != nil && httpResp.StatusCode == http.StatusUnauthorized {
 			resp.Diagnostics.AddError(
 				"Invalid credential in provider config",
 				"Make sure client_id and client_secret are correct in provider config.",
@@ -887,7 +899,6 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 							"Error: "+err.Error(),
 					)
 				}
-
 			} else {
 				handleNetworkError(err, resp)
 			}
@@ -918,7 +929,7 @@ func handleNetworkError(err error, resp *provider.ConfigureResponse) {
 	syscallErr := new(os.SyscallError)
 
 	// Case 1: DDC off
-	if errors.As(err, &urlErr) && errors.As(urlErr.Err, &opErr) && errors.As(opErr.Err, &syscallErr) && syscallErr.Err == syscall.Errno(10060) {
+	if errors.As(err, &urlErr) && errors.As(urlErr.Err, &opErr) && errors.As(opErr.Err, &syscallErr) && errors.Is(syscallErr.Err, syscall.Errno(10060)) {
 		resp.Diagnostics.AddError(
 			"DDC(s) cannot be reached",
 			"Ensure that the DDC(s) are running. Make sure this machine has proper network routing to reach the DDC(s) and is not blocked by any firewall rules.",

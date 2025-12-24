@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package cc_identity_providers
 
 import (
@@ -90,7 +91,6 @@ func (OktaIdentityProviderModel) GetAttributesNamesToMask() map[string]bool {
 }
 
 func (r OktaIdentityProviderModel) RefreshPropertyValues(isResource bool, oktaIdp *citrixcws.IdpStatusModel) OktaIdentityProviderModel {
-
 	// Overwrite Okta Identity Provider Resource with refreshed state
 	r.Id = types.StringValue(oktaIdp.GetIdpInstanceId())
 	r.Name = types.StringValue(oktaIdp.GetIdpNickname())

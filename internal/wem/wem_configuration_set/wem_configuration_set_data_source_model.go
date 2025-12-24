@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package wem_configuration_set
 
@@ -22,7 +22,6 @@ type WemSiteDataSourceModel struct {
 }
 
 func (r WemSiteDataSourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, wemSite *citrixwemservice.SiteModel) WemSiteDataSourceModel {
-
 	r.Id = types.StringValue(strconv.FormatInt(wemSite.GetId(), 10))
 	r.Name = types.StringValue(wemSite.GetName())
 	r.Description = types.StringValue(wemSite.GetDescription())

@@ -1,3 +1,5 @@
+// Copyright © 2025. Citrix Systems, Inc.
+
 package qcs_connection
 
 import (
@@ -49,7 +51,7 @@ func (r *awsWorkspacesDirectoryConnectionResource) Configure(_ context.Context, 
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -221,7 +223,10 @@ func (r *awsWorkspacesDirectoryConnectionResource) Delete(ctx context.Context, r
 	}
 
 	// Remove the AWS WorkSpaces Directory Connection
-	removeAwsWorkspacesDirectoryConnection(ctx, r.client, &resp.Diagnostics, state.AccountId.ValueString(), state.DirectoryConnectionId.ValueString())
+	_, _, err = removeAwsWorkspacesDirectoryConnection(ctx, r.client, &resp.Diagnostics, state.AccountId.ValueString(), state.DirectoryConnectionId.ValueString())
+	if err != nil {
+		return // error already added to diagnostics
+	}
 }
 
 // ImportState imports the resource state from the given ID
@@ -281,7 +286,6 @@ func addAwsWorkspacesDirectoryConnection(ctx context.Context, client *citrixdaas
 	}
 
 	return pollTaskResponse.ResourceConnectionTask, httpResp, nil
-
 }
 
 func getAwsWorkspacesDirectoryConnection(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, accountId string, directoryConnectionId string, returnIfNotFound bool) (*citrixquickcreate.AwsEdcDirectoryConnection, *http.Response, error) {

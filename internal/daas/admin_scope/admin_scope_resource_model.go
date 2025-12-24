@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package admin_scope
 
@@ -30,7 +30,6 @@ type AdminScopeModel struct {
 }
 
 func (r AdminScopeModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, adminScope *citrixorchestration.ScopeResponseModel) AdminScopeModel {
-
 	// Overwrite admin scope with refreshed state
 	r.Id = types.StringValue(adminScope.GetId())
 	r.Name = types.StringValue(adminScope.GetName())

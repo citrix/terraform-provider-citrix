@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package qcs_deployment
 
 import (
@@ -45,7 +46,7 @@ func (r *awsWorkspacesDeploymentDataSource) Configure(_ context.Context, req dat
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Read refreshes the Terraform state with the latest data.

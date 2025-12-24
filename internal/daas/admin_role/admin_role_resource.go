@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package admin_role
 
@@ -51,7 +51,7 @@ func (r *adminRoleResource) Configure(_ context.Context, req resource.ConfigureR
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Create creates the resource and sets the initial Terraform state.
@@ -72,7 +72,7 @@ func (r *adminRoleResource) Create(ctx context.Context, req resource.CreateReque
 	body.SetDescription(plan.Description.ValueString())
 	body.SetCanLaunchManage(plan.CanLaunchManage.ValueBool())
 	body.SetCanLaunchMonitor(plan.CanLaunchMonitor.ValueBool())
-	body.SetPermissions(util.StringSetToStringArray(ctx, &diags, plan.Permissions))
+	body.SetPermissions(util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Permissions))
 
 	createAdminRoleRequest := r.client.ApiClient.AdminAPIsDAAS.AdminCreateAdminRole(ctx)
 	createAdminRoleRequest = createAdminRoleRequest.CreateAdminRoleRequestModel(body)
@@ -80,13 +80,20 @@ func (r *adminRoleResource) Create(ctx context.Context, req resource.CreateReque
 	// Create new admin role
 	httpResp, err := citrixdaasclient.AddRequestData(createAdminRoleRequest, r.client).Execute()
 	if err != nil {
-
 		// If httpresponse is forbidden, then check if the role exists and delete it
 		if httpResp.StatusCode == http.StatusForbidden {
 			_, getRoleError := getAdminRole(ctx, r.client, &resp.Diagnostics, plan.Name.ValueString())
 			if getRoleError == nil {
 				deleteAdminRoleRequest := r.client.ApiClient.AdminAPIsDAAS.AdminDeleteAdminRole(ctx, plan.Name.ValueString())
-				citrixdaasclient.AddRequestData(deleteAdminRoleRequest, r.client).Execute()
+				_, err = citrixdaasclient.AddRequestData(deleteAdminRoleRequest, r.client).Execute()
+				if err != nil {
+					resp.Diagnostics.AddError(
+						"Error cleaning up Admin Role "+plan.Name.ValueString()+" after create failure",
+						"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+							"\nError message: "+util.ReadClientError(err),
+					)
+					return
+				}
 			}
 		}
 
@@ -172,7 +179,7 @@ func (r *adminRoleResource) Update(ctx context.Context, req resource.UpdateReque
 	body.SetDescription(plan.Description.ValueString())
 	body.SetCanLaunchManage(plan.CanLaunchManage.ValueBool())
 	body.SetCanLaunchMonitor(plan.CanLaunchMonitor.ValueBool())
-	body.SetPermissions(util.StringSetToStringArray(ctx, &diags, plan.Permissions))
+	body.SetPermissions(util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Permissions))
 
 	// Update admin role using orchestration call
 	updateAdminRoleRequest := r.client.ApiClient.AdminAPIsDAAS.AdminUpdateAdminRole(ctx, adminRoleId)

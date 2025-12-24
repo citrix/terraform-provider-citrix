@@ -1,9 +1,10 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package stf_webreceiver
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strconv"
 
@@ -369,7 +370,7 @@ func (UserInterface) GetSchema() schema.SingleNestedAttribute {
 			"app_shortcuts":          AppShortcuts{}.GetSchema(),
 			"ui_views":               UIViews{}.GetSchema(),
 			"category_view_collapsed": schema.BoolAttribute{
-				Description: "Collapse the category view so that only the immediate contents of the selected category/sub-catagory are displayed. Defaults to `false`.",
+				Description: "Collapse the category view so that only the immediate contents of the selected category/sub-category are displayed. Defaults to `false`.",
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
@@ -654,6 +655,9 @@ type STFWebReceiverResourceModel struct {
 	UserInterface           types.Object `tfsdk:"user_interface"`            // UserInterface
 	ResourcesService        types.Object `tfsdk:"resources_service"`         // ResourcesServiceModel
 	WebReceiverSiteStyle    types.Object `tfsdk:"web_receiver_site_style"`   // WebReceiverSiteStyle
+	DiscoveryService        types.Object `tfsdk:"discovery_service"`         // DiscoveryService
+	AppProtection           types.Bool   `tfsdk:"app_protection"`            // AppProtection
+	BlockingNotification    types.Object `tfsdk:"blocking_notification"`     // BlockingNotification
 }
 
 type ResourcesService struct {
@@ -701,6 +705,136 @@ func (ResourcesService) GetSchema() schema.SingleNestedAttribute {
 
 func (ResourcesService) GetAttributes() map[string]schema.Attribute {
 	return ResourcesService{}.GetSchema().Attributes
+}
+
+type DiscoveryService struct {
+	RunDiscoveryAtStart types.Bool `tfsdk:"run_discovery_at_start"`
+}
+
+func (DiscoveryService) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "Discovery Service settings for the WebReceiver.",
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			"run_discovery_at_start": schema.BoolAttribute{
+				Description: "Whether to run the Discovery Service at start. Defaults to `true`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(true),
+			},
+		},
+	}
+}
+
+func (DiscoveryService) GetAttributes() map[string]schema.Attribute {
+	return DiscoveryService{}.GetSchema().Attributes
+}
+
+type BlockingNotification struct {
+	Enabled   types.Bool   `tfsdk:"enabled"`
+	Title     types.String `tfsdk:"title"`
+	Body      types.String `tfsdk:"body"`
+	Button    types.String `tfsdk:"button"`
+	Frequency types.String `tfsdk:"frequency"`
+}
+
+func (BlockingNotification) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "Blocking Notification settings for the WebReceiver.",
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			"enabled": schema.BoolAttribute{
+				Description: "Whether to enable Blocking Notification. Defaults to `false`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+			"title": schema.StringAttribute{
+				Description: "Title of the Blocking Notification.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"body": schema.StringAttribute{
+				Description: "Body text of the Blocking Notification.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"button": schema.StringAttribute{
+				Description: "Text for the action button of the Blocking Notification.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+			},
+			"frequency": schema.StringAttribute{
+				Description: "Frequency of displaying the Blocking Notification. Available values are `FirstLogin`, `EveryDay`, `Every7Days`, and `Every30Days`. Defaults to `FirstLogin`",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("FirstLogin"),
+				Validators: []validator.String{
+					stringvalidator.OneOf("FirstLogin", "EveryDay", "Every7Days", "Every30Days"),
+				},
+			},
+		},
+	}
+}
+
+func (BlockingNotification) GetAttributes() map[string]schema.Attribute {
+	return BlockingNotification{}.GetSchema().Attributes
+}
+
+func (r *STFWebReceiverResourceModel) RefreshDiscoveryService(ctx context.Context, diagnostics *diag.Diagnostics, discoveryService *citrixstorefront.STFWebReceiverDiscoveryServiceResponseModel) {
+	refreshedDiscoveryService := DiscoveryService{}
+	refreshedDiscoveryService.RunDiscoveryAtStart = types.BoolValue(*discoveryService.RunDiscoveryAtStart.Get())
+	refreshedDiscoveryServiceObject := util.TypedObjectToObjectValue(ctx, diagnostics, refreshedDiscoveryService)
+	r.DiscoveryService = refreshedDiscoveryServiceObject
+}
+
+func (r *STFWebReceiverResourceModel) RefreshAppProtection(ctx context.Context, diagnostics *diag.Diagnostics, appProtection *citrixstorefront.GetWebReceiverAppProtectionResponseModel) {
+	switch appProtection.Enabled {
+	case 1:
+		r.AppProtection = types.BoolValue(false)
+	case 2:
+		r.AppProtection = types.BoolValue(true)
+	default:
+		// Throw an error if the value is unexpected
+		diagnostics.AddError(
+			"App Protection Refresh Error",
+			fmt.Sprintf("Received unexpected value for App Protection Enabled: %d", appProtection.Enabled),
+		)
+	}
+}
+
+func (r *STFWebReceiverResourceModel) RefreshBlockingNotification(ctx context.Context, diagnostics *diag.Diagnostics, blockingNotification *citrixstorefront.STFWebReceiverBlockingNotificationResponse) {
+	refreshedBlockingNotification := util.ObjectValueToTypedObject[BlockingNotification](ctx, diagnostics, r.BlockingNotification)
+	refreshedBlockingNotification.Enabled = types.BoolValue(*blockingNotification.Enabled.Get())
+	refreshedBlockingNotification.Title = types.StringValue(*blockingNotification.Title.Get())
+	refreshedBlockingNotification.Body = types.StringValue(*blockingNotification.Body.Get())
+	refreshedBlockingNotification.Button = types.StringValue(*blockingNotification.Button.Get())
+
+	switch blockingNotification.Frequency {
+	case 0:
+		refreshedBlockingNotification.Frequency = types.StringValue("FirstLogin")
+	case 1:
+		refreshedBlockingNotification.Frequency = types.StringValue("EveryDay")
+	case 2:
+		refreshedBlockingNotification.Frequency = types.StringValue("Every7Days")
+	case 3:
+		refreshedBlockingNotification.Frequency = types.StringValue("Every30Days")
+	default:
+		// Throw an error if the value is unexpected
+		diagnostics.AddError(
+			"Blocking Notification Refresh Error",
+			fmt.Sprintf("Received unexpected value for Blocking Notification Frequency: %d", blockingNotification.Frequency),
+		)
+	}
+
+	refreshedBlockingNotificationObject := util.TypedObjectToObjectValue(ctx, diagnostics, refreshedBlockingNotification)
+	r.BlockingNotification = refreshedBlockingNotificationObject
 }
 
 func (r *STFWebReceiverResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, webreceiver *citrixstorefront.STFWebReceiverDetailModel) {
@@ -753,16 +887,25 @@ func (r *STFWebReceiverResourceModel) RefreshCommunication(ctx context.Context, 
 	refreshedCommunicationObject := util.TypedObjectToObjectValue(ctx, diagnostics, refreshedCommunication)
 
 	r.Communication = refreshedCommunicationObject
-
 }
 
 func (r *STFWebReceiverResourceModel) RefreshWebReceiverSiteStyle(ctx context.Context, diagnostics *diag.Diagnostics, ss *citrixstorefront.STFWebReceiverSiteStyleResponseModel) {
 	refreshedSiteStyle := WebReceiverSiteStyle{}
-	refreshedSiteStyle.HeaderBackgroundColor = types.StringValue(*ss.HeaderBackgroundColor.Get())
-	refreshedSiteStyle.HeaderForegroundColor = types.StringValue(*ss.HeaderForegroundColor.Get())
-	refreshedSiteStyle.HeaderLogoPath = types.StringValue(*ss.HeaderLogoPath.Get())
-	refreshedSiteStyle.LogonLogoPath = types.StringValue(*ss.LogonLogoPath.Get())
-	refreshedSiteStyle.LinkColor = types.StringValue(*ss.LinkColor.Get())
+	if ss.HeaderBackgroundColor.IsSet() {
+		refreshedSiteStyle.HeaderBackgroundColor = types.StringValue(*ss.HeaderBackgroundColor.Get())
+	}
+	if ss.HeaderForegroundColor.IsSet() {
+		refreshedSiteStyle.HeaderForegroundColor = types.StringValue(*ss.HeaderForegroundColor.Get())
+	}
+	if ss.HeaderLogoPath.IsSet() {
+		refreshedSiteStyle.HeaderLogoPath = types.StringValue(*ss.HeaderLogoPath.Get())
+	}
+	if ss.LogonLogoPath.IsSet() {
+		refreshedSiteStyle.LogonLogoPath = types.StringValue(*ss.LogonLogoPath.Get())
+	}
+	if ss.LinkColor.IsSet() {
+		refreshedSiteStyle.LinkColor = types.StringValue(*ss.LinkColor.Get())
+	}
 	refreshedSiteStyleObject := util.TypedObjectToObjectValue(ctx, diagnostics, refreshedSiteStyle)
 	r.WebReceiverSiteStyle = refreshedSiteStyleObject
 }
@@ -1016,6 +1159,14 @@ func (STFWebReceiverResourceModel) GetSchema() schema.Schema {
 			"user_interface":            UserInterface{}.GetSchema(),
 			"resources_service":         ResourcesService{}.GetSchema(),
 			"web_receiver_site_style":   WebReceiverSiteStyle{}.GetSchema(),
+			"discovery_service":         DiscoveryService{}.GetSchema(),
+			"app_protection": schema.BoolAttribute{
+				Description: "Enable App Protection.  Defaults to `false`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+			"blocking_notification": BlockingNotification{}.GetSchema(),
 		},
 	}
 }

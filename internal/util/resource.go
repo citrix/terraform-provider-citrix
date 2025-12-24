@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package util
 
@@ -56,7 +56,11 @@ func GetHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.Cit
 }
 
 func GetMachineCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, machineCatalogId string, addErrorToDiagnostics bool) (*citrixorchestration.MachineCatalogDetailResponseModel, error) {
-	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId).Fields("Id,Name,Description,ProvisioningType,PersistChanges,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC,Metadata,Scopes,UpgradeInfo,AdminFolder")
+	return GetMachineCatalogWithFieldsOverride(ctx, client, diagnostics, machineCatalogId, addErrorToDiagnostics, "Id,Name,Description,ProvisioningType,PersistChanges,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC,Metadata,Scopes,UpgradeInfo,AdminFolder")
+}
+
+func GetMachineCatalogWithFieldsOverride(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, machineCatalogId string, addErrorToDiagnostics bool, fields string) (*citrixorchestration.MachineCatalogDetailResponseModel, error) {
+	getMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogId).Fields(fields)
 	catalog, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.MachineCatalogDetailResponseModel](getMachineCatalogRequest, client)
 	if err != nil && addErrorToDiagnostics {
 		diagnostics.AddError(
@@ -434,10 +438,10 @@ func GetAllResourcePathList(ctx context.Context, client *citrixdaasclient.Citrix
 	return result
 }
 
-func GetFilteredResourcePathListWithNoCacheRetry(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId, folderPath, resourceType string, filter []string, connectionType citrixorchestration.HypervisorConnectionType, pluginId string) ([]string, error) {
-	resource, err := getFilteredResourcePathList(ctx, client, diagnostics, hypervisorId, folderPath, resourceType, filter, connectionType, pluginId, false, false)
+func GetFilteredResourcePathListWithNoCacheRetry(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId, folderPath, resourceType string, filter []string, connectionType citrixorchestration.HypervisorConnectionType, pluginId string, isFilterCaseSensitive bool) ([]string, error) {
+	resource, err := getFilteredResourcePathList(ctx, client, diagnostics, hypervisorId, folderPath, resourceType, filter, connectionType, pluginId, false, false, isFilterCaseSensitive)
 	if err != nil {
-		resource, err = getFilteredResourcePathList(ctx, client, diagnostics, hypervisorId, folderPath, resourceType, filter, connectionType, pluginId, true, true)
+		resource, err = getFilteredResourcePathList(ctx, client, diagnostics, hypervisorId, folderPath, resourceType, filter, connectionType, pluginId, true, true, isFilterCaseSensitive)
 		if err != nil {
 			return nil, err
 		}
@@ -445,7 +449,7 @@ func GetFilteredResourcePathListWithNoCacheRetry(ctx context.Context, client *ci
 	return resource, nil
 }
 
-func getFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId, folderPath, resourceType string, filter []string, connectionType citrixorchestration.HypervisorConnectionType, pluginId string, addToDiagnostics bool, noCache bool) ([]string, error) {
+func getFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId, folderPath, resourceType string, filter []string, connectionType citrixorchestration.HypervisorConnectionType, pluginId string, addToDiagnostics bool, noCache bool, isFilterCaseSensitive bool) ([]string, error) {
 	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorAllResources(ctx, hypervisorId)
 	req = req.Children(1)
 	req = req.Path(folderPath)
@@ -473,10 +477,12 @@ func getFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.C
 
 	result := []string{}
 	if filter != nil {
-
 		filterMap := map[string]bool{}
 		for _, f := range filter {
-			filterMap[strings.ToLower(f)] = false
+			if !isFilterCaseSensitive {
+				f = strings.ToLower(f)
+			}
+			filterMap[f] = false
 		}
 
 		for _, child := range resources.Children {
@@ -509,7 +515,6 @@ func getFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.C
 		if len(resourcesNotFound) > 0 {
 			return nil, fmt.Errorf("the following resources were not found: %v", resourcesNotFound)
 		}
-
 	} else {
 		//when the filter is empty
 		for _, child := range resources.Children {
@@ -588,17 +593,18 @@ func IsScopeInherited(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 			object := scopedObject.GetObject()
 			objectId := object.GetId()
 			// For the ScopedObjects API, the id attribute of Machine Catalog, Delivery Group, and Application Group responses use UID instead of GUID
-			if parentObjectType == citrixorchestration.SCOPEDOBJECTTYPE_MACHINE_CATALOG {
+			switch parentObjectType { //nolint:exhaustive // Hypervisor, Tag, Policy, Service Account uses GetId()
+			case citrixorchestration.SCOPEDOBJECTTYPE_MACHINE_CATALOG:
 				objectId, err = GetMachineCatalogIdWithPath(ctx, client, diagnostics, strings.ReplaceAll(object.GetName(), "\\", "|"))
 				if err != nil {
 					return false, err
 				}
-			} else if parentObjectType == citrixorchestration.SCOPEDOBJECTTYPE_DELIVERY_GROUP {
+			case citrixorchestration.SCOPEDOBJECTTYPE_DELIVERY_GROUP:
 				objectId, err = GetDeliveryGroupIdWithPath(ctx, client, diagnostics, strings.ReplaceAll(object.GetName(), "\\", "|"))
 				if err != nil {
 					return false, err
 				}
-			} else if parentObjectType == citrixorchestration.SCOPEDOBJECTTYPE_APPLICATION_GROUP {
+			case citrixorchestration.SCOPEDOBJECTTYPE_APPLICATION_GROUP:
 				objectId, err = GetApplicationGroupIdWithPath(ctx, client, diagnostics, strings.ReplaceAll(object.GetName(), "\\", "|"))
 				if err != nil {
 					return false, err
@@ -640,4 +646,27 @@ func BuildResourcePathForGetRequest(resourcePathInput string, resourceName strin
 	} else {
 		return resourceName
 	}
+}
+
+func MoveItemsToZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, zoneId string, items []citrixorchestration.ZonedItemRequestModel) error {
+	moveItemRequest := client.ApiClient.ZonesAPIsDAAS.ZonesMoveItemsIntoZone(ctx, zoneId)
+	moveItemRequest = moveItemRequest.ZonedItemsRequestModel(citrixorchestration.ZonedItemsRequestModel{
+		Items: items,
+	})
+	itemIds := []string{}
+	for _, item := range items {
+		itemIds = append(itemIds, item.Id)
+	}
+	errorMessage := fmt.Sprintf("Error moving resource [%s] to zone %s", strings.Join(itemIds, ","), zoneId)
+	httpResp, err := citrixdaasclient.AddRequestData(moveItemRequest, client).Async(true).Execute()
+	if err != nil {
+		diagnostics.AddError(
+			errorMessage,
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+ReadClientError(err),
+		)
+	}
+
+	err = ProcessAsyncJobResponse(ctx, client, httpResp, errorMessage, diagnostics, 5)
+	return err
 }

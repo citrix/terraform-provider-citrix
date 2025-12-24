@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package wem_configuration_set
 
@@ -16,7 +16,7 @@ import (
 func readConfigurationSet(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, wemResource WemSiteResourceModel) (*citrixwemservice.SiteModel, error) {
 	idInt64, err := strconv.ParseInt(wemResource.Id.ValueString(), 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("invalid id: %v", err)
+		return nil, fmt.Errorf("invalid id: %w", err)
 	}
 	siteGetRequest := client.WemClient.SiteDAAS.SiteQueryById(ctx, idInt64)
 	siteGetResponse, _, err := util.ReadResource[*citrixwemservice.SiteModel](siteGetRequest, ctx, client, resp, "Configuration Set", wemResource.Name.ValueString())
@@ -49,7 +49,7 @@ func getSiteByName(ctx context.Context, client *citrixdaasclient.CitrixDaasClien
 func getSiteById(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, wemResource WemSiteResourceModel) (*citrixwemservice.SiteModel, error) {
 	idInt64, err := strconv.ParseInt(wemResource.Id.ValueString(), 10, 64)
 	if err != nil {
-		return &citrixwemservice.SiteModel{}, fmt.Errorf("invalid id: %v", err)
+		return &citrixwemservice.SiteModel{}, fmt.Errorf("invalid id: %w", err)
 	}
 	siteGetRequest := client.WemClient.SiteDAAS.SiteQueryById(ctx, idInt64)
 	siteGetResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixwemservice.SiteModel](siteGetRequest, client)

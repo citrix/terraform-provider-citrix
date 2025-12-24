@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package cma_image
 
 import (
@@ -49,7 +50,7 @@ func (r *citrixManagedAzureImageResource) Configure(_ context.Context, req resou
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Create is the implementation of the Create method in the resource.ResourceWithValidateConfig interface.
@@ -351,11 +352,7 @@ func waitForImageImportCompletion(ctx context.Context, client *citrixdaasclient.
 	imageId := imageResp.GetId()
 
 	var image *citrixquickdeploy.TemplateImageDetails
-	for {
-		if time.Since(startTime) > time.Minute*time.Duration(120) {
-			break
-		}
-
+	for time.Since(startTime) <= time.Minute*time.Duration(120) {
 		// Sleep ahead of getting the image to account for the time of resource group creation
 		time.Sleep(time.Second * time.Duration(30))
 

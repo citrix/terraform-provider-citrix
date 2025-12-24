@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package hypervisor_resource_pool
 
@@ -102,7 +102,7 @@ func (r *openshiftHypervisorResourcePoolResource) Configure(_ context.Context, r
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 func (r *openshiftHypervisorResourcePoolResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -286,7 +286,6 @@ func (r *openshiftHypervisorResourcePoolResource) Update(ctx context.Context, re
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 func (r *openshiftHypervisorResourcePoolResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -347,7 +346,6 @@ func (r *openshiftHypervisorResourcePoolResource) ImportState(ctx context.Contex
 		"Error importing Hypervisor Resource Pool",
 		fmt.Sprintf("Hypervisor Resource Pool with ID %q not found", req.ID),
 	)
-
 }
 
 func (r *openshiftHypervisorResourcePoolResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -389,7 +387,7 @@ func (plan OpenShiftHypervisorResourcePoolResourceModel) GetNamespace(ctx contex
 
 	namespaceFromPlan := []string{plan.Namespace.ValueString()}
 
-	namespaces, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, "", util.NamespaceResourceType, namespaceFromPlan, hypervisorConnectionType, hypervisor.GetPluginId())
+	namespaces, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, "", util.NamespaceResourceType, namespaceFromPlan, hypervisorConnectionType, hypervisor.GetPluginId(), false)
 	if len(namespaces) == 0 {
 		errDetail := "No namespaces found for the given namespace value"
 		if err != nil {
@@ -422,7 +420,7 @@ func (plan OpenShiftHypervisorResourcePoolResourceModel) GetStorageList(ctx cont
 	hypervisorId := hypervisor.GetId()
 	hypervisorConnectionType := hypervisor.GetConnectionType()
 	folderPath := fmt.Sprintf("%s\\%s.namespace", hypervisor.GetXDPath(), plan.Namespace.ValueString())
-	storages, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, folderPath, util.StorageResourceType, storageNames, hypervisorConnectionType, hypervisor.GetPluginId())
+	storages, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, folderPath, util.StorageResourceType, storageNames, hypervisorConnectionType, hypervisor.GetPluginId(), false)
 
 	if len(storage) > 0 && len(storages) == 0 {
 		errDetail := "No storage found for the given storage names"
@@ -444,7 +442,7 @@ func (plan OpenShiftHypervisorResourcePoolResourceModel) GetStorageList(ctx cont
 		}
 	}
 	tempStorageNames := util.ConvertBaseStringArrayToPrimitiveStringArray(tempStorage)
-	tempStorages, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, folderPath, util.StorageResourceType, tempStorageNames, hypervisorConnectionType, hypervisor.GetPluginId())
+	tempStorages, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, folderPath, util.StorageResourceType, tempStorageNames, hypervisorConnectionType, hypervisor.GetPluginId(), false)
 	if len(tempStorage) > 0 && len(tempStorages) == 0 {
 		errDetail := "No storage found for the given temporary storage names"
 		if err != nil {
@@ -471,7 +469,7 @@ func (plan OpenShiftHypervisorResourcePoolResourceModel) GetNetworksList(ctx con
 	folderPath := fmt.Sprintf("%s.namespace", plan.Namespace.ValueString())
 
 	networkNames := util.StringListToStringArray(ctx, diags, plan.Networks)
-	networks, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, folderPath, util.NetworkResourceType, networkNames, hypervisorConnectionType, hypervisor.GetPluginId())
+	networks, err := util.GetFilteredResourcePathListWithNoCacheRetry(ctx, client, diags, hypervisorId, folderPath, util.NetworkResourceType, networkNames, hypervisorConnectionType, hypervisor.GetPluginId(), false)
 	if len(networks) == 0 {
 		errDetail := "No network found for the given network names"
 		if err != nil {

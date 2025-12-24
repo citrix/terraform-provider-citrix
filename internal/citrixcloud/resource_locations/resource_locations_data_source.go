@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package resource_locations
 
@@ -6,7 +6,6 @@ import (
 	"context"
 	"strings"
 
-	ccresourcelocations "github.com/citrix/citrix-daas-rest-go/ccresourcelocations"
 	resourcelocations "github.com/citrix/citrix-daas-rest-go/ccresourcelocations"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
@@ -43,7 +42,7 @@ func (d *ResourceLocationsDataSource) Configure(ctx context.Context, req datasou
 		return
 	}
 
-	d.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	d.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 func (d *ResourceLocationsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -74,7 +73,7 @@ func (d *ResourceLocationsDataSource) Read(ctx context.Context, req datasource.R
 		)
 	}
 
-	var matchedResourceLocation *ccresourcelocations.CitrixCloudServicesRegistryApiModelsLocationsResourceLocationModel
+	var matchedResourceLocation *resourcelocations.CitrixCloudServicesRegistryApiModelsLocationsResourceLocationModel
 	// Refresh data with the latest state
 	for _, rl := range resourceLocation.Items {
 		if strings.EqualFold(rl.GetName(), data.Name.ValueString()) {

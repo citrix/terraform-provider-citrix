@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package application
 
@@ -48,7 +48,7 @@ func (r *applicationGroupResource) Configure(_ context.Context, req resource.Con
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Schema defines the schema for the resource.
@@ -143,10 +143,8 @@ func (r *applicationGroupResource) Create(ctx context.Context, req resource.Crea
 			)
 		}
 
-		err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error disabling Application Group "+plan.Name.ValueString(), &resp.Diagnostics, 5)
-		if err != nil {
-			// We have the errors logged. Continue so that the resource is marked as tainted.
-		}
+		//nolint:errcheck // Errors added to diagnostics, continue so resource gets marked as tainted
+		_ = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error disabling Application Group "+plan.Name.ValueString(), &resp.Diagnostics, 5)
 	}
 
 	// Update application group tags
@@ -434,7 +432,10 @@ func (r *applicationGroupResource) ModifyPlan(ctx context.Context, req resource.
 	}
 
 	if !plan.DeliveryGroups.IsUnknown() {
-		validateAndReturnDeliveryGroups(ctx, r.client, &resp.Diagnostics, plan)
+		_, err := validateAndReturnDeliveryGroups(ctx, r.client, &resp.Diagnostics, plan)
+		if err != nil {
+			return // error added to diagnostics
+		}
 	}
 }
 
@@ -465,7 +466,6 @@ func getApplicationGroupTags(ctx context.Context, diagnostics *diag.Diagnostics,
 func validateAndReturnDeliveryGroups(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, plan ApplicationGroupResourceModel) ([]citrixorchestration.PriorityRefRequestModel, error) {
 	var deliveryGroups []citrixorchestration.PriorityRefRequestModel
 	for _, value := range util.StringSetToStringArray(ctx, diagnostics, plan.DeliveryGroups) {
-
 		if value == "" {
 			continue
 		}

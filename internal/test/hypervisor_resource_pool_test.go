@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package test
 
@@ -956,7 +956,7 @@ func hypervisorResourcePoolSweeper(ctx context.Context, hypervisorName string, r
 			// Resource does not exist in remote, no need to delete
 			return nil
 		}
-		return fmt.Errorf("Error getting resource pool: %s", err)
+		return fmt.Errorf("Error getting resource pool: %w", err)
 	}
 	deleteResourcePoolRequest := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsDeleteHypervisorResourcePool(ctx, hypervisorName, resourcePool.GetId())
 	httpResp, err = citrixclient.AddRequestData(deleteResourcePoolRequest, client).Execute()

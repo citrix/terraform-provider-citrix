@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package global_app_configuration
 
@@ -711,7 +711,6 @@ func (MacosSettings) GetAttributes() map[string]schema.Attribute {
 }
 
 func (r GACSettingsResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, settingsRecordModel globalappconfiguration.SettingsRecordModel) GACSettingsResourceModel {
-
 	var serviceUrlModel = settingsRecordModel.GetServiceURL()
 	r.ServiceUrl = types.StringValue(serviceUrlModel.GetUrl())
 
@@ -789,7 +788,6 @@ func (r GACSettingsResourceModel) getWindowsSettings(ctx context.Context, diagno
 		})
 
 		remoteWindowsSetting.IsVisited = true
-
 	}
 
 	// Add the windows settings from remote which are not present in the state
@@ -845,7 +843,6 @@ func (r GACSettingsResourceModel) getLinuxSettings(ctx context.Context, diagnost
 		})
 
 		remoteLinuxSetting.IsVisited = true
-
 	}
 
 	// Add the linux settings from remote which are not present in the state
@@ -901,7 +898,6 @@ func (r GACSettingsResourceModel) getIosSettings(ctx context.Context, diagnostic
 		})
 
 		remoteIosSetting.IsVisited = true
-
 	}
 
 	// Add the ios settings from remote which are not present in the state
@@ -957,7 +953,6 @@ func (r GACSettingsResourceModel) getAndroidSettings(ctx context.Context, diagno
 		})
 
 		remoteAndroidSetting.IsVisited = true
-
 	}
 
 	// Add the android settings from remote which are not present in the state
@@ -1013,7 +1008,6 @@ func (r GACSettingsResourceModel) getHtml5Settings(ctx context.Context, diagnost
 		})
 
 		remoteHtml5Setting.IsVisited = true
-
 	}
 
 	// Add the html5 settings from remote which are not present in the state
@@ -1069,7 +1063,6 @@ func (r GACSettingsResourceModel) getChromeosSettings(ctx context.Context, diagn
 		})
 
 		remoteChromeosSetting.IsVisited = true
-
 	}
 
 	// Add the chromeos settings from remote which are not present in the state
@@ -1125,7 +1118,6 @@ func (r GACSettingsResourceModel) getMacosSettings(ctx context.Context, diagnost
 		})
 
 		remoteMacosSetting.IsVisited = true
-
 	}
 
 	// Add the macos settings from remote which are not present in the state
@@ -1153,7 +1145,11 @@ func parseWindowsSettings(ctx context.Context, diagnostics *diag.Diagnostics, re
 		valueType := reflect.TypeOf(remoteWindowsSetting.GetValue())
 		switch valueType.Kind() {
 		case reflect.String:
-			windowsSetting.ValueString = types.StringValue(remoteWindowsSetting.GetValue().(string))
+			if strVal, ok := remoteWindowsSetting.GetValue().(string); ok {
+				windowsSetting.ValueString = types.StringValue(strVal)
+			} else {
+				errMsg = "failed to convert value to string"
+			}
 		case reflect.Slice:
 			localAppAllowList := GACSettingsUpdate[LocalAppAllowListModel, LocalAppAllowListModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
 			if localAppAllowList != nil {
@@ -1179,9 +1175,17 @@ func parseWindowsSettings(ctx context.Context, diagnostics *diag.Diagnostics, re
 				break
 			}
 
-			windowsSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteWindowsSetting.Value.([]interface{}))
+			if sliceVal, ok := remoteWindowsSetting.Value.([]interface{}); ok {
+				windowsSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, sliceVal)
+			} else {
+				errMsg = "failed to convert value to []interface{}"
+			}
 		case reflect.Map:
-			v := remoteWindowsSetting.Value.(map[string]interface{})
+			v, ok := remoteWindowsSetting.Value.(map[string]interface{})
+			if !ok {
+				errMsg = "failed to convert value to map[string]interface{}"
+				break
+			}
 			elementJSON, err := json.Marshal(v)
 			if err != nil {
 				errMsg = fmt.Sprintf("Error marshaling element to CitrixEnterpriseBrowserModel: %v", err)
@@ -1194,7 +1198,11 @@ func parseWindowsSettings(ctx context.Context, diagnostics *diag.Diagnostics, re
 			}
 			var browserModel CitrixEnterpriseBrowserModel
 			browserModel.CitrixEnterpriseBrowserSSOEnabled = types.BoolValue(app.CitrixEnterpriseBrowserSSOEnabled)
-			browserModel.CitrixEnterpriseBrowserSSODomains, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, v["CitrixEnterpriseBrowserSSODomains"].([]interface{}))
+			if domainsVal, ok := v["CitrixEnterpriseBrowserSSODomains"].([]interface{}); ok {
+				browserModel.CitrixEnterpriseBrowserSSODomains, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, domainsVal)
+			} else {
+				errMsg = "failed to convert CitrixEnterpriseBrowserSSODomains to []interface{}"
+			}
 			windowsSetting.EnterpriseBroswerSSO = util.TypedObjectToObjectValue(ctx, diagnostics, browserModel)
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for windows setting value: %v", valueType.Kind())
@@ -1223,7 +1231,11 @@ func parseLinuxSettings(ctx context.Context, diagnostics *diag.Diagnostics, remo
 		valueType := reflect.TypeOf(remoteLinuxSetting.GetValue())
 		switch valueType.Kind() {
 		case reflect.String:
-			linuxSetting.ValueString = types.StringValue(remoteLinuxSetting.GetValue().(string))
+			if strVal, ok := remoteLinuxSetting.GetValue().(string); ok {
+				linuxSetting.ValueString = types.StringValue(strVal)
+			} else {
+				errMsg = "failed to convert value to string"
+			}
 		case reflect.Slice:
 			extentionInstallAllowList := GACSettingsUpdate[ExtensionInstallAllowListModel, ExtensionInstallAllowListModel_Go](ctx, diagnostics, remoteLinuxSetting.Value)
 			if extentionInstallAllowList != nil {
@@ -1243,7 +1255,11 @@ func parseLinuxSettings(ctx context.Context, diagnostics *diag.Diagnostics, remo
 				break
 			}
 
-			linuxSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteLinuxSetting.Value.([]interface{}))
+			if sliceVal, ok := remoteLinuxSetting.Value.([]interface{}); ok {
+				linuxSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, sliceVal)
+			} else {
+				errMsg = "failed to convert value to []interface{}"
+			}
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for linux setting value: %v", valueType.Kind())
 		}
@@ -1270,7 +1286,11 @@ func parseIosSettings(ctx context.Context, diagnostics *diag.Diagnostics, remote
 		valueType := reflect.TypeOf(remoteIosSetting.GetValue())
 		switch valueType.Kind() {
 		case reflect.String:
-			iosSetting.ValueString = types.StringValue(remoteIosSetting.GetValue().(string))
+			if strVal, ok := remoteIosSetting.GetValue().(string); ok {
+				iosSetting.ValueString = types.StringValue(strVal)
+			} else {
+				errMsg = "failed to convert value to string"
+			}
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for ios setting value: %v", valueType.Kind())
 		}
@@ -1298,9 +1318,17 @@ func parseAndroidSettings(ctx context.Context, diagnostics *diag.Diagnostics, re
 		valueType := reflect.TypeOf(remoteAndroidSetting.GetValue())
 		switch valueType.Kind() {
 		case reflect.String:
-			androidSetting.ValueString = types.StringValue(remoteAndroidSetting.GetValue().(string))
+			if strVal, ok := remoteAndroidSetting.GetValue().(string); ok {
+				androidSetting.ValueString = types.StringValue(strVal)
+			} else {
+				errMsg = "failed to convert value to string"
+			}
 		case reflect.Slice:
-			androidSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteAndroidSetting.Value.([]interface{}))
+			if sliceVal, ok := remoteAndroidSetting.Value.([]interface{}); ok {
+				androidSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, sliceVal)
+			} else {
+				errMsg = "failed to convert value to []interface{}"
+			}
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for android setting value: %v", valueType.Kind())
 		}
@@ -1328,9 +1356,17 @@ func parseHtml5Settings(ctx context.Context, diagnostics *diag.Diagnostics, remo
 		valueType := reflect.TypeOf(remoteHtml5Setting.GetValue())
 		switch valueType.Kind() {
 		case reflect.String:
-			html5Setting.ValueString = types.StringValue(remoteHtml5Setting.GetValue().(string))
+			if strVal, ok := remoteHtml5Setting.GetValue().(string); ok {
+				html5Setting.ValueString = types.StringValue(strVal)
+			} else {
+				errMsg = "failed to convert value to string"
+			}
 		case reflect.Slice:
-			html5Setting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteHtml5Setting.Value.([]interface{}))
+			if sliceVal, ok := remoteHtml5Setting.Value.([]interface{}); ok {
+				html5Setting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, sliceVal)
+			} else {
+				errMsg = "failed to convert value to []interface{}"
+			}
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for html5 setting value: %v", valueType.Kind())
 		}
@@ -1358,7 +1394,11 @@ func parseMacosSettings(ctx context.Context, diagnostics *diag.Diagnostics, remo
 		valueType := reflect.TypeOf(remoteMacosSetting.GetValue())
 		switch valueType.Kind() {
 		case reflect.String:
-			macosSetting.ValueString = types.StringValue(remoteMacosSetting.GetValue().(string))
+			if strVal, ok := remoteMacosSetting.GetValue().(string); ok {
+				macosSetting.ValueString = types.StringValue(strVal)
+			} else {
+				errMsg = "failed to convert value to string"
+			}
 		case reflect.Slice:
 			// Check if the value is of type LocalAppAllowList
 			autoLaunchProtocolsList := GACSettingsUpdate[AutoLaunchProtocolsFromOriginsModel, AutoLaunchProtocolsFromOriginsModel_Go](ctx, diagnostics, remoteMacosSetting.Value)
@@ -1380,10 +1420,20 @@ func parseMacosSettings(ctx context.Context, diagnostics *diag.Diagnostics, remo
 				break
 			}
 
-			macosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteMacosSetting.Value.([]interface{}))
+			if sliceVal, ok := remoteMacosSetting.Value.([]interface{}); ok {
+				macosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, sliceVal)
+			} else {
+				errMsg = "failed to convert value to []interface{}"
+			}
 
 		case reflect.Map:
-			v := remoteMacosSetting.Value.(map[string]interface{})
+			v, ok := remoteMacosSetting.Value.(map[string]interface{})
+
+			if !ok {
+				errMsg = "failed to convert value to map[string]interface{}"
+
+				break
+			}
 			elementJSON, err := json.Marshal(v)
 			if err != nil {
 				errMsg = fmt.Sprintf("Error marshaling element to CitrixEnterpriseBrowserModel: %v", err)
@@ -1396,7 +1446,11 @@ func parseMacosSettings(ctx context.Context, diagnostics *diag.Diagnostics, remo
 			}
 			var browserModel CitrixEnterpriseBrowserModel
 			browserModel.CitrixEnterpriseBrowserSSOEnabled = types.BoolValue(app.CitrixEnterpriseBrowserSSOEnabled)
-			browserModel.CitrixEnterpriseBrowserSSODomains, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, v["CitrixEnterpriseBrowserSSODomains"].([]interface{}))
+			if domainsVal, ok := v["CitrixEnterpriseBrowserSSODomains"].([]interface{}); ok {
+				browserModel.CitrixEnterpriseBrowserSSODomains, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, domainsVal)
+			} else {
+				errMsg = "failed to convert CitrixEnterpriseBrowserSSODomains to []interface{}"
+			}
 			macosSetting.EnterpriseBroswerSSO = util.TypedObjectToObjectValue(ctx, diagnostics, browserModel)
 
 		default:
@@ -1426,9 +1480,17 @@ func parseChromeosSettings(ctx context.Context, diagnostics *diag.Diagnostics, r
 		valueType := reflect.TypeOf(remoteChromeosSetting.GetValue())
 		switch valueType.Kind() {
 		case reflect.String:
-			chromeosSetting.ValueString = types.StringValue(remoteChromeosSetting.GetValue().(string))
+			if strVal, ok := remoteChromeosSetting.GetValue().(string); ok {
+				chromeosSetting.ValueString = types.StringValue(strVal)
+			} else {
+				errMsg = "failed to convert value to string"
+			}
 		case reflect.Slice:
-			chromeosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteChromeosSetting.Value.([]interface{}))
+			if sliceVal, ok := remoteChromeosSetting.Value.([]interface{}); ok {
+				chromeosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, sliceVal)
+			} else {
+				errMsg = "failed to convert value to []interface{}"
+			}
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for chrome os setting value: %v", valueType.Kind())
 		}
@@ -1446,7 +1508,6 @@ func parseChromeosSettings(ctx context.Context, diagnostics *diag.Diagnostics, r
 }
 
 func getWindowsCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, windowsSettings types.Set, remoteWindowsSettings []globalappconfiguration.CategorySettings) types.Set {
-
 	var windowsSettingsForState []WindowsSettings
 	var errMsg string
 
@@ -1481,7 +1542,11 @@ func getWindowsCategorySettings(ctx context.Context, diagnostics *diag.Diagnosti
 		valueType := reflect.TypeOf(remoteWindowsSetting.Value)
 		switch valueType.Kind() {
 		case reflect.String:
-			windowsSetting.ValueString = types.StringValue(remoteWindowsSetting.Value.(string))
+			if strVal, ok := remoteWindowsSetting.Value.(string); ok {
+				windowsSetting.ValueString = types.StringValue(strVal)
+			} else {
+				errMsg = "failed to convert value to string"
+			}
 		case reflect.Slice:
 			localAppAllowList := GACSettingsUpdate[LocalAppAllowListModel, LocalAppAllowListModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
 			if localAppAllowList != nil {
@@ -1507,10 +1572,20 @@ func getWindowsCategorySettings(ctx context.Context, diagnostics *diag.Diagnosti
 				break
 			}
 
-			windowsSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteWindowsSetting.Value.([]interface{}))
+			if sliceVal, ok := remoteWindowsSetting.Value.([]interface{}); ok {
+				windowsSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, sliceVal)
+			} else {
+				errMsg = "failed to convert value to []interface{}"
+			}
 
 		case reflect.Map:
-			v := remoteWindowsSetting.Value.(map[string]interface{})
+			v, ok := remoteWindowsSetting.Value.(map[string]interface{})
+
+			if !ok {
+				errMsg = "failed to convert value to map[string]interface{}"
+
+				break
+			}
 			elementJSON, err := json.Marshal(v)
 			if err != nil {
 				errMsg = fmt.Sprintf("Error marshaling element to CitrixEnterpriseBrowserModel: %v", err)
@@ -1523,7 +1598,11 @@ func getWindowsCategorySettings(ctx context.Context, diagnostics *diag.Diagnosti
 			}
 			var browserModel CitrixEnterpriseBrowserModel
 			browserModel.CitrixEnterpriseBrowserSSOEnabled = types.BoolValue(app.CitrixEnterpriseBrowserSSOEnabled)
-			browserModel.CitrixEnterpriseBrowserSSODomains, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, v["CitrixEnterpriseBrowserSSODomains"].([]interface{}))
+			if domainsVal, ok := v["CitrixEnterpriseBrowserSSODomains"].([]interface{}); ok {
+				browserModel.CitrixEnterpriseBrowserSSODomains, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, domainsVal)
+			} else {
+				errMsg = "failed to convert CitrixEnterpriseBrowserSSODomains to []interface{}"
+			}
 			windowsSetting.EnterpriseBroswerSSO = util.TypedObjectToObjectValue(ctx, diagnostics, browserModel)
 
 		default:
@@ -1550,7 +1629,13 @@ func getWindowsCategorySettings(ctx context.Context, diagnostics *diag.Diagnosti
 			valueType := reflect.TypeOf(remoteWindowsSetting.Value)
 			switch valueType.Kind() {
 			case reflect.String:
-				windowsSetting.ValueString = types.StringValue(remoteWindowsSetting.Value.(string))
+				if strVal, ok := remoteWindowsSetting.Value.(string); ok {
+					windowsSetting.ValueString = types.StringValue(strVal)
+				} else {
+					errMsg = "failed to convert value to string"
+
+					break
+				}
 			case reflect.Slice:
 				localAppAllowList := GACSettingsUpdate[LocalAppAllowListModel, LocalAppAllowListModel_Go](ctx, diagnostics, remoteWindowsSetting.Value)
 				if localAppAllowList != nil {
@@ -1576,9 +1661,19 @@ func getWindowsCategorySettings(ctx context.Context, diagnostics *diag.Diagnosti
 					break
 				}
 
-				windowsSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteWindowsSetting.Value.([]interface{}))
+				if sliceVal, ok := remoteWindowsSetting.Value.([]interface{}); ok {
+					windowsSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, sliceVal)
+				} else {
+					errMsg = "failed to convert value to []interface{}"
+				}
 			case reflect.Map:
-				v := remoteWindowsSetting.Value.(map[string]interface{})
+				v, ok := remoteWindowsSetting.Value.(map[string]interface{})
+
+				if !ok {
+					errMsg = "failed to convert value to map[string]interface{}"
+
+					break
+				}
 				elementJSON, err := json.Marshal(v)
 				if err != nil {
 					errMsg = fmt.Sprintf("Error marshaling element to CitrixEnterpriseBrowserModel: %v", err)
@@ -1591,7 +1686,11 @@ func getWindowsCategorySettings(ctx context.Context, diagnostics *diag.Diagnosti
 				}
 				var browserModel CitrixEnterpriseBrowserModel
 				browserModel.CitrixEnterpriseBrowserSSOEnabled = types.BoolValue(app.CitrixEnterpriseBrowserSSOEnabled)
-				browserModel.CitrixEnterpriseBrowserSSODomains, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, v["CitrixEnterpriseBrowserSSODomains"].([]interface{}))
+				if domainsVal, ok := v["CitrixEnterpriseBrowserSSODomains"].([]interface{}); ok {
+					browserModel.CitrixEnterpriseBrowserSSODomains, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, domainsVal)
+				} else {
+					errMsg = "failed to convert CitrixEnterpriseBrowserSSODomains to []interface{}"
+				}
 				windowsSetting.EnterpriseBroswerSSO = util.TypedObjectToObjectValue(ctx, diagnostics, browserModel)
 
 			default:
@@ -1612,7 +1711,6 @@ func getWindowsCategorySettings(ctx context.Context, diagnostics *diag.Diagnosti
 }
 
 func getLinuxCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, linuxSettings types.Set, remoteLinuxSettings []globalappconfiguration.CategorySettings) types.Set {
-
 	var linuxSettingsForState []LinuxSettings
 	var errMsg string
 
@@ -1647,7 +1745,11 @@ func getLinuxCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 		valueType := reflect.TypeOf(remoteLinuxSetting.Value)
 		switch valueType.Kind() {
 		case reflect.String:
-			linuxSetting.ValueString = types.StringValue(remoteLinuxSetting.Value.(string))
+			if strVal, ok := remoteLinuxSetting.Value.(string); ok {
+				linuxSetting.ValueString = types.StringValue(strVal)
+			} else {
+				errMsg = "failed to convert value to string"
+			}
 		case reflect.Slice:
 			extentionInstallAllowList := GACSettingsUpdate[ExtensionInstallAllowListModel, ExtensionInstallAllowListModel_Go](ctx, diagnostics, remoteLinuxSetting.Value)
 			if extentionInstallAllowList != nil {
@@ -1667,7 +1769,11 @@ func getLinuxCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 				break
 			}
 
-			linuxSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteLinuxSetting.Value.([]interface{}))
+			if sliceVal, ok := remoteLinuxSetting.Value.([]interface{}); ok {
+				linuxSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, sliceVal)
+			} else {
+				errMsg = "failed to convert value to []interface{}"
+			}
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for linux setting value: %v", valueType.Kind())
 		}
@@ -1692,7 +1798,13 @@ func getLinuxCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 			valueType := reflect.TypeOf(remoteLinuxSetting.Value)
 			switch valueType.Kind() {
 			case reflect.String:
-				linuxSetting.ValueString = types.StringValue(remoteLinuxSetting.Value.(string))
+				if strVal, ok := remoteLinuxSetting.Value.(string); ok {
+					linuxSetting.ValueString = types.StringValue(strVal)
+				} else {
+					errMsg = "failed to convert value to string"
+
+					break
+				}
 			case reflect.Slice:
 				extentionInstallAllowList := GACSettingsUpdate[ExtensionInstallAllowListModel, ExtensionInstallAllowListModel_Go](ctx, diagnostics, remoteLinuxSetting.Value)
 				if extentionInstallAllowList != nil {
@@ -1712,7 +1824,11 @@ func getLinuxCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 					break
 				}
 
-				linuxSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteLinuxSetting.Value.([]interface{}))
+				if sliceVal, ok := remoteLinuxSetting.Value.([]interface{}); ok {
+					linuxSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, sliceVal)
+				} else {
+					errMsg = "failed to convert value to []interface{}"
+				}
 			default:
 				errMsg = fmt.Sprintf("Unsupported type for linux setting value: %v", valueType.Kind())
 			}
@@ -1731,7 +1847,6 @@ func getLinuxCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 }
 
 func getIosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, iosSettings types.Set, remoteIosSettings []globalappconfiguration.CategorySettings) types.Set {
-
 	var iosSettingsForState []IosSettings
 	var errMsg string
 
@@ -1766,7 +1881,11 @@ func getIosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, 
 		valueType := reflect.TypeOf(remoteIosSetting.Value)
 		switch valueType.Kind() {
 		case reflect.String:
-			iosSetting.ValueString = types.StringValue(remoteIosSetting.Value.(string))
+			if strVal, ok := remoteIosSetting.Value.(string); ok {
+				iosSetting.ValueString = types.StringValue(strVal)
+			} else {
+				errMsg = "failed to convert value to string"
+			}
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for ios setting value: %v", valueType.Kind())
 		}
@@ -1790,7 +1909,13 @@ func getIosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, 
 			valueType := reflect.TypeOf(remoteIosSetting.Value)
 			switch valueType.Kind() {
 			case reflect.String:
-				iosSetting.ValueString = types.StringValue(remoteIosSetting.Value.(string))
+				if strVal, ok := remoteIosSetting.Value.(string); ok {
+					iosSetting.ValueString = types.StringValue(strVal)
+				} else {
+					errMsg = "failed to convert value to string"
+
+					break
+				}
 			default:
 				errMsg = fmt.Sprintf("Unsupported type for ios setting value: %v", valueType.Kind())
 			}
@@ -1809,7 +1934,6 @@ func getIosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, 
 }
 
 func getAndroidCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, androidSettings types.Set, remoteAndroidSettings []globalappconfiguration.CategorySettings) types.Set {
-
 	var androidSettingsForState []AndroidSettings
 	var errMsg string
 
@@ -1843,9 +1967,17 @@ func getAndroidCategorySettings(ctx context.Context, diagnostics *diag.Diagnosti
 		valueType := reflect.TypeOf(remoteAndroidSetting.Value)
 		switch valueType.Kind() {
 		case reflect.String:
-			androidSetting.ValueString = types.StringValue(remoteAndroidSetting.Value.(string))
+			if strVal, ok := remoteAndroidSetting.Value.(string); ok {
+				androidSetting.ValueString = types.StringValue(strVal)
+			} else {
+				errMsg = "failed to convert value to string"
+			}
 		case reflect.Slice:
-			androidSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteAndroidSetting.Value.([]interface{}))
+			if sliceVal, ok := remoteAndroidSetting.Value.([]interface{}); ok {
+				androidSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, sliceVal)
+			} else {
+				errMsg = "failed to convert value to []interface{}"
+			}
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for android setting value: %v", valueType.Kind())
 		}
@@ -1870,9 +2002,19 @@ func getAndroidCategorySettings(ctx context.Context, diagnostics *diag.Diagnosti
 			valueType := reflect.TypeOf(remoteAndroidSetting.Value)
 			switch valueType.Kind() {
 			case reflect.String:
-				androidSetting.ValueString = types.StringValue(remoteAndroidSetting.Value.(string))
+				if strVal, ok := remoteAndroidSetting.Value.(string); ok {
+					androidSetting.ValueString = types.StringValue(strVal)
+				} else {
+					errMsg = "failed to convert value to string"
+
+					break
+				}
 			case reflect.Slice:
-				androidSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteAndroidSetting.Value.([]interface{}))
+				if sliceVal, ok := remoteAndroidSetting.Value.([]interface{}); ok {
+					androidSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, sliceVal)
+				} else {
+					errMsg = "failed to convert value to []interface{}"
+				}
 			default:
 				errMsg = fmt.Sprintf("Unsupported type for android setting value: %v", valueType.Kind())
 			}
@@ -1891,7 +2033,6 @@ func getAndroidCategorySettings(ctx context.Context, diagnostics *diag.Diagnosti
 }
 
 func getChromeosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, chromeosSettings types.Set, remoteChromeosSettings []globalappconfiguration.CategorySettings) types.Set {
-
 	var chromeosSettingsForState []ChromeosSettings
 	var errMsg string
 
@@ -1927,9 +2068,17 @@ func getChromeosCategorySettings(ctx context.Context, diagnostics *diag.Diagnost
 		valueType := reflect.TypeOf(remoteChromeosSetting.Value)
 		switch valueType.Kind() {
 		case reflect.String:
-			chromeosSetting.ValueString = types.StringValue(remoteChromeosSetting.Value.(string))
+			if strVal, ok := remoteChromeosSetting.Value.(string); ok {
+				chromeosSetting.ValueString = types.StringValue(strVal)
+			} else {
+				errMsg = "failed to convert value to string"
+			}
 		case reflect.Slice:
-			chromeosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteChromeosSetting.Value.([]interface{}))
+			if sliceVal, ok := remoteChromeosSetting.Value.([]interface{}); ok {
+				chromeosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, sliceVal)
+			} else {
+				errMsg = "failed to convert value to []interface{}"
+			}
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for chromeos setting value: %v", valueType.Kind())
 		}
@@ -1955,9 +2104,19 @@ func getChromeosCategorySettings(ctx context.Context, diagnostics *diag.Diagnost
 			valueType := reflect.TypeOf(remoteChromeosSetting.Value)
 			switch valueType.Kind() {
 			case reflect.String:
-				chromeosSetting.ValueString = types.StringValue(remoteChromeosSetting.Value.(string))
+				if strVal, ok := remoteChromeosSetting.Value.(string); ok {
+					chromeosSetting.ValueString = types.StringValue(strVal)
+				} else {
+					errMsg = "failed to convert value to string"
+
+					break
+				}
 			case reflect.Slice:
-				chromeosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteChromeosSetting.Value.([]interface{}))
+				if sliceVal, ok := remoteChromeosSetting.Value.([]interface{}); ok {
+					chromeosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, sliceVal)
+				} else {
+					errMsg = "failed to convert value to []interface{}"
+				}
 			default:
 				errMsg = fmt.Sprintf("Unsupported type for chromeos setting value: %v", valueType.Kind())
 			}
@@ -1976,7 +2135,6 @@ func getChromeosCategorySettings(ctx context.Context, diagnostics *diag.Diagnost
 }
 
 func getHtml5CategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, html5Settings types.Set, remoteHtml5Settings []globalappconfiguration.CategorySettings) types.Set {
-
 	var html5SettingsForState []Html5Settings
 	var errMsg string
 
@@ -2012,9 +2170,17 @@ func getHtml5CategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 		valueType := reflect.TypeOf(remoteHtml5Setting.Value)
 		switch valueType.Kind() {
 		case reflect.String:
-			html5Setting.ValueString = types.StringValue(remoteHtml5Setting.Value.(string))
+			if strVal, ok := remoteHtml5Setting.Value.(string); ok {
+				html5Setting.ValueString = types.StringValue(strVal)
+			} else {
+				errMsg = "failed to convert value to string"
+			}
 		case reflect.Slice:
-			html5Setting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteHtml5Setting.Value.([]interface{}))
+			if sliceVal, ok := remoteHtml5Setting.Value.([]interface{}); ok {
+				html5Setting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, sliceVal)
+			} else {
+				errMsg = "failed to convert value to []interface{}"
+			}
 		default:
 			errMsg = fmt.Sprintf("Unsupported type for html5 setting value: %v", valueType.Kind())
 		}
@@ -2040,9 +2206,19 @@ func getHtml5CategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 			valueType := reflect.TypeOf(remoteHtml5Setting.Value)
 			switch valueType.Kind() {
 			case reflect.String:
-				html5Setting.ValueString = types.StringValue(remoteHtml5Setting.Value.(string))
+				if strVal, ok := remoteHtml5Setting.Value.(string); ok {
+					html5Setting.ValueString = types.StringValue(strVal)
+				} else {
+					errMsg = "failed to convert value to string"
+
+					break
+				}
 			case reflect.Slice:
-				html5Setting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteHtml5Setting.Value.([]interface{}))
+				if sliceVal, ok := remoteHtml5Setting.Value.([]interface{}); ok {
+					html5Setting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, sliceVal)
+				} else {
+					errMsg = "failed to convert value to []interface{}"
+				}
 			default:
 				errMsg = fmt.Sprintf("Unsupported type for html5 setting value: %v", valueType.Kind())
 			}
@@ -2061,7 +2237,6 @@ func getHtml5CategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 }
 
 func getMacosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics, macosSettings types.Set, remoteMacosSettings []globalappconfiguration.CategorySettings) types.Set {
-
 	var macosSettingsForState []MacosSettings
 	var errMsg string
 
@@ -2096,7 +2271,11 @@ func getMacosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 		valueType := reflect.TypeOf(remoteMacosSetting.Value)
 		switch valueType.Kind() {
 		case reflect.String:
-			macosSetting.ValueString = types.StringValue(remoteMacosSetting.Value.(string))
+			if strVal, ok := remoteMacosSetting.Value.(string); ok {
+				macosSetting.ValueString = types.StringValue(strVal)
+			} else {
+				errMsg = "failed to convert value to string"
+			}
 		case reflect.Slice:
 			// Check if the value is of type LocalAppAllowList
 			autoLaunchProtocolsList := GACSettingsUpdate[AutoLaunchProtocolsFromOriginsModel, AutoLaunchProtocolsFromOriginsModel_Go](ctx, diagnostics, remoteMacosSetting.Value)
@@ -2118,10 +2297,20 @@ func getMacosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 				break
 			}
 
-			macosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteMacosSetting.Value.([]interface{}))
+			if sliceVal, ok := remoteMacosSetting.Value.([]interface{}); ok {
+				macosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, sliceVal)
+			} else {
+				errMsg = "failed to convert value to []interface{}"
+			}
 
 		case reflect.Map:
-			v := remoteMacosSetting.Value.(map[string]interface{})
+			v, ok := remoteMacosSetting.Value.(map[string]interface{})
+
+			if !ok {
+				errMsg = "failed to convert value to map[string]interface{}"
+
+				break
+			}
 			elementJSON, err := json.Marshal(v)
 			if err != nil {
 				errMsg = fmt.Sprintf("Error marshaling element to CitrixEnterpriseBrowserModel: %v", err)
@@ -2134,7 +2323,11 @@ func getMacosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 			}
 			var browserModel CitrixEnterpriseBrowserModel
 			browserModel.CitrixEnterpriseBrowserSSOEnabled = types.BoolValue(app.CitrixEnterpriseBrowserSSOEnabled)
-			browserModel.CitrixEnterpriseBrowserSSODomains, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, v["CitrixEnterpriseBrowserSSODomains"].([]interface{}))
+			if domainsVal, ok := v["CitrixEnterpriseBrowserSSODomains"].([]interface{}); ok {
+				browserModel.CitrixEnterpriseBrowserSSODomains, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, domainsVal)
+			} else {
+				errMsg = "failed to convert CitrixEnterpriseBrowserSSODomains to []interface{}"
+			}
 			macosSetting.EnterpriseBroswerSSO = util.TypedObjectToObjectValue(ctx, diagnostics, browserModel)
 
 		default:
@@ -2162,7 +2355,13 @@ func getMacosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 			valueType := reflect.TypeOf(remoteMacosSetting.Value)
 			switch valueType.Kind() {
 			case reflect.String:
-				macosSetting.ValueString = types.StringValue(remoteMacosSetting.Value.(string))
+				if strVal, ok := remoteMacosSetting.Value.(string); ok {
+					macosSetting.ValueString = types.StringValue(strVal)
+				} else {
+					errMsg = "failed to convert value to string"
+
+					break
+				}
 			case reflect.Slice:
 				// Check if the value is of type LocalAppAllowList
 				autoLaunchProtocolsList := GACSettingsUpdate[AutoLaunchProtocolsFromOriginsModel, AutoLaunchProtocolsFromOriginsModel_Go](ctx, diagnostics, remoteMacosSetting.Value)
@@ -2182,10 +2381,20 @@ func getMacosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 					macosSetting.ExtensionInstallAllowList = util.TypedArrayToObjectSet(ctx, diagnostics, extensionInstallAllowList)
 					break
 				}
-				macosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, remoteMacosSetting.Value.([]interface{}))
+				if sliceVal, ok := remoteMacosSetting.Value.([]interface{}); ok {
+					macosSetting.ValueList, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, sliceVal)
+				} else {
+					errMsg = "failed to convert value to []interface{}"
+				}
 
 			case reflect.Map:
-				v := remoteMacosSetting.Value.(map[string]interface{})
+				v, ok := remoteMacosSetting.Value.(map[string]interface{})
+
+				if !ok {
+					errMsg = "failed to convert value to map[string]interface{}"
+
+					break
+				}
 				elementJSON, err := json.Marshal(v)
 				if err != nil {
 					errMsg = fmt.Sprintf("Error marshaling element to CitrixEnterpriseBrowserModel: %v", err)
@@ -2198,7 +2407,11 @@ func getMacosCategorySettings(ctx context.Context, diagnostics *diag.Diagnostics
 				}
 				var browserModel CitrixEnterpriseBrowserModel
 				browserModel.CitrixEnterpriseBrowserSSOEnabled = types.BoolValue(app.CitrixEnterpriseBrowserSSOEnabled)
-				browserModel.CitrixEnterpriseBrowserSSODomains, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, v["CitrixEnterpriseBrowserSSODomains"].([]interface{}))
+				if domainsVal, ok := v["CitrixEnterpriseBrowserSSODomains"].([]interface{}); ok {
+					browserModel.CitrixEnterpriseBrowserSSODomains, errMsg = util.ConvertPrimitiveInterfaceArrayToStringList(ctx, diagnostics, domainsVal)
+				} else {
+					errMsg = "failed to convert CitrixEnterpriseBrowserSSODomains to []interface{}"
+				}
 				macosSetting.EnterpriseBroswerSSO = util.TypedObjectToObjectValue(ctx, diagnostics, browserModel)
 			default:
 				errMsg = fmt.Sprintf("Unsupported type for macos setting value: %v", valueType.Kind())

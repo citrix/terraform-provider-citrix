@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package machine_catalog
 
@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -17,7 +18,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"golang.org/x/exp/slices"
 )
 
 func getRequestModelForCreateMachineCatalog(plan MachineCatalogResourceModel, ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, isOnPremises bool) (*citrixorchestration.CreateMachineCatalogRequestModel, error) {
@@ -185,7 +185,6 @@ func getRequestModelForUpdateMachineCatalog(plan MachineCatalogResourceModel, st
 	}
 
 	if *provisioningType == citrixorchestration.PROVISIONINGTYPE_MANUAL {
-
 		if plan.IsRemotePc.ValueBool() {
 			remotePCEnrollmentScopes, err := getRemotePcEnrollmentScopes(ctx, &resp.Diagnostics, client, plan, false)
 			if err != nil {
@@ -198,7 +197,7 @@ func getRequestModelForUpdateMachineCatalog(plan MachineCatalogResourceModel, st
 	}
 
 	provSchemeModel := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, plan.ProvisioningScheme)
-	if !checkIfProvSchemeIsCloudOnly(ctx, &resp.Diagnostics, provSchemeModel, isOnPremises) {
+	if !checkIfProvSchemeIsCloudOnly(&resp.Diagnostics, provSchemeModel, isOnPremises) {
 		return nil, fmt.Errorf("identity type %s is not supported in OnPremises environment. ", provSchemeModel.IdentityType.ValueString())
 	}
 
@@ -218,13 +217,13 @@ func getRequestModelForUpdateMachineCatalog(plan MachineCatalogResourceModel, st
 	return &body, nil
 }
 
-func checkIfProvSchemeIsCloudOnly(ctx context.Context, diagnostics *diag.Diagnostics, provisoningScheme ProvisioningSchemeModel, isOnPremises bool) bool {
+func checkIfProvSchemeIsCloudOnly(diagnostics *diag.Diagnostics, provisoningScheme ProvisioningSchemeModel, isOnPremises bool) bool {
 	if provisoningScheme.IdentityType.ValueString() == string(citrixorchestration.IDENTITYTYPE_AZURE_AD) {
 		if isOnPremises {
 			diagnostics.AddAttributeError(
 				path.Root("identity_type"),
 				"Unsupported Machine Catalog Configuration",
-				fmt.Sprintf("Identity type %s is not supported in OnPremises environment. ", string(provisoningScheme.IdentityType.ValueString())),
+				fmt.Sprintf("Identity type %s is not supported in OnPremises environment. ", provisoningScheme.IdentityType.ValueString()),
 			)
 
 			return false
@@ -360,6 +359,7 @@ func verifyMachinesUsingIdentity(ctx context.Context, client *citrixdaasclient.C
 	return httpResp, err
 }
 
+//nolint:unparam // return the IdentityMachineResponseModel for future use
 func getMachinesUsingIdentity(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, machines []string) ([]citrixorchestration.IdentityMachineResponseModel, *http.Response, error) {
 	getMachinesRequest := client.ApiClient.IdentityAPIsDAAS.IdentityGetMachines(ctx)
 	getMachinesRequest = getMachinesRequest.Machine(machines)
@@ -517,11 +517,19 @@ func validateInUseMachineAccounts(ctx context.Context, diagnostics *diag.Diagnos
 		// If there are any machines that are in use by other machine catalogs
 		var batchRequestModel citrixorchestration.BatchRequestModel
 		batchRequestModel.SetItems(batchRequestItems)
-		successfulJobs, _, subJobs, _ := citrixdaasclient.PerformBatchOperationAndReturnSubJobResponses(ctx, client, batchRequestModel)
+		successfulJobs, _, subJobs, err := citrixdaasclient.PerformBatchOperationAndReturnSubJobResponses(ctx, client, batchRequestModel)
+		if err != nil {
+			diagnostics.AddError(
+				"Error getting all machine accounts in use in Machine Catalog "+catalogName,
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(nil)+
+					"\nError Message: "+err.Error(),
+			)
+			// continue to evaluate any jobs which were successful
+		}
 
 		if successfulJobs > 0 {
 			machineAccountsInUse := []string{}
-			for i := 0; i < len(subJobs); i++ {
+			for i := range subJobs {
 				subJob := subJobs[i]
 				if subJob.GetCode() == 200 {
 					machineAccountInUse := fmt.Sprintf("`%s`", reqReferenceMachineAccountMap[subJob.GetReference()])
@@ -550,14 +558,19 @@ func getMachineAccountDeleteOptionValue(v string) citrixorchestration.MachineAcc
 	return *machineAccountDeleteOption
 }
 
-func IsAzureImageDefinitionUsingSharedImageGallery(imageDefinitionResp *citrixorchestration.ImageDefinitionResponseModel) bool {
+func IsAzureImageDefinitionUsingSharedImageGallery(diagnostics *diag.Diagnostics, imageDefinitionResp *citrixorchestration.ImageDefinitionResponseModel) bool {
 	preparedImageUseSharedGallery := false
+	var err error
 	imgDefinitionConn := imageDefinitionResp.GetHypervisorConnections()
 	if len(imgDefinitionConn) > 0 {
 		customProperties := imgDefinitionConn[0].GetCustomProperties()
 		for _, property := range customProperties {
 			if property.GetName() == "UseSharedImageGallery" {
-				preparedImageUseSharedGallery, _ = strconv.ParseBool(property.GetValue())
+				preparedImageUseSharedGallery, err = strconv.ParseBool(property.GetValue())
+				if err != nil {
+					diagnostics.AddError("Error parsing string to bool", err.Error())
+					return false
+				}
 			}
 		}
 	}

@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package hypervisor_resource_pool
 
@@ -51,7 +51,7 @@ func (r *gcpHypervisorResourcePoolResource) Configure(_ context.Context, req res
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 func (r *gcpHypervisorResourcePoolResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -108,7 +108,7 @@ func (r *gcpHypervisorResourcePoolResource) Create(ctx context.Context, req reso
 		)
 		return
 	}
-	planSubnet := util.StringListToStringArray(ctx, &diags, plan.Subnets)
+	planSubnet := util.StringListToStringArray(ctx, &resp.Diagnostics, plan.Subnets)
 	subnets, err := getHypervisorResourcePoolSubnets(ctx, r.client, &resp.Diagnostics, hypervisorId, vnetPath, planSubnet, hypervisorConnectionType)
 	if err != nil {
 		// Directly return. Error logs have been populated in common function
@@ -125,7 +125,7 @@ func (r *gcpHypervisorResourcePoolResource) Create(ctx context.Context, req reso
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(ctx, &diags, resourcePool)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, resourcePool)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -133,7 +133,6 @@ func (r *gcpHypervisorResourcePoolResource) Create(ctx context.Context, req reso
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 func (r *gcpHypervisorResourcePoolResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -156,7 +155,7 @@ func (r *gcpHypervisorResourcePoolResource) Read(ctx context.Context, req resour
 	}
 
 	// Override with refreshed state
-	state = state.RefreshPropertyValues(ctx, &diags, resourcePool)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, resourcePool)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -164,7 +163,6 @@ func (r *gcpHypervisorResourcePoolResource) Read(ctx context.Context, req resour
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 func (r *gcpHypervisorResourcePoolResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -189,7 +187,7 @@ func (r *gcpHypervisorResourcePoolResource) Update(ctx context.Context, req reso
 	editHypervisorResourcePool.SetConnectionType(citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM)
 	editHypervisorResourcePool.SetVmTagging(plan.VmTagging.ValueBool())
 
-	planSubnet := util.StringListToStringArray(ctx, &diags, plan.Subnets)
+	planSubnet := util.StringListToStringArray(ctx, &resp.Diagnostics, plan.Subnets)
 	regionPath := fmt.Sprintf("%s.project/%s.region", plan.ProjectName.ValueString(), plan.Region.ValueString())
 	vnetPath := fmt.Sprintf("%s/%s.virtualprivatecloud", regionPath, plan.Vpc.ValueString())
 	if plan.SharedVpc.ValueBool() {
@@ -210,7 +208,7 @@ func (r *gcpHypervisorResourcePoolResource) Update(ctx context.Context, req reso
 		return
 	}
 
-	plan = plan.RefreshPropertyValues(ctx, &diags, updatedResourcePool)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, updatedResourcePool)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -218,7 +216,6 @@ func (r *gcpHypervisorResourcePoolResource) Update(ctx context.Context, req reso
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 func (r *gcpHypervisorResourcePoolResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -279,7 +276,6 @@ func (r *gcpHypervisorResourcePoolResource) ImportState(ctx context.Context, req
 		"Error importing Hypervisor Resource Pool",
 		fmt.Sprintf("Hypervisor Resource Pool with ID %q not found", req.ID),
 	)
-
 }
 
 func (r *gcpHypervisorResourcePoolResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

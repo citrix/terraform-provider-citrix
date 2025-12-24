@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package application
 
@@ -49,7 +49,7 @@ func (r *applicationResource) Configure(_ context.Context, req resource.Configur
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Schema defines the schema for the data source.
@@ -543,7 +543,6 @@ func (r *applicationResource) ModifyPlan(ctx context.Context, req resource.Modif
 			}
 		}
 	}
-
 }
 
 func readApplication(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, applicationId string) (*citrixorchestration.ApplicationDetailResponseModel, error) {

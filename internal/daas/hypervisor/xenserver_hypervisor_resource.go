@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package hypervisor
 
@@ -43,7 +43,7 @@ func (r *xenserverHypervisorResource) Configure(_ context.Context, req resource.
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Schema implements resource.Resource.
@@ -85,11 +85,11 @@ func (r *xenserverHypervisorResource) Create(ctx context.Context, req resource.C
 	}
 	connectionDetails.SetPasswordFormat(*pwdFormat)
 
-	addresses := util.StringListToStringArray(ctx, &diags, plan.Addresses)
+	addresses := util.StringListToStringArray(ctx, &resp.Diagnostics, plan.Addresses)
 	connectionDetails.SetAddresses(addresses)
 
 	if !plan.SslThumbprints.IsNull() {
-		sslThumbprints := util.StringListToStringArray(ctx, &diags, plan.SslThumbprints)
+		sslThumbprints := util.StringListToStringArray(ctx, &resp.Diagnostics, plan.SslThumbprints)
 		connectionDetails.SetSslThumbprints(sslThumbprints)
 	}
 
@@ -113,7 +113,7 @@ func (r *xenserverHypervisorResource) Create(ctx context.Context, req resource.C
 	}
 
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(ctx, &diags, hypervisor)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, hypervisor)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -151,7 +151,7 @@ func (r *xenserverHypervisorResource) Read(ctx context.Context, req resource.Rea
 	}
 
 	// Overwrite hypervisor with refreshed state
-	state = state.RefreshPropertyValues(ctx, &diags, hypervisor)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, hypervisor)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -196,10 +196,10 @@ func (r *xenserverHypervisorResource) Update(ctx context.Context, req resource.U
 	}
 	editHypervisorRequestBody.SetPasswordFormat(*pwdFormat)
 
-	addresses := util.StringListToStringArray(ctx, &diags, plan.Addresses)
+	addresses := util.StringListToStringArray(ctx, &resp.Diagnostics, plan.Addresses)
 	editHypervisorRequestBody.SetAddresses(addresses)
 
-	sslThumbprints := util.StringListToStringArray(ctx, &diags, plan.SslThumbprints)
+	sslThumbprints := util.StringListToStringArray(ctx, &resp.Diagnostics, plan.SslThumbprints)
 	editHypervisorRequestBody.SetSslThumbprints(sslThumbprints)
 
 	editHypervisorRequestBody.SetMaxAbsoluteActiveActions(int32(plan.MaxAbsoluteActiveActions.ValueInt64()))
@@ -219,7 +219,7 @@ func (r *xenserverHypervisorResource) Update(ctx context.Context, req resource.U
 	}
 
 	// Update resource state with updated property values
-	plan = plan.RefreshPropertyValues(ctx, &diags, updatedHypervisor)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, updatedHypervisor)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)

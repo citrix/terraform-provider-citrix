@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package stf_store
 
 import (
@@ -45,7 +46,7 @@ func (r *stfStoreServiceResource) Configure(_ context.Context, req resource.Conf
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 func (*stfStoreServiceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -137,11 +138,10 @@ func (r *stfStoreServiceResource) Create(ctx context.Context, req resource.Creat
 	//Create Store Farms
 	var farms []citrixstorefront.StoreFarmModel
 	storeFarm := util.ObjectListToTypedArray[StoreFarm](ctx, &resp.Diagnostics, plan.StoreFarm)
-	createAndUpdateStoreFarms(ctx, r.client, &resp.Diagnostics, farms, siteIdInt, plan.VirtualPath.ValueString(), storeFarm)
-	farms, err = plan.getStoreFarms(ctx, r.client, &resp.Diagnostics)
-	if err != nil {
-		return
-	}
+	//nolint:errcheck // Errors added to diagnostics, continue so resource gets marked as tainted
+	_ = createAndUpdateStoreFarms(ctx, r.client, &resp.Diagnostics, farms, siteIdInt, plan.VirtualPath.ValueString(), storeFarm)
+	//nolint:errcheck // Errors added to diagnostics, continue so resource gets marked as tainted
+	farms, _ = plan.getStoreFarms(ctx, r.client, &resp.Diagnostics)
 
 	// Map response body to schema and populate Computed attribute values
 	plan.RefreshPropertyValues(ctx, &resp.Diagnostics, &StoreServiceDetail, farms)
@@ -149,9 +149,8 @@ func (r *stfStoreServiceResource) Create(ctx context.Context, req resource.Creat
 	if !plan.FarmSettings.IsNull() {
 		plannedFarmSettings := util.ObjectValueToTypedObject[FarmSettings](ctx, &resp.Diagnostics, plan.FarmSettings)
 		err := setFarmSettingsSetRequest(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), plannedFarmSettings)
-
 		if err != nil {
-			return
+			return // error added to diagnostics
 		}
 
 		// Get updated STFStoreFarmConfiguration Settings
@@ -170,8 +169,8 @@ func (r *stfStoreServiceResource) Create(ctx context.Context, req resource.Creat
 	if !plan.EnumerationOptions.IsNull() {
 		enumerationOptions := util.ObjectValueToTypedObject[EnumerationOptions](ctx, &resp.Diagnostics, plan.EnumerationOptions)
 		// Update Storefront Store Enumeration Options
-		setSTFStoreEnumerationOptions(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), enumerationOptions)
-
+		//nolint:errcheck // Errors added to diagnostics, continue so resource gets marked as tainted
+		_ = setSTFStoreEnumerationOptions(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), enumerationOptions)
 		// Get updated STFStoreService Enumeration Options
 		getResponse, err := getSTFStoreEnumerationOptions(ctx, r.client, siteIdInt, plan.VirtualPath.ValueString())
 		if err != nil {
@@ -189,7 +188,8 @@ func (r *stfStoreServiceResource) Create(ctx context.Context, req resource.Creat
 	// Set PNA properties
 	if !plan.PNA.IsNull() {
 		pna := util.ObjectValueToTypedObject[PNA](ctx, &resp.Diagnostics, plan.PNA)
-		setSTFStorePNA(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), pna)
+		//nolint:errcheck // Errors added to diagnostics, continue so resource gets marked as tainted
+		_ = setSTFStorePNA(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), pna)
 
 		updatedPna, err := getSTFStorePNA(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString())
 		if err != nil {
@@ -206,8 +206,8 @@ func (r *stfStoreServiceResource) Create(ctx context.Context, req resource.Creat
 		launchOptions := util.ObjectValueToTypedObject[LaunchOptions](ctx, &resp.Diagnostics, plan.LaunchOptions)
 
 		// Update Storefront Store Launch Options
-		setSTFStoreLaunchOptions(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), launchOptions)
-
+		//nolint:errcheck // Errors added to diagnostics, continue so resource gets marked as tainted
+		_ = setSTFStoreLaunchOptions(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), launchOptions)
 		// Get updated STFStoreService Launch Options
 		getResponse, err := getSTFStoreLaunchOptions(ctx, r.client, siteIdInt, plan.VirtualPath.ValueString())
 		if err != nil {
@@ -232,7 +232,7 @@ func (r *stfStoreServiceResource) Create(ctx context.Context, req resource.Creat
 		}
 
 		// Get updated STFStoreService Optimal Launch Gateway
-		getResponse, err := getSTFStoreOptimalLaunchGateway(ctx, r.client, &diags, siteIdInt, plan.VirtualPath.ValueString())
+		getResponse, err := getSTFStoreOptimalLaunchGateway(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching StoreFront Store Optimal Launch Gateway",
@@ -266,13 +266,31 @@ func (r *stfStoreServiceResource) Create(ctx context.Context, req resource.Creat
 		plan.RefreshRoamingAccount(ctx, &resp.Diagnostics, getResponse)
 	}
 
+	if !plan.FASResilienceConfig.IsNull() {
+		fasResilienceConfig := util.ObjectValueToTypedObject[FASResilienceConfig](ctx, &resp.Diagnostics, plan.FASResilienceConfig)
+		err := setSTFStoreFASResilienceConfig(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), fasResilienceConfig)
+		if err != nil {
+			return
+		}
+		// Get updated FAS Resilience Config
+		getResponse, err := getSTFStoreFASResilienceConfig(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error fetching STF StoreFront FAS Resilience Config",
+				"Error message: "+err.Error(),
+			)
+			return
+		}
+		// Refresh Storefront StoreService FAS Resilience Config
+		plan.RefreshFASResilienceConfig(ctx, &resp.Diagnostics, getResponse)
+	}
+
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 // Read refreshes the Terraform state with the latest data.
@@ -298,14 +316,18 @@ func (r *stfStoreServiceResource) Read(ctx context.Context, req resource.ReadReq
 
 	STFStoreService, err := getSTFStoreService(ctx, r.client, siteIdInt, state.VirtualPath.ValueString())
 	if err != nil {
-		return
-	}
-	if STFStoreService == nil {
-		resp.Diagnostics.AddWarning(
-			"StoreFront Store Service not found",
-			"StoreFront Store Service was not found and will be removed from the state file. An apply action will result in the creation of a new resource.",
-		)
-		resp.State.RemoveResource(ctx)
+		if strings.EqualFold(err.Error(), util.NOT_EXIST) {
+			resp.Diagnostics.AddWarning(
+				"StoreFront Store Service not found",
+				"StoreFront Store Service was not found and will be removed from the state file. An apply action will result in the creation of a new resource.",
+			)
+			resp.State.RemoveResource(ctx)
+		} else {
+			resp.Diagnostics.AddError(
+				"Error reading StoreFront Store Service",
+				"Error message: "+err.Error(),
+			)
+		}
 		return
 	}
 
@@ -375,7 +397,7 @@ func (r *stfStoreServiceResource) Read(ctx context.Context, req resource.ReadReq
 	state.RefreshRoamingAccount(ctx, &resp.Diagnostics, getRoamingAccResponse)
 
 	// Fetch Optimal Launch Gateway
-	getOptimalLaunchResponse, err := getSTFStoreOptimalLaunchGateway(ctx, r.client, &diags, siteIdInt, state.VirtualPath.ValueString())
+	getOptimalLaunchResponse, err := getSTFStoreOptimalLaunchGateway(ctx, r.client, &resp.Diagnostics, siteIdInt, state.VirtualPath.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error fetching StoreFront Store Optimal Launch Gateway",
@@ -385,13 +407,23 @@ func (r *stfStoreServiceResource) Read(ctx context.Context, req resource.ReadReq
 	}
 	state.RefreshOptimalLaunchGateway(ctx, &resp.Diagnostics, &getOptimalLaunchResponse)
 
+	// Fetch FAS Resilience Config
+	getFasResilienceConfigResponse, err := getSTFStoreFASResilienceConfig(ctx, r.client, &resp.Diagnostics, siteIdInt, state.VirtualPath.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error fetching STF FAS Resilience Config",
+			"Error message: "+err.Error(),
+		)
+		return
+	}
+	state.RefreshFASResilienceConfig(ctx, &resp.Diagnostics, getFasResilienceConfigResponse)
+
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
@@ -417,6 +449,10 @@ func (r *stfStoreServiceResource) Update(ctx context.Context, req resource.Updat
 	// Get refreshed STFStoreService
 	_, err = getSTFStoreService(ctx, r.client, siteIdInt, plan.VirtualPath.ValueString())
 	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error fetching StoreFront StoreService in Update",
+			"Error message: "+err.Error(),
+		)
 		return
 	}
 
@@ -438,6 +474,10 @@ func (r *stfStoreServiceResource) Update(ctx context.Context, req resource.Updat
 	// Fetch updated STFStoreService
 	updatedSTFStoreService, err := getSTFStoreService(ctx, r.client, siteIdInt, plan.VirtualPath.ValueString())
 	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error fetching updated StoreFront StoreService after Update",
+			"Error message: "+err.Error(),
+		)
 		return
 	}
 
@@ -450,7 +490,8 @@ func (r *stfStoreServiceResource) Update(ctx context.Context, req resource.Updat
 	}
 	//Update farms
 	storeFarms := util.ObjectListToTypedArray[StoreFarm](ctx, &resp.Diagnostics, plan.StoreFarm)
-	createAndUpdateStoreFarms(ctx, r.client, &resp.Diagnostics, existingFarms, siteIdInt, plan.VirtualPath.ValueString(), storeFarms)
+	//nolint:errcheck // Errors added to diagnostics, continue so resource gets marked as tainted
+	_ = createAndUpdateStoreFarms(ctx, r.client, &resp.Diagnostics, existingFarms, siteIdInt, plan.VirtualPath.ValueString(), storeFarms)
 	farms, err := plan.getStoreFarms(ctx, r.client, &resp.Diagnostics)
 	if err != nil {
 		return
@@ -484,8 +525,8 @@ func (r *stfStoreServiceResource) Update(ctx context.Context, req resource.Updat
 	if !plan.EnumerationOptions.IsNull() {
 		enumerationOptions := util.ObjectValueToTypedObject[EnumerationOptions](ctx, &resp.Diagnostics, plan.EnumerationOptions)
 		// Update Storefront Store Enumeration Options
-		setSTFStoreEnumerationOptions(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), enumerationOptions)
-
+		//nolint:errcheck // Errors added to diagnostics, continue so resource gets marked as tainted
+		_ = setSTFStoreEnumerationOptions(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), enumerationOptions)
 		// Get updated STFStoreService Enumeration Options
 		getResponse, err := getSTFStoreEnumerationOptions(ctx, r.client, siteIdInt, plan.VirtualPath.ValueString())
 		if err != nil {
@@ -501,8 +542,8 @@ func (r *stfStoreServiceResource) Update(ctx context.Context, req resource.Updat
 	// Set PNA properties
 	if !plan.PNA.IsNull() {
 		pna := util.ObjectValueToTypedObject[PNA](ctx, &resp.Diagnostics, plan.PNA)
-		setSTFStorePNA(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), pna)
-
+		//nolint:errcheck // Errors added to diagnostics, continue so resource gets marked as tainted
+		_ = setSTFStorePNA(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), pna)
 		updatedPna, err := getSTFStorePNA(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
@@ -517,8 +558,8 @@ func (r *stfStoreServiceResource) Update(ctx context.Context, req resource.Updat
 	if !plan.LaunchOptions.IsNull() {
 		launchOptions := util.ObjectValueToTypedObject[LaunchOptions](ctx, &resp.Diagnostics, plan.LaunchOptions)
 		// Update Storefront Store Launch Options
-		setSTFStoreLaunchOptions(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), launchOptions)
-
+		//nolint:errcheck // Errors added to diagnostics, continue so resource gets marked as tainted
+		_ = setSTFStoreLaunchOptions(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), launchOptions)
 		// Get updated STFStoreService Launch Options
 		getResponse, err := getSTFStoreLaunchOptions(ctx, r.client, siteIdInt, plan.VirtualPath.ValueString())
 		if err != nil {
@@ -564,18 +605,16 @@ func (r *stfStoreServiceResource) Update(ctx context.Context, req resource.Updat
 		optimalLaunchGateway := util.ObjectValueToTypedObject[OptimalLaunchGateway](ctx, &resp.Diagnostics, plan.OptimalLaunchGateway)
 
 		// Get Optimal Launch Gateways to see if they exist
-		existingOptimalLaunch, err := getSTFStoreOptimalLaunchGateway(ctx, r.client, &diags, siteIdInt, plan.VirtualPath.ValueString())
+		existingOptimalLaunch, err := getSTFStoreOptimalLaunchGateway(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString())
 		if err != nil {
 			return
 		}
 		// If they exist, Unregister them first, and then register the new ones
 		if existingOptimalLaunch.Name.IsSet() {
-
 			unregister_err := r.unregisterOptimalLaunchGateway(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), optimalLaunchGateway.GatewayName.ValueString())
 			if unregister_err != nil {
 				return
 			}
-
 		}
 
 		err = r.registerOptimalLaunchGateway(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), optimalLaunchGateway)
@@ -584,7 +623,7 @@ func (r *stfStoreServiceResource) Update(ctx context.Context, req resource.Updat
 		}
 
 		// Get updated STFStoreService Optimal Launch Gateway
-		getResponse, err := getSTFStoreOptimalLaunchGateway(ctx, r.client, &diags, siteIdInt, plan.VirtualPath.ValueString())
+		getResponse, err := getSTFStoreOptimalLaunchGateway(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error fetching StoreFront Store Optimal Launch Gateway",
@@ -593,6 +632,25 @@ func (r *stfStoreServiceResource) Update(ctx context.Context, req resource.Updat
 			return
 		}
 		plan.RefreshOptimalLaunchGateway(ctx, &resp.Diagnostics, &getResponse)
+	}
+
+	if !plan.FASResilienceConfig.IsNull() {
+		fasResilienceConfig := util.ObjectValueToTypedObject[FASResilienceConfig](ctx, &resp.Diagnostics, plan.FASResilienceConfig)
+		err := setSTFStoreFASResilienceConfig(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString(), fasResilienceConfig)
+		if err != nil {
+			return
+		}
+		// Get updated FAS Resilience Config
+		getResponse, err := getSTFStoreFASResilienceConfig(ctx, r.client, &resp.Diagnostics, siteIdInt, plan.VirtualPath.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error fetching STF StoreFront FAS Resilience Config",
+				"Error message: "+err.Error(),
+			)
+			return
+		}
+		// Refresh Storefront StoreService FAS Resilience Config
+		plan.RefreshFASResilienceConfig(ctx, &resp.Diagnostics, getResponse)
 	}
 
 	diags = resp.State.Set(ctx, plan)
@@ -629,8 +687,14 @@ func (r *stfStoreServiceResource) Delete(ctx context.Context, req resource.Delet
 	body.SetVirtualPath(state.VirtualPath.ValueString())
 
 	// Get refreshed STFDeployment, if no STFDeployment found, return
-	deployment, err := stf_deployment.GetSTFDeployment(ctx, r.client, &resp.Diagnostics, state.SiteId.ValueStringPointer())
-	if err != nil || deployment == nil {
+	_, err := stf_deployment.GetSTFDeployment(ctx, r.client, &resp.Diagnostics, state.SiteId.ValueStringPointer())
+	if err != nil {
+		if !strings.EqualFold(err.Error(), util.NOT_EXIST) {
+			resp.Diagnostics.AddError(
+				"Error retrieving StoreFront Deployment for deleting Store Service",
+				"Error message: "+err.Error(),
+			)
+		}
 		return
 	}
 
@@ -685,10 +749,7 @@ func getSTFStoreService(ctx context.Context, client *citrixdaasclient.CitrixDaas
 	// Get refreshed STFStoreService properties from Orchestration
 	STFStoreService, err := getSTFStoreServiceRequest.Execute()
 	if err != nil {
-		if strings.EqualFold(err.Error(), util.NOT_EXIST) {
-			return nil, nil
-		}
-		return &STFStoreService, err
+		return nil, err
 	}
 	return &STFStoreService, nil
 }
@@ -726,7 +787,6 @@ func setFarmSettingsSetRequest(ctx context.Context, client *citrixdaasclient.Cit
 		return err
 	}
 	return nil
-
 }
 
 // Get STF-StoreFarm Config
@@ -763,15 +823,15 @@ func getSTFStorePNA(ctx context.Context, client *citrixdaasclient.CitrixDaasClie
 
 // Set STF Store PNA
 func setSTFStorePNA(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, siteIdInt int64, VirtualPath string, pna PNA) error {
-
 	var storeBody citrixstorefront.GetSTFStoreRequestModel
 	storeBody.SetSiteId(siteIdInt)
 	storeBody.SetVirtualPath(VirtualPath)
 
+	var err error
 	if pna.Enable.ValueBool() {
 		// Disable PNA first because of the existing problem from PNA cmdlet
 		disablePnaRequest := client.StorefrontClient.StoreSF.STFStoreDisableStorePna(ctx, storeBody)
-		err := disablePnaRequest.Execute()
+		err = disablePnaRequest.Execute()
 		if err != nil {
 			diagnostics.AddError(
 				"Error disabling PNA for StoreFront StoreService",
@@ -792,7 +852,7 @@ func setSTFStorePNA(ctx context.Context, client *citrixdaasclient.CitrixDaasClie
 	} else {
 		// Disable PNA
 		disablePnaRequest := client.StorefrontClient.StoreSF.STFStoreDisableStorePna(ctx, storeBody)
-		err := disablePnaRequest.Execute()
+		err = disablePnaRequest.Execute()
 		if err != nil {
 			diagnostics.AddError(
 				"Error disabling PNA for StoreFront StoreService",
@@ -800,12 +860,11 @@ func setSTFStorePNA(ctx context.Context, client *citrixdaasclient.CitrixDaasClie
 			)
 		}
 	}
-	return nil
+	return err
 }
 
 // Set Storefront Store Enumeration Options
 func setSTFStoreEnumerationOptions(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, siteId int64, VirtualPath string, enumerationOptions EnumerationOptions) error {
-
 	// Generate API request body
 	var enumerationOptionsBody citrixstorefront.SetSTFStoreEnumerationOptionsRequestModel
 
@@ -847,7 +906,6 @@ func setSTFStoreEnumerationOptions(ctx context.Context, client *citrixdaasclient
 
 // Get Storefront store Enumeration Options
 func getSTFStoreEnumerationOptions(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, siteId int64, VirtualPath string) (*citrixstorefront.GetSTFStoreEnumerationOptionsResponseModel, error) {
-
 	// Generate getSTFStoreService body
 	getSTFStoreServiceBody := citrixstorefront.GetSTFStoreRequestModel{}
 	getSTFStoreServiceBody.SetSiteId(siteId)
@@ -863,7 +921,6 @@ func getSTFStoreEnumerationOptions(ctx context.Context, client *citrixdaasclient
 
 // Set Storefront Store Launch Options
 func setSTFStoreLaunchOptions(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, siteId int64, VirtualPath string, launchOptions LaunchOptions) error {
-
 	// Generate API request body
 	var launchOptionsBody citrixstorefront.SetSTFStoreLaunchOptionsRequestModel
 
@@ -939,7 +996,6 @@ func getSTFStoreLaunchOptions(ctx context.Context, client *citrixdaasclient.Citr
 }
 
 func setSTFRoamingAccount(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, siteId int64, VirtualPath string, roamingAccountSettings RoamingAccount) error {
-
 	var roamingAccountSettingsBody citrixstorefront.SetSTFRoamingAccountRequestModel
 
 	if !roamingAccountSettings.Published.IsNull() {
@@ -964,11 +1020,9 @@ func setSTFRoamingAccount(ctx context.Context, client *citrixdaasclient.CitrixDa
 		return err
 	}
 	return nil
-
 }
 
 func getSTFRoamingAccount(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, siteId int64, VirtualPath string) (*citrixstorefront.GetSTFRoamingAccountResponseModel, error) {
-
 	// Generate getSTFStoreService body
 	getSTFStoreServiceBody := citrixstorefront.GetSTFStoreRequestModel{}
 	getSTFStoreServiceBody.SetSiteId(siteId)
@@ -984,7 +1038,6 @@ func getSTFRoamingAccount(ctx context.Context, client *citrixdaasclient.CitrixDa
 }
 
 func createAndUpdateStoreFarms(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, existingFarms []citrixstorefront.StoreFarmModel, siteId int64, VirtualPath string, farms []StoreFarm) error {
-
 	//set Store for StoreFarm Set Request
 	getStoreBody := citrixstorefront.GetSTFStoreRequestModel{}
 	getStoreBody.SetSiteId(siteId)
@@ -1160,11 +1213,9 @@ func (plan STFStoreServiceResourceModel) getStoreFarms(ctx context.Context, clie
 		return nil, err
 	}
 	return farmWithoutFarmName, err
-
 }
 
 func getSTFStoreOptimalLaunchGateway(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, siteIdInt int64, VirtualPath string) (citrixstorefront.STFStoreRegisteredOptimalLaunchGatewayResponseModel, error) {
-
 	// Generate getSTFStoreService body
 	getSTFStoreServiceBody := citrixstorefront.GetSTFStoreRequestModel{}
 	getSTFStoreServiceBody.SetSiteId(siteIdInt)
@@ -1184,7 +1235,6 @@ func getSTFStoreOptimalLaunchGateway(ctx context.Context, client *citrixdaasclie
 }
 
 func (r *stfStoreServiceResource) registerOptimalLaunchGateway(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, siteIdInt int64, VirtualPath string, optimalLaunch OptimalLaunchGateway) error {
-
 	var registerBody citrixstorefront.RegisterSTFStoreOptimalLaunchGatewayRequestModel
 
 	// Generate registerOptimalLaunchGateway body
@@ -1220,7 +1270,6 @@ func (r *stfStoreServiceResource) registerOptimalLaunchGateway(ctx context.Conte
 }
 
 func (r *stfStoreServiceResource) unregisterOptimalLaunchGateway(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, siteIdInt int64, VirtualPath string, gatewayName string) error {
-
 	// Generate getSTFStoreService body
 	getSTFStoreServiceBody := citrixstorefront.GetSTFStoreRequestModel{}
 	getSTFStoreServiceBody.SetSiteId(siteIdInt)
@@ -1238,4 +1287,50 @@ func (r *stfStoreServiceResource) unregisterOptimalLaunchGateway(ctx context.Con
 	}
 
 	return nil
+}
+
+func setSTFStoreFASResilienceConfig(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, siteId int64, VirtualPath string, fasResilienceConfig FASResilienceConfig) error {
+	var fasResilienceConfigBody citrixstorefront.SetFASResilienceConfigurationRequestModel
+	fasResilienceConfigBody.SetEnabled(fasResilienceConfig.Enabled.ValueBool())
+	fasResilienceConfigBody.SetNumberOfExceptionsBeforeBreak(int(fasResilienceConfig.NumberOfExceptionsBeforeBreak.ValueInt64()))
+	fasResilienceConfigBody.SetDurationOfBreakInMinutes(int(fasResilienceConfig.DurationOfBreakInMinutes.ValueInt64()))
+
+	// Generate getSTFStoreService body
+	getSTFStoreServiceBody := citrixstorefront.GetSTFStoreRequestModel{}
+	getSTFStoreServiceBody.SetSiteId(siteId)
+	getSTFStoreServiceBody.SetVirtualPath(VirtualPath)
+
+	// Create the client request to Set StoreFront FAS Resilience Config
+	fasResilienceConfigRequest := client.StorefrontClient.StoreSF.STFStoreSetFASResilienceConfiguration(ctx, fasResilienceConfigBody, getSTFStoreServiceBody)
+	// Execute the request
+	err := fasResilienceConfigRequest.Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error setting StoreFront Store FAS Resilience Config",
+			"Error message: "+err.Error(),
+		)
+		return err
+	}
+	return nil
+}
+
+func getSTFStoreFASResilienceConfig(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, siteIdInt int64, VirtualPath string) (citrixstorefront.GetFASResilienceConfigurationResponseModel, error) {
+	// Generate getSTFStoreService body
+	getSTFStoreServiceBody := citrixstorefront.GetSTFStoreRequestModel{}
+	getSTFStoreServiceBody.SetSiteId(siteIdInt)
+	getSTFStoreServiceBody.SetVirtualPath(VirtualPath)
+	// Create the client request to Get StoreFront FAS Resilience Config
+	fasResilienceConfigRequest := client.StorefrontClient.StoreSF.STFStoreGetFASResilienceConfiguration(ctx, getSTFStoreServiceBody)
+	// Execute the request
+	getResponse, err := fasResilienceConfigRequest.Execute()
+
+	if err != nil {
+		diagnostics.AddError(
+			"Error fetching StoreFront FAS Resilience Config",
+			"Error message: "+err.Error(),
+		)
+		return citrixstorefront.GetFASResilienceConfigurationResponseModel{}, err
+	}
+
+	return getResponse, nil
 }

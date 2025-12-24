@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package test
 
@@ -29,30 +29,20 @@ func init() {
 			hypervisorName := os.Getenv("TEST_HYPERV_NAME_AZURE")
 			if hypervisor == "aws" {
 				hypervisorName = os.Getenv("TEST_HYPERV_NAME_AWS_EC2")
-				err := hypervisorSweeper(ctx, hypervisorName, client)
-				if err != nil {
-					errs = multierror.Append(errs, err)
-				}
-
-				hypervisorNameUpdated := hypervisorName + "-updated"
-				err = hypervisorSweeper(ctx, hypervisorNameUpdated, client)
-				if err != nil {
-					errs = multierror.Append(errs, err)
-				}
-
 			}
 			if hypervisor == "gcp" {
 				hypervisorName = os.Getenv("TEST_HYPERV_NAME_GCP")
-				err := hypervisorSweeper(ctx, hypervisorName, client)
-				if err != nil {
-					errs = multierror.Append(errs, err)
-				}
+			}
 
-				hypervisorNameUpdated := hypervisorName + "-updated"
-				err = hypervisorSweeper(ctx, hypervisorNameUpdated, client)
-				if err != nil {
-					errs = multierror.Append(errs, err)
-				}
+			err := hypervisorSweeper(ctx, hypervisorName, client)
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			}
+
+			hypervisorNameUpdated := hypervisorName + "-updated"
+			err = hypervisorSweeper(ctx, hypervisorNameUpdated, client)
+			if err != nil {
+				errs = multierror.Append(errs, err)
 			}
 
 			return errs.ErrorOrNil()
@@ -841,7 +831,7 @@ func hypervisorSweeper(ctx context.Context, hypervisorName string, client *citri
 			// Resource does not exist in remote, no need to delete
 			return nil
 		}
-		return fmt.Errorf("Error getting hypervisor: %s", err)
+		return fmt.Errorf("Error getting hypervisor: %w", err)
 	}
 	deleteHypervisorRequest := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsDeleteHypervisor(ctx, hypervisor.GetId())
 	httpResp, err = citrixclient.AddRequestData(deleteHypervisorRequest, client).Execute()

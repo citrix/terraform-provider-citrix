@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package policy_priority
 
@@ -83,7 +83,6 @@ func (r PolicyPriorityModel) RefreshPropertyValues(ctx context.Context, diagnost
 			policyIds = append(policyIds, policy.GetPolicyGuid())
 			policyNames = append(policyNames, policy.GetPolicyName())
 		}
-
 	} else {
 		r.PolicyPriority = util.StringArrayToStringList(ctx, diagnostics, []string{})
 		r.PolicyNames = util.StringArrayToStringList(ctx, diagnostics, []string{})

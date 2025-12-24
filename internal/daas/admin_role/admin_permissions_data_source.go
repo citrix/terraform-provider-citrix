@@ -1,4 +1,5 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
+
 package admin_role
 
 import (
@@ -39,7 +40,7 @@ func (d *AdminPermissionsDataSource) Configure(ctx context.Context, req datasour
 		return
 	}
 
-	d.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	d.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 func (d *AdminPermissionsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -73,7 +74,7 @@ func (d *AdminPermissionsDataSource) Read(ctx context.Context, req datasource.Re
 // Cache the admin predefined permissions as they do not change
 var adminPermissionsCache []citrixorchestration.PredefinedPermissionResponseModel
 var cacheLoad sync.Once
-var cacheLoadError error
+var errCacheLoad error
 
 func getAdminPermissions(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, filterCloudRestrictedPermissions bool) ([]citrixorchestration.PredefinedPermissionResponseModel, error) {
 	cacheLoad.Do(func() {
@@ -89,7 +90,7 @@ func getAdminPermissions(ctx context.Context, client *citrixdaasclient.CitrixDaa
 					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 						"\nError message: "+util.ReadClientError(err),
 				)
-				cacheLoadError = err
+				errCacheLoad = err
 				return
 			}
 
@@ -102,8 +103,8 @@ func getAdminPermissions(ctx context.Context, client *citrixdaasclient.CitrixDaa
 		}
 	})
 
-	if cacheLoadError != nil {
-		return nil, cacheLoadError
+	if errCacheLoad != nil {
+		return nil, errCacheLoad
 	}
 
 	if filterCloudRestrictedPermissions {

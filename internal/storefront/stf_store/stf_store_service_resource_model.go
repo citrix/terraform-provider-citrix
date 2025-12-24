@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package stf_store
 
@@ -51,6 +51,41 @@ type StoreFarm struct {
 	RestrictPoPs               types.String `tfsdk:"restrict_pops"`                  // Cloud deployments only otherwise ignored. Restricts GWaaS traffic to the specified POP.
 	FarmGuid                   types.String `tfsdk:"farm_guid"`                      // Cloud deployments only otherwise ignored. A tag indicating the scope of the farm.
 
+}
+
+type FASResilienceConfig struct {
+	Enabled                       types.Bool  `tfsdk:"enabled"`
+	NumberOfExceptionsBeforeBreak types.Int64 `tfsdk:"number_of_exceptions_before_break"`
+	DurationOfBreakInMinutes      types.Int64 `tfsdk:"duration_of_break_in_minutes"`
+}
+
+func (FASResilienceConfig) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Optional:    true,
+		Description: "FAS Resilience configuration for the Store",
+		Attributes: map[string]schema.Attribute{
+			"enabled": schema.BoolAttribute{
+				Description: "Whether FAS Resilience is enabled for the Store. Default is true.",
+				Required:    true,
+			},
+			"number_of_exceptions_before_break": schema.Int64Attribute{
+				Description: "Number of exceptions before breaking the FAS connection. Default is 3.",
+				Optional:    true,
+				Computed:    true,
+				Default:     int64default.StaticInt64(3),
+			},
+			"duration_of_break_in_minutes": schema.Int64Attribute{
+				Description: "Duration of the break in minutes. Default is 5.",
+				Optional:    true,
+				Computed:    true,
+				Default:     int64default.StaticInt64(5),
+			},
+		},
+	}
+}
+
+func (FASResilienceConfig) GetAttributes() map[string]schema.Attribute {
+	return FASResilienceConfig{}.GetSchema().Attributes
 }
 
 // OptimalLaunchGateway represents preferred farm/zone options for launching via optimal gateway
@@ -251,7 +286,6 @@ func (StoreFarm) GetSchema() schema.NestedAttributeObject {
 			},
 		},
 	}
-
 }
 
 func (StoreFarm) GetAttributes() map[string]schema.Attribute {
@@ -578,6 +612,7 @@ type STFStoreServiceResourceModel struct {
 	FarmSettings          types.Object `tfsdk:"farm_settings"`
 	RoamingAccount        types.Object `tfsdk:"roaming_account"`        // RoamingAccount
 	OptimalLaunchGateway  types.Object `tfsdk:"optimal_launch_gateway"` // OptimalLaunchGateway
+	FASResilienceConfig   types.Object `tfsdk:"fas_resilience_config"`  // FASResilienceConfig
 }
 
 // GetAttributes implements util.ResourceModelWithAttributeMasking.
@@ -652,7 +687,6 @@ func (r *STFStoreServiceResourceModel) RefreshPropertyValues(ctx context.Context
 		farmList = append(farmList, storefarm)
 	}
 	r.StoreFarm = util.TypedArrayToObjectList[StoreFarm](ctx, diagnostics, farmList)
-
 }
 
 func FarmTypeFromInt(farmTypeInt int64) string {
@@ -808,16 +842,13 @@ func (r *STFStoreServiceResourceModel) RefreshRoamingAccount(ctx context.Context
 }
 
 func (r *STFStoreServiceResourceModel) RefreshOptimalLaunchGateway(ctx context.Context, diagnostics *diag.Diagnostics, optimal *citrixstorefront.STFStoreRegisteredOptimalLaunchGatewayResponseModel) {
-
 	// Populate OptimalLaunchGateway based on available farms and zones
 	refreshedOptimal := util.ObjectValueToTypedObject[OptimalLaunchGateway](ctx, diagnostics, r.OptimalLaunchGateway)
 
 	if !refreshedOptimal.FarmName.IsNull() {
-
 		refreshedOptimal.FarmName = util.RefreshListValues(ctx, diagnostics, refreshedOptimal.FarmName, optimal.Farms)
 	}
 	if !refreshedOptimal.ZoneName.IsNull() {
-
 		refreshedOptimal.ZoneName = util.RefreshListValues(ctx, diagnostics, refreshedOptimal.ZoneName, optimal.Zones)
 	}
 	if optimal.Name.IsSet() && optimal.Name.Get() != nil {
@@ -825,6 +856,15 @@ func (r *STFStoreServiceResourceModel) RefreshOptimalLaunchGateway(ctx context.C
 	}
 
 	r.OptimalLaunchGateway = util.TypedObjectToObjectValue(ctx, diagnostics, refreshedOptimal)
+}
+
+func (r *STFStoreServiceResourceModel) RefreshFASResilienceConfig(ctx context.Context, diagnostics *diag.Diagnostics, fasConfig citrixstorefront.GetFASResilienceConfigurationResponseModel) {
+	refreshedFASResilienceConfig := util.ObjectValueToTypedObject[FASResilienceConfig](ctx, diagnostics, r.FASResilienceConfig)
+	refreshedFASResilienceConfig.Enabled = types.BoolValue(*fasConfig.Enabled.Get())
+	refreshedFASResilienceConfig.NumberOfExceptionsBeforeBreak = types.Int64Value(int64(*fasConfig.NumberOfExceptionsBeforeBreak.Get()))
+	refreshedFASResilienceConfig.DurationOfBreakInMinutes = types.Int64Value(int64(*fasConfig.DurationOfBreakInMinutes.Get()))
+
+	r.FASResilienceConfig = util.TypedObjectToObjectValue(ctx, diagnostics, refreshedFASResilienceConfig)
 }
 
 func (STFStoreServiceResourceModel) GetSchema() schema.Schema {
@@ -896,6 +936,7 @@ func (STFStoreServiceResourceModel) GetSchema() schema.Schema {
 			"farm_settings":          FarmSettings{}.GetSchema(),
 			"roaming_account":        RoamingAccount{}.GetSchema(),
 			"optimal_launch_gateway": OptimalLaunchGateway{}.GetSchema(),
+			"fas_resilience_config":  FASResilienceConfig{}.GetSchema(),
 		},
 	}
 }

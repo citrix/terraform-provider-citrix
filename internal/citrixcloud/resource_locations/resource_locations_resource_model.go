@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package resource_locations
 
@@ -64,7 +64,6 @@ func (ResourceLocationModel) GetAttributesNamesToMask() map[string]bool {
 }
 
 func (r ResourceLocationModel) RefreshPropertyValues(ccResourceLocation *ccresourcelocations.CitrixCloudServicesRegistryApiModelsLocationsResourceLocationModel) ResourceLocationModel {
-
 	// Overwrite resource location with refreshed state
 	r.Id = types.StringValue(ccResourceLocation.GetId())
 	r.Name = types.StringValue(ccResourceLocation.GetName())

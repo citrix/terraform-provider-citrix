@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package cc_admin_user
 
@@ -105,7 +105,6 @@ func getAdminUser(ctx context.Context, client *citrixdaasclient.CitrixDaasClient
 }
 
 func getAdminUserPolicies(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, adminUserResourceModel CCAdminUserResourceModel) ([]ccadmins.AdministratorAccessPolicyModel, error) {
-
 	// If access type is Full or policies are not set, return nil
 	if strings.EqualFold(adminUserResourceModel.AccessType.ValueString(), string(ccadmins.ADMINISTRATORACCESSTYPE_FULL)) && adminUserResourceModel.Policies.IsNull() {
 		return nil, nil
@@ -143,7 +142,7 @@ func fetchAdminPoliciesWithRetry(ctx context.Context, diagnostics *diag.Diagnost
 		itemFound               bool
 	)
 
-	for retryCount := 0; retryCount < maxRetries; retryCount++ {
+	for range maxRetries {
 		accessPolicies, err = getAccessPolicies(ctx, client, adminId)
 		if err != nil {
 			return nil, err
@@ -263,7 +262,7 @@ func getAccessPolicies(ctx context.Context, client *citrixdaasclient.CitrixDaasC
 func getAdminIdFromAuthToken(client *citrixdaasclient.CitrixDaasClient) (string, error) {
 	authToken, _, err := client.SignIn()
 	if err != nil {
-		return "", fmt.Errorf("failed to sign in: %v", err)
+		return "", fmt.Errorf("failed to sign in: %w", err)
 	}
 
 	if authToken == "" {
@@ -279,13 +278,13 @@ func getAdminIdFromAuthToken(client *citrixdaasclient.CitrixDaasClient) (string,
 	// Decode the payload part (second part)
 	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		return "", fmt.Errorf("failed to decode auth token payload: %v", err)
+		return "", fmt.Errorf("failed to decode auth token payload: %w", err)
 	}
 
 	// Parse the JSON payload
 	var claims map[string]interface{}
 	if err := json.Unmarshal(payload, &claims); err != nil {
-		return "", fmt.Errorf("failed to parse auth token JSON payload: %v", err)
+		return "", fmt.Errorf("failed to parse auth token JSON payload: %w", err)
 	}
 
 	// Fetch the user_id claim

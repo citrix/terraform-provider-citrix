@@ -33,6 +33,11 @@ resource "citrix_machine_catalog" "example-azure-mtsession" {
             service_account          = "<Admin Username>"
             service_account_password = "<Admin Password>"
         }
+        # machine domain identity can also be specified with service account id
+        # machine_domain_identity = {
+        #     domain                   = "<DomainFQDN>"
+        #     service_account_id       = citrix_service_account.example-azuread-service-account.id # GUID identifier of the service account (ServiceAccountUid)
+        # }
 		azure_machine_config = {
 			storage_type = "Standard_LRS"
 			use_managed_disks = true

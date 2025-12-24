@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package test
 
@@ -3175,7 +3175,7 @@ func machineCatalogSweeper(ctx context.Context, machineCatalogName string, clien
 			// Resource does not exist in remote, no need to delete
 			return nil
 		}
-		return fmt.Errorf("Error getting machine catalog: %s", err)
+		return fmt.Errorf("Error getting machine catalog: %w", err)
 	}
 	deleteMachineCatalogRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsDeleteMachineCatalog(ctx, machineCatalog.GetId())
 	httpResp, err = citrixclient.AddRequestData(deleteMachineCatalogRequest, client).Execute()

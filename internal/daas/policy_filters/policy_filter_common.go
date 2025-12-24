@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package policy_filters
 
@@ -92,7 +92,7 @@ func getPolicyFilter(ctx context.Context, client *citrixdaasclient.CitrixDaasCli
 	if err != nil {
 		// Check if this is a 404 Not Found error - return a specific error that can be handled by the caller
 		if httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
-			return nil, fmt.Errorf("%w: %v", util.ErrPolicyFilterNotFound, err)
+			return nil, fmt.Errorf("%w: %w", util.ErrPolicyFilterNotFound, err)
 		}
 
 		diagnostics.AddError(

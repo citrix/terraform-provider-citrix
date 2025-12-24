@@ -1,4 +1,4 @@
-// Copyright © 2024. Citrix Systems, Inc.
+// Copyright © 2025. Citrix Systems, Inc.
 
 package desktop_icon
 
@@ -49,7 +49,7 @@ func (r *desktopIconResource) Configure(_ context.Context, req resource.Configur
 		return
 	}
 
-	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient)
+	r.client = req.ProviderData.(*citrixdaasclient.CitrixDaasClient) //nolint:forcetypeassert // framework guarantee
 }
 
 // Schema returns the resource schema.
@@ -133,7 +133,6 @@ func (r *desktopIconResource) Create(ctx context.Context, req resource.CreateReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 func (r *desktopIconResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -162,7 +161,6 @@ func (r *desktopIconResource) Read(ctx context.Context, req resource.ReadRequest
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 }
 
 func (r *desktopIconResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
