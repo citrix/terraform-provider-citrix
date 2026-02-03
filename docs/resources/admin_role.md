@@ -73,7 +73,7 @@ data "citrix_admin_role" "desktop_group_admin_role" {
 ### Read-Only
 
 - `id` (String) ID of the admin role.
-- `is_built_in` (Boolean) Flag to determine if the role was built-in or user defined
+- `is_built_in` (Boolean) Flag to determine if the role was built-in or user defined.
 
 ## Import
 

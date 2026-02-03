@@ -1,10 +1,11 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package tags
 
 import (
 	"context"
 
+	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
@@ -66,7 +67,7 @@ func (d *TagDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 	}
 
 	getTagRequest := d.client.ApiClient.TagsAPIsDAAS.TagsGetTag(ctx, tagNameOrId)
-	tagDetailResponse, httpResp, err := citrixdaasclient.AddRequestData(getTagRequest, d.client).Execute()
+	tagDetailResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.TagDetailResponseModel](getTagRequest, d.client)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error fetching details of tag: "+tagNameOrId,

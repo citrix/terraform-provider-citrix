@@ -1,10 +1,11 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package hypervisor
 
 import (
 	"context"
 
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
@@ -67,7 +68,7 @@ func (d *HypervisorDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		hypervisorNameOrId = data.Id.ValueString()
 	}
 	getHypervisorRequest := d.client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisor(ctx, hypervisorNameOrId)
-	hypervisor, httpResp, err := citrixdaasclient.AddRequestData(getHypervisorRequest, d.client).Execute()
+	hypervisor, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.HypervisorDetailResponseModel](getHypervisorRequest, d.client)
 
 	if err != nil {
 		resp.Diagnostics.AddError(

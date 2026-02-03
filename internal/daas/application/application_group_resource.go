@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package application
 
@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
-	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
@@ -76,13 +76,8 @@ func (r *applicationGroupResource) Create(ctx context.Context, req resource.Crea
 	if !plan.IncludedUsers.IsNull() {
 		createApplicationGroupRequest.SetIncludedUserFilterEnabled(true)
 		includedUsers := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.IncludedUsers)
-		includedUserIds, httpResp, err := util.GetUserIdsUsingIdentity(ctx, r.client, includedUsers)
+		includedUserIds, _, err := util.GetUserIdsUsingIdentity(ctx, r.client, &resp.Diagnostics, includedUsers, "Error fetching user details for application group")
 		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error fetching user details for application group",
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+util.ReadClientError(err),
-			)
 			return
 		}
 		createApplicationGroupRequest.SetIncludedUsers(includedUserIds)
@@ -243,13 +238,8 @@ func (r *applicationGroupResource) Update(ctx context.Context, req resource.Upda
 	if !plan.IncludedUsers.IsNull() {
 		editApplicationGroupRequestBody.SetIncludedUserFilterEnabled(true)
 		includedUsers := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.IncludedUsers)
-		includedUserIds, httpResp, err := util.GetUserIdsUsingIdentity(ctx, r.client, includedUsers)
+		includedUserIds, _, err := util.GetUserIdsUsingIdentity(ctx, r.client, &resp.Diagnostics, includedUsers, "Error fetching user details for application group "+applicationGroupName)
 		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error fetching user details for application group"+applicationGroupName,
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+util.ReadClientError(err),
-			)
 			return
 		}
 		editApplicationGroupRequestBody.SetIncludedUsers(includedUserIds)
@@ -459,7 +449,7 @@ func setApplicationGroupTags(ctx context.Context, diagnostics *diag.Diagnostics,
 func getApplicationGroupTags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, applicationGroupId string) []string {
 	getTagsRequest := client.ApiClient.ApplicationGroupsAPIsDAAS.ApplicationGroupsGetApplicationGroupTags(ctx, applicationGroupId)
 	getTagsRequest = getTagsRequest.Fields("Id,Name,Description")
-	tagsResp, httpResp, err := citrixdaasclient.AddRequestData(getTagsRequest, client).Execute()
+	tagsResp, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.TagResponseModelCollection](getTagsRequest, client)
 	return util.ProcessTagsResponseCollection(diagnostics, tagsResp, httpResp, err, "Application Group", applicationGroupId)
 }
 

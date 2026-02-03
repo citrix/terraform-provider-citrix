@@ -1,10 +1,11 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package machine_catalog
 
 import (
 	"context"
 
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
@@ -71,7 +72,7 @@ func (d *MachineCatalogDataSource) Read(ctx context.Context, req datasource.Read
 		machineCatalogPathOrId = util.BuildResourcePathForGetRequest(data.MachineCatalogFolderPath.ValueString(), data.Name.ValueString())
 	}
 	getMachineCatalogRequest := d.client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalog(ctx, machineCatalogPathOrId).Fields("Id,Name,Description,ProvisioningType,PersistChanges,Zone,AllocationType,SessionSupport,TotalCount,HypervisorConnection,ProvisioningScheme,RemotePCEnrollmentScopes,IsPowerManaged,MinimumFunctionalLevel,IsRemotePC")
-	machineCatalog, httpResp, err := citrixdaasclient.AddRequestData(getMachineCatalogRequest, d.client).Execute()
+	machineCatalog, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.MachineCatalogDetailResponseModel](getMachineCatalogRequest, d.client)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading Machine Catalog "+machineCatalogNameOrId,

@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package delivery_group
 
@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/citrix/terraform-provider-citrix/internal/validators"
@@ -1242,7 +1242,7 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 				Default:     booldefault.StaticBool(false),
 			},
 			"delivery_type": schema.StringAttribute{
-				Description: "Delivery type of the delivery group. Available values are `DesktopsOnly`, `AppsOnly`, and `DesktopsAndApps`. Defaults to `DesktopsOnly` for Delivery Groups with associated Machine Catalogs that have `allocation_type` set to `Static` and for Delivery Groups that have `sharing_kind` set to `private`. Otherwise defaults to `DesktopsAndApps",
+				Description: "Delivery type of the delivery group. Available values are `DesktopsOnly`, `AppsOnly`, and `DesktopsAndApps`. Defaults to `DesktopsOnly` for Delivery Groups with associated Machine Catalogs that have `allocation_type` set to `Static` and for Delivery Groups that have `sharing_kind` set to `private`. Otherwise defaults to `DesktopsAndApps`.",
 				Optional:    true,
 				Validators: []validator.String{
 					util.GetValidatorFromEnum(citrixorchestration.AllowedDeliveryKindEnumValues),
@@ -1366,10 +1366,10 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"make_resources_available_in_lhc": schema.BoolAttribute{
-				Description: "In the event of a service disruption or loss of connectivity, select if you want Local Host Cache to keep resources in the delivery group available to launch new sessions. Existing sessions are not impacted. " +
+				Description: "In the event of a service disruption or loss of connectivity, select if you want Local Host Cache to keep resources in the delivery group available to launch new sessions. Existing sessions are not impacted." +
 					"\n\n~> **Please Note** This setting only impacts Single Session OS Random (pooled) desktops which are power managed. LHC is always enabled for Single Session OS static and Multi Session OS desktops." +
 					"\n\n-> **Note** When set to `true`, machines will remain available and allow new connections and changes to the machine caused by a user might be present in subsequent sessions. " +
-					"When set to `false`, machines in the delivery group will be unavailable for new connections during a Local Host Cache event. ",
+					"When set to `false`, machines in the delivery group will be unavailable for new connections during a Local Host Cache event.",
 				Optional: true,
 			},
 			"app_protection": DeliveryGroupAppProtection{}.GetSchema(),
@@ -1424,7 +1424,7 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 			},
 			"default_desktop_icon": schema.StringAttribute{
 				Description: "The id of the icon to be used as the default icon for the desktops in the delivery group." +
-					"\n\n~> **Please Note** This option is only supported for Citrix Cloud Customer",
+					"\n\n~> **Please Note** This option is only supported for Citrix Cloud Customer.",
 				Optional: true,
 				Computed: true,
 				Default:  stringdefault.StaticString("1"),

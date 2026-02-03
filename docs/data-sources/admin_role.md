@@ -41,7 +41,7 @@ data "citrix_admin_role" "example_admin_role" {
 
 ~> **Please Note** This field is only applicable for cloud admins. For on-premise admins, the only acceptable value is `true`.
 - `description` (String) Description of the admin role.
-- `is_built_in` (Boolean) Flag to determine if the role was built-in or user defined
+- `is_built_in` (Boolean) Flag to determine if the role was built-in or user defined.
 - `permissions` (Set of String) Permissions to be associated with the admin role. 
 
 -> **Note** To get a list of supported permissions, please refer to [Admin Predefined Permissions for Cloud](https://developer-docs.citrix.com/en-us/citrix-daas-service-apis/citrix-daas-rest-apis/apis/#/Admin-APIs/Admin-GetPredefinedPermissions) and [Admin Predefined Permissions for On-Premise](https://developer-docs.citrix.com/en-us/citrix-virtual-apps-desktops/citrix-cvad-rest-apis/apis/#/Admin-APIs/Admin-GetPredefinedPermissions).

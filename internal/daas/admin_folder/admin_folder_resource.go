@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package admin_folder
 
@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -260,7 +260,7 @@ func (r *adminFolderResource) ModifyPlan(ctx context.Context, req resource.Modif
 
 func getAdminFolder(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, adminFolderIdOrPath string) (*citrixorchestration.AdminFolderResponseModel, error) {
 	getAdminFolderRequest := client.ApiClient.AdminFoldersAPIsDAAS.AdminFoldersGetAdminFolder(ctx, adminFolderIdOrPath)
-	adminFolderResource, httpResp, err := citrixdaasclient.AddRequestData(getAdminFolderRequest, client).Execute()
+	adminFolderResource, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.AdminFolderResponseModel](getAdminFolderRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error reading Admin Folder "+adminFolderIdOrPath,

@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package machine_catalog
 
@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
@@ -1359,7 +1359,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 				fmt.Sprintf("Remote PC access catalog cannot be created when provisioning_type is %s.", provisioningTypePvsStreaming),
 			)
 		}
-	} else if data.ProvisioningType.ValueString() == provisioningTypeManual && data.RemotePcPowerManagementHypervisor.IsNull() {
+	} else if data.ProvisioningType.ValueString() == provisioningTypeManual && !data.RemotePcPowerManagementHypervisor.IsUnknown() && data.RemotePcPowerManagementHypervisor.IsNull() {
 		// Manual provisioning type
 		if !data.IsPowerManaged.IsUnknown() && data.IsPowerManaged.IsNull() {
 			resp.Diagnostics.AddAttributeError(
@@ -1495,7 +1495,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 	}
 
 	deleteVirtualMachines := data.DeleteVirtualMachines.ValueBool()
-	if data.DeleteVirtualMachines.IsNull() && data.ProvisioningType.ValueString() != string(citrixorchestration.PROVISIONINGTYPE_MANUAL) {
+	if !data.DeleteVirtualMachines.IsUnknown() && data.DeleteVirtualMachines.IsNull() && data.ProvisioningType.ValueString() != string(citrixorchestration.PROVISIONINGTYPE_MANUAL) {
 		deleteVirtualMachines = true
 	}
 
@@ -1509,7 +1509,7 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 	}
 
 	deleteMachineAccounts := data.DeleteMachineAccounts.ValueString()
-	if data.DeleteMachineAccounts.IsNull() {
+	if !data.DeleteMachineAccounts.IsUnknown() && data.DeleteMachineAccounts.IsNull() {
 		deleteMachineAccounts = string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE)
 	}
 	if deleteMachineAccounts != string(citrixorchestration.MACHINEACCOUNTDELETEOPTION_NONE) && data.ProvisioningType.ValueString() == string(citrixorchestration.PROVISIONINGTYPE_MANUAL) {
@@ -1656,7 +1656,7 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 		provSchemeState := util.ObjectValueToTypedObject[ProvisioningSchemeModel](ctx, &resp.Diagnostics, state.ProvisioningScheme)
 		machineAccountsInPlan := util.ObjectListToTypedArray[MachineADAccountModel](ctx, &resp.Diagnostics, provSchemePlan.MachineADAccounts)
 
-		if len(machineAccountsInPlan) < int(provSchemePlan.NumTotalMachines.ValueInt64()) && provSchemePlan.MachineAccountCreationRules.IsNull() {
+		if len(machineAccountsInPlan) < int(provSchemePlan.NumTotalMachines.ValueInt64()) && !provSchemePlan.MachineAccountCreationRules.IsUnknown() && provSchemePlan.MachineAccountCreationRules.IsNull() {
 			resp.Diagnostics.AddError(
 				"Error updating Machine Catalog "+state.Name.ValueString(),
 				"`machine_account_creation_rules` must be specified when machine accounts associated with catalog is less than the desired number of machines.",
@@ -1730,7 +1730,7 @@ func (r *machineCatalogResource) ModifyPlan(ctx context.Context, req resource.Mo
 		}
 
 		if provSchemePlan.IdentityType.ValueString() == string(citrixorchestration.IDENTITYTYPE_AZURE_AD) {
-			if provSchemePlan.MachineDomainIdentity.IsNull() && !provSchemeState.MachineDomainIdentity.IsNull() {
+			if !provSchemePlan.MachineDomainIdentity.IsUnknown() && provSchemePlan.MachineDomainIdentity.IsNull() && !provSchemeState.MachineDomainIdentity.IsNull() {
 				resp.Diagnostics.AddError(
 					"Error updating Machine Catalog "+state.Name.ValueString(),
 					"Service Account cannot be removed when identity type is Azure AD.",

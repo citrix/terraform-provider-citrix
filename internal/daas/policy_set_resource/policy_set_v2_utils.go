@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package policy_set_resource
 
@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/policies"
 	"github.com/citrix/terraform-provider-citrix/internal/util"

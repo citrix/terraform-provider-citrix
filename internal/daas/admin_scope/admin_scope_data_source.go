@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package admin_scope
 
@@ -73,7 +73,7 @@ func (d *AdminScopeDataSource) Read(ctx context.Context, req datasource.ReadRequ
 	}
 
 	getAdminScopeRequest := d.client.ApiClient.AdminAPIsDAAS.AdminGetAdminScope(ctx, adminScopeNameOrId)
-	adminScope, httpResp, err := citrixdaasclient.AddRequestData(getAdminScopeRequest, d.client).Execute()
+	adminScope, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ScopeResponseModel](getAdminScopeRequest, d.client)
 
 	if err != nil && httpResp != nil && httpResp.StatusCode == http.StatusNotFound {
 		// Check for Tenant ID

@@ -770,7 +770,7 @@ resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
 
 - `allocation_type` (String) Denotes how the machines in the catalog are allocated to a user. Choose between `Static` and `Random`. Allocation type should be `Random` when `session_support = MultiSession`.
 - `name` (String) Name of the machine catalog.
-- `provisioning_type` (String) Specifies how the machines are provisioned in the catalog.
+- `provisioning_type` (String) Specifies how the machines are provisioned in the catalog. Possible values are `MCS`, `Manual`, and `PVSStreaming`.
 - `session_support` (String) Session support type. Choose between `SingleSession` and `MultiSession`. Session support should be SingleSession when `is_remote_pc = true`.
 - `zone` (String) Id of the zone the machine catalog is associated with.
 
@@ -785,7 +785,7 @@ resource "citrix_machine_catalog" "example-non-domain-joined-azure-mcs" {
 - `description` (String) Description of the machine catalog.
 - `is_power_managed` (Boolean) Specify if the machines in the machine catalog will be power managed.
 - `is_remote_pc` (Boolean) Specify if this catalog is for Remote PC access.
-- `machine_accounts` (Attributes List) Machine accounts to add to the catalog. Only to be used when using `provisioning_type = MANUAL` (see [below for nested schema](#nestedatt--machine_accounts))
+- `machine_accounts` (Attributes List) Machine accounts to add to the catalog. Only to be used when using `provisioning_type = MANUAL`. (see [below for nested schema](#nestedatt--machine_accounts))
 - `machine_catalog_folder_path` (String) The path to the folder in which the machine catalog is located.
 - `metadata` (Attributes List) Metadata for the Machine Catalog. (see [below for nested schema](#nestedatt--metadata))
 - `minimum_functional_level` (String) Specifies the minimum functional level for the VDA machines in the catalog. Defaults to `L7_20`.

@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package stf_deployment
 
@@ -47,7 +47,7 @@ func (*stfDeploymentResource) ValidateConfig(ctx context.Context, req resource.V
 	}
 
 	// Validate Roaming Beacon Configuration: It can only exist if Roaming Gateway is present
-	if !data.RoamingBeacon.IsNull() && data.RoamingGateway.IsNull() {
+	if !data.RoamingBeacon.IsNull() && !data.RoamingGateway.IsUnknown() && data.RoamingGateway.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("roaming_beacon"),
 			"Roaming Beacon Configuration Error",
@@ -64,7 +64,7 @@ func (*stfDeploymentResource) ValidateConfig(ctx context.Context, req resource.V
 				staUrlList := util.ObjectListToTypedArray[STFSecureTicketAuthority](ctx, &resp.Diagnostics, roamingGateway.SecureTicketAuthorityUrls)
 				for _, staUrl := range staUrlList {
 					if staUrl.StaValidationEnabled.ValueBool() {
-						if staUrl.StaValidationSecret.IsNull() {
+						if !staUrl.StaValidationSecret.IsUnknown() && staUrl.StaValidationSecret.IsNull() {
 							resp.Diagnostics.AddAttributeError(
 								path.Root("secure_ticket_authority_urls"),
 								"Incorrect Attribute Configuration",

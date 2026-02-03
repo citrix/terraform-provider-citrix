@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package site_backup_schedule
 
@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -34,7 +34,7 @@ type SiteBackupScheduleModel struct {
 
 func (SiteBackupScheduleModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "Backup schedule configuration.",
+		Description: "Site Configuration --- Backup schedule configuration.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "Unique identifier of the backup schedule.",
@@ -72,7 +72,7 @@ func (SiteBackupScheduleModel) GetSchema() schema.Schema {
 				},
 			},
 			"frequency": schema.StringAttribute{
-				Description: "Frequency of the backup schedule. Defaults to `Daily`.",
+				Description: "Frequency of the backup schedule. Possible values are `Daily`, `Weekly`, and `Monthly`. Defaults to `Daily`.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(string(citrixorchestration.BACKUPRESTORESCHEDULEFREQUENCY_DAILY)),

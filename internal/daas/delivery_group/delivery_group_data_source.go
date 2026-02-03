@@ -1,10 +1,11 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package delivery_group
 
 import (
 	"context"
 
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
@@ -72,7 +73,7 @@ func (d *DeliveryGroupDataSource) Read(ctx context.Context, req datasource.ReadR
 	}
 
 	getDeliveryGroupRequest := d.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroup(ctx, deliveryGroupPathOrId)
-	deliveryGroup, httpResp, err := citrixdaasclient.AddRequestData(getDeliveryGroupRequest, d.client).Execute()
+	deliveryGroup, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.DeliveryGroupDetailResponseModel](getDeliveryGroupRequest, d.client)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading Delivery Group "+deliveryGroupNameOrId,

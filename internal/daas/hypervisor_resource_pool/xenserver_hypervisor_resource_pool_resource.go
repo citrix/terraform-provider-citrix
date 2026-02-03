@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package hypervisor_resource_pool
 
@@ -276,7 +276,7 @@ func (r *xenserverHypervisorResourcePoolResource) ImportState(ctx context.Contex
 
 	// Support for importing hypervisor resource pool with only resource pool id
 	getHypervisorsAndResourcePoolsRequest := r.client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorsAndResourcePools(ctx)
-	hypervisorAndResourcePools, httpResp, err := citrixdaasclient.AddRequestData(getHypervisorsAndResourcePoolsRequest, r.client).Execute()
+	hypervisorAndResourcePools, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.HypervisorsAndResourcePoolsResponseModelCollection](getHypervisorsAndResourcePoolsRequest, r.client)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error getting Hypervisor and Resource Pools",

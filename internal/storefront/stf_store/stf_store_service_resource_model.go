@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package stf_store
 
@@ -62,7 +62,7 @@ type FASResilienceConfig struct {
 func (FASResilienceConfig) GetSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
 		Optional:    true,
-		Description: "FAS Resilience configuration for the Store",
+		Description: "FAS Resilience configuration for the Store.",
 		Attributes: map[string]schema.Attribute{
 			"enabled": schema.BoolAttribute{
 				Description: "Whether FAS Resilience is enabled for the Store. Default is true.",
@@ -99,7 +99,7 @@ type OptimalLaunchGateway struct {
 func (OptimalLaunchGateway) GetSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
 		Optional:    true,
-		Description: "Optimal launch gateway selection for the Store",
+		Description: "Optimal launch gateway selection for the Store.",
 		Attributes: map[string]schema.Attribute{
 			"gateway_name": schema.StringAttribute{
 				Description: "The name of the Gateway.",
@@ -298,7 +298,7 @@ type RoamingAccount struct {
 
 func (RoamingAccount) GetSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
-		Description: "Roaming account settings for the Store",
+		Description: "Roaming account settings for the Store.",
 		Optional:    true,
 		Attributes: map[string]schema.Attribute{
 			"published": schema.BoolAttribute{
@@ -356,7 +356,7 @@ type FarmSettings struct {
 
 func (LaunchOptions) GetSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
-		Description: "Launch options for the Store",
+		Description: "Launch options for the Store.",
 		Optional:    true,
 		Attributes: map[string]schema.Attribute{
 			"address_resolution_type": schema.StringAttribute{
@@ -537,7 +537,7 @@ func (FarmSettings) GetAttributes() map[string]schema.Attribute {
 
 func (EnumerationOptions) GetSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
-		Description: "Enumeration options for the Store",
+		Description: "Enumeration options for the Store.",
 		Optional:    true,
 		Attributes: map[string]schema.Attribute{
 			"enhanced_enumeration": schema.BoolAttribute{
@@ -637,7 +637,7 @@ func (PNA) GetAttributes() map[string]schema.Attribute {
 func (PNA) GetSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
 		Optional:    true,
-		Description: "StoreFront PNA (Program Neighborhood Agent) state of the Store",
+		Description: "StoreFront PNA (Program Neighborhood Agent) state of the Store.",
 		Attributes: map[string]schema.Attribute{
 			"enable": schema.BoolAttribute{
 				Description: "Whether PNA is enabled for the Store.",
@@ -891,7 +891,7 @@ func (STFStoreServiceResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"friendly_name": schema.StringAttribute{
-				Description: "The friendly name of the Store",
+				Description: "The friendly name of the Store.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{

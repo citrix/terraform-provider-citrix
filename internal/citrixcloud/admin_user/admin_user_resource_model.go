@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package cc_admin_user
 
@@ -170,14 +170,14 @@ func (CCAdminUserResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"external_provider_id": schema.StringAttribute{
-				Description: " External provider Id for directory. For `AzureAd`, specify the external tenant ID. For `Ad`, specify the AD domain name in FQDN format (e.g., MyDomain.com)",
+				Description: " External provider Id for directory. For `AzureAd`, specify the external tenant ID. For `Ad`, specify the AD domain name in FQDN format (e.g., MyDomain.com).",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"external_user_id": schema.StringAttribute{
-				Description: "External objectId for user or group from the directory",
+				Description: "External objectId for user or group from the directory.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),

@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package util
 
@@ -81,8 +81,10 @@ func (AzureDiskEncryptionSetModel) GetSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
 		Description: "The configuration for Disk Encryption Set (DES). The DES must be in the same subscription and region as your resources. If your master image is encrypted with a DES, use the same DES when creating this machine catalog. When using a DES, if you later disable the key with which the corresponding DES is associated in Azure, you can no longer power on the machines in this catalog or add machines to it.",
 		Optional:    true,
+		Computed:    true,
 		PlanModifiers: []planmodifier.Object{
 			objectplanmodifier.RequiresReplace(),
+			objectplanmodifier.UseStateForUnknown(),
 		},
 		Attributes: map[string]schema.Attribute{
 			"disk_encryption_set_name": schema.StringAttribute{
@@ -227,7 +229,9 @@ func (NetworkMappingModel) GetDataSourceAttributes() map[string]dataSourceSchema
 }
 
 func (networkMapping NetworkMappingModel) RefreshListItem(_ context.Context, _ *diag.Diagnostics, nic citrixorchestration.NetworkMapResponseModel) ResourceModelWithAttributes {
-	networkMapping.NetworkDevice = types.StringValue(nic.GetDeviceId())
+	if !strings.EqualFold(networkMapping.NetworkDevice.ValueString(), nic.GetDeviceId()) {
+		networkMapping.NetworkDevice = types.StringValue(nic.GetDeviceId())
+	}
 	network := nic.GetNetwork()
 	segments := strings.Split(network.GetXDPath(), "\\")
 	lastIndex := len(segments)
@@ -241,7 +245,11 @@ func (networkMapping NetworkMappingModel) RefreshListItem(_ context.Context, _ *
 		 */
 		networkName = strings.ReplaceAll(strings.Split((networkName), " ")[0], "`/", "/")
 	}
-	networkMapping.Network = types.StringValue(networkName)
+
+	if !strings.EqualFold(networkMapping.Network.ValueString(), networkName) {
+		networkMapping.Network = types.StringValue(networkName)
+	}
+
 	return networkMapping
 }
 

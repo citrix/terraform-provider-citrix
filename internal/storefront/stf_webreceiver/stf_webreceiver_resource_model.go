@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package stf_webreceiver
 
@@ -1127,7 +1127,7 @@ func (STFWebReceiverResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"friendly_name": schema.StringAttribute{
-				Description: "The friendly name of the WebReceiver",
+				Description: "The friendly name of the WebReceiver.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{

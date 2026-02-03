@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package policy_filters
 
@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"regexp"
 
-	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -58,7 +58,7 @@ func (AccessControlFilterModel) GetSchema() schema.Schema {
 				Required:    true,
 			},
 			"connection_type": schema.StringAttribute{
-				Description: "Gateway connection for the policy filter.",
+				Description: "Gateway connection for the policy filter. Possible values are `WithAccessGateway` and `WithoutAccessGateway`.",
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.OneOf([]string{

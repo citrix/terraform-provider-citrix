@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package qcs_image
 
@@ -47,6 +47,8 @@ func (d *AwsWorkspacesImageDataSource) Configure(ctx context.Context, req dataso
 }
 
 func (d *AwsWorkspacesImageDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
 	var data AwsWorkspacesImageModel
 
 	// Read Terraform configuration data into the model

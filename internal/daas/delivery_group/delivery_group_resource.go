@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package delivery_group
 
@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
@@ -617,7 +617,7 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 		errorSummary := "Incorrect Attribute Configuration"
 		errorDetail := "session_support and sharing_kind must be specified if no machine catalogs are associated."
 
-		if data.SessionSupport.IsNull() {
+		if !data.SessionSupport.IsUnknown() && data.SessionSupport.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("session_support"),
 				errorSummary,
@@ -627,7 +627,7 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 			return
 		}
 
-		if data.SharingKind.IsNull() {
+		if !data.SharingKind.IsUnknown() && data.SharingKind.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("sharing_kind"),
 				errorSummary,
@@ -761,7 +761,7 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 		return
 	}
 
-	if plan.AssociatedMachineCatalogs.IsNull() || len(associatedMachineCatalogs) == 0 {
+	if !plan.AssociatedMachineCatalogs.IsUnknown() && (plan.AssociatedMachineCatalogs.IsNull() || len(associatedMachineCatalogs) == 0) {
 		errorSummary := fmt.Sprintf("Error %s Delivery Group", operation)
 		feature := "Delivery Groups without associated machine catalogs"
 		isFeatureSupportedForCurrentDDC := util.CheckProductVersion(r.client, &resp.Diagnostics, 118, 118, 7, 42, errorSummary, feature)
@@ -834,7 +834,7 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 		return
 	}
 
-	if associatedMachineCatalogProperties.IsRemotePcCatalog && plan.Desktops.IsNull() && len(plan.Desktops.Elements()) > 1 {
+	if associatedMachineCatalogProperties.IsRemotePcCatalog && !plan.Desktops.IsUnknown() && plan.Desktops.IsNull() && len(plan.Desktops.Elements()) > 1 {
 		resp.Diagnostics.AddError(
 			"Error "+operation+" Delivery Group "+plan.Name.ValueString(),
 			"Only one assignment policy rule can be added to a Remote PC Delivery Group",
@@ -852,7 +852,7 @@ func (r *deliveryGroupResource) ModifyPlan(ctx context.Context, req resource.Mod
 				return
 			}
 
-			if desktop.RestrictedAccessUsers.IsNull() {
+			if !desktop.RestrictedAccessUsers.IsUnknown() && desktop.RestrictedAccessUsers.IsNull() {
 				resp.Diagnostics.AddError(
 					"Error "+operation+" Delivery Group "+plan.Name.ValueString(),
 					"restricted_access_users needs to be set for Remote PC Delivery Group with desktop:"+desktop.PublishedName.ValueString(),

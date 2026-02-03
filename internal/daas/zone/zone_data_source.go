@@ -1,10 +1,11 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package zone
 
 import (
 	"context"
 
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
@@ -63,7 +64,7 @@ func (d *ZoneDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	// Get refreshed zone state from Orchestration
 	zoneName := data.Name.ValueString()
 	getZoneRequest := d.client.ApiClient.ZonesAPIsDAAS.ZonesGetZone(ctx, zoneName)
-	zone, httpResp, err := citrixdaasclient.AddRequestData(getZoneRequest, d.client).Execute()
+	zone, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ZoneDetailResponseModel](getZoneRequest, d.client)
 
 	if err != nil {
 		resp.Diagnostics.AddError(

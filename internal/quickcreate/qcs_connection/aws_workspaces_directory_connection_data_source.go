@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package qcs_connection
 
@@ -47,6 +47,8 @@ func (d *AwsWorkspacesDirectoryConnectionDataSource) Configure(ctx context.Conte
 }
 
 func (d *AwsWorkspacesDirectoryConnectionDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
 	var data AwsWorkspacesDirectoryConnectionModel
 
 	// Read Terraform configuration data into the model

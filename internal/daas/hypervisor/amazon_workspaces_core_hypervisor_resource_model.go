@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package hypervisor
 
@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -98,7 +98,7 @@ func (AmazonWorkSpacesCoreHypervisorResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"use_iam_role": schema.BoolAttribute{
-				Description: "When set to `true`, the provider will use the IAM role configured on the Citrix Cloud Connector or Delivery Controller instead of the `api_key` and `secret_key` for authentication. Omit this attribute if you want to use `api_key` and `secret_key` for authentication. Default value is `false`. ",
+				Description: "When set to `true`, the provider will use the IAM role configured on the Citrix Cloud Connector or Delivery Controller instead of the `api_key` and `secret_key` for authentication. Omit this attribute if you want to use `api_key` and `secret_key` for authentication. Default value is `false`.",
 				Optional:    true,
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
