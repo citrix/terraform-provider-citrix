@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package machine_catalog
 
@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
@@ -62,7 +63,7 @@ func (d *PvsDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 
 	// Get the farm id and the pvs site id from the pvs farm and site names
 	getPvsStreamingSitesRequest := d.client.ApiClient.PvsStreamingAPIsDAAS.PvsStreamingGetPvsStreamingSites(ctx)
-	pvsStreamingSitesResponse, httpResp, err := citrixdaasclient.AddRequestData(getPvsStreamingSitesRequest, d.client).Execute()
+	pvsStreamingSitesResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.PvsStreamingSiteResponseModelCollection](getPvsStreamingSitesRequest, d.client)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -95,7 +96,7 @@ func (d *PvsDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 
 	// Use the farm id to fetch the store details
 	getPvsStreamingStoresRequest := d.client.ApiClient.PvsStreamingAPIsDAAS.PvsStreamingGetPvsStreamingStores(ctx, pvsFarmId)
-	pvsStreamingStoresResponse, httpResp, err := citrixdaasclient.AddRequestData(getPvsStreamingStoresRequest, d.client).Execute()
+	pvsStreamingStoresResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.PvsStreamingStoreResponseModelCollection](getPvsStreamingStoresRequest, d.client)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -128,7 +129,7 @@ func (d *PvsDataSource) Read(ctx context.Context, req datasource.ReadRequest, re
 	// Use the farmID, pvs site id and the pvs store id from the previous call to fetch the disklocatorId which is the vdisk id to be used for the pvs deployment
 	getPvsStreamingVdisksRequest := d.client.ApiClient.PvsStreamingAPIsDAAS.PvsStreamingGetPvsStreamingVDisks(ctx)
 	getPvsStreamingVdisksRequest = getPvsStreamingVdisksRequest.FarmId(pvsFarmId).PvsSiteId(pvsSiteId).StoreId(pvsStoreId)
-	pvsStreamingVdisksResponse, httpResp, err := citrixdaasclient.AddRequestData(getPvsStreamingVdisksRequest, d.client).Execute()
+	pvsStreamingVdisksResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.PvsStreamingVDiskResponseModelCollection](getPvsStreamingVdisksRequest, d.client)
 
 	if err != nil {
 		resp.Diagnostics.AddError(

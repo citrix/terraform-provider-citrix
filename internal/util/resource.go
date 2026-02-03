@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package util
 
@@ -235,7 +235,7 @@ func GetAllChildrenForResourcePath(ctx context.Context, client *citrixdaasclient
 
 	req = req.Async(true)
 
-	_, httpResp, err := citrixdaasclient.AddRequestData(req, client).Execute()
+	_, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.HypervisorResourceResponseModel](req, client)
 	if err != nil {
 		return nil, httpResp, err
 	}
@@ -263,7 +263,7 @@ func getSingleResourceFromHypervisor(ctx context.Context, client *citrixdaasclie
 
 	req = req.Async(true)
 
-	_, httpResp, err := citrixdaasclient.AddRequestData(req, client).Execute()
+	_, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.HypervisorResourceResponseModel](req, client)
 	if err != nil {
 		return nil, httpResp, err
 	}
@@ -352,7 +352,7 @@ func getSingleHypervisorResource(ctx context.Context, client *citrixdaasclient.C
 	}
 	req = req.Async(true)
 
-	_, httpResp, err := citrixdaasclient.AddRequestData(req, client).Execute()
+	_, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.HypervisorResourceResponseModel](req, client)
 	if err != nil {
 		return nil, httpResp, err
 	}
@@ -420,7 +420,7 @@ func GetAllResourcePathList(ctx context.Context, client *citrixdaasclient.Citrix
 	req = req.Async(true)
 	req = req.NoCache(noCache)
 
-	_, httpResp, err := citrixdaasclient.AddRequestData(req, client).Execute()
+	_, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.HypervisorResourceResponseModel](req, client)
 	if err != nil {
 		return []string{}
 	}
@@ -465,7 +465,7 @@ func getFilteredResourcePathList(ctx context.Context, client *citrixdaasclient.C
 
 	req = req.Async(true)
 
-	_, httpResp, err := citrixdaasclient.AddRequestData(req, client).Execute()
+	_, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.HypervisorResourceResponseModel](req, client)
 	if err != nil {
 		return []string{}, err
 	}
@@ -623,7 +623,7 @@ func GetAllScopedObjects(ctx context.Context, client *citrixdaasclient.CitrixDaa
 	req := client.ApiClient.AdminAPIsDAAS.AdminGetAdminScopedObjects(ctx, scopeNameOrId)
 	req = req.Limit(250)
 	req = req.ContinuationToken(continuationToken)
-	responseModel, httpResp, err := citrixdaasclient.AddRequestData(req, client).Execute()
+	responseModel, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ScopedObjectResponseModelCollection](req, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error fetching associated objects for admin scope "+scopeNameOrId,

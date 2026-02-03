@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package cvad_site
 
@@ -61,6 +61,8 @@ func (r *siteSettingsResource) Schema(_ context.Context, _ resource.SchemaReques
 
 // Create implements resource.ResourceWithModifyPlan.
 func (r *siteSettingsResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
 	// Retrieve values from plan
 	var plan SiteSettingsModel
 	diags := req.Plan.Get(ctx, &plan)
@@ -239,7 +241,7 @@ func getSiteSettings(ctx context.Context, client *citrixdaasclient.CitrixDaasCli
 		}
 		getSiteSettingsRequest = getSiteSettingsRequest.Authorization(authToken)
 	}
-	getSiteSettingsResult, httpResp, err := getSiteSettingsRequest.Execute()
+	getSiteSettingsResult, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.SiteSettingsResponseModel](getSiteSettingsRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			fmt.Sprintf("Error fetching Site Settings for site %s", siteId),

@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package tags
 
@@ -284,7 +284,7 @@ func (r *TagResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 
 func checkTagNameAvailability(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, tagId string, tagName string) (bool, error) {
 	getTagRequest := client.ApiClient.TagsAPIsDAAS.TagsGetTag(ctx, tagName)
-	tag, httpResp, err := citrixdaasclient.AddRequestData(getTagRequest, client).Execute()
+	tag, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.TagDetailResponseModel](getTagRequest, client)
 	if err != nil {
 		if httpResp.StatusCode == http.StatusNotFound {
 			return true, nil

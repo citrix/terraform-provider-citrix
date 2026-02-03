@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package cma_image
 
@@ -298,7 +298,7 @@ func (r *citrixManagedAzureImageResource) ValidateConfig(ctx context.Context, re
 				"vTPM must be enabled when Secure Boot is enabled",
 			)
 		}
-		if data.GuestDiskUri.IsNull() {
+		if !data.GuestDiskUri.IsUnknown() && data.GuestDiskUri.IsNull() {
 			resp.Diagnostics.AddError(
 				"Error validating Template Image configuration",
 				"Guest Disk URI must be specified when Secure Boot is enabled",

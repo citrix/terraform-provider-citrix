@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package global_app_configuration
 
@@ -718,7 +718,7 @@ func (r *gacSettingsResource) ValidateConfig(ctx context.Context, req resource.V
 		for _, windowsInstance := range windowsList {
 			appSettings := util.ObjectSetToTypedArray[WindowsSettings](ctx, &resp.Diagnostics, windowsInstance.Settings)
 			for _, appSetting := range appSettings {
-				if appSetting.LocalAppAllowList.IsNull() && appSetting.EnterpriseBroswerSSO.IsNull() && appSetting.ExtensionInstallAllowList.IsNull() && appSetting.ValueList.IsNull() && appSetting.ValueString.IsNull() && appSetting.AutoLaunchProtocolsFromOrigins.IsNull() && appSetting.ManagedBookmarks.IsNull() {
+				if !appSetting.LocalAppAllowList.IsUnknown() && appSetting.LocalAppAllowList.IsNull() && !appSetting.EnterpriseBroswerSSO.IsUnknown() && appSetting.EnterpriseBroswerSSO.IsNull() && !appSetting.ExtensionInstallAllowList.IsUnknown() && appSetting.ExtensionInstallAllowList.IsNull() && !appSetting.ValueList.IsUnknown() && appSetting.ValueList.IsNull() && !appSetting.ValueString.IsUnknown() && appSetting.ValueString.IsNull() && !appSetting.AutoLaunchProtocolsFromOrigins.IsUnknown() && appSetting.AutoLaunchProtocolsFromOrigins.IsNull() && !appSetting.ManagedBookmarks.IsUnknown() && appSetting.ManagedBookmarks.IsNull() {
 					resp.Diagnostics.AddError("Error in Windows Settings", "At least one value should be specified for Windows Settings")
 				}
 				if !exactlyOneValueTypeIsSet(appSetting.ValueString.IsNull(), appSetting.ValueList.IsNull(), appSetting.AutoLaunchProtocolsFromOrigins.IsNull(), appSetting.ManagedBookmarks.IsNull(), appSetting.ExtensionInstallAllowList.IsNull(), appSetting.EnterpriseBroswerSSO.IsNull(), appSetting.LocalAppAllowList.IsNull()) {
@@ -734,7 +734,7 @@ func (r *gacSettingsResource) ValidateConfig(ctx context.Context, req resource.V
 		for _, macosInstance := range macosList {
 			appSettings := util.ObjectSetToTypedArray[MacosSettings](ctx, &resp.Diagnostics, macosInstance.Settings)
 			for _, appSetting := range appSettings {
-				if appSetting.EnterpriseBroswerSSO.IsNull() && appSetting.ExtensionInstallAllowList.IsNull() && appSetting.ValueList.IsNull() && appSetting.ValueString.IsNull() && appSetting.AutoLaunchProtocolsFromOrigins.IsNull() && appSetting.ManagedBookmarks.IsNull() {
+				if !appSetting.EnterpriseBroswerSSO.IsUnknown() && appSetting.EnterpriseBroswerSSO.IsNull() && !appSetting.ExtensionInstallAllowList.IsUnknown() && appSetting.ExtensionInstallAllowList.IsNull() && !appSetting.ValueList.IsUnknown() && appSetting.ValueList.IsNull() && !appSetting.ValueString.IsUnknown() && appSetting.ValueString.IsNull() && !appSetting.AutoLaunchProtocolsFromOrigins.IsUnknown() && appSetting.AutoLaunchProtocolsFromOrigins.IsNull() && !appSetting.ManagedBookmarks.IsUnknown() && appSetting.ManagedBookmarks.IsNull() {
 					resp.Diagnostics.AddError("Error in MacOs Settings", "At least one value should be specified for MacOs Settings")
 				}
 				if !exactlyOneValueTypeIsSet(appSetting.ValueString.IsNull(), appSetting.ValueList.IsNull(), appSetting.AutoLaunchProtocolsFromOrigins.IsNull(), appSetting.ManagedBookmarks.IsNull(), appSetting.ExtensionInstallAllowList.IsNull(), appSetting.EnterpriseBroswerSSO.IsNull()) {
@@ -750,7 +750,7 @@ func (r *gacSettingsResource) ValidateConfig(ctx context.Context, req resource.V
 		for _, LinuxInstance := range linuxList {
 			appSettings := util.ObjectSetToTypedArray[LinuxSettings](ctx, &resp.Diagnostics, LinuxInstance.Settings)
 			for _, appSetting := range appSettings {
-				if appSetting.ValueString.IsNull() && appSetting.ValueList.IsNull() && appSetting.AutoLaunchProtocolsFromOrigins.IsNull() && appSetting.ManagedBookmarks.IsNull() && appSetting.ExtensionInstallAllowList.IsNull() {
+				if !appSetting.ValueString.IsUnknown() && appSetting.ValueString.IsNull() && !appSetting.ValueList.IsUnknown() && appSetting.ValueList.IsNull() && !appSetting.AutoLaunchProtocolsFromOrigins.IsUnknown() && appSetting.AutoLaunchProtocolsFromOrigins.IsNull() && !appSetting.ManagedBookmarks.IsUnknown() && appSetting.ManagedBookmarks.IsNull() && !appSetting.ExtensionInstallAllowList.IsUnknown() && appSetting.ExtensionInstallAllowList.IsNull() {
 					resp.Diagnostics.AddError("Error in Linux Settings", "At least one value should be specified for Linux Settings")
 				}
 				if !exactlyOneValueTypeIsSet(appSetting.ValueString.IsNull(), appSetting.ValueList.IsNull(), appSetting.AutoLaunchProtocolsFromOrigins.IsNull(), appSetting.ManagedBookmarks.IsNull(), appSetting.ExtensionInstallAllowList.IsNull()) {
@@ -766,7 +766,7 @@ func (r *gacSettingsResource) ValidateConfig(ctx context.Context, req resource.V
 		for _, chromeosInstance := range chromeosList {
 			appSettings := util.ObjectSetToTypedArray[ChromeosSettings](ctx, &resp.Diagnostics, chromeosInstance.Settings)
 			for _, appSetting := range appSettings {
-				if appSetting.ValueString.IsNull() && appSetting.ValueList.IsNull() {
+				if !appSetting.ValueString.IsUnknown() && appSetting.ValueString.IsNull() && !appSetting.ValueList.IsUnknown() && appSetting.ValueList.IsNull() {
 					resp.Diagnostics.AddError("Error in Chrome OS Settings", "At least one value should be specified for Chrome OS Settings")
 				}
 				if !exactlyOneValueTypeIsSet(appSetting.ValueString.IsNull(), appSetting.ValueList.IsNull()) {
@@ -782,7 +782,7 @@ func (r *gacSettingsResource) ValidateConfig(ctx context.Context, req resource.V
 		for _, html5Instance := range htmls5List {
 			appSettings := util.ObjectSetToTypedArray[Html5Settings](ctx, &resp.Diagnostics, html5Instance.Settings)
 			for _, appSetting := range appSettings {
-				if appSetting.ValueString.IsNull() && appSetting.ValueList.IsNull() {
+				if !appSetting.ValueString.IsUnknown() && appSetting.ValueString.IsNull() && !appSetting.ValueList.IsUnknown() && appSetting.ValueList.IsNull() {
 					resp.Diagnostics.AddError("Error in Html5 Settings", "At least one value should be specified for Html5 Settings")
 				}
 				if !exactlyOneValueTypeIsSet(appSetting.ValueString.IsNull(), appSetting.ValueList.IsNull()) {
@@ -798,7 +798,7 @@ func (r *gacSettingsResource) ValidateConfig(ctx context.Context, req resource.V
 		for _, androidInstance := range androidList {
 			appSettings := util.ObjectSetToTypedArray[AndroidSettings](ctx, &resp.Diagnostics, androidInstance.Settings)
 			for _, appSetting := range appSettings {
-				if appSetting.ValueString.IsNull() && appSetting.ValueList.IsNull() {
+				if !appSetting.ValueString.IsUnknown() && appSetting.ValueString.IsNull() && !appSetting.ValueList.IsUnknown() && appSetting.ValueList.IsNull() {
 					resp.Diagnostics.AddError("Error in Android Settings", "At least one value should be specified for Android Settings")
 				}
 				if !exactlyOneValueTypeIsSet(appSetting.ValueString.IsNull(), appSetting.ValueList.IsNull()) {

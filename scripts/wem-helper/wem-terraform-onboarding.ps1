@@ -1,4 +1,4 @@
-# Copyright © 2025. Citrix Systems, Inc. All Rights Reserved.
+# Copyright © 2026. Citrix Systems, Inc. All Rights Reserved.
 <#
 Currently this script is still in TechPreview
 .SYNOPSIS

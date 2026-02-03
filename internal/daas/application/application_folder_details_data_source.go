@@ -1,10 +1,11 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package application
 
 import (
 	"context"
 
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -64,7 +65,7 @@ func (d *ApplicationDataSource) Read(ctx context.Context, req datasource.ReadReq
 	if !data.Path.IsNull() {
 		applicationFolderPath := util.BuildResourcePathForGetRequest(data.Path.ValueString(), "")
 		getApplicationsRequest := d.client.ApiClient.AdminFoldersAPIsDAAS.AdminFoldersGetAdminFolderApplications(ctx, applicationFolderPath)
-		apps, httpResp, err := citrixdaasclient.AddRequestData(getApplicationsRequest, d.client).Execute()
+		apps, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ApplicationResponseModelCollection](getApplicationsRequest, d.client)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error getting Applications from folder "+data.Path.ValueString(),

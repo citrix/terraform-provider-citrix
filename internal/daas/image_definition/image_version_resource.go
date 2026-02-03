@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package image_definition
 
@@ -361,7 +361,7 @@ func readImageVersion(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 
 func GetImageVersion(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, imageDefinitionId string, imageVersionId string) (*citrixorchestration.ImageVersionResponseModel, error) {
 	getImageVersionRequest := client.ApiClient.ImageDefinitionsAPIsDAAS.ImageDefinitionsGetImageDefinitionImageVersion(ctx, imageDefinitionId, imageVersionId)
-	imageVersionResource, httpResp, err := citrixdaasclient.AddRequestData(getImageVersionRequest, client).Execute()
+	imageVersionResource, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ImageVersionResponseModel](getImageVersionRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error reading Image Version "+imageVersionId,

@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package hypervisor_resource_pool
 
@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
@@ -157,7 +157,7 @@ func waitForProvImagesPendingDelete(ctx context.Context, client *citrixdaasclien
 
 	for time.Now().Before(deadline) {
 		poolDeleteRequest := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorResourcePoolDeletePreview(ctx, hypervisorId, resourcePoolId).Async(true)
-		_, httpResp, err := citrixdaasclient.AddRequestData(poolDeleteRequest, client).Execute()
+		_, httpResp, err := citrixdaasclient.AddRequestData(poolDeleteRequest, client).Execute() //nolint:executewithretry // Actually a DELETE request
 		if err != nil {
 			diagnostics.AddError(
 				"Error fetching resource pool delete preview",

@@ -1,10 +1,11 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package hypervisor_resource_pool
 
 import (
 	"context"
 
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
@@ -70,7 +71,7 @@ func (d *HypervisorResourcePoolDataSource) Read(ctx context.Context, req datasou
 	// Get refreshed hypervisor resource pool state from Orchestration
 	hypervisorName := data.HypervisorName.ValueString()
 	getHypervisorResourcePoolRequest := d.client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorResourcePool(ctx, hypervisorName, resourcePoolNameOrId)
-	resourcePool, httpResp, err := citrixdaasclient.AddRequestData(getHypervisorResourcePoolRequest, d.client).Execute()
+	resourcePool, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.HypervisorResourcePoolDetailResponseModel](getHypervisorResourcePoolRequest, d.client)
 
 	if err != nil {
 		resp.Diagnostics.AddError(

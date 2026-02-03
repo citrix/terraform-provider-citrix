@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package hypervisor
 
@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
-	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
@@ -324,7 +324,7 @@ func (r *amazonWorkSpacesCoreHypervisorResource) ValidateConfig(ctx context.Cont
 	}
 
 	if !data.ApiKey.IsUnknown() || !data.UseIamRole.IsUnknown() || !data.SecretKey.IsUnknown() {
-		if data.ApiKey.IsNull() && !data.UseIamRole.ValueBool() {
+		if !data.ApiKey.IsUnknown() && data.ApiKey.IsNull() && !data.UseIamRole.ValueBool() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("api_key"),
 				"Invalid Attribute Configuration",

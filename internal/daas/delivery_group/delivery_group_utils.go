@@ -1,16 +1,15 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package delivery_group
 
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"slices"
 	"strconv"
 	"strings"
 
-	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -661,7 +660,6 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 	rebootSchedules := util.ObjectListToTypedArray[DeliveryGroupRebootSchedule](ctx, diagnostics, plan.RebootSchedules)
 	deliveryGroupRebootScheduleArray := parseDeliveryGroupRebootScheduleToClientModel(ctx, diagnostics, rebootSchedules)
 
-	var httpResp *http.Response
 	var includedUserIds []string
 	var excludedUserIds []string
 	includedUsersFilterEnabled := false
@@ -670,28 +668,18 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 		includedUsersFilterEnabled = true
 		users := util.ObjectValueToTypedObject[RestrictedAccessUsers](ctx, diagnostics, plan.RestrictedAccessUsers)
 		includedUsers := util.StringSetToStringArray(ctx, diagnostics, users.AllowList)
-		includedUserIds, httpResp, err = util.GetUserIdsUsingIdentity(ctx, client, includedUsers)
+		includedUserIds, _, err = util.GetUserIdsUsingIdentity(ctx, client, diagnostics, includedUsers, "Error fetching user details for delivery group")
 
 		if err != nil {
-			diagnostics.AddError(
-				"Error fetching user details for delivery group",
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+util.ReadClientError(err),
-			)
 			return citrixorchestration.CreateDeliveryGroupRequestModel{}, err
 		}
 
 		if !users.BlockList.IsNull() {
 			excludedUsersFilterEnabled = true
 			excludedUsers := util.StringSetToStringArray(ctx, diagnostics, users.BlockList)
-			excludedUserIds, httpResp, err = util.GetUserIdsUsingIdentity(ctx, client, excludedUsers)
+			excludedUserIds, _, err = util.GetUserIdsUsingIdentity(ctx, client, diagnostics, excludedUsers, "Error fetching user details for delivery group")
 
 			if err != nil {
-				diagnostics.AddError(
-					"Error fetching user details for delivery group",
-					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-						"\nError message: "+util.ReadClientError(err),
-				)
 				return citrixorchestration.CreateDeliveryGroupRequestModel{}, err
 			}
 		}
@@ -902,7 +890,6 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 	rebootSchedules := util.ObjectListToTypedArray[DeliveryGroupRebootSchedule](ctx, diagnostics, plan.RebootSchedules)
 	deliveryGroupRebootScheduleArray := parseDeliveryGroupRebootScheduleToClientModel(ctx, diagnostics, rebootSchedules)
 
-	var httpResp *http.Response
 	includedUserIds := []string{}
 	excludedUserIds := []string{}
 	includedUsersFilterEnabled := false
@@ -928,27 +915,17 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 		includedUsers := util.StringSetToStringArray(ctx, diagnostics, users.AllowList)
 
 		// Call identity to make sure users exist. Extract the Ids from the response
-		includedUserIds, httpResp, err = util.GetUserIdsUsingIdentity(ctx, client, includedUsers)
+		includedUserIds, _, err = util.GetUserIdsUsingIdentity(ctx, client, diagnostics, includedUsers, "Error fetching user details for delivery group")
 		if err != nil {
-			diagnostics.AddError(
-				"Error fetching user details for delivery group",
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+util.ReadClientError(err),
-			)
 			return citrixorchestration.EditDeliveryGroupRequestModel{}, err
 		}
 
 		if !users.BlockList.IsNull() {
 			excludedUsersFilterEnabled = true
 			excludedUsers := util.StringSetToStringArray(ctx, diagnostics, users.BlockList)
-			excludedUserIds, httpResp, err = util.GetUserIdsUsingIdentity(ctx, client, excludedUsers)
+			excludedUserIds, _, err = util.GetUserIdsUsingIdentity(ctx, client, diagnostics, excludedUsers, "Error fetching user details for delivery group")
 
 			if err != nil {
-				diagnostics.AddError(
-					"Error fetching user details for delivery group",
-					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-						"\nError message: "+util.ReadClientError(err),
-				)
 				return citrixorchestration.EditDeliveryGroupRequestModel{}, err
 			}
 		}
@@ -1598,7 +1575,6 @@ func verifyUsersAndParseDeliveryGroupDesktopsToClientModel(ctx context.Context, 
 		includedUserIds := []string{}
 		excludedUserIds := []string{}
 		var err error
-		var httpResp *http.Response
 		includedUsersFilterEnabled := false
 		excludedUsersFilterEnabled := false
 		if !deliveryGroupDesktop.RestrictedAccessUsers.IsNull() {
@@ -1608,27 +1584,17 @@ func verifyUsersAndParseDeliveryGroupDesktopsToClientModel(ctx context.Context, 
 			includedUsers := util.StringSetToStringArray(ctx, diagnostics, users.AllowList)
 
 			// Call identity to make sure users exist. Extract the Ids from the response
-			includedUserIds, httpResp, err = util.GetUserIdsUsingIdentity(ctx, client, includedUsers)
+			includedUserIds, _, err = util.GetUserIdsUsingIdentity(ctx, client, diagnostics, includedUsers, "Error fetching user details for delivery group")
 			if err != nil {
-				diagnostics.AddError(
-					"Error fetching user details for delivery group",
-					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-						"\nError message: "+util.ReadClientError(err),
-				)
 				return desktopRequests, err
 			}
 
 			if !users.BlockList.IsNull() {
 				excludedUsersFilterEnabled = true
 				excludedUsers := util.StringSetToStringArray(ctx, diagnostics, users.BlockList)
-				excludedUserIds, httpResp, err = util.GetUserIdsUsingIdentity(ctx, client, excludedUsers)
+				excludedUserIds, _, err = util.GetUserIdsUsingIdentity(ctx, client, diagnostics, excludedUsers, "Error fetching user details for delivery group")
 
 				if err != nil {
-					diagnostics.AddError(
-						"Error fetching user details for delivery group",
-						"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-							"\nError message: "+util.ReadClientError(err),
-					)
 					return desktopRequests, err
 				}
 			}
@@ -1637,7 +1603,7 @@ func verifyUsersAndParseDeliveryGroupDesktopsToClientModel(ctx context.Context, 
 		if !deliveryGroupDesktop.RestrictToTag.IsNull() {
 			tagId := deliveryGroupDesktop.RestrictToTag.ValueString()
 			getTagRequest := client.ApiClient.TagsAPIsDAAS.TagsGetTag(ctx, tagId)
-			tag, httpResp, err := citrixdaasclient.AddRequestData(getTagRequest, client).Execute()
+			tag, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.TagDetailResponseModel](getTagRequest, client)
 			if err != nil {
 				diagnostics.AddError(
 					"Error fetching tag for delivery group desktop",
@@ -1801,7 +1767,6 @@ func updateDeliveryGroupAndDesktopUsers(ctx context.Context, client *citrixdaasc
 func updateIdentityUserDetails(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, includedUsers []citrixorchestration.IdentityUserResponseModel, excludedUsers []citrixorchestration.IdentityUserResponseModel) ([]citrixorchestration.IdentityUserResponseModel, []citrixorchestration.IdentityUserResponseModel, error) {
 	includedUserNames := []string{}
 	var err error
-	var httpResp *http.Response
 	for _, includedUser := range includedUsers {
 		if includedUser.GetPrincipalName() != "" {
 			includedUserNames = append(includedUserNames, includedUser.GetPrincipalName())
@@ -1811,13 +1776,8 @@ func updateIdentityUserDetails(ctx context.Context, client *citrixdaasclient.Cit
 	}
 
 	if len(includedUserNames) > 0 {
-		includedUsers, httpResp, err = util.GetUsersUsingIdentity(ctx, client, includedUserNames)
+		includedUsers, _, err = util.GetUsersUsingIdentity(ctx, client, diagnostics, includedUserNames, "Error fetching user details for delivery group")
 		if err != nil {
-			diagnostics.AddError(
-				"Error fetching user details for delivery group",
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+util.ReadClientError(err),
-			)
 			return nil, nil, err
 		}
 	}
@@ -1832,13 +1792,8 @@ func updateIdentityUserDetails(ctx context.Context, client *citrixdaasclient.Cit
 	}
 
 	if len(excludedUserNames) > 0 {
-		excludedUsers, httpResp, err = util.GetUsersUsingIdentity(ctx, client, excludedUserNames)
+		excludedUsers, _, err = util.GetUsersUsingIdentity(ctx, client, diagnostics, excludedUserNames, "Error fetching user details for delivery group")
 		if err != nil {
-			diagnostics.AddError(
-				"Error fetching user details for delivery group",
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+util.ReadClientError(err),
-			)
 			return nil, nil, err
 		}
 	}
@@ -2319,7 +2274,7 @@ func setDeliveryGroupTags(ctx context.Context, diagnostics *diag.Diagnostics, cl
 func getDeliveryGroupTags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, deliveryGroupId string) []string {
 	getTagsRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroupTags(ctx, deliveryGroupId)
 	getTagsRequest = getTagsRequest.Fields("Id,Name,Description")
-	tagsResp, httpResp, err := citrixdaasclient.AddRequestData(getTagsRequest, client).Execute()
+	tagsResp, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.TagResponseModelCollection](getTagsRequest, client)
 	return util.ProcessTagsResponseCollection(diagnostics, tagsResp, httpResp, err, "Delivery Group", deliveryGroupId)
 }
 
@@ -2369,13 +2324,8 @@ func getAssignUsersToMachinesRequestModel(ctx context.Context, client *citrixdaa
 		if len(users) == 0 {
 			assignMachinesToUsersRequestModel.SetUsers(users)
 		} else {
-			userIds, httpResp, err := util.GetUserIdsUsingIdentity(ctx, client, users)
+			userIds, _, err := util.GetUserIdsUsingIdentity(ctx, client, diagnostics, users, "Error assigning machine to users")
 			if err != nil {
-				diagnostics.AddError(
-					"Error assigning machine to users",
-					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-						"\nError message: "+util.ReadClientError(err),
-				)
 				return nil, err
 			}
 			assignMachinesToUsersRequestModel.SetUsers(userIds)
@@ -2409,7 +2359,7 @@ func getDeliveryGroupAutoscalePlugins(ctx context.Context, client *citrixdaascli
 	}
 
 	getAutoscalePluginsRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroupAutoscaleGroupPlugins(ctx, deliveryGroupId).Type_(string(citrixorchestration.AUTOSCALEPLUGINTYPE_HOLIDAY)) // Only holiday plugin is supported for now
-	autoscalePlugins, httpResp, err := citrixdaasclient.AddRequestData(getAutoscalePluginsRequest, client).Execute()
+	autoscalePlugins, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.AutoscaleGroupPluginModelCollection](getAutoscalePluginsRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error fetching Delivery Group Autoscale Plugins",

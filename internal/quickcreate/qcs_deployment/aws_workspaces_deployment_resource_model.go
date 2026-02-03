@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package qcs_deployment
 
@@ -315,7 +315,7 @@ func (AwsWorkspacesDeploymentResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"volumes_encryption_key": schema.StringAttribute{
-				Description: "AWS KMS key to be used for workspace encryption. Use `alias/aws/workspaces` for default AWS KMS workspace encryption key. ",
+				Description: "AWS KMS key to be used for workspace encryption. Use `alias/aws/workspaces` for default AWS KMS workspace encryption key.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -336,7 +336,7 @@ func (AwsWorkspacesDeploymentResourceModel) GetSchema() schema.Schema {
 			},
 			"scale_settings": AwsWorkspacesScaleSettingsModel{}.GetSchema(),
 			"user_decoupled_workspaces": schema.BoolAttribute{
-				Description: "Indicates if the user decoupled workspaces are enabled. ",
+				Description: "Indicates if the user decoupled workspaces are enabled.",
 				Required:    true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.RequiresReplace(),

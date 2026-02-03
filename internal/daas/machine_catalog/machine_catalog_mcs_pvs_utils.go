@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package machine_catalog
 
@@ -194,7 +194,7 @@ func setProvSchemePropertiesForCreateCatalog(ctx context.Context, client *citrix
 			}
 		}
 
-		if !azureMachineConfigModel.DiskEncryptionSet.IsNull() {
+		if !azureMachineConfigModel.DiskEncryptionSet.IsUnknown() && !azureMachineConfigModel.DiskEncryptionSet.IsNull() {
 			diskEncryptionSetModel := util.ObjectValueToTypedObject[util.AzureDiskEncryptionSetModel](ctx, diag, azureMachineConfigModel.DiskEncryptionSet)
 			diskEncryptionSet := diskEncryptionSetModel.DiskEncryptionSetName.ValueString()
 			diskEncryptionSetRg := diskEncryptionSetModel.DiskEncryptionSetResourceGroup.ValueString()
@@ -205,6 +205,8 @@ func setProvSchemePropertiesForCreateCatalog(ctx context.Context, client *citrix
 					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 						fmt.Sprintf("\nFailed to locate disk encryption set %s in resource group %s, error: %s", diskEncryptionSet, diskEncryptionSetRg, err.Error()),
 				)
+
+				return nil, err
 			}
 
 			customProp := provisioningScheme.GetCustomProperties()
@@ -2077,7 +2079,7 @@ func getOnPremImagePath(ctx context.Context, client *citrixdaasclient.CitrixDaas
 func getNetworkMappingForSCVMMCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diag *diag.Diagnostics, hypervisorName, hypervisorResourcePoolName, imageVmName string, provisioningSchemePlan ProvisioningSchemeModel) ([]citrixorchestration.NetworkMapRequestModel, error) {
 	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorResourcePoolResources(ctx, hypervisorName, hypervisorResourcePoolName).Children(0).Path(imageVmName).Detail(true)
 
-	result, _, err := citrixdaasclient.AddRequestData(req, client).Execute()
+	result, _, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.HypervisorResourceResponseModel](req, client)
 	if err != nil {
 		return nil, err
 	}

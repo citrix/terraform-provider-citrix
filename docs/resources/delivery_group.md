@@ -225,9 +225,9 @@ resource "citrix_delivery_group" "example-delivery-group" {
 -> **Note** Use `Citrix Gateway connections` as the name for the default policy that is Via Access Gateway and `Non-Citrix Gateway connections` as the name for the default policy that is Not Via Access Gateway. (see [below for nested schema](#nestedatt--default_access_policies))
 - `default_desktop_icon` (String) The id of the icon to be used as the default icon for the desktops in the delivery group.
 
-~> **Please Note** This option is only supported for Citrix Cloud Customer
+~> **Please Note** This option is only supported for Citrix Cloud Customer.
 - `delivery_group_folder_path` (String) The path of the folder in which the delivery group is located.
-- `delivery_type` (String) Delivery type of the delivery group. Available values are `DesktopsOnly`, `AppsOnly`, and `DesktopsAndApps`. Defaults to `DesktopsOnly` for Delivery Groups with associated Machine Catalogs that have `allocation_type` set to `Static` and for Delivery Groups that have `sharing_kind` set to `private`. Otherwise defaults to `DesktopsAndApps
+- `delivery_type` (String) Delivery type of the delivery group. Available values are `DesktopsOnly`, `AppsOnly`, and `DesktopsAndApps`. Defaults to `DesktopsOnly` for Delivery Groups with associated Machine Catalogs that have `allocation_type` set to `Static` and for Delivery Groups that have `sharing_kind` set to `private`. Otherwise defaults to `DesktopsAndApps`.
 - `description` (String) Description of the delivery group.
 - `desktops` (Attributes List) A list of Desktop resources to publish on the delivery group. Only 1 desktop can be added to a Remote PC Delivery Group. (see [below for nested schema](#nestedatt--desktops))
 - `enabled` (Boolean) Whether the delivery group is enabled or not. Defaults to `true`.
@@ -236,7 +236,7 @@ resource "citrix_delivery_group" "example-delivery-group" {
 ~> **Please Note** The force deletion only happens when the `destroy` action is performed, not when setting this parameter to `true`. Once this parameter is set to `true`, there must be a successful `terraform apply` run before a `destroy` to update this value in the resource state. Without a successful `terraform apply` after this parameter is set, this flag will have no effect. If setting this field in the same operation that would require replacing the delivery group or destroying the delivery group, this flag will not work. Additionally when importing a delivery group, a successful `terraform apply` is required to set this value in state before it will take effect on a destroy operation.
 - `in_maintenance_mode` (Boolean) Indicates whether the delivery group is in maintenance mode. Defaults to `false`.
 - `load_balancing_type` (String) Specifies the load balancing type for the delivery group. Supported values are `None`, `Horizontal`, and `Vertical`. Defaults to `None`.
-- `make_resources_available_in_lhc` (Boolean) In the event of a service disruption or loss of connectivity, select if you want Local Host Cache to keep resources in the delivery group available to launch new sessions. Existing sessions are not impacted. 
+- `make_resources_available_in_lhc` (Boolean) In the event of a service disruption or loss of connectivity, select if you want Local Host Cache to keep resources in the delivery group available to launch new sessions. Existing sessions are not impacted.
 
 ~> **Please Note** This setting only impacts Single Session OS Random (pooled) desktops which are power managed. LHC is always enabled for Single Session OS static and Multi Session OS desktops.
 

@@ -1,0 +1,15 @@
+# golangci-lint custom binary configuration for module plugins
+version: v2.7.2
+
+# The name of the custom binary
+name: custom-gcl
+
+# The directory path used to store the custom binary
+destination: ./custom-linters/bin
+
+# The list of plugins to integrate
+plugins:
+  # Our local panichandler plugin
+  - module: 'github.com/citrix/terraform-provider-citrix/custom-linters'
+    import: 'github.com/citrix/terraform-provider-citrix/custom-linters'
+    path: ./custom-linters

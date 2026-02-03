@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package test
 
@@ -123,12 +123,10 @@ func sharedClientForSweepers(ctx context.Context) *citrixclient.CitrixDaasClient
 
 	// Initialize CVAD client
 	client := &citrixclient.CitrixDaasClient{}
-	//nolint:errcheck // Test setup, errors not critical
 	token, _, _ := client.SetupCitrixClientsContext(ctx, authUrl, ccUrl, hostname, customerId, clientId, clientSecret, onPremises, apiGateway, isGov, disableSslVerification, &userAgent, environment, middleware.MiddlewareAuthFunc, middleware.MiddlewareAuthWithCustomerIdHeaderFunc)
 	if !onPremises {
 		client.InitializeCitrixCloudClients(ctx, ccUrl, hostname, middleware.MiddlewareAuthFunc, middleware.MiddlewareAuthWithCustomerIdHeaderFunc)
 	}
-	//nolint:errcheck // Test setup, errors not critical
 	_, _ = client.InitializeCitrixDaasClient(ctx, customerId, token, onPremises, apiGateway, disableSslVerification, &userAgent)
 
 	// Set Quick Deploy Client

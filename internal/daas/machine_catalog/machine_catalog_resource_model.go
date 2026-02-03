@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package machine_catalog
 
@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/citrix/terraform-provider-citrix/internal/validators"
@@ -513,7 +513,7 @@ func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 				Default:     stringdefault.StaticString(""),
 			},
 			"persist_user_changes": schema.StringAttribute{
-				Description: "Specify if user changes are persisted on the machines in the machine catalog. Choose between `Discard` and `OnLocal`. Defaults to OnLocal for manual or non-PVS single session static catalogs, Discard otherwise. ",
+				Description: "Specify if user changes are persisted on the machines in the machine catalog. Choose between `Discard` and `OnLocal`. Defaults to OnLocal for manual or non-PVS single session static catalogs, Discard otherwise.",
 				Optional:    true,
 				Computed:    true,
 				Validators: []validator.String{
@@ -580,7 +580,7 @@ func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"provisioning_type": schema.StringAttribute{
-				Description: "Specifies how the machines are provisioned in the catalog.",
+				Description: "Specifies how the machines are provisioned in the catalog. Possible values are `MCS`, `Manual`, and `PVSStreaming`.",
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.OneOf(
@@ -594,7 +594,7 @@ func (MachineCatalogResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"machine_accounts": schema.ListNestedAttribute{
-				Description:  "Machine accounts to add to the catalog. Only to be used when using `provisioning_type = MANUAL`",
+				Description:  "Machine accounts to add to the catalog. Only to be used when using `provisioning_type = MANUAL`.",
 				Optional:     true,
 				NestedObject: MachineAccountsModel{}.GetSchema(),
 				Validators: []validator.List{

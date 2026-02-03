@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package service_account
 
@@ -17,7 +17,7 @@ func GetServiceAccountUsingAccountId(ctx context.Context, client *citrixdaasclie
 	getServiceAccountsRequest := client.ApiClient.IdentityAPIsDAAS.IdentityGetServiceAccounts(ctx)
 
 	// Get all service accounts
-	serviceAccounts, httpResp, err := citrixdaasclient.AddRequestData(getServiceAccountsRequest, client).Execute()
+	serviceAccounts, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ServiceAccountResponseModelCollection](getServiceAccountsRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error reading Service Accounts",

@@ -44,7 +44,7 @@ resource "citrix_access_control_policy_filter" "example_access_control_policy_fi
 
 - `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
 - `condition` (String) Gateway condition for the policy filter.
-- `connection_type` (String) Gateway connection for the policy filter.
+- `connection_type` (String) Gateway connection for the policy filter. Possible values are `WithAccessGateway` and `WithoutAccessGateway`.
 - `enabled` (Boolean) Indicate whether the filter is being enabled.
 - `gateway` (String) Gateway for the policy filter.
 - `policy_id` (String) Id of the policy to which the filter belongs.

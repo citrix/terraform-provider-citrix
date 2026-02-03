@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package machine_catalog
 
@@ -450,12 +450,12 @@ func setMachineCatalogTags(ctx context.Context, diagnostics *diag.Diagnostics, c
 func getMachineCatalogMachineADAccounts(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, machineCatalogId string) ([]citrixorchestration.ProvisioningSchemeMachineAccountResponseModel, error) {
 	accounts := []citrixorchestration.ProvisioningSchemeMachineAccountResponseModel{}
 	errorMessage := fmt.Sprintf("Error getting machine AD accounts for Machine Catalog %s", machineCatalogId)
-	getADAccountsRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogMachineAccounts(ctx, machineCatalogId).Limit(100)
+	getADAccountsRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogMachineAccounts(ctx, machineCatalogId).Limit(100).Async(true)
 
 	adAccountsResp := &citrixorchestration.ProvisioningSchemeMachineAccountResponseModelCollection{}
 	for ok := true; ok; ok = adAccountsResp.HasContinuationToken() {
 		getADAccountsRequest = getADAccountsRequest.ContinuationToken(adAccountsResp.GetContinuationToken())
-		_, httpResp, err := citrixdaasclient.AddRequestData(getADAccountsRequest, client).Async(true).Execute()
+		_, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ProvisioningSchemeMachineAccountResponseModelCollection](getADAccountsRequest, client)
 
 		if err != nil {
 			diagnostics.AddError(
@@ -480,7 +480,7 @@ func getMachineCatalogMachineADAccounts(ctx context.Context, diagnostics *diag.D
 func getMachineCatalogTags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, machineCatalogId string) []string {
 	getTagsRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogTags(ctx, machineCatalogId)
 	getTagsRequest = getTagsRequest.Fields("Id,Name,Description")
-	tagsResp, httpResp, err := citrixdaasclient.AddRequestData(getTagsRequest, client).Execute()
+	tagsResp, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.TagResponseModelCollection](getTagsRequest, client)
 	return util.ProcessTagsResponseCollection(diagnostics, tagsResp, httpResp, err, "Machine Catalog", machineCatalogId)
 }
 

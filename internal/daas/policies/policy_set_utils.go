@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package policies
 
@@ -630,7 +630,7 @@ func clearPolicyFilters(ctx context.Context, client *citrixdaasclient.CitrixDaas
 	readFiltersRequest := client.ApiClient.GpoDAAS.GpoReadGpoFilters(ctx)
 	readFiltersRequest = readFiltersRequest.PolicyGuid(policyId)
 
-	filtersResponse, httpResp, err := citrixdaasclient.AddRequestData(readFiltersRequest, client).Execute()
+	filtersResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.CollectionEnvelopeOfFilterResponse](readFiltersRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error updating Policy Filters for Policy "+policyId,
