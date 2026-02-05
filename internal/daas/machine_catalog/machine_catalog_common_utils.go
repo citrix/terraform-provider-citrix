@@ -450,7 +450,7 @@ func setMachineCatalogTags(ctx context.Context, diagnostics *diag.Diagnostics, c
 func getMachineCatalogMachineADAccounts(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, machineCatalogId string) ([]citrixorchestration.ProvisioningSchemeMachineAccountResponseModel, error) {
 	accounts := []citrixorchestration.ProvisioningSchemeMachineAccountResponseModel{}
 	errorMessage := fmt.Sprintf("Error getting machine AD accounts for Machine Catalog %s", machineCatalogId)
-	getADAccountsRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogMachineAccounts(ctx, machineCatalogId).Limit(100)
+	getADAccountsRequest := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogMachineAccounts(ctx, machineCatalogId).Limit(100).Async(true)
 
 	adAccountsResp := &citrixorchestration.ProvisioningSchemeMachineAccountResponseModelCollection{}
 	for ok := true; ok; ok = adAccountsResp.HasContinuationToken() {

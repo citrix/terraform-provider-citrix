@@ -120,13 +120,8 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 		createApplicationRequest.SetIncludedUsers([]string{})
 	} else {
 		limitVisibilityToUsers := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.LimitVisibilityToUsers)
-		limitVisibilityToUserIds, httpResponse, err := util.GetUserIdsUsingIdentity(ctx, r.client, limitVisibilityToUsers)
+		limitVisibilityToUserIds, _, err := util.GetUserIdsUsingIdentity(ctx, r.client, &resp.Diagnostics, limitVisibilityToUsers, "Error fetching user details for application resource")
 		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error fetching user details for application resource",
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResponse)+
-					"\nError message: "+util.ReadClientError(err),
-			)
 			return
 		}
 		createApplicationRequest.SetIncludedUsers(limitVisibilityToUserIds)
@@ -311,13 +306,8 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 		editApplicationRequestBody.SetIncludedUsers([]string{})
 	} else {
 		limitVisibilityToUsers := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.LimitVisibilityToUsers)
-		limitVisibilityToUserIds, httpResponse, err := util.GetUserIdsUsingIdentity(ctx, r.client, limitVisibilityToUsers)
+		limitVisibilityToUserIds, _, err := util.GetUserIdsUsingIdentity(ctx, r.client, &resp.Diagnostics, limitVisibilityToUsers, "Error fetching user details for application resource")
 		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error fetching user details for application resource",
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResponse)+
-					"\nError message: "+util.ReadClientError(err),
-			)
 			return
 		}
 		editApplicationRequestBody.SetIncludedUsers(limitVisibilityToUserIds)

@@ -1343,7 +1343,7 @@ func FetchScopes(ctx context.Context, client *citrixdaasclient.CitrixDaasClient,
 	}
 }
 
-func GetUsersUsingIdentity(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, users []string) ([]citrixorchestration.IdentityUserResponseModel, *http.Response, error) {
+func GetUsersUsingIdentity(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, users []string, errorMessage string) ([]citrixorchestration.IdentityUserResponseModel, *http.Response, error) {
 	allUsersFromIdentity := []citrixorchestration.IdentityUserResponseModel{}
 	var httpResp *http.Response
 	var azureAdUsers *citrixorchestration.IdentityUserResponseModelCollection
@@ -1351,12 +1351,23 @@ func GetUsersUsingIdentity(ctx context.Context, client *citrixdaasclient.CitrixD
 	var err error
 
 	usersChunks := ChunkSlice(users, 25)
-	getIncludedUsersRequest := client.ApiClient.IdentityAPIsDAAS.IdentityGetUsers(ctx)
+	getIncludedUsersRequest := client.ApiClient.IdentityAPIsDAAS.IdentityGetUsers(ctx).Async(true)
 
 	for _, usersChunk := range usersChunks {
 		getIncludedUsersRequest = getIncludedUsersRequest.User(usersChunk).UserType(citrixorchestration.IDENTITYUSERTYPE_ALL)
-		adUsers, httpResp, err = citrixdaasclient.ExecuteWithRetry[*citrixorchestration.IdentityUserResponseModelCollection](getIncludedUsersRequest, client)
+		_, httpResp, err = citrixdaasclient.ExecuteWithRetry[*citrixorchestration.IdentityUserResponseModelCollection](getIncludedUsersRequest, client)
 
+		if err != nil {
+			diagnostics.AddError(
+				errorMessage,
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+ReadClientError(err),
+			)
+
+			return allUsersFromIdentity, httpResp, err
+		}
+
+		adUsers, err = GetAsyncJobResult[*citrixorchestration.IdentityUserResponseModelCollection](ctx, client, httpResp, errorMessage, diagnostics, 5)
 		if err != nil {
 			return allUsersFromIdentity, httpResp, err
 		}
@@ -1365,8 +1376,18 @@ func GetUsersUsingIdentity(ctx context.Context, client *citrixdaasclient.CitrixD
 
 		if len(allUsersFromIdentity) < len(usersChunk) {
 			getIncludedUsersRequest = getIncludedUsersRequest.User(usersChunk).UserType(citrixorchestration.IDENTITYUSERTYPE_ALL).Provider(citrixorchestration.IDENTITYPROVIDERTYPE_ALL)
-			azureAdUsers, httpResp, err = citrixdaasclient.ExecuteWithRetry[*citrixorchestration.IdentityUserResponseModelCollection](getIncludedUsersRequest, client)
+			_, httpResp, err = citrixdaasclient.ExecuteWithRetry[*citrixorchestration.IdentityUserResponseModelCollection](getIncludedUsersRequest, client)
 
+			if err != nil {
+				diagnostics.AddError(
+					errorMessage,
+					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+						"\nError message: "+ReadClientError(err),
+				)
+				return allUsersFromIdentity, httpResp, err
+			}
+
+			azureAdUsers, err = GetAsyncJobResult[*citrixorchestration.IdentityUserResponseModelCollection](ctx, client, httpResp, errorMessage, diagnostics, 5)
 			if err != nil {
 				return allUsersFromIdentity, httpResp, err
 			}
@@ -1378,15 +1399,21 @@ func GetUsersUsingIdentity(ctx context.Context, client *citrixdaasclient.CitrixD
 	err = VerifyIdentityUserListCompleteness(users, allUsersFromIdentity)
 
 	if err != nil {
+		diagnostics.AddError(
+			errorMessage,
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+err.Error(),
+		)
+
 		return allUsersFromIdentity, httpResp, err
 	}
 
 	return allUsersFromIdentity, httpResp, nil
 }
 
-func GetUserIdsUsingIdentity(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, users []string) ([]string, *http.Response, error) {
+func GetUserIdsUsingIdentity(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, users []string, errorMessage string) ([]string, *http.Response, error) {
 	userIds := []string{}
-	allUsersFromIdentity, httpResp, err := GetUsersUsingIdentity(ctx, client, users)
+	allUsersFromIdentity, httpResp, err := GetUsersUsingIdentity(ctx, client, diagnostics, users, errorMessage)
 	if err != nil {
 		return userIds, httpResp, err
 	}

@@ -76,13 +76,8 @@ func (r *applicationGroupResource) Create(ctx context.Context, req resource.Crea
 	if !plan.IncludedUsers.IsNull() {
 		createApplicationGroupRequest.SetIncludedUserFilterEnabled(true)
 		includedUsers := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.IncludedUsers)
-		includedUserIds, httpResp, err := util.GetUserIdsUsingIdentity(ctx, r.client, includedUsers)
+		includedUserIds, _, err := util.GetUserIdsUsingIdentity(ctx, r.client, &resp.Diagnostics, includedUsers, "Error fetching user details for application group")
 		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error fetching user details for application group",
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+util.ReadClientError(err),
-			)
 			return
 		}
 		createApplicationGroupRequest.SetIncludedUsers(includedUserIds)
@@ -243,13 +238,8 @@ func (r *applicationGroupResource) Update(ctx context.Context, req resource.Upda
 	if !plan.IncludedUsers.IsNull() {
 		editApplicationGroupRequestBody.SetIncludedUserFilterEnabled(true)
 		includedUsers := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.IncludedUsers)
-		includedUserIds, httpResp, err := util.GetUserIdsUsingIdentity(ctx, r.client, includedUsers)
+		includedUserIds, _, err := util.GetUserIdsUsingIdentity(ctx, r.client, &resp.Diagnostics, includedUsers, "Error fetching user details for application group "+applicationGroupName)
 		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error fetching user details for application group"+applicationGroupName,
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+util.ReadClientError(err),
-			)
 			return
 		}
 		editApplicationGroupRequestBody.SetIncludedUsers(includedUserIds)
