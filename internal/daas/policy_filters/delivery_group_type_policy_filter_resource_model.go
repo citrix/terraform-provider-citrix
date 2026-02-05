@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package policy_filters
 
@@ -6,7 +6,7 @@ import (
 	"context"
 	"regexp"
 
-	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -55,7 +55,7 @@ func (DeliveryGroupTypeFilterModel) GetSchema() schema.Schema {
 				Required:    true,
 			},
 			"delivery_group_type": schema.StringAttribute{
-				Description: "Type of the delivery groups to be filtered.",
+				Description: "Type of the delivery groups to be filtered. Possible values are `Private`, `PrivateApp`, `Shared`, and `SharedApp`.",
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.OneOf([]string{

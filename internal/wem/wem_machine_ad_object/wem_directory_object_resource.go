@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package wem_machine_ad_object
 
@@ -74,10 +74,10 @@ func NewWemDirectoryResource() resource.Resource {
 
 // Create implements resource.Resource.
 func (w *wemDirectoryResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
 	mutex.Lock()
 	defer mutex.Unlock()
-
-	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
 	var plan WemDirectoryResourceModel
@@ -150,10 +150,10 @@ func (w *wemDirectoryResource) Create(ctx context.Context, req resource.CreateRe
 
 // Delete implements resource.Resource.
 func (w *wemDirectoryResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
 	mutex.Lock()
 	defer mutex.Unlock()
-
-	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Get current state
 	var state WemDirectoryResourceModel
@@ -179,10 +179,10 @@ func (w *wemDirectoryResource) Delete(ctx context.Context, req resource.DeleteRe
 
 // Read implements resource.Resource.
 func (w *wemDirectoryResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
 	mutex.Lock()
 	defer mutex.Unlock()
-
-	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Get current state
 	var state WemDirectoryResourceModel
@@ -210,10 +210,10 @@ func (w *wemDirectoryResource) Read(ctx context.Context, req resource.ReadReques
 
 // Update implements resource.Resource.
 func (w *wemDirectoryResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	defer util.PanicHandler(&resp.Diagnostics)
+
 	mutex.Lock()
 	defer mutex.Unlock()
-
-	defer util.PanicHandler(&resp.Diagnostics)
 
 	// Retrieve values from plan
 	var plan WemDirectoryResourceModel

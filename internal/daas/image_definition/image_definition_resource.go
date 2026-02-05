@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package image_definition
 
@@ -340,7 +340,7 @@ func (r *ImageDefinitionResource) ModifyPlan(ctx context.Context, req resource.M
 		if hypervisor.GetConnectionType() == citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM {
 			if r.client.ClientConfig.OrchestrationApiVersion >= 121 {
 				// At least one type of hypervisor image definition is required for Orchestration API version 121 and above
-				if plan.AzureImageDefinitionModel.IsNull() {
+				if !plan.AzureImageDefinitionModel.IsUnknown() && plan.AzureImageDefinitionModel.IsNull() {
 					resp.Diagnostics.AddError(
 						"Error validating Image Definition configuration",
 						"`azure_image_definition` is required.",
@@ -378,7 +378,7 @@ func (r *ImageDefinitionResource) ModifyPlan(ctx context.Context, req resource.M
 
 	if !plan.AzureImageDefinitionModel.IsUnknown() && !plan.AzureImageDefinitionModel.IsNull() {
 		azureImageDefinition := util.ObjectValueToTypedObject[AzureImageDefinitionModel](ctx, &resp.Diagnostics, plan.AzureImageDefinitionModel)
-		if azureImageDefinition.ResourceGroup.IsNull() && !azureImageDefinition.ImageGalleryName.IsNull() && !azureImageDefinition.ImageGalleryName.IsUnknown() {
+		if !azureImageDefinition.ResourceGroup.IsUnknown() && azureImageDefinition.ResourceGroup.IsNull() && !azureImageDefinition.ImageGalleryName.IsNull() && !azureImageDefinition.ImageGalleryName.IsUnknown() {
 			resp.Diagnostics.AddError(
 				"Error validating Image Definition configuration",
 				"`azure_image_definition` is required when `image_gallery_name` is provided.",
@@ -401,7 +401,7 @@ func (r *ImageDefinitionResource) ModifyPlan(ctx context.Context, req resource.M
 
 func GetImageDefinition(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, imageDefinitionNameOrId string) (*citrixorchestration.ImageDefinitionResponseModel, error) {
 	getImageDefinitionRequest := client.ApiClient.ImageDefinitionsAPIsDAAS.ImageDefinitionsGetImageDefinition(ctx, imageDefinitionNameOrId)
-	imageDefinitionResource, httpResp, err := citrixdaasclient.AddRequestData(getImageDefinitionRequest, client).Execute()
+	imageDefinitionResource, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ImageDefinitionResponseModel](getImageDefinitionRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error reading Image Definition "+imageDefinitionNameOrId,

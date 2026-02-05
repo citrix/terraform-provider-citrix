@@ -35,7 +35,7 @@ resource "citrix_delivery_group_type_policy_filter" "example_delivery_group_type
 ### Required
 
 - `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
-- `delivery_group_type` (String) Type of the delivery groups to be filtered.
+- `delivery_group_type` (String) Type of the delivery groups to be filtered. Possible values are `Private`, `PrivateApp`, `Shared`, and `SharedApp`.
 - `enabled` (Boolean) Indicate whether the filter is being enabled.
 - `policy_id` (String) Id of the policy to which the filter belongs.
 

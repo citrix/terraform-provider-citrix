@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package hypervisor
 
@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
@@ -407,7 +407,7 @@ func (r *azureHypervisorResource) ValidateConfig(ctx context.Context, req resour
 			)
 		}
 	} else {
-		if data.ApplicationSecret.IsNull() {
+		if !data.ApplicationSecret.IsUnknown() && data.ApplicationSecret.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("application_secret"),
 				"application_secret Configuration Error",
@@ -417,7 +417,7 @@ func (r *azureHypervisorResource) ValidateConfig(ctx context.Context, req resour
 	}
 
 	if !data.AuthenticationMode.IsNull() && data.AuthenticationMode.ValueString() == util.SystemAssignedManagedIdentity {
-		if !data.ApplicationId.IsNull() {
+		if !data.ApplicationId.IsUnknown() && !data.ApplicationId.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("application_id"),
 				"application_id Configuration Error.",

@@ -84,15 +84,15 @@ resource "citrix_stf_store_service" "example-stf-store-service" {
 
 - `anonymous` (Boolean) Whether the Store is anonymous. Anonymous Store not requiring authentication.
 - `authentication_service_virtual_path` (String) The Virtual Path of the StoreFront Authentication Service to use for authenticating users.
-- `enumeration_options` (Attributes) Enumeration options for the Store (see [below for nested schema](#nestedatt--enumeration_options))
+- `enumeration_options` (Attributes) Enumeration options for the Store. (see [below for nested schema](#nestedatt--enumeration_options))
 - `farm_settings` (Attributes) Store farm configuration settings for the Store. (see [below for nested schema](#nestedatt--farm_settings))
-- `fas_resilience_config` (Attributes) FAS Resilience configuration for the Store (see [below for nested schema](#nestedatt--fas_resilience_config))
-- `friendly_name` (String) The friendly name of the Store
-- `launch_options` (Attributes) Launch options for the Store (see [below for nested schema](#nestedatt--launch_options))
+- `fas_resilience_config` (Attributes) FAS Resilience configuration for the Store. (see [below for nested schema](#nestedatt--fas_resilience_config))
+- `friendly_name` (String) The friendly name of the Store.
+- `launch_options` (Attributes) Launch options for the Store. (see [below for nested schema](#nestedatt--launch_options))
 - `load_balance` (Boolean) Whether the Store is load balanced.
-- `optimal_launch_gateway` (Attributes) Optimal launch gateway selection for the Store (see [below for nested schema](#nestedatt--optimal_launch_gateway))
-- `pna` (Attributes) StoreFront PNA (Program Neighborhood Agent) state of the Store (see [below for nested schema](#nestedatt--pna))
-- `roaming_account` (Attributes) Roaming account settings for the Store (see [below for nested schema](#nestedatt--roaming_account))
+- `optimal_launch_gateway` (Attributes) Optimal launch gateway selection for the Store. (see [below for nested schema](#nestedatt--optimal_launch_gateway))
+- `pna` (Attributes) StoreFront PNA (Program Neighborhood Agent) state of the Store. (see [below for nested schema](#nestedatt--pna))
+- `roaming_account` (Attributes) Roaming account settings for the Store. (see [below for nested schema](#nestedatt--roaming_account))
 - `site_id` (String) The IIS site id of the StoreFront storeservice. Defaults to 1.
 
 <a id="nestedatt--farms"></a>

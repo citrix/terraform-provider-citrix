@@ -83,8 +83,8 @@ resource "citrix_cloud_admin_user" "example-custom-ad-admin-group" {
 
 - `display_name` (String) Display name for the user.
 - `email` (String) Email of the user where the invitation link will be sent.
-- `external_provider_id` (String) External provider Id for directory. For `AzureAd`, specify the external tenant ID. For `Ad`, specify the AD domain name in FQDN format (e.g., MyDomain.com)
-- `external_user_id` (String) External objectId for user or group from the directory
+- `external_provider_id` (String) External provider Id for directory. For `AzureAd`, specify the external tenant ID. For `Ad`, specify the AD domain name in FQDN format (e.g., MyDomain.com).
+- `external_user_id` (String) External objectId for user or group from the directory.
 - `first_name` (String) First name of the user.
 - `last_name` (String) Last name of the user.
 - `policies` (Attributes List) Policies to be associated with the admin user. Only applicable when access_type is Custom. (see [below for nested schema](#nestedatt--policies))

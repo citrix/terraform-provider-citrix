@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package machine_catalog
 
@@ -2077,7 +2077,7 @@ func getOnPremImagePath(ctx context.Context, client *citrixdaasclient.CitrixDaas
 func getNetworkMappingForSCVMMCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diag *diag.Diagnostics, hypervisorName, hypervisorResourcePoolName, imageVmName string, provisioningSchemePlan ProvisioningSchemeModel) ([]citrixorchestration.NetworkMapRequestModel, error) {
 	req := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisorResourcePoolResources(ctx, hypervisorName, hypervisorResourcePoolName).Children(0).Path(imageVmName).Detail(true)
 
-	result, _, err := citrixdaasclient.AddRequestData(req, client).Execute()
+	result, _, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.HypervisorResourceResponseModel](req, client)
 	if err != nil {
 		return nil, err
 	}

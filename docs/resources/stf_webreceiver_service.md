@@ -119,7 +119,7 @@ resource "citrix_stf_webreceiver_service" "example-stf-webreceiver-service"{
 - `blocking_notification` (Attributes) Blocking Notification settings for the WebReceiver. (see [below for nested schema](#nestedatt--blocking_notification))
 - `communication` (Attributes) Communication settings used for the WebReceiver proxy. (see [below for nested schema](#nestedatt--communication))
 - `discovery_service` (Attributes) Discovery Service settings for the WebReceiver. (see [below for nested schema](#nestedatt--discovery_service))
-- `friendly_name` (String) The friendly name of the WebReceiver
+- `friendly_name` (String) The friendly name of the WebReceiver.
 - `plugin_assistant` (Attributes) Pluin Assistant configuration for the WebReceiver. (see [below for nested schema](#nestedatt--plugin_assistant))
 - `resources_service` (Attributes) Resources Service settings for the WebReceiver. (see [below for nested schema](#nestedatt--resources_service))
 - `site_id` (String) The IIS site id of the StoreFront WebReceiver. Defaults to 1.

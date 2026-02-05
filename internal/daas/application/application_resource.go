@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package application
 
@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
@@ -666,6 +666,6 @@ func validateDeliveryGroupsPriority(ctx context.Context, diagnostics *diag.Diagn
 func getApplicationTags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, applicationId string) []string {
 	getTagsRequest := client.ApiClient.ApplicationsAPIsDAAS.ApplicationsGetApplicationTags(ctx, applicationId)
 	getTagsRequest = getTagsRequest.Fields("Id,Name,Description")
-	tagsResp, httpResp, err := citrixdaasclient.AddRequestData(getTagsRequest, client).Execute()
+	tagsResp, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.TagResponseModelCollection](getTagsRequest, client)
 	return util.ProcessTagsResponseCollection(diagnostics, tagsResp, httpResp, err, "Application", applicationId)
 }

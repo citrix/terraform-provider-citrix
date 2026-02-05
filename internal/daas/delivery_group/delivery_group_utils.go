@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package delivery_group
 
@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -1637,7 +1637,7 @@ func verifyUsersAndParseDeliveryGroupDesktopsToClientModel(ctx context.Context, 
 		if !deliveryGroupDesktop.RestrictToTag.IsNull() {
 			tagId := deliveryGroupDesktop.RestrictToTag.ValueString()
 			getTagRequest := client.ApiClient.TagsAPIsDAAS.TagsGetTag(ctx, tagId)
-			tag, httpResp, err := citrixdaasclient.AddRequestData(getTagRequest, client).Execute()
+			tag, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.TagDetailResponseModel](getTagRequest, client)
 			if err != nil {
 				diagnostics.AddError(
 					"Error fetching tag for delivery group desktop",
@@ -2319,7 +2319,7 @@ func setDeliveryGroupTags(ctx context.Context, diagnostics *diag.Diagnostics, cl
 func getDeliveryGroupTags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, deliveryGroupId string) []string {
 	getTagsRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroupTags(ctx, deliveryGroupId)
 	getTagsRequest = getTagsRequest.Fields("Id,Name,Description")
-	tagsResp, httpResp, err := citrixdaasclient.AddRequestData(getTagsRequest, client).Execute()
+	tagsResp, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.TagResponseModelCollection](getTagsRequest, client)
 	return util.ProcessTagsResponseCollection(diagnostics, tagsResp, httpResp, err, "Delivery Group", deliveryGroupId)
 }
 
@@ -2409,7 +2409,7 @@ func getDeliveryGroupAutoscalePlugins(ctx context.Context, client *citrixdaascli
 	}
 
 	getAutoscalePluginsRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroupAutoscaleGroupPlugins(ctx, deliveryGroupId).Type_(string(citrixorchestration.AUTOSCALEPLUGINTYPE_HOLIDAY)) // Only holiday plugin is supported for now
-	autoscalePlugins, httpResp, err := citrixdaasclient.AddRequestData(getAutoscalePluginsRequest, client).Execute()
+	autoscalePlugins, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.AutoscaleGroupPluginModelCollection](getAutoscalePluginsRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error fetching Delivery Group Autoscale Plugins",

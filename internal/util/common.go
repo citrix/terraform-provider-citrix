@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package util
 
@@ -750,7 +750,7 @@ func GetAsyncJobResultWithAddToDiagsOption[ResponseType any](ctx context.Context
 
 	// Job is completed successfully. Get results
 	ss := client.ApiClient.JobsAPIsDAAS.JobsGetJobResults(ctx, jobId)
-	res, _, err := citrixdaasclient.AddRequestData(ss, client).Execute()
+	res, _, err := citrixdaasclient.ExecuteWithRetry[string](ss, client)
 
 	if err == nil {
 		err = json.Unmarshal([]byte(res), &response)
@@ -1748,7 +1748,7 @@ func PollZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, zo
 	for time.Since(startTime) <= time.Minute*time.Duration(8) {
 		// Zone sync should be completed within 8 minutes
 
-		zone, httpResp, err := citrixdaasclient.AddRequestData(getZoneRequest, client).Execute()
+		zone, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ZoneDetailResponseModel](getZoneRequest, client)
 		if isZoneBeingDeleted {
 			if httpResp.StatusCode == http.StatusNotFound {
 				// Zone deletion completed. Return nil

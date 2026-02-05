@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package application
 
@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
-	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
+	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 
@@ -459,7 +459,7 @@ func setApplicationGroupTags(ctx context.Context, diagnostics *diag.Diagnostics,
 func getApplicationGroupTags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, applicationGroupId string) []string {
 	getTagsRequest := client.ApiClient.ApplicationGroupsAPIsDAAS.ApplicationGroupsGetApplicationGroupTags(ctx, applicationGroupId)
 	getTagsRequest = getTagsRequest.Fields("Id,Name,Description")
-	tagsResp, httpResp, err := citrixdaasclient.AddRequestData(getTagsRequest, client).Execute()
+	tagsResp, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.TagResponseModelCollection](getTagsRequest, client)
 	return util.ProcessTagsResponseCollection(diagnostics, tagsResp, httpResp, err, "Application Group", applicationGroupId)
 }
 

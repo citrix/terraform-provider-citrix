@@ -1,4 +1,4 @@
-// Copyright © 2025. Citrix Systems, Inc.
+// Copyright © 2026. Citrix Systems, Inc.
 
 package admin_role
 
@@ -73,7 +73,7 @@ func (AdminRoleModel) GetSchema() schema.Schema {
 				Default:     stringdefault.StaticString(""),
 			},
 			"is_built_in": schema.BoolAttribute{
-				Description: "Flag to determine if the role was built-in or user defined",
+				Description: "Flag to determine if the role was built-in or user defined.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
