@@ -8,7 +8,7 @@ resource citrix_quickdeploy_catalog default-power-schedule-catalog {
     template_image_id = "<Template Image ID>"
     machine_size = "d2asv5"
     storage_type = "StandardSSD_LRS"
-    number_of_machines = 2
+    number_of_users = 2
     max_users_per_vm = 4
     power_schedule = {}
 }
@@ -22,7 +22,7 @@ resource citrix_quickdeploy_catalog custom-power-schedule-catalog {
     template_image_id = "<Template Image ID>"
     machine_size = "d2asv5"
     storage_type = "StandardSSD_LRS"
-    number_of_machines = 4
+    number_of_users = 4
     max_users_per_vm = 4
     machine_naming_scheme = {
         naming_scheme = "example-vda-#"
@@ -55,7 +55,7 @@ resource citrix_quickdeploy_catalog domain-joined-catalog {
     template_image_id = "<Template Image ID>"
     machine_size = "d2asv5"
     storage_type = "StandardSSD_LRS"
-    number_of_machines = 2
+    number_of_users = 2
     max_users_per_vm = 4
     power_schedule = {}
     on_prem_connectivity = {

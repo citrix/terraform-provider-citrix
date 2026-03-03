@@ -91,7 +91,7 @@ func (r *clientNameFilterResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
-	policyFilter, err := getPolicyFilter(ctx, r.client, &resp.Diagnostics, state.GetId())
+	policyFilter, err := readPolicyFilter(ctx, r.client, &resp.Diagnostics, state.GetId())
 	if err != nil {
 		// Check if this is a "policy filter not found" error
 		if errors.Is(err, util.ErrPolicyFilterNotFound) {

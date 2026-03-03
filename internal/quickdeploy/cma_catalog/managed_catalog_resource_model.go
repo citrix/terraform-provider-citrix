@@ -16,8 +16,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -37,8 +35,8 @@ type CitrixManagedCatalogResourceModel struct {
 	TemplateImageId     types.String `tfsdk:"template_image_id"`
 	MachineSize         types.String `tfsdk:"machine_size"`
 	StorageType         types.String `tfsdk:"storage_type"`
-	UseManagedDisks     types.Bool   `tfsdk:"use_managed_disks"`
-	NumberOfMachines    types.Int64  `tfsdk:"number_of_machines"`
+	NumberOfUsers       types.Int64  `tfsdk:"number_of_users"`
+	MaxNumberOfUsers    types.Int64  `tfsdk:"max_number_of_users"`
 	MaxUsersPerVm       types.Int64  `tfsdk:"max_users_per_vm"`
 	MachineNamingScheme types.Object `tfsdk:"machine_naming_scheme"` // MachineNamingSchemeModel
 	PowerSchedule       types.Object `tfsdk:"power_schedule"`        // PowerScheduleModel
@@ -114,21 +112,16 @@ func (CitrixManagedCatalogResourceModel) GetSchema() schema.Schema {
 					),
 				},
 			},
-			"use_managed_disks": schema.BoolAttribute{
-				Description: "Indicate whether to use Azure managed disks for the provisioned virtual machine. Defaults to `true`.",
-				Optional:    true,
-				Computed:    true,
-				Default:     booldefault.StaticBool(true),
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.RequiresReplace(),
-				},
-			},
-			"number_of_machines": schema.Int64Attribute{
-				Description: "Number of VMs that will be provisioned for this catalog. Defaults to `1`.",
+			"number_of_users": schema.Int64Attribute{
+				Description: "Number of users for the catalog. Defaults to `1`.",
 				Required:    true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(1),
 				},
+			},
+			"max_number_of_users": schema.Int64Attribute{
+				Description: "Maximum number of users allowed for the current catalog capacity.",
+				Computed:    true,
 			},
 			"max_users_per_vm": schema.Int64Attribute{
 				Description: "Maximum number of concurrent users that could launch session on the same machine. Only allowed to have more than 1 concurrent user when `catalog_type` is `MultiSession`. Defaults to `1`.",
@@ -200,8 +193,6 @@ type PowerScheduleModel struct {
 	OffPeakDisconnectedSessionTimeout types.Int64  `tfsdk:"off_peak_disconnected_session_timeout"`
 	PeakExtendedDisconnectTimeout     types.Int64  `tfsdk:"peak_extended_disconnect_timeout"`
 	OffPeakExtendedDisconnectTimeout  types.Int64  `tfsdk:"off_peak_extended_disconnect_timeout"`
-	PeakBufferCapacity                types.Int64  `tfsdk:"peak_buffer_capacity"`
-	OffPeakBufferCapacity             types.Int64  `tfsdk:"off_peak_buffer_capacity"`
 	PeakMinInstances                  types.Int64  `tfsdk:"peak_min_instances"`
 	OffPeakMinInstances               types.Int64  `tfsdk:"off_peak_min_instances"`
 	PeakDisconnectedSessionAction     types.String `tfsdk:"peak_disconnected_session_action"`
@@ -252,24 +243,6 @@ func (PowerScheduleModel) GetSchema() schema.SingleNestedAttribute {
 				Default:     int64default.StaticInt64(0),
 				Validators: []validator.Int64{
 					int64validator.AtLeast(0),
-				},
-			},
-			"peak_buffer_capacity": schema.Int64Attribute{
-				Description: "The percentage of machines in the managed catalog that should be kept available in an idle state in peak hours.",
-				Optional:    true,
-				Computed:    true,
-				Default:     int64default.StaticInt64(0),
-				Validators: []validator.Int64{
-					int64validator.Between(0, 100),
-				},
-			},
-			"off_peak_buffer_capacity": schema.Int64Attribute{
-				Description: "The percentage of machines in the delivery group that should be kept available in an idle state outside peak hours.",
-				Optional:    true,
-				Computed:    true,
-				Default:     int64default.StaticInt64(0),
-				Validators: []validator.Int64{
-					int64validator.Between(0, 100),
 				},
 			},
 			"peak_min_instances": schema.Int64Attribute{
@@ -403,6 +376,9 @@ func (OnPremConnectivityModel) GetAttributes() map[string]schema.Attribute {
 func (r CitrixManagedCatalogResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, catalog *citrixquickdeploy.CatalogOverview, capacity *citrixquickdeploy.CatalogCapacitySettingsModel, region *citrixquickdeploy.DeploymentRegionModel) CitrixManagedCatalogResourceModel {
 	r.Id = types.StringValue(catalog.GetId())
 	r.Name = types.StringValue(catalog.GetName())
+	r.NumberOfUsers = types.Int64Value(int64(catalog.GetNumOfUsers()))
+	r.MaxNumberOfUsers = types.Int64Value(int64(catalog.GetMaxNumOfUsers()))
+
 	sessionSupport := catalog.GetSessionSupport()
 	allocationType := catalog.GetAllocationType()
 	switch sessionSupport {
@@ -426,9 +402,7 @@ func (r CitrixManagedCatalogResourceModel) RefreshPropertyValues(ctx context.Con
 	computerWorker := capacity.GetComputeWorker()
 	r.MachineSize = types.StringValue(computerWorker.GetInstanceTypeId())
 	r.StorageType = types.StringValue(string(computerWorker.GetStorageType()))
-	r.UseManagedDisks = types.BoolValue(computerWorker.GetUseManagedDisks())
 	r.MaxUsersPerVm = types.Int64Value(int64(computerWorker.GetMaxUsersPerVM()))
-	r.NumberOfMachines = types.Int64Value(int64(capacity.ScaleSettings.GetMaxInstances()))
 
 	r = r.updatePlanWithPowerSchedule(ctx, diagnostics, capacity)
 
@@ -448,8 +422,6 @@ func (r CitrixManagedCatalogResourceModel) updatePlanWithPowerSchedule(ctx conte
 	powerSchedule.OffPeakDisconnectedSessionTimeout = types.Int64Value(int64(scaleSettings.GetOffPeakDisconnectedSessionTimeout()))
 	powerSchedule.PeakExtendedDisconnectTimeout = types.Int64Value(int64(scaleSettings.GetPeakExtendedDisconnectTimeoutMinutes()))
 	powerSchedule.OffPeakExtendedDisconnectTimeout = types.Int64Value(int64(scaleSettings.GetOffPeakExtendedDisconnectTimeoutMinutes()))
-	powerSchedule.PeakBufferCapacity = types.Int64Value(int64(scaleSettings.GetBufferCapacity()))
-	powerSchedule.OffPeakBufferCapacity = types.Int64Value(int64(scaleSettings.GetOffPeakBufferCapacity()))
 	powerSchedule.PeakMinInstances = types.Int64Value(int64(scaleSettings.GetPeakMinInstances()))
 	powerSchedule.OffPeakMinInstances = types.Int64Value(int64(scaleSettings.GetMinInstances()))
 	powerSchedule.PeakDisconnectedSessionAction = types.StringValue(string(scaleSettings.GetPeakDisconnectedSessionAction()))

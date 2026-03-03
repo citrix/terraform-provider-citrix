@@ -109,9 +109,9 @@ function New-RequiredFiles {
     $config = @"
 provider "citrix" {
     storefront_remote_host = {
-        computer_name                = "$script:computerName"
-        ad_admin_username            = "$script:processedadUsername"
-        ad_admin_password            = "$script:adPassword"
+        computer_name                = "$($script:computerName)"
+        ad_admin_username            = "$($script:processedadUsername)"
+        ad_admin_password            = "$($script:adPassword)"
         disable_ssl_verification       =  $disableSSL
     }
 }

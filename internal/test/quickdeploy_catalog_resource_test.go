@@ -78,8 +78,8 @@ func TestQuickDeployCatalogResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_quickdeploy_catalog.test-catalog", "name", name),
 					// Verify catalog type
 					resource.TestCheckResourceAttr("citrix_quickdeploy_catalog.test-catalog", "catalog_type", "MultiSession"),
-					// Verify number of machines
-					resource.TestCheckResourceAttr("citrix_quickdeploy_catalog.test-catalog", "number_of_machines", "1"),
+					// Verify number of users
+					resource.TestCheckResourceAttr("citrix_quickdeploy_catalog.test-catalog", "number_of_users", "2"),
 					// Verify subscription name
 					resource.TestCheckResourceAttr("citrix_quickdeploy_catalog.test-catalog", "subscription_name", "Citrix Managed"),
 				),
@@ -107,8 +107,8 @@ func TestQuickDeployCatalogResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_quickdeploy_catalog.test-catalog", "name", name),
 					// Verify catalog type
 					resource.TestCheckResourceAttr("citrix_quickdeploy_catalog.test-catalog", "catalog_type", "MultiSession"),
-					// Verify number of machines
-					resource.TestCheckResourceAttr("citrix_quickdeploy_catalog.test-catalog", "number_of_machines", "2"),
+					// Verify number of users
+					resource.TestCheckResourceAttr("citrix_quickdeploy_catalog.test-catalog", "number_of_users", "10"),
 					// Verify subscription name
 					resource.TestCheckResourceAttr("citrix_quickdeploy_catalog.test-catalog", "subscription_name", "Citrix Managed"),
 				),
@@ -128,15 +128,13 @@ var (
 		template_image_id = data.citrix_quickdeploy_template_image.test_image.id
 		machine_size = "d8asv5"
 		storage_type = "StandardSSD_LRS"
-		number_of_machines = 1
+		number_of_users = 2
 		max_users_per_vm = 8
 		machine_naming_scheme = {
 			naming_scheme = "gotest-###"
 			naming_scheme_type = "Numeric"
 		}
 		power_schedule = {
-			peak_buffer_capacity = 30
-			off_peak_buffer_capacity = 15
 			peak_min_instances = 1
 			off_peak_min_instances = 1
 			weekdays = ["monday", "tuesday", "wednesday", "thursday", "friday"]
@@ -156,15 +154,13 @@ var (
 		template_image_id = data.citrix_quickdeploy_template_image.test_image.id
 		machine_size = "d8asv5"
 		storage_type = "StandardSSD_LRS"
-		number_of_machines = 2
+		number_of_users = 10
 		max_users_per_vm = 8
 		machine_naming_scheme = {
 			naming_scheme = "gotest-###"
 			naming_scheme_type = "Numeric"
 		}
 		power_schedule = {
-			peak_buffer_capacity = 30
-			off_peak_buffer_capacity = 15
 			peak_min_instances = 1
 			off_peak_min_instances = 1
 			weekdays = ["monday", "tuesday", "wednesday", "thursday", "friday"]

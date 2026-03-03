@@ -79,13 +79,13 @@ Param (
 ### Helper Functions ###
 
 function Get-Site {
-    $siteRequest = "https://$script:hostname/cvad/manage/me"
+    $siteRequest = "https://$($script:hostname)/cvad/manage/me"
     $response = Start-GetRequest -url $siteRequest
     $script:siteId = $response.Customers[0].Sites[0].Id
 }
 
 function Get-RequestBaseUrl {
-    $url = "https://$script:hostname/cvad/manage"
+    $url = "https://$($script:hostname)/cvad/manage"
     $script:urlBase = $url
 }
 
@@ -161,10 +161,10 @@ function Get-AuthToken {
         }
 
         if ($script:environment -eq "Production") {
-            $url = "https://api.cloud.com/cctrustoauth2/$script:customerId/tokens/clients"
+            $url = "https://api.cloud.com/cctrustoauth2/$($script:customerId)/tokens/clients"
         }
         elseif ($script:environment -eq "Staging") {
-            $url = "https://api.cloudburrito.com/cctrustoauth2/$script:customerId/tokens/clients"
+            $url = "https://api.cloudburrito.com/cctrustoauth2/$($script:customerId)/tokens/clients"
         }
 
         $body = @{
@@ -192,11 +192,11 @@ function Start-GetRequest {
     
         $headers = @{
             "Authorization"     = "CwsAuth Bearer=$token"
-            "Citrix-CustomerId" = $script:customerId
+            "Citrix-CustomerId" = $($script:customerId)
             "Accept"            = "application/json, text/plain, */*"
         }
         if ($null -ne $script:siteId) {
-            $headers["Citrix-InstanceId"] = $script:siteId
+            $headers["Citrix-InstanceId"] = $($script:siteId)
         }
     
     
@@ -221,11 +221,11 @@ function New-RequiredFiles {
         $config = @"
 provider "citrix" {
     cvad_config = {
-        customer_id                 = "$script:customerId"
-        client_id                   = "$script:clientId"
+        customer_id                 = "$($script:customerId)"
+        client_id                   = "$($script:clientId)"
         # client_secret               = "$secretValue"
-        hostname                    = "$script:hostname"
-        environment                 = "$script:environment"
+        hostname                    = "$($script:hostname)"
+        environment                 = "$($script:environment)"
     }
 }
 "@
@@ -272,10 +272,10 @@ function Get-UrlForWemObjects {
 
 
     if ($requestPath -eq "sites") {
-        return "https://$script:wemHostName/services/wem/sites?includeHidden=true&includeUnboundAgentsSite=true"
+        return "https://$($script:wemHostName)/services/wem/sites?includeHidden=true&includeUnboundAgentsSite=true"
     }
     else {
-        return "https://$script:wemHostName/services/wem/machines"
+        return "https://$($script:wemHostName)/services/wem/machines"
     }
 }
 
@@ -305,7 +305,7 @@ function Get-ResourceList {
         [string] $resourceProviderName
     )
 
-    $url = "$script:urlBase/$requestPath"
+    $url = "$($script:urlBase)/$requestPath"
 
     # Update url for WEM Objects
     if ($resourceProviderName -in "wem_configuration_set", "wem_directory_object") {
