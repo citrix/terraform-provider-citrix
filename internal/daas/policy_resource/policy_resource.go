@@ -95,7 +95,7 @@ func (r *policyResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	policy, err := GetPolicy(ctx, r.client, &resp.Diagnostics, state.Id.ValueString(), false, false)
+	policy, err := readPolicy(ctx, r.client, &resp.Diagnostics, state.Id.ValueString(), false, false)
 	if err != nil {
 		// Check if this is a "policy not found" error
 		if errors.Is(err, util.ErrPolicyNotFound) {
@@ -272,7 +272,7 @@ func createPolicy(ctx context.Context, client *citrixdaasclient.CitrixDaasClient
 	return policy, nil
 }
 
-func GetPolicy(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policyId string, withFilters bool, withSettings bool) (*citrixorchestration.PolicyResponse, error) {
+func readPolicy(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policyId string, withFilters bool, withSettings bool) (*citrixorchestration.PolicyResponse, error) {
 	getPolicyReq := client.ApiClient.GpoDAAS.GpoReadGpoPolicy(ctx, policyId)
 	getPolicyReq = getPolicyReq.WithFilters(withFilters)
 	getPolicyReq = getPolicyReq.WithSettings(withSettings)
@@ -283,6 +283,23 @@ func GetPolicy(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, d
 			return nil, fmt.Errorf("%w: %w", util.ErrPolicyNotFound, err)
 		}
 
+		diagnostics.AddError(
+			"Error reading Policy "+policyId,
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		return nil, err
+	}
+
+	return policy, nil
+}
+
+func GetPolicy(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policyId string, withFilters bool, withSettings bool) (*citrixorchestration.PolicyResponse, error) {
+	getPolicyReq := client.ApiClient.GpoDAAS.GpoReadGpoPolicy(ctx, policyId)
+	getPolicyReq = getPolicyReq.WithFilters(withFilters)
+	getPolicyReq = getPolicyReq.WithSettings(withSettings)
+	policy, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.PolicyResponse](getPolicyReq, client)
+	if err != nil {
 		diagnostics.AddError(
 			"Error reading Policy "+policyId,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+

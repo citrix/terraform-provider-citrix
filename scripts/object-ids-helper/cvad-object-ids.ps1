@@ -64,10 +64,10 @@ Param (
 
 function Get-Site {
     if ($script:onPremise) {
-        $siteRequest = "https://$script:hostname/citrix/orchestration/api/me"
+        $siteRequest = "https://$($script:hostname)/citrix/orchestration/api/me"
     }
     else {
-        $siteRequest = "https://$script:hostname/cvad/manage/me"
+        $siteRequest = "https://$($script:hostname)/cvad/manage/me"
     }
 
     $response = Start-GetRequest -url $siteRequest
@@ -76,10 +76,10 @@ function Get-Site {
 
 function Get-RequestBaseUrl {
     if ($script:onPremise) {
-        $url = "https://$script:hostname/citrix/orchestration/api/CitrixOnPremises/$script:siteId"
+        $url = "https://$($script:hostname)/citrix/orchestration/api/CitrixOnPremises/$($script:siteId)"
     }
     else {
-        $url = "https://$script:hostname/cvad/manage"
+        $url = "https://$($script:hostname)/cvad/manage"
     }
 
     $script:urlBase = $url
@@ -144,8 +144,8 @@ function Invoke-WebRequestWithRetry {
 
 function Get-AuthToken {
     if ($script:onPremise) {
-        $url = "https://$script:hostname/citrix/orchestration/api/tokens"
-        $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}\{1}:{2}" -f $script:domainFqdn, $script:clientId, $script:clientSecret)))
+        $url = "https://$($script:hostname)/citrix/orchestration/api/tokens"
+        $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}\{1}:{2}" -f $($script:domainFqdn), $($script:clientId), $($script:clientSecret))))
         $basicAuth = "Basic $base64AuthInfo"
         $response = Invoke-WebRequestWithRetry -Uri $url -Method 'POST' -Headers @{Authorization = $basicAuth } 
         $jsonObj = ConvertFrom-Json $([String]::new($response.Content))
@@ -165,22 +165,22 @@ function Get-AuthToken {
         }
 
         if ($script:environment -eq "Production") {
-            $url = "https://api.cloud.com/cctrustoauth2/$script:customerId/tokens/clients"
+            $url = "https://api.cloud.com/cctrustoauth2/$($script:customerId)/tokens/clients"
         }
         elseif ($script:environment -eq "Staging") {
-            $url = "https://api.cloudburrito.com/cctrustoauth2/$script:customerId/tokens/clients"
+            $url = "https://api.cloudburrito.com/cctrustoauth2/$($script:customerId)/tokens/clients"
         }
         elseif ($script:environment -eq "Japan") {
-            $url = "https://api.citrixcloud.jp/cctrustoauth2/$script:customerId/tokens/clients"
+            $url = "https://api.citrixcloud.jp/cctrustoauth2/$($script:customerId)/tokens/clients"
         }
         elseif ($script:environment -eq "JapanStaging") {
-            $url = "https://api.citrixcloud-test.jp/cctrustoauth2/$script:customerId/tokens/clients"
+            $url = "https://api.citrixcloud-test.jp/cctrustoauth2/$($script:customerId)/tokens/clients"
         }
         elseif ($script:environment -eq "Gov") {
-            $url = "https://api.citrixcloud.us/cctrustoauth2/$script:customerId/tokens/clients"
+            $url = "https://api.citrixcloud.us/cctrustoauth2/$($script:customerId)/tokens/clients"
         }
         elseif ($script:environment -eq "GovStaging") {
-            $url = "https://api.citrixcloud-test.us/cctrustoauth2/$script:customerId/tokens/clients"
+            $url = "https://api.citrixcloud-test.us/cctrustoauth2/$($script:customerId)/tokens/clients"
         }
 
         $body = @{
@@ -213,11 +213,11 @@ function Start-GetRequest {
     else {
         $headers = @{
             "Authorization"     = "CwsAuth Bearer=$token"
-            "Citrix-CustomerId" = $script:customerId
+            "Citrix-CustomerId" = $($script:customerId)
             "Accept"            = "application/json, text/plain, */*"
         }
         if ($null -ne $script:siteId) {
-            $headers["Citrix-InstanceId"] = $script:siteId
+            $headers["Citrix-InstanceId"] = $($script:siteId)
         }
     }
     
@@ -255,10 +255,10 @@ function Get-UrlForWemObjects {
     }
 
     if ($requestPath -eq "sites") {
-        return "https://$script:wemHostName/services/wem/sites?includeHidden=true&includeUnboundAgentsSite=true"
+        return "https://$($script:wemHostName)/services/wem/sites?includeHidden=true&includeUnboundAgentsSite=true"
     }
     else {
-        return "https://$script:wemHostName/services/wem/machines"
+        return "https://$($script:wemHostName)/services/wem/machines"
     }
 }
 
@@ -290,7 +290,7 @@ function Get-ResourceList {
 
     $object_list   = @()
 
-    $url = "$script:urlBase/$requestPath"
+    $url = "$($script:urlBase)/$requestPath"
 
     # Update url for WEM Objects
     if ($resourceProviderName -in "wem_configuration_set", "wem_directory_object") {

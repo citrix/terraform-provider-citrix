@@ -94,10 +94,10 @@ Param (
 
 function Get-Site {
     if ($script:onPremise) {
-        $siteRequest = "https://$script:hostname/citrix/orchestration/api/me"
+        $siteRequest = "https://$($script:hostname)/citrix/orchestration/api/me"
     }
     else {
-        $siteRequest = "https://$script:hostname/cvad/manage/me"
+        $siteRequest = "https://$($script:hostname)/cvad/manage/me"
     }
 
     $response = Start-GetRequest -url $siteRequest
@@ -106,10 +106,10 @@ function Get-Site {
 
 function Get-RequestBaseUrl {
     if ($script:onPremise) {
-        $url = "https://$script:hostname/citrix/orchestration/api/CitrixOnPremises/$script:siteId"
+        $url = "https://$($script:hostname)/citrix/orchestration/api/CitrixOnPremises/$($script:siteId)"
     }
     else {
-        $url = "https://$script:hostname/cvad/manage"
+        $url = "https://$($script:hostname)/cvad/manage"
     }
 
     $script:urlBase = $url
@@ -174,8 +174,8 @@ function Invoke-WebRequestWithRetry {
 
 function Get-AuthToken {
     if ($script:onPremise) {
-        $url = "https://$script:hostname/citrix/orchestration/api/tokens"
-        $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}\{1}:{2}" -f $script:domainFqdn, $script:clientId, $script:clientSecret)))
+        $url = "https://$($script:hostname)/citrix/orchestration/api/tokens"
+        $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}\{1}:{2}" -f $($script:domainFqdn), $($script:clientId), $($script:clientSecret))))
         $basicAuth = "Basic $base64AuthInfo"
         $response = Invoke-WebRequestWithRetry -Uri $url -Method 'POST' -Headers @{Authorization = $basicAuth } 
         $jsonObj = ConvertFrom-Json $response.Content
@@ -195,22 +195,22 @@ function Get-AuthToken {
         }
 
         if ($script:environment -eq "Production") {
-            $url = "https://api.cloud.com/cctrustoauth2/$script:customerId/tokens/clients"
+            $url = "https://api.cloud.com/cctrustoauth2/$($script:customerId)/tokens/clients"
         }
         elseif ($script:environment -eq "Staging") {
-            $url = "https://api.cloudburrito.com/cctrustoauth2/$script:customerId/tokens/clients"
+            $url = "https://api.cloudburrito.com/cctrustoauth2/$($script:customerId)/tokens/clients"
         }
         elseif ($script:environment -eq "Japan") {
-            $url = "https://api.citrixcloud.jp/cctrustoauth2/$script:customerId/tokens/clients"
+            $url = "https://api.citrixcloud.jp/cctrustoauth2/$($script:customerId)/tokens/clients"
         }
         elseif ($script:environment -eq "JapanStaging") {
-            $url = "https://api.citrixcloud-test.jp/cctrustoauth2/$script:customerId/tokens/clients"
+            $url = "https://api.citrixcloud-test.jp/cctrustoauth2/$($script:customerId)/tokens/clients"
         }
         elseif ($script:environment -eq "Gov") {
-            $url = "https://api.citrixcloud.us/cctrustoauth2/$script:customerId/tokens/clients"
+            $url = "https://api.citrixcloud.us/cctrustoauth2/$($script:customerId)/tokens/clients"
         }
         elseif ($script:environment -eq "GovStaging") {
-            $url = "https://api.citrixcloud-test.us/cctrustoauth2/$script:customerId/tokens/clients"
+            $url = "https://api.citrixcloud-test.us/cctrustoauth2/$($script:customerId)/tokens/clients"
         }
 
         $body = @{
@@ -243,11 +243,11 @@ function Start-GetRequest {
     else {
         $headers = @{
             "Authorization"     = "CwsAuth Bearer=$token"
-            "Citrix-CustomerId" = $script:customerId
+            "Citrix-CustomerId" = $($script:customerId)
             "Accept"            = "application/json, text/plain, */*"
         }
         if ($null -ne $script:siteId) {
-            $headers["Citrix-InstanceId"] = $script:siteId
+            $headers["Citrix-InstanceId"] = $($script:siteId)
         }
     }
     
@@ -273,8 +273,8 @@ function New-RequiredFiles {
         $config = @"
 provider "citrix" {
     cvad_config = {
-        hostname                    = "$script:hostname"
-        client_id                   = "$script:domainFqdn\\$script:clientId"
+        hostname                    = "$($script:hostname)"
+        client_id                   = "$($script:domainFqdn)\\$($script:clientId)"
         # client_secret               = "$secretValue"
         disable_ssl_verification    = $disable_ssl_verification
     }
@@ -286,11 +286,11 @@ provider "citrix" {
         $config = @"
 provider "citrix" {
     cvad_config = {
-        customer_id                 = "$script:customerId"
-        client_id                   = "$script:clientId"
+        customer_id                 = "$($script:customerId)"
+        client_id                   = "$($script:clientId)"
         # client_secret               = "$secretValue"
-        hostname                    = "$script:hostname"
-        environment                 = "$script:environment"
+        hostname                    = "$($script:hostname)"
+        environment                 = "$($script:environment)"
     }
 }
 "@
@@ -331,7 +331,7 @@ function Get-ResourceList {
         [string] $resourceProviderName
     )
 
-    $url = "$script:urlBase/$requestPath"
+    $url = "$($script:urlBase)/$requestPath"
 
     
     # Check if the resource provider is supported in the current environment (eg. WEM is not supported for most environments)

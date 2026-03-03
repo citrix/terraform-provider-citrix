@@ -1796,6 +1796,10 @@ func PollZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, zo
 		continue
 	}
 
+	if isZoneBeingDeleted {
+		err = fmt.Errorf("Timed out waiting for zone %s to be deleted", zoneName)
+	}
+
 	return zone, err
 }
 

@@ -103,7 +103,7 @@ func (r *citrixManagedAzureImageResource) Create(ctx context.Context, req resour
 	importImageBody.SetAzureSubscriptionId(subscription.GetSubscriptionId())
 
 	importTemplateImageRequest := r.client.QuickDeployClient.MasterImageCMD.ImportTemplateImage(ctx, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId)
-	importTemplateImageRequest = importTemplateImageRequest.Body(importImageBody)
+	importTemplateImageRequest = importTemplateImageRequest.ImportTemplateImageModel(importImageBody)
 
 	// Import new Citrix Managed Azure Template Image
 	importImageResponse, httpResp, err := citrixdaasclient.AddRequestData(importTemplateImageRequest, r.client).Execute()
@@ -198,7 +198,7 @@ func (r *citrixManagedAzureImageResource) Update(ctx context.Context, req resour
 	templateImageUpdateBody.SetNewNotes(plan.Notes.ValueString())
 
 	updateTemplateImageRequest := r.client.QuickDeployClient.MasterImageCMD.UpdateTemplateImage(ctx, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId, imageId)
-	updateTemplateImageRequest = updateTemplateImageRequest.Body(templateImageUpdateBody)
+	updateTemplateImageRequest = updateTemplateImageRequest.UpdateTemplateImageModel(templateImageUpdateBody)
 
 	// Update Citrix Managed Azure Template Image
 	httpResp, err := citrixdaasclient.AddRequestData(updateTemplateImageRequest, r.client).Execute()

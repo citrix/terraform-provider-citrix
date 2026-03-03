@@ -27,8 +27,8 @@ github.com/bmatcuk/doublestar/v4 v4.7.1 h1:fdDeAqgT47acgwd9bd9HxJRDmc9UAmPpc+2m0
 github.com/bmatcuk/doublestar/v4 v4.7.1/go.mod h1:xBQ8jztBU6kakFMg+8WGxn0c6z1fTSPVIjEY1Wr7jzc=
 github.com/bufbuild/protocompile v0.14.1 h1:iA73zAf/fyljNjQKwYzUHD6AD4R8KMasmwa/FBatYVw=
 github.com/bufbuild/protocompile v0.14.1/go.mod h1:ppVdAIhbr2H8asPk6k4pY7t9zB1OU5DoEw9xY/FUi1c=
-github.com/citrix/citrix-daas-rest-go v1.0.26 h1:+u9w0bS1thIUm5qvExh6b62pPOeU72nSHlCcZcNSTFQ=
-github.com/citrix/citrix-daas-rest-go v1.0.26/go.mod h1:4Me0VHpyxMYfPwpU2XWV0jOE2Jdz8MHNpge3MLD5B2E=
+github.com/citrix/citrix-daas-rest-go v1.0.27 h1:9WHnJs/mQdAPtc6YD+Audkix9mauBHi8xq4L0+rlpMA=
+github.com/citrix/citrix-daas-rest-go v1.0.27/go.mod h1:4Me0VHpyxMYfPwpU2XWV0jOE2Jdz8MHNpge3MLD5B2E=
 github.com/cloudflare/circl v1.6.1 h1:zqIqSPIndyBh1bjLVVDHMPpVKqp8Su/V+6MeDzzQBQ0=
 github.com/cloudflare/circl v1.6.1/go.mod h1:uddAzsPgqdMAYatqJ0lsjX1oECcQLIlRpzZh3pJrofs=
 github.com/cyphar/filepath-securejoin v0.4.1 h1:JyxxyPEaktOD+GAnqIqTf9A8tHyAG22rowi7HkoSU1s=

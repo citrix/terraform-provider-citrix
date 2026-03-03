@@ -1258,7 +1258,9 @@ func (mc *AzureMachineConfigModel) RefreshProperties(ctx context.Context, diagno
 	// Refresh Service Offering
 	provScheme := catalog.GetProvisioningScheme()
 	if provScheme.GetServiceOffering() != "" {
-		mc.ServiceOffering = types.StringValue(provScheme.GetServiceOffering())
+		if !strings.EqualFold(mc.ServiceOffering.ValueString(), provScheme.GetServiceOffering()) {
+			mc.ServiceOffering = types.StringValue(provScheme.GetServiceOffering())
+		}
 	}
 
 	// Refresh Master Image for non PVS catalogs
@@ -1517,7 +1519,9 @@ func (mc *AwsMachineConfigModel) RefreshProperties(ctx context.Context, diagnost
 	// Refresh Service Offering
 	provScheme := catalog.GetProvisioningScheme()
 	if provScheme.GetServiceOffering() != "" {
-		mc.ServiceOffering = types.StringValue(provScheme.GetServiceOffering())
+		if !strings.EqualFold(mc.ServiceOffering.ValueString(), provScheme.GetServiceOffering()) {
+			mc.ServiceOffering = types.StringValue(provScheme.GetServiceOffering())
+		}
 	}
 
 	if provScheme.CurrentImageVersion != nil {
@@ -1602,7 +1606,9 @@ func (mc *AmazonWorkspacesCoreMachineConfigModel) RefreshProperties(ctx context.
 	// Refresh Service Offering
 	provScheme := catalog.GetProvisioningScheme()
 	if provScheme.GetServiceOffering() != "" {
-		mc.ServiceOffering = types.StringValue(provScheme.GetServiceOffering())
+		if !strings.EqualFold(mc.ServiceOffering.ValueString(), provScheme.GetServiceOffering()) {
+			mc.ServiceOffering = types.StringValue(provScheme.GetServiceOffering())
+		}
 	}
 
 	currentImage := provScheme.GetCurrentImageVersion()

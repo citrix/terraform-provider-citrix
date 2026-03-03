@@ -22,7 +22,7 @@ resource citrix_quickdeploy_catalog default-power-schedule-catalog {
     template_image_id = "<Template Image ID>"
     machine_size = "d2asv5"
     storage_type = "StandardSSD_LRS"
-    number_of_machines = 2
+    number_of_users = 2
     max_users_per_vm = 4
     power_schedule = {}
 }
@@ -36,7 +36,7 @@ resource citrix_quickdeploy_catalog custom-power-schedule-catalog {
     template_image_id = "<Template Image ID>"
     machine_size = "d2asv5"
     storage_type = "StandardSSD_LRS"
-    number_of_machines = 4
+    number_of_users = 4
     max_users_per_vm = 4
     machine_naming_scheme = {
         naming_scheme = "example-vda-#"
@@ -69,7 +69,7 @@ resource citrix_quickdeploy_catalog domain-joined-catalog {
     template_image_id = "<Template Image ID>"
     machine_size = "d2asv5"
     storage_type = "StandardSSD_LRS"
-    number_of_machines = 2
+    number_of_users = 2
     max_users_per_vm = 4
     power_schedule = {}
     on_prem_connectivity = {
@@ -91,7 +91,7 @@ resource citrix_quickdeploy_catalog domain-joined-catalog {
 - `catalog_type` (String) Denotes how the machines in the catalog are allocated to a user. Choose between `MultiSession`, `SingleSessionStatic` and `SingleSessionRandom`.
 - `machine_size` (String) The Azure VM SKU to use for creating machines.
 - `name` (String) Name of the managed catalog.
-- `number_of_machines` (Number) Number of VMs that will be provisioned for this catalog. Defaults to `1`.
+- `number_of_users` (Number) Number of users for the catalog. Defaults to `1`.
 - `power_schedule` (Attributes) The power management schedule for the Citrix Managed catalog. (see [below for nested schema](#nestedatt--power_schedule))
 - `region` (String) The Azure region to deploy the managed catalog.
 - `storage_type` (String) Storage account type used for provisioned virtual machine disks on Azure. Storage types include: `Standard_LRS`, `StandardSSD_LRS` and `Premium_LRS`.
@@ -105,23 +105,21 @@ resource citrix_quickdeploy_catalog domain-joined-catalog {
 - `max_users_per_vm` (Number) Maximum number of concurrent users that could launch session on the same machine. Only allowed to have more than 1 concurrent user when `catalog_type` is `MultiSession`. Defaults to `1`.
 - `on_prem_connectivity` (Attributes) On-Premises connectivity configuration for creating a domain-joined catalog. (see [below for nested schema](#nestedatt--on_prem_connectivity))
 - `subscription_name` (String) The name of the Citrix Managed Azure subscription to deploy the managed catalog. Defaults to `Citrix Managed` if omitted.
-- `use_managed_disks` (Boolean) Indicate whether to use Azure managed disks for the provisioned virtual machine. Defaults to `true`.
 
 ### Read-Only
 
 - `id` (String) GUID identifier of the managed catalog.
+- `max_number_of_users` (Number) Maximum number of users allowed for the current catalog capacity.
 
 <a id="nestedatt--power_schedule"></a>
 ### Nested Schema for `power_schedule`
 
 Optional:
 
-- `off_peak_buffer_capacity` (Number) The percentage of machines in the delivery group that should be kept available in an idle state outside peak hours.
 - `off_peak_disconnected_session_action` (String) The action to be performed after a configurable period of a user session disconnecting outside peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.
 - `off_peak_disconnected_session_timeout` (Number) The number of minutes before the configured action should be performed after a user session disconnectts outside peak hours.
 - `off_peak_extended_disconnect_timeout` (Number) The number of minutes before the second configured action should be performed after a user session disconnects outside peak hours.
 - `off_peak_min_instances` (Number) The minimum number of machines that should be powered on during off peak hours. Defaults to `0`. Can only be set to more than `0` if `catalog_type` is `Dedicated`.
-- `peak_buffer_capacity` (Number) The percentage of machines in the managed catalog that should be kept available in an idle state in peak hours.
 - `peak_disconnected_session_action` (String) The action to be performed after a configurable period of a user session disconnecting in peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.
 - `peak_disconnected_session_timeout` (Number) The number of minutes before the configured action should be performed after a user session disconnects in peak hours.
 - `peak_end_time` (Number) The end time of peak hours (0-23).

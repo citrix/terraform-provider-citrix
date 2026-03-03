@@ -87,6 +87,7 @@ func (r *citrixManagedCatalogResource) Create(ctx context.Context, req resource.
 	addCatalog.SetIsDomainJoined(false)
 	addCatalog.SetIsAzureAdJoined(false)
 	addCatalog.SetPersistStaticAllocatedVmDisks(true)
+	addCatalog.SetMinUniqueUsers(int32(plan.NumberOfUsers.ValueInt64()))
 
 	if !plan.MachineNamingScheme.IsNull() {
 		var namingScheme citrixquickdeploy.MachineNamingSchemeModel
@@ -109,7 +110,6 @@ func (r *citrixManagedCatalogResource) Create(ctx context.Context, req resource.
 	catalogScaleSettings := util.ObjectValueToTypedObject[PowerScheduleModel](ctx, &resp.Diagnostics, plan.PowerSchedule)
 	scaleSettings := getScaleSettingsRequestModel(ctx, &resp.Diagnostics, catalogScaleSettings)
 	// Set max instance to be the same as number of machines
-	scaleSettings.SetMaxInstances(int32(plan.NumberOfMachines.ValueInt64()))
 	catalogCapacity.SetScaleSettings(scaleSettings)
 
 	// Set static catalog capacity settings
@@ -164,7 +164,7 @@ func (r *citrixManagedCatalogResource) Create(ctx context.Context, req resource.
 	}
 
 	createManagedCatalogRequest := r.client.QuickDeployClient.CatalogCMD.ConfigureAndDeployCitrixManagedCatalogApi(ctx, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId)
-	createManagedCatalogRequest = createManagedCatalogRequest.Body(managedCatalogConfigBody)
+	createManagedCatalogRequest = createManagedCatalogRequest.CitrixManagedCatalogConfigDeployModel(managedCatalogConfigBody)
 
 	// Create new Citrix Managed Catalog
 	_, httpResp, err := citrixdaasclient.AddRequestData(createManagedCatalogRequest, r.client).Execute()
@@ -318,7 +318,7 @@ func (r *citrixManagedCatalogResource) Update(ctx context.Context, req resource.
 		templateImageUpdateModel.SetCitrixPrepared(templateImage.GetCitrixPrepared())
 
 		updateCatalogImageRequest := r.client.QuickDeployClient.CatalogCMD.UpdateCatalogImage(ctx, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId, catalogId)
-		updateCatalogImageRequest = updateCatalogImageRequest.Body(templateImageUpdateModel)
+		updateCatalogImageRequest = updateCatalogImageRequest.UpdateCatalogTemplateImageModel(templateImageUpdateModel)
 
 		// Update Citrix Managed Azure Template Image
 		_, httpResp, err := citrixdaasclient.AddRequestData(updateCatalogImageRequest, r.client).Execute()
@@ -358,9 +358,18 @@ func (r *citrixManagedCatalogResource) Update(ctx context.Context, req resource.
 	// Configure scale settings model
 	catalogScaleSettings := util.ObjectValueToTypedObject[PowerScheduleModel](ctx, &resp.Diagnostics, plan.PowerSchedule)
 	scaleSettings := getScaleSettingsRequestModel(ctx, &resp.Diagnostics, catalogScaleSettings)
+	var additionalUsers = plan.NumberOfUsers.ValueInt64() - state.NumberOfUsers.ValueInt64()
+	scaleSettings.SetAdditionalUsers(int32(additionalUsers))
+
+	// Get catalog capacity to workaround mandatory input for MaxInstances
+	catalogCapacitySettings, err := getManagedCatalogCapacityWithId(ctx, r.client, &resp.Diagnostics, catalog.GetId(), true)
+	if err != nil {
+		return
+	}
+	currentScaleSettings := catalogCapacitySettings.GetScaleSettings()
+	scaleSettings.SetMaxInstances(currentScaleSettings.GetMaxInstances())
+
 	// Set pending max instances to be the same as number of machines for update instead of max instances
-	scaleSettings.SetPendingMaxInstances(int32(plan.NumberOfMachines.ValueInt64()))
-	scaleSettings.SetMaxInstances(int32(state.NumberOfMachines.ValueInt64()))
 	catalogCapacity.SetScaleSettings(scaleSettings)
 
 	// Set static catalog capacity settings
@@ -368,7 +377,7 @@ func (r *citrixManagedCatalogResource) Update(ctx context.Context, req resource.
 	catalogCapacity.SetMultiSessionDisconnectedSessionTimeout(15)
 
 	updateCatalogCapacityRequest := r.client.QuickDeployClient.CatalogCMD.UpdateCatalogScaleConfiguration(ctx, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId, catalogId)
-	updateCatalogCapacityRequest = updateCatalogCapacityRequest.Body(catalogCapacity)
+	updateCatalogCapacityRequest = updateCatalogCapacityRequest.CatalogCapacitySettingsModel(catalogCapacity)
 
 	// Update Citrix Managed Catalog Capacity Settings
 	httpResp, err := citrixdaasclient.AddRequestData(updateCatalogCapacityRequest, r.client).Execute()
@@ -403,7 +412,7 @@ func (r *citrixManagedCatalogResource) Update(ctx context.Context, req resource.
 		return
 	}
 	// Get catalog capacity
-	catalogCapacitySettings, err := getManagedCatalogCapacityWithId(ctx, r.client, &resp.Diagnostics, catalog.GetId(), true)
+	catalogCapacitySettings, err = getManagedCatalogCapacityWithId(ctx, r.client, &resp.Diagnostics, catalog.GetId(), true)
 	if err != nil {
 		return
 	}
@@ -438,7 +447,7 @@ func (r *citrixManagedCatalogResource) Delete(ctx context.Context, req resource.
 
 	// Delete Citrix Managed Catalog
 	deleteCatalogRequest := r.client.QuickDeployClient.CatalogCMD.DeleteCustomerCatalog(ctx, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId, state.Id.ValueString())
-	deleteCatalogRequest = deleteCatalogRequest.Body(deleteModel)
+	deleteCatalogRequest = deleteCatalogRequest.DeleteCatalogModel(deleteModel)
 	httpResp, err := citrixdaasclient.AddRequestData(deleteCatalogRequest, r.client).Execute()
 
 	if err != nil {
@@ -660,8 +669,6 @@ func getScaleSettingsRequestModel(ctx context.Context, diagnostics *diag.Diagnos
 	scaleSettings.SetOffPeakDisconnectedSessionTimeout(int32(plan.OffPeakDisconnectedSessionTimeout.ValueInt64()))
 	scaleSettings.SetPeakExtendedDisconnectTimeoutMinutes(int32(plan.PeakExtendedDisconnectTimeout.ValueInt64()))
 	scaleSettings.SetOffPeakExtendedDisconnectTimeoutMinutes(int32(plan.OffPeakExtendedDisconnectTimeout.ValueInt64()))
-	scaleSettings.SetBufferCapacity(int32(plan.PeakBufferCapacity.ValueInt64()))
-	scaleSettings.SetOffPeakBufferCapacity(int32(plan.OffPeakBufferCapacity.ValueInt64()))
 	scaleSettings.SetPeakMinInstances(int32(plan.PeakMinInstances.ValueInt64()))
 	scaleSettings.SetMinInstances(int32(plan.OffPeakMinInstances.ValueInt64()))
 	scaleSettings.SetPeakDisconnectedSessionAction(citrixquickdeploy.SessionChangeHostingAction(plan.PeakDisconnectedSessionAction.ValueString()))
@@ -682,8 +689,11 @@ func getComputerWorkerRequestModel(plan CitrixManagedCatalogResourceModel) citri
 	var computerWorker citrixquickdeploy.CatalogComputeWorkerModel
 	computerWorker.SetInstanceTypeId(plan.MachineSize.ValueString())
 	computerWorker.SetStorageType(citrixquickdeploy.CatalogCapacityStorageType(plan.StorageType.ValueString()))
-	computerWorker.SetUseManagedDisks(plan.UseManagedDisks.ValueBool())
 	computerWorker.SetMaxUsersPerVM(int32(plan.MaxUsersPerVm.ValueInt64()))
+
+	// Always use Azure Hub and Managed Disks for managed catalogs
+	computerWorker.SetUseManagedDisks(true)
+	computerWorker.SetUseAzureHUB(true)
 
 	return computerWorker
 }

@@ -62,7 +62,7 @@ func (d *tagPolicyFilterDataSource) Read(ctx context.Context, req datasource.Rea
 	var err error
 	if !data.Id.IsNull() {
 		// Get refreshed policy set from Orchestration
-		policyFilter, err = getPolicyFilter(ctx, d.client, &resp.Diagnostics, data.Id.ValueString())
+		policyFilter, err = readPolicyFilter(ctx, d.client, &resp.Diagnostics, data.Id.ValueString())
 		if err != nil {
 			// Check if this is a "policy filter not found" error
 			if errors.Is(err, util.ErrPolicyFilterNotFound) {

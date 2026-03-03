@@ -62,7 +62,7 @@ func buildImageScheme(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 		// Set License Type
 		util.AppendNameValueStringPair(customProperties, "LicenseType", licenseType)
 		// Set Disk Encryption Set
-		if !azureImageSpecs.DiskEncryptionSet.IsNull() {
+		if !azureImageSpecs.DiskEncryptionSet.IsUnknown() && !azureImageSpecs.DiskEncryptionSet.IsNull() {
 			diskEncryptionSetModel := util.ObjectValueToTypedObject[util.AzureDiskEncryptionSetModel](ctx, diagnostics, azureImageSpecs.DiskEncryptionSet)
 			diskEncryptionSet := diskEncryptionSetModel.DiskEncryptionSetName.ValueString()
 			diskEncryptionSetRg := diskEncryptionSetModel.DiskEncryptionSetResourceGroup.ValueString()
