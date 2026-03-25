@@ -1189,6 +1189,7 @@ type DeliveryGroupResourceModel struct {
 	SecureIcaRequired           types.Bool   `tfsdk:"secure_ica_required"`
 	LoadBalancingType           types.String `tfsdk:"load_balancing_type"`
 	AutoscalePlugins            types.List   `tfsdk:"autoscale_plugins"` //List[DeliveryGroupAutoscalePluginModel]
+	SettlementPeriodBeforeUse   types.Int64  `tfsdk:"settlement_period_before_use"`
 }
 
 func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
@@ -1468,6 +1469,15 @@ func (DeliveryGroupResourceModel) GetSchema() schema.Schema {
 					listvalidator.SizeAtLeast(1),
 				},
 			},
+			"settlement_period_before_use": schema.Int64Attribute{
+				Description: "Idle period in seconds before a machine can be selected to host a new session after registration or the end of a previous session. Defaults to `0`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     int64default.StaticInt64(0),
+				Validators: []validator.Int64{
+					int64validator.AtLeast(0),
+				},
+			},
 		},
 	}
 }
@@ -1584,6 +1594,8 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 
 	r.SecureIcaRequired = types.BoolValue(deliveryGroup.GetSecureIcaRequired())
 	r.LoadBalancingType = types.StringValue(string(deliveryGroup.GetLoadBalanceType()))
+
+	r.SettlementPeriodBeforeUse = types.Int64Value(int64(deliveryGroup.GetSettlementPeriodBeforeUseSeconds()))
 
 	return r
 }

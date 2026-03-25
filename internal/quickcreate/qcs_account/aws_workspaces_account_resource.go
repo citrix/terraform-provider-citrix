@@ -83,6 +83,8 @@ func (r *awsWorkspacesAccountResource) Create(ctx context.Context, req resource.
 		return
 	}
 
+	accountDetails.SetAwsByolFeatureEnabled(plan.AwsByolFeatureEnabled.ValueBool())
+
 	// Generate API request body from plan
 	createAccountRequest := r.client.QuickCreateClient.AccountQCS.AddAccountAsync(ctx, r.client.ClientConfig.CustomerId)
 	createAccountRequest = createAccountRequest.Body(accountDetails)
@@ -231,6 +233,23 @@ func (r *awsWorkspacesAccountResource) Update(ctx context.Context, req resource.
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating AWS WorkSpaces Account Credentials: "+plan.Name.ValueString(),
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadQcsClientError(err),
+			)
+			return
+		}
+	}
+
+	if plan.AwsByolFeatureEnabled.ValueBool() != state.AwsByolFeatureEnabled.ValueBool() {
+		updateAwsByolFeatureRequest := citrixquickcreate.UpdateAwsEdcAccountByolFeature{}
+		updateAwsByolFeatureRequest.SetAccountOperationType(citrixquickcreate.UPDATEACCOUNTOPERATIONTYPE_UPDATE_AWS_EDC_ACCOUNT_BYOL_FEATURE)
+		updateAwsByolFeatureRequest.SetEnablebyolflagwithverification(plan.AwsByolFeatureEnabled.ValueBool())
+
+		httpResp, err := updateAwsWorkspacesAccount(ctx, r.client, &resp.Diagnostics, accountId, citrixquickcreate.UpdateCustomerAccountAsyncRequest{UpdateAwsEdcAccountByolFeature: &updateAwsByolFeatureRequest})
+
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating AWS WorkSpaces Account BYOL Feature: "+plan.Name.ValueString(),
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadQcsClientError(err),
 			)

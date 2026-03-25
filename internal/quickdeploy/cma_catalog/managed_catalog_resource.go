@@ -581,6 +581,7 @@ func getManagedCatalogWithId(ctx context.Context, client *citrixdaasclient.Citri
 	return catalog, httpResp, nil
 }
 
+//nolint:unparam // keep the addWarningIfNotFound parameter for future use
 func getManagedCatalogCapacityWithId(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, catalogId string, addWarningIfNotFound bool) (*citrixquickdeploy.CatalogCapacitySettingsModel, error) {
 	getCatalogCapacityRequest := client.QuickDeployClient.CatalogCMD.GetCatalogCapacityConfiguration(ctx, client.ClientConfig.CustomerId, client.ClientConfig.SiteId, catalogId)
 	capacitySettings, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickdeploy.CatalogCapacitySettingsModel](getCatalogCapacityRequest, client)

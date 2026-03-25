@@ -8230,6 +8230,43 @@ jsonencode([
 Example:
 [virtual_channel_allow_list.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/virtual_channel_allow_list.tf)
 
+### Virtual channel allow list for DVC
+Description:
+```
+Enables the use of an allow list that specifies which dynamic virtual channels are allowed to be opened in an ICA session.
+
+When disabled, all dynamic virtual channels are allowed.
+
+When enabled, no dynamic virtual channels are allowed. To use dynamic virtual channels (DVC) with this feature, the DVCs must be added to the list. To add a DVC to the list, enter the path to the process that accesses the DVC in the session host followed by a comma, then the client-side plugin name followed by a comma and the name of the listener used by the plugin. Multiple listener names can be added separated by commas.
+
+You may use a wildcard to allow all the listeners supported by the plugin.
+
+You may also use a wildcard to replace a single directory name in the process path, part of a directory name in the process path, replace the executable's name, or replace part of the executable's name.
+
+Changes to this setting will only apply after restarting the session host.
+```
+
+Setting Name: `DynamicVirtualChannelAllowList`
+
+Setting Value:
+```
+jsonencode([
+    "{App Path 1}",
+    "{App Path 2}",
+    ...
+])
+```
+
+Setting Value for disabled:
+```
+jsonencode([
+    "=disabled="
+])
+```
+
+Example:
+[virtual_channel_allow_list_for_dvc.tf](https://github.com/citrix/terraform-provider-citrix/blob/main/examples/policy_setting_examples/virtual_channel_allow_list_for_dvc.tf)
+
 ### Virtual channel allow list log throttling
 Description:
 ```

@@ -877,6 +877,8 @@ func getRequestModelForDeliveryGroupCreate(ctx context.Context, diagnostics *dia
 	}
 	body.SetLoadBalanceType(*loadBalanceType)
 
+	body.SetSettlementPeriodBeforeUseSeconds(int32(plan.SettlementPeriodBeforeUse.ValueInt64()))
+
 	return body, nil
 }
 
@@ -1188,6 +1190,8 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 		return editDeliveryGroupRequestBody, err
 	}
 	editDeliveryGroupRequestBody.SetLoadBalanceType(*loadBalanceType)
+
+	editDeliveryGroupRequestBody.SetSettlementPeriodBeforeUseSeconds(int32(plan.SettlementPeriodBeforeUse.ValueInt64()))
 
 	return editDeliveryGroupRequestBody, nil
 }

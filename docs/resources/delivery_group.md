@@ -250,6 +250,7 @@ resource "citrix_delivery_group" "example-delivery-group" {
 - `scopes` (Set of String) The IDs of the scopes for the delivery group to be a part of.
 - `secure_ica_required` (Boolean) When set to `true`, the SecureICA protocol is required for connections to the delivery group. Defaults to `false`.
 - `session_support` (String) The session support for the delivery group. Can only be set to `SingleSession` or `MultiSession`. Specify only if you want to create a Delivery Group without any `associated_machine_catalogs`. Ensure session support is same as that of the prospective Machine Catalogs you will associate this Delivery Group with.
+- `settlement_period_before_use` (Number) Idle period in seconds before a machine can be selected to host a new session after registration or the end of a previous session. Defaults to `0`.
 - `sharing_kind` (String) The sharing kind for the delivery group. Can only be set to `Shared` or `Private`. Specify only if you want to create a Delivery Group wthout any `associated_machine_catalogs`.
 - `storefront_servers` (Set of String) A list of GUID identifiers of StoreFront Servers to associate with the delivery group.
 - `tags` (Set of String) A set of identifiers of tags to associate with the delivery group.
