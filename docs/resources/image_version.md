@@ -47,6 +47,13 @@ resource "citrix_image_version" "example_azure_image_version" {
             disk_encryption_set_resource_group = var.disk_encryption_set_resource_group
         }
 	}
+
+    share_with_resources = [
+        {
+            hypervisor_id = citrix_azure_hypervisor.example_azure_hypervisor_2.id
+            hypervisor_resource_pool_id = citrix_azure_hypervisor_resource_pool.example_azure_resource_pool_2.id
+        }
+    ]
 }
 
 resource "citrix_image_version" "example_vsphere_image_version" {
@@ -63,6 +70,13 @@ resource "citrix_image_version" "example_vsphere_image_version" {
         // Optional attributes
 		// machine_profile = "machine_profile_template_name"
 	}
+
+    share_with_resources = [
+        {
+            hypervisor_id = citrix_vsphere_hypervisor.example_vsphere_hypervisor_2.id
+            hypervisor_resource_pool_id = citrix_vsphere_hypervisor_resource_pool.example_vsphere_resource_pool_2.id
+        }
+    ]
 }
 
 resource "citrix_image_version" "example_aws_ec2_image_version" {
@@ -122,6 +136,9 @@ resource "citrix_image_version" "example_workspaces_core_image_version" {
 - `azure_image_specs` (Attributes) Image configuration for Azure image version. (see [below for nested schema](#nestedatt--azure_image_specs))
 - `description` (String) Description of the image version.
 - `network_mapping` (Attributes List) Specifies how the attached NICs are mapped to networks. (see [below for nested schema](#nestedatt--network_mapping))
+- `share_with_resources` (Attributes Set) Specifies the resources to share the image version with.
+
+ ~> **Please Note** Sharing an image version is currently applicable to Amazon WorkSpaces Core, AWS EC2, Azure, OpenShift, vSphere and XenServer hypervisors only. (see [below for nested schema](#nestedatt--share_with_resources))
 - `timeout` (Attributes) Timeout in minutes for the long-running jobs in image version resource's create, delete operation(s). (see [below for nested schema](#nestedatt--timeout))
 - `vsphere_image_specs` (Attributes) Image configuration for vSphere image version. (see [below for nested schema](#nestedatt--vsphere_image_specs))
 
@@ -239,6 +256,15 @@ Required:
 
 - `network` (String) The name of the virtual network that the device should be attached to. This must be a subnet within a Virtual Private Cloud item in the resource pool to which the Machine Catalog is associated.<br />For AWS, please specify the network mask of the network you want to use within the VPC.
 - `network_device` (String) Name or Id of the network device.
+
+
+<a id="nestedatt--share_with_resources"></a>
+### Nested Schema for `share_with_resources`
+
+Required:
+
+- `hypervisor_id` (String) Id of the hypervisor to share the image version with.
+- `hypervisor_resource_pool_id` (String) Id of the hypervisor resource pool to share the image version with.
 
 
 <a id="nestedatt--timeout"></a>

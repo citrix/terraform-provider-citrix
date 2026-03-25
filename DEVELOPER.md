@@ -62,6 +62,9 @@ make test       # test
 make generate   # regenerate docs
 ```
 
+### Linting
+The `make lint` target includes custom static analysis linters specific to our Terraform provider. See [custom-linters/README.md](./custom-linters/README.md) for details on the custom linters and how to add new ones.
+
 ## Load project in VSCode for Go Development
 Visual Studio Code requires the `Go` extension to be able to load go projects, resolve internal references and even cross package references. Once the `Go` extension is installed, you should be able to load `terraform-provider-citrix` in VSCode. `Go` plugin requires the `go.mod` file to be in the root work directory when you load the project.
 

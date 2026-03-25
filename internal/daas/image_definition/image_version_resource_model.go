@@ -13,6 +13,7 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int32validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -139,6 +140,9 @@ func (VsphereImageSpecsModel) GetSchema() schema.SingleNestedAttribute {
 			"disk_size": schema.Int32Attribute{
 				Description: "The size of the disk in GB.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Int32{
+					int32planmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 		PlanModifiers: []planmodifier.Object{
@@ -187,6 +191,36 @@ func (AmazonWorkspacesCoreImageSpecsModel) GetAttributes() map[string]schema.Att
 	return AmazonWorkspacesCoreImageSpecsModel{}.GetSchema().Attributes
 }
 
+type ShareImageVersionWithResourcesModel struct {
+	HypervisorId             types.String `tfsdk:"hypervisor_id"`
+	HypervisorResourcePoolId types.String `tfsdk:"hypervisor_resource_pool_id"`
+}
+
+func (ShareImageVersionWithResourcesModel) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"hypervisor_id": schema.StringAttribute{
+				Description: "Id of the hypervisor to share the image version with.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
+				},
+			},
+			"hypervisor_resource_pool_id": schema.StringAttribute{
+				Description: "Id of the hypervisor resource pool to share the image version with.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
+				},
+			},
+		},
+	}
+}
+
+func (ShareImageVersionWithResourcesModel) GetAttributes() map[string]schema.Attribute {
+	return ShareImageVersionWithResourcesModel{}.GetSchema().Attributes
+}
+
 type ImageVersionModel struct {
 	// Computed Attributes
 	Id            types.String `tfsdk:"id"`
@@ -207,6 +241,7 @@ type ImageVersionModel struct {
 	SessionSupport                 types.String `tfsdk:"session_support"`
 	OsType                         types.String `tfsdk:"os_type"`
 	Timeout                        types.Object `tfsdk:"timeout"`
+	ShareWithResources             types.Set    `tfsdk:"share_with_resources"` //Set[ShareImageVersionWithResourcesModel]
 }
 
 func (ImageVersionModel) GetSchema() schema.Schema {
@@ -284,6 +319,15 @@ func (ImageVersionModel) GetSchema() schema.Schema {
 				Computed:    true,
 			},
 			"timeout": ImageVersionTimeout{}.GetSchema(),
+			"share_with_resources": schema.SetNestedAttribute{
+				Description: "Specifies the resources to share the image version with." +
+					"\n\n ~> **Please Note** Sharing an image version is currently applicable to Amazon WorkSpaces Core, AWS EC2, Azure, OpenShift, vSphere and XenServer hypervisors only.",
+				Optional:     true,
+				NestedObject: ShareImageVersionWithResourcesModel{}.GetSchema(),
+				Validators: []validator.Set{
+					setvalidator.SizeAtLeast(1),
+				},
+			},
 		},
 	}
 }
@@ -346,6 +390,32 @@ func (r ImageVersionModel) RefreshPropertyValues(ctx context.Context, diagnostic
 		r.NetworkMapping = util.RefreshListValueProperties[util.NetworkMappingModel, citrixorchestration.NetworkMapResponseModel](ctx, diagnostics, r.NetworkMapping, networkMaps, util.GetOrchestrationNetworkMappingKey)
 	} else {
 		r.NetworkMapping = util.TypedArrayToObjectList[util.NetworkMappingModel](ctx, diagnostics, nil)
+	}
+
+	resourcePools := imageSpecs.GetResourcePools()
+	sharedResources := []ShareImageVersionWithResourcesModel{}
+	for _, resourcePool := range resourcePools {
+		if resourcePool.GetIsPrimary() {
+			continue
+		}
+
+		sharedHypervisor := resourcePool.GetHypervisor()
+		sharedHypervisorId := sharedHypervisor.GetId()
+		sharedResourcePoolId := resourcePool.GetId()
+		sharedResources = append(sharedResources, ShareImageVersionWithResourcesModel{
+			HypervisorId:             types.StringValue(sharedHypervisorId),
+			HypervisorResourcePoolId: types.StringValue(sharedResourcePoolId),
+		})
+	}
+
+	if len(sharedResources) > 0 {
+		r.ShareWithResources = util.TypedArrayToObjectSet[ShareImageVersionWithResourcesModel](ctx, diagnostics, sharedResources)
+	} else {
+		if attrMap, err := util.ResourceAttributeMapFromObject(ShareImageVersionWithResourcesModel{}); err == nil {
+			r.ShareWithResources = types.SetNull(types.ObjectType{AttrTypes: attrMap})
+		} else {
+			diagnostics.AddWarning("Error converting schema to attribute map. Error ", err.Error())
+		}
 	}
 
 	switch imageContext.GetPluginFactoryName() {
