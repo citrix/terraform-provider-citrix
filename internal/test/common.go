@@ -3,8 +3,32 @@
 package test
 
 import (
+	"fmt"
 	"os"
 	"testing"
+)
+
+var (
+	citrix_provider_cloud = `
+ provider "citrix" {
+	cvad_config = {
+		customer_id   = "%s"
+		hostname = "%s"
+		client_id     = "%s"
+		client_secret = "%s"
+	}
+ }
+`
+	citrix_provider_on_prem = `
+	provider "citrix" {
+		cvad_config = {
+			hostname = "%s"
+			client_id     = "%s"
+			client_secret = "%s"
+			disable_ssl_verification = true
+		}
+	}
+`
 )
 
 // Used to skip a test case if environment is cloud
@@ -79,4 +103,11 @@ func checkTestEnvironmentVariables(t *testing.T, envVarNames []string) {
 			t.Fatalf("%s must be set for acceptance tests", v)
 		}
 	}
+}
+
+func BuildProvider(clientId string, clientSecret string, hostname string, customerId string, isOnPremises bool) string {
+	if isOnPremises {
+		return fmt.Sprintf(citrix_provider_on_prem, hostname, clientId, clientSecret)
+	}
+	return fmt.Sprintf(citrix_provider_cloud, customerId, hostname, clientId, clientSecret)
 }

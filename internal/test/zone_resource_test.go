@@ -201,6 +201,7 @@ resource "citrix_zone" "test" {
 `
 
 	zone_testResource_resource_location = `
+
 resource "citrix_zone" "test" {
 	resource_location_id = citrix_cloud_resource_location.test_resource_location.id
 }

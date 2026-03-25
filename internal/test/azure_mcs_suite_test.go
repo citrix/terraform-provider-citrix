@@ -71,6 +71,9 @@ func TestAzureMcs(t *testing.T) {
 	isDDCVersionSupportedForCatalogAndDelGrp := util.CheckProductVersion(client, &diag, 120, 120, 7, 42, "", "")
 
 	customerId := os.Getenv("CITRIX_CUSTOMER_ID")
+	clientId := os.Getenv("CITRIX_CLIENT_ID")
+	clientSecret := os.Getenv("CITRIX_CLIENT_SECRET")
+	hostname := os.Getenv("CITRIX_HOSTNAME")
 	isOnPremises := customerId == "" || customerId == "CitrixOnPremises"
 	// Tests being run in on-premises environment with CVAD version < 2407
 	isPre2407AndOnPremises := isOnPremises && !isDDCVersionSupportedForCatalogAndDelGrp
@@ -126,8 +129,11 @@ func TestAzureMcs(t *testing.T) {
 			/****************** Zone Test ******************/
 			// Zone - Create and Read testing
 			{
-				Config: BuildZoneResource(t, zoneInput, false),
-				Check:  getAggregateTestFunc(isOnPremises, zoneInput, zoneDescription),
+				Config: composeTestResourceTf(
+					BuildZoneResource(t, zoneInput, false),
+					// BuildProvider(clientId, clientSecret, hostname, customerId, isOnPremises),
+				),
+				Check: getAggregateTestFunc(isOnPremises, zoneInput, zoneDescription),
 			},
 			// ImportState testing
 			{
@@ -140,7 +146,10 @@ func TestAzureMcs(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: BuildZoneResource(t, zoneInput, true),
+				Config: composeTestResourceTf(
+					BuildZoneResource(t, zoneInput, true),
+					BuildProvider(clientId, clientSecret, hostname, customerId, isOnPremises),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of zone
 					resource.TestCheckResourceAttr("citrix_zone.test", "name", fmt.Sprintf("%s-updated", zoneInput)),
@@ -161,6 +170,7 @@ func TestAzureMcs(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildHypervisorResourceAzure(t, hypervisor_testResources),
 					BuildZoneResource(t, zoneInput, true),
+					BuildProvider(clientId, clientSecret, hostname, customerId, isOnPremises),
 				),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -183,6 +193,7 @@ func TestAzureMcs(t *testing.T) {
 				Config: composeTestResourceTf(
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
 					BuildZoneResource(t, zoneInput, true),
+					BuildProvider(clientId, clientSecret, hostname, customerId, isOnPremises),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
@@ -198,6 +209,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
 					BuildZoneResource(t, zoneInput, true),
+					BuildProvider(clientId, clientSecret, hostname, customerId, isOnPremises),
 				),
 
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -225,6 +237,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildHypervisorResourcePoolResourceAzure(t, hypervisor_resource_pool_updated_testResource_azure),
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
 					BuildZoneResource(t, zoneInput, true),
+					BuildProvider(clientId, clientSecret, hostname, customerId, isOnPremises),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("citrix_azure_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", resourcePoolName)),
@@ -238,6 +251,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
 					BuildZoneResource(t, zoneInput, true),
 					BuildAzureImageDefinitionTestResourceForTestSuite(t),
+					BuildProvider(clientId, clientSecret, hostname, customerId, isOnPremises),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the image definition
@@ -266,6 +280,7 @@ func TestAzureMcs(t *testing.T) {
 					BuildHypervisorResourceAzure(t, hypervisor_testResources_updated),
 					BuildZoneResource(t, zoneInput, true),
 					BuildAzureImageDefinitionUpdatedTestResourceForTestSuite(t),
+					BuildProvider(clientId, clientSecret, hostname, customerId, isOnPremises),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the image definition
@@ -285,6 +300,7 @@ func TestAzureMcs(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildServiceAccountResourceAD(t, testServiceAccountResourceAD),
+					BuildProvider(clientId, clientSecret, hostname, customerId, isOnPremises),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
@@ -305,7 +321,7 @@ func TestAzureMcs(t *testing.T) {
 			},
 			// Update and Read
 			{
-				Config: composeTestResourceTf(BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated)),
+				Config: composeTestResourceTf(BuildServiceAccountResourceAD(t, testServiceAccountResourceAD_updated), BuildProvider(clientId, clientSecret, hostname, customerId, isOnPremises)),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify name of hypervisor
 					resource.TestCheckResourceAttr("citrix_service_account.testServiceAccountAD", "display_name", fmt.Sprintf("%s-updated", os.Getenv("TEST_SERVICE_ACCOUNT_DISPLAY_NAME"))),
