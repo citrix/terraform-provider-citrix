@@ -29,11 +29,8 @@ resource citrix_quickdeploy_catalog custom-power-schedule-catalog {
         naming_scheme_type = "Numeric"
     }
     power_schedule = {
-        peak_buffer_capacity = 30
-        off_peak_buffer_capacity = 15
         peak_min_instances = 2
         off_peak_min_instances = 1
-        max_users_per_vm = 4
         weekdays = ["monday", "tuesday", "wednesday", "thursday", "friday"]
         peak_start_time = 9
         peak_end_time = 18

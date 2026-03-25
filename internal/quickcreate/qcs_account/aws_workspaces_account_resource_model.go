@@ -3,6 +3,7 @@
 package qcs_account
 
 import (
+	"context"
 	"regexp"
 
 	quickcreateservice "github.com/citrix/citrix-daas-rest-go/citrixquickcreate"
@@ -11,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -88,6 +90,15 @@ func (AwsWorkspacesAccountResourceModel) GetSchema() schema.Schema {
 				Computed:    true,
 				Optional:    true,
 				Default:     booldefault.StaticBool(true),
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.RequiresReplaceIf(
+						func(ctx context.Context, req planmodifier.BoolRequest, resp *boolplanmodifier.RequiresReplaceIfFuncResponse) {
+							resp.RequiresReplace = req.StateValue.ValueBool() && !req.PlanValue.ValueBool()
+						},
+						"BYOL feature support cannot be disabled once enabled. To disable BYOL, a new account must be created with aws_byol_feature_enabled set to false.",
+						"BYOL feature support cannot be disabled once enabled. To disable BYOL, a new account must be created with aws_byol_feature_enabled set to false.",
+					),
+				},
 			},
 		},
 	}

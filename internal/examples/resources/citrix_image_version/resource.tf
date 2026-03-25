@@ -32,6 +32,13 @@ resource "citrix_image_version" "example_azure_image_version" {
             disk_encryption_set_resource_group = var.disk_encryption_set_resource_group
         }
 	}
+
+    share_with_resources = [
+        {
+            hypervisor_id = citrix_azure_hypervisor.example_azure_hypervisor_2.id
+            hypervisor_resource_pool_id = citrix_azure_hypervisor_resource_pool.example_azure_resource_pool_2.id
+        }
+    ]
 }
 
 resource "citrix_image_version" "example_vsphere_image_version" {
@@ -48,6 +55,13 @@ resource "citrix_image_version" "example_vsphere_image_version" {
         // Optional attributes
 		// machine_profile = "machine_profile_template_name"
 	}
+
+    share_with_resources = [
+        {
+            hypervisor_id = citrix_vsphere_hypervisor.example_vsphere_hypervisor_2.id
+            hypervisor_resource_pool_id = citrix_vsphere_hypervisor_resource_pool.example_vsphere_resource_pool_2.id
+        }
+    ]
 }
 
 resource "citrix_image_version" "example_aws_ec2_image_version" {

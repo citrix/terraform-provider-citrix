@@ -246,6 +246,8 @@ func (r *ImageVersionResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
+	updateImageVersionResourcePools(ctx, r.client, &resp.Diagnostics, plan)
+
 	imageVersion, err = GetImageVersion(ctx, r.client, &resp.Diagnostics, plan.ImageDefinition.ValueString(), imageVersion.GetId())
 	if err != nil {
 		return
@@ -345,8 +347,85 @@ func (r *ImageVersionResource) ModifyPlan(ctx context.Context, req resource.Modi
 		return
 	}
 
+	create := req.State.Raw.IsNull()
+
 	var plan ImageVersionModel
 	diags := req.Plan.Get(ctx, &plan)
+
+	if !plan.ShareWithResources.IsNull() {
+		if create {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("share_with_resources"),
+				"Invalid Attribute Configuration",
+				"The attribute share_with_resources cannot be specified during creation. Please specify the resources to share the image version with in an update operation after the image version has been created.",
+			)
+			return
+		}
+
+		isFeatureSupported := util.CheckProductVersion(r.client, &resp.Diagnostics, 125, 126, 7, 45, "Error managing Image Version resource", "Sharing Image Version")
+		if !isFeatureSupported {
+			return
+		}
+
+		if !plan.Hypervisor.IsNull() && !plan.Hypervisor.IsUnknown() {
+			hypervisor, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, plan.Hypervisor.ValueString())
+			if err != nil {
+				return
+			}
+
+			if hypervisor.GetConnectionType() != citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM &&
+				hypervisor.GetConnectionType() != citrixorchestration.HYPERVISORCONNECTIONTYPE_V_CENTER &&
+				hypervisor.GetConnectionType() != citrixorchestration.HYPERVISORCONNECTIONTYPE_AMAZON_WORK_SPACES_CORE &&
+				hypervisor.GetConnectionType() != citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS &&
+				hypervisor.GetConnectionType() != citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT &&
+				hypervisor.GetConnectionType() != citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER {
+				resp.Diagnostics.AddError(
+					"Error managing Image Version resource",
+					"Sharing an image version is currently applicable to Amazon WorkSpaces Core, AWS EC2, Azure, OpenShift, vSphere and XenServer hypervisors only.",
+				)
+				return
+			}
+
+			shareWithResources := util.ObjectSetToTypedArray[ShareImageVersionWithResourcesModel](ctx, &resp.Diagnostics, plan.ShareWithResources)
+
+			for _, shareWithResource := range shareWithResources {
+				if !shareWithResource.HypervisorId.IsNull() && !shareWithResource.HypervisorId.IsUnknown() {
+					hypervisorToShareWith, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, shareWithResource.HypervisorId.ValueString())
+					if err != nil {
+						return
+					}
+
+					if hypervisorToShareWith.GetConnectionType() != hypervisor.GetConnectionType() {
+						resp.Diagnostics.AddError(
+							"Error managing Image Version resource",
+							"The Image Version is being shared with hypervisor "+shareWithResource.HypervisorId.ValueString()+" which has a different connection type than the Image Version's hypervisor."+
+								"\nImage Version sharing is only supported between hypervisors of the same connection type.",
+						)
+						return
+					}
+
+					if !shareWithResource.HypervisorResourcePoolId.IsNull() && !shareWithResource.HypervisorResourcePoolId.IsUnknown() {
+						if !plan.ResourcePool.IsUnknown() &&
+							!plan.ResourcePool.IsNull() &&
+							strings.EqualFold(plan.ResourcePool.ValueString(), shareWithResource.HypervisorResourcePoolId.ValueString()) {
+							resp.Diagnostics.AddError(
+								"Error managing Image Version resource",
+								"The resource pool specified in share_with_resources cannot be the same as the image version's own resource pool.",
+							)
+							return
+						}
+
+						// make sure the resource pool exists
+						_, err = util.GetHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, shareWithResource.HypervisorId.ValueString(), shareWithResource.HypervisorResourcePoolId.ValueString())
+						if err != nil {
+							return
+						}
+					}
+				}
+			}
+		}
+	}
+
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -500,4 +579,49 @@ func validateImageVersionMachineProfileConfigs(diagnostics *diag.Diagnostics, id
 		}
 	}
 	return nil
+}
+
+func generateImageVersionResourcePoolRequestModel(ctx context.Context, diagnostics *diag.Diagnostics, plan ImageVersionModel) []citrixorchestration.ImageVersionResourcePoolRequestModel {
+	imageVersionResourcePools := []citrixorchestration.ImageVersionResourcePoolRequestModel{}
+	imageVersionResourcePool := citrixorchestration.ImageVersionResourcePoolRequestModel{}
+	// Set the image version's own resource pool
+	imageVersionResourcePool.SetResourcePool(plan.ResourcePool.ValueString())
+	imageVersionResourcePools = append(imageVersionResourcePools, imageVersionResourcePool)
+
+	if plan.ShareWithResources.IsNull() {
+		return imageVersionResourcePools
+	}
+
+	shareWithResources := util.ObjectSetToTypedArray[ShareImageVersionWithResourcesModel](ctx, diagnostics, plan.ShareWithResources)
+
+	for _, shareWithResource := range shareWithResources {
+		imageVersionResourcePool = citrixorchestration.ImageVersionResourcePoolRequestModel{}
+		imageVersionResourcePool.SetResourcePool(shareWithResource.HypervisorResourcePoolId.ValueString())
+		imageVersionResourcePools = append(imageVersionResourcePools, imageVersionResourcePool)
+	}
+
+	return imageVersionResourcePools
+}
+
+func updateImageVersionResourcePools(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, plan ImageVersionModel) {
+	imageVersionResourcePools := generateImageVersionResourcePoolRequestModel(ctx, diagnostics, plan)
+
+	updateImageVersionRequestModel := citrixorchestration.UpdateImageVersionResourcePoolsRequestModel{}
+	updateImageVersionRequestModel.SetImageVersionResourcePools(imageVersionResourcePools)
+	updateImageVersionResourcePoolsRequest := client.ApiClient.ImageDefinitionsAPIsDAAS.ImageDefinitionsUpdateImageVersionResourcePools(ctx, plan.ImageDefinition.ValueString(), plan.Id.ValueString())
+	updateImageVersionResourcePoolsRequest = updateImageVersionResourcePoolsRequest.UpdateImageVersionResourcePoolsRequestModel(updateImageVersionRequestModel).Async(true)
+
+	// make API call
+	httpResp, err := citrixdaasclient.AddRequestData(updateImageVersionResourcePoolsRequest, client).Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error sharing Image Version with resources",
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		return
+	}
+
+	//nolint:errcheck // Errors added to diagnostics, continue so resource gets marked as tainted
+	_ = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error sharing Image Version", diagnostics, 5)
 }
