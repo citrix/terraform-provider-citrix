@@ -113,6 +113,11 @@ func (r *azureHypervisorResource) Create(ctx context.Context, req resource.Creat
 	enableProxyHypervisorTraffic.SetValue(strconv.FormatBool(plan.ProxyHypervisorTrafficThroughConnector.ValueBool()))
 	customProperties = append(customProperties, enableProxyHypervisorTraffic)
 
+	useSystemProxyProperty := citrixorchestration.NameValueStringPairModel{}
+	useSystemProxyProperty.SetName(UseSystemProxyForHypervisorTrafficOnConnectors_CustomProperty)
+	useSystemProxyProperty.SetValue(strconv.FormatBool(plan.UseSystemProxyForHypervisorTrafficOnConnectors.ValueBool()))
+	customProperties = append(customProperties, useSystemProxyProperty)
+
 	enableAuthenticationMode := citrixorchestration.NameValueStringPairModel{}
 	enableAuthenticationMode.SetName(AuthenticationMode_CustomProperty)
 	enableAuthenticationMode.SetValue(plan.AuthenticationMode.ValueString())
@@ -249,6 +254,7 @@ func (r *azureHypervisorResource) Update(ctx context.Context, req resource.Updat
 
 	isEnableAADeviceManagement := false
 	isEnableProxyHyp := false
+	isEnableUseSystemProxy := false
 	isEnableAuthMode := false
 
 	updatedCustomProperties := []*citrixorchestration.NameValueStringPairModel{}
@@ -261,6 +267,10 @@ func (r *azureHypervisorResource) Update(ctx context.Context, req resource.Updat
 		if currentProperty.GetName() == ProxyHypervisorTrafficThroughConnector_CustomProperty {
 			currentProperty.SetValue(strconv.FormatBool(plan.ProxyHypervisorTrafficThroughConnector.ValueBool()))
 			isEnableProxyHyp = true
+		}
+		if currentProperty.GetName() == UseSystemProxyForHypervisorTrafficOnConnectors_CustomProperty {
+			currentProperty.SetValue(strconv.FormatBool(plan.UseSystemProxyForHypervisorTrafficOnConnectors.ValueBool()))
+			isEnableUseSystemProxy = true
 		}
 		if currentProperty.GetName() == AuthenticationMode_CustomProperty {
 			currentProperty.SetValue(plan.AuthenticationMode.ValueString())
@@ -281,6 +291,13 @@ func (r *azureHypervisorResource) Update(ctx context.Context, req resource.Updat
 		enableProxyHypervisorTraffic.SetName(ProxyHypervisorTrafficThroughConnector_CustomProperty)
 		enableProxyHypervisorTraffic.SetValue(strconv.FormatBool(plan.ProxyHypervisorTrafficThroughConnector.ValueBool()))
 		updatedCustomProperties = append(updatedCustomProperties, &enableProxyHypervisorTraffic)
+	}
+
+	if !isEnableUseSystemProxy {
+		useSystemProxyProperty := citrixorchestration.NameValueStringPairModel{}
+		useSystemProxyProperty.SetName(UseSystemProxyForHypervisorTrafficOnConnectors_CustomProperty)
+		useSystemProxyProperty.SetValue(strconv.FormatBool(plan.UseSystemProxyForHypervisorTrafficOnConnectors.ValueBool()))
+		updatedCustomProperties = append(updatedCustomProperties, &useSystemProxyProperty)
 	}
 
 	if !isEnableAuthMode {
@@ -432,6 +449,14 @@ func (r *azureHypervisorResource) ValidateConfig(ctx context.Context, req resour
 				"application_id should be set if the authentication_mode is either not set or is set to one of AppClientSecret or UserAssignedManagedIdentity.",
 			)
 		}
+	}
+
+	if data.UseSystemProxyForHypervisorTrafficOnConnectors.ValueBool() && !data.ProxyHypervisorTrafficThroughConnector.ValueBool() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("use_system_proxy_for_hypervisor_traffic_on_connectors"),
+			"use_system_proxy_for_hypervisor_traffic_on_connectors Configuration Error.",
+			"use_system_proxy_for_hypervisor_traffic_on_connectors can only be set to true if proxy_hypervisor_traffic_through_connector is set to true.",
+		)
 	}
 
 	if !data.Metadata.IsNull() {

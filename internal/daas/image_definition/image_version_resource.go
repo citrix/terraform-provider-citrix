@@ -386,7 +386,7 @@ func (r *ImageVersionResource) ModifyPlan(ctx context.Context, req resource.Modi
 				return
 			}
 
-			shareWithResources := util.ObjectSetToTypedArray[ShareImageVersionWithResourcesModel](ctx, &resp.Diagnostics, plan.ShareWithResources)
+			shareWithResources := util.ObjectSetToTypedArray[util.ShareImageVersionWithResourcesModel](ctx, &resp.Diagnostics, plan.ShareWithResources)
 
 			for _, shareWithResource := range shareWithResources {
 				if !shareWithResource.HypervisorId.IsNull() && !shareWithResource.HypervisorId.IsUnknown() {
@@ -592,7 +592,7 @@ func generateImageVersionResourcePoolRequestModel(ctx context.Context, diagnosti
 		return imageVersionResourcePools
 	}
 
-	shareWithResources := util.ObjectSetToTypedArray[ShareImageVersionWithResourcesModel](ctx, diagnostics, plan.ShareWithResources)
+	shareWithResources := util.ObjectSetToTypedArray[util.ShareImageVersionWithResourcesModel](ctx, diagnostics, plan.ShareWithResources)
 
 	for _, shareWithResource := range shareWithResources {
 		imageVersionResourcePool = citrixorchestration.ImageVersionResourcePoolRequestModel{}

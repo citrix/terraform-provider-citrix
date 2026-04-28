@@ -702,6 +702,57 @@ func (AwsMachineProfileModel) GetDataSourceAttributes() map[string]dataSourceSch
 	return AwsMachineProfileModel{}.GetDataSourceSchema().Attributes
 }
 
+type ShareImageVersionWithResourcesModel struct {
+	HypervisorId             types.String `tfsdk:"hypervisor_id"`
+	HypervisorResourcePoolId types.String `tfsdk:"hypervisor_resource_pool_id"`
+}
+
+func (ShareImageVersionWithResourcesModel) GetSchema() schema.NestedAttributeObject {
+	return schema.NestedAttributeObject{
+		Attributes: map[string]schema.Attribute{
+			"hypervisor_id": schema.StringAttribute{
+				Description: "Id of the hypervisor to share the image version with.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(GuidRegex), "must be specified with ID in GUID format"),
+				},
+			},
+			"hypervisor_resource_pool_id": schema.StringAttribute{
+				Description: "Id of the hypervisor resource pool to share the image version with.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(GuidRegex), "must be specified with ID in GUID format"),
+				},
+			},
+		},
+	}
+}
+
+func (ShareImageVersionWithResourcesModel) GetDataSourceSchema() dataSourceSchema.NestedAttributeObject {
+	return dataSourceSchema.NestedAttributeObject{
+		Attributes: map[string]dataSourceSchema.Attribute{
+			"hypervisor_id": schema.StringAttribute{
+				Description: "Id of the hypervisor the image version is shared with.",
+				Computed:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(GuidRegex), "must be specified with ID in GUID format"),
+				},
+			},
+			"hypervisor_resource_pool_id": schema.StringAttribute{
+				Description: "Id of the hypervisor resource pool the image version is shared with.",
+				Computed:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(GuidRegex), "must be specified with ID in GUID format"),
+				},
+			},
+		},
+	}
+}
+
+func (ShareImageVersionWithResourcesModel) GetAttributes() map[string]schema.Attribute {
+	return ShareImageVersionWithResourcesModel{}.GetSchema().Attributes
+}
+
 func HandleMachineProfileForAwsMcsPvsCatalog(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diag *diag.Diagnostics, hypervisorName string, resourcePoolName string, machineProfile AwsMachineProfileModel, errorTitle string) (string, error) {
 	isUsingImageTemplate := machineProfile.VmName.IsNull() || machineProfile.VmName.IsUnknown()
 

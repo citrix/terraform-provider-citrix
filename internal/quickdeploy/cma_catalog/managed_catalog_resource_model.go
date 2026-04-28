@@ -10,13 +10,16 @@ import (
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/citrix-daas-rest-go/citrixquickdeploy"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
+	"github.com/citrix/terraform-provider-citrix/internal/validators"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setdefault"
@@ -41,6 +44,7 @@ type CitrixManagedCatalogResourceModel struct {
 	MachineNamingScheme types.Object `tfsdk:"machine_naming_scheme"` // MachineNamingSchemeModel
 	PowerSchedule       types.Object `tfsdk:"power_schedule"`        // PowerScheduleModel
 	OnPremConnectivity  types.Object `tfsdk:"on_prem_connectivity"`  // OnPremConnectivityModel
+	Persona             types.String `tfsdk:"persona"`
 }
 
 func (CitrixManagedCatalogResourceModel) GetSchema() schema.Schema {
@@ -62,13 +66,26 @@ func (CitrixManagedCatalogResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"catalog_type": schema.StringAttribute{
-				Description: "Denotes how the machines in the catalog are allocated to a user. Choose between `MultiSession`, `SingleSessionStatic` and `SingleSessionRandom`.",
-				Required:    true,
+				Description: "Denotes how the machines in the catalog are allocated to a user. Choose between `MultiSession`, `SingleSessionStatic` and `SingleSessionRandom`." +
+					"\n\n -> **Note** Catalog type is required when `persona` is not specified. When a persona is specified, the catalog type associated with the persona will be used. However, catalog type can still be specified alongside certain personas as an add-on (extra credits).",
+				Optional: true,
+				Computed: true,
 				Validators: []validator.String{
 					util.GetValidatorFromEnum(citrixquickdeploy.AllowedAddCatalogTypeEnumValues),
+					stringvalidator.AtLeastOneOf(
+						path.MatchRoot("catalog_type"),
+						path.MatchRoot("persona"),
+					),
+					validators.AlsoRequiresOnStringValues(
+						[]string{
+							string(citrixquickdeploy.ADDCATALOGTYPE_MULTI_SESSION),
+						},
+						path.MatchRelative().AtParent().AtName("max_users_per_vm"),
+					),
 				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"region": schema.StringAttribute{
@@ -95,21 +112,39 @@ func (CitrixManagedCatalogResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"machine_size": schema.StringAttribute{
-				Description: "The Azure VM SKU to use for creating machines.",
-				Required:    true,
+				Description: "The Azure VM SKU to use for creating machines." +
+					"\n\n -> **Note** Machine size is required when `persona` is not specified. When a persona is specified, the machine size associated with the persona is used.",
+				Optional: true,
+				Computed: true,
+				Validators: []validator.String{
+					stringvalidator.ExactlyOneOf(
+						path.MatchRoot("machine_size"),
+						path.MatchRoot("persona"),
+					),
+				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"storage_type": schema.StringAttribute{
-				Description: "Storage account type used for provisioned virtual machine disks on Azure. Storage types include: `Standard_LRS`, `StandardSSD_LRS` and `Premium_LRS`.",
-				Required:    true,
+				Description: "Storage account type used for provisioned virtual machine disks on Azure. Storage types include: `Standard_LRS`, `StandardSSD_LRS` and `Premium_LRS`." +
+					"\n\n -> **Note** Storage type is required when `persona` is not specified. When a persona is specified, the storage type associated with the persona is used.",
+				Optional: true,
+				Computed: true,
 				Validators: []validator.String{
 					stringvalidator.OneOf(
 						util.StandardLRS,
 						util.StandardSSDLRS,
 						util.Premium_LRS,
 					),
+					stringvalidator.ExactlyOneOf(
+						path.MatchRoot("storage_type"),
+						path.MatchRoot("persona"),
+					),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"number_of_users": schema.Int64Attribute{
@@ -124,17 +159,29 @@ func (CitrixManagedCatalogResourceModel) GetSchema() schema.Schema {
 				Computed:    true,
 			},
 			"max_users_per_vm": schema.Int64Attribute{
-				Description: "Maximum number of concurrent users that could launch session on the same machine. Only allowed to have more than 1 concurrent user when `catalog_type` is `MultiSession`. Defaults to `1`.",
-				Optional:    true,
-				Computed:    true,
-				Default:     int64default.StaticInt64(1),
+				Description: "Maximum number of concurrent users that could launch session on the same machine. Only allowed to have more than 1 concurrent user when `catalog_type` is `MultiSession`." +
+					"\n\n -> **Note** When a persona is specified, the max users per VM associated with the persona is used and this field must not be specified.",
+				Optional: true,
+				Computed: true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(1),
+				},
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
 				},
 			},
 			"machine_naming_scheme": MachineNamingSchemeModel{}.GetSchema(),
 			"power_schedule":        PowerScheduleModel{}.GetSchema(),
 			"on_prem_connectivity":  OnPremConnectivityModel{}.GetSchema(),
+			"persona": schema.StringAttribute{
+				Description: "The name of the persona to be used for the catalog." +
+					"\n\n -> **Note** When persona is specified, values for `machine_size`, `storage_type` and `catalog_type` are derived from the persona. Only `catalog_type` can be specified alongside certain personas as an add-on.",
+				Optional: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
 		},
 	}
 }
@@ -331,9 +378,11 @@ func (PowerScheduleModel) GetSchema() schema.SingleNestedAttribute {
 					"\n\n-> **Note** By default, the power-off delay is 30 minutes. You can set it in a range of 0 to 60 minutes. ",
 				Optional: true,
 				Computed: true,
-				Default:  int64default.StaticInt64(30),
 				Validators: []validator.Int64{
 					int64validator.Between(0, 60),
+				},
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
 				},
 			},
 		},
@@ -404,7 +453,9 @@ func (r CitrixManagedCatalogResourceModel) RefreshPropertyValues(ctx context.Con
 	r.StorageType = types.StringValue(string(computerWorker.GetStorageType()))
 	r.MaxUsersPerVm = types.Int64Value(int64(computerWorker.GetMaxUsersPerVM()))
 
-	r = r.updatePlanWithPowerSchedule(ctx, diagnostics, capacity)
+	isMultiSession := sessionSupport == citrixquickdeploy.SESSIONSUPPORT_MULTI_SESSION
+
+	r = r.updatePlanWithPowerSchedule(ctx, diagnostics, capacity, isMultiSession)
 
 	// Refresh on-prem connectivity if domain joined
 	if catalog.GetVnetPeeringId() != "" {
@@ -414,7 +465,7 @@ func (r CitrixManagedCatalogResourceModel) RefreshPropertyValues(ctx context.Con
 	return r
 }
 
-func (r CitrixManagedCatalogResourceModel) updatePlanWithPowerSchedule(ctx context.Context, diagnostics *diag.Diagnostics, capacity *citrixquickdeploy.CatalogCapacitySettingsModel) CitrixManagedCatalogResourceModel {
+func (r CitrixManagedCatalogResourceModel) updatePlanWithPowerSchedule(ctx context.Context, diagnostics *diag.Diagnostics, capacity *citrixquickdeploy.CatalogCapacitySettingsModel, isMultiSession bool) CitrixManagedCatalogResourceModel {
 	scaleSettings := capacity.GetScaleSettings()
 	powerSchedule := util.ObjectValueToTypedObject[PowerScheduleModel](ctx, diagnostics, r.PowerSchedule)
 
@@ -429,7 +480,10 @@ func (r CitrixManagedCatalogResourceModel) updatePlanWithPowerSchedule(ctx conte
 	powerSchedule.PeakStartTime = types.Int64Value(int64(scaleSettings.GetPeakStartTime()))
 	powerSchedule.PeakEndTime = types.Int64Value(int64(scaleSettings.GetPeakEndTime()))
 	powerSchedule.PeakTimeZoneId = types.StringValue(scaleSettings.GetPeakTimeZoneId())
-	powerSchedule.PowerOffDelay = types.Int64Value(int64(scaleSettings.GetPowerOffDelay()))
+
+	if isMultiSession {
+		powerSchedule.PowerOffDelay = types.Int64Value(int64(scaleSettings.GetPowerOffDelay()))
+	}
 
 	weekdayString := scaleSettings.GetWeekdaysString()
 	weekdays := []string{}

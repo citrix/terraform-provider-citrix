@@ -46,6 +46,7 @@ resource "citrix_azure_hypervisor" "example-azure-hypervisor" {
 - `metadata` (Attributes List) Metadata for the Hypervisor. (see [below for nested schema](#nestedatt--metadata))
 - `proxy_hypervisor_traffic_through_connector` (Boolean) Enables the routing of hypervisor traffic through a Citrix Cloud Connector. Should be enabled if the `AuthenticationMode` is set to either `UserAssignedManagedIdentity` or `SystemAssignedManagedIdentity`. Defaults to `false`.
 - `scopes` (Set of String) The IDs of the scopes for the hypervisor to be a part of.
+- `use_system_proxy_for_hypervisor_traffic_on_connectors` (Boolean) Enables the use of a system proxy when routing hypervisor traffic through connectors. Can only be set to `true` if `proxy_hypervisor_traffic_through_connector` is set to `true`. Defaults to `false`.
 
 ### Read-Only
 

@@ -4,7 +4,9 @@ package hypervisor
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -86,6 +88,23 @@ func (r *gcpHypervisorResource) Create(ctx context.Context, req resource.CreateR
 
 	metadata := util.GetMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
 	connectionDetails.SetMetadata(metadata)
+
+	customProperties := []citrixorchestration.NameValueStringPairModel{}
+	useSystemProxyForHypervisorTrafficOnConnectors := citrixorchestration.NameValueStringPairModel{}
+	useSystemProxyForHypervisorTrafficOnConnectors.SetName(UseSystemProxyForHypervisorTrafficOnConnectors_CustomProperty)
+	useSystemProxyForHypervisorTrafficOnConnectors.SetValue(strconv.FormatBool(plan.UseSystemProxyForHypervisorTrafficOnConnectors.ValueBool()))
+	customProperties = append(customProperties, useSystemProxyForHypervisorTrafficOnConnectors)
+
+	customPropertyString, err := json.Marshal(customProperties)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error creating Hypervisor",
+			"Hypervisor "+plan.Name.ValueString()+" failed to be created. Could not marshal custom properties.\n"+
+				"Error message: "+err.Error(),
+		)
+		return
+	}
+	connectionDetails.SetCustomProperties(string(customPropertyString))
 
 	// Generate API request body from plan
 	var body citrixorchestration.CreateHypervisorRequestModel
@@ -179,6 +198,56 @@ func (r *gcpHypervisorResource) Update(ctx context.Context, req resource.UpdateR
 
 	metadata := util.GetUpdatedMetadataRequestModel(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, state.Metadata), util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, plan.Metadata))
 	editHypervisorRequestBody.SetMetadata(metadata)
+
+	// Get refreshed hypervisor properties from Orchestration
+	hypervisorId := plan.Id.ValueString()
+	hypervisor, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, hypervisorId)
+	if err != nil {
+		return
+	}
+
+	// Update custom properties
+	customPropertiesString := hypervisor.GetCustomProperties()
+	var customProperties []citrixorchestration.NameValueStringPairModel
+
+	err = json.Unmarshal([]byte(customPropertiesString), &customProperties)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating Hypervisor",
+			"Hypervisor "+hypervisor.GetName()+" failed to be retrieved from remote.",
+		)
+		return
+	}
+
+	useConnectorSystemProxy := false
+	updatedCustomProperties := []*citrixorchestration.NameValueStringPairModel{}
+	for _, customProperty := range customProperties {
+		currentProperty := customProperty
+		if currentProperty.GetName() == UseSystemProxyForHypervisorTrafficOnConnectors_CustomProperty {
+			currentProperty.SetValue(strconv.FormatBool(plan.UseSystemProxyForHypervisorTrafficOnConnectors.ValueBool()))
+			useConnectorSystemProxy = true
+		}
+
+		updatedCustomProperties = append(updatedCustomProperties, &currentProperty)
+	}
+
+	if !useConnectorSystemProxy {
+		useSystemProxyForHypervisorTrafficOnConnectors := citrixorchestration.NameValueStringPairModel{}
+		useSystemProxyForHypervisorTrafficOnConnectors.SetName(UseSystemProxyForHypervisorTrafficOnConnectors_CustomProperty)
+		useSystemProxyForHypervisorTrafficOnConnectors.SetValue(strconv.FormatBool(plan.UseSystemProxyForHypervisorTrafficOnConnectors.ValueBool()))
+		updatedCustomProperties = append(updatedCustomProperties, &useSystemProxyForHypervisorTrafficOnConnectors)
+	}
+
+	customPropertiesByte, err := json.Marshal(updatedCustomProperties)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating Hypervisor",
+			"Hypervisor "+plan.Name.ValueString()+" failed to be updated. Could not marshal custom properties.\n"+
+				"Error message: "+err.Error(),
+		)
+		return
+	}
+	editHypervisorRequestBody.SetCustomProperties(string(customPropertiesByte))
 
 	// Patch hypervisor
 	updatedHypervisor, err := UpdateHypervisor(ctx, r.client, &resp.Diagnostics, editHypervisorRequestBody, plan.Id.ValueString(), plan.Name.ValueString())

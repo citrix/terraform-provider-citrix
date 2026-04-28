@@ -36,6 +36,7 @@ resource "citrix_gcp_hypervisor" "example-gcp-hypervisor" {
 
 - `metadata` (Attributes List) Metadata for the Hypervisor. (see [below for nested schema](#nestedatt--metadata))
 - `scopes` (Set of String) The IDs of the scopes for the hypervisor to be a part of.
+- `use_system_proxy_for_hypervisor_traffic_on_connectors` (Boolean) When set to `true`, the hypervisor connection will be setup with the proxy configured during connector installation. Default value is `false`.
 
 ### Read-Only
 

@@ -107,8 +107,16 @@ func validateImageVersion(ctx context.Context, diagnostics *diag.Diagnostics, cl
 				}
 
 				if !provSchemePlan.HypervisorResourcePool.IsNull() {
-					imageVersionResourcePool := imageSpecs.GetResourcePool()
-					if imageVersionResourcePool.GetId() != provSchemePlan.HypervisorResourcePool.ValueString() {
+					imageVersionResourcePools := imageSpecs.GetResourcePools()
+					resourcePoolFound := false
+					for _, imageVersionResourcePool := range imageVersionResourcePools {
+						if strings.EqualFold(imageVersionResourcePool.GetId(), provSchemePlan.HypervisorResourcePool.ValueString()) {
+							resourcePoolFound = true
+							break
+						}
+					}
+
+					if !resourcePoolFound {
 						err := fmt.Errorf("resource pool specified in the prepared image does not match the resource pool configured in the provisioning scheme")
 						diagnostics.AddError(
 							"Error validating `azure_machine_config`",
@@ -147,8 +155,16 @@ func validateImageVersion(ctx context.Context, diagnostics *diag.Diagnostics, cl
 				}
 
 				if !provSchemePlan.HypervisorResourcePool.IsNull() {
-					imageVersionResourcePool := imageSpecs.GetResourcePool()
-					if imageVersionResourcePool.GetId() != provSchemePlan.HypervisorResourcePool.ValueString() {
+					imageVersionResourcePools := imageSpecs.GetResourcePools()
+					resourcePoolFound := false
+					for _, imageVersionResourcePool := range imageVersionResourcePools {
+						if strings.EqualFold(imageVersionResourcePool.GetId(), provSchemePlan.HypervisorResourcePool.ValueString()) {
+							resourcePoolFound = true
+							break
+						}
+					}
+
+					if !resourcePoolFound {
 						err := fmt.Errorf("resource pool specified in the prepared image does not match the resource pool configured in the provisioning scheme")
 						diagnostics.AddError(
 							"Error validating `vsphere_machine_config`",

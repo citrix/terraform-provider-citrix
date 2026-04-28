@@ -375,6 +375,8 @@ func accountOperationTypeEnumToString(operationType citrixquickcreate.UpdateAcco
 		return "RenameAccount"
 	case citrixquickcreate.UPDATEACCOUNTOPERATIONTYPE_UPDATE_AWS_EDC_ACCOUNT_CREDENTIALS:
 		return "UpdateAwsEdcAccountCredentials"
+	case citrixquickcreate.UPDATEACCOUNTOPERATIONTYPE_UPDATE_AWS_EDC_ACCOUNT_BYOL_FEATURE:
+		return "UpdateAwsEdcAccountByolFeature"
 	default:
 		return ""
 	}
