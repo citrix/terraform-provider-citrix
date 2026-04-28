@@ -4,7 +4,9 @@ package hypervisor
 
 import (
 	"context"
+	"encoding/json"
 	"regexp"
+	"strconv"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
@@ -14,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -31,8 +34,9 @@ type GcpHypervisorResourceModel struct {
 	Metadata types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
 	Tenants  types.Set    `tfsdk:"tenants"`  // Set[string]
 	/** GCP Connection **/
-	ServiceAccountId          types.String `tfsdk:"service_account_id"`
-	ServiceAccountCredentials types.String `tfsdk:"service_account_credentials"`
+	ServiceAccountId                               types.String `tfsdk:"service_account_id"`
+	ServiceAccountCredentials                      types.String `tfsdk:"service_account_credentials"`
+	UseSystemProxyForHypervisorTrafficOnConnectors types.Bool   `tfsdk:"use_system_proxy_for_hypervisor_traffic_on_connectors"`
 }
 
 func (GcpHypervisorResourceModel) GetSchema() schema.Schema {
@@ -89,6 +93,12 @@ func (GcpHypervisorResourceModel) GetSchema() schema.Schema {
 				Description: "A set of identifiers of tenants to associate with the hypervisor connection.",
 				Computed:    true,
 			},
+			"use_system_proxy_for_hypervisor_traffic_on_connectors": schema.BoolAttribute{
+				Description: "When set to `true`, the hypervisor connection will be setup with the proxy configured during connector installation. Default value is `false`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
 		},
 	}
 }
@@ -119,6 +129,28 @@ func (r GcpHypervisorResourceModel) RefreshPropertyValues(ctx context.Context, d
 		r.Metadata = util.RefreshListValueProperties[util.NameValueStringPairModel, citrixorchestration.NameValueStringPairModel](ctx, diagnostics, r.Metadata, effectiveMetadata, util.GetOrchestrationNameValueStringPairKey)
 	} else {
 		r.Metadata = util.TypedArrayToObjectList[util.NameValueStringPairModel](ctx, diagnostics, nil)
+	}
+
+	r.UseSystemProxyForHypervisorTrafficOnConnectors = types.BoolValue(false)
+
+	customPropertiesString := hypervisor.GetCustomProperties()
+	if customPropertiesString != "" {
+		var customProperties []citrixorchestration.NameValueStringPairModel
+		err := json.Unmarshal([]byte(customPropertiesString), &customProperties)
+		if err == nil {
+			for _, customProperty := range customProperties {
+				if customProperty.GetName() == UseSystemProxyForHypervisorTrafficOnConnectors_CustomProperty {
+					proxy, err := strconv.ParseBool(customProperty.GetValue())
+					if err != nil {
+						diagnostics.AddError("Error parsing "+customProperty.GetName()+" to bool", err.Error())
+						return r
+					}
+					r.UseSystemProxyForHypervisorTrafficOnConnectors = types.BoolValue(proxy)
+				}
+			}
+		} else {
+			diagnostics.AddWarning("Error reading GCP Hypervisor custom properties", err.Error())
+		}
 	}
 
 	r.Tenants = util.RefreshTenantSet(ctx, diagnostics, hypervisor.GetTenants())

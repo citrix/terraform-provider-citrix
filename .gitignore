@@ -5,3 +5,5 @@
 # VSCode .gitignore
 
 .vscode/*
+
+custom-linters/bin/*

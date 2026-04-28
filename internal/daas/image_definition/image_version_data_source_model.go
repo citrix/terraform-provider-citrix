@@ -222,6 +222,11 @@ func (ImageVersionModel) GetDataSourceSchema() schema.Schema {
 				Computed:    true,
 			},
 			"timeout": ImageDefinitionTimeout{}.GetSchema(),
+			"share_with_resources": schema.SetNestedAttribute{
+				Description:  "Specifies the resources the image version is shared with.",
+				Computed:     true,
+				NestedObject: util.ShareImageVersionWithResourcesModel{}.GetDataSourceSchema(),
+			},
 		},
 	}
 }
@@ -245,6 +250,32 @@ func (r ImageVersionModel) RefreshDataSourcePropertyValues(ctx context.Context, 
 		r.NetworkMapping = util.RefreshListValueProperties[util.NetworkMappingModel, citrixorchestration.NetworkMapResponseModel](ctx, diagnostics, r.NetworkMapping, networkMaps, util.GetOrchestrationNetworkMappingKey)
 	} else {
 		r.NetworkMapping = util.TypedArrayToObjectList[util.NetworkMappingModel](ctx, diagnostics, nil)
+	}
+
+	resourcePools := imageSpecs.GetResourcePools()
+	sharedResources := []util.ShareImageVersionWithResourcesModel{}
+	for _, resourcePool := range resourcePools {
+		if resourcePool.GetIsPrimary() {
+			continue
+		}
+
+		sharedHypervisor := resourcePool.GetHypervisor()
+		sharedHypervisorId := sharedHypervisor.GetId()
+		sharedResourcePoolId := resourcePool.GetId()
+		sharedResources = append(sharedResources, util.ShareImageVersionWithResourcesModel{
+			HypervisorId:             types.StringValue(sharedHypervisorId),
+			HypervisorResourcePoolId: types.StringValue(sharedResourcePoolId),
+		})
+	}
+
+	if len(sharedResources) > 0 {
+		r.ShareWithResources = util.TypedArrayToObjectSet[util.ShareImageVersionWithResourcesModel](ctx, diagnostics, sharedResources)
+	} else {
+		if attrMap, err := util.ResourceAttributeMapFromObject(util.ShareImageVersionWithResourcesModel{}); err == nil {
+			r.ShareWithResources = types.SetNull(types.ObjectType{AttrTypes: attrMap})
+		} else {
+			diagnostics.AddWarning("Error converting schema to attribute map. Error ", err.Error())
+		}
 	}
 
 	switch imageContext.GetPluginFactoryName() {

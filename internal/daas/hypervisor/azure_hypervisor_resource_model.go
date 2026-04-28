@@ -36,14 +36,15 @@ type AzureHypervisorResourceModel struct {
 	Tenants  types.Set    `tfsdk:"tenants"`  // Set[string]
 
 	/** Azure Connection **/
-	ApplicationId                          types.String `tfsdk:"application_id"`
-	ApplicationSecret                      types.String `tfsdk:"application_secret"`
-	ApplicationSecretExpirationDate        types.String `tfsdk:"application_secret_expiration_date"`
-	SubscriptionId                         types.String `tfsdk:"subscription_id"`
-	ActiveDirectoryId                      types.String `tfsdk:"active_directory_id"`
-	EnableAzureADDeviceManagement          types.Bool   `tfsdk:"enable_azure_ad_device_management"`
-	AuthenticationMode                     types.String `tfsdk:"authentication_mode"`
-	ProxyHypervisorTrafficThroughConnector types.Bool   `tfsdk:"proxy_hypervisor_traffic_through_connector"`
+	ApplicationId                                  types.String `tfsdk:"application_id"`
+	ApplicationSecret                              types.String `tfsdk:"application_secret"`
+	ApplicationSecretExpirationDate                types.String `tfsdk:"application_secret_expiration_date"`
+	SubscriptionId                                 types.String `tfsdk:"subscription_id"`
+	ActiveDirectoryId                              types.String `tfsdk:"active_directory_id"`
+	EnableAzureADDeviceManagement                  types.Bool   `tfsdk:"enable_azure_ad_device_management"`
+	AuthenticationMode                             types.String `tfsdk:"authentication_mode"`
+	ProxyHypervisorTrafficThroughConnector         types.Bool   `tfsdk:"proxy_hypervisor_traffic_through_connector"`
+	UseSystemProxyForHypervisorTrafficOnConnectors types.Bool   `tfsdk:"use_system_proxy_for_hypervisor_traffic_on_connectors"`
 }
 
 func (AzureHypervisorResourceModel) GetSchema() schema.Schema {
@@ -143,6 +144,12 @@ func (AzureHypervisorResourceModel) GetSchema() schema.Schema {
 				Computed:    true,
 				Default:     booldefault.StaticBool(false),
 			},
+			"use_system_proxy_for_hypervisor_traffic_on_connectors": schema.BoolAttribute{
+				Description: "Enables the use of a system proxy when routing hypervisor traffic through connectors. Can only be set to `true` if `proxy_hypervisor_traffic_through_connector` is set to `true`. Defaults to `false`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
 		},
 	}
 }
@@ -186,6 +193,7 @@ func (r AzureHypervisorResourceModel) RefreshPropertyValues(ctx context.Context,
 
 	r.AuthenticationMode = types.StringValue(util.AppClientSecret)
 	r.ProxyHypervisorTrafficThroughConnector = types.BoolValue(false)
+	r.UseSystemProxyForHypervisorTrafficOnConnectors = types.BoolValue(false)
 	r.EnableAzureADDeviceManagement = types.BoolValue(false)
 
 	customPropertiesString := hypervisor.GetCustomProperties()
@@ -208,6 +216,14 @@ func (r AzureHypervisorResourceModel) RefreshPropertyValues(ctx context.Context,
 						return r
 					}
 					r.ProxyHypervisorTrafficThroughConnector = types.BoolValue(proxy)
+				}
+				if customProperty.GetName() == UseSystemProxyForHypervisorTrafficOnConnectors_CustomProperty {
+					useSystemProxy, err := strconv.ParseBool(customProperty.GetValue())
+					if err != nil {
+						diagnostics.AddError("Error parsing "+customProperty.GetName()+" to bool", err.Error())
+						return r
+					}
+					r.UseSystemProxyForHypervisorTrafficOnConnectors = types.BoolValue(useSystemProxy)
 				}
 				if customProperty.GetName() == AuthenticationMode_CustomProperty {
 					auth := (customProperty.GetValue())

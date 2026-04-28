@@ -50,6 +50,7 @@ data "citrix_image_version" "example_image_version_by_version_number" {
 - `network_mapping` (Attributes List) Specifies how the attached NICs are mapped to networks. (see [below for nested schema](#nestedatt--network_mapping))
 - `os_type` (String) The OS type of the image version.
 - `session_support` (String) Session support for the image version.
+- `share_with_resources` (Attributes Set) Specifies the resources the image version is shared with. (see [below for nested schema](#nestedatt--share_with_resources))
 - `vsphere_image_specs` (Attributes) Image configuration for vSphere image version. (see [below for nested schema](#nestedatt--vsphere_image_specs))
 
 <a id="nestedatt--aws_ec2_image_specs"></a>
@@ -148,6 +149,15 @@ Required:
 
 - `network` (String) The name of the virtual network that the device should be attached to. This must be a subnet within a Virtual Private Cloud item in the resource pool to which the Machine Catalog is associated.<br />For AWS, please specify the network mask of the network you want to use within the VPC.
 - `network_device` (String) Name or Id of the network device.
+
+
+<a id="nestedatt--share_with_resources"></a>
+### Nested Schema for `share_with_resources`
+
+Read-Only:
+
+- `hypervisor_id` (String) Id of the hypervisor the image version is shared with.
+- `hypervisor_resource_pool_id` (String) Id of the hypervisor resource pool the image version is shared with.
 
 
 <a id="nestedatt--vsphere_image_specs"></a>

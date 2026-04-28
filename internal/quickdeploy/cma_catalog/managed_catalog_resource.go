@@ -70,6 +70,7 @@ func (r *citrixManagedCatalogResource) Create(ctx context.Context, req resource.
 
 	// Generate API request body from plan
 	var managedCatalogConfigBody citrixquickdeploy.CitrixManagedCatalogConfigDeployModel
+	var persona *citrixquickdeploy.Persona
 
 	// Configure managed catalog config model
 	var addCatalog citrixquickdeploy.AddCitrixManagedCatalogModel
@@ -81,7 +82,36 @@ func (r *citrixManagedCatalogResource) Create(ctx context.Context, req resource.
 		return
 	}
 	addCatalog.SetRegion(region.GetId())
-	addCatalog.SetType(citrixquickdeploy.AddCatalogType(plan.CatalogType.ValueString()))
+
+	// Set subscription ID based on the subscription name
+	subscription := util.GetCitrixManagedSubscriptionWithName(ctx, r.client, &resp.Diagnostics, plan.SubscriptionName.ValueString())
+	if subscription == nil {
+		return
+	}
+	managedCatalogConfigBody.SetManagedSubscriptionId(subscription.GetSubscriptionId())
+
+	//If persona is specified, get the persona
+	if !plan.Persona.IsNull() {
+		persona = util.GetPersonaWithName(ctx, r.client, &resp.Diagnostics, subscription.GetSubscriptionId(), plan.Persona.ValueString())
+		if persona == nil {
+			return
+		}
+
+		// Set properties based on the persona
+		catalogType := citrixquickdeploy.ADDCATALOGTYPE_MULTI_SESSION
+		if persona.GetSessionSupport() == citrixquickdeploy.SESSIONSUPPORT_SINGLE_SESSION {
+			catalogType = citrixquickdeploy.ADDCATALOGTYPE_SINGLE_SESSION_RANDOM
+
+			if persona.GetAllocationType() == citrixquickdeploy.CATALOGALLOCATIONTYPE_PERMANENT {
+				catalogType = citrixquickdeploy.ADDCATALOGTYPE_SINGLE_SESSION_STATIC
+			}
+		}
+		addCatalog.SetType(catalogType)
+	}
+
+	if !plan.CatalogType.IsUnknown() && !plan.CatalogType.IsNull() {
+		addCatalog.SetType(citrixquickdeploy.AddCatalogType(plan.CatalogType.ValueString()))
+	}
 
 	// Set static catalog configuration
 	addCatalog.SetIsDomainJoined(false)
@@ -103,7 +133,7 @@ func (r *citrixManagedCatalogResource) Create(ctx context.Context, req resource.
 	var catalogCapacity citrixquickdeploy.CatalogCapacitySettingsModel
 
 	// Configure computer worker model
-	computerWorker := getComputerWorkerRequestModel(plan)
+	computerWorker := getComputerWorkerRequestModel(plan, persona)
 	catalogCapacity.SetComputeWorker(computerWorker)
 
 	// Configure scale settings model
@@ -117,13 +147,6 @@ func (r *citrixManagedCatalogResource) Create(ctx context.Context, req resource.
 	catalogCapacity.SetMultiSessionDisconnectedSessionTimeout(15)
 
 	managedCatalogConfigBody.SetAddCatalogCapacity(catalogCapacity)
-
-	// Set subscription ID based on the subscription name
-	subscription := util.GetCitrixManagedSubscriptionWithName(ctx, r.client, &resp.Diagnostics, plan.SubscriptionName.ValueString())
-	if subscription == nil {
-		return
-	}
-	managedCatalogConfigBody.SetManagedSubscriptionId(subscription.GetSubscriptionId())
 
 	// Set template image
 	var templateImageModel citrixquickdeploy.CatalogTemplateImageModel
@@ -298,11 +321,20 @@ func (r *citrixManagedCatalogResource) Update(ctx context.Context, req resource.
 		return
 	}
 
+	var persona *citrixquickdeploy.Persona
+
 	catalogId := plan.Id.ValueString()
 	// Try getting the existing Citrix Managed Catalog
 	catalog, _, err := getManagedCatalogWithId(ctx, r.client, &resp.Diagnostics, catalogId, true)
 	if err != nil {
 		return
+	}
+
+	if !plan.Persona.IsNull() {
+		persona = util.GetPersonaWithName(ctx, r.client, &resp.Diagnostics, catalog.GetSubscriptionId(), plan.Persona.ValueString())
+		if persona == nil {
+			return
+		}
 	}
 
 	templateImageId := plan.TemplateImageId.ValueString()
@@ -345,6 +377,8 @@ func (r *citrixManagedCatalogResource) Update(ctx context.Context, req resource.
 					"\nError message: Catalog state is "+string(catalog.GetState())+
 					"\nError details: "+catalog.GetStatusMessage(),
 			)
+
+			return
 		}
 	}
 
@@ -352,7 +386,7 @@ func (r *citrixManagedCatalogResource) Update(ctx context.Context, req resource.
 	var catalogCapacity citrixquickdeploy.CatalogCapacitySettingsModel
 
 	// Configure computer worker model
-	computerWorker := getComputerWorkerRequestModel(plan)
+	computerWorker := getComputerWorkerRequestModel(plan, persona)
 	catalogCapacity.SetComputeWorker(computerWorker)
 
 	// Configure scale settings model
@@ -490,10 +524,11 @@ func (r *citrixManagedCatalogResource) ValidateConfig(ctx context.Context, req r
 		return
 	}
 
+	catalogScaleSettings := util.ObjectValueToTypedObject[PowerScheduleModel](ctx, &resp.Diagnostics, data.PowerSchedule)
+
 	// Validate Catalog Type
-	if citrixquickdeploy.AddCatalogType(data.CatalogType.ValueString()) != citrixquickdeploy.ADDCATALOGTYPE_MULTI_SESSION {
+	if !data.CatalogType.IsNull() && citrixquickdeploy.AddCatalogType(data.CatalogType.ValueString()) != citrixquickdeploy.ADDCATALOGTYPE_MULTI_SESSION {
 		// Configure scale settings model
-		catalogScaleSettings := util.ObjectValueToTypedObject[PowerScheduleModel](ctx, &resp.Diagnostics, data.PowerSchedule)
 		if catalogScaleSettings.PeakMinInstances.ValueInt64() > 0 {
 			resp.Diagnostics.AddError(
 				"Invalid peak minimum instances",
@@ -512,12 +547,28 @@ func (r *citrixManagedCatalogResource) ValidateConfig(ctx context.Context, req r
 			)
 		}
 
+		if !catalogScaleSettings.PowerOffDelay.IsUnknown() && !catalogScaleSettings.PowerOffDelay.IsNull() {
+			resp.Diagnostics.AddError(
+				"Invalid power off delay.",
+				"Power off delay is only applicable for Multi-Session Catalogs. Please set the catalog type to MultiSession or remove power_off_delay from power_schedule.",
+			)
+		}
+
 		if data.MaxUsersPerVm.ValueInt64() > 1 {
 			resp.Diagnostics.AddError(
 				"Invalid maximum users per VM.",
 				fmt.Sprintf("Catalog Type is set to %s, but the maximum users per VM was set to %d. "+
 					"Maximum users per VM are only applicable for Multi-Session Catalogs. Please set the catalog type to MultiSession or remove max_users_per_vm.",
 					data.CatalogType.ValueString(), data.MaxUsersPerVm.ValueInt64()),
+			)
+		}
+	}
+
+	if !data.Persona.IsNull() {
+		if !data.MaxUsersPerVm.IsNull() {
+			resp.Diagnostics.AddError(
+				"Invalid maximum users per VM.",
+				"Maximum users per VM cannot be specified when a persona is specified.",
 			)
 		}
 	}
@@ -552,7 +603,39 @@ func (r *citrixManagedCatalogResource) ModifyPlan(ctx context.Context, req resou
 
 	// Validate subscription
 	if !plan.SubscriptionName.IsUnknown() && r.client != nil {
-		util.GetCitrixManagedSubscriptionWithName(ctx, r.client, &resp.Diagnostics, plan.SubscriptionName.ValueString())
+		subscription := util.GetCitrixManagedSubscriptionWithName(ctx, r.client, &resp.Diagnostics, plan.SubscriptionName.ValueString())
+		if subscription == nil {
+			return
+		}
+
+		if !plan.Persona.IsUnknown() && !plan.Persona.IsNull() {
+			persona := util.GetPersonaWithName(ctx, r.client, &resp.Diagnostics, subscription.GetSubscriptionId(), plan.Persona.ValueString())
+			if persona == nil {
+				return
+			}
+
+			catalogScaleSettings := util.ObjectValueToTypedObject[PowerScheduleModel](ctx, &resp.Diagnostics, plan.PowerSchedule)
+			if persona.GetSessionSupport() != citrixquickdeploy.SESSIONSUPPORT_MULTI_SESSION &&
+				!catalogScaleSettings.PowerOffDelay.IsUnknown() && !catalogScaleSettings.PowerOffDelay.IsNull() {
+				resp.Diagnostics.AddError(
+					"Invalid power off delay.",
+					"Power off delay is not applicable for MultiSession personas. Please remove power_off_delay from power_schedule.",
+				)
+				return
+			}
+
+			if persona.GetSessionSupport() == citrixquickdeploy.SESSIONSUPPORT_MULTI_SESSION && !plan.CatalogType.IsNull() {
+				resp.Diagnostics.AddError(
+					"Invalid catalog type",
+					"Catalog type cannot be overridden for MultiSession personas and must not be specified.",
+				)
+			} else if !plan.CatalogType.IsNull() && citrixquickdeploy.AddCatalogType(plan.CatalogType.ValueString()) != citrixquickdeploy.ADDCATALOGTYPE_SINGLE_SESSION_STATIC {
+				resp.Diagnostics.AddError(
+					"Invalid catalog type",
+					"The specified catalog type is not valid as an add-on for the specified persona.",
+				)
+			}
+		}
 	}
 }
 
@@ -675,6 +758,10 @@ func getScaleSettingsRequestModel(ctx context.Context, diagnostics *diag.Diagnos
 	scaleSettings.SetPeakDisconnectedSessionAction(citrixquickdeploy.SessionChangeHostingAction(plan.PeakDisconnectedSessionAction.ValueString()))
 	scaleSettings.SetOffPeakDisconnectedSessionAction(citrixquickdeploy.SessionChangeHostingAction(plan.OffPeakDisconnectedSessionAction.ValueString()))
 
+	if !plan.PowerOffDelay.IsNull() {
+		scaleSettings.SetPowerOffDelay(int32(plan.PowerOffDelay.ValueInt64()))
+	}
+
 	weekdaysMap := make(map[string]bool)
 	weekdays := util.StringSetToStringArray(ctx, diagnostics, plan.Weekdays)
 	for _, weekday := range weekdays {
@@ -685,16 +772,29 @@ func getScaleSettingsRequestModel(ctx context.Context, diagnostics *diag.Diagnos
 	return scaleSettings
 }
 
-func getComputerWorkerRequestModel(plan CitrixManagedCatalogResourceModel) citrixquickdeploy.CatalogComputeWorkerModel {
+func getComputerWorkerRequestModel(plan CitrixManagedCatalogResourceModel, persona *citrixquickdeploy.Persona) citrixquickdeploy.CatalogComputeWorkerModel {
 	// Configure computer worker model
-	var computerWorker citrixquickdeploy.CatalogComputeWorkerModel
-	computerWorker.SetInstanceTypeId(plan.MachineSize.ValueString())
-	computerWorker.SetStorageType(citrixquickdeploy.CatalogCapacityStorageType(plan.StorageType.ValueString()))
-	computerWorker.SetMaxUsersPerVM(int32(plan.MaxUsersPerVm.ValueInt64()))
+	var computeWorker citrixquickdeploy.CatalogComputeWorkerModel
+	computeWorker.SetInstanceTypeId(plan.MachineSize.ValueString())
+	computeWorker.SetStorageType(citrixquickdeploy.CatalogCapacityStorageType(plan.StorageType.ValueString()))
+
+	if plan.MaxUsersPerVm.IsNull() {
+		// Set default max users per VM to 1 if not specified since CMA requires it to be at least 1
+		computeWorker.SetMaxUsersPerVM(1)
+	} else {
+		computeWorker.SetMaxUsersPerVM(int32(plan.MaxUsersPerVm.ValueInt64()))
+	}
 
 	// Always use Azure Hub and Managed Disks for managed catalogs
-	computerWorker.SetUseManagedDisks(true)
-	computerWorker.SetUseAzureHUB(true)
+	computeWorker.SetUseManagedDisks(true)
+	computeWorker.SetUseAzureHUB(true)
 
-	return computerWorker
+	if persona != nil {
+		vmSku := persona.GetAzureVmSku()
+		computeWorker.SetInstanceTypeId(vmSku.GetSku())
+		computeWorker.SetStorageType(citrixquickdeploy.CatalogCapacityStorageType(persona.GetDiskSku()))
+		computeWorker.SetMaxUsersPerVM(persona.GetSessionsPerVm())
+	}
+
+	return computeWorker
 }

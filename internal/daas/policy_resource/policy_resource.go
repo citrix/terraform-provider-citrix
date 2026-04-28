@@ -298,7 +298,7 @@ func GetPolicy(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, d
 	getPolicyReq := client.ApiClient.GpoDAAS.GpoReadGpoPolicy(ctx, policyId)
 	getPolicyReq = getPolicyReq.WithFilters(withFilters)
 	getPolicyReq = getPolicyReq.WithSettings(withSettings)
-	policy, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.PolicyResponse](getPolicyReq, client)
+	policy, httpResp, err := citrixdaasclient.ExecuteWithRetryOnNotFound[*citrixorchestration.PolicyResponse](getPolicyReq, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error reading Policy "+policyId,

@@ -85,22 +85,33 @@ resource citrix_quickdeploy_catalog domain-joined-catalog {
 
 ### Required
 
-- `catalog_type` (String) Denotes how the machines in the catalog are allocated to a user. Choose between `MultiSession`, `SingleSessionStatic` and `SingleSessionRandom`.
-- `machine_size` (String) The Azure VM SKU to use for creating machines.
 - `name` (String) Name of the managed catalog.
 - `number_of_users` (Number) Number of users for the catalog. Defaults to `1`.
 - `power_schedule` (Attributes) The power management schedule for the Citrix Managed catalog. (see [below for nested schema](#nestedatt--power_schedule))
 - `region` (String) The Azure region to deploy the managed catalog.
-- `storage_type` (String) Storage account type used for provisioned virtual machine disks on Azure. Storage types include: `Standard_LRS`, `StandardSSD_LRS` and `Premium_LRS`.
 - `template_image_id` (String) The GUID identifier of the template image for creating the managed catalog.
 
 ### Optional
 
+- `catalog_type` (String) Denotes how the machines in the catalog are allocated to a user. Choose between `MultiSession`, `SingleSessionStatic` and `SingleSessionRandom`.
+
+ -> **Note** Catalog type is required when `persona` is not specified. When a persona is specified, the catalog type associated with the persona will be used. However, catalog type can still be specified alongside certain personas as an add-on (extra credits).
 - `machine_naming_scheme` (Attributes) Rules specifying how Active Directory machine accounts should be created when machines are provisioned.
 
 ~> **Please Note** When importing a `citrix_quickdeploy_catalog` resource, `machine_naming_scheme` must be omitted in the terraform resource body. Explicitly setting it will result in replacing the quick deploy catalog. (see [below for nested schema](#nestedatt--machine_naming_scheme))
-- `max_users_per_vm` (Number) Maximum number of concurrent users that could launch session on the same machine. Only allowed to have more than 1 concurrent user when `catalog_type` is `MultiSession`. Defaults to `1`.
+- `machine_size` (String) The Azure VM SKU to use for creating machines.
+
+ -> **Note** Machine size is required when `persona` is not specified. When a persona is specified, the machine size associated with the persona is used.
+- `max_users_per_vm` (Number) Maximum number of concurrent users that could launch session on the same machine. Only allowed to have more than 1 concurrent user when `catalog_type` is `MultiSession`.
+
+ -> **Note** When a persona is specified, the max users per VM associated with the persona is used and this field must not be specified.
 - `on_prem_connectivity` (Attributes) On-Premises connectivity configuration for creating a domain-joined catalog. (see [below for nested schema](#nestedatt--on_prem_connectivity))
+- `persona` (String) The name of the persona to be used for the catalog.
+
+ -> **Note** When persona is specified, values for `machine_size`, `storage_type` and `catalog_type` are derived from the persona. Only `catalog_type` can be specified alongside certain personas as an add-on.
+- `storage_type` (String) Storage account type used for provisioned virtual machine disks on Azure. Storage types include: `Standard_LRS`, `StandardSSD_LRS` and `Premium_LRS`.
+
+ -> **Note** Storage type is required when `persona` is not specified. When a persona is specified, the storage type associated with the persona is used.
 - `subscription_name` (String) The name of the Citrix Managed Azure subscription to deploy the managed catalog. Defaults to `Citrix Managed` if omitted.
 
 ### Read-Only

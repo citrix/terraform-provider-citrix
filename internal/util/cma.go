@@ -121,6 +121,33 @@ func GetCitrixManagedSubscriptionWithName(ctx context.Context, client *citrixdaa
 	return nil
 }
 
+func GetPersonaWithName(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, subscriptionId, personaName string) *citrixquickdeploy.Persona {
+	getPersonasReq := client.QuickDeployClient.ManagedCapacityCMD.GetPersonasAsync(ctx, client.ClientConfig.CustomerId, client.ClientConfig.SiteId, subscriptionId)
+	personasResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[[]citrixquickdeploy.Persona](getPersonasReq, client)
+	if err != nil {
+		diagnostics.AddError(
+			"Error getting Persona: "+personaName,
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+ReadCatalogServiceClientError(err),
+		)
+		return nil
+	}
+
+	for _, persona := range personasResponse {
+		if strings.EqualFold(persona.GetName(), personaName) {
+			return &persona
+		}
+	}
+
+	diagnostics.AddError(
+		"Error getting Persona: "+personaName,
+		"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+			"\nError message: Persona not found",
+	)
+
+	return nil
+}
+
 // <summary>
 // Helper function to Get Citrix Managed Azure On-Prem Connection with name
 // </summary>
