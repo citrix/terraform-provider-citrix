@@ -312,10 +312,15 @@ Optional:
 
 - `header_background_color` (String) Sets the background color of the header.
 - `header_foreground_color` (String) Sets the foreground color of the header.
-- `header_logo_path` (String) Points to the Header Logo's path in the system.
+- `header_logo_path` (String) User input for the Header Logo's path in the system.
 - `ignore_non_existent_logos` (Boolean) Whether to ignore non-existent logo files and continue to set colors.
 - `link_color` (String) Sets the link color of the page.
-- `logon_logo_path` (String) Points to the Logon Logo's path in the system.
+- `logon_logo_path` (String) User input for the Logon Logo's path in the system.
+
+Read-Only:
+
+- `current_header_logo_path` (String) Points to the current Header Logo's path in the system.
+- `current_logon_logo_path` (String) Points to the current Logon Logo's path in the system.
 
 ## Import
 

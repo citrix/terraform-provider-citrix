@@ -43,8 +43,6 @@ resource citrix_quickdeploy_catalog custom-power-schedule-catalog {
         naming_scheme_type = "Numeric"
     }
     power_schedule = {
-        peak_min_instances = 2
-        off_peak_min_instances = 1
         weekdays = ["monday", "tuesday", "wednesday", "thursday", "friday"]
         peak_start_time = 9
         peak_end_time = 18
@@ -124,22 +122,36 @@ resource citrix_quickdeploy_catalog domain-joined-catalog {
 
 Optional:
 
-- `off_peak_disconnected_session_action` (String) The action to be performed after a configurable period of a user session disconnecting outside peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.
-- `off_peak_disconnected_session_timeout` (Number) The number of minutes before the configured action should be performed after a user session disconnectts outside peak hours.
-- `off_peak_extended_disconnect_timeout` (Number) The number of minutes before the second configured action should be performed after a user session disconnects outside peak hours.
-- `off_peak_min_instances` (Number) The minimum number of machines that should be powered on during off peak hours. Defaults to `0`. Can only be set to more than `0` if `catalog_type` is `Dedicated`.
-- `peak_disconnected_session_action` (String) The action to be performed after a configurable period of a user session disconnecting in peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.
+- `multi_session_disconnected_session_timeout` (Number) The timeout in minutes after which disconnected sessions on multi-session VMs should be logged off. This value is valid only for `MultiSession` catalogs. Defaults to `45` if not specified.
+
+-> **Note** Applies only to Multi Session catalogs.
+- `off_peak_disconnected_session_action` (String) The action to be performed after a configurable period of a user session disconnecting outside peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Shutdown`.
+
+-> **Note** Applies only to Single Session catalogs.
+- `off_peak_disconnected_session_timeout` (Number) The number of minutes before the configured action should be performed after a user session disconnects outside peak hours.
+
+-> **Note** Applies only to Single Session catalogs.
+- `off_peak_extended_disconnect_timeout` (Number) The number of minutes after which shutdown should be performed if a user session is suspended the first time outside peak hours.
+
+-> **Note** Applies only to Single Session catalogs.
+- `peak_disconnected_session_action` (String) The action to be performed after a configurable period of a user session disconnecting in peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Shutdown`.
+
+-> **Note** Applies only to Single Session catalogs.
 - `peak_disconnected_session_timeout` (Number) The number of minutes before the configured action should be performed after a user session disconnects in peak hours.
+
+-> **Note** Applies only to Single Session catalogs.
 - `peak_end_time` (Number) The end time of peak hours (0-23).
-- `peak_extended_disconnect_timeout` (Number) The number of minutes before the second configured action should be performed after a user session disconnects in peak hours.
-- `peak_min_instances` (Number) The minimum number of machines that should be powered on during peak hours. Defaults to `0`. Can only be set to more than `0` if `catalog_type` is `Dedicated`.
+- `peak_extended_disconnect_timeout` (Number) The number of minutes after which shutdown should be performed if a user session is suspended the first time in peak hours.
+
+-> **Note** Applies only to Single Session catalogs.
 - `peak_start_time` (Number) The start time of peak hours (0-23).
 - `peak_time_zone_id` (String) The time zone for peak hours. Default is `Eastern Standard Time`.
 - `power_off_delay` (Number) Delay before machines are powered off, when scaling down. Specified in minutes. 
 
 ~> **Please Note** Applies only to multi-session machines. 
 
--> **Note** By default, the power-off delay is 30 minutes. You can set it in a range of 0 to 60 minutes.
+-> **Note** If not specified, the power-off delay is 30 minutes. You can set it in a range of 0 to 60 minutes.
+- `session_timeout` (Number) The idle timeout in minutes after which sessions are disconnected. Defaults to `15`.
 - `weekdays` (Set of String) The pattern of days of the week that the power time scheme covers.
 
 

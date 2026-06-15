@@ -109,7 +109,7 @@ func (r *citrixManagedCatalogResource) Create(ctx context.Context, req resource.
 		addCatalog.SetType(catalogType)
 	}
 
-	if !plan.CatalogType.IsUnknown() && !plan.CatalogType.IsNull() {
+	if !plan.CatalogType.IsNull() {
 		addCatalog.SetType(citrixquickdeploy.AddCatalogType(plan.CatalogType.ValueString()))
 	}
 
@@ -138,13 +138,14 @@ func (r *citrixManagedCatalogResource) Create(ctx context.Context, req resource.
 
 	// Configure scale settings model
 	catalogScaleSettings := util.ObjectValueToTypedObject[PowerScheduleModel](ctx, &resp.Diagnostics, plan.PowerSchedule)
-	scaleSettings := getScaleSettingsRequestModel(ctx, &resp.Diagnostics, catalogScaleSettings)
+	isMultiSessionCatalog := isMultiSessionCatalog(plan, persona)
+	scaleSettings := getScaleSettingsRequestModel(ctx, &resp.Diagnostics, catalogScaleSettings, isMultiSessionCatalog)
 	// Set max instance to be the same as number of machines
 	catalogCapacity.SetScaleSettings(scaleSettings)
 
 	// Set static catalog capacity settings
-	catalogCapacity.SetSessionTimeout(60)
-	catalogCapacity.SetMultiSessionDisconnectedSessionTimeout(15)
+	catalogCapacity.SetSessionTimeout(int32(catalogScaleSettings.SessionTimeout.ValueInt64()))
+	catalogCapacity.SetMultiSessionDisconnectedSessionTimeout(int32(catalogScaleSettings.MultiSessionDisconnectedSessionTimeout.ValueInt64()))
 
 	managedCatalogConfigBody.SetAddCatalogCapacity(catalogCapacity)
 
@@ -190,7 +191,7 @@ func (r *citrixManagedCatalogResource) Create(ctx context.Context, req resource.
 	createManagedCatalogRequest = createManagedCatalogRequest.CitrixManagedCatalogConfigDeployModel(managedCatalogConfigBody)
 
 	// Create new Citrix Managed Catalog
-	_, httpResp, err := citrixdaasclient.AddRequestData(createManagedCatalogRequest, r.client).Execute()
+	catalogId, httpResp, err := citrixdaasclient.AddRequestData(createManagedCatalogRequest, r.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Citrix Managed Catalog: "+plan.Name.ValueString(),
@@ -200,32 +201,7 @@ func (r *citrixManagedCatalogResource) Create(ctx context.Context, req resource.
 		return
 	}
 
-	// Get Catalog ID from name
-	catalogId := ""
-	getManagedCatalogsRequest := r.client.QuickDeployClient.CatalogCMD.GetCustomerManagedCatalogs(ctx, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId)
-	catalogs, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickdeploy.CustomerManagedCatalogOverviewsModel](getManagedCatalogsRequest, r.client)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error fetching Citrix Managed Catalogs",
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+err.Error(),
-		)
-		return
-	}
-	for _, catalog := range catalogs.GetItems() {
-		if catalog.GetName() == plan.Name.ValueString() {
-			catalogId = catalog.GetId()
-			break
-		}
-	}
-	if catalogId == "" {
-		resp.Diagnostics.AddError(
-			"Error getting Citrix Managed Catalog ID for catalog: "+plan.Name.ValueString(),
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: Catalog not found",
-		)
-		return
-	}
+	catalogId = strings.Trim(catalogId, "\"") // Remove quotes from the catalog ID
 
 	// Try getting the new Citrix Managed Catalog
 	catalog, httpResp, err := waitForCatalogDeployCompletion(ctx, r.client, &resp.Diagnostics, catalogId)
@@ -391,7 +367,8 @@ func (r *citrixManagedCatalogResource) Update(ctx context.Context, req resource.
 
 	// Configure scale settings model
 	catalogScaleSettings := util.ObjectValueToTypedObject[PowerScheduleModel](ctx, &resp.Diagnostics, plan.PowerSchedule)
-	scaleSettings := getScaleSettingsRequestModel(ctx, &resp.Diagnostics, catalogScaleSettings)
+	isMultiSessionCatalog := isMultiSessionCatalog(plan, persona)
+	scaleSettings := getScaleSettingsRequestModel(ctx, &resp.Diagnostics, catalogScaleSettings, isMultiSessionCatalog)
 	var additionalUsers = plan.NumberOfUsers.ValueInt64() - state.NumberOfUsers.ValueInt64()
 	scaleSettings.SetAdditionalUsers(int32(additionalUsers))
 
@@ -407,8 +384,8 @@ func (r *citrixManagedCatalogResource) Update(ctx context.Context, req resource.
 	catalogCapacity.SetScaleSettings(scaleSettings)
 
 	// Set static catalog capacity settings
-	catalogCapacity.SetSessionTimeout(60)
-	catalogCapacity.SetMultiSessionDisconnectedSessionTimeout(15)
+	catalogCapacity.SetSessionTimeout(int32(catalogScaleSettings.SessionTimeout.ValueInt64()))
+	catalogCapacity.SetMultiSessionDisconnectedSessionTimeout(int32(catalogScaleSettings.MultiSessionDisconnectedSessionTimeout.ValueInt64()))
 
 	updateCatalogCapacityRequest := r.client.QuickDeployClient.CatalogCMD.UpdateCatalogScaleConfiguration(ctx, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId, catalogId)
 	updateCatalogCapacityRequest = updateCatalogCapacityRequest.CatalogCapacitySettingsModel(catalogCapacity)
@@ -478,6 +455,7 @@ func (r *citrixManagedCatalogResource) Delete(ctx context.Context, req resource.
 
 	var deleteModel citrixquickdeploy.DeleteCatalogModel
 	deleteModel.SetDeleteResourceLocationIfUnused(true)
+	deleteModel.SetDeleteVm(true)
 
 	// Delete Citrix Managed Catalog
 	deleteCatalogRequest := r.client.QuickDeployClient.CatalogCMD.DeleteCustomerCatalog(ctx, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId, state.Id.ValueString())
@@ -526,28 +504,42 @@ func (r *citrixManagedCatalogResource) ValidateConfig(ctx context.Context, req r
 
 	catalogScaleSettings := util.ObjectValueToTypedObject[PowerScheduleModel](ctx, &resp.Diagnostics, data.PowerSchedule)
 
+	if !catalogScaleSettings.PeakExtendedDisconnectTimeout.IsNull() && catalogScaleSettings.PeakExtendedDisconnectTimeout.ValueInt64() <= catalogScaleSettings.PeakDisconnectedSessionTimeout.ValueInt64() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("power_schedule").AtName("peak_extended_disconnect_timeout"),
+			"Invalid peak extended disconnected session timeout",
+			"Peak extended disconnected session timeout must be greater than peak disconnected session timeout.",
+		)
+	}
+
+	if !catalogScaleSettings.OffPeakExtendedDisconnectTimeout.IsNull() && catalogScaleSettings.OffPeakExtendedDisconnectTimeout.ValueInt64() <= catalogScaleSettings.OffPeakDisconnectedSessionTimeout.ValueInt64() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("power_schedule").AtName("off_peak_extended_disconnect_timeout"),
+			"Invalid off peak extended disconnected session timeout",
+			"Off peak extended disconnected session timeout must be greater than off peak disconnected session timeout.",
+		)
+	}
+
+	if !catalogScaleSettings.PeakExtendedDisconnectTimeout.IsNull() && catalogScaleSettings.PeakDisconnectedSessionAction.ValueString() != string(citrixorchestration.SESSIONCHANGEHOSTINGACTION_SUSPEND) {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("power_schedule").AtName("peak_extended_disconnect_timeout"),
+			"Invalid peak extended disconnect timeout.",
+			"Peak extended disconnect timeout can only be specified when peak_disconnected_session_action is set to `Suspend`.",
+		)
+	}
+
+	if !catalogScaleSettings.OffPeakExtendedDisconnectTimeout.IsNull() && catalogScaleSettings.OffPeakDisconnectedSessionAction.ValueString() != string(citrixorchestration.SESSIONCHANGEHOSTINGACTION_SUSPEND) {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("power_schedule").AtName("off_peak_extended_disconnect_timeout"),
+			"Invalid off peak extended disconnect timeout.",
+			"Off peak extended disconnect timeout can only be specified when off_peak_disconnected_session_action is set to `Suspend`.",
+		)
+	}
+
 	// Validate Catalog Type
 	if !data.CatalogType.IsNull() && citrixquickdeploy.AddCatalogType(data.CatalogType.ValueString()) != citrixquickdeploy.ADDCATALOGTYPE_MULTI_SESSION {
 		// Configure scale settings model
-		if catalogScaleSettings.PeakMinInstances.ValueInt64() > 0 {
-			resp.Diagnostics.AddError(
-				"Invalid peak minimum instances",
-				fmt.Sprintf("Catalog Type is set to %s, but the Power Schedule has peak minimum instances set to %d. "+
-					"Peak minimum instances are only applicable for Multi-Session Catalogs. Please set the catalog type to MultiSession or remove the peak_min_instances from power_schedule.",
-					data.CatalogType.ValueString(), catalogScaleSettings.PeakMinInstances.ValueInt64()),
-			)
-		}
-
-		if catalogScaleSettings.OffPeakMinInstances.ValueInt64() > 0 {
-			resp.Diagnostics.AddError(
-				"Invalid off peak minimum instances.",
-				fmt.Sprintf("Catalog Type is set to %s, but the Power Schedule has off peak minimum instances set to %d. "+
-					"Minimum instances are only applicable for Multi-Session Catalogs. Please set the catalog type to MultiSession or remove the off_peak_min_instances from power_schedule.",
-					data.CatalogType.ValueString(), catalogScaleSettings.OffPeakMinInstances.ValueInt64()),
-			)
-		}
-
-		if !catalogScaleSettings.PowerOffDelay.IsUnknown() && !catalogScaleSettings.PowerOffDelay.IsNull() {
+		if !catalogScaleSettings.PowerOffDelay.IsNull() {
 			resp.Diagnostics.AddError(
 				"Invalid power off delay.",
 				"Power off delay is only applicable for Multi-Session Catalogs. Please set the catalog type to MultiSession or remove power_off_delay from power_schedule.",
@@ -560,6 +552,59 @@ func (r *citrixManagedCatalogResource) ValidateConfig(ctx context.Context, req r
 				fmt.Sprintf("Catalog Type is set to %s, but the maximum users per VM was set to %d. "+
 					"Maximum users per VM are only applicable for Multi-Session Catalogs. Please set the catalog type to MultiSession or remove max_users_per_vm.",
 					data.CatalogType.ValueString(), data.MaxUsersPerVm.ValueInt64()),
+			)
+		}
+
+		if !catalogScaleSettings.MultiSessionDisconnectedSessionTimeout.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("power_schedule").AtName("multi_session_disconnected_session_timeout"),
+				"Invalid multi-session disconnected session timeout.",
+				"Multi-session disconnected session timeout is only applicable for MultiSession catalogs.",
+			)
+		}
+	}
+
+	if !data.CatalogType.IsNull() && citrixquickdeploy.AddCatalogType(data.CatalogType.ValueString()) == citrixquickdeploy.ADDCATALOGTYPE_MULTI_SESSION {
+		if !catalogScaleSettings.PeakDisconnectedSessionTimeout.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("power_schedule").AtName("peak_disconnected_session_timeout"),
+				"Invalid peak disconnected session timeout.",
+				"Peak disconnected session timeout is only applicable for Single Session catalogs.",
+			)
+		}
+		if !catalogScaleSettings.OffPeakDisconnectedSessionTimeout.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("power_schedule").AtName("off_peak_disconnected_session_timeout"),
+				"Invalid off peak disconnected session timeout.",
+				"Off peak disconnected session timeout is only applicable for Single Session catalogs.",
+			)
+		}
+		if !catalogScaleSettings.PeakExtendedDisconnectTimeout.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("power_schedule").AtName("peak_extended_disconnect_timeout"),
+				"Invalid peak extended disconnect timeout.",
+				"Peak extended disconnect timeout is only applicable for Single Session catalogs.",
+			)
+		}
+		if !catalogScaleSettings.OffPeakExtendedDisconnectTimeout.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("power_schedule").AtName("off_peak_extended_disconnect_timeout"),
+				"Invalid off peak extended disconnect timeout.",
+				"Off peak extended disconnect timeout is only applicable for Single Session catalogs.",
+			)
+		}
+		if !catalogScaleSettings.PeakDisconnectedSessionAction.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("power_schedule").AtName("peak_disconnected_session_action"),
+				"Invalid peak disconnected session action.",
+				"Peak disconnected session action is only applicable for Single Session catalogs.",
+			)
+		}
+		if !catalogScaleSettings.OffPeakDisconnectedSessionAction.IsNull() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("power_schedule").AtName("off_peak_disconnected_session_action"),
+				"Invalid off peak disconnected session action.",
+				"Off peak disconnected session action is only applicable for Single Session catalogs.",
 			)
 		}
 	}
@@ -615,13 +660,66 @@ func (r *citrixManagedCatalogResource) ModifyPlan(ctx context.Context, req resou
 			}
 
 			catalogScaleSettings := util.ObjectValueToTypedObject[PowerScheduleModel](ctx, &resp.Diagnostics, plan.PowerSchedule)
-			if persona.GetSessionSupport() != citrixquickdeploy.SESSIONSUPPORT_MULTI_SESSION &&
-				!catalogScaleSettings.PowerOffDelay.IsUnknown() && !catalogScaleSettings.PowerOffDelay.IsNull() {
+			if persona.GetSessionSupport() != citrixquickdeploy.SESSIONSUPPORT_MULTI_SESSION && !catalogScaleSettings.PowerOffDelay.IsNull() {
 				resp.Diagnostics.AddError(
 					"Invalid power off delay.",
-					"Power off delay is not applicable for MultiSession personas. Please remove power_off_delay from power_schedule.",
+					"Power off delay is not applicable for Single Session personas. Please remove power_off_delay from power_schedule.",
 				)
 				return
+			}
+
+			if persona.GetSessionSupport() != citrixquickdeploy.SESSIONSUPPORT_MULTI_SESSION && !catalogScaleSettings.MultiSessionDisconnectedSessionTimeout.IsNull() {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("power_schedule").AtName("multi_session_disconnected_session_timeout"),
+					"Invalid multi-session disconnected session timeout.",
+					"Multi-session disconnected session timeout is not applicable for Single Session personas.",
+				)
+				return
+			}
+
+			if persona.GetSessionSupport() == citrixquickdeploy.SESSIONSUPPORT_MULTI_SESSION {
+				if !catalogScaleSettings.PeakDisconnectedSessionTimeout.IsNull() {
+					resp.Diagnostics.AddAttributeError(
+						path.Root("power_schedule").AtName("peak_disconnected_session_timeout"),
+						"Invalid peak disconnected session timeout.",
+						"Peak disconnected session timeout is only applicable for Single Session catalogs.",
+					)
+				}
+				if !catalogScaleSettings.OffPeakDisconnectedSessionTimeout.IsNull() {
+					resp.Diagnostics.AddAttributeError(
+						path.Root("power_schedule").AtName("off_peak_disconnected_session_timeout"),
+						"Invalid off peak disconnected session timeout.",
+						"Off peak disconnected session timeout is only applicable for Single Session catalogs.",
+					)
+				}
+				if !catalogScaleSettings.PeakExtendedDisconnectTimeout.IsNull() {
+					resp.Diagnostics.AddAttributeError(
+						path.Root("power_schedule").AtName("peak_extended_disconnect_timeout"),
+						"Invalid peak extended disconnect timeout.",
+						"Peak extended disconnect timeout is only applicable for Single Session catalogs.",
+					)
+				}
+				if !catalogScaleSettings.OffPeakExtendedDisconnectTimeout.IsNull() {
+					resp.Diagnostics.AddAttributeError(
+						path.Root("power_schedule").AtName("off_peak_extended_disconnect_timeout"),
+						"Invalid off peak extended disconnect timeout.",
+						"Off peak extended disconnect timeout is only applicable for Single Session catalogs.",
+					)
+				}
+				if !catalogScaleSettings.PeakDisconnectedSessionAction.IsNull() {
+					resp.Diagnostics.AddAttributeError(
+						path.Root("power_schedule").AtName("peak_disconnected_session_action"),
+						"Invalid peak disconnected session action.",
+						"Peak disconnected session action is only applicable for Single Session catalogs.",
+					)
+				}
+				if !catalogScaleSettings.OffPeakDisconnectedSessionAction.IsNull() {
+					resp.Diagnostics.AddAttributeError(
+						path.Root("power_schedule").AtName("off_peak_disconnected_session_action"),
+						"Invalid off peak disconnected session action.",
+						"Off peak disconnected session action is only applicable for Single Session catalogs.",
+					)
+				}
 			}
 
 			if persona.GetSessionSupport() == citrixquickdeploy.SESSIONSUPPORT_MULTI_SESSION && !plan.CatalogType.IsNull() {
@@ -664,6 +762,24 @@ func getManagedCatalogWithId(ctx context.Context, client *citrixdaasclient.Citri
 	return catalog, httpResp, nil
 }
 
+func getCatalogStatus(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, catalogId string) (*citrixquickdeploy.CustomerCatalogsStatusOverview, *http.Response, error) {
+	getCatalogStatusRequest := client.QuickDeployClient.CatalogCMD.GetCustomerCatalogsStatus(ctx, client.ClientConfig.CustomerId, client.ClientConfig.SiteId)
+	getCatalogStatusRequest = getCatalogStatusRequest.CatalogId([]string{catalogId})
+	catalogStatus, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickdeploy.CustomerCatalogsStatusOverview](getCatalogStatusRequest, client)
+
+	if err != nil {
+		diagnostics.AddError(
+			"Error getting status for Managed Catalog: "+catalogId,
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadCatalogServiceClientError(err),
+		)
+
+		return nil, httpResp, err
+	}
+
+	return catalogStatus, httpResp, nil
+}
+
 //nolint:unparam // keep the addWarningIfNotFound parameter for future use
 func getManagedCatalogCapacityWithId(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, catalogId string, addWarningIfNotFound bool) (*citrixquickdeploy.CatalogCapacitySettingsModel, error) {
 	getCatalogCapacityRequest := client.QuickDeployClient.CatalogCMD.GetCatalogCapacityConfiguration(ctx, client.ClientConfig.CustomerId, client.ClientConfig.SiteId, catalogId)
@@ -692,26 +808,28 @@ func waitForCatalogDeployCompletion(ctx context.Context, client *citrixdaasclien
 	// default polling to every 30 seconds
 	startTime := time.Now()
 
-	var catalog *citrixquickdeploy.CatalogOverview
-	for time.Since(startTime) <= time.Minute*time.Duration(60) {
+	for time.Since(startTime) <= time.Minute*time.Duration(75) {
 		// Set create timeout to 60 minutes
 
 		// Sleep ahead of getting the image to account for the time of resource group creation
 		time.Sleep(time.Second * time.Duration(30))
 
-		catalog, httpResp, err := getManagedCatalogWithId(ctx, client, diagnostics, catalogId, false)
+		catalogStatus, httpResp, err := getCatalogStatus(ctx, client, diagnostics, catalogId)
 		if err != nil {
 			return nil, httpResp, err
 		}
 
-		if catalog.GetState() == citrixquickdeploy.CATALOGOVERALLSTATE_PRE_DEPLOYMENT || catalog.GetState() == citrixquickdeploy.CATALOGOVERALLSTATE_PROCESSING {
-			continue
+		statusMap := catalogStatus.GetCatalogsStatus()
+		if status, exists := statusMap[catalogId]; exists {
+			if status.GetState() == citrixquickdeploy.CATALOGOVERALLSTATE_PRE_DEPLOYMENT || status.GetState() == citrixquickdeploy.CATALOGOVERALLSTATE_PROCESSING {
+				continue
+			} else {
+				break
+			}
 		}
-
-		return catalog, httpResp, err
 	}
 
-	return catalog, nil, nil
+	return getManagedCatalogWithId(ctx, client, diagnostics, catalogId, false)
 }
 
 func waitForCatalogDeleteCompletion(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, catalogId string) (*http.Response, error) {
@@ -724,27 +842,27 @@ func waitForCatalogDeleteCompletion(ctx context.Context, client *citrixdaasclien
 		// Sleep ahead of getting the image to account for the time of resource group creation
 		time.Sleep(time.Second * time.Duration(30))
 
-		catalog, httpResp, err := getManagedCatalogWithId(ctx, client, diagnostics, catalogId, false)
+		catalogStatus, httpResp, err := getCatalogStatus(ctx, client, diagnostics, catalogId)
 		if err != nil {
-			if httpResp.StatusCode == http.StatusNotFound {
-				// If the catalog is not found, it means the deletion is complete
-				return httpResp, nil
-			}
-
 			return httpResp, err
 		}
 
-		if catalog.GetState() == citrixquickdeploy.CATALOGOVERALLSTATE_DELETING {
-			continue
+		statusMap := catalogStatus.GetCatalogsStatus()
+		if status, exists := statusMap[catalogId]; exists {
+			if status.GetState() == citrixquickdeploy.CATALOGOVERALLSTATE_NOT_FOUND {
+				return httpResp, nil
+			} else if status.GetState() == citrixquickdeploy.CATALOGOVERALLSTATE_DELETING {
+				continue
+			} else {
+				return httpResp, fmt.Errorf("Catalog deletion is no longer in progress for catalog ID: %s, current state: %s", catalogId, status.GetState())
+			}
 		}
-
-		return httpResp, fmt.Errorf("Catalog deletion is no longer in progress for catalog ID: %s, current state: %s", catalogId, catalog.GetState())
 	}
 
 	return nil, fmt.Errorf("Timed out waiting for catalog deletion to complete for catalog ID: %s", catalogId)
 }
 
-func getScaleSettingsRequestModel(ctx context.Context, diagnostics *diag.Diagnostics, plan PowerScheduleModel) citrixquickdeploy.CatalogScaleSettingsModel {
+func getScaleSettingsRequestModel(ctx context.Context, diagnostics *diag.Diagnostics, plan PowerScheduleModel, isMultiSession bool) citrixquickdeploy.CatalogScaleSettingsModel {
 	var scaleSettings citrixquickdeploy.CatalogScaleSettingsModel
 	scaleSettings.SetPeakStartTime(int32(plan.PeakStartTime.ValueInt64()))
 	scaleSettings.SetPeakEndTime(int32(plan.PeakEndTime.ValueInt64()))
@@ -753,10 +871,25 @@ func getScaleSettingsRequestModel(ctx context.Context, diagnostics *diag.Diagnos
 	scaleSettings.SetOffPeakDisconnectedSessionTimeout(int32(plan.OffPeakDisconnectedSessionTimeout.ValueInt64()))
 	scaleSettings.SetPeakExtendedDisconnectTimeoutMinutes(int32(plan.PeakExtendedDisconnectTimeout.ValueInt64()))
 	scaleSettings.SetOffPeakExtendedDisconnectTimeoutMinutes(int32(plan.OffPeakExtendedDisconnectTimeout.ValueInt64()))
-	scaleSettings.SetPeakMinInstances(int32(plan.PeakMinInstances.ValueInt64()))
-	scaleSettings.SetMinInstances(int32(plan.OffPeakMinInstances.ValueInt64()))
-	scaleSettings.SetPeakDisconnectedSessionAction(citrixquickdeploy.SessionChangeHostingAction(plan.PeakDisconnectedSessionAction.ValueString()))
-	scaleSettings.SetOffPeakDisconnectedSessionAction(citrixquickdeploy.SessionChangeHostingAction(plan.OffPeakDisconnectedSessionAction.ValueString()))
+	scaleSettings.SetPeakMinInstances(0)
+	scaleSettings.SetMinInstances(0)
+
+	if isMultiSession {
+		scaleSettings.SetPeakDisconnectedSessionAction(citrixquickdeploy.SessionChangeHostingAction(citrixorchestration.SESSIONCHANGEHOSTINGACTION_NOTHING))
+		scaleSettings.SetOffPeakDisconnectedSessionAction(citrixquickdeploy.SessionChangeHostingAction(citrixorchestration.SESSIONCHANGEHOSTINGACTION_NOTHING))
+	} else {
+		if plan.PeakDisconnectedSessionAction.IsNull() {
+			scaleSettings.SetPeakDisconnectedSessionAction(citrixquickdeploy.SessionChangeHostingAction(citrixorchestration.SESSIONCHANGEHOSTINGACTION_SHUTDOWN))
+		} else {
+			scaleSettings.SetPeakDisconnectedSessionAction(citrixquickdeploy.SessionChangeHostingAction(plan.PeakDisconnectedSessionAction.ValueString()))
+		}
+
+		if plan.OffPeakDisconnectedSessionAction.IsNull() {
+			scaleSettings.SetOffPeakDisconnectedSessionAction(citrixquickdeploy.SessionChangeHostingAction(citrixorchestration.SESSIONCHANGEHOSTINGACTION_SHUTDOWN))
+		} else {
+			scaleSettings.SetOffPeakDisconnectedSessionAction(citrixquickdeploy.SessionChangeHostingAction(plan.OffPeakDisconnectedSessionAction.ValueString()))
+		}
+	}
 
 	if !plan.PowerOffDelay.IsNull() {
 		scaleSettings.SetPowerOffDelay(int32(plan.PowerOffDelay.ValueInt64()))
@@ -770,6 +903,14 @@ func getScaleSettingsRequestModel(ctx context.Context, diagnostics *diag.Diagnos
 	scaleSettings.SetWeekdays(weekdaysMap)
 
 	return scaleSettings
+}
+
+func isMultiSessionCatalog(plan CitrixManagedCatalogResourceModel, persona *citrixquickdeploy.Persona) bool {
+	if persona != nil {
+		return persona.GetSessionSupport() == citrixquickdeploy.SESSIONSUPPORT_MULTI_SESSION
+	}
+
+	return citrixquickdeploy.AddCatalogType(plan.CatalogType.ValueString()) == citrixquickdeploy.ADDCATALOGTYPE_MULTI_SESSION
 }
 
 func getComputerWorkerRequestModel(plan CitrixManagedCatalogResourceModel, persona *citrixquickdeploy.Persona) citrixquickdeploy.CatalogComputeWorkerModel {

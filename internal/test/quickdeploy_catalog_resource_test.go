@@ -135,8 +135,6 @@ var (
 			naming_scheme_type = "Numeric"
 		}
 		power_schedule = {
-			peak_min_instances = 1
-			off_peak_min_instances = 1
 			weekdays = ["monday", "tuesday", "wednesday", "thursday", "friday"]
 			peak_start_time = 9
 			peak_end_time = 18
@@ -161,8 +159,6 @@ var (
 			naming_scheme_type = "Numeric"
 		}
 		power_schedule = {
-			peak_min_instances = 1
-			off_peak_min_instances = 1
 			weekdays = ["monday", "tuesday", "wednesday", "thursday", "friday"]
 			peak_start_time = 9
 			peak_end_time = 18

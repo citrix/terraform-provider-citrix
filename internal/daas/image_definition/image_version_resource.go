@@ -246,7 +246,12 @@ func (r *ImageVersionResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	updateImageVersionResourcePools(ctx, r.client, &resp.Diagnostics, plan)
+	timeoutConfigs := util.ObjectValueToTypedObject[ImageVersionTimeout](ctx, &resp.Diagnostics, plan.Timeout)
+	updateTimeout := timeoutConfigs.Update.ValueInt32()
+	if updateTimeout == 0 {
+		updateTimeout = getImageVersionTimeoutConfigs().UpdateDefault
+	}
+	updateImageVersionResourcePools(ctx, r.client, &resp.Diagnostics, plan, updateTimeout)
 
 	imageVersion, err = GetImageVersion(ctx, r.client, &resp.Diagnostics, plan.ImageDefinition.ValueString(), imageVersion.GetId())
 	if err != nil {
@@ -603,7 +608,7 @@ func generateImageVersionResourcePoolRequestModel(ctx context.Context, diagnosti
 	return imageVersionResourcePools
 }
 
-func updateImageVersionResourcePools(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, plan ImageVersionModel) {
+func updateImageVersionResourcePools(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, plan ImageVersionModel, updateTimeout int32) {
 	imageVersionResourcePools := generateImageVersionResourcePoolRequestModel(ctx, diagnostics, plan)
 
 	updateImageVersionRequestModel := citrixorchestration.UpdateImageVersionResourcePoolsRequestModel{}
@@ -623,5 +628,5 @@ func updateImageVersionResourcePools(ctx context.Context, client *citrixdaasclie
 	}
 
 	//nolint:errcheck // Errors added to diagnostics, continue so resource gets marked as tainted
-	_ = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error sharing Image Version", diagnostics, 5)
+	_ = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error sharing Image Version", diagnostics, updateTimeout)
 }
