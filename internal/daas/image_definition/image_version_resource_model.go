@@ -312,6 +312,7 @@ func (ImageVersionModel) GetAttributesNamesToMask() map[string]bool {
 
 type ImageVersionTimeout struct {
 	Create types.Int32 `tfsdk:"create"`
+	Update types.Int32 `tfsdk:"update"`
 	Delete types.Int32 `tfsdk:"delete"`
 }
 
@@ -320,6 +321,10 @@ func getImageVersionTimeoutConfigs() util.TimeoutConfigs {
 		Create:        true,
 		CreateDefault: 30,
 		CreateMin:     5,
+
+		Update:        true,
+		UpdateDefault: 30,
+		UpdateMin:     5,
 
 		Delete:        true,
 		DeleteDefault: 10,

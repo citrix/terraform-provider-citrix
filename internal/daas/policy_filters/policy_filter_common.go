@@ -121,6 +121,22 @@ func getPolicyFilter(ctx context.Context, client *citrixdaasclient.CitrixDaasCli
 	return policyFilter, nil
 }
 
+func getPolicyFilters(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policyGuid string) ([]citrixorchestration.FilterResponse, error) {
+	getPolicyFiltersRequest := client.ApiClient.GpoDAAS.GpoReadGpoFilters(ctx)
+	getPolicyFiltersRequest = getPolicyFiltersRequest.PolicyGuid(policyGuid)
+	policyFilters, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.CollectionEnvelopeOfFilterResponse](getPolicyFiltersRequest, client)
+	if err != nil {
+		diagnostics.AddError(
+			"Error Reading Policy Filters",
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		return nil, err
+	}
+
+	return policyFilters.GetItems(), nil
+}
+
 func updatePolicyFilter(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policyFilter PolicyFilterInterface) error {
 	serverValue := getServerValue(client)
 	filterRequest, err := policyFilter.GetFilterRequest(diagnostics, serverValue)

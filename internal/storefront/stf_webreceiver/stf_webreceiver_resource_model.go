@@ -28,7 +28,9 @@ import (
 
 type WebReceiverSiteStyle struct {
 	HeaderLogoPath         types.String `tfsdk:"header_logo_path"`
+	CurrentHeaderLogoPath  types.String `tfsdk:"current_header_logo_path"`
 	LogonLogoPath          types.String `tfsdk:"logon_logo_path"`
+	CurrentLogonLogoPath   types.String `tfsdk:"current_logon_logo_path"`
 	HeaderBackgroundColor  types.String `tfsdk:"header_background_color"`
 	HeaderForegroundColor  types.String `tfsdk:"header_foreground_color"`
 	LinkColor              types.String `tfsdk:"link_color"`
@@ -41,7 +43,7 @@ func (WebReceiverSiteStyle) GetSchema() schema.SingleNestedAttribute {
 		Optional:    true,
 		Attributes: map[string]schema.Attribute{
 			"header_logo_path": schema.StringAttribute{
-				Description: "Points to the Header Logo's path in the system.",
+				Description: "User input for the Header Logo's path in the system.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString("C:\\inetpub\\wwwroot\\Citrix\\StoreWeb\\receiver\\images\\2x\\CitrixStoreFrontReceiverLogo_Home@2x_B07AF017CEE39553.png"),
@@ -49,14 +51,22 @@ func (WebReceiverSiteStyle) GetSchema() schema.SingleNestedAttribute {
 					stringvalidator.RegexMatches(regexp.MustCompile(`^.*\.(png|jpg|jpeg|gif|tiff|bmp)$`), "must be a valid image file"),
 				},
 			},
+			"current_header_logo_path": schema.StringAttribute{
+				Description: "Points to the current Header Logo's path in the system.",
+				Computed:    true,
+			},
 			"logon_logo_path": schema.StringAttribute{
-				Description: "Points to the Logon Logo's path in the system.",
+				Description: "User input for the Logon Logo's path in the system.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString("C:\\inetpub\\wwwroot\\Citrix\\StoreWeb\\receiver\\images\\2x\\CitrixStoreFront_auth@2x_CB5D9D1BADB08AFF.png"),
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(`^.*\.(png|jpg|jpeg|gif|tiff|bmp)$`), "must be a valid image file"),
 				},
+			},
+			"current_logon_logo_path": schema.StringAttribute{
+				Description: "Points to the current Logon Logo's path in the system.",
+				Computed:    true,
 			},
 			"header_background_color": schema.StringAttribute{
 				Description: "Sets the background color of the header.",
@@ -898,10 +908,10 @@ func (r *STFWebReceiverResourceModel) RefreshWebReceiverSiteStyle(ctx context.Co
 		refreshedSiteStyle.HeaderForegroundColor = types.StringValue(*ss.HeaderForegroundColor.Get())
 	}
 	if ss.HeaderLogoPath.IsSet() {
-		refreshedSiteStyle.HeaderLogoPath = types.StringValue(*ss.HeaderLogoPath.Get())
+		refreshedSiteStyle.CurrentHeaderLogoPath = types.StringValue(*ss.HeaderLogoPath.Get())
 	}
 	if ss.LogonLogoPath.IsSet() {
-		refreshedSiteStyle.LogonLogoPath = types.StringValue(*ss.LogonLogoPath.Get())
+		refreshedSiteStyle.CurrentLogonLogoPath = types.StringValue(*ss.LogonLogoPath.Get())
 	}
 	if ss.LinkColor.IsSet() {
 		refreshedSiteStyle.LinkColor = types.StringValue(*ss.LinkColor.Get())

@@ -69,7 +69,6 @@ func (CitrixManagedCatalogResourceModel) GetSchema() schema.Schema {
 				Description: "Denotes how the machines in the catalog are allocated to a user. Choose between `MultiSession`, `SingleSessionStatic` and `SingleSessionRandom`." +
 					"\n\n -> **Note** Catalog type is required when `persona` is not specified. When a persona is specified, the catalog type associated with the persona will be used. However, catalog type can still be specified alongside certain personas as an add-on (extra credits).",
 				Optional: true,
-				Computed: true,
 				Validators: []validator.String{
 					util.GetValidatorFromEnum(citrixquickdeploy.AllowedAddCatalogTypeEnumValues),
 					stringvalidator.AtLeastOneOf(
@@ -85,7 +84,6 @@ func (CitrixManagedCatalogResourceModel) GetSchema() schema.Schema {
 				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
-					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"region": schema.StringAttribute{
@@ -236,19 +234,19 @@ func (a MachineNamingSchemeModel) Equals(b MachineNamingSchemeModel) bool {
 }
 
 type PowerScheduleModel struct {
-	PeakDisconnectedSessionTimeout    types.Int64  `tfsdk:"peak_disconnected_session_timeout"`
-	OffPeakDisconnectedSessionTimeout types.Int64  `tfsdk:"off_peak_disconnected_session_timeout"`
-	PeakExtendedDisconnectTimeout     types.Int64  `tfsdk:"peak_extended_disconnect_timeout"`
-	OffPeakExtendedDisconnectTimeout  types.Int64  `tfsdk:"off_peak_extended_disconnect_timeout"`
-	PeakMinInstances                  types.Int64  `tfsdk:"peak_min_instances"`
-	OffPeakMinInstances               types.Int64  `tfsdk:"off_peak_min_instances"`
-	PeakDisconnectedSessionAction     types.String `tfsdk:"peak_disconnected_session_action"`
-	OffPeakDisconnectedSessionAction  types.String `tfsdk:"off_peak_disconnected_session_action"`
-	PeakEndTime                       types.Int64  `tfsdk:"peak_end_time"`
-	PeakStartTime                     types.Int64  `tfsdk:"peak_start_time"`
-	PeakTimeZoneId                    types.String `tfsdk:"peak_time_zone_id"`
-	Weekdays                          types.Set    `tfsdk:"weekdays"`
-	PowerOffDelay                     types.Int64  `tfsdk:"power_off_delay"`
+	PeakDisconnectedSessionTimeout         types.Int64  `tfsdk:"peak_disconnected_session_timeout"`
+	OffPeakDisconnectedSessionTimeout      types.Int64  `tfsdk:"off_peak_disconnected_session_timeout"`
+	PeakExtendedDisconnectTimeout          types.Int64  `tfsdk:"peak_extended_disconnect_timeout"`
+	OffPeakExtendedDisconnectTimeout       types.Int64  `tfsdk:"off_peak_extended_disconnect_timeout"`
+	PeakDisconnectedSessionAction          types.String `tfsdk:"peak_disconnected_session_action"`
+	OffPeakDisconnectedSessionAction       types.String `tfsdk:"off_peak_disconnected_session_action"`
+	PeakEndTime                            types.Int64  `tfsdk:"peak_end_time"`
+	PeakStartTime                          types.Int64  `tfsdk:"peak_start_time"`
+	PeakTimeZoneId                         types.String `tfsdk:"peak_time_zone_id"`
+	Weekdays                               types.Set    `tfsdk:"weekdays"`
+	PowerOffDelay                          types.Int64  `tfsdk:"power_off_delay"`
+	SessionTimeout                         types.Int64  `tfsdk:"session_timeout"`
+	MultiSessionDisconnectedSessionTimeout types.Int64  `tfsdk:"multi_session_disconnected_session_timeout"`
 }
 
 func (PowerScheduleModel) GetSchema() schema.SingleNestedAttribute {
@@ -257,73 +255,49 @@ func (PowerScheduleModel) GetSchema() schema.SingleNestedAttribute {
 		Required:    true,
 		Attributes: map[string]schema.Attribute{
 			"peak_disconnected_session_timeout": schema.Int64Attribute{
-				Description: "The number of minutes before the configured action should be performed after a user session disconnects in peak hours.",
-				Optional:    true,
-				Computed:    true,
-				Default:     int64default.StaticInt64(0),
+				Description: "The number of minutes before the configured action should be performed after a user session disconnects in peak hours." +
+					"\n\n-> **Note** Applies only to Single Session catalogs. ",
+				Optional: true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(0),
 				},
 			},
 			"off_peak_disconnected_session_timeout": schema.Int64Attribute{
-				Description: "The number of minutes before the configured action should be performed after a user session disconnectts outside peak hours.",
-				Optional:    true,
-				Computed:    true,
-				Default:     int64default.StaticInt64(0),
+				Description: "The number of minutes before the configured action should be performed after a user session disconnects outside peak hours." +
+					"\n\n-> **Note** Applies only to Single Session catalogs. ",
+				Optional: true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(0),
 				},
 			},
 			"peak_extended_disconnect_timeout": schema.Int64Attribute{
-				Description: "The number of minutes before the second configured action should be performed after a user session disconnects in peak hours.",
-				Optional:    true,
-				Computed:    true,
-				Default:     int64default.StaticInt64(0),
+				Description: "The number of minutes after which shutdown should be performed if a user session is suspended the first time in peak hours." +
+					"\n\n-> **Note** Applies only to Single Session catalogs. ",
+				Optional: true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(0),
 				},
 			},
 			"off_peak_extended_disconnect_timeout": schema.Int64Attribute{
-				Description: "The number of minutes before the second configured action should be performed after a user session disconnects outside peak hours.",
-				Optional:    true,
-				Computed:    true,
-				Default:     int64default.StaticInt64(0),
-				Validators: []validator.Int64{
-					int64validator.AtLeast(0),
-				},
-			},
-			"peak_min_instances": schema.Int64Attribute{
-				Description: "The minimum number of machines that should be powered on during peak hours. Defaults to `0`. Can only be set to more than `0` if `catalog_type` is `Dedicated`.",
-				Optional:    true,
-				Computed:    true,
-				Default:     int64default.StaticInt64(0),
-				Validators: []validator.Int64{
-					int64validator.AtLeast(0),
-				},
-			},
-			"off_peak_min_instances": schema.Int64Attribute{
-				Description: "The minimum number of machines that should be powered on during off peak hours. Defaults to `0`. Can only be set to more than `0` if `catalog_type` is `Dedicated`.",
-				Optional:    true,
-				Computed:    true,
-				Default:     int64default.StaticInt64(0),
+				Description: "The number of minutes after which shutdown should be performed if a user session is suspended the first time outside peak hours." +
+					"\n\n-> **Note** Applies only to Single Session catalogs. ",
+				Optional: true,
 				Validators: []validator.Int64{
 					int64validator.AtLeast(0),
 				},
 			},
 			"peak_disconnected_session_action": schema.StringAttribute{
-				Description: "The action to be performed after a configurable period of a user session disconnecting in peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.",
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString(string(citrixorchestration.SESSIONCHANGEHOSTINGACTION_NOTHING)),
+				Description: "The action to be performed after a configurable period of a user session disconnecting in peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Shutdown`." +
+					"\n\n-> **Note** Applies only to Single Session catalogs. ",
+				Optional: true,
 				Validators: []validator.String{
 					util.GetValidatorFromEnum(citrixorchestration.AllowedSessionChangeHostingActionEnumValues),
 				},
 			},
 			"off_peak_disconnected_session_action": schema.StringAttribute{
-				Description: "The action to be performed after a configurable period of a user session disconnecting outside peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Nothing`.",
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString(string(citrixorchestration.SESSIONCHANGEHOSTINGACTION_NOTHING)),
+				Description: "The action to be performed after a configurable period of a user session disconnecting outside peak hours. Choose between `Nothing`, `Suspend`, and `Shutdown`. Default is `Shutdown`." +
+					"\n\n-> **Note** Applies only to Single Session catalogs. ",
+				Optional: true,
 				Validators: []validator.String{
 					util.GetValidatorFromEnum(citrixorchestration.AllowedSessionChangeHostingActionEnumValues),
 				},
@@ -332,7 +306,7 @@ func (PowerScheduleModel) GetSchema() schema.SingleNestedAttribute {
 				Description: "The end time of peak hours (0-23).",
 				Optional:    true,
 				Computed:    true,
-				Default:     int64default.StaticInt64(17),
+				Default:     int64default.StaticInt64(16),
 				Validators: []validator.Int64{
 					int64validator.Between(0, 23),
 				},
@@ -341,7 +315,7 @@ func (PowerScheduleModel) GetSchema() schema.SingleNestedAttribute {
 				Description: "The start time of peak hours (0-23).",
 				Optional:    true,
 				Computed:    true,
-				Default:     int64default.StaticInt64(9),
+				Default:     int64default.StaticInt64(8),
 				Validators: []validator.Int64{
 					int64validator.Between(0, 23),
 				},
@@ -375,14 +349,27 @@ func (PowerScheduleModel) GetSchema() schema.SingleNestedAttribute {
 			"power_off_delay": schema.Int64Attribute{
 				Description: "Delay before machines are powered off, when scaling down. Specified in minutes. " +
 					"\n\n~> **Please Note** Applies only to multi-session machines. " +
-					"\n\n-> **Note** By default, the power-off delay is 30 minutes. You can set it in a range of 0 to 60 minutes. ",
+					"\n\n-> **Note** If not specified, the power-off delay is 30 minutes. You can set it in a range of 0 to 60 minutes. ",
 				Optional: true,
-				Computed: true,
 				Validators: []validator.Int64{
 					int64validator.Between(0, 60),
 				},
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.UseStateForUnknown(),
+			},
+			"session_timeout": schema.Int64Attribute{
+				Description: "The idle timeout in minutes after which sessions are disconnected. Defaults to `15`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     int64default.StaticInt64(15),
+				Validators: []validator.Int64{
+					int64validator.AtLeast(0),
+				},
+			},
+			"multi_session_disconnected_session_timeout": schema.Int64Attribute{
+				Description: "The timeout in minutes after which disconnected sessions on multi-session VMs should be logged off. This value is valid only for `MultiSession` catalogs. Defaults to `45` if not specified." +
+					"\n\n-> **Note** Applies only to Multi Session catalogs. ",
+				Optional: true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(0),
 				},
 			},
 		},
@@ -430,17 +417,21 @@ func (r CitrixManagedCatalogResourceModel) RefreshPropertyValues(ctx context.Con
 
 	sessionSupport := catalog.GetSessionSupport()
 	allocationType := catalog.GetAllocationType()
-	switch sessionSupport {
-	case citrixquickdeploy.SESSIONSUPPORT_MULTI_SESSION:
-		r.CatalogType = types.StringValue(string(citrixquickdeploy.ADDCATALOGTYPE_MULTI_SESSION))
-	case citrixquickdeploy.SESSIONSUPPORT_SINGLE_SESSION:
-		switch allocationType {
-		case citrixquickdeploy.CATALOGALLOCATIONTYPE_PERMANENT:
-			r.CatalogType = types.StringValue(string(citrixquickdeploy.ADDCATALOGTYPE_SINGLE_SESSION_STATIC))
-		case citrixquickdeploy.CATALOGALLOCATIONTYPE_RANDOM:
-			r.CatalogType = types.StringValue(string(citrixquickdeploy.ADDCATALOGTYPE_SINGLE_SESSION_RANDOM))
+
+	if r.Persona.IsNull() {
+		switch sessionSupport {
+		case citrixquickdeploy.SESSIONSUPPORT_MULTI_SESSION:
+			r.CatalogType = types.StringValue(string(citrixquickdeploy.ADDCATALOGTYPE_MULTI_SESSION))
+		case citrixquickdeploy.SESSIONSUPPORT_SINGLE_SESSION:
+			switch allocationType {
+			case citrixquickdeploy.CATALOGALLOCATIONTYPE_PERMANENT:
+				r.CatalogType = types.StringValue(string(citrixquickdeploy.ADDCATALOGTYPE_SINGLE_SESSION_STATIC))
+			case citrixquickdeploy.CATALOGALLOCATIONTYPE_RANDOM:
+				r.CatalogType = types.StringValue(string(citrixquickdeploy.ADDCATALOGTYPE_SINGLE_SESSION_RANDOM))
+			}
 		}
 	}
+
 	r.SubscriptionName = types.StringValue(catalog.GetSubscriptionName())
 	if region == nil || r.shouldSetRegion(*region) {
 		// Set region only if region is not set in state, or inconsistent with plan
@@ -453,9 +444,7 @@ func (r CitrixManagedCatalogResourceModel) RefreshPropertyValues(ctx context.Con
 	r.StorageType = types.StringValue(string(computerWorker.GetStorageType()))
 	r.MaxUsersPerVm = types.Int64Value(int64(computerWorker.GetMaxUsersPerVM()))
 
-	isMultiSession := sessionSupport == citrixquickdeploy.SESSIONSUPPORT_MULTI_SESSION
-
-	r = r.updatePlanWithPowerSchedule(ctx, diagnostics, capacity, isMultiSession)
+	r = r.updatePlanWithPowerSchedule(ctx, diagnostics, capacity)
 
 	// Refresh on-prem connectivity if domain joined
 	if catalog.GetVnetPeeringId() != "" {
@@ -465,24 +454,40 @@ func (r CitrixManagedCatalogResourceModel) RefreshPropertyValues(ctx context.Con
 	return r
 }
 
-func (r CitrixManagedCatalogResourceModel) updatePlanWithPowerSchedule(ctx context.Context, diagnostics *diag.Diagnostics, capacity *citrixquickdeploy.CatalogCapacitySettingsModel, isMultiSession bool) CitrixManagedCatalogResourceModel {
+func (r CitrixManagedCatalogResourceModel) updatePlanWithPowerSchedule(ctx context.Context, diagnostics *diag.Diagnostics, capacity *citrixquickdeploy.CatalogCapacitySettingsModel) CitrixManagedCatalogResourceModel {
 	scaleSettings := capacity.GetScaleSettings()
 	powerSchedule := util.ObjectValueToTypedObject[PowerScheduleModel](ctx, diagnostics, r.PowerSchedule)
 
-	powerSchedule.PeakDisconnectedSessionTimeout = types.Int64Value(int64(scaleSettings.GetPeakDisconnectedSessionTimeout()))
-	powerSchedule.OffPeakDisconnectedSessionTimeout = types.Int64Value(int64(scaleSettings.GetOffPeakDisconnectedSessionTimeout()))
-	powerSchedule.PeakExtendedDisconnectTimeout = types.Int64Value(int64(scaleSettings.GetPeakExtendedDisconnectTimeoutMinutes()))
-	powerSchedule.OffPeakExtendedDisconnectTimeout = types.Int64Value(int64(scaleSettings.GetOffPeakExtendedDisconnectTimeoutMinutes()))
-	powerSchedule.PeakMinInstances = types.Int64Value(int64(scaleSettings.GetPeakMinInstances()))
-	powerSchedule.OffPeakMinInstances = types.Int64Value(int64(scaleSettings.GetMinInstances()))
-	powerSchedule.PeakDisconnectedSessionAction = types.StringValue(string(scaleSettings.GetPeakDisconnectedSessionAction()))
-	powerSchedule.OffPeakDisconnectedSessionAction = types.StringValue(string(scaleSettings.GetOffPeakDisconnectedSessionAction()))
 	powerSchedule.PeakStartTime = types.Int64Value(int64(scaleSettings.GetPeakStartTime()))
 	powerSchedule.PeakEndTime = types.Int64Value(int64(scaleSettings.GetPeakEndTime()))
 	powerSchedule.PeakTimeZoneId = types.StringValue(scaleSettings.GetPeakTimeZoneId())
+	powerSchedule.SessionTimeout = types.Int64Value(int64(capacity.GetSessionTimeout()))
 
-	if isMultiSession {
+	if !powerSchedule.PeakDisconnectedSessionAction.IsNull() {
+		powerSchedule.PeakDisconnectedSessionAction = types.StringValue(string(scaleSettings.GetPeakDisconnectedSessionAction()))
+	}
+	if !powerSchedule.OffPeakDisconnectedSessionAction.IsNull() {
+		powerSchedule.OffPeakDisconnectedSessionAction = types.StringValue(string(scaleSettings.GetOffPeakDisconnectedSessionAction()))
+	}
+	if !powerSchedule.PeakDisconnectedSessionTimeout.IsNull() {
+		powerSchedule.PeakDisconnectedSessionTimeout = types.Int64Value(int64(scaleSettings.GetPeakDisconnectedSessionTimeout()))
+	}
+	if !powerSchedule.OffPeakDisconnectedSessionTimeout.IsNull() {
+		powerSchedule.OffPeakDisconnectedSessionTimeout = types.Int64Value(int64(scaleSettings.GetOffPeakDisconnectedSessionTimeout()))
+	}
+	if !powerSchedule.PeakExtendedDisconnectTimeout.IsNull() {
+		powerSchedule.PeakExtendedDisconnectTimeout = types.Int64Value(int64(scaleSettings.GetPeakExtendedDisconnectTimeoutMinutes()))
+	}
+	if !powerSchedule.OffPeakExtendedDisconnectTimeout.IsNull() {
+		powerSchedule.OffPeakExtendedDisconnectTimeout = types.Int64Value(int64(scaleSettings.GetOffPeakExtendedDisconnectTimeoutMinutes()))
+	}
+
+	if !powerSchedule.PowerOffDelay.IsNull() {
 		powerSchedule.PowerOffDelay = types.Int64Value(int64(scaleSettings.GetPowerOffDelay()))
+	}
+
+	if !powerSchedule.MultiSessionDisconnectedSessionTimeout.IsNull() {
+		powerSchedule.MultiSessionDisconnectedSessionTimeout = types.Int64Value(int64(capacity.GetMultiSessionDisconnectedSessionTimeout()))
 	}
 
 	weekdayString := scaleSettings.GetWeekdaysString()
