@@ -59,6 +59,18 @@ func TestIPFilterValidator(t *testing.T) {
 		"valid ip 2001:0db8:3c4d:0015:0:0:abcd:ef12 mask 39": {
 			ipAddress: types.StringValue("2001:0db8:3c4d:0015:0:0:abcd:ef12/39"),
 		},
+		"valid ip 2001:0db8:3c4d:0015:0:0:abcd:ef12 mask 40": {
+			ipAddress: types.StringValue("2001:0db8:3c4d:0015:0:0:abcd:ef12/40"),
+		},
+		"valid ip 2001:db8::/64": {
+			ipAddress: types.StringValue("2001:db8::/64"),
+		},
+		"valid ip 2001:db8::/128": {
+			ipAddress: types.StringValue("2001:db8::/128"),
+		},
+		"valid ip 2001:db8::1-2001:db8::2": {
+			ipAddress: types.StringValue("2001:db8::1-2001:db8::2"),
+		},
 		"invalid ip *.1.*.*": {
 			ipAddress:   types.StringValue("*.1.*.*"),
 			expectError: true,
@@ -139,10 +151,6 @@ func TestIPFilterValidator(t *testing.T) {
 			ipAddress:   types.StringValue(":::3c4d:0015:0:0:abcd:ef12"),
 			expectError: true,
 		},
-		"invalid ip 2001:0db8:3c4d:0015:0:0:abcd:ef12 mask 40": {
-			ipAddress:   types.StringValue("2001:0db8:3c4d:0015:0:0:abcd:ef12/40"),
-			expectError: true,
-		},
 		"invalid ip 2001:0db8:3c4d:0015:0:0:abcd:ef12 mask null": {
 			ipAddress:   types.StringValue("2001:0db8:3c4d:0015:0:0:abcd:ef12/"),
 			expectError: true,
@@ -162,6 +170,79 @@ func TestIPFilterValidator(t *testing.T) {
 		"invalid ip empty string": {
 			ipAddress:   types.StringValue(""),
 			expectError: true,
+		},
+		"invalid ip 2001:db8::2-2001:db8::1": {
+			ipAddress:   types.StringValue("2001:db8::2-2001:db8::1"),
+			expectError: true,
+		},
+		"invalid ip 2001:db8::1-2001:db8::1": {
+			ipAddress:   types.StringValue("2001:db8::1-2001:db8::1"),
+			expectError: true,
+		},
+		"invalid ip 12.0.0.1-2001:db8::1": {
+			ipAddress:   types.StringValue("12.0.0.1-2001:db8::1"),
+			expectError: true,
+		},
+		// --- XAC-71946 edge-case hardening: boundaries, error paths, family-agnostic
+		// ordering, and the former 32-bit-overflow path removed with convertIpAddressToNumber ---
+		"invalid ip multiple hyphens 12.0.0.1-12.0.0.2-12.0.0.3": {
+			ipAddress:   types.StringValue("12.0.0.1-12.0.0.2-12.0.0.3"),
+			expectError: true,
+		},
+		"invalid ip empty range start": {
+			ipAddress:   types.StringValue("-12.0.0.1"),
+			expectError: true,
+		},
+		"invalid ip empty range end": {
+			ipAddress:   types.StringValue("12.0.0.1-"),
+			expectError: true,
+		},
+		"invalid ip cidr-cidr range 12.0.0.0/24-12.0.0.128/25": {
+			ipAddress:   types.StringValue("12.0.0.0/24-12.0.0.128/25"),
+			expectError: true,
+		},
+		"invalid ip ipv6 cidr in range 2001:db8::/64-2001:db8::5": {
+			ipAddress:   types.StringValue("2001:db8::/64-2001:db8::5"),
+			expectError: true,
+		},
+		"valid ip 0.0.0.0 mask 0": {
+			ipAddress: types.StringValue("0.0.0.0/0"),
+		},
+		"valid ip :: mask 0": {
+			ipAddress: types.StringValue("::/0"),
+		},
+		"invalid ip 2001:db8:: mask 129": {
+			ipAddress:   types.StringValue("2001:db8::/129"),
+			expectError: true,
+		},
+		"invalid ip 12.0.0.1 mask 33": {
+			ipAddress:   types.StringValue("12.0.0.1/33"),
+			expectError: true,
+		},
+		"invalid ip equal ipv6 different notation": {
+			ipAddress:   types.StringValue("2001:db8::1-2001:0db8:0000:0000:0000:0000:0000:0001"),
+			expectError: true,
+		},
+		"valid ip cross-octet ascending 12.0.0.255-12.0.1.0": {
+			ipAddress: types.StringValue("12.0.0.255-12.0.1.0"),
+		},
+		"valid ip high range 240.0.0.1-250.0.0.1": {
+			ipAddress: types.StringValue("240.0.0.1-250.0.0.1"),
+		},
+		"invalid ip high range reversed 250.0.0.1-240.0.0.1": {
+			ipAddress:   types.StringValue("250.0.0.1-240.0.0.1"),
+			expectError: true,
+		},
+		"invalid ip leading space": {
+			ipAddress:   types.StringValue(" 12.0.0.1"),
+			expectError: true,
+		},
+		"invalid ip ipv6 with zone fe80::1%eth0": {
+			ipAddress:   types.StringValue("fe80::1%eth0"),
+			expectError: true,
+		},
+		"valid ip ipv4-mapped ipv6 ::ffff:12.0.0.1": {
+			ipAddress: types.StringValue("::ffff:12.0.0.1"),
 		},
 	}
 

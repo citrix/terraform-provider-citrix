@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -84,7 +85,7 @@ func (r *MachinePropertiesResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
-	machineTagIds, err := getMachineTagIds(ctx, r.client, &resp.Diagnostics, machineName)
+	machineTagIds, err := getMachineTagIdsAfterWrite(ctx, r.client, &resp.Diagnostics, machineName, util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Tags))
 	if err != nil {
 		return
 	}
@@ -165,7 +166,7 @@ func (r *MachinePropertiesResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
-	machineTagIds, err := getMachineTagIds(ctx, r.client, &resp.Diagnostics, machineName)
+	machineTagIds, err := getMachineTagIdsAfterWrite(ctx, r.client, &resp.Diagnostics, machineName, util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Tags))
 	if err != nil {
 		return
 	}
@@ -262,6 +263,43 @@ func getMachineProperties(ctx context.Context, client *citrixdaasclient.CitrixDa
 		return nil, err
 	}
 	return machineProperties, err
+}
+
+// Tags API may return 200 with an empty list or stale data immediately after a write due to propagation
+// delay, even though setMachineTags completed successfully.
+func getMachineTagIdsAfterWrite(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, machineNameOrId string, expectedTagIds []string) ([]string, error) {
+	const (
+		maxRetries    = 5
+		retryInterval = 3 * time.Second
+	)
+
+	expectedSet := make(map[string]struct{}, len(expectedTagIds))
+	for _, id := range expectedTagIds {
+		expectedSet[id] = struct{}{}
+	}
+
+	matchesExpected := func(tagIds []string) bool {
+		if len(tagIds) != len(expectedSet) {
+			return false
+		}
+		for _, id := range tagIds {
+			if _, ok := expectedSet[id]; !ok {
+				return false
+			}
+		}
+		return true
+	}
+
+	var tagIds []string
+	var err error
+	for range maxRetries {
+		tagIds, err = getMachineTagIds(ctx, client, diagnostics, machineNameOrId)
+		if err != nil || matchesExpected(tagIds) {
+			break
+		}
+		time.Sleep(retryInterval)
+	}
+	return tagIds, err
 }
 
 func getMachineTagIds(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, machineNameOrId string) ([]string, error) {

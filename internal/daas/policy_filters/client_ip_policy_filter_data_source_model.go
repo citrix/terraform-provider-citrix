@@ -46,7 +46,7 @@ func (ClientIPFilterModel) GetDataSourceAttributes() map[string]schema.Attribute
 			Computed:    true,
 		},
 		"ip_address": schema.StringAttribute{
-			Description: "IP Address of the client to be filtered.",
+			Description: "IP Address of the client to be filtered. Accepts a single IPv4 or IPv6 address (e.g. 12.0.0.1, 2001:db8::1), an inclusive range with both endpoints of the same IP version in ascending order (e.g. 12.0.0.1-12.0.0.70, 2001:db8::1-2001:db8::2), a CIDR block (IPv4 /0-/32, IPv6 /0-/128; e.g. 12.0.0.0/24, 2001:db8::/64), or an IPv4 address with trailing-octet wildcards (e.g. 12.0.*.*).",
 			Computed:    true,
 		},
 	}

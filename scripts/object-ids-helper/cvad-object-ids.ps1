@@ -262,6 +262,35 @@ function Get-UrlForWemObjects {
     }
 }
 
+# Function to get the URL for Quick Deploy objects
+function Get-UrlForQuickDeployObjects {
+    param(
+        [parameter(Mandatory = $true)]
+        [string] $requestPath
+    )
+
+    if ($script:environment -eq "Production") {
+        $script:quickDeployHostName = "api.cloud.com"
+    }
+    elseif ($script:environment -eq "Staging") {
+        $script:quickDeployHostName = "api.cloudburrito.com"
+    }
+    elseif ($script:environment -eq "Japan") {
+        $script:quickDeployHostName = "api.citrixcloud.jp"
+    }
+    elseif ($script:environment -eq "JapanStaging") {
+        $script:quickDeployHostName = "api.citrixcloudstaging.jp"
+    }
+    elseif ($script:environment -eq "Gov") {
+        $script:quickDeployHostName = "api.cloud.us"
+    }
+    elseif ($script:environment -eq "GovStaging") {
+        $script:quickDeployHostName = "api.cloudstaging.us"
+    }
+
+    return "https://$($script:quickDeployHostName)/catalogservice/$($script:customerId)/$($script:siteId)/$requestPath"
+}
+
 # Function to find Catalog AD objects
 function Find-CatalogADObjects {
     param(
@@ -296,6 +325,10 @@ function Get-ResourceList {
     if ($resourceProviderName -in "wem_configuration_set", "wem_directory_object") {
         $url = Get-UrlForWemObjects -requestPath $requestPath
     }
+    # Update url for Quick Deploy Objects
+    elseif ($resourceProviderName -in "quickdeploy_catalog", "quickdeploy_template_image") {
+        $url = Get-UrlForQuickDeployObjects -requestPath $requestPath
+    }
     
     # Check if the resource provider is supported in the current environment (eg. WEM is not supported for most environments)
     try {
@@ -310,6 +343,14 @@ function Get-ResourceList {
     }
     
     $items = $response.Items
+
+    # Quick Deploy has different response structure
+    if ($resourceProviderName -eq "quickdeploy_catalog") {
+        $items = if ($null -ne $response.items) { $response.items } else { $response.catalogs }
+    }
+    elseif ($resourceProviderName -eq "quickdeploy_template_image") {
+        $items = $response.items
+    }
 
     # WEM supports AD object type 'Catalog'. Filter out other object types
     if ($resourceProviderName -eq "wem_directory_object" -and $items.Count -gt 0) {
@@ -456,6 +497,19 @@ function Get-ObjectIdsFromCVADResources {
             }
         }
         $resources += $wemResources
+
+        # Add Quick Deploy resources for cloud customer environment
+        $quickDeployResources = @{
+            "quickdeploy_catalog" = @{
+                "resourceApi"          = "catalogs"
+                "resourceProviderName" = "quickdeploy_catalog"
+            }
+            "quickdeploy_template_image" = @{
+                "resourceApi"          = "images"
+                "resourceProviderName" = "quickdeploy_template_image"
+            }
+        }
+        $resources += $quickDeployResources
     }else {
     # If On-Prem add admin resource
         $resources.Add("admin_user", @{

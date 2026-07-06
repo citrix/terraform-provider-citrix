@@ -31,7 +31,7 @@ type NutanixHypervisorResourcePoolResourceModel struct {
 
 func (NutanixHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "CVAD --- Manages a Nutanix AHV hypervisor resource pool.",
+		Description: "CVAD --- Manages a Nutanix AHV Prism Element hypervisor resource pool.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the resource pool.",

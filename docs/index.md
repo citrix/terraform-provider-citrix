@@ -78,6 +78,7 @@ A service principal is an API client which is not associated with an email. It c
 |            Title            |            Details            |
 |-----------------------------|-------------------------------|
 | [Packer Image Management Module for Citrix® Virtual Apps and Desktops](https://github.com/citrix/citrix-packer-tools) | Use Packer to create golden images with the Citrix VDA installed and using Citrix best practices. |
+| [Packer Plugin for Citrix](https://github.com/citrix/packer-plugin-citrix) | Packer Plugin to manage Citrix App Layering creation and revision workflows. |
 | [Citrix Ansible Tools](https://github.com/citrix/citrix-ansible-tools) | Playbooks to install Citrix components using automation such as the VDA. |
 | [Site Deployment Module for Citrix® Virtual Apps and Desktops](https://github.com/citrix/citrix-cvad-site-deployment-module) | Uses PowerShell to drive Terraform files to create a fully functional CVAD site. |
 

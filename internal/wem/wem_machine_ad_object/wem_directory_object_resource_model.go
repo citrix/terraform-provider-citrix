@@ -28,7 +28,7 @@ type WemDirectoryResourceModel struct {
 func (WemDirectoryResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "WEM --- Manages machine-level AD objects within a WEM deployment." +
-			"\n\n~> **Disclaimer** This feature is supported for Citrix Cloud customers, and will be made available for On-Premises soon." +
+			"\n\n~> **Disclaimer** This feature is supported for Citrix Cloud customers." +
 			"\n\n~> **Warning**  Having more than one Directory Object with the same Catalog ID is not allowed.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{

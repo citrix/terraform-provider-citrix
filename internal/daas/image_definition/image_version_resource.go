@@ -166,6 +166,16 @@ func (r *ImageVersionResource) Create(ctx context.Context, req resource.CreateRe
 			"Image Version creation finished with status: "+string(imageVersion.GetImageVersionStatus())+
 				"\nTransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp),
 		)
+	} else {
+		if !plan.ShareWithResources.IsNull() {
+			plan.Id = types.StringValue(imageVersion.GetId())
+			updateImageVersionResourcePools(ctx, r.client, &resp.Diagnostics, plan, createTimeout)
+
+			imageVersion, err = GetImageVersion(ctx, r.client, &resp.Diagnostics, plan.ImageDefinition.ValueString(), imageVersion.GetId())
+			if err != nil {
+				return
+			}
+		}
 	}
 
 	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, imageVersion)
@@ -352,21 +362,10 @@ func (r *ImageVersionResource) ModifyPlan(ctx context.Context, req resource.Modi
 		return
 	}
 
-	create := req.State.Raw.IsNull()
-
 	var plan ImageVersionModel
 	diags := req.Plan.Get(ctx, &plan)
 
 	if !plan.ShareWithResources.IsNull() {
-		if create {
-			resp.Diagnostics.AddAttributeError(
-				path.Root("share_with_resources"),
-				"Invalid Attribute Configuration",
-				"The attribute share_with_resources cannot be specified during creation. Please specify the resources to share the image version with in an update operation after the image version has been created.",
-			)
-			return
-		}
-
 		isFeatureSupported := util.CheckProductVersion(r.client, &resp.Diagnostics, 125, 126, 7, 45, "Error managing Image Version resource", "Sharing Image Version")
 		if !isFeatureSupported {
 			return

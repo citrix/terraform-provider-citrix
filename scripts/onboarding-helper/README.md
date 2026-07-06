@@ -5,7 +5,7 @@ This automation script is designed to onboard an existing site to Terraform. It 
 ## Environment Requirements
 
 - PowerShell version `5.0` or higher
-- Citrix Provider version `>=1.0.22`
+- Citrix Provider version `>=1.0.24`
 - For On-Premises Customers: CVAD DDC `version 2311` or newer.
 
 ## Workflow:
@@ -76,9 +76,14 @@ This incremental approach allows you to become familiar with Terraform concepts 
     - `ResourceTypes` (Array):
       - Optional list of resource types to onboard. When specified, only those resources will be onboarded, the rest skipped. This helps make the onboarding process more manageable by limiting the scope.
       - By default (if `-NoDependencyRelationship` is not specified), will resolve all dependency relationships between resources as long as the dependent resource is included.
-      - Available resource types include: `citrix_admin_folder`, `citrix_admin_role`, `citrix_admin_scope`, `citrix_admin_user`, `citrix_application`, `citrix_application_group`, `citrix_application_icon`, `citrix_aws_hypervisor`, `citrix_azure_hypervisor`, `citrix_delivery_group`, `citrix_gcp_hypervisor`, `citrix_image_definition`, `citrix_machine_catalog`, `citrix_nutanix_hypervisor`, `citrix_openshift_hypervisor`, `citrix_policy_set`, `citrix_scvmm_hypervisor`, `citrix_service_account`, `citrix_storefront_server`, `citrix_tag`, `citrix_vsphere_hypervisor`, `citrix_xenserver_hypervisor`, `citrix_zone`.
+      - Available resource types include: `citrix_admin_folder`, `citrix_admin_role`, `citrix_admin_scope`, `citrix_admin_user`, `citrix_application`, `citrix_application_group`, `citrix_application_icon`, `citrix_aws_hypervisor`, `citrix_azure_hypervisor`, `citrix_delivery_group`, `citrix_gcp_hypervisor`, `citrix_image_definition`, `citrix_machine_catalog`, `citrix_nutanix_hypervisor`, `citrix_openshift_hypervisor`, `citrix_policy_set`, `citrix_quickdeploy_catalog`, `citrix_scvmm_hypervisor`, `citrix_service_account`, `citrix_storefront_server`, `citrix_tag`, `citrix_vsphere_hypervisor`, `citrix_xenserver_hypervisor`, `citrix_zone`.
       - `citrix_<hypervisorType>_resource_pools` are included with the `citrix_<hypervisorType>_hypervisor` resource.
       - `citrix_image_version` is included with the `citrix_image_definition` resource.
+      - **Quick Deploy resources** (Cloud only):
+        - `citrix_quickdeploy_catalog` – Quick Deploy catalogs can be onboarded via `terraform import`.
+        - **Quick Deploy template images** are **not** onboarded as resources. Instead, the script generates `data "citrix_quickdeploy_template_image"` data source blocks for each template image referenced by onboarded Quick Deploy catalogs. Quick Deploy catalogs reference these template images via `template_image_id`.
+        - **Quick Deploy on-premises network connections** are not onboardable (data source only).
+        - Quick Deploy resources are only available for **Citrix Cloud customers** (not on-premises).
     - `NamesOrIds` (Array):
       - Optional string array parameter to filter resources by name or ID. Only resources with a Name or ID matching any of these values will be onboarded.
       - This allows you to onboard multiple specific resources by name or ID in a single operation.

@@ -27,6 +27,7 @@ import (
 var MappedCustomProperties = map[string]string{
 	"Zones":                            "availability_zones",
 	"StorageType":                      "storage_type",
+	"CryptoKeyId":                      "crypto_key_id",
 	"ResourceGroups":                   "vda_resource_group",
 	"UseManagedDisks":                  "use_managed_disks",
 	"WBCDiskStorageType":               "wbc_disk_storage_type",
@@ -302,6 +303,15 @@ func setProvSchemePropertiesForCreateCatalog(ctx context.Context, client *citrix
 			customProperties := provisioningScheme.GetCustomProperties()
 			util.AppendNameValueStringPair(&customProperties, util.MachineCatalogCustomPropertyBackupVmConfiguration, backupVmConfigsStr)
 			provisioningScheme.SetCustomProperties(customProperties)
+		}
+
+		if !awsMachineConfig.WritebackCache.IsNull() {
+			writeBackCacheModel := util.ObjectValueToTypedObject[AwsWritebackCacheModel](ctx, diag, awsMachineConfig.WritebackCache)
+			provisioningScheme.SetUseWriteBackCache(true)
+			provisioningScheme.SetWriteBackCacheDiskSizeGB(int32(writeBackCacheModel.WriteBackCacheDiskSizeGB.ValueInt64()))
+			if !writeBackCacheModel.WriteBackCacheMemorySizeMB.IsNull() {
+				provisioningScheme.SetWriteBackCacheMemorySizeMB(int32(writeBackCacheModel.WriteBackCacheMemorySizeMB.ValueInt64()))
+			}
 		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AMAZON_WORK_SPACES_CORE:
 		amazonWorkspacesCoreMachineConfig := util.ObjectValueToTypedObject[AmazonWorkspacesCoreMachineConfigModel](ctx, diag, provisioningSchemePlan.AmazonWorkspacesCoreMachineConfig)
@@ -1986,9 +1996,22 @@ func parseCustomPropertiesToClientModel(ctx context.Context, diagnostics *diag.D
 		licenseType := azureMachineConfigModel.LicenseType.ValueString()
 		util.AppendNameValueStringPair(res, "LicenseType", licenseType)
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AWS:
+		awsMachineConfig := util.ObjectValueToTypedObject[AwsMachineConfigModel](ctx, nil, provisioningScheme.AwsMachineConfig)
 		if !provisioningScheme.AvailabilityZones.IsNull() {
 			availability_zones := util.StringListToStringArray(ctx, diagnostics, provisioningScheme.AvailabilityZones)
 			util.AppendNameValueStringPair(res, "Zones", strings.Join(availability_zones, ","))
+		}
+		if !awsMachineConfig.WritebackCache.IsNull() {
+			writebackCacheModel := util.ObjectValueToTypedObject[AwsWritebackCacheModel](ctx, nil, awsMachineConfig.WritebackCache)
+			if !writebackCacheModel.WBCDiskStorageType.IsNull() {
+				util.AppendNameValueStringPair(res, "WBCDiskStorageType", writebackCacheModel.WBCDiskStorageType.ValueString())
+			}
+			if writebackCacheModel.PersistWBC.ValueBool() {
+				util.AppendNameValueStringPair(res, "PersistWBC", "true")
+			}
+			if writebackCacheModel.PersistOsDisk.ValueBool() {
+				util.AppendNameValueStringPair(res, "PersistOsDisk", "true")
+			}
 		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
 		gcpMachineConfig := util.ObjectValueToTypedObject[GcpMachineConfigModel](ctx, nil, provisioningScheme.GcpMachineConfig)
@@ -1998,6 +2021,9 @@ func parseCustomPropertiesToClientModel(ctx context.Context, diagnostics *diag.D
 		}
 		if !gcpMachineConfig.StorageType.IsNull() {
 			util.AppendNameValueStringPair(res, "StorageType", gcpMachineConfig.StorageType.ValueString())
+		}
+		if !gcpMachineConfig.CryptoKeyId.IsNull() {
+			util.AppendNameValueStringPair(res, "CryptoKeyId", gcpMachineConfig.CryptoKeyId.ValueString())
 		}
 		if !gcpMachineConfig.WritebackCache.IsNull() {
 			writebackCacheModel := util.ObjectValueToTypedObject[GcpWritebackCacheModel](ctx, nil, gcpMachineConfig.WritebackCache)

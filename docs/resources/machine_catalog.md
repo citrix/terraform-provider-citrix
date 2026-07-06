@@ -194,6 +194,13 @@ resource "citrix_machine_catalog" "example-aws-mtsession" {
                     use_spot_pricing_if_available   = false
                 }
             ]
+            writeback_cache = {
+                wbc_disk_storage_type = "gp3"
+                persist_wbc = true
+                persist_os_disk = true
+                writeback_cache_disk_size_gb = 32
+                writeback_cache_memory_size_mb = 256
+            }
         }
 		number_of_total_machines =  1
         machine_account_creation_rules ={
@@ -958,6 +965,7 @@ Optional:
 
 ~> **Please Note** The `secondary_vm_sizes` cannot contain the value of `service_offering` (see [below for nested schema](#nestedatt--provisioning_scheme--aws_machine_config--secondary_vm_sizes))
 - `security_groups` (List of String) Security groups to associate with the machine. If omitted, the VPC's default security group is used.<br />Do not specify this value if a machine_profile is provided, as the security groups will be derived from the machine profile instead.
+- `writeback_cache` (Attributes) Write-back Cache config. Leave this empty to disable Write-back Cache. Write-back Cache requires Machine image with Write-back Cache plugin installed. (see [below for nested schema](#nestedatt--provisioning_scheme--aws_machine_config--writeback_cache))
 
 <a id="nestedatt--provisioning_scheme--aws_machine_config--image_update_reboot_options"></a>
 ### Nested Schema for `provisioning_scheme.aws_machine_config.image_update_reboot_options`
@@ -1005,6 +1013,21 @@ Required:
 Optional:
 
 - `use_spot_pricing_if_available` (Boolean) The cloud provider supports two types of VMs: regular and spot. Regular VMs are standard VMs with pay-as-you-go prices. Spot is offered at a discounted rate, utilizing unused cloud provider capacity. Set this to `true` to use spot pricing if it's available for the specified VM SKU.
+
+
+<a id="nestedatt--provisioning_scheme--aws_machine_config--writeback_cache"></a>
+### Nested Schema for `provisioning_scheme.aws_machine_config.writeback_cache`
+
+Required:
+
+- `wbc_disk_storage_type` (String) Type of the storage for the Write-back Cache disk. Choose between `gp2`, `gp3`, `io1`, and `io2`. For `gp3`, optional IOPS and throughput may be appended as `gp3:<iops>` or `gp3:<iops>:<throughput>` (e.g. `gp3:3000:125`). `io1`/`io2` may specify IOPS as `io1:<iops>`.
+- `writeback_cache_disk_size_gb` (Number) The size in GB of any temporary storage disk used by the write back cache.
+
+Optional:
+
+- `persist_os_disk` (Boolean) Persist the OS disk when power cycling the non-persistent provisioned virtual machine.
+- `persist_wbc` (Boolean) Persist Write-back Cache.
+- `writeback_cache_memory_size_mb` (Number) The size of the in-memory write back cache in MB.
 
 
 
@@ -1177,6 +1200,7 @@ Required:
 
 Optional:
 
+- `crypto_key_id` (String) The Cloud KMS customer-managed encryption key (CMEK) used to encrypt the provisioned virtual machine disks. When omitted, the default Google-managed encryption is used.
 - `image_update_reboot_options` (Attributes) The options for how rebooting is performed for image update. When omitted, image update on the VDAs will be performed on next shutdown. (see [below for nested schema](#nestedatt--provisioning_scheme--gcp_machine_config--image_update_reboot_options))
 - `machine_profile` (String) The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone. If not specified, the VM specified in master_image will be used as template.
 - `machine_snapshot` (String) The name of the virtual machine snapshot of a GCP VM that will be used as master image.

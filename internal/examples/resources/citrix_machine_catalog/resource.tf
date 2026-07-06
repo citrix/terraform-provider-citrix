@@ -176,6 +176,13 @@ resource "citrix_machine_catalog" "example-aws-mtsession" {
                     use_spot_pricing_if_available   = false
                 }
             ]
+            writeback_cache = {
+                wbc_disk_storage_type = "gp3"
+                persist_wbc = true
+                persist_os_disk = true
+                writeback_cache_disk_size_gb = 32
+                writeback_cache_memory_size_mb = 256
+            }
         }
 		number_of_total_machines =  1
         machine_account_creation_rules ={

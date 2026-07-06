@@ -33,9 +33,10 @@ Currently this script is still in TechPreview
     Optional list of resource types to onboard. When specified, only those resources will be onboarded, the rest skipped.
     This helps make the onboarding process more manageable by limiting the scope.
     By default if (-NoDependencyRelationship is not specified), will resolve all dependency relationships between resources as long as the dependent resource is included.
-    Available resource types include: citrix_admin_folder, citrix_admin_role, citrix_admin_scope, citrix_admin_user, citrix_application, citrix_application_group, citrix_application_icon, citrix_aws_hypervisor, citrix_azure_hypervisor, citrix_delivery_group, citrix_gcp_hypervisor, citrix_image_definition, citrix_machine_catalog, citrix_nutanix_hypervisor, citrix_openshift_hypervisor, citrix_policy_set, citrix_scvmm_hypervisor, citrix_service_account, citrix_storefront_server, citrix_tag, citrix_vsphere_hypervisor, citrix_xenserver_hypervisor, citrix_zone
+    Available resource types include: citrix_admin_folder, citrix_admin_role, citrix_admin_scope, citrix_admin_user, citrix_application, citrix_application_group, citrix_application_icon, citrix_aws_hypervisor, citrix_azure_hypervisor, citrix_delivery_group, citrix_gcp_hypervisor, citrix_image_definition, citrix_machine_catalog, citrix_nutanix_hypervisor, citrix_openshift_hypervisor, citrix_policy_set, citrix_quickdeploy_catalog, citrix_scvmm_hypervisor, citrix_service_account, citrix_storefront_server, citrix_tag, citrix_vsphere_hypervisor, citrix_xenserver_hypervisor, citrix_zone
     citrix_<hypervisorType>_resource_pools are included with the citrix_<hypervisorType>_hypervisor resource.
     citrix_image_version is included with the citrix_image_definition resource.
+    Note: Quick Deploy is cloud-only. citrix_quickdeploy_catalog is imported via terraform import. Quick Deploy template images are emitted as data sources (referenced by onboarded catalogs) rather than imported as resources. Quick Deploy on-premises network connections are not supported by this script.
 
 .Parameter NamesOrIds
     Optional string array parameter to filter resources by name or ID. Only resources with a Name or ID matching any of these values will be onboarded.
@@ -50,7 +51,12 @@ Currently this script is still in TechPreview
 
 .Parameter ShowClientSecret
     Specifies whether to display the client secret value in the generated Terraform configuration file; defaults to `$false` for security.
-#>  
+
+.Parameter QuickDeployHostname
+    Optional override for the Quick Deploy catalog service base (host plus the `/catalogservice` path segment, e.g. `api.dev.cloud.com/catalogservice`).
+    For standard Cloud environments the host is derived from -Environment automatically; only set this for non-standard / internal environments.
+    Mirrors the provider's `CITRIX_QUICK_DEPLOY_HOST_NAME` override; if this parameter is omitted, the `CITRIX_QUICK_DEPLOY_HOST_NAME` environment variable is used when present.
+#>
 
 [CmdletBinding()]
 Param (
@@ -74,7 +80,7 @@ Param (
     [string] $Environment = "Production",
 
     [Parameter(Mandatory = $false)]
-    [ValidateSet("citrix_admin_folder", "citrix_admin_role", "citrix_admin_scope", "citrix_admin_user", "citrix_application", "citrix_application_group", "citrix_application_icon", "citrix_aws_hypervisor", "citrix_azure_hypervisor", "citrix_delivery_group", "citrix_gcp_hypervisor", "citrix_image_definition", "citrix_machine_catalog", "citrix_nutanix_hypervisor", "citrix_openshift_hypervisor", "citrix_policy_set", "citrix_scvmm_hypervisor", "citrix_service_account", "citrix_storefront_server", "citrix_tag", "citrix_vsphere_hypervisor", "citrix_xenserver_hypervisor", "citrix_zone")]
+    [ValidateSet("citrix_admin_folder", "citrix_admin_role", "citrix_admin_scope", "citrix_admin_user", "citrix_application", "citrix_application_group", "citrix_application_icon", "citrix_aws_hypervisor", "citrix_azure_hypervisor", "citrix_delivery_group", "citrix_gcp_hypervisor", "citrix_image_definition", "citrix_machine_catalog", "citrix_nutanix_hypervisor", "citrix_openshift_hypervisor", "citrix_policy_set", "citrix_quickdeploy_catalog", "citrix_scvmm_hypervisor", "citrix_service_account", "citrix_storefront_server", "citrix_tag", "citrix_vsphere_hypervisor", "citrix_xenserver_hypervisor", "citrix_zone")]
     [string[]] $ResourceTypes,
 
     [Parameter(Mandatory = $false)]
@@ -87,7 +93,10 @@ Param (
     [switch] $DisableSSLValidation,
 
     [Parameter(Mandatory=$false)]
-    [switch] $ShowClientSecret
+    [switch] $ShowClientSecret,
+
+    [Parameter(Mandatory=$false)]
+    [string] $QuickDeployHostname
 )
 
 ### Helper Functions ###
@@ -115,6 +124,91 @@ function Get-RequestBaseUrl {
     $script:urlBase = $url
 }
 
+# Function to get the URL for Quick Deploy objects
+function Get-UrlForQuickDeployObjects {
+    param(
+        [parameter(Mandatory = $true)]
+        [string] $requestPath
+    )
+
+    # Allow overriding the catalog service base (host + /catalogservice path) for non-standard environments,
+    # mirroring the provider's CITRIX_QUICK_DEPLOY_HOST_NAME override. When set, it is used verbatim as the base.
+    if (-not [string]::IsNullOrWhiteSpace($script:quickDeployHostnameOverride)) {
+        $catalogServiceBase = $script:quickDeployHostnameOverride
+    }
+    else {
+        if ($script:environment -eq "Production") {
+            $quickDeployHostName = "api.cloud.com"
+        }
+        elseif ($script:environment -eq "Staging") {
+            $quickDeployHostName = "api.cloudburrito.com"
+        }
+        elseif ($script:environment -eq "Japan") {
+            $quickDeployHostName = "api.citrixcloud.jp"
+        }
+        elseif ($script:environment -eq "JapanStaging") {
+            $quickDeployHostName = "api.citrixcloudstaging.jp"
+        }
+        elseif ($script:environment -eq "Gov") {
+            $quickDeployHostName = "api.cloud.us"
+        }
+        elseif ($script:environment -eq "GovStaging") {
+            $quickDeployHostName = "api.cloudstaging.us"
+        }
+        $catalogServiceBase = "$quickDeployHostName/catalogservice"
+    }
+
+    return "https://$catalogServiceBase/$($script:customerId)/$($script:siteId)/$requestPath"
+}
+
+# Function to enumerate Quick Deploy template images and build data source map
+function Get-QuickDeployTemplateImageDataSources {
+    Write-Verbose "Enumerating Quick Deploy template images for data source generation."
+
+    $url = Get-UrlForQuickDeployObjects -requestPath "images"
+
+    try {
+        $response = Start-GetRequest -url $url
+    }
+    catch {
+        Write-Verbose "Failed to enumerate Quick Deploy template images. Error: $($_.Exception.Message)"
+        return @{}
+    }
+
+    $items = $response.items
+    if (-not $items -or $items.Count -eq 0) {
+        Write-Verbose "No Quick Deploy template images found."
+        return @{}
+    }
+
+    # Build an id -> name lookup for every available template image. Data sources are NOT emitted for all of
+    # these; only the ones actually referenced by an onboarded catalog are emitted (see ReplaceDependencyRelationships
+    # / WriteQuickDeployTemplateImageDataSources), so a customer's onboarded TF stays scoped to what it actually uses.
+    $templateImageMap = @{}
+    $nameCountMap = @{}
+
+    foreach ($item in $items) {
+        if (-not $item.id -or -not $item.name) {
+            continue
+        }
+
+        # Track duplicate names
+        if ($nameCountMap.ContainsKey($item.name)) {
+            $nameCountMap[$item.name] += 1
+            Write-Warning "Duplicate Quick Deploy template image name detected: '$($item.name)'. Data source matching by name may be ambiguous."
+        }
+        else {
+            $nameCountMap[$item.name] = 1
+        }
+
+        $templateImageMap[$item.id] = @{
+            Name = $item.name
+        }
+    }
+
+    Write-Verbose "Found $($templateImageMap.Count) Quick Deploy template images available for lookup."
+    return $templateImageMap
+}
 
 function Invoke-WebRequestWithRetry {
     param(
@@ -333,7 +427,11 @@ function Get-ResourceList {
 
     $url = "$($script:urlBase)/$requestPath"
 
-    
+    # Update url for Quick Deploy Objects
+    if ($resourceProviderName -eq "quickdeploy_catalog") {
+        $url = Get-UrlForQuickDeployObjects -requestPath $requestPath
+    }
+
     # Check if the resource provider is supported in the current environment (eg. WEM is not supported for most environments)
     try {
         $response = Start-GetRequest -url $url
@@ -345,8 +443,13 @@ function Get-ResourceList {
         }
         return @()
     }
-    
+
     $items = $response.Items
+
+    # Quick Deploy catalogs endpoint returns response.items[] (canonical) or response.catalogs[] (backward-compat alias)
+    if ($resourceProviderName -eq "quickdeploy_catalog") {
+        $items = if ($null -ne $response.items) { $response.items } else { $response.catalogs }
+    }
 
 
 
@@ -598,6 +701,14 @@ function Get-ExistingCVADResources([string[]]$filter = $null) {
         }
     }
 
+    # Add Quick Deploy resources for cloud customers (Quick Deploy is cloud-only)
+    if (-not($script:onPremise)) {
+        $resources.Add("quickdeploy_catalog", @{
+            "resourceApi"          = "catalogs"
+            "resourceProviderName" = "quickdeploy_catalog"
+        })
+    }
+
     # If On-Prem add admin resource
     if (($script:onPremise)) {
         $resources.Add("admin_user", @{
@@ -731,7 +842,8 @@ function RemoveComputedProperties {
         "(\s+)associated_application_count(\s+)= (\S+)",
         "(\s+)tenant_id(\s+)= (\S+)",
         "(\s+)tenant_name(\s+)= (\S+)",
-        "(\s+)tenants\s*=\s*\[[\s\S]*?\]"
+        "(\s+)tenants\s*=\s*\[[\s\S]*?\]",
+        "(\s+)max_number_of_users(\s+)= (\S+)"
     )
 
     # Identify the delivery_groups_priority block
@@ -800,7 +912,57 @@ function ReplaceDependencyRelationships {
         $content = $content -replace "(\s(parent_path|application_folder_path|application_group_folder_path|delivery_group_folder_path|machine_catalog_folder_path)\s+= )(`"$path`")", "`${1}citrix_admin_folder.$($script:applicationFolderPathMap[$applicationFolderPath]).path"
     }
 
+    # Replace Quick Deploy template image ID references with data source references.
+    # Only template images actually referenced by an onboarded catalog get a data source (and a stable, reference-
+    # ordered resource name), so the generated TF is not polluted with a data block for every available image.
+    $script:referencedQuickDeployTemplateImages = @()
+    if ($script:quickDeployTemplateImageMap.Count -gt 0) {
+        $referencedImageIds = @()
+        foreach ($imageId in $script:quickDeployTemplateImageMap.Keys) {
+            if ($content -match "template_image_id\s*=\s*`"$([regex]::Escape($imageId))`"") {
+                $referencedImageIds += $imageId
+            }
+        }
+        $index = 0
+        foreach ($imageId in ($referencedImageIds | Sort-Object)) {
+            $resourceName = "quickdeploy_template_image_$index"
+            $imageName = $script:quickDeployTemplateImageMap[$imageId].Name
+            Write-Verbose "Replacing Quick Deploy template image ID: $imageId with data.citrix_quickdeploy_template_image.$resourceName.id"
+            $content = $content -replace "(template_image_id\s*=\s*)`"$([regex]::Escape($imageId))`"", "`${1}data.citrix_quickdeploy_template_image.$resourceName.id"
+            $script:referencedQuickDeployTemplateImages += [PSCustomObject]@{ Id = $imageId; Name = $imageName; ResourceName = $resourceName }
+            $index++
+        }
+    }
+
     return $content
+}
+
+function WriteQuickDeployTemplateImageDataSources {
+    if (-not $script:referencedQuickDeployTemplateImages -or $script:referencedQuickDeployTemplateImages.Count -eq 0) {
+        Write-Verbose "No referenced Quick Deploy template images to generate data sources for."
+        return
+    }
+
+    Write-Verbose "Writing Quick Deploy template image data source blocks to dedicated file."
+    $dataSourceBlocks = ""
+
+    foreach ($image in $script:referencedQuickDeployTemplateImages) {
+        $resourceName = $image.ResourceName
+        $imageName = $image.Name
+
+        $dataSourceBlocks += @"
+data "citrix_quickdeploy_template_image" "$resourceName" {
+  name = "$imageName"
+}
+
+
+"@
+    }
+
+    # Write data source blocks to dedicated file
+    $filename = "quickdeploy_template_image.tf"
+    Set-Content -Path ".\$filename" -Value $dataSourceBlocks -Encoding utf8
+    Write-Verbose "Wrote $($script:referencedQuickDeployTemplateImages.Count) Quick Deploy template image data source blocks to $filename."
 }
 
 function InjectPlaceHolderSensitiveValues {
@@ -938,9 +1100,12 @@ function PostProcessTerraformOutput {
 
     # Remove computed properties
     $content = RemoveComputedProperties -content $content
-    
+
     # Overwrite extracted terraform with processed value
     Set-Content -Path ".\resource.tf" -Value $content -Encoding utf8
+
+    # Write Quick Deploy template image data sources to dedicated file
+    WriteQuickDeployTemplateImageDataSources
 
     # Organize terraform resources into separate files
     OrganizeTerraformResources -content $content
@@ -972,6 +1137,8 @@ $script:domainFqdn = $DomainFqdn
 $script:hostname = $Hostname
 $script:environment = $Environment
 $script:disable_ssl = $DisableSSLValidation
+# Optional override for the Quick Deploy catalog service base; falls back to the provider's CITRIX_QUICK_DEPLOY_HOST_NAME env var.
+$script:quickDeployHostnameOverride = if (-not [string]::IsNullOrWhiteSpace($QuickDeployHostname)) { $QuickDeployHostname } else { $env:CITRIX_QUICK_DEPLOY_HOST_NAME }
 $script:hypervisorResourceMap = @{
     "azure_hypervisor"     = "AzureRM"
     "aws_hypervisor"       = "AWS"
@@ -985,6 +1152,8 @@ $script:hypervisorResourceMap = @{
 $NUTANIX_PLUGIN_ID = "AcropolisFactory"
 $script:applicationFolderPathMap = @{}
 $script:parentChildMap = @{} # Initialize the parent-child map for hypervisors and image_definitions
+$script:quickDeployTemplateImageMap = @{} # Map of Quick Deploy template image ID to @{Name} for data source name lookup
+$script:referencedQuickDeployTemplateImages = @() # Ordered list of template images actually referenced by onboarded catalogs (Id/Name/ResourceName)
 
 $script:TokenExpiryTime = (Get-Date).AddMinutes(-1) # Initialize the expiry time of the refresh token to an earlier time
 
@@ -1005,6 +1174,11 @@ try {
 
     # Get CVAD resources from existing site
     Get-ExistingCVADResources $resouceTypesWithoutCitrixPrefix
+
+    # Enumerate Quick Deploy template images for data source generation (cloud-only)
+    if (-not($script:onPremise) -and ($null -eq $resouceTypesWithoutCitrixPrefix -or $resouceTypesWithoutCitrixPrefix -contains "quickdeploy_catalog")) {
+        $script:quickDeployTemplateImageMap = Get-QuickDeployTemplateImageDataSources
+    }
 
     # Initialize terraform
     terraform init

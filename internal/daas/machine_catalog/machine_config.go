@@ -232,6 +232,7 @@ type AwsMachineConfigModel struct {
 	AwsEc2PreparedImage types.Object `tfsdk:"prepared_image"`  // PreparedImageConfigModel
 	TenancyType         types.String `tfsdk:"tenancy_type"`
 	SecondaryVmSizes    types.List   `tfsdk:"secondary_vm_sizes"` // List[SecondaryVmSizeModel]
+	WritebackCache      types.Object `tfsdk:"writeback_cache"`    // AwsWritebackCacheModel
 }
 
 func (AwsMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
@@ -327,6 +328,7 @@ func (AwsMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 					listvalidator.ConflictsWith(path.MatchRelative().AtParent().AtName("prepared_image")),
 				},
 			},
+			"writeback_cache": AwsWritebackCacheModel{}.GetSchema(),
 		},
 	}
 }
@@ -343,6 +345,7 @@ type GcpMachineConfigModel struct {
 	MachineProfile  types.String `tfsdk:"machine_profile"`
 	MachineSnapshot types.String `tfsdk:"machine_snapshot"`
 	StorageType     types.String `tfsdk:"storage_type"`
+	CryptoKeyId     types.String `tfsdk:"crypto_key_id"`
 	WritebackCache  types.Object `tfsdk:"writeback_cache"` // GcpWritebackCacheModel
 }
 
@@ -384,6 +387,10 @@ func (GcpMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 						"pd-extreme",
 					),
 				},
+			},
+			"crypto_key_id": schema.StringAttribute{
+				Description: "The Cloud KMS customer-managed encryption key (CMEK) used to encrypt the provisioned virtual machine disks. When omitted, the default Google-managed encryption is used.",
+				Optional:    true,
 			},
 			"writeback_cache": GcpWritebackCacheModel{}.GetSchema(),
 		},
@@ -1056,6 +1063,66 @@ func (GcpWritebackCacheModel) GetAttributes() map[string]schema.Attribute {
 	return GcpWritebackCacheModel{}.GetSchema().Attributes
 }
 
+type AwsWritebackCacheModel struct {
+	PersistWBC                 types.Bool   `tfsdk:"persist_wbc"`
+	WBCDiskStorageType         types.String `tfsdk:"wbc_disk_storage_type"`
+	PersistOsDisk              types.Bool   `tfsdk:"persist_os_disk"`
+	WriteBackCacheDiskSizeGB   types.Int64  `tfsdk:"writeback_cache_disk_size_gb"`
+	WriteBackCacheMemorySizeMB types.Int64  `tfsdk:"writeback_cache_memory_size_mb"`
+}
+
+func (AwsWritebackCacheModel) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "Write-back Cache config. Leave this empty to disable Write-back Cache. Write-back Cache requires Machine image with Write-back Cache plugin installed.",
+		Optional:    true,
+		PlanModifiers: []planmodifier.Object{
+			objectplanmodifier.RequiresReplace(),
+		},
+		Attributes: map[string]schema.Attribute{
+			"persist_wbc": schema.BoolAttribute{
+				Description: "Persist Write-back Cache.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+			"wbc_disk_storage_type": schema.StringAttribute{
+				Description: "Type of the storage for the Write-back Cache disk. Choose between `gp2`, `gp3`, `io1`, and `io2`. For `gp3`, optional IOPS and throughput may be appended as `gp3:<iops>` or `gp3:<iops>:<throughput>` (e.g. `gp3:3000:125`). `io1`/`io2` may specify IOPS as `io1:<iops>`.",
+				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(`^(?i)(gp2|gp3|io1|io2)(:[1-9][0-9]*)?(:[1-9][0-9]*)?$`),
+						"must be one of gp2, gp3, io1, io2, optionally followed by `:IOPS` and `:throughput` using positive integers (e.g. gp3:3000:125).",
+					),
+				},
+			},
+			"persist_os_disk": schema.BoolAttribute{
+				Description: "Persist the OS disk when power cycling the non-persistent provisioned virtual machine.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+			"writeback_cache_disk_size_gb": schema.Int64Attribute{
+				Description: "The size in GB of any temporary storage disk used by the write back cache.",
+				Required:    true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(0),
+				},
+			},
+			"writeback_cache_memory_size_mb": schema.Int64Attribute{
+				Description: "The size of the in-memory write back cache in MB.",
+				Optional:    true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(0),
+				},
+			},
+		},
+	}
+}
+
+func (AwsWritebackCacheModel) GetAttributes() map[string]schema.Attribute {
+	return AwsWritebackCacheModel{}.GetSchema().Attributes
+}
+
 type XenserverWritebackCacheModel struct {
 	WriteBackCacheDiskSizeGB   types.Int64 `tfsdk:"writeback_cache_disk_size_gb"`
 	WriteBackCacheMemorySizeMB types.Int64 `tfsdk:"writeback_cache_memory_size_mb"`
@@ -1573,9 +1640,24 @@ func (mc *AwsMachineConfigModel) RefreshProperties(ctx context.Context, diagnost
 		}
 	}
 
+	// Refresh Writeback Cache
+	wbcDiskSize := provScheme.GetWriteBackCacheDiskSizeGB()
+	wbcMemorySize := provScheme.GetWriteBackCacheMemorySizeMB()
+	writebackCache := util.ObjectValueToTypedObject[AwsWritebackCacheModel](ctx, diagnostics, mc.WritebackCache)
+	if wbcDiskSize != 0 {
+		writebackCache.WriteBackCacheDiskSizeGB = types.Int64Value(int64(wbcDiskSize))
+		if wbcMemorySize != 0 {
+			writebackCache.WriteBackCacheMemorySizeMB = types.Int64Value(int64(wbcMemorySize))
+		}
+		// default bool values to false because Orchestration won't return them in the custom properties when false
+		writebackCache.PersistOsDisk = types.BoolValue(false)
+		writebackCache.PersistWBC = types.BoolValue(false)
+	}
+
 	// Refresh custom properties
 	customProperties := provScheme.GetCustomProperties()
 	for _, stringPair := range customProperties {
+		var err error
 		switch stringPair.GetName() {
 		case util.MachineCatalogCustomPropertyBackupVmConfiguration:
 			if stringPair.GetValue() == "" {
@@ -1597,8 +1679,21 @@ func (mc *AwsMachineConfigModel) RefreshProperties(ctx context.Context, diagnost
 				}
 				mc.SecondaryVmSizes = util.TypedArrayToObjectList(ctx, diagnostics, secondaryVmSizes)
 			}
+		case "WBCDiskStorageType":
+			writebackCache.WBCDiskStorageType = types.StringValue(stringPair.GetValue())
+		case "PersistWBC":
+			writebackCache.PersistWBC, err = util.StringToTypeBool(stringPair.GetValue())
+		case "PersistOsDisk":
+			writebackCache.PersistOsDisk, err = util.StringToTypeBool(stringPair.GetValue())
 		default:
 		}
+		if err != nil {
+			diagnostics.AddError("Error parsing value for custom property "+stringPair.GetName(), err.Error())
+		}
+	}
+
+	if wbcDiskSize != 0 {
+		mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, writebackCache)
 	}
 }
 
@@ -1699,6 +1794,8 @@ func (mc *GcpMachineConfigModel) RefreshProperties(ctx context.Context, diagnost
 		switch stringPair.GetName() {
 		case "StorageType":
 			mc.StorageType = types.StringValue(stringPair.GetValue())
+		case "CryptoKeyId":
+			mc.CryptoKeyId = types.StringValue(stringPair.GetValue())
 		case "WBCDiskStorageType":
 			writebackCache.WBCDiskStorageType = types.StringValue(stringPair.GetValue())
 		case "PersistWBC":
