@@ -921,11 +921,12 @@ func (DeliveryGroupAccessPolicyModel) GetSchema() schema.NestedAttributeObject {
 				Default:     booldefault.StaticBool(true),
 			},
 			"allowed_connection": schema.StringAttribute{
-				Description: "The behavior of the include filter. Choose between `Filtered`, `ViaAG`, and `NotViaAG`.",
+				Description: "The behavior of the include filter. Choose between `Filtered`, `AnyViaAG`, `ViaAG`, and `NotViaAG`.",
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.OneOf(
 						"Filtered",
+						"AnyViaAG",
 						"ViaAG",
 						"NotViaAG",
 					),

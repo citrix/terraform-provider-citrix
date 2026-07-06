@@ -15,6 +15,7 @@ import (
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 )
 
 func init() {
@@ -1082,6 +1083,76 @@ func TestMachineCatalogResourceAwsEc2(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "description", "Updated AWS EC2 MCS Machine Catalog"),
 					// Verify total number of machines
 					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.number_of_total_machines", "2"),
+				),
+			},
+			//Delete testing automatically occurs in TestCase
+		},
+	})
+}
+
+func TestMachineCatalogResourceAwsEc2WithWBC(t *testing.T) {
+	name := os.Getenv("TEST_MC_NAME_AWS_EC2")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_AWS_EC2")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck: func() {
+			TestProviderPreCheck(t)
+			TestHypervisorPreCheck_AWS_EC2(t)
+			TestHypervisorResourcePoolPreCheck_Aws_Ec2(t)
+			TestMachineCatalogPreCheck_Aws_Ec2(t)
+		},
+		Steps: []resource.TestStep{
+			// Create and Read testing with Write-back Cache
+			{
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceAwsEc2(t, machinecatalog_testResources_aws_ec2_wbc),
+					BuildHypervisorResourcePoolResourceAwsEc2(t, hypervisor_resource_pool_testResource_aws_ec2),
+					BuildHypervisorResourceAwsEc2(t, hypervisor_testResources_aws_ec2),
+					BuildZoneResource(t, zoneInput, false),
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify name of catalog
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "name", name),
+					// Verify Write-back Cache storage type
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.aws_machine_config.writeback_cache.wbc_disk_storage_type", "gp2"),
+					// Verify persist Write-back Cache
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.aws_machine_config.writeback_cache.persist_wbc", "true"),
+					// Verify persist OS disk
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.aws_machine_config.writeback_cache.persist_os_disk", "true"),
+					// Verify Write-back Cache disk size
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.aws_machine_config.writeback_cache.writeback_cache_disk_size_gb", "127"),
+					// Verify Write-back Cache memory size
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.aws_machine_config.writeback_cache.writeback_cache_memory_size_mb", "256"),
+				),
+			},
+			// ImportState testing - assert no drift on the writeback_cache block
+			{
+				ResourceName:      "citrix_machine_catalog.testMachineCatalog",
+				ImportState:       true,
+				ImportStateVerify: true,
+				// The last_updated attribute does not exist in the Orchestration
+				// API, therefore there is no value for it during import.
+				// Note: writeback_cache is intentionally NOT ignored here to assert no drift.
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.network_mapping", "provisioning_scheme.aws_machine_config.image_ami", "provisioning_scheme.aws_machine_config.service_offering", "provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_domain_identity.service_account_password", "delete_machine_accounts", "force_delete"},
+			},
+			// Update a Write-back Cache field - expect resource replacement
+			{
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceAwsEc2(t, machinecatalog_testResources_aws_ec2_wbc_updated),
+					BuildHypervisorResourcePoolResourceAwsEc2(t, hypervisor_resource_pool_testResource_aws_ec2),
+					BuildHypervisorResourceAwsEc2(t, hypervisor_testResources_aws_ec2),
+					BuildZoneResource(t, zoneInput, false),
+				),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						// Changing a Write-back Cache field forces replacement of the catalog
+						plancheck.ExpectResourceAction("citrix_machine_catalog.testMachineCatalog", plancheck.ResourceActionReplace),
+					},
+				},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify the updated Write-back Cache disk size
+					resource.TestCheckResourceAttr("citrix_machine_catalog.testMachineCatalog", "provisioning_scheme.aws_machine_config.writeback_cache.writeback_cache_disk_size_gb", "256"),
 				),
 			},
 			//Delete testing automatically occurs in TestCase
@@ -2663,6 +2734,102 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 				}
 			]
 			number_of_total_machines =  2
+			machine_account_creation_rules ={
+				naming_scheme =     "test-machine-##"
+				naming_scheme_type ="Numeric"
+			}
+		}
+	}
+	`
+
+	machinecatalog_testResources_aws_ec2_wbc = `
+	resource "citrix_machine_catalog" "testMachineCatalog" {
+		name                        = "%s"
+		description                 = "AWS EC2 MCS Machine Catalog with Write-back Cache"
+		zone                        = citrix_zone.test.id
+		allocation_type             = "Random"
+		session_support             = "MultiSession"
+		provisioning_type           = "MCS"
+		provisioning_scheme         =   {
+    	    hypervisor = citrix_aws_hypervisor.testHypervisor.id
+    	    hypervisor_resource_pool = citrix_aws_hypervisor_resource_pool.testHypervisorResourcePool.id
+			identity_type      = "ActiveDirectory"
+    	    machine_domain_identity = {
+    	        service_account             = "%s"
+			    domain = "%s"
+    	        service_account_password    = "%s"
+    	    }
+			aws_machine_config = {
+				image_ami = "%s"
+				master_image = "%s"
+				service_offering = "%s"
+				security_groups = [
+					"default"
+				]
+				tenancy_type = "Shared"
+				writeback_cache = {
+					wbc_disk_storage_type = "gp2"
+					persist_wbc = true
+					persist_os_disk = true
+					writeback_cache_disk_size_gb = 127
+					writeback_cache_memory_size_mb = 256
+				}
+			}
+			network_mapping = [
+				{
+					network_device = "0"
+					network = "%s"
+				}
+			]
+			number_of_total_machines =  1
+			machine_account_creation_rules ={
+				naming_scheme =     "test-machine-##"
+				naming_scheme_type ="Numeric"
+			}
+		}
+	}
+	`
+
+	machinecatalog_testResources_aws_ec2_wbc_updated = `
+	resource "citrix_machine_catalog" "testMachineCatalog" {
+		name                        = "%s"
+		description                 = "AWS EC2 MCS Machine Catalog with Write-back Cache"
+		zone                        = citrix_zone.test.id
+		allocation_type             = "Random"
+		session_support             = "MultiSession"
+		provisioning_type           = "MCS"
+		provisioning_scheme         =   {
+    	    hypervisor = citrix_aws_hypervisor.testHypervisor.id
+    	    hypervisor_resource_pool = citrix_aws_hypervisor_resource_pool.testHypervisorResourcePool.id
+			identity_type      = "ActiveDirectory"
+    	    machine_domain_identity = {
+    	        service_account             = "%s"
+			    domain = "%s"
+    	        service_account_password    = "%s"
+    	    }
+			aws_machine_config = {
+				image_ami = "%s"
+				master_image = "%s"
+				service_offering = "%s"
+				security_groups = [
+					"default"
+				]
+				tenancy_type = "Shared"
+				writeback_cache = {
+					wbc_disk_storage_type = "gp2"
+					persist_wbc = true
+					persist_os_disk = true
+					writeback_cache_disk_size_gb = 256
+					writeback_cache_memory_size_mb = 256
+				}
+			}
+			network_mapping = [
+				{
+					network_device = "0"
+					network = "%s"
+				}
+			]
+			number_of_total_machines =  1
 			machine_account_creation_rules ={
 				naming_scheme =     "test-machine-##"
 				naming_scheme_type ="Numeric"

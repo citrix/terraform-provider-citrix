@@ -4,7 +4,7 @@ page_title: "citrix_wem_directory_object Resource - citrix"
 subcategory: "WEM"
 description: |-
   Manages machine-level AD objects within a WEM deployment.
-  ~> Disclaimer This feature is supported for Citrix Cloud customers, and will be made available for On-Premises soon.
+  ~> Disclaimer This feature is supported for Citrix Cloud customers.
   ~> Warning  Having more than one Directory Object with the same Catalog ID is not allowed.
 ---
 
@@ -12,7 +12,7 @@ description: |-
 
 Manages machine-level AD objects within a WEM deployment.
 
-~> **Disclaimer** This feature is supported for Citrix Cloud customers, and will be made available for On-Premises soon.
+~> **Disclaimer** This feature is supported for Citrix Cloud customers.
 
 ~> **Warning**  Having more than one Directory Object with the same Catalog ID is not allowed.
 

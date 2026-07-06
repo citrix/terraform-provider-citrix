@@ -417,7 +417,7 @@ Required:
 
 Required:
 
-- `allowed_connection` (String) The behavior of the include filter. Choose between `Filtered`, `ViaAG`, and `NotViaAG`.
+- `allowed_connection` (String) The behavior of the include filter. Choose between `Filtered`, `AnyViaAG`, `ViaAG`, and `NotViaAG`.
 - `enable_criteria_for_exclude_connections` (Boolean) Whether to enable criteria for exclude connections.
 - `enable_criteria_for_include_connections` (Boolean) Whether to enable criteria for include connections.
 - `name` (String) The name of the access policy.
@@ -459,7 +459,7 @@ Required:
 
 Required:
 
-- `allowed_connection` (String) The behavior of the include filter. Choose between `Filtered`, `ViaAG`, and `NotViaAG`.
+- `allowed_connection` (String) The behavior of the include filter. Choose between `Filtered`, `AnyViaAG`, `ViaAG`, and `NotViaAG`.
 - `enable_criteria_for_exclude_connections` (Boolean) Whether to enable criteria for exclude connections.
 - `enable_criteria_for_include_connections` (Boolean) Whether to enable criteria for include connections.
 - `name` (String) The name of the access policy.

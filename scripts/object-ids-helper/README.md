@@ -2,6 +2,28 @@
 
 This helper script is designed to fetch the CVAD object IDs from the Webstudio. It collects the list of resources from DDC, and generates a JSON consisting of the object ids for all the object types. Please note that this script is still in **tech preview**.
 
+## Supported Object Types
+
+The script enumerates the following object types from your CVAD site:
+
+- Zones
+- Hypervisors (Azure, AWS, GCP, SCVMM, XenServer, vSphere, Nutanix, OpenShift)
+- Hypervisor Resource Pools
+- Machine Catalogs
+- Delivery Groups
+- Admin Scopes, Roles, and Users
+- Policy Sets
+- Applications, Application Groups, and Application Icons
+- Admin Folders
+- Service Accounts
+- Image Definitions and Image Versions
+- StoreFront Servers
+- Tags
+- **Quick Deploy Catalogs** (Cloud only)
+- **Quick Deploy Template Images** (Cloud only)
+
+**Note:** Quick Deploy resources (`quickdeploy_catalog` and `quickdeploy_template_image`) are only available for Citrix Cloud customers and will be skipped for on-premises deployments.
+
 ## Environment Requirements
 
 - PowerShell version `5.0` or higher

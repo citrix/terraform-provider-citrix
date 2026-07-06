@@ -3,6 +3,7 @@
 package validators
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net"
@@ -65,15 +66,18 @@ func ipAddressValidation(ipAddress string) error {
 		}
 
 		// Make sure the first ip address is before the second ip address.
-		firstIpAddress, err := convertIpAddressToNumber(ipAddresses[0])
-		if err != nil {
-			return err
+		// Use net.ParseIP + bytes.Compare so the comparison is family-agnostic
+		// (works for both IPv4 and IPv6) and cannot panic.
+		firstIpAddress := net.ParseIP(ipAddresses[0])
+		secondIpAddress := net.ParseIP(ipAddresses[1])
+		if firstIpAddress == nil || secondIpAddress == nil {
+			// Rejects CIDR/wildcard endpoints inside a range, since net.ParseIP returns nil for those.
+			return fmt.Errorf("value must be a valid IP address, IP address range, or IP address CIDR block")
 		}
-		secondIpAddress, err := convertIpAddressToNumber(ipAddresses[1])
-		if err != nil {
-			return err
+		if (firstIpAddress.To4() != nil) != (secondIpAddress.To4() != nil) {
+			return fmt.Errorf("the IP address range endpoints must be the same IP version")
 		}
-		if firstIpAddress >= secondIpAddress {
+		if bytes.Compare(firstIpAddress.To16(), secondIpAddress.To16()) >= 0 {
 			return fmt.Errorf("the first IP address `%s` must be before the second IP address `%s`", ipAddresses[0], ipAddresses[1])
 		}
 		return nil
@@ -83,11 +87,8 @@ func ipAddressValidation(ipAddress string) error {
 }
 
 func ipAddressValidationHelper(ipInput string) error {
-	if _, ipNet, err := net.ParseCIDR(ipInput); err == nil {
-		mask, _ := ipNet.Mask.Size()
-		if mask < 0 || mask > 39 {
-			return fmt.Errorf("the IP address masks lower than 0 or greater than 39 are not supported")
-		}
+	if _, _, err := net.ParseCIDR(ipInput); err == nil {
+		// net.ParseCIDR already enforces the per-family maximum mask (IPv4 /0-/32, IPv6 /0-/128).
 		return nil
 	} else if ipAddressWithoutCidr := net.ParseIP(ipInput); ipAddressWithoutCidr != nil {
 		return nil
@@ -126,33 +127,6 @@ func ipAddressValidationHelper(ipInput string) error {
 	}
 
 	return fmt.Errorf("value must be a valid IP address, IP address range, or IP address CIDR block")
-}
-
-func convertIpAddressToNumber(ipAddress string) (int, error) {
-	byteIP := strings.Split(ipAddress, ".")
-	byteIp1, err := strconv.Atoi(byteIP[0])
-	if err != nil {
-		return -1, err
-	}
-	byteIp2, err := strconv.Atoi(byteIP[1])
-	if err != nil {
-		return -1, err
-	}
-	byteIp3, err := strconv.Atoi(byteIP[2])
-	if err != nil {
-		return -1, err
-	}
-	byteIp4, err := strconv.Atoi(byteIP[3])
-	if err != nil {
-		return -1, err
-	}
-
-	ip := byteIp1 * 16777216 // 256 * 256 * 256
-	ip += byteIp2 * 65536    // 256 * 256
-	ip += byteIp3 * 256
-	ip += byteIp4
-
-	return ip, nil
 }
 
 // ValidateIpFilter checks that a set of path.Expression has a non-null value,

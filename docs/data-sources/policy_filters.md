@@ -79,7 +79,7 @@ Read-Only:
 
 - `allowed` (Boolean) Indicate the filtered policy is allowed or denied if the filter condition is met.
 - `enabled` (Boolean) Indicate whether the filter is being enabled.
-- `ip_address` (String) IP Address of the client to be filtered.
+- `ip_address` (String) IP Address of the client to be filtered. Accepts a single IPv4 or IPv6 address (e.g. 12.0.0.1, 2001:db8::1), an inclusive range with both endpoints of the same IP version in ascending order (e.g. 12.0.0.1-12.0.0.70, 2001:db8::1-2001:db8::2), a CIDR block (IPv4 /0-/32, IPv6 /0-/128; e.g. 12.0.0.0/24, 2001:db8::/64), or an IPv4 address with trailing-octet wildcards (e.g. 12.0.*.*).
 - `policy_id` (String) Id of the policy to which the filter belongs.
 
 

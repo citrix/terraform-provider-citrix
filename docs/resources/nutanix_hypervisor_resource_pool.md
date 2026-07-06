@@ -3,12 +3,12 @@
 page_title: "citrix_nutanix_hypervisor_resource_pool Resource - citrix"
 subcategory: "CVAD"
 description: |-
-  Manages a Nutanix AHV hypervisor resource pool.
+  Manages a Nutanix AHV Prism Element hypervisor resource pool.
 ---
 
 # citrix_nutanix_hypervisor_resource_pool (Resource)
 
-Manages a Nutanix AHV hypervisor resource pool.
+Manages a Nutanix AHV Prism Element hypervisor resource pool.
 
 ## Example Usage
 
