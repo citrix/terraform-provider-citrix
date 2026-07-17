@@ -7,3 +7,5 @@
 .vscode/*
 
 custom-linters/bin/*
+
+scripts/onboarding-helper/citrix-site

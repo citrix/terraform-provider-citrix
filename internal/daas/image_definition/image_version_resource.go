@@ -117,6 +117,17 @@ func (r *ImageVersionResource) Create(ctx context.Context, req resource.CreateRe
 	createImageVersionRequest := r.client.ApiClient.ImageDefinitionsAPIsDAAS.ImageDefinitionsCreateImageVersion(ctx, plan.ImageDefinition.ValueString())
 	createImageVersionRequest = createImageVersionRequest.CreateImageVersionRequestModel(createImageVersionRequestBody).Async(true)
 
+	// Save the highest existing version number so the failure path can distinguish a version the backend created for this attempt from any pre-existing version.
+	preCreateMaxNumber := int32(-1)
+	//nolint:errcheck // Best-effort to assist with the failure path ahead; errors discarded intentionally
+	if preVersions, _ := getImageVersions(ctx, new(diag.Diagnostics), r.client, plan.ImageDefinition.ValueString()); len(preVersions) > 0 {
+		for _, v := range preVersions {
+			if v.GetNumber() > preCreateMaxNumber {
+				preCreateMaxNumber = v.GetNumber()
+			}
+		}
+	}
+
 	// Create new Image Version
 	imageVersion, httpResp, err := citrixdaasclient.AddRequestData(createImageVersionRequest, r.client).Execute()
 	if err != nil {
@@ -150,9 +161,26 @@ func (r *ImageVersionResource) Create(ctx context.Context, req resource.CreateRe
 	if createTimeout == 0 {
 		createTimeout = getImageVersionTimeoutConfigs().CreateDefault
 	}
+
+	// Use GetAsyncJobResult to wait for the async job to complete and image version
+	// Unlike other resources we cannot easily query the new version so we cannot use ProcessAsyncJobResponse
 	imageVersion, err = util.GetAsyncJobResult[*citrixorchestration.ImageVersionResponseModel](ctx, r.client, httpResp, "Error creating Image Version", &resp.Diagnostics, createTimeout)
 	if err != nil {
-		return
+		// Job failed. The backend may have created a version in failed state. Find it so it can be stored as tainted and not orphaned.
+
+		//nolint:errcheck // Errors added to resp.Diagnostics; best-effort listing on failure path
+		versions, _ := getImageVersions(ctx, &resp.Diagnostics, r.client, plan.ImageDefinition.ValueString())
+		for i := range versions {
+			v := &versions[i]
+			if v.GetImageVersionStatus() == citrixorchestration.IMAGEVERSIONSTATUS_FAILED &&
+				v.GetNumber() > preCreateMaxNumber && // Only consider versions created after the failed attempt
+				(imageVersion == nil || v.GetNumber() > imageVersion.GetNumber()) { // If multiple failed versions exist, pick the one with the highest version number
+				imageVersion = v
+			}
+		}
+		if imageVersion == nil {
+			return
+		}
 	}
 
 	imageVersion, err = GetImageVersion(ctx, r.client, &resp.Diagnostics, plan.ImageDefinition.ValueString(), imageVersion.GetId())

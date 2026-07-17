@@ -48,6 +48,22 @@ func (r CCAdminPolicyResourceModel) GetKey() string {
 	return r.Name.ValueString()
 }
 
+// getServiceNameValidators restricts service_name to the public service names, except under -debug where internal
+// service names must be usable without hardcoding them into this schema.
+func getServiceNameValidators() []validator.String {
+	if util.DebugMode {
+		return nil
+	}
+	return []validator.String{
+		stringvalidator.OneOf(
+			ADMINISTRATORSERVICENAME_XENDESKTOP,
+			ADMINISTRATORSERVICENAME_PLATFORM,
+			ADMINISTRATORACCESSTYPE_CAS,
+			ADMINISTRATORACCESSTYPE_WEM,
+		),
+	}
+}
+
 func (CCAdminPolicyResourceModel) GetSchema() schema.NestedAttributeObject {
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
@@ -59,14 +75,7 @@ func (CCAdminPolicyResourceModel) GetSchema() schema.NestedAttributeObject {
 				Description: "Name of the service to be associated with the admin user. Currently, this attribute can be set to `XenDesktop`, `Platform`, `CAS`, or `WEM`.",
 				Optional:    true,
 				Computed:    true,
-				Validators: []validator.String{
-					stringvalidator.OneOf(
-						ADMINISTRATORSERVICENAME_XENDESKTOP,
-						ADMINISTRATORSERVICENAME_PLATFORM,
-						ADMINISTRATORACCESSTYPE_CAS,
-						ADMINISTRATORACCESSTYPE_WEM,
-					),
-				},
+				Validators:  getServiceNameValidators(),
 			},
 			"scopes": schema.SetAttribute{
 				Description: "Scope names to be associated with the admin user.",
@@ -236,11 +245,17 @@ func (r CCAdminUserResourceModel) RefreshPropertyValues(ctx context.Context, dia
 		r.LastName = types.StringValue(adminUser.GetLastName())
 	}
 
-	if !r.ExternalProviderId.IsNull() {
+	// External directory admins (AzureAd / AD) are always backed by these identifiers, so populate them even on a fresh
+	// import where prior state is empty; CitrixSts admins have none and are left untouched.
+	providerType := r.ProviderType.ValueString()
+	isExternalDirectoryAdmin := providerType == string(ccadmins.ADMINISTRATORPROVIDERTYPE_AZURE_AD) ||
+		providerType == string(ccadmins.ADMINISTRATOREXTERNALPROVIDERTYPE_AD)
+
+	if isExternalDirectoryAdmin || !r.ExternalProviderId.IsNull() {
 		r.ExternalProviderId = types.StringValue(adminUser.GetProviderId())
 	}
 
-	if !r.ExternalUserId.IsNull() {
+	if isExternalDirectoryAdmin || !r.ExternalUserId.IsNull() {
 		r.ExternalUserId = types.StringValue(getExternalUserId(adminUser.GetExternalOid()))
 	}
 	return r

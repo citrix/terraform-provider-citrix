@@ -333,6 +333,8 @@ func TestHypervisorResourcePoolVsphere(t *testing.T) {
 					// Verify name of the project
 					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "temporary_storage.#", "1"),
 					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "temporary_storage.0.storage_name", os.Getenv("TEST_HYPERV_RP_TEMP_STORAGE_VSPHERE")),
+					// Verify configurable create timeout
+					resource.TestCheckResourceAttr("citrix_vsphere_hypervisor_resource_pool.testHypervisorResourcePool", "timeout.create", "30"),
 				),
 			},
 			// ImportState testing
@@ -757,6 +759,9 @@ resource "citrix_vsphere_hypervisor_resource_pool" "testHypervisorResourcePool" 
 	temporary_storage = [{
 		storage_name = "%s"
 	}]
+	timeout = {
+		create = 30
+	}
 }
 `
 	hypervisor_resource_pool_updated_testResource_vsphere = `

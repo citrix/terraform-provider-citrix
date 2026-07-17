@@ -369,19 +369,22 @@ func (r *ccAdminUserResource) ValidateConfig(ctx context.Context, req resource.V
 			return
 		}
 
-		// TODO: Implement validation for the provider type field when set to 'AzureAd' for users, pending API support.
-		if data.ProviderType.ValueString() != string(ccadmins.ADMINISTRATORPROVIDERTYPE_CITRIX_STS) {
+		providerType := data.ProviderType.ValueString()
+		if providerType != string(ccadmins.ADMINISTRATORPROVIDERTYPE_CITRIX_STS) &&
+			providerType != string(ccadmins.ADMINISTRATORPROVIDERTYPE_AZURE_AD) {
 			resp.Diagnostics.AddError(
 				"Error validating provider type",
-				"Provider type should be CitrixSts for Administrator type User",
+				"Provider type should be CitrixSts or AzureAd for Administrator type User",
 			)
 			return
 		}
 
-		if !data.ExternalProviderId.IsNull() || !data.ExternalUserId.IsNull() {
+		// CitrixSts users are identified by email alone; the external directory identifiers belong only to AzureAd users.
+		if providerType == string(ccadmins.ADMINISTRATORPROVIDERTYPE_CITRIX_STS) &&
+			(!data.ExternalProviderId.IsNull() || !data.ExternalUserId.IsNull()) {
 			resp.Diagnostics.AddError(
 				"Error validating external provider id and external user id",
-				"Administrator type User does not require external provider id and external user id",
+				"Administrator type User with provider type CitrixSts does not require external provider id and external user id",
 			)
 			return
 		}
@@ -396,11 +399,10 @@ func (r *ccAdminUserResource) ValidateConfig(ctx context.Context, req resource.V
 			return
 		}
 
-		// TODO: Remove this once https://updates.cloud.com/details/cc50882/ is completed
-		if data.AccessType.ValueString() != string(ccadmins.ADMINISTRATORACCESSTYPE_CUSTOM) {
+		if data.ProviderType.ValueString() != string(ccadmins.ADMINISTRATORPROVIDERTYPE_AZURE_AD) && data.ProviderType.ValueString() != string(ccadmins.ADMINISTRATOREXTERNALPROVIDERTYPE_AD) {
 			resp.Diagnostics.AddError(
-				"Error validating access type",
-				"Access type should be Custom for Administrator type Group",
+				"Error validating provider type",
+				"Administrator Groups are only supported for provider type AzureAd or Ad",
 			)
 			return
 		}

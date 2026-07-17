@@ -152,7 +152,13 @@ func (r *openshiftHypervisorResourcePoolResource) Create(ctx context.Context, re
 	resourcePoolDetails.SetTemporaryStorage(tempStorages)
 	resourcePoolDetails.SetNetworks(networks)
 
-	resourcePool, err := CreateHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, *hypervisor, resourcePoolDetails)
+	timeoutConfigs := util.ObjectValueToTypedObject[ResourcePoolTimeout](ctx, &resp.Diagnostics, plan.Timeout)
+	createTimeout := timeoutConfigs.Create.ValueInt32()
+	if createTimeout == 0 {
+		createTimeout = getResourcePoolTimeoutConfigs().CreateDefault
+	}
+
+	resourcePool, err := CreateHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, *hypervisor, resourcePoolDetails, createTimeout)
 	if err != nil {
 		// Directly return. Error logs have been populated in common function
 		return
@@ -273,7 +279,13 @@ func (r *openshiftHypervisorResourcePoolResource) Update(ctx context.Context, re
 
 	editHypervisorResourcePool.SetNetworks(networks)
 
-	updatedResourcePool, err := UpdateHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, plan.Hypervisor.ValueString(), plan.Id.ValueString(), editHypervisorResourcePool)
+	timeoutConfigs := util.ObjectValueToTypedObject[ResourcePoolTimeout](ctx, &resp.Diagnostics, plan.Timeout)
+	updateTimeout := timeoutConfigs.Update.ValueInt32()
+	if updateTimeout == 0 {
+		updateTimeout = getResourcePoolTimeoutConfigs().UpdateDefault
+	}
+
+	updatedResourcePool, err := UpdateHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, plan.Hypervisor.ValueString(), plan.Id.ValueString(), editHypervisorResourcePool, updateTimeout)
 	if err != nil {
 		return
 	}
@@ -371,7 +383,13 @@ func (r *openshiftHypervisorResourcePoolResource) Delete(ctx context.Context, re
 		return
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Resource Pool for Hypervisor "+hypervisorId, &resp.Diagnostics, 5)
+	timeoutConfigs := util.ObjectValueToTypedObject[ResourcePoolTimeout](ctx, &resp.Diagnostics, state.Timeout)
+	deleteTimeout := timeoutConfigs.Delete.ValueInt32()
+	if deleteTimeout == 0 {
+		deleteTimeout = getResourcePoolTimeoutConfigs().DeleteDefault
+	}
+
+	err = util.ProcessAsyncJobResponse(ctx, r.client, httpResp, "Error deleting Resource Pool for Hypervisor "+hypervisorId, &resp.Diagnostics, deleteTimeout)
 	if err != nil {
 		return
 	}

@@ -63,6 +63,7 @@ type VsphereHypervisorResourcePoolResourceModel struct {
 	Name       types.String `tfsdk:"name"`
 	Hypervisor types.String `tfsdk:"hypervisor"`
 	Metadata   types.List   `tfsdk:"metadata"` // List[NameValueStringPairModel]
+	Timeout    types.Object `tfsdk:"timeout"`
 	VmTagging  types.Bool   `tfsdk:"vm_tagging"`
 	/**** Resource Pool Details ****/
 	Cluster                types.Object `tfsdk:"cluster"`           //VsphereHypervisorClusterModel
@@ -131,6 +132,7 @@ func (VsphereHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 					boolplanmodifier.RequiresReplace(),
 				},
 			},
+			"timeout":  ResourcePoolTimeout{}.GetSchema(),
 			"metadata": util.GetMetadataListSchema("Hypervisor Resource Pool"),
 			"vm_tagging": schema.BoolAttribute{
 				Description: "Indicates whether VMs created by provisioning operations should be tagged. Default is `true`.",

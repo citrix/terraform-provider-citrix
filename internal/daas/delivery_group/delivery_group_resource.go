@@ -601,6 +601,33 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 		}
 	}
 
+	if !data.RestrictedAccessUsers.IsNull() {
+		if !data.DefaultAccessPolicies.IsNull() {
+			for _, p := range util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, &resp.Diagnostics, data.DefaultAccessPolicies) {
+				if !p.RestrictedAccessUsers.IsNull() && !p.RestrictedAccessUsers.IsUnknown() {
+					resp.Diagnostics.AddAttributeError(
+						path.Root("restricted_access_users"),
+						"Conflicting Attribute Configuration",
+						"restricted_access_users cannot be set at the delivery group level when any default_access_policies entry also sets restricted_access_users. Use one or the other.",
+					)
+					return
+				}
+			}
+		}
+		if !data.CustomAccessPolicies.IsNull() {
+			for _, p := range util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, &resp.Diagnostics, data.CustomAccessPolicies) {
+				if !p.RestrictedAccessUsers.IsNull() && !p.RestrictedAccessUsers.IsUnknown() {
+					resp.Diagnostics.AddAttributeError(
+						path.Root("restricted_access_users"),
+						"Conflicting Attribute Configuration",
+						"restricted_access_users cannot be set at the delivery group level when any custom_access_policies entry also sets restricted_access_users. Use one or the other.",
+					)
+					return
+				}
+			}
+		}
+	}
+
 	if !data.AppProtection.IsNull() {
 		appProtection := util.ObjectValueToTypedObject[DeliveryGroupAppProtection](ctx, &resp.Diagnostics, data.AppProtection)
 		isValid := appProtection.ValidateConfig(ctx, &resp.Diagnostics)

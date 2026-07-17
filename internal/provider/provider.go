@@ -844,6 +844,18 @@ func validateAndInitializeDaaSClient(ctx context.Context, resp *provider.Configu
 
 	userAgent := "citrix-terraform-provider/" + version + " (https://github.com/citrix/terraform-provider-citrix)"
 
+	// Reuse a caller-supplied token so many short-lived processes (e.g. the onboarding script's imports) share one
+	// sign-in instead of each tripping the Citrix Cloud token rate limit. Falls back to sign-in once it expires.
+	if !onPremises {
+		if accessToken := os.Getenv("CITRIX_ACCESS_TOKEN"); accessToken != "" {
+			if err := client.SeedAccessToken(accessToken); err != nil {
+				tflog.Warn(ctx, "Ignoring CITRIX_ACCESS_TOKEN environment variable: "+err.Error())
+			} else {
+				tflog.Debug(ctx, "Using access token supplied via CITRIX_ACCESS_TOKEN environment variable")
+			}
+		}
+	}
+
 	// Setup the Citrix API Client
 	token, httpResp, err := client.SetupCitrixClientsContext(ctx, authUrl, ccUrl, hostname, customerId, clientId, clientSecret, onPremises, apiGateway, isGov, disableSslVerification, &userAgent, environment, middleware.MiddlewareAuthFunc, middleware.MiddlewareAuthWithCustomerIdHeaderFunc)
 	if err != nil {

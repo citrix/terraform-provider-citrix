@@ -36,7 +36,7 @@ resource "citrix_application_group" "example-application-group" {
 - `enabled` (Boolean) Whether the application group is enabled or not. Defaults to `true`.
 - `included_users` (Set of String) Restrict access to applications in this application group to only users included in this list. 
 
--> **Note** User must be in SID, SAM account name (`DOMAIN\UserOrGroupName`) or UPN (`user@domain.com`) format
+-> **Note** User must be in SID, SAM account name (`DOMAIN\UserOrGroupName`), UPN (`user@domain.com`), or Azure AD OID (`OID:/azuread/<object_id>`) format
 
 ~> **Please Note** If `included_users` attribute is omitted or set to `null`, all users in the specified delivery groups will have access to applications in this application group. If attribute is specified as an empty list i.e. `[]`, then no user will have access to the applications in this application group.
 - `metadata` (Attributes List) Metadata for the Application Group. (see [below for nested schema](#nestedatt--metadata))

@@ -37,6 +37,25 @@ resource "citrix_cloud_admin_user" "example-custom-admin-user" {
   ]
 }
 
+resource "citrix_cloud_admin_user" "example-custom-azure-ad-admin-user" {
+  access_type          = "Custom"
+  provider_type        = "AzureAd"
+  type                 = "AdministratorUser"
+  email                = "example-azure-ad-admin@citrix.com"
+  first_name           = "Example"
+  last_name            = "Admin"
+  display_name         = "Example Azure Ad Admin User"
+  external_provider_id = "Example Azure Tenant Id"
+  external_user_id     = "Example Azure User Id"
+  policies = [
+    {
+      name         = "Example Policy 1"
+      service_name = "XenDesktop"
+      scopes       = ["Scope1", "Scope2"]
+    }
+  ]
+}
+
 resource "citrix_cloud_admin_user" "example-custom-azure-ad-admin-group" {
   access_type          = "Custom"
   provider_type        = "AzureAd"

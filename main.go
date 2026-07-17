@@ -8,6 +8,7 @@ import (
 	"log"
 
 	"github.com/citrix/terraform-provider-citrix/internal/provider"
+	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 )
 
@@ -28,6 +29,8 @@ func main() {
 
 	flag.BoolVar(&debug, "debug", false, "set to true to run the provider with support for debuggers like delve")
 	flag.Parse()
+
+	util.DebugMode = debug
 
 	err := providerserver.Serve(context.Background(), provider.New(version), providerserver.ServeOpts{
 		Address: "registry.terraform.io/citrix/citrix",

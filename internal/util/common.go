@@ -40,6 +40,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
+// DebugMode is set by main when the provider runs under a debugger (-debug). It relaxes select value validators.
+var DebugMode bool
+
 // AWS Role ARN Regex
 const AwsRoleArnRegex string = `^arn:aws(-us-gov)?:iam::[0-9]{12}:role\/[a-zA-Z0-9+=,.@\-_]{1,64}$`
 
@@ -75,7 +78,11 @@ const UpnRegex string = `^[^@]+@\b(([a-zA-Z0-9-_]){1,63}\.)+[a-zA-Z]{2,63}$`
 
 const SamAndUpnRegex string = SamRegex + `|` + UpnRegex
 
-const SamUpnSidRegex string = SamRegex + `|` + UpnRegex + `|` + ActiveDirectorySidRegex
+// Azure AD / EntraID group or user OID identifier
+// Format: OID:/azuread/<objectId>
+const AzureAdOidRegex string = `^OID:/azuread/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$`
+
+const SamUpnSidOidRegex string = SamRegex + `|` + UpnRegex + `|` + ActiveDirectorySidRegex + `|` + AzureAdOidRegex
 
 // SAM
 const ComputerAccountRegex string = `^[a-zA-Z0-9\-_]{0,61}[a-zA-Z0-9]\\\w[\w\.\- ]+\$$`
@@ -1166,11 +1173,13 @@ func RefreshUsersList(ctx context.Context, diags *diag.Diagnostics, usersSet typ
 	samNamesMap := map[string]int{}
 	upnMap := map[string]int{}
 	sidMap := map[string]int{}
+	oidMap := map[string]int{}
 
 	for index, userInRemote := range usersInRemote {
 		userSamName := userInRemote.GetSamName()
 		userPrincipalName := userInRemote.GetPrincipalName()
 		userSid := userInRemote.GetSid()
+		userOid := userInRemote.GetOid()
 		if userSamName != "" {
 			samNamesMap[strings.ToLower(userSamName)] = index
 		}
@@ -1180,12 +1189,19 @@ func RefreshUsersList(ctx context.Context, diags *diag.Diagnostics, usersSet typ
 		if userSid != "" {
 			sidMap[strings.ToLower(userSid)] = index
 		}
+		if userOid != "" {
+			oidMap[strings.ToLower(userOid)] = index
+		}
 	}
 
 	res := []string{}
 	users := StringSetToStringArray(ctx, diags, usersSet)
+	samRegex, _ := regexp.Compile(SamRegex)                //nolint:errcheck // SamRegex is a constant, compile will not fail
+	upnRegex, _ := regexp.Compile(UpnRegex)                //nolint:errcheck // UpnRegex is a constant, compile will not fail
+	sidRegex, _ := regexp.Compile(ActiveDirectorySidRegex) //nolint:errcheck // ActiveDirectorySidRegex is a constant, compile will not fail
+	oidRegex, _ := regexp.Compile(AzureAdOidRegex)         //nolint:errcheck // AzureAdOidRegex is a constant, compile will not fail
+
 	for _, user := range users {
-		samRegex, _ := regexp.Compile(SamRegex) //nolint:errcheck // SamRegex is a constant, compile will not fail
 		if samRegex.MatchString(user) {
 			index, exists := samNamesMap[strings.ToLower(user)]
 			if !exists {
@@ -1209,7 +1225,6 @@ func RefreshUsersList(ctx context.Context, diags *diag.Diagnostics, usersSet typ
 			continue
 		}
 
-		upnRegex, _ := regexp.Compile(UpnRegex) //nolint:errcheck // UpnRegex is a constant, compile will not fail
 		if upnRegex.MatchString(user) {
 			index, exists := upnMap[strings.ToLower(user)]
 			if !exists {
@@ -1231,7 +1246,6 @@ func RefreshUsersList(ctx context.Context, diags *diag.Diagnostics, usersSet typ
 			}
 		}
 
-		sidRegex, _ := regexp.Compile(ActiveDirectorySidRegex) //nolint:errcheck // ActiveDirectorySidRegex is a constant, compile will not fail
 		if sidRegex.MatchString(user) {
 			index, exists := sidMap[strings.ToLower(user)]
 			if !exists {
@@ -1249,6 +1263,34 @@ func RefreshUsersList(ctx context.Context, diags *diag.Diagnostics, usersSet typ
 				_, exists = upnMap[strings.ToLower(userPrincipalName)]
 				if exists {
 					upnMap[strings.ToLower(userPrincipalName)] = -1
+				}
+			}
+
+			continue
+		}
+
+		if oidRegex.MatchString(user) {
+			index, exists := oidMap[strings.ToLower(user)]
+			if !exists {
+				continue
+			}
+			res = append(res, user)
+			oidMap[strings.ToLower(user)] = -1
+			if index != -1 {
+				samName := usersInRemote[index].GetSamName()
+				userPrincipalName := usersInRemote[index].GetPrincipalName()
+				userSid := usersInRemote[index].GetSid()
+				_, exists = samNamesMap[strings.ToLower(samName)]
+				if exists {
+					samNamesMap[strings.ToLower(samName)] = -1
+				}
+				_, exists = upnMap[strings.ToLower(userPrincipalName)]
+				if exists {
+					upnMap[strings.ToLower(userPrincipalName)] = -1
+				}
+				_, exists = sidMap[strings.ToLower(userSid)]
+				if exists {
+					sidMap[strings.ToLower(userSid)] = -1
 				}
 			}
 		}
@@ -1437,7 +1479,7 @@ func VerifyIdentityUserListCompleteness(inputUserNames []string, remoteUsers []c
 	missingUsers := []string{}
 	for _, includedUser := range inputUserNames {
 		userIndex := slices.IndexFunc(remoteUsers, func(i citrixorchestration.IdentityUserResponseModel) bool {
-			return strings.EqualFold(includedUser, i.GetSamName()) || strings.EqualFold(includedUser, i.GetPrincipalName()) || strings.EqualFold(includedUser, i.GetSid())
+			return strings.EqualFold(includedUser, i.GetSamName()) || strings.EqualFold(includedUser, i.GetPrincipalName()) || strings.EqualFold(includedUser, i.GetSid()) || strings.EqualFold(includedUser, i.GetOid())
 		})
 		if userIndex == -1 {
 			missingUsers = append(missingUsers, includedUser)
