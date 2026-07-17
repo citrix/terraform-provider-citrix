@@ -109,27 +109,6 @@ func (AzureHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 	}
 }
 
-type ResourcePoolTimeout struct {
-	Delete types.Int32 `tfsdk:"delete"`
-}
-
-func getResourcePoolTimeoutConfigs() util.TimeoutConfigs {
-	return util.TimeoutConfigs{
-
-		Delete:        true,
-		DeleteDefault: 10,
-		DeleteMin:     5,
-	}
-}
-
-func (ResourcePoolTimeout) GetSchema() schema.SingleNestedAttribute {
-	return util.GetTimeoutSchema("resource pool", getResourcePoolTimeoutConfigs())
-}
-
-func (ResourcePoolTimeout) GetAttributes() map[string]schema.Attribute {
-	return ResourcePoolTimeout{}.GetSchema().Attributes
-}
-
 func (AzureHypervisorResourcePoolResourceModel) GetAttributes() map[string]schema.Attribute {
 	return AzureHypervisorResourcePoolResourceModel{}.GetSchema().Attributes
 }

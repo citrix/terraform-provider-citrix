@@ -41,6 +41,7 @@ resource "citrix_gcp_hypervisor_resource_pool" "example-gcp-hypervisor-resource-
 
 - `metadata` (Attributes List) Metadata for the Hypervisor Resource Pool. (see [below for nested schema](#nestedatt--metadata))
 - `shared_vpc` (Boolean) Indicate whether the GCP Virtual Private Cloud is a shared VPC.
+- `timeout` (Attributes) Timeout in minutes for the long-running jobs in resource pool resource's create, update, delete operation(s). (see [below for nested schema](#nestedatt--timeout))
 - `vm_tagging` (Boolean) Indicates whether VMs created by provisioning operations should be tagged. Default is `true`.
 
 ### Read-Only
@@ -54,6 +55,16 @@ Required:
 
 - `name` (String) Metadata name.
 - `value` (String) Metadata value.
+
+
+<a id="nestedatt--timeout"></a>
+### Nested Schema for `timeout`
+
+Optional:
+
+- `create` (Number) Timeout in minutes for the long-running jobs in create operation. Defaults to 10. Minimum value is 5.
+- `delete` (Number) Timeout in minutes for the long-running jobs in delete operation. Defaults to 10. Minimum value is 5.
+- `update` (Number) Timeout in minutes for the long-running jobs in update operation. Defaults to 5. Minimum value is 5.
 
 ## Import
 

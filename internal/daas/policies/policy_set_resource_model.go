@@ -11,6 +11,7 @@ import (
 
 	citrixorchestration "github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
+	"github.com/citrix/terraform-provider-citrix/internal/util/planmodifiers"
 	"github.com/citrix/terraform-provider-citrix/internal/validators"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -97,6 +98,7 @@ func (PolicyModel) GetSchema() schema.NestedAttributeObject {
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+					planmodifiers.MarkUnknownIfNoPriorState(),
 				},
 			},
 			"name": schema.StringAttribute{

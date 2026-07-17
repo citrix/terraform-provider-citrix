@@ -11,6 +11,7 @@ import (
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
+	"github.com/citrix/terraform-provider-citrix/internal/util/planmodifiers"
 	"github.com/citrix/terraform-provider-citrix/internal/validators"
 	"github.com/hashicorp/terraform-plugin-framework-validators/boolvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int32validator"
@@ -675,7 +676,8 @@ func (RestrictedAccessUsers) GetSchemaForDeliveryGroup() schema.SingleNestedAttr
 func (RestrictedAccessUsers) getSchemaInternal(forDeliveryGroup bool) schema.SingleNestedAttribute {
 	resource := "Delivery Group"
 	description := "Restrict access to this Delivery Group by specifying users and groups in the allow and block list. To give access to unauthenticated users, use the `allow_anonymous_access` property." +
-		"\n\n~> **Please Note** If `restricted_access_users` attribute is omitted or set to `null`, all authenticated users will have access to this Delivery Group. If attribute is specified as an empty object i.e. `{}`, then no user will have access to the delivery group because `allow_list` and `block_list` will be set as empty sets by default."
+		"\n\n~> **Please Note** If `restricted_access_users` attribute is omitted or set to `null`, all authenticated users will have access to this Delivery Group. If attribute is specified as an empty object i.e. `{}`, then no user will have access to the delivery group because `allow_list` and `block_list` will be set as empty sets by default." +
+		"\n\n~> **Please Note** Mutually exclusive with `restricted_access_users` on individual `default_access_policies` or `custom_access_policies` entries. Use one or the other, not both."
 	if !forDeliveryGroup {
 		resource = "Desktop"
 		description = "Restrict access to this Desktop by specifying users and groups in the allow and block list. " +
@@ -688,28 +690,28 @@ func (RestrictedAccessUsers) getSchemaInternal(forDeliveryGroup bool) schema.Sin
 		Attributes: map[string]schema.Attribute{
 			"allow_list": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: fmt.Sprintf("Users who can use this %s. \n\n-> **Note** Users must be in SID, SAM account name (`DOMAIN\\UserOrGroupName`) or UPN (`user@domain.com`) format", resource),
+				Description: fmt.Sprintf("Users who can use this %s. \n\n-> **Note** Users must be in SID, SAM account name (`DOMAIN\\UserOrGroupName`), UPN (`user@domain.com`), or Azure AD OID (`OID:/azuread/<object_id>`) format", resource),
 				Optional:    true,
 				Computed:    true,
 				Default:     setdefault.StaticValue(types.SetValueMust(types.StringType, []attr.Value{})),
 				Validators: []validator.Set{
 					setvalidator.ValueStringsAre(
 						validator.String(
-							stringvalidator.RegexMatches(regexp.MustCompile(util.SamUpnSidRegex), "must be in SID, SAM account name (`DOMAIN\\UserOrGroupName`) or UPN (`user@domain.com`) format"),
+							stringvalidator.RegexMatches(regexp.MustCompile(util.SamUpnSidOidRegex), "must be in SID, SAM account name (`DOMAIN\\UserOrGroupName`), UPN (`user@domain.com`), or Azure AD OID (`OID:/azuread/<object_id>`) format"),
 						),
 					),
 				},
 			},
 			"block_list": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: fmt.Sprintf("Users who cannot use this %s. A block list is meaningful only when used to block users in the allow list. \n\n-> **Note** Users must be in SID, SAM account name (`DOMAIN\\UserOrGroupName`) or UPN (`user@domain.com`) format", resource),
+				Description: fmt.Sprintf("Users who cannot use this %s. A block list is meaningful only when used to block users in the allow list. \n\n-> **Note** Users must be in SID, SAM account name (`DOMAIN\\UserOrGroupName`), UPN (`user@domain.com`), or Azure AD OID (`OID:/azuread/<object_id>`) format", resource),
 				Optional:    true,
 				Computed:    true,
 				Default:     setdefault.StaticValue(types.SetValueMust(types.StringType, []attr.Value{})),
 				Validators: []validator.Set{
 					setvalidator.ValueStringsAre(
 						validator.String(
-							stringvalidator.RegexMatches(regexp.MustCompile(util.SamUpnSidRegex), "must be in SID, SAM account name (`DOMAIN\\UserOrGroupName`) or UPN (`user@domain.com`) format"),
+							stringvalidator.RegexMatches(regexp.MustCompile(util.SamUpnSidOidRegex), "must be in SID, SAM account name (`DOMAIN\\UserOrGroupName`), UPN (`user@domain.com`), or Azure AD OID (`OID:/azuread/<object_id>`) format"),
 						),
 					),
 				},
@@ -887,6 +889,7 @@ type DeliveryGroupAccessPolicyModel struct {
 	EnableCriteriaForExcludeConnections types.Bool   `tfsdk:"enable_criteria_for_exclude_connections"`
 	IncludeCriteriaFilters              types.List   `tfsdk:"include_criteria_filters"` //List[DeliveryGroupAccessPolicyCriteriaTagsModel]
 	ExcludeCriteriaFilters              types.List   `tfsdk:"exclude_criteria_filters"` //List[DeliveryGroupAccessPolicyCriteriaTagsModel]
+	RestrictedAccessUsers               types.Object `tfsdk:"restricted_access_users"`  // RestrictedAccessUsers; mutually exclusive with the DG-level restricted_access_users
 }
 
 func (r DeliveryGroupAccessPolicyModel) GetKey() string {
@@ -900,6 +903,12 @@ func (r DeliveryGroupAccessPolicyModel) GetKey() string {
 }
 
 func (DeliveryGroupAccessPolicyModel) GetSchema() schema.NestedAttributeObject {
+	perPolicyUsersSchema := RestrictedAccessUsers{}.GetSchemaForDeliveryGroup()
+	perPolicyUsersSchema.Description = "Restrict access via this access policy by specifying users and groups in the allow and block list. " +
+		"\n\n~> **Please Note** If omitted or set to `null`, the delivery group's `restricted_access_users` applies to this policy. " +
+		"If specified as an empty object `{}`, no user will have access via this policy." +
+		"\n\n~> **Please Note** Mutually exclusive with `restricted_access_users` at the delivery group level. Use one or the other, not both."
+
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -907,6 +916,7 @@ func (DeliveryGroupAccessPolicyModel) GetSchema() schema.NestedAttributeObject {
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+					planmodifiers.MarkUnknownIfNoPriorState(), // TF does not auto-mark Computed as unknown for new nested list elements with no prior state
 				},
 			},
 			"name": schema.StringAttribute{
@@ -972,6 +982,7 @@ func (DeliveryGroupAccessPolicyModel) GetSchema() schema.NestedAttributeObject {
 					listvalidator.SizeAtLeast(1),
 				},
 			},
+			"restricted_access_users": perPolicyUsersSchema,
 		},
 	}
 }
@@ -1031,13 +1042,13 @@ func (DeliveryGroupAssignMachinesToUsersModel) GetSchema() schema.NestedAttribut
 			},
 			"users": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "The list of users to assign to the machine. \n\n-> **Note** Users must be in SID, SAM account name (`DOMAIN\\UserName`) or UPN (`user@domain.com`) format.",
+				Description: "The list of users to assign to the machine. \n\n-> **Note** Users must be in SID, SAM account name (`DOMAIN\\UserName`), UPN (`user@domain.com`), or Azure AD OID (`OID:/azuread/<object_id>`) format.",
 				Required:    true,
 				Validators: []validator.Set{
 					setvalidator.SizeAtLeast(1),
 					setvalidator.ValueStringsAre(
 						validator.String(
-							stringvalidator.RegexMatches(regexp.MustCompile(util.SamUpnSidRegex), "must be in SID, SAM account name (`DOMAIN\\UserName`) or UPN (`user@domain.com`) format"),
+							stringvalidator.RegexMatches(regexp.MustCompile(util.SamUpnSidOidRegex), "must be in SID, SAM account name (`DOMAIN\\UserName`), UPN (`user@domain.com`), or Azure AD OID (`OID:/azuread/<object_id>`) format"),
 						),
 					),
 				},
@@ -1082,6 +1093,7 @@ func (DeliveryGroupAutoscalePluginModel) GetSchema() schema.NestedAttributeObjec
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+					planmodifiers.MarkUnknownIfNoPriorState(),
 				},
 			},
 			"name": schema.StringAttribute{
@@ -1543,7 +1555,7 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 	r = r.updatePlanWithRestrictedAccessUsers(ctx, diagnostics, deliveryGroup)
 	r = r.updatePlanWithDesktops(ctx, diagnostics, dgDesktops)
 	r = r.updatePlanWithAssociatedCatalogs(ctx, diagnostics, dgMachines)
-	r = r.updatePlanWithAutoscaleSettings(ctx, diagnostics, deliveryGroup, dgPowerTimeSchemes)
+	r = r.updatePlanWithAutoscaleSettings(ctx, diagnostics, client, deliveryGroup, dgPowerTimeSchemes)
 	r = r.updatePlanWithRebootSchedule(ctx, diagnostics, dgRebootSchedule)
 	r = r.updatePlanWithAppProtection(ctx, diagnostics, deliveryGroup)
 	r = r.updatePlanWithAssignMachinesToUsers(ctx, diagnostics, dgMachines)

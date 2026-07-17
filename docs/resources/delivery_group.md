@@ -246,7 +246,9 @@ resource "citrix_delivery_group" "example-delivery-group" {
 - `reboot_schedules` (Attributes List) The reboot schedule for the delivery group. (see [below for nested schema](#nestedatt--reboot_schedules))
 - `restricted_access_users` (Attributes) Restrict access to this Delivery Group by specifying users and groups in the allow and block list. To give access to unauthenticated users, use the `allow_anonymous_access` property.
 
-~> **Please Note** If `restricted_access_users` attribute is omitted or set to `null`, all authenticated users will have access to this Delivery Group. If attribute is specified as an empty object i.e. `{}`, then no user will have access to the delivery group because `allow_list` and `block_list` will be set as empty sets by default. (see [below for nested schema](#nestedatt--restricted_access_users))
+~> **Please Note** If `restricted_access_users` attribute is omitted or set to `null`, all authenticated users will have access to this Delivery Group. If attribute is specified as an empty object i.e. `{}`, then no user will have access to the delivery group because `allow_list` and `block_list` will be set as empty sets by default.
+
+~> **Please Note** Mutually exclusive with `restricted_access_users` on individual `default_access_policies` or `custom_access_policies` entries. Use one or the other, not both. (see [below for nested schema](#nestedatt--restricted_access_users))
 - `scopes` (Set of String) The IDs of the scopes for the delivery group to be a part of.
 - `secure_ica_required` (Boolean) When set to `true`, the SecureICA protocol is required for connections to the delivery group. Defaults to `false`.
 - `session_support` (String) The session support for the delivery group. Can only be set to `SingleSession` or `MultiSession`. Specify only if you want to create a Delivery Group without any `associated_machine_catalogs`. Ensure session support is same as that of the prospective Machine Catalogs you will associate this Delivery Group with.
@@ -297,7 +299,7 @@ Required:
 - `machine_name` (String) The name of the machine. For domain-joined machines, the name must be in the format <domain>\<machine>, all in lowercase. For non domain-joined machines, use the machine name, all in lowercase.
 - `users` (Set of String) The list of users to assign to the machine. 
 
--> **Note** Users must be in SID, SAM account name (`DOMAIN\UserName`) or UPN (`user@domain.com`) format.
+-> **Note** Users must be in SID, SAM account name (`DOMAIN\UserName`), UPN (`user@domain.com`), or Azure AD OID (`OID:/azuread/<object_id>`) format.
 
 
 <a id="nestedatt--associated_machine_catalogs"></a>
@@ -430,6 +432,11 @@ Optional:
 - `exclude_criteria_filters` (Attributes List) The list of filters that meet the criteria for exclude connections. (see [below for nested schema](#nestedatt--custom_access_policies--exclude_criteria_filters))
 - `include_connections_criteria_type` (String) The type of criteria for include connections. Choose between `MatchAny` and `MatchAll`.
 - `include_criteria_filters` (Attributes List) The list of filters that meet the criteria for include connections. (see [below for nested schema](#nestedatt--custom_access_policies--include_criteria_filters))
+- `restricted_access_users` (Attributes) Restrict access via this access policy by specifying users and groups in the allow and block list. 
+
+~> **Please Note** If omitted or set to `null`, the delivery group's `restricted_access_users` applies to this policy. If specified as an empty object `{}`, no user will have access via this policy.
+
+~> **Please Note** Mutually exclusive with `restricted_access_users` at the delivery group level. Use one or the other, not both. (see [below for nested schema](#nestedatt--custom_access_policies--restricted_access_users))
 
 Read-Only:
 
@@ -453,6 +460,19 @@ Required:
 - `filter_value` (String) The value of the filter.
 
 
+<a id="nestedatt--custom_access_policies--restricted_access_users"></a>
+### Nested Schema for `custom_access_policies.restricted_access_users`
+
+Optional:
+
+- `allow_list` (Set of String) Users who can use this Delivery Group. 
+
+-> **Note** Users must be in SID, SAM account name (`DOMAIN\UserOrGroupName`), UPN (`user@domain.com`), or Azure AD OID (`OID:/azuread/<object_id>`) format
+- `block_list` (Set of String) Users who cannot use this Delivery Group. A block list is meaningful only when used to block users in the allow list. 
+
+-> **Note** Users must be in SID, SAM account name (`DOMAIN\UserOrGroupName`), UPN (`user@domain.com`), or Azure AD OID (`OID:/azuread/<object_id>`) format
+
+
 
 <a id="nestedatt--default_access_policies"></a>
 ### Nested Schema for `default_access_policies`
@@ -472,6 +492,11 @@ Optional:
 - `exclude_criteria_filters` (Attributes List) The list of filters that meet the criteria for exclude connections. (see [below for nested schema](#nestedatt--default_access_policies--exclude_criteria_filters))
 - `include_connections_criteria_type` (String) The type of criteria for include connections. Choose between `MatchAny` and `MatchAll`.
 - `include_criteria_filters` (Attributes List) The list of filters that meet the criteria for include connections. (see [below for nested schema](#nestedatt--default_access_policies--include_criteria_filters))
+- `restricted_access_users` (Attributes) Restrict access via this access policy by specifying users and groups in the allow and block list. 
+
+~> **Please Note** If omitted or set to `null`, the delivery group's `restricted_access_users` applies to this policy. If specified as an empty object `{}`, no user will have access via this policy.
+
+~> **Please Note** Mutually exclusive with `restricted_access_users` at the delivery group level. Use one or the other, not both. (see [below for nested schema](#nestedatt--default_access_policies--restricted_access_users))
 
 Read-Only:
 
@@ -493,6 +518,19 @@ Required:
 
 - `filter_name` (String) The name of the filter.
 - `filter_value` (String) The value of the filter.
+
+
+<a id="nestedatt--default_access_policies--restricted_access_users"></a>
+### Nested Schema for `default_access_policies.restricted_access_users`
+
+Optional:
+
+- `allow_list` (Set of String) Users who can use this Delivery Group. 
+
+-> **Note** Users must be in SID, SAM account name (`DOMAIN\UserOrGroupName`), UPN (`user@domain.com`), or Azure AD OID (`OID:/azuread/<object_id>`) format
+- `block_list` (Set of String) Users who cannot use this Delivery Group. A block list is meaningful only when used to block users in the allow list. 
+
+-> **Note** Users must be in SID, SAM account name (`DOMAIN\UserOrGroupName`), UPN (`user@domain.com`), or Azure AD OID (`OID:/azuread/<object_id>`) format
 
 
 
@@ -532,10 +570,10 @@ Optional:
 
 - `allow_list` (Set of String) Users who can use this Desktop. 
 
--> **Note** Users must be in SID, SAM account name (`DOMAIN\UserOrGroupName`) or UPN (`user@domain.com`) format
+-> **Note** Users must be in SID, SAM account name (`DOMAIN\UserOrGroupName`), UPN (`user@domain.com`), or Azure AD OID (`OID:/azuread/<object_id>`) format
 - `block_list` (Set of String) Users who cannot use this Desktop. A block list is meaningful only when used to block users in the allow list. 
 
--> **Note** Users must be in SID, SAM account name (`DOMAIN\UserOrGroupName`) or UPN (`user@domain.com`) format
+-> **Note** Users must be in SID, SAM account name (`DOMAIN\UserOrGroupName`), UPN (`user@domain.com`), or Azure AD OID (`OID:/azuread/<object_id>`) format
 
 
 
@@ -602,10 +640,10 @@ Optional:
 
 - `allow_list` (Set of String) Users who can use this Delivery Group. 
 
--> **Note** Users must be in SID, SAM account name (`DOMAIN\UserOrGroupName`) or UPN (`user@domain.com`) format
+-> **Note** Users must be in SID, SAM account name (`DOMAIN\UserOrGroupName`), UPN (`user@domain.com`), or Azure AD OID (`OID:/azuread/<object_id>`) format
 - `block_list` (Set of String) Users who cannot use this Delivery Group. A block list is meaningful only when used to block users in the allow list. 
 
--> **Note** Users must be in SID, SAM account name (`DOMAIN\UserOrGroupName`) or UPN (`user@domain.com`) format
+-> **Note** Users must be in SID, SAM account name (`DOMAIN\UserOrGroupName`), UPN (`user@domain.com`), or Azure AD OID (`OID:/azuread/<object_id>`) format
 
 ## Import
 

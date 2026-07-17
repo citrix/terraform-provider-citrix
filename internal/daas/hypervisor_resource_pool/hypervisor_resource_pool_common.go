@@ -57,8 +57,41 @@ func (HypervisorStorageModel) GetAttributes() map[string]schema.Attribute {
 	return HypervisorStorageModel{}.GetSchema().Attributes
 }
 
+// ResourcePoolTimeout is shared by all hypervisor resource pool resource types to
+// expose configurable create/update/delete timeouts (in minutes) for the underlying
+// long-running jobs.
+type ResourcePoolTimeout struct {
+	Create types.Int32 `tfsdk:"create"`
+	Update types.Int32 `tfsdk:"update"`
+	Delete types.Int32 `tfsdk:"delete"`
+}
+
+func getResourcePoolTimeoutConfigs() util.TimeoutConfigs {
+	return util.TimeoutConfigs{
+		Create:        true,
+		CreateDefault: 10,
+		CreateMin:     5,
+
+		Update:        true,
+		UpdateDefault: 5,
+		UpdateMin:     5,
+
+		Delete:        true,
+		DeleteDefault: 10,
+		DeleteMin:     5,
+	}
+}
+
+func (ResourcePoolTimeout) GetSchema() schema.SingleNestedAttribute {
+	return util.GetTimeoutSchema("resource pool", getResourcePoolTimeoutConfigs())
+}
+
+func (ResourcePoolTimeout) GetAttributes() map[string]schema.Attribute {
+	return ResourcePoolTimeout{}.GetSchema().Attributes
+}
+
 // Create creates the resource and sets the initial Terraform state.
-func CreateHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisor citrixorchestration.HypervisorDetailResponseModel, resourcePoolDetails citrixorchestration.CreateHypervisorResourcePoolRequestModel) (*citrixorchestration.HypervisorResourcePoolDetailResponseModel, error) {
+func CreateHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisor citrixorchestration.HypervisorDetailResponseModel, resourcePoolDetails citrixorchestration.CreateHypervisorResourcePoolRequestModel, createTimeout int32) (*citrixorchestration.HypervisorResourcePoolDetailResponseModel, error) {
 	// Create new hypervisor resource pool
 	createResourcePoolRequest := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsCreateResourcePool(ctx, hypervisor.GetId())
 	createResourcePoolRequest = createResourcePoolRequest.CreateHypervisorResourcePoolRequestModel(resourcePoolDetails).Async(true)
@@ -72,7 +105,7 @@ func CreateHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.
 		return nil, err
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error creating Resource Pool for Hypervisor "+hypervisor.GetName(), diagnostics, 10)
+	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error creating Resource Pool for Hypervisor "+hypervisor.GetName(), diagnostics, createTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +120,7 @@ func CreateHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
-func UpdateHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId string, resourcePoolId string, editHypervisorResourcePool citrixorchestration.EditHypervisorResourcePoolRequestModel) (*citrixorchestration.HypervisorResourcePoolDetailResponseModel, error) {
+func UpdateHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorId string, resourcePoolId string, editHypervisorResourcePool citrixorchestration.EditHypervisorResourcePoolRequestModel, updateTimeout int32) (*citrixorchestration.HypervisorResourcePoolDetailResponseModel, error) {
 	// Patch hypervisor
 	patchResourcePoolRequest := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsPatchHypervisorResourcePool(ctx, hypervisorId, resourcePoolId)
 	patchResourcePoolRequest = patchResourcePoolRequest.EditHypervisorResourcePoolRequestModel(editHypervisorResourcePool).Async(true)
@@ -101,7 +134,7 @@ func UpdateHypervisorResourcePool(ctx context.Context, client *citrixdaasclient.
 		return nil, err
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating Resource Pool "+resourcePoolId, diagnostics, 5)
+	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating Resource Pool "+resourcePoolId, diagnostics, updateTimeout)
 	if err != nil {
 		return nil, err
 	}

@@ -27,6 +27,7 @@ type OpenShiftHypervisorResourcePoolResourceModel struct {
 	Networks         types.List   `tfsdk:"networks"`          // List[string]
 	Storage          types.List   `tfsdk:"storage"`           // List[HypervisorStorageModel]
 	TemporaryStorage types.List   `tfsdk:"temporary_storage"` // List[HypervisorStorageModel]
+	Timeout          types.Object `tfsdk:"timeout"`
 }
 
 func (OpenShiftHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
@@ -85,6 +86,7 @@ func (OpenShiftHypervisorResourcePoolResourceModel) GetSchema() schema.Schema {
 					listvalidator.SizeAtLeast(1),
 				},
 			},
+			"timeout": ResourcePoolTimeout{}.GetSchema(),
 		},
 	}
 }

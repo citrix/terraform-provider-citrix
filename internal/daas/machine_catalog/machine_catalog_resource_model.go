@@ -760,8 +760,8 @@ func (r MachineCatalogResourceModel) RefreshPropertyValues(ctx context.Context, 
 	provScheme := catalog.GetProvisioningScheme()
 	provSchemeType := provScheme.GetProvisioningSchemeType()
 
-	if provSchemeType == "PVS" {
-		// For PVS Streaming, provisioning type returned (MCS) is different from the value sent in schema (PVSStreaming)
+	if provSchemeType == "PVS" || provtype == citrixorchestration.PROVISIONINGTYPE_PVS {
+		// API may return ProvisioningType "MCS" (with scheme type "PVS") or "PVS" directly; both map to "PVSStreaming" in schema
 		r.ProvisioningType = types.StringValue(string(citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING))
 	} else {
 		r.ProvisioningType = types.StringValue(string(provtype))

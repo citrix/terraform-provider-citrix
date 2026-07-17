@@ -48,6 +48,10 @@ resource "citrix_openshift_hypervisor_resource_pool" "example-openshift-hypervis
 - `storage` (Attributes List) Storage resources to use for OS data. (see [below for nested schema](#nestedatt--storage))
 - `temporary_storage` (Attributes List) Storage resources to use for temporary data. (see [below for nested schema](#nestedatt--temporary_storage))
 
+### Optional
+
+- `timeout` (Attributes) Timeout in minutes for the long-running jobs in resource pool resource's create, update, delete operation(s). (see [below for nested schema](#nestedatt--timeout))
+
 ### Read-Only
 
 - `id` (String) GUID identifier of the resource pool.
@@ -74,6 +78,16 @@ Required:
 Optional:
 
 - `superseded` (Boolean) Indicates whether the storage has been superseded. Superseded storage may be used for existing virtual machines, but is not used when provisioning new virtual machines. Use only when updating the resource pool.
+
+
+<a id="nestedatt--timeout"></a>
+### Nested Schema for `timeout`
+
+Optional:
+
+- `create` (Number) Timeout in minutes for the long-running jobs in create operation. Defaults to 10. Minimum value is 5.
+- `delete` (Number) Timeout in minutes for the long-running jobs in delete operation. Defaults to 10. Minimum value is 5.
+- `update` (Number) Timeout in minutes for the long-running jobs in update operation. Defaults to 5. Minimum value is 5.
 
 ## Import
 
