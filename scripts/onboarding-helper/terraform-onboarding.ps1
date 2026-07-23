@@ -345,27 +345,74 @@ function Start-GetRequest {
         [parameter(Mandatory = $true)][string] $url
     )
 
-    $token = Get-AuthToken
-    if ($script:onPremise) {
-        $headers = @{
-            Authorization = "Bearer $token"
+    # Requests use the service's default page size (250 items). When a response carries a ContinuationToken there are
+    # more items than fit on one page, so keep following the token and merge every page's Items into the first response.
+    $maxPages = 1000
+    $requestUrl = $url
+    $aggregatedResponse = $null
+    $allItems = [System.Collections.Generic.List[object]]::new()
+    $previousContinuationToken = $null
+    $pageNumber = 0
+
+    while ($true) {
+        $token = Get-AuthToken
+        if ($script:onPremise) {
+            $headers = @{
+                Authorization = "Bearer $token"
+            }
         }
+        else {
+            $headers = @{
+                "Authorization"     = "CwsAuth Bearer=$token"
+                "Citrix-CustomerId" = $($script:customerId)
+                "Accept"            = "application/json"
+            }
+            if ($null -ne $script:siteId) {
+                $headers["Citrix-InstanceId"] = $($script:siteId)
+            }
+        }
+
+        $response = Invoke-WebRequestWithRetry -Uri $requestUrl -Method 'GET' -Headers $headers -ContentType $contentType
+        $responseJsonString = [regex]::Replace($response.Content, '\\x([0-9A-Fa-f]{2})', { param($hex) '\u{0}' -f $hex.Groups[1].Value.PadLeft(4,'0') })
+        $jsonObj = ConvertFrom-Json $responseJsonString
+        $pageNumber++
+
+        # The first page defines the response shape (Items plus sibling properties); later pages only contribute Items.
+        if ($null -eq $aggregatedResponse) {
+            $aggregatedResponse = $jsonObj
+        }
+        if ($null -ne $jsonObj.Items) {
+            $allItems.AddRange([object[]]$jsonObj.Items)
+        }
+
+        $continuationToken = $jsonObj.ContinuationToken
+        if ([string]::IsNullOrEmpty($continuationToken)) {
+            break
+        }
+        # Guard against a server that keeps handing back the same token, which would otherwise loop forever.
+        if ($continuationToken -eq $previousContinuationToken) {
+            Write-Verbose "Continuation token for $url did not advance. Stopping after $pageNumber page(s)."
+            break
+        }
+        if ($pageNumber -ge $maxPages) {
+            Write-Warning "Reached the $maxPages page limit while paging $url. Some items may be missing."
+            break
+        }
+
+        $previousContinuationToken = $continuationToken
+        $separator = if ($url.Contains("?")) { "&" } else { "?" }
+        $requestUrl = "$url$separator" + "continuationtoken=$([System.Uri]::EscapeDataString($continuationToken))"
+        Write-Verbose "Fetching page $($pageNumber + 1) of $url ($($allItems.Count) items so far)."
     }
-    else {
-        $headers = @{
-            "Authorization"     = "CwsAuth Bearer=$token"
-            "Citrix-CustomerId" = $($script:customerId)
-            "Accept"            = "application/json"
-        }
-        if ($null -ne $script:siteId) {
-            $headers["Citrix-InstanceId"] = $($script:siteId)
-        }
+
+    # Only rewrite Items when multiple pages were merged; single-page responses (and responses without an Items
+    # property, such as the cloud resource locations endpoint) are returned exactly as received.
+    if ($pageNumber -gt 1) {
+        $aggregatedResponse.Items = $allItems.ToArray()
+        Write-Verbose "Retrieved $($allItems.Count) items from $url across $pageNumber pages."
     }
-    
-    $response = Invoke-WebRequestWithRetry -Uri $url -Method 'GET' -Headers $headers -ContentType $contentType
-    $responseJsonString = [regex]::Replace($response.Content, '\\x([0-9A-Fa-f]{2})', { param($hex) '\u{0}' -f $hex.Groups[1].Value.PadLeft(4,'0') })
-    $jsonObj = ConvertFrom-Json $responseJsonString
-    return $jsonObj
+
+    return $aggregatedResponse
 }
 
 function New-RequiredFiles {
