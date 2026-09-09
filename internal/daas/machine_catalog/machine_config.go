@@ -1785,8 +1785,6 @@ func (mc *GcpMachineConfigModel) RefreshProperties(ctx context.Context, diagnost
 		writebackCache.PersistWBC = types.BoolValue(false)
 	}
 
-	mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, writebackCache)
-	writebackCache = util.ObjectValueToTypedObject[GcpWritebackCacheModel](ctx, diagnostics, mc.WritebackCache)
 	//Refresh custom properties
 	customProperties := provScheme.GetCustomProperties()
 	for _, stringPair := range customProperties {
@@ -1808,7 +1806,16 @@ func (mc *GcpMachineConfigModel) RefreshProperties(ctx context.Context, diagnost
 			diagnostics.AddError("Error parsing value for custom property "+stringPair.GetName(), err.Error())
 		}
 	}
-	mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, writebackCache)
+
+	if wbcDiskSize != 0 {
+		mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, writebackCache)
+	} else if attributesMap, err := util.ResourceAttributeMapFromObject(GcpWritebackCacheModel{}); err == nil {
+		// Write-back Cache is disabled. Keep writeback_cache null, otherwise the custom properties above
+		// materialize a block that the configuration cannot express.
+		mc.WritebackCache = types.ObjectNull(attributesMap)
+	} else {
+		diagnostics.AddWarning("Error when creating null GcpWritebackCacheModel", err.Error())
+	}
 }
 
 func (mc *VsphereMachineConfigModel) RefreshProperties(ctx context.Context, diagnostics *diag.Diagnostics, catalog citrixorchestration.MachineCatalogDetailResponseModel) {
