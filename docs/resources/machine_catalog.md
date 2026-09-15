@@ -339,6 +339,13 @@ resource "citrix_machine_catalog" "example-amazon-workspaces-core-mtsession" {
             }
             master_image_note = "Example Image Note"
             tenancy_type = "Shared"
+            writeback_cache = {
+                writeback_cache_disk_size_gb   = 20
+                writeback_cache_memory_size_mb = 256
+                wbc_disk_storage_type          = "gp3"
+                persist_os_disk                = true
+                persist_wbc                    = true
+            }
         }
 		number_of_total_machines =  1
         machine_account_creation_rules ={
@@ -907,6 +914,7 @@ Optional:
 - `image_update_reboot_options` (Attributes) The options for how rebooting is performed for image update. When omitted, image update on the VDAs will be performed on next shutdown. (see [below for nested schema](#nestedatt--provisioning_scheme--amazon_workspaces_core_machine_config--image_update_reboot_options))
 - `master_image_note` (String) The note for the image.
 - `prepared_image` (Attributes) Specifying the prepared master image to be used for machine catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--amazon_workspaces_core_machine_config--prepared_image))
+- `writeback_cache` (Attributes) Write-back Cache config for Amazon WorkSpaces Core catalogs. Leave this empty to disable Write-back Cache. Write-back Cache requires Machine image with MCSIO driver installed. MCS I/O can only be enabled on non-persistent catalogs using Windows images. (see [below for nested schema](#nestedatt--provisioning_scheme--amazon_workspaces_core_machine_config--writeback_cache))
 
 <a id="nestedatt--provisioning_scheme--amazon_workspaces_core_machine_config--machine_profile"></a>
 ### Nested Schema for `provisioning_scheme.amazon_workspaces_core_machine_config.machine_profile`
@@ -942,6 +950,21 @@ Required:
 
 - `image_definition` (String) ID of the image definition.
 - `image_version` (String) ID of the image version.
+
+
+<a id="nestedatt--provisioning_scheme--amazon_workspaces_core_machine_config--writeback_cache"></a>
+### Nested Schema for `provisioning_scheme.amazon_workspaces_core_machine_config.writeback_cache`
+
+Required:
+
+- `writeback_cache_disk_size_gb` (Number) The size in GB of any temporary storage disk used by the write back cache. Must be greater than 0 and not larger than the OS disk.
+- `writeback_cache_memory_size_mb` (Number) The size of the in-memory write back cache in MB. Must be greater than 0 and less than the VM's physical memory.
+
+Optional:
+
+- `persist_os_disk` (Boolean) Persist the OS disk when power cycling the non-persistent provisioned virtual machine.
+- `persist_wbc` (Boolean) Persist Write-back Cache.
+- `wbc_disk_storage_type` (String) Type of the storage for the Write-back Cache disk. Choose between `gp2`, `gp3`, `io1`, and `io2`. For `gp3`, optional IOPS and throughput may be appended as `gp3:<iops>` or `gp3:<iops>:<throughput>` (e.g. `gp3:3000:125`). `io1`/`io2` may specify IOPS as `io1:<iops>`. Defaults to `gp3`.
 
 
 

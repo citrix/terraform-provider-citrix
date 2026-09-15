@@ -172,6 +172,7 @@ type AmazonWorkspacesCoreMachineConfigModel struct {
 	MasterImageNote                   types.String `tfsdk:"master_image_note"`
 	MachineProfile                    types.Object `tfsdk:"machine_profile"` // AmazonWorkspacesCoreMachineProfileModel
 	TenancyType                       types.String `tfsdk:"tenancy_type"`
+	WritebackCache                    types.Object `tfsdk:"writeback_cache"` // AmazonWorkspacesCoreWritebackCacheModel
 }
 
 func (AmazonWorkspacesCoreMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
@@ -212,6 +213,7 @@ func (AmazonWorkspacesCoreMachineConfigModel) GetSchema() schema.SingleNestedAtt
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
+			"writeback_cache": AmazonWorkspacesCoreWritebackCacheModel{}.GetSchema(),
 		},
 	}
 }
@@ -1123,6 +1125,66 @@ func (AwsWritebackCacheModel) GetAttributes() map[string]schema.Attribute {
 	return AwsWritebackCacheModel{}.GetSchema().Attributes
 }
 
+type AmazonWorkspacesCoreWritebackCacheModel struct {
+	PersistWBC                 types.Bool   `tfsdk:"persist_wbc"`
+	WBCDiskStorageType         types.String `tfsdk:"wbc_disk_storage_type"`
+	PersistOsDisk              types.Bool   `tfsdk:"persist_os_disk"`
+	WriteBackCacheDiskSizeGB   types.Int64  `tfsdk:"writeback_cache_disk_size_gb"`
+	WriteBackCacheMemorySizeMB types.Int64  `tfsdk:"writeback_cache_memory_size_mb"`
+}
+
+func (AmazonWorkspacesCoreWritebackCacheModel) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "Write-back Cache config for Amazon WorkSpaces Core catalogs. Leave this empty to disable Write-back Cache. Write-back Cache requires Machine image with MCSIO driver installed. " +
+			"MCS I/O can only be enabled on non-persistent catalogs using Windows images.",
+		Optional: true,
+		Attributes: map[string]schema.Attribute{
+			"persist_wbc": schema.BoolAttribute{
+				Description: "Persist Write-back Cache.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+			"wbc_disk_storage_type": schema.StringAttribute{
+				Description: "Type of the storage for the Write-back Cache disk. Choose between `gp2`, `gp3`, `io1`, and `io2`. For `gp3`, optional IOPS and throughput may be appended as `gp3:<iops>` or `gp3:<iops>:<throughput>` (e.g. `gp3:3000:125`). `io1`/`io2` may specify IOPS as `io1:<iops>`. Defaults to `gp3`.",
+				Optional:    true,
+				Computed:    true,
+				Default:     stringdefault.StaticString("gp3"),
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(`^(?i)(gp2|gp3|io1|io2)(:[1-9][0-9]*)?(:[1-9][0-9]*)?$`),
+						"must be one of gp2, gp3, io1, io2, optionally followed by `:IOPS` and `:throughput` using positive integers (e.g. gp3:3000:125).",
+					),
+				},
+			},
+			"persist_os_disk": schema.BoolAttribute{
+				Description: "Persist the OS disk when power cycling the non-persistent provisioned virtual machine.",
+				Optional:    true,
+				Computed:    true,
+				Default:     booldefault.StaticBool(false),
+			},
+			"writeback_cache_disk_size_gb": schema.Int64Attribute{
+				Description: "The size in GB of any temporary storage disk used by the write back cache. Must be greater than 0 and not larger than the OS disk.",
+				Required:    true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(1),
+				},
+			},
+			"writeback_cache_memory_size_mb": schema.Int64Attribute{
+				Description: "The size of the in-memory write back cache in MB. Must be greater than 0 and less than the VM's physical memory.",
+				Required:    true,
+				Validators: []validator.Int64{
+					int64validator.AtLeast(1),
+				},
+			},
+		},
+	}
+}
+
+func (AmazonWorkspacesCoreWritebackCacheModel) GetAttributes() map[string]schema.Attribute {
+	return AmazonWorkspacesCoreWritebackCacheModel{}.GetSchema().Attributes
+}
+
 type XenserverWritebackCacheModel struct {
 	WriteBackCacheDiskSizeGB   types.Int64 `tfsdk:"writeback_cache_disk_size_gb"`
 	WriteBackCacheMemorySizeMB types.Int64 `tfsdk:"writeback_cache_memory_size_mb"`
@@ -1733,6 +1795,42 @@ func (mc *AmazonWorkspacesCoreMachineConfigModel) RefreshProperties(ctx context.
 		} else {
 			diagnostics.AddWarning("Error when creating null AmazonWorkspacesCoreMachineProfileModel", err.Error())
 		}
+	}
+
+	// Refresh Writeback Cache
+	wbcDiskSize := provScheme.GetWriteBackCacheDiskSizeGB()
+	wbcMemorySize := provScheme.GetWriteBackCacheMemorySizeMB()
+	writebackCache := util.ObjectValueToTypedObject[AmazonWorkspacesCoreWritebackCacheModel](ctx, diagnostics, mc.WritebackCache)
+	if wbcDiskSize != 0 {
+		writebackCache.WriteBackCacheDiskSizeGB = types.Int64Value(int64(wbcDiskSize))
+		if wbcMemorySize != 0 {
+			writebackCache.WriteBackCacheMemorySizeMB = types.Int64Value(int64(wbcMemorySize))
+		}
+		// default bool values to false because Orchestration won't return them in the custom properties when false
+		writebackCache.PersistOsDisk = types.BoolValue(false)
+		writebackCache.PersistWBC = types.BoolValue(false)
+	}
+
+	// Refresh Writeback Cache custom properties
+	customProperties := provScheme.GetCustomProperties()
+	for _, stringPair := range customProperties {
+		var err error
+		switch stringPair.GetName() {
+		case "WBCDiskStorageType":
+			writebackCache.WBCDiskStorageType = types.StringValue(stringPair.GetValue())
+		case "PersistWBC":
+			writebackCache.PersistWBC, err = util.StringToTypeBool(stringPair.GetValue())
+		case "PersistOsDisk":
+			writebackCache.PersistOsDisk, err = util.StringToTypeBool(stringPair.GetValue())
+		default:
+		}
+		if err != nil {
+			diagnostics.AddError("Error parsing value for custom property "+stringPair.GetName(), err.Error())
+		}
+	}
+
+	if wbcDiskSize != 0 {
+		mc.WritebackCache = util.TypedObjectToObjectValue(ctx, diagnostics, writebackCache)
 	}
 }
 

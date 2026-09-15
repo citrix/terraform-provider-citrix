@@ -358,6 +358,15 @@ func setProvSchemePropertiesForCreateCatalog(ctx context.Context, client *citrix
 		}
 		provisioningScheme.SetTenancyType(*tenancyType)
 
+		if !amazonWorkspacesCoreMachineConfig.WritebackCache.IsNull() {
+			writeBackCacheModel := util.ObjectValueToTypedObject[AmazonWorkspacesCoreWritebackCacheModel](ctx, diag, amazonWorkspacesCoreMachineConfig.WritebackCache)
+			provisioningScheme.SetUseWriteBackCache(true)
+			provisioningScheme.SetWriteBackCacheDiskSizeGB(int32(writeBackCacheModel.WriteBackCacheDiskSizeGB.ValueInt64()))
+			if !writeBackCacheModel.WriteBackCacheMemorySizeMB.IsNull() {
+				provisioningScheme.SetWriteBackCacheMemorySizeMB(int32(writeBackCacheModel.WriteBackCacheMemorySizeMB.ValueInt64()))
+			}
+		}
+
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
 		gcpMachineConfig := util.ObjectValueToTypedObject[GcpMachineConfigModel](ctx, diag, provisioningSchemePlan.GcpMachineConfig)
 		var imagePath string
@@ -782,6 +791,14 @@ func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan Provisioning
 			return body, err
 		}
 		body.SetServiceOfferingPath(serviceOffering)
+
+		if !amazonWorkspacesCoreMachineConfig.WritebackCache.IsNull() {
+			writeBackCacheModel := util.ObjectValueToTypedObject[AmazonWorkspacesCoreWritebackCacheModel](ctx, diagnostics, amazonWorkspacesCoreMachineConfig.WritebackCache)
+			body.SetWriteBackCacheDiskSizeGB(int32(writeBackCacheModel.WriteBackCacheDiskSizeGB.ValueInt64()))
+			if !writeBackCacheModel.WriteBackCacheMemorySizeMB.IsNull() {
+				body.SetWriteBackCacheMemorySizeMB(int32(writeBackCacheModel.WriteBackCacheMemorySizeMB.ValueInt64()))
+			}
+		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER:
 		xenserverMachineConfig := util.ObjectValueToTypedObject[XenserverMachineConfigModel](ctx, nil, provisioningSchemePlan.XenserverMachineConfig)
@@ -2003,6 +2020,20 @@ func parseCustomPropertiesToClientModel(ctx context.Context, diagnostics *diag.D
 		}
 		if !awsMachineConfig.WritebackCache.IsNull() {
 			writebackCacheModel := util.ObjectValueToTypedObject[AwsWritebackCacheModel](ctx, nil, awsMachineConfig.WritebackCache)
+			if !writebackCacheModel.WBCDiskStorageType.IsNull() {
+				util.AppendNameValueStringPair(res, "WBCDiskStorageType", writebackCacheModel.WBCDiskStorageType.ValueString())
+			}
+			if writebackCacheModel.PersistWBC.ValueBool() {
+				util.AppendNameValueStringPair(res, "PersistWBC", "true")
+			}
+			if writebackCacheModel.PersistOsDisk.ValueBool() {
+				util.AppendNameValueStringPair(res, "PersistOsDisk", "true")
+			}
+		}
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AMAZON_WORK_SPACES_CORE:
+		amazonWorkspacesCoreMachineConfig := util.ObjectValueToTypedObject[AmazonWorkspacesCoreMachineConfigModel](ctx, nil, provisioningScheme.AmazonWorkspacesCoreMachineConfig)
+		if !amazonWorkspacesCoreMachineConfig.WritebackCache.IsNull() {
+			writebackCacheModel := util.ObjectValueToTypedObject[AmazonWorkspacesCoreWritebackCacheModel](ctx, nil, amazonWorkspacesCoreMachineConfig.WritebackCache)
 			if !writebackCacheModel.WBCDiskStorageType.IsNull() {
 				util.AppendNameValueStringPair(res, "WBCDiskStorageType", writebackCacheModel.WBCDiskStorageType.ValueString())
 			}
