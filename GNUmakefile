@@ -21,7 +21,7 @@ install: build
 	go install -v ./...
 
 lint: custom-gcl # custom GolangCi-Linter build containing our custom linter modules
-	@echo "Running linters (includes custom linters: executewithretry, panichandler, & unknowncheck)"
+	@echo "Running linters (includes custom linters: executewithretry, panichandler, unknowncheck, & continuationtoken)"
 	@echo "  For any false positives in the custom linters either ask AI to fix it at /custom-linters/<linter> (and add a test) or disable it in .golangci.yml"
 	cd custom-linters && $(CUSTOM_GCL) run --allow-parallel-runners ./... # lint the custom linters
 	./custom-linters/$(CUSTOM_GCL) run --allow-parallel-runners ./...

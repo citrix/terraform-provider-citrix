@@ -33,6 +33,8 @@ Citrix has developed a custom Terraform provider for automating Citrix product d
     - [Create Citrix Cloud Resource Locations](#create-citrix-cloud-resource-locations)
     - [Managing StoreFront resources](#managing-storefront-resources)
     - [Managing DaaS Quick Deploy resources](#managing-daas-quick-deploy-resources)
+      - [Citrix DaaS Flex for Azure](#citrix-daas-flex-for-azure)
+      - [Quick Deploy for Amazon](#quick-deploy-for-amazon)
   - [Frequently Asked Questions](#frequently-asked-questions)
     - [What resource is supported for different connection types?](#what-resource-is-supported-for-different-connection-types)
     - [What URLs should be whitelisted in order to use the Citrix Terraform provider?](#what-urls-should-be-whitelisted-in-order-to-use-the-citrix-terraform-provider)
@@ -238,13 +240,17 @@ Resource locations contain the resources (e.g. cloud connectors) required to del
 Please refer to the [StoreFront.md](StoreFront.md) to configure StoreFront resources via terraform. Note that this feature is in Tech Preview.
 
 ### Managing DaaS Quick Deploy resources
-QuickCreate service allows customers to create and manage Amazon WorkSpaces Core instances in Amazon Web Services (AWS). Please refer to the [QuickCreate documentation](https://docs.citrix.com/en-us/citrix-daas/install-configure/amazon-workspaces-core.html) to learn more. Note that this feature is in Tech Preview.
+#### Citrix DaaS Flex for Azure
+Flex Azure customers can create and manage Flex [catalogs](docs/resources/quickdeploy_catalog.md) and [images](docs/resources/quickdeploy_template_image.md). Please refer to the [Citrix DaaS Flex for Azure documentation](https://docs.citrix.com/en-us/citrix-daas-flex/azure). Note that this feature is in Tech Preview.
+
+#### Quick Deploy for Amazon
+QuickCreate service allows customers to create and manage Amazon WorkSpaces Core instances in Amazon Web Services (AWS). Please refer to the [Citrix DaaS Quick Deploy for Amazon WorkSpaces Core Bundles documentation](https://docs.citrix.com/en-us/citrix-daas/install-configure/amazon-workspaces-core.html) to learn more. Note that this feature is in Tech Preview.
 
 ## Frequently Asked Questions
 
 ### What resource is supported for different connection types?
 
-| Connection Type | Hypervisor | Resource Pool | MCS Power Managed | MCS Provisioning | Manual/Remote PC | Quick Deploy | PVS 
+| Connection Type | Hypervisor | Resource Pool | MCS Power Managed | MCS Provisioning | Manual/Remote PC | Flex/Quick Deploy | PVS 
 |--------------------------------------------|--------------------|--------------------|--------------------------|--------------------------|--------------------|----------------------------|--------------|
 | AzureRM | [:heavy_check_mark:](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/azure_hypervisor) | [:heavy_check_mark:](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/azure_hypervisor_resource_pool) | [:heavy_check_mark:](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/machine_catalog#is_power_managed-1) | [:heavy_check_mark:](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/machine_catalog#azure_machine_config-1) | [:heavy_check_mark:](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/machine_catalog#remote_pc_power_management_hypervisor-1) | [:heavy_check_mark:](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/quickdeploy_catalog) | [:heavy_check_mark:](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/machine_catalog#azure_pvs_config-1) |
 | AWS EC2 |[:heavy_check_mark:](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/aws_hypervisor) | [:heavy_check_mark:](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/aws_hypervisor_resource_pool) | [:heavy_check_mark:](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/machine_catalog#is_power_managed-1) | [:heavy_check_mark:](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/machine_catalog#aws_machine_config-1) | [:heavy_check_mark:](https://registry.terraform.io/providers/citrix/citrix/latest/docs/resources/machine_catalog#remote_pc_power_management_hypervisor-1) | N/A | N/A |

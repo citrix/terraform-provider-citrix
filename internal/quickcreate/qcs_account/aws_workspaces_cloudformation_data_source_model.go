@@ -18,7 +18,7 @@ type AwsWorkspacesCloudFormationDataSourceModel struct {
 
 func (AwsWorkspacesCloudFormationDataSourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "DaaS Quick Deploy - AWS WorkSpaces Core --- Data source to fetch AWS WorkSpaces CloudFormation template.",
+		Description: "DaaS Quick Deploy for AWS --- Data source to fetch AWS WorkSpaces CloudFormation template.",
 		Attributes: map[string]schema.Attribute{
 			"content": schema.StringAttribute{
 				Description: "Content of the CloudFormation template.",

@@ -4,8 +4,12 @@ package policy_filters
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"strings"
+	"sync"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -40,6 +44,18 @@ type PolicyFilterInterface interface {
 	GetFilterRequest(diagnostics *diag.Diagnostics, serverValue string) (citrixorchestration.FilterRequest, error)
 }
 
+// policyLocks holds one mutex per policy, keyed on the lowercased policy GUID because DaaS
+// does not guarantee GUID casing.
+var policyLocks sync.Map
+
+// lockPolicy acquires the lock for a policy and returns its unlock function.
+func lockPolicy(policyId string) func() {
+	value, _ := policyLocks.LoadOrStore(strings.ToLower(policyId), &sync.Mutex{})
+	mutex := value.(*sync.Mutex) //nolint:forcetypeassert // only *sync.Mutex is ever stored
+	mutex.Lock()
+	return mutex.Unlock
+}
+
 func getServerValue(client *citrixdaasclient.CitrixDaasClient) string {
 	if client.AuthConfig.OnPremises || !client.AuthConfig.ApiGateway {
 		return client.ApiClient.GetConfig().Host
@@ -63,6 +79,12 @@ func createPolicyFilter(ctx context.Context, client *citrixdaasclient.CitrixDaas
 		return nil, err
 	}
 
+	return postPolicyFilter(ctx, client, diagnostics, policyFilter)
+}
+
+// postPolicyFilter issues the create without the policy existence check, so callers holding
+// the policy lock can run that check outside it.
+func postPolicyFilter(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policyFilter PolicyFilterInterface) (*citrixorchestration.FilterResponse, error) {
 	serverValue := getServerValue(client)
 	createFilterRequestBody, err := policyFilter.GetFilterRequest(diagnostics, serverValue)
 	if err != nil {
@@ -106,9 +128,12 @@ func readPolicyFilter(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 	return policyFilter, nil
 }
 
+// getPolicyFilter reads a filter back after a create or update, retrying on 404 because DaaS
+// can briefly not find one it just accepted. Read and the data sources use readPolicyFilter
+// instead, which must keep treating 404 as "gone".
 func getPolicyFilter(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policyFilterId string) (*citrixorchestration.FilterResponse, error) {
 	getPolicyFilterRequest := client.ApiClient.GpoDAAS.GpoReadGpoFilter(ctx, policyFilterId)
-	policyFilter, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.FilterResponse](getPolicyFilterRequest, client)
+	policyFilter, httpResp, err := citrixdaasclient.ExecuteWithRetryOnNotFound[*citrixorchestration.FilterResponse](getPolicyFilterRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error Reading Policy Filter "+policyFilterId,
@@ -135,6 +160,66 @@ func getPolicyFilters(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 	}
 
 	return policyFilters.GetItems(), nil
+}
+
+var ErrDuplicateDeliveryGroupFilter = errors.New("duplicate delivery group policy filter")
+
+// findConflictingDeliveryGroupFilter returns the existing DesktopGroup filter on policyId that
+// already targets deliveryGroupId. Matching ignores `allowed`, per XAC-71644.
+func findConflictingDeliveryGroupFilter(policyFilters []citrixorchestration.FilterResponse, policyId string, deliveryGroupId string) (citrixorchestration.FilterResponse, bool) {
+	for _, policyFilter := range policyFilters {
+		if !strings.EqualFold(policyFilter.GetPolicyGuid(), policyId) || policyFilter.GetFilterType() != "DesktopGroup" {
+			continue
+		}
+
+		var uuidFilterData util.PolicyFilterUuidDataClientModel
+		if err := json.Unmarshal([]byte(policyFilter.GetFilterData()), &uuidFilterData); err != nil {
+			continue
+		}
+
+		if strings.EqualFold(uuidFilterData.Uuid, deliveryGroupId) {
+			return policyFilter, true
+		}
+	}
+
+	return citrixorchestration.FilterResponse{}, false
+}
+
+func buildDuplicateDeliveryGroupFilterError(existingFilterId string, deliveryGroupId string, policyId string) string {
+	return fmt.Sprintf(
+		"A Delivery Group Policy Filter (ID: %s) for Delivery Group %s already exists on policy %s.\n\n"+
+			"If this filter is not managed by Terraform, import it instead of creating a new one:\n"+
+			"  terraform import <resource_address> %s\n\n"+
+			"If a previous apply created the filter without recording it, importing it will reconcile the state.",
+		existingFilterId, deliveryGroupId, policyId, existingFilterId,
+	)
+}
+
+// createDeliveryGroupFilterChecked runs the duplicate check and the create under the policy
+// lock, so no other Create on the same policy can list between the two. The policy existence
+// check is kept outside the lock because it retries 404 for ~105s and would otherwise
+// serialise across every filter on the policy.
+func createDeliveryGroupFilterChecked(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, plan DeliveryGroupFilterModel) (*citrixorchestration.FilterResponse, error) {
+	if _, err := policy_resource.GetPolicy(ctx, client, diagnostics, plan.GetPolicyId(), true, false); err != nil {
+		return nil, err
+	}
+
+	defer lockPolicy(plan.GetPolicyId())()
+
+	policyFilters, err := getPolicyFilters(ctx, client, diagnostics, plan.GetPolicyId())
+	if err != nil {
+		return nil, err
+	}
+
+	if conflict, found := findConflictingDeliveryGroupFilter(policyFilters, plan.GetPolicyId(), plan.DeliveryGroupId.ValueString()); found {
+		diagnostics.AddError(
+			"Error creating Delivery Group Policy Filter",
+			buildDuplicateDeliveryGroupFilterError(conflict.GetFilterGuid(), plan.DeliveryGroupId.ValueString(), plan.GetPolicyId()),
+		)
+		return nil, ErrDuplicateDeliveryGroupFilter
+	}
+
+	return postPolicyFilter(ctx, client, diagnostics, plan)
 }
 
 func updatePolicyFilter(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, policyFilter PolicyFilterInterface) error {

@@ -26,7 +26,7 @@ type AwsWorkspacesDeploymentDataSourceModel struct {
 
 func (AwsWorkspacesDeploymentDataSourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "DaaS Quick Deploy - AWS WorkSpaces Core --- Data source to get details of an AWS WorkSpaces deployment.",
+		Description: "DaaS Quick Deploy for AWS --- Data source to get details of an AWS WorkSpaces deployment.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the deployment.",

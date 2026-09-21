@@ -1,6 +1,6 @@
 module github.com/citrix/terraform-provider-citrix/custom-linters
 
-go 1.26.1
+go 1.26.4
 
 require (
 	github.com/golangci/plugin-module-register v0.1.2

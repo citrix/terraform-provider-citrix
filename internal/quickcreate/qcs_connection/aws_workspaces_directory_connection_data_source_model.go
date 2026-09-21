@@ -15,7 +15,7 @@ import (
 
 func (AwsWorkspacesDirectoryConnectionModel) GetDataSourceSchema() schema.Schema {
 	return schema.Schema{
-		Description: "DaaS Quick Deploy - AWS WorkSpaces Core --- Data Source of an AWS WorkSpaces directory connection.",
+		Description: "DaaS Quick Deploy for AWS --- Data Source of an AWS WorkSpaces directory connection.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the directory connection.",

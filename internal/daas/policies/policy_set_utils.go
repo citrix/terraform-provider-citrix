@@ -847,7 +847,7 @@ func getGpoUserSettingDefinitions(ctx context.Context, diagnostics *diag.Diagnos
 	getSettingDefinitionsRequest = getSettingDefinitionsRequest.IsLean(true)
 	getSettingDefinitionsRequest = getSettingDefinitionsRequest.Limit(-1)
 	getSettingDefinitionsRequest = getSettingDefinitionsRequest.IsUserSetting(true)
-	settingResp, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.SettingDefinitionEnvelope](getSettingDefinitionsRequest, client)
+	settingResp, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.SettingDefinitionEnvelope](getSettingDefinitionsRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Unable to fetch user setting definitions",
@@ -856,6 +856,7 @@ func getGpoUserSettingDefinitions(ctx context.Context, diagnostics *diag.Diagnos
 		)
 		return []citrixorchestration.SettingDefinition{}, err
 	}
+
 	return settingResp.GetItems(), nil
 }
 
@@ -864,7 +865,7 @@ func GetGpoBooleanSettingDefaultValueMap(ctx context.Context, diagnostics *diag.
 	getSettingDefinitionsRequest := client.ApiClient.GpoDAAS.GpoGetSettingDefinitions(ctx)
 	getSettingDefinitionsRequest = getSettingDefinitionsRequest.IsLean(true)
 	getSettingDefinitionsRequest = getSettingDefinitionsRequest.Limit(-1)
-	settingResp, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.SettingDefinitionEnvelope](getSettingDefinitionsRequest, client)
+	settingResp, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.SettingDefinitionEnvelope](getSettingDefinitionsRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Unable to fetch boolean setting definitions",
@@ -873,6 +874,7 @@ func GetGpoBooleanSettingDefaultValueMap(ctx context.Context, diagnostics *diag.
 		)
 		return defaultValueMap, err
 	}
+
 	for _, setting := range settingResp.GetItems() {
 		if setting.GetValueType() == "State" || setting.GetValueType() == "StateAllowed" {
 			defaultValueMap[setting.GetSettingName()] = setting.GetDefaultValue()

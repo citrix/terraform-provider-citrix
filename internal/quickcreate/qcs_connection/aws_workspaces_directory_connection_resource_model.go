@@ -38,7 +38,7 @@ type AwsWorkspacesDirectoryConnectionModel struct {
 
 func (AwsWorkspacesDirectoryConnectionModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "DaaS Quick Deploy - AWS WorkSpaces Core --- Manages an AWS WorkSpaces directory connection.",
+		Description: "DaaS Quick Deploy for AWS --- Manages an AWS WorkSpaces directory connection.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the directory connection.",

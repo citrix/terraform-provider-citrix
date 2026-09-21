@@ -26,11 +26,11 @@ func TestPolicySettingResource(t *testing.T) {
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the policy setting
-					resource.TestCheckResourceAttr("citrix_policy_setting.test_policy_setting", "name", "AdvanceWarningPeriod"),
+					resource.TestCheckResourceAttr("citrix_policy_setting.test_policy_setting", "name", "WemBrokerSvcName"),
 					// Verify the use_default of the policy setting
 					resource.TestCheckResourceAttr("citrix_policy_setting.test_policy_setting", "use_default", "false"),
 					// Verify the value of the policy setting
-					resource.TestCheckResourceAttr("citrix_policy_setting.test_policy_setting", "value", "13:00:00"),
+					resource.TestCheckResourceAttr("citrix_policy_setting.test_policy_setting", "value", "wem-broker-1.test.local"),
 				),
 			},
 			{
@@ -47,11 +47,11 @@ func TestPolicySettingResource(t *testing.T) {
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the policy setting
-					resource.TestCheckResourceAttr("citrix_policy_setting.test_policy_setting", "name", "AdvanceWarningPeriod"),
+					resource.TestCheckResourceAttr("citrix_policy_setting.test_policy_setting", "name", "WemBrokerSvcName"),
 					// Verify the use_default of the policy setting
 					resource.TestCheckResourceAttr("citrix_policy_setting.test_policy_setting", "use_default", "false"),
 					// Verify the value of the policy setting
-					resource.TestCheckResourceAttr("citrix_policy_setting.test_policy_setting", "value", "16:00:00"),
+					resource.TestCheckResourceAttr("citrix_policy_setting.test_policy_setting", "value", "wem-broker-2.test.local"),
 				),
 			},
 			{
@@ -63,7 +63,7 @@ func TestPolicySettingResource(t *testing.T) {
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the name of the policy setting
-					resource.TestCheckResourceAttr("citrix_policy_setting.test_policy_setting", "name", "AdvanceWarningPeriod"),
+					resource.TestCheckResourceAttr("citrix_policy_setting.test_policy_setting", "name", "WemBrokerSvcName"),
 					// Verify the use_default of the policy setting
 					resource.TestCheckResourceAttr("citrix_policy_setting.test_policy_setting", "use_default", "true"),
 				),
@@ -76,25 +76,25 @@ var (
 	testPolicySettingResource = `
 resource "citrix_policy_setting" "test_policy_setting" {
     policy_id   = citrix_policy.test_policy1.id
-    name        = "AdvanceWarningPeriod"
+    name        = "WemBrokerSvcName"
     use_default = false
-    value       = "13:00:00"
+    value       = "wem-broker-1.test.local"
 }
 `
 
 	testPolicySettingResource_Updated = `
 resource "citrix_policy_setting" "test_policy_setting" {
     policy_id   = citrix_policy.test_policy2.id
-    name        = "AdvanceWarningPeriod"
+    name        = "WemBrokerSvcName"
     use_default = false
-    value       = "16:00:00"
+    value       = "wem-broker-2.test.local"
 }
 `
 
 	testPolicySettingResource_UseDefault = `
 resource "citrix_policy_setting" "test_policy_setting" {
     policy_id   = citrix_policy.test_policy2.id
-    name        = "AdvanceWarningPeriod"
+    name        = "WemBrokerSvcName"
     use_default = true
 }
 `

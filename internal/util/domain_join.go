@@ -94,7 +94,7 @@ func (MachineDomainIdentityModel) GetAttributes() map[string]schema.Attribute {
 
 func (MachineDomainIdentityModel) GetCmaSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
-		Description: "The domain identity for creating machines in the domain-joined Citrix Managed Azure catalog. Only required when the machines in catalog are domain-joined",
+		Description: "The domain identity for creating machines in the domain-joined Flex Azure catalog. Only required when the machines in catalog are domain-joined",
 		Optional:    true,
 		Attributes: map[string]schema.Attribute{
 			"domain": schema.StringAttribute{
@@ -115,7 +115,7 @@ func (MachineDomainIdentityModel) GetCmaSchema() schema.SingleNestedAttribute {
 				},
 			},
 			"service_account_domain": schema.StringAttribute{
-				Description: "The domain name of the service account if it is in a different domain from where the machines resides. **This is not yet supported in Citrix Managed Azure Catalogs.**",
+				Description: "The domain name of the service account if it is in a different domain from where the machines resides. **This is not yet supported in Flex Azure Catalogs.**",
 				Optional:    true,
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(regexp.MustCompile(DomainFqdnRegex), "must be in FQDN format"),
@@ -148,7 +148,7 @@ func (MachineDomainIdentityModel) GetCmaSchema() schema.SingleNestedAttribute {
 				},
 			},
 			"service_account_id": schema.StringAttribute{
-				Description: "The service account Id to be used for managing the machine accounts. **This is not yet supported in Citrix Managed Azure Catalogs.**",
+				Description: "The service account Id to be used for managing the machine accounts. **This is not yet supported in Flex Azure Catalogs.**",
 				Optional:    true,
 			},
 		},

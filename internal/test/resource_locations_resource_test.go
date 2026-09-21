@@ -40,6 +40,8 @@ func TestResourceLocationResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_cloud_resource_location.test_resource_location", "internal_only", "false"),
 					// Verify the value of the time_zone attribute (Set to "UTC" by default)
 					resource.TestCheckResourceAttr("citrix_cloud_resource_location.test_resource_location", "time_zone", "GMT Standard Time"),
+					// Verify the value of the force_delete flag (Set to false by default)
+					resource.TestCheckResourceAttr("citrix_cloud_resource_location.test_resource_location", "force_delete", "false"),
 				),
 			},
 			// ImportState testing

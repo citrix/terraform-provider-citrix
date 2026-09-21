@@ -3,6 +3,7 @@
 package linters
 
 import (
+	"github.com/citrix/terraform-provider-citrix/custom-linters/continuationtoken"
 	"github.com/citrix/terraform-provider-citrix/custom-linters/executewithretry"
 	"github.com/citrix/terraform-provider-citrix/custom-linters/panichandler"
 	"github.com/citrix/terraform-provider-citrix/custom-linters/unknowncheck"
@@ -14,6 +15,7 @@ func init() {
 	register.Plugin("panichandler", NewPanicHandler)
 	register.Plugin("unknowncheck", NewUnknownCheck)
 	register.Plugin("executewithretry", NewExecuteWithRetry)
+	register.Plugin("continuationtoken", NewContinuationToken)
 }
 
 type PanicHandlerPlugin struct{}
@@ -61,5 +63,21 @@ func (p *ExecuteWithRetryPlugin) BuildAnalyzers() ([]*analysis.Analyzer, error) 
 }
 
 func (p *ExecuteWithRetryPlugin) GetLoadMode() string {
+	return register.LoadModeTypesInfo
+}
+
+type ContinuationTokenPlugin struct{}
+
+func NewContinuationToken(settings any) (register.LinterPlugin, error) {
+	return &ContinuationTokenPlugin{}, nil
+}
+
+func (p *ContinuationTokenPlugin) BuildAnalyzers() ([]*analysis.Analyzer, error) {
+	return []*analysis.Analyzer{
+		continuationtoken.Analyzer,
+	}, nil
+}
+
+func (p *ContinuationTokenPlugin) GetLoadMode() string {
 	return register.LoadModeTypesInfo
 }

@@ -368,7 +368,7 @@ func getApplicationGroup(ctx context.Context, client *citrixdaasclient.CitrixDaa
 
 func getDeliveryGroups(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, applicationGroupId string) (*citrixorchestration.ApplicationGroupDeliveryGroupResponseModelCollection, error) {
 	getDeliveryGroupsRequest := client.ApiClient.ApplicationGroupsAPIsDAAS.ApplicationGroupsGetApplicationGroupDeliveryGroups(ctx, applicationGroupId)
-	deliveryGroups, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ApplicationGroupDeliveryGroupResponseModelCollection](getDeliveryGroupsRequest, client)
+	deliveryGroups, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.ApplicationGroupDeliveryGroupResponseModelCollection](getDeliveryGroupsRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error Reading Delivery Groups",

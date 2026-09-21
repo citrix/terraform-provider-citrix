@@ -12,6 +12,7 @@ linters:
     - panichandler     # Enforce defer util.PanicHandler(&resp.Diagnostics) in SDK methods
     - unknowncheck     # Enforce IsUnknown() before IsNull() in ValidateConfig/ModifyPlan
     - executewithretry # Enforce ExecuteWithRetry wrapper for API GET calls
+    - continuationtoken # Enforce paginated fetches loop over their page token
     
     # Static Analysis
     - gocheckcompilerdirectives # Compiler directive checks
@@ -123,6 +124,10 @@ linters:
         type: "module"
         description: Checks that API GET calls use ExecuteWithRetry wrapper instead of calling Execute() directly for proper resilience
         path: ./custom-linters
+      continuationtoken:
+        type: "module"
+        description: Checks that paginated API fetches loop over their continuation/next token instead of truncating at the API page size
+        path: ./custom-linters
 
   exclusions:
     rules:
@@ -133,6 +138,7 @@ linters:
           - panichandler
           - unknowncheck
           - executewithretry
+          - continuationtoken
       # Allow nilnil and errcheck issues in test code
       - path: test
         linters:

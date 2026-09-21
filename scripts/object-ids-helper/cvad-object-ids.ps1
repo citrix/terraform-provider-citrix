@@ -330,27 +330,68 @@ function Get-ResourceList {
         $url = Get-UrlForQuickDeployObjects -requestPath $requestPath
     }
     
-    # Check if the resource provider is supported in the current environment (eg. WEM is not supported for most environments)
-    try {
-        $response = Start-GetRequest -url $url
-    }
-    catch {
-        # Ignore 503 errors for WEM objects
-        if (-not($_.Exception.Response.StatusCode -eq 503)) {
-            Write-Error "Failed to get $resourceProviderName. Error: $($_.Exception.Message)" -ErrorAction Continue
+    # List endpoints cap each response at a default page size (250) and return a ContinuationToken when more
+    # results remain; follow it so every resource is enumerated instead of just the first page.
+    $items = [System.Collections.Generic.List[object]]::new()
+    $continuationToken = $null
+    $pageNumber = 0
+    $maxPages = 1000
+    do {
+        $pageUrl = $url
+        if ($continuationToken) {
+            $separator = if ($url.Contains("?")) { "&" } else { "?" }
+            $pageUrl = "$url$separator" + "continuationToken=$([uri]::EscapeDataString($continuationToken))"
         }
-        return @()
-    }
-    
-    $items = $response.Items
 
-    # Quick Deploy has different response structure
-    if ($resourceProviderName -eq "quickdeploy_catalog") {
-        $items = if ($null -ne $response.items) { $response.items } else { $response.catalogs }
-    }
-    elseif ($resourceProviderName -eq "quickdeploy_template_image") {
-        $items = $response.items
-    }
+        # Check if the resource provider is supported in the current environment (eg. WEM is not supported for most environments)
+        try {
+            $response = Start-GetRequest -url $pageUrl
+        }
+        catch {
+            # Ignore 503 errors for WEM objects; Response is null on network/TLS failures so guard before reading StatusCode
+            if (($null -eq $_.Exception.Response) -or ($_.Exception.Response.StatusCode -ne 503)) {
+                Write-Error "Failed to get $resourceProviderName. Error: $($_.Exception.Message)" -ErrorAction Continue
+            }
+            return @()
+        }
+
+        $pageItems = $response.Items
+
+        # Quick Deploy has different response structure
+        if ($resourceProviderName -eq "quickdeploy_catalog") {
+            $pageItems = if ($null -ne $response.items) { $response.items } else { $response.catalogs }
+        }
+        elseif ($resourceProviderName -eq "quickdeploy_template_image") {
+            $pageItems = $response.items
+        }
+
+        if ($null -ne $pageItems) {
+            $items.AddRange([object[]]@($pageItems))
+        }
+
+        $pageNumber++
+
+        $nextToken = $null
+        if ($response.PSObject.Properties.Name -contains "ContinuationToken") {
+            $nextToken = $response.ContinuationToken
+        }
+
+        if ([string]::IsNullOrEmpty($nextToken)) {
+            $continuationToken = $null
+        }
+        elseif ($nextToken -eq $continuationToken) {
+            # Some filtered endpoints keep returning the same token; stop so paging cannot loop forever.
+            Write-Verbose "Continuation token for $resourceProviderName did not advance; stopping after $pageNumber page(s)."
+            $continuationToken = $null
+        }
+        elseif ($pageNumber -ge $maxPages) {
+            Write-Warning "Reached the $maxPages page limit while paging $resourceProviderName; some items may be missing."
+            $continuationToken = $null
+        }
+        else {
+            $continuationToken = $nextToken
+        }
+    } while ($continuationToken)
 
     # WEM supports AD object type 'Catalog'. Filter out other object types
     if ($resourceProviderName -eq "wem_directory_object" -and $items.Count -gt 0) {

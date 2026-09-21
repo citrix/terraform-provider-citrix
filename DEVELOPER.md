@@ -7,6 +7,7 @@ This documentation will guide you through the process of setting up your dev env
   - [Table of Contents](#table-of-contents)
   - [Install Dependencies](#install-dependencies)
   - [Building the Provider](#building-the-provider)
+  - [Calling the Citrix DaaS API](#calling-the-citrix-daas-api)
   - [Load project in VSCode for Go Development](#load-project-in-vscode-for-go-development)
   - [Debugging Provider code in VSCode](#debugging-provider-code-in-vscode)
     - [Add VSCode Launch Configuration](#add-vscode-launch-configuration)
@@ -64,6 +65,29 @@ make generate   # regenerate docs
 
 ### Linting
 The `make lint` target includes custom static analysis linters specific to our Terraform provider. See [custom-linters/README.md](./custom-linters/README.md) for details on the custom linters and how to add new ones.
+
+## Calling the Citrix DaaS API
+
+Read operations go through the [citrix-daas-rest-go](https://github.com/citrix/citrix-daas-rest-go) client. Two wrappers standardize resilience and pagination, and both are enforced by custom linters so the compiler and CI catch misuse.
+
+### ExecuteWithRetry
+Use `citrixdaasclient.ExecuteWithRetry[*ResponseType](request, client)` for every GET/read call rather than calling `request.Execute()` directly. It adds automatic retry with exponential backoff for transient failures (429 and 5xx). The `executewithretry` linter flags a direct `Execute()` on a GET request. Non-GET operations (Create, Update, Delete, Set) use `AddRequestData(request, client).Execute()`.
+
+```go
+getRequest := client.ApiClient.HypervisorsAPIsDAAS.HypervisorsGetHypervisor(ctx, hypervisorId)
+hypervisor, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.HypervisorDetailResponseModel](getRequest, client)
+```
+
+### GetAllPagesWithRetry
+List endpoints return at most one page (default 250 records) plus a page token when more results remain. Use `citrixdaasclient.GetAllPagesWithRetry[*Collection](request, client)` for these. It wraps `ExecuteWithRetry`, follows the page token (`ContinuationToken` for DaaS, `NextToken` for Global App Configuration) until every page is retrieved, and returns the collection populated with the full item set, so no hand-written loop is needed. The `continuationtoken` linter flags any fetch (not just `ExecuteWithRetry`) that is handed a paginable request and returns a paginated collection, requiring `GetAllPagesWithRetry` instead; a call that genuinely cannot use the helper (for example an async fetch whose pages come from `GetAsyncJobResult`, or a read that needs `ReadResource`'s remove-from-state handling) must be suppressed with `//nolint:continuationtoken`.
+
+```go
+getRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroups(ctx)
+deliveryGroups, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.DeliveryGroupResponseModelCollection](getRequest, client)
+// deliveryGroups.GetItems() now holds every page
+```
+
+Endpoints whose request builder has no token setter are returned after the first page unchanged, so the helper is safe to use for any list GET. Hand-write a pagination loop only when you need to process each page as it arrives.
 
 ## Load project in VSCode for Go Development
 Visual Studio Code requires the `Go` extension to be able to load go projects, resolve internal references and even cross package references. Once the `Go` extension is installed, you should be able to load `terraform-provider-citrix` in VSCode. `Go` plugin requires the `go.mod` file to be in the root work directory when you load the project.

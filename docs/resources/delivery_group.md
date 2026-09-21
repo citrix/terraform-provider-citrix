@@ -550,7 +550,7 @@ Optional:
 
 ~> **Please Note** Session roaming should be set to `false` for Remote PC Delivery Group.
 - `enabled` (Boolean) Specify whether to enable the delivery of this desktop. Default is `true`.
-- `restrict_to_tag` (String) Restrict session launch to machines with tag specified in GUID.
+- `restrict_to_tag` (String) Restrict session launch to machines with the specified tag.
 - `restricted_access_users` (Attributes) Restrict access to this Desktop by specifying users and groups in the allow and block list. 
 
 ~> **Please Note** If `restricted_access_users` attribute is omitted or set to `null`, all authenticated users will have access to this Desktop. If attribute is specified as an empty object i.e. `{}`, then no user will have access to the desktop because `allow_list` and `block_list` will be set as empty sets by default.
@@ -613,7 +613,7 @@ Optional:
 - `reboot_notification_to_users` (Attributes) The reboot notification for the reboot schedule. 
 
 ~> **Please Note** Not available for natural reboot. (see [below for nested schema](#nestedatt--reboot_schedules--reboot_notification_to_users))
-- `restrict_to_tag` (String) Restrict reboot schedule to machines with tag specified in Guid.
+- `restrict_to_tag` (String) Restrict reboot schedule to machines with the specified tag.
 - `week_in_month` (String) The week in the month on which the reboot schedule runs monthly. Can only be set to `First`, `Second`, `Third`, `Fourth`, or `Last`.
 
 <a id="nestedatt--reboot_schedules--reboot_notification_to_users"></a>

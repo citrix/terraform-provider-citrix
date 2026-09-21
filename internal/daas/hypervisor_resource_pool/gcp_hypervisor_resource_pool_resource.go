@@ -200,7 +200,7 @@ func (r *gcpHypervisorResourcePoolResource) Update(ctx context.Context, req reso
 		// Support shared VPC if specified as true
 		vnetPath = fmt.Sprintf("%s/%s.sharedvirtualprivatecloud", regionPath, plan.Vpc.ValueString())
 	}
-	subnets, err := getHypervisorResourcePoolSubnets(ctx, r.client, &resp.Diagnostics, plan.Hypervisor.ValueString(), vnetPath, planSubnet, citrixorchestration.HYPERVISORCONNECTIONTYPE_AZURE_RM)
+	subnets, err := getHypervisorResourcePoolSubnets(ctx, r.client, &resp.Diagnostics, plan.Hypervisor.ValueString(), vnetPath, planSubnet, citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM)
 	if err != nil {
 		// Directly return. Error logs have been populated in common function
 		return

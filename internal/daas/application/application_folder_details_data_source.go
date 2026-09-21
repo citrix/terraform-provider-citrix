@@ -65,7 +65,7 @@ func (d *ApplicationDataSource) Read(ctx context.Context, req datasource.ReadReq
 	if !data.Path.IsNull() {
 		applicationFolderPath := util.BuildResourcePathForGetRequest(data.Path.ValueString(), "")
 		getApplicationsRequest := d.client.ApiClient.AdminFoldersAPIsDAAS.AdminFoldersGetAdminFolderApplications(ctx, applicationFolderPath)
-		apps, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ApplicationResponseModelCollection](getApplicationsRequest, d.client)
+		apps, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.ApplicationResponseModelCollection](getApplicationsRequest, d.client)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error getting Applications from folder "+data.Path.ValueString(),

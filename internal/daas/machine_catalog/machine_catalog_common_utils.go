@@ -363,7 +363,7 @@ func verifyMachinesUsingIdentity(ctx context.Context, client *citrixdaasclient.C
 func getMachinesUsingIdentity(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, machines []string) ([]citrixorchestration.IdentityMachineResponseModel, *http.Response, error) {
 	getMachinesRequest := client.ApiClient.IdentityAPIsDAAS.IdentityGetMachines(ctx)
 	getMachinesRequest = getMachinesRequest.Machine(machines)
-	identityMachinesResponseModel, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.IdentityMachineResponseModelCollection](getMachinesRequest, client)
+	identityMachinesResponseModel, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.IdentityMachineResponseModelCollection](getMachinesRequest, client)
 
 	identityMachines := identityMachinesResponseModel.GetItems()
 
@@ -455,6 +455,7 @@ func getMachineCatalogMachineADAccounts(ctx context.Context, diagnostics *diag.D
 	adAccountsResp := &citrixorchestration.ProvisioningSchemeMachineAccountResponseModelCollection{}
 	for ok := true; ok; ok = adAccountsResp.HasContinuationToken() {
 		getADAccountsRequest = getADAccountsRequest.ContinuationToken(adAccountsResp.GetContinuationToken())
+		//nolint:continuationtoken // async paged fetch: ExecuteWithRetry starts the job, each page is collected via GetAsyncJobResult below
 		_, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ProvisioningSchemeMachineAccountResponseModelCollection](getADAccountsRequest, client)
 
 		if err != nil {

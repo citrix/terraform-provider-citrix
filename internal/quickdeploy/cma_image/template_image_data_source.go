@@ -58,7 +58,7 @@ func (d *CitrixManagedAzureImageDataSource) Read(ctx context.Context, req dataso
 	getTemplateImagesRequest := d.client.QuickDeployClient.MasterImageCMD.GetImages(ctx, d.client.ClientConfig.CustomerId, d.client.ClientConfig.SiteId)
 	images, _, err := citrixdaasclient.ExecuteWithRetry[*citrixquickdeploy.CustomerTemplateImageOverviewsModel](getTemplateImagesRequest, d.client)
 	if err != nil {
-		resp.Diagnostics.AddError("Error getting Citrix Managed Azure Template Images", err.Error())
+		resp.Diagnostics.AddError("Error getting Flex Azure Template Images", err.Error())
 		return
 	}
 	id := ""
@@ -69,11 +69,11 @@ func (d *CitrixManagedAzureImageDataSource) Read(ctx context.Context, req dataso
 		}
 	}
 	if id == "" {
-		resp.Diagnostics.AddError("Error getting Citrix Managed Azure Template Image", "Image with name "+data.Name.ValueString()+" not found")
+		resp.Diagnostics.AddError("Error getting Flex Azure Template Image", "Image with name "+data.Name.ValueString()+" not found")
 		return
 	}
 
-	// Try getting the Citrix Managed Azure Template Image
+	// Try getting the Flex Azure Template Image
 	image, _, err := util.GetTemplateImageWithId(ctx, d.client, &resp.Diagnostics, id, true)
 	if err != nil {
 		// Remove from state

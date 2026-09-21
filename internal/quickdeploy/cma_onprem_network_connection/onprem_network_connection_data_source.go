@@ -55,11 +55,11 @@ func (d *CitrixManagedAzureOnPremNetworkConnectionDataSource) Read(ctx context.C
 	// Get VNet Peering Id from Name
 	onPremConnection, err := util.GetCitrixManagedOnPremConnectionWithName(ctx, d.client, data.Name.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Error getting Citrix Managed Azure VNet Peering", err.Error())
+		resp.Diagnostics.AddError("Error getting Flex Azure VNet Peering", err.Error())
 		return
 	}
 	if onPremConnection == nil {
-		resp.Diagnostics.AddError("Error getting Citrix Managed Azure VNet Peering", "VNet Peering with name "+data.Name.ValueString()+" not found")
+		resp.Diagnostics.AddError("Error getting Flex Azure VNet Peering", "VNet Peering with name "+data.Name.ValueString()+" not found")
 		return
 	}
 

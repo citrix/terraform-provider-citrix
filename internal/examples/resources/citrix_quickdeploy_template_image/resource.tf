@@ -1,7 +1,7 @@
 # Quick Deploy Template Image with VHD URI
 resource citrix_quickdeploy_template_image test_image {
     name = "example-template-image"
-    notes = "Example Windows Gen 1 template image imported to US East region in the Citrix Managed Azure Subscription via VHD URI"
+    notes = "Example Windows Gen 1 template image imported to US East region in the Flex Azure Subscription via VHD URI"
     subscription_name = "Citrix Managed"
     region = "East US"
     vhd_uri = "<Image VHD URI>"

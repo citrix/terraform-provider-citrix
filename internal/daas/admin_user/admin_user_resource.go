@@ -286,33 +286,17 @@ func getAllAdminUsers(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 	// Get admin users
 	getAdminUsersRequest := client.ApiClient.AdminAPIsDAAS.AdminGetAdminAdministrators(ctx)
 
-	var adminUsers []citrixorchestration.AdministratorResponseModel
-	getAdminUsersResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.AdministratorResponseModelCollection](getAdminUsersRequest, client)
-
+	getAdminUsersResponse, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.AdministratorResponseModelCollection](getAdminUsersRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error fetching Admin Users",
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return []citrixorchestration.AdministratorResponseModel{}, err
 	}
 
-	adminUsers = getAdminUsersResponse.GetItems()
-
-	for getAdminUsersResponse.GetContinuationToken() != "" {
-		getAdminUsersRequest = getAdminUsersRequest.ContinuationToken(getAdminUsersResponse.GetContinuationToken())
-		getAdminUsersResponse, httpResp, err = citrixdaasclient.ExecuteWithRetry[*citrixorchestration.AdministratorResponseModelCollection](getAdminUsersRequest, client)
-		if err != nil {
-			diagnostics.AddError(
-				"Error fetching Admin Users",
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+util.ReadClientError(err),
-			)
-		}
-		adminUsers = append(adminUsers, getAdminUsersResponse.GetItems()...)
-	}
-
-	return adminUsers, err
+	return getAdminUsersResponse.GetItems(), nil
 }
 
 func readAdminUser(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, adminUserFqdnOrId string) (*citrixorchestration.AdministratorResponseModel, error) {

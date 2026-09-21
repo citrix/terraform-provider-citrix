@@ -557,7 +557,7 @@ func getApplication(ctx context.Context, client *citrixdaasclient.CitrixDaasClie
 
 func getApplicationDeliveryGroups(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, applicationPathOrId string) (*citrixorchestration.ApplicationDeliveryGroupResponseModelCollection, error) {
 	getApplicationDeliveryGroupsRequest := client.ApiClient.ApplicationsAPIsDAAS.ApplicationsGetApplicationDeliveryGroups(ctx, applicationPathOrId)
-	applicationDeliveryGroups, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ApplicationDeliveryGroupResponseModelCollection](getApplicationDeliveryGroupsRequest, client)
+	applicationDeliveryGroups, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.ApplicationDeliveryGroupResponseModelCollection](getApplicationDeliveryGroupsRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error Reading Delivery Groups associated with Application "+applicationPathOrId,
@@ -571,7 +571,7 @@ func getApplicationDeliveryGroups(ctx context.Context, client *citrixdaasclient.
 
 func getApplicationGroupsForApplication(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, applicationPathOrId string) (*citrixorchestration.ApplicationGroupResponseModelCollection, error) {
 	getApplicationGroupsRequest := client.ApiClient.ApplicationsAPIsDAAS.ApplicationsGetApplicationApplicationGroups(ctx, applicationPathOrId)
-	applicationGroups, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ApplicationGroupResponseModelCollection](getApplicationGroupsRequest, client)
+	applicationGroups, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.ApplicationGroupResponseModelCollection](getApplicationGroupsRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error Reading Application Groups associated with Application "+applicationPathOrId,

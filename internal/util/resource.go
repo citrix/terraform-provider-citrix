@@ -94,27 +94,16 @@ func GetDeliveryGroups(ctx context.Context, client *citrixdaasclient.CitrixDaasC
 		req = req.Fields(fields)
 	}
 
-	deliveryGroups := []citrixorchestration.DeliveryGroupResponseModel{}
-	continuationToken := ""
-	for {
-		req = req.ContinuationToken(continuationToken)
-
-		responseModel, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.DeliveryGroupResponseModelCollection](req, client)
-		if err != nil {
-			diagnostics.AddError(
-				"Error reading delivery groups",
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+ReadClientError(err),
-			)
-			return deliveryGroups, err
-		}
-		deliveryGroups = append(deliveryGroups, responseModel.GetItems()...)
-
-		if responseModel.GetContinuationToken() == "" {
-			return deliveryGroups, nil
-		}
-		continuationToken = responseModel.GetContinuationToken()
+	responseModel, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.DeliveryGroupResponseModelCollection](req, client)
+	if err != nil {
+		diagnostics.AddError(
+			"Error reading delivery groups",
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+ReadClientError(err),
+		)
+		return []citrixorchestration.DeliveryGroupResponseModel{}, err
 	}
+	return responseModel.GetItems(), nil
 }
 
 func GetDeliveryGroup(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string) (*citrixorchestration.DeliveryGroupDetailResponseModel, error) {
@@ -149,25 +138,16 @@ func GetDeliveryGroupMachines(ctx context.Context, client *citrixdaasclient.Citr
 	req := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroupMachines(ctx, deliveryGroupId)
 	req = req.Limit(250)
 
-	responses := []citrixorchestration.MachineResponseModel{}
-	continuationToken := ""
-	for {
-		req = req.ContinuationToken(continuationToken)
-		responseModel, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.MachineResponseModelCollection](req, client)
-		if err != nil {
-			diagnostics.AddError(
-				"Error reading Machines for Delivery Group "+deliveryGroupId,
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+ReadClientError(err),
-			)
-			return responses, err
-		}
-		responses = append(responses, responseModel.GetItems()...)
-		if responseModel.GetContinuationToken() == "" {
-			return responses, nil
-		}
-		continuationToken = responseModel.GetContinuationToken()
+	responseModel, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.MachineResponseModelCollection](req, client)
+	if err != nil {
+		diagnostics.AddError(
+			"Error reading Machines for Delivery Group "+deliveryGroupId,
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+ReadClientError(err),
+		)
+		return []citrixorchestration.MachineResponseModel{}, err
 	}
+	return responseModel.GetItems(), nil
 }
 
 func GetApplicationGroupIdWithPath(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, appGroupPath string) (string, error) {
@@ -188,25 +168,16 @@ func GetMachineCatalogMachines(ctx context.Context, client *citrixdaasclient.Cit
 	req := client.ApiClient.MachineCatalogsAPIsDAAS.MachineCatalogsGetMachineCatalogMachines(ctx, machineCatalogId).Fields("Id,Name,Hosting,DeliveryGroup,InMaintenanceMode,AssignedUsers,AssociatedUsers,AllocationType,Sid")
 	req = req.Limit(250)
 
-	responses := []citrixorchestration.MachineResponseModel{}
-	continuationToken := ""
-	for {
-		req = req.ContinuationToken(continuationToken)
-		responseModel, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.MachineResponseModelCollection](req, client)
-		if err != nil {
-			diagnostics.AddError(
-				"Error reading Machines for Machine Catalog "+machineCatalogId,
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+ReadClientError(err),
-			)
-			return responses, err
-		}
-		responses = append(responses, responseModel.GetItems()...)
-		if responseModel.GetContinuationToken() == "" {
-			return responses, nil
-		}
-		continuationToken = responseModel.GetContinuationToken()
+	responseModel, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.MachineResponseModelCollection](req, client)
+	if err != nil {
+		diagnostics.AddError(
+			"Error reading Machines for Machine Catalog "+machineCatalogId,
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+ReadClientError(err),
+		)
+		return []citrixorchestration.MachineResponseModel{}, err
 	}
+	return responseModel.GetItems(), nil
 }
 
 func GetSingleResourceFromHypervisorWithNoCacheRetry(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorName, hypervisorPoolName, folderPath, resourceName, resourceType, resourceGroupName string) (*citrixorchestration.HypervisorResourceResponseModel, *http.Response, error) {
@@ -584,7 +555,7 @@ func CategorizeScopes(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 }
 
 func IsScopeInherited(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, scopeNameOrId string, parentObjectType citrixorchestration.ScopedObjectType, parentObjectIds []string) (bool, error) {
-	responseModels, err := GetAllScopedObjects(ctx, client, diagnostics, scopeNameOrId, "")
+	responseModels, err := GetAllScopedObjects(ctx, client, diagnostics, scopeNameOrId)
 	if err != nil {
 		return false, err
 	}
@@ -619,11 +590,10 @@ func IsScopeInherited(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 	return false, nil
 }
 
-func GetAllScopedObjects(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, scopeNameOrId string, continuationToken string) ([]citrixorchestration.ScopedObjectResponseModel, error) {
+func GetAllScopedObjects(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, scopeNameOrId string) ([]citrixorchestration.ScopedObjectResponseModel, error) {
 	req := client.ApiClient.AdminAPIsDAAS.AdminGetAdminScopedObjects(ctx, scopeNameOrId)
 	req = req.Limit(250)
-	req = req.ContinuationToken(continuationToken)
-	responseModel, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ScopedObjectResponseModelCollection](req, client)
+	responseModel, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.ScopedObjectResponseModelCollection](req, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error fetching associated objects for admin scope "+scopeNameOrId,
@@ -632,12 +602,7 @@ func GetAllScopedObjects(ctx context.Context, client *citrixdaasclient.CitrixDaa
 		)
 		return []citrixorchestration.ScopedObjectResponseModel{}, err
 	}
-	if responseModel.GetContinuationToken() != "" {
-		childResponse, err := GetAllScopedObjects(ctx, client, diagnostics, scopeNameOrId, responseModel.GetContinuationToken())
-		return append(responseModel.GetItems(), childResponse...), err
-	} else {
-		return responseModel.GetItems(), nil
-	}
+	return responseModel.GetItems(), nil
 }
 
 func BuildResourcePathForGetRequest(resourcePathInput string, resourceName string) string {

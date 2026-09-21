@@ -243,11 +243,8 @@ func (DeliveryGroupRebootSchedule) GetSchema() schema.NestedAttributeObject {
 				Required:    true,
 			},
 			"restrict_to_tag": schema.StringAttribute{
-				Description: "Restrict reboot schedule to machines with tag specified in Guid.",
+				Description: "Restrict reboot schedule to machines with the specified tag.",
 				Optional:    true,
-				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
-				},
 			},
 			"ignore_maintenance_mode": schema.BoolAttribute{
 				Description: "Whether the reboot schedule ignores machines in the maintenance mode.",
@@ -762,11 +759,8 @@ func (DeliveryGroupDesktop) GetSchema() schema.NestedAttributeObject {
 				Default:     stringdefault.StaticString(""),
 			},
 			"restrict_to_tag": schema.StringAttribute{
-				Description: "Restrict session launch to machines with tag specified in GUID.",
+				Description: "Restrict session launch to machines with the specified tag.",
 				Optional:    true,
-				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
-				},
 			},
 			"enabled": schema.BoolAttribute{
 				Description: "Specify whether to enable the delivery of this desktop. Default is `true`.",
