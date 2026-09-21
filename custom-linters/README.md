@@ -61,6 +61,30 @@ func createHypervisor(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 }
 ```
 
+### ContinuationToken
+
+**Purpose:** Enforces that paginated API responses are looped over using their continuation token, so callers do not silently stop at the first page.
+
+**Why?** List endpoints cap each response at a default page size (250 records for Orchestration) and return a `ContinuationToken` when more results remain. Reading `GetItems()` without ever following `GetContinuationToken()` truncates the result set, causing resources beyond the first page to be missed.
+
+**Required fix:** use `citrixdaasclient.GetAllPagesWithRetry[*Collection](request, client)` instead of `ExecuteWithRetry`. It follows the page token (ContinuationToken or NextToken) internally and returns the collection with the full item set, so no hand-written loop is needed. A hand-written pagination loop is also flagged. If a call genuinely cannot use the helper (for example an async fetch whose pages come from `GetAsyncJobResult`), suppress it with `//nolint:continuationtoken // <reason>`.
+
+**How it Works:**
+- Flags any call (not just `ExecuteWithRetry`) that is handed a paginable request AND returns a paginated collection. "Paginable request" means the first argument's builder type exposes a page-token setter (`ContinuationToken` or `NextToken`) and "paginated collection" means the result type exposes `GetContinuationToken()` or `GetNextToken()`. Requiring both signals keeps the check precise while catching fetch wrappers beyond `ExecuteWithRetry` (for example `util.ReadResource`)
+- `GetAllPagesWithRetry` is exempt, it is the sanctioned way to page
+- A response model that carries `GetContinuationToken()` structurally but whose request builder has no token setter is never flagged, because its endpoint returns everything in one call. Direct `Execute()` is out of scope, the `executewithretry` linter already requires GET operations to use `ExecuteWithRetry`
+
+**Code Examples:**
+
+```go
+// ✓ Correct - GetAllPagesWithRetry follows the page token and returns every page
+func getAll(ctx context.Context, client *citrixdaasclient.CitrixDaasClient) (*citrixorchestration.ItemResponseModelCollection, error) {
+    req := client.ApiClient.ItemsAPIsDAAS.ItemsGetItems(ctx)
+    result, _, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.ItemResponseModelCollection](req, client)
+    return result, err // result.GetItems() now holds the full set
+}
+```
+
 ### PanicHandler
 
 **Purpose:** Enforces that all Terraform provider SDK interface functions start with `defer util.PanicHandler(&resp.Diagnostics)`.

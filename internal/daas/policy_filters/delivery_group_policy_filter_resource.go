@@ -4,7 +4,6 @@ package policy_filters
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -63,30 +62,7 @@ func (r *deliveryGroupFilterResource) Create(ctx context.Context, req resource.C
 		return
 	}
 
-	policyFilters, err := getPolicyFilters(ctx, r.client, &resp.Diagnostics, plan.GetPolicyId())
-	if err != nil {
-		return
-	}
-
-	for _, policyFilter := range policyFilters {
-		if policyFilter.GetPolicyGuid() == plan.GetPolicyId() && policyFilter.GetFilterType() == "DesktopGroup" {
-			var uuidFilterData util.PolicyFilterUuidDataClientModel
-			err := json.Unmarshal([]byte(policyFilter.GetFilterData()), &uuidFilterData)
-			if err != nil {
-				continue
-			}
-
-			if uuidFilterData.Uuid == plan.DeliveryGroupId.ValueString() {
-				resp.Diagnostics.AddError(
-					"Error creating Delivery Group Policy Filter",
-					fmt.Sprintf("A Delivery Group Policy Filter (ID: %s) with the same Delivery Group ID %s already exists for this policy %s.", policyFilter.GetFilterGuid(), plan.DeliveryGroupId.ValueString(), plan.GetPolicyId()),
-				)
-				return
-			}
-		}
-	}
-
-	policyFilter, err := createPolicyFilter(ctx, r.client, &resp.Diagnostics, plan)
+	policyFilter, err := createDeliveryGroupFilterChecked(ctx, r.client, &resp.Diagnostics, plan)
 	if err != nil {
 		return
 	}

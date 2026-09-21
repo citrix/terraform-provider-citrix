@@ -94,6 +94,10 @@ func (r *TagResource) Create(ctx context.Context, req resource.CreateRequest, re
 	// Try getting the new tag detail from remote
 	tagDetailResponse, err := getTag(ctx, r.client, &resp.Diagnostics, tagResponse.GetId())
 	if err != nil {
+		// The tag was created in DaaS. Record its id so Terraform tracks the resource as tainted and
+		// replaces it on the next apply, instead of leaving it orphaned and failing every later plan
+		// with "Tag with name <name> already exist".
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), tagResponse.GetId())...)
 		return
 	}
 

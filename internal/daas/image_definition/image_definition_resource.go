@@ -454,23 +454,14 @@ func buildAssignedHypervisorConnectionRequest(ctx context.Context, diagnostics *
 func getImageVersions(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, imageDefinitionId string) ([]citrixorchestration.ImageVersionResponseModel, error) {
 	req := client.ApiClient.ImageDefinitionsAPIsDAAS.ImageDefinitionsGetImageDefinitionImageVersions(ctx, imageDefinitionId)
 	req.Limit(250)
-	responses := []citrixorchestration.ImageVersionResponseModel{}
-	continuationToken := ""
-	for {
-		req = req.ContinuationToken(continuationToken)
-		responseModel, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ImageVersionResponseModelCollection](req, client)
-		if err != nil {
-			diagnostics.AddError(
-				"Error reading Image Versions of Image Definition "+imageDefinitionId,
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+util.ReadClientError(err),
-			)
-			return responses, err
-		}
-		responses = append(responses, responseModel.GetItems()...)
-		if responseModel.GetContinuationToken() == "" {
-			return responses, nil
-		}
-		continuationToken = responseModel.GetContinuationToken()
+	responseModel, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.ImageVersionResponseModelCollection](req, client)
+	if err != nil {
+		diagnostics.AddError(
+			"Error reading Image Versions of Image Definition "+imageDefinitionId,
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		return []citrixorchestration.ImageVersionResponseModel{}, err
 	}
+	return responseModel.GetItems(), nil
 }

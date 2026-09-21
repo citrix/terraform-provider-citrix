@@ -65,6 +65,12 @@ func (r *citrixManagedAzureImageResource) Create(ctx context.Context, req resour
 		return
 	}
 
+	// Re-check the Trusted Launch rules against the resolved plan, before any API call.
+	validateTrustedLaunchConfig(&plan, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	// Generate API request body from plan
 	var importImageBody citrixquickdeploy.ImportTemplateImageModel
 	importImageBody.SetName(plan.Name.ValueString())
@@ -91,7 +97,8 @@ func (r *citrixManagedAzureImageResource) Create(ctx context.Context, req resour
 	importImageBody.SetOsPlatform(*osPlatform)
 	importImageBody.SetVtpmEnabled(plan.VtpmEnabled.ValueBool())
 	importImageBody.SetSecureBootEnabled(plan.SecureBootEnabled.ValueBool())
-	if !plan.GuestDiskUri.IsNull() {
+	// Catalog Service only null-checks this value, so "" would pass its Secure Boot check.
+	if !plan.GuestDiskUri.IsNull() && plan.GuestDiskUri.ValueString() != "" {
 		importImageBody.SetVhdEncryptionUri(plan.GuestDiskUri.ValueString())
 	}
 
@@ -105,7 +112,7 @@ func (r *citrixManagedAzureImageResource) Create(ctx context.Context, req resour
 	importTemplateImageRequest := r.client.QuickDeployClient.MasterImageCMD.ImportTemplateImage(ctx, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId)
 	importTemplateImageRequest = importTemplateImageRequest.ImportTemplateImageModel(importImageBody)
 
-	// Import new Citrix Managed Azure Template Image
+	// Import new Flex Azure Template Image
 	importImageResponse, httpResp, err := citrixdaasclient.AddRequestData(importTemplateImageRequest, r.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -116,7 +123,7 @@ func (r *citrixManagedAzureImageResource) Create(ctx context.Context, req resour
 		return
 	}
 
-	// Try getting the new Citrix Managed Azure Template Image
+	// Try getting the new Flex Azure Template Image
 	image, httpResp, err := waitForImageImportCompletion(ctx, r.client, &resp.Diagnostics, importImageResponse)
 	if err != nil {
 		return
@@ -157,7 +164,7 @@ func (r *citrixManagedAzureImageResource) Read(ctx context.Context, req resource
 		return
 	}
 
-	// Try getting the Citrix Managed Azure Template Image
+	// Try getting the Flex Azure Template Image
 	image, _, err := util.GetTemplateImageWithId(ctx, r.client, &resp.Diagnostics, state.Id.ValueString(), true)
 	if err != nil {
 		// Remove from state
@@ -200,7 +207,7 @@ func (r *citrixManagedAzureImageResource) Update(ctx context.Context, req resour
 	updateTemplateImageRequest := r.client.QuickDeployClient.MasterImageCMD.UpdateTemplateImage(ctx, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId, imageId)
 	updateTemplateImageRequest = updateTemplateImageRequest.UpdateTemplateImageModel(templateImageUpdateBody)
 
-	// Update Citrix Managed Azure Template Image
+	// Update Flex Azure Template Image
 	httpResp, err := citrixdaasclient.AddRequestData(updateTemplateImageRequest, r.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -211,7 +218,7 @@ func (r *citrixManagedAzureImageResource) Update(ctx context.Context, req resour
 		return
 	}
 
-	// Try getting the updated Citrix Managed Azure Template Image
+	// Try getting the updated Flex Azure Template Image
 	image, httpResp, err := util.GetTemplateImageWithId(ctx, r.client, &resp.Diagnostics, imageId, false)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -247,7 +254,7 @@ func (r *citrixManagedAzureImageResource) Delete(ctx context.Context, req resour
 		return
 	}
 
-	// Delete Citrix Managed Azure Template Image
+	// Delete Flex Azure Template Image
 	deleteImageRequest := r.client.QuickDeployClient.MasterImageCMD.DeleteTemplateImage(ctx, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId, state.Id.ValueString())
 	httpResp, err := citrixdaasclient.AddRequestData(deleteImageRequest, r.client).Execute()
 
@@ -278,42 +285,62 @@ func (r *citrixManagedAzureImageResource) ValidateConfig(ctx context.Context, re
 		return
 	}
 
-	if data.VtpmEnabled.ValueBool() && strings.EqualFold(data.MachineGeneration.ValueString(), util.HypervGen1) {
-		resp.Diagnostics.AddError(
+	validateTrustedLaunchConfig(&data, &resp.Diagnostics)
+
+	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
+	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
+}
+
+// validateTrustedLaunchConfig enforces the Trusted Launch rules: vTPM and Secure Boot are only
+// supported on V2 generation images, Secure Boot additionally requires vTPM to be enabled and a
+// guest disk URI to be supplied, and a guest disk URI is only meaningful with Secure Boot on.
+//
+// A rule is evaluated only once all of its values are resolved. Create calls this helper again
+// with the resolved plan, so a rule skipped here is still enforced before the image is imported.
+func validateTrustedLaunchConfig(data *CitrixManagedAzureImageResourceModel, diagnostics *diag.Diagnostics) {
+	vtpmKnown := !data.VtpmEnabled.IsUnknown()
+	secureBootKnown := !data.SecureBootEnabled.IsUnknown()
+	guestDiskKnown := !data.GuestDiskUri.IsUnknown()
+
+	isGen1 := !data.MachineGeneration.IsUnknown() && strings.EqualFold(data.MachineGeneration.ValueString(), util.HypervGen1)
+	vtpmEnabled := vtpmKnown && data.VtpmEnabled.ValueBool()
+	secureBootEnabled := secureBootKnown && data.SecureBootEnabled.ValueBool()
+	guestDiskSet := guestDiskKnown && !data.GuestDiskUri.IsNull() && data.GuestDiskUri.ValueString() != ""
+
+	if vtpmEnabled && isGen1 {
+		diagnostics.AddError(
 			"Error validating Template Image configuration",
 			"vTPM is only supported for V2 generation images",
 		)
 	}
 
-	if data.SecureBootEnabled.ValueBool() {
-		if strings.EqualFold(data.MachineGeneration.ValueString(), util.HypervGen1) {
-			resp.Diagnostics.AddError(
+	if secureBootEnabled {
+		if isGen1 {
+			diagnostics.AddError(
 				"Error validating Template Image configuration",
 				"Secure Boot is only supported for V2 generation images",
 			)
 		}
-		if !data.VtpmEnabled.ValueBool() {
-			resp.Diagnostics.AddError(
+		if vtpmKnown && !data.VtpmEnabled.ValueBool() {
+			diagnostics.AddError(
 				"Error validating Template Image configuration",
 				"vTPM must be enabled when Secure Boot is enabled",
 			)
 		}
-		if !data.GuestDiskUri.IsUnknown() && data.GuestDiskUri.IsNull() {
-			resp.Diagnostics.AddError(
+		if guestDiskKnown && data.GuestDiskUri.IsNull() {
+			diagnostics.AddError(
 				"Error validating Template Image configuration",
 				"Guest Disk URI must be specified when Secure Boot is enabled",
 			)
 		}
 	}
-	if !data.GuestDiskUri.IsNull() && !data.SecureBootEnabled.ValueBool() {
-		resp.Diagnostics.AddError(
+
+	if guestDiskSet && secureBootKnown && !data.SecureBootEnabled.ValueBool() {
+		diagnostics.AddError(
 			"Error validating Template Image configuration",
 			"Guest Disk URI is only applicable when Secure Boot is enabled",
 		)
 	}
-
-	schemaType, configValuesForSchema := util.GetConfigValuesForSchema(ctx, &resp.Diagnostics, &data)
-	tflog.Debug(ctx, "Validate Config - "+schemaType, configValuesForSchema)
 }
 
 func (r *citrixManagedAzureImageResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {

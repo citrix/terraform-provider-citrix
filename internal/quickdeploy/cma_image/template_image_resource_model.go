@@ -36,7 +36,7 @@ type CitrixManagedAzureImageResourceModel struct {
 
 func (CitrixManagedAzureImageResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "DaaS Quick Deploy - Citrix Managed Azure --- Manages an Citrix Managed Azure image. **Note that this feature is in Tech Preview.**",
+		Description: "DaaS Quick Deploy for Azure --- Manages a Flex Azure image. **Note that this feature is in Tech Preview.**",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the image.",
@@ -59,7 +59,7 @@ func (CitrixManagedAzureImageResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"subscription_name": schema.StringAttribute{
-				Description: "The name of the Citrix Managed Azure subscription to import the image. Defaults to `Citrix Managed` if omitted.",
+				Description: "The name of the Flex Azure subscription to import the image. Defaults to `Citrix Managed` if omitted.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString("Citrix Managed"),
@@ -131,6 +131,12 @@ func (CitrixManagedAzureImageResourceModel) GetSchema() schema.Schema {
 				Optional:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+				},
+				Validators: []validator.String{
+					// An empty string is neither null nor a usable URI: Catalog Service only
+					// null-checks this value, so "" would pass its Secure Boot check and fail
+					// later in Azure. Reject it at the attribute instead.
+					stringvalidator.LengthAtLeast(1),
 				},
 			},
 		},

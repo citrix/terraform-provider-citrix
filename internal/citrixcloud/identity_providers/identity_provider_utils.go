@@ -58,6 +58,7 @@ func createIdentityProviderConnection(ctx context.Context, diagnostics *diag.Dia
 // Read Identity Provider Utility Functions
 func readIdentityProvider(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, idpType string, idpInstanceId string) (*citrixcws.IdpStatusModel, error) {
 	getIdpsRequest := client.CwsClient.IdentityProvidersDAAS.CustomerIdentityProvidersIdpTypeGet(ctx, idpType, client.ClientConfig.CustomerId)
+	//nolint:continuationtoken // ReadResource supplies the not-found/remove-from-state handling this read needs, which GetAllPagesWithRetry does not. The IdP list is small and returned in a single page
 	getIdpsResult, _, err := util.ReadResource[*citrixcws.IdpStatusesModel](getIdpsRequest, ctx, client, resp, fmt.Sprintf("%s Identity Provider", idpType), idpInstanceId)
 	if err != nil {
 		return nil, err
@@ -72,7 +73,7 @@ func readIdentityProvider(ctx context.Context, client *citrixdaasclient.CitrixDa
 
 func getIdentityProvidersWithType(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, idpType string) (*citrixcws.IdpStatusesModel, error) {
 	getIdpsRequest := client.CwsClient.IdentityProvidersDAAS.CustomerIdentityProvidersIdpTypeGet(ctx, idpType, client.ClientConfig.CustomerId)
-	getIdpsResult, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixcws.IdpStatusesModel](getIdpsRequest, client)
+	getIdpsResult, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixcws.IdpStatusesModel](getIdpsRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			fmt.Sprintf("Error fetching Identity Provider instances with type: %s", idpType),
@@ -81,6 +82,7 @@ func getIdentityProvidersWithType(ctx context.Context, client *citrixdaasclient.
 		)
 		return nil, err
 	}
+
 	return getIdpsResult, nil
 }
 

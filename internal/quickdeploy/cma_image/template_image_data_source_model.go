@@ -26,7 +26,7 @@ type CitrixManagedAzureImageDataSourceModel struct {
 
 func (CitrixManagedAzureImageDataSourceModel) GetDataSourceSchema() schema.Schema {
 	return schema.Schema{
-		Description: "DaaS Quick Deploy - Citrix Managed Azure --- Data Source of an Citrix Managed Azure image. **Note that this feature is in Tech Preview.**",
+		Description: "DaaS Quick Deploy for Azure --- Data Source of a Flex Azure image. **Note that this feature is in Tech Preview.**",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the image.",
@@ -45,7 +45,7 @@ func (CitrixManagedAzureImageDataSourceModel) GetDataSourceSchema() schema.Schem
 				Computed:    true,
 			},
 			"subscription_name": schema.StringAttribute{
-				Description: "The name of the Citrix Managed Azure subscription the image was imported to.",
+				Description: "The name of the Flex Azure subscription the image was imported to.",
 				Computed:    true,
 			},
 			"region": schema.StringAttribute{

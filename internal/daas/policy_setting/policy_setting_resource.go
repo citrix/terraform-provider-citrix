@@ -330,7 +330,7 @@ func getSettingsDefinitions(ctx context.Context, client *citrixdaasclient.Citrix
 	getSettingDefinitionsReq := client.ApiClient.GpoDAAS.GpoGetSettingDefinitions(ctx)
 	getSettingDefinitionsReq = getSettingDefinitionsReq.NamePattern(settingName)
 	getSettingDefinitionsReq = getSettingDefinitionsReq.IsLean(true)
-	settingDefinitions, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.SettingDefinitionEnvelope](getSettingDefinitionsReq, client)
+	settingDefinitions, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.SettingDefinitionEnvelope](getSettingDefinitionsReq, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error fetching setting definitions",

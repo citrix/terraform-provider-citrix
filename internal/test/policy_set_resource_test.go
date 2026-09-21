@@ -30,8 +30,8 @@ resource "citrix_policy_set" "testPolicySet" {
                     use_default = false
                 },
                 {
-                    name = "AdvanceWarningPeriod"
-                    value = "13:00:00"
+                    name = "WemBrokerSvcName"
+                    value = "wem-broker-1.test.local"
                     use_default = false
                 },
                 {
@@ -54,7 +54,7 @@ resource "citrix_policy_set" "testPolicySet" {
             enabled = false
             policy_settings = [
                 {
-                    name = "AdvanceWarningPeriod"
+                    name = "WemBrokerSvcName"
                     use_default = true
                 },
             ]
@@ -76,7 +76,7 @@ resource "citrix_policy_set" "testPolicySet" {
             enabled = false
             policy_settings = [
                 {
-                    name = "AdvanceWarningPeriod"
+                    name = "WemBrokerSvcName"
                     use_default = true
                 },
             ]
@@ -87,8 +87,8 @@ resource "citrix_policy_set" "testPolicySet" {
             enabled = true
             policy_settings = [
                 {
-                    name = "AdvanceWarningPeriod"
-                    value = "13:00:00"
+                    name = "WemBrokerSvcName"
+                    value = "wem-broker-1.test.local"
                     use_default = false
                 },
             ]
@@ -117,8 +117,8 @@ resource "citrix_policy_set" "testPolicySet" {
             enabled = true
             policy_settings = [
                 {
-                    name = "AdvanceWarningPeriod"
-                    value = "13:00:00"
+                    name = "WemBrokerSvcName"
+                    value = "wem-broker-1.test.local"
                     use_default = false
                 },
             ]
@@ -215,9 +215,9 @@ func TestPolicySetResource(t *testing.T) {
 					// Verify policy settings of the first policy in the policy set
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.0.policy_settings.#", "3"),
 					resource.TestCheckTypeSetElemNestedAttrs("citrix_policy_set.testPolicySet", "policies.0.policy_settings.*", map[string]string{
-						"name":        "AdvanceWarningPeriod",
+						"name":        "WemBrokerSvcName",
 						"use_default": "false",
-						"value":       "13:00:00",
+						"value":       "wem-broker-1.test.local",
 					}),
 					resource.TestCheckTypeSetElemNestedAttrs("citrix_policy_set.testPolicySet", "policies.0.policy_settings.*", map[string]string{
 						"name":        "AllowFileDownload",
@@ -228,7 +228,7 @@ func TestPolicySetResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.1.name", "second-test-policy"),
 					resource.TestCheckResourceAttr("citrix_policy_set.testPolicySet", "policies.1.policy_settings.#", "1"),
 					resource.TestCheckTypeSetElemNestedAttrs("citrix_policy_set.testPolicySet", "policies.1.policy_settings.*", map[string]string{
-						"name":        "AdvanceWarningPeriod",
+						"name":        "WemBrokerSvcName",
 						"use_default": "true",
 					}),
 					// Verify delivery groups association of the policy set

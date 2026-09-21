@@ -190,6 +190,28 @@ func (r *resourceLocationResource) Delete(ctx context.Context, req resource.Dele
 		return
 	}
 
+	// Re-check here rather than relying on ModifyPlan alone, because a destroy and recreate reaches Delete
+	// without a destroy plan. Connectors are removed first so Citrix Cloud does not orphan them.
+	connectors, err := getConnectorsInResourceLocation(ctx, r.client, &resp.Diagnostics, state.Id.ValueString())
+	if err != nil {
+		return
+	}
+
+	if len(connectors) > 0 {
+		if !state.ForceDelete.ValueBool() {
+			summary, detail := connectorsBlockingDeleteError(state.Id.ValueString(), connectors)
+			resp.Diagnostics.AddError(summary, detail)
+			return
+		}
+
+		for _, connector := range connectors {
+			err = deleteConnector(ctx, r.client, &resp.Diagnostics, connector)
+			if err != nil {
+				return
+			}
+		}
+	}
+
 	deleteResourceLocationRequest := r.client.ResourceLocationsClient.LocationsDAAS.LocationsDelete(ctx, state.Id.ValueString())
 	httpResp, err := citrixdaasclient.AddRequestData(deleteResourceLocationRequest, r.client).Execute()
 	if err != nil {
@@ -242,22 +264,47 @@ func (r *resourceLocationResource) ValidateConfig(ctx context.Context, req resou
 func (r *resourceLocationResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	defer util.PanicHandler(&resp.Diagnostics)
 
-	if r.client != nil && r.client.ResourceLocationsClient == nil {
+	if r.client != nil && (r.client.ResourceLocationsClient == nil || r.client.ConnectorsClient == nil) {
 		resp.Diagnostics.AddError(util.ProviderInitializationErrorMsg, util.MissingProviderClientIdAndSecretErrorMsg)
 		return
 	}
 
 	if r.client.AuthConfig.OnPremises {
 		resp.Diagnostics.AddError("Error managing resource location", "Resource locations are only supported for Cloud customers. On-premises customers can use the Zone resource directly.")
+		return
 	}
 
-	// Retrieve values from plan
-	if !req.Plan.Raw.IsNull() {
-		var plan ResourceLocationModel
-		diags := req.Plan.Get(ctx, &plan)
+	// A null plan with existing state means the resource location is being destroyed.
+	if req.Plan.Raw.IsNull() {
+		var state ResourceLocationModel
+		diags := req.State.Get(ctx, &state)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
+
+		connectors, err := getConnectorsInResourceLocation(ctx, r.client, &resp.Diagnostics, state.Id.ValueString())
+		if err != nil || len(connectors) == 0 {
+			return
+		}
+
+		if state.ForceDelete.ValueBool() {
+			resp.Diagnostics.AddWarning(
+				"Connectors will be removed from Citrix Cloud",
+				"Deleting resource location "+state.Name.ValueString()+" will remove the following Connectors from Citrix Cloud: "+getConnectorFqdns(connectors),
+			)
+		} else {
+			summary, detail := connectorsBlockingDeleteError(state.Id.ValueString(), connectors)
+			resp.Diagnostics.AddError(summary, detail)
+		}
+		return
+	}
+
+	// Retrieve values from plan
+	var plan ResourceLocationModel
+	diags := req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 }

@@ -211,25 +211,16 @@ func readApplicationIcon(ctx context.Context, client *citrixdaasclient.CitrixDaa
 func GetAllExistingIcons(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics) ([]citrixorchestration.IconResponseModel, error) {
 	req := client.ApiClient.IconsAPIsDAAS.IconsGetIcons(ctx)
 
-	responses := []citrixorchestration.IconResponseModel{}
-	continuationToken := ""
-	for {
-		req = req.ContinuationToken(continuationToken)
-		responseModel, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.IconResponseModelCollection](req, client)
-		if err != nil {
-			diagnostics.AddError(
-				"Error getting all the existing icons",
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+util.ReadClientError(err),
-			)
-			return responses, err
-		}
-		responses = append(responses, responseModel.GetItems()...)
-		if responseModel.GetContinuationToken() == "" {
-			return responses, nil
-		}
-		continuationToken = responseModel.GetContinuationToken()
+	responseModel, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.IconResponseModelCollection](req, client)
+	if err != nil {
+		diagnostics.AddError(
+			"Error getting all the existing icons",
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		return []citrixorchestration.IconResponseModel{}, err
 	}
+	return responseModel.GetItems(), nil
 }
 
 func (r *applicationIconResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {

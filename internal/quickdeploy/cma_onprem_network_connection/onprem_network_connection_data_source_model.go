@@ -18,7 +18,7 @@ type CitrixManagedAzureOnPremNetworkConnectionDataSourceModel struct {
 
 func (CitrixManagedAzureOnPremNetworkConnectionDataSourceModel) GetDataSourceSchema() schema.Schema {
 	return schema.Schema{
-		Description: "DaaS Quick Deploy - Citrix Managed Azure --- Data Source of an Citrix Managed Azure VNet Peering.",
+		Description: "DaaS Quick Deploy for Azure --- Data Source of a Flex Azure VNet Peering.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the VNet Peering.",

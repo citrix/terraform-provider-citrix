@@ -534,7 +534,7 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 		return
 	}
 
-	if !data.Metadata.IsNull() {
+	if !data.Metadata.IsNull() && !data.Metadata.IsUnknown() {
 		metadata := util.ObjectListToTypedArray[util.NameValueStringPairModel](ctx, &resp.Diagnostics, data.Metadata)
 		isValid := util.ValidateMetadataConfig(ctx, &resp.Diagnostics, metadata)
 		if !isValid {
@@ -542,7 +542,7 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 		}
 	}
 
-	if !data.DefaultAccessPolicies.IsNull() {
+	if !data.DefaultAccessPolicies.IsNull() && !data.DefaultAccessPolicies.IsUnknown() {
 		accesPolicies := util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, &resp.Diagnostics, data.DefaultAccessPolicies)
 
 		if len(accesPolicies) != 2 {
@@ -590,7 +590,7 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 		}
 	}
 
-	if !data.CustomAccessPolicies.IsNull() {
+	if !data.CustomAccessPolicies.IsNull() && !data.CustomAccessPolicies.IsUnknown() {
 		accessPolicies := util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, &resp.Diagnostics, data.CustomAccessPolicies)
 		for index, accessPolicy := range accessPolicies {
 			isValid := accessPolicy.ValidateConfig(ctx, &resp.Diagnostics, index)
@@ -601,8 +601,8 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 		}
 	}
 
-	if !data.RestrictedAccessUsers.IsNull() {
-		if !data.DefaultAccessPolicies.IsNull() {
+	if !data.RestrictedAccessUsers.IsNull() && !data.RestrictedAccessUsers.IsUnknown() {
+		if !data.DefaultAccessPolicies.IsNull() && !data.DefaultAccessPolicies.IsUnknown() {
 			for _, p := range util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, &resp.Diagnostics, data.DefaultAccessPolicies) {
 				if !p.RestrictedAccessUsers.IsNull() && !p.RestrictedAccessUsers.IsUnknown() {
 					resp.Diagnostics.AddAttributeError(
@@ -614,7 +614,7 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 				}
 			}
 		}
-		if !data.CustomAccessPolicies.IsNull() {
+		if !data.CustomAccessPolicies.IsNull() && !data.CustomAccessPolicies.IsUnknown() {
 			for _, p := range util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, &resp.Diagnostics, data.CustomAccessPolicies) {
 				if !p.RestrictedAccessUsers.IsNull() && !p.RestrictedAccessUsers.IsUnknown() {
 					resp.Diagnostics.AddAttributeError(
@@ -628,7 +628,7 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 		}
 	}
 
-	if !data.AppProtection.IsNull() {
+	if !data.AppProtection.IsNull() && !data.AppProtection.IsUnknown() {
 		appProtection := util.ObjectValueToTypedObject[DeliveryGroupAppProtection](ctx, &resp.Diagnostics, data.AppProtection)
 		isValid := appProtection.ValidateConfig(ctx, &resp.Diagnostics)
 
@@ -686,11 +686,11 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 		}
 	}
 
-	if !data.RebootSchedules.IsNull() {
+	if !data.RebootSchedules.IsNull() && !data.RebootSchedules.IsUnknown() {
 		validateRebootSchedules(ctx, &resp.Diagnostics, util.ObjectListToTypedArray[DeliveryGroupRebootSchedule](ctx, &resp.Diagnostics, data.RebootSchedules))
 	}
 
-	if !data.AutoscalePlugins.IsNull() {
+	if !data.AutoscalePlugins.IsNull() && !data.AutoscalePlugins.IsUnknown() {
 		autoscalePlugins := util.ObjectListToTypedArray[DeliveryGroupAutoscalePluginModel](ctx, &resp.Diagnostics, data.AutoscalePlugins)
 		pluginPriorities := map[int32]bool{}
 		for _, autoscalePlugin := range autoscalePlugins {

@@ -1363,26 +1363,16 @@ func FetchScopes(ctx context.Context, client *citrixdaasclient.CitrixDaasClient,
 	getAdminScopesRequest := client.ApiClient.AdminAPIsDAAS.AdminGetAdminScopes(ctx)
 	getAdminScopesRequest = getAdminScopesRequest.Limit(250)
 
-	scopeResponses := []citrixorchestration.ScopeResponseModel{}
-	continuationToken := ""
-
-	for {
-		getAdminScopesRequest = getAdminScopesRequest.ContinuationToken(continuationToken)
-		getScopesResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ScopeResponseModelCollection](getAdminScopesRequest, client)
-		if err != nil {
-			diagnostics.AddError(
-				"Error reading Scopes",
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+ReadClientError(err),
-			)
-			return scopeResponses, httpResp, err
-		}
-		scopeResponses = append(scopeResponses, getScopesResponse.GetItems()...)
-		if getScopesResponse.GetContinuationToken() == "" {
-			return scopeResponses, httpResp, nil
-		}
-		continuationToken = getScopesResponse.GetContinuationToken()
+	getScopesResponse, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.ScopeResponseModelCollection](getAdminScopesRequest, client)
+	if err != nil {
+		diagnostics.AddError(
+			"Error reading Scopes",
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+ReadClientError(err),
+		)
+		return []citrixorchestration.ScopeResponseModel{}, httpResp, err
 	}
+	return getScopesResponse.GetItems(), httpResp, nil
 }
 
 func GetUsersUsingIdentity(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, users []string, errorMessage string) ([]citrixorchestration.IdentityUserResponseModel, *http.Response, error) {
@@ -1397,6 +1387,7 @@ func GetUsersUsingIdentity(ctx context.Context, client *citrixdaasclient.CitrixD
 
 	for _, usersChunk := range usersChunks {
 		getIncludedUsersRequest = getIncludedUsersRequest.User(usersChunk).UserType(citrixorchestration.IDENTITYUSERTYPE_ALL)
+		//nolint:continuationtoken // each request is bounded to a <=25-user chunk (ChunkSlice above), below the page size; async results are collected via GetAsyncJobResult
 		_, httpResp, err = citrixdaasclient.ExecuteWithRetry[*citrixorchestration.IdentityUserResponseModelCollection](getIncludedUsersRequest, client)
 
 		if err != nil {
@@ -1418,6 +1409,7 @@ func GetUsersUsingIdentity(ctx context.Context, client *citrixdaasclient.CitrixD
 
 		if len(allUsersFromIdentity) < len(usersChunk) {
 			getIncludedUsersRequest = getIncludedUsersRequest.User(usersChunk).UserType(citrixorchestration.IDENTITYUSERTYPE_ALL).Provider(citrixorchestration.IDENTITYPROVIDERTYPE_ALL)
+			//nolint:continuationtoken // each request is bounded to a <=25-user chunk (ChunkSlice above), below the page size; async results are collected via GetAsyncJobResult
 			_, httpResp, err = citrixdaasclient.ExecuteWithRetry[*citrixorchestration.IdentityUserResponseModelCollection](getIncludedUsersRequest, client)
 
 			if err != nil {

@@ -5,6 +5,7 @@ subcategory: "Citrix Cloud"
 description: |-
   Manages a Citrix Cloud resource location.
   ~> Please Note For Citrix Cloud Customer, DaaS Zone permissions are required to manage Citrix Cloud Resource Location.
+  ~> Please Note A resource location cannot be deleted while it still contains Connectors. Set force_delete to true to have the provider remove those Connectors from Citrix Cloud when the resource location is deleted.
 ---
 
 # citrix_cloud_resource_location (Resource)
@@ -12,6 +13,8 @@ description: |-
 Manages a Citrix Cloud resource location.
 
 ~> **Please Note** For Citrix Cloud Customer, DaaS Zone permissions are required to manage Citrix Cloud Resource Location.
+
+~> **Please Note** A resource location cannot be deleted while it still contains Connectors. Set `force_delete` to `true` to have the provider remove those Connectors from Citrix Cloud when the resource location is deleted.
 
 ## Example Usage
 
@@ -30,6 +33,11 @@ resource "citrix_cloud_resource_location" "example-resource-location" {
 
 ### Optional
 
+- `force_delete` (Boolean) Boolean that indicates any Connectors still in the resource location should be removed from Citrix Cloud on `terraform destroy` action. When `false`, the destroy is blocked while the resource location still contains Connectors. Defaults to `false`.
+
+~> **Please Note** Only the Citrix Cloud Connector records are removed. The Connector VMs themselves still need to be cleaned up separately.
+
+~> **Please Note** The force deletion only happens when the resource location is actually deleted, not when setting this parameter to `true`. Once this parameter is set to `true`, there must be a successful `terraform apply` run before a `destroy` to update this value in the resource state. Without a successful `terraform apply` after this parameter is set, this flag will have no effect. If setting this field in the same operation that would destroy the resource location, this flag will not work. Additionally when importing a resource location, a successful `terraform apply` is required to set this value in state before it will take effect on a destroy operation.
 - `internal_only` (Boolean) Flag to determine if the resource location can only be used internally. Defaults to `false`.
 - `time_zone` (String) Timezone associated with the resource location. Please refer to the `Timezone` column in the following [table](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/default-time-zones?view=windows-11#time-zones) for allowed values.
 

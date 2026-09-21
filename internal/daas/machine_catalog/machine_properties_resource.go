@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -85,12 +84,10 @@ func (r *MachinePropertiesResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
-	machineTagIds, err := getMachineTagIdsAfterWrite(ctx, r.client, &resp.Diagnostics, machineName, util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Tags))
-	if err != nil {
-		return
-	}
-
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, machineProperties, machineTagIds)
+	// setMachineTags succeeded, so the planned tags are the authoritative result. `tags` is Optional and
+	// not Computed, which means Terraform requires the post-apply state to equal the plan; reading the
+	// value back from Orchestration can only ever disagree with it. Drift is picked up by the next Read.
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, machineProperties, util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Tags))
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &plan)
@@ -166,12 +163,9 @@ func (r *MachinePropertiesResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
-	machineTagIds, err := getMachineTagIdsAfterWrite(ctx, r.client, &resp.Diagnostics, machineName, util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Tags))
-	if err != nil {
-		return
-	}
-
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, machineProperties, machineTagIds)
+	// See the note in Create: record the planned tags rather than a read-back, which cannot be relied on
+	// to match the plan for a non-Computed attribute.
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, machineProperties, util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Tags))
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &plan)
@@ -263,43 +257,6 @@ func getMachineProperties(ctx context.Context, client *citrixdaasclient.CitrixDa
 		return nil, err
 	}
 	return machineProperties, err
-}
-
-// Tags API may return 200 with an empty list or stale data immediately after a write due to propagation
-// delay, even though setMachineTags completed successfully.
-func getMachineTagIdsAfterWrite(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, machineNameOrId string, expectedTagIds []string) ([]string, error) {
-	const (
-		maxRetries    = 5
-		retryInterval = 3 * time.Second
-	)
-
-	expectedSet := make(map[string]struct{}, len(expectedTagIds))
-	for _, id := range expectedTagIds {
-		expectedSet[id] = struct{}{}
-	}
-
-	matchesExpected := func(tagIds []string) bool {
-		if len(tagIds) != len(expectedSet) {
-			return false
-		}
-		for _, id := range tagIds {
-			if _, ok := expectedSet[id]; !ok {
-				return false
-			}
-		}
-		return true
-	}
-
-	var tagIds []string
-	var err error
-	for range maxRetries {
-		tagIds, err = getMachineTagIds(ctx, client, diagnostics, machineNameOrId)
-		if err != nil || matchesExpected(tagIds) {
-			break
-		}
-		time.Sleep(retryInterval)
-	}
-	return tagIds, err
 }
 
 func getMachineTagIds(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, machineNameOrId string) ([]string, error) {

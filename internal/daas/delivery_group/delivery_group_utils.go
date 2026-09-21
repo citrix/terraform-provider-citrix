@@ -36,7 +36,7 @@ func readDeliveryGroup(ctx context.Context, client *citrixdaasclient.CitrixDaasC
 
 func getDeliveryGroupDesktops(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string) (*citrixorchestration.DesktopResponseModelCollection, error) {
 	getDeliveryGroupDesktopsRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroupsDesktops(ctx, deliveryGroupId)
-	deliveryGroupDesktops, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.DesktopResponseModelCollection](getDeliveryGroupDesktopsRequest, client)
+	deliveryGroupDesktops, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.DesktopResponseModelCollection](getDeliveryGroupDesktopsRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error reading Desktops for Delivery Group "+deliveryGroupId,
@@ -50,7 +50,7 @@ func getDeliveryGroupDesktops(ctx context.Context, client *citrixdaasclient.Citr
 
 func getDeliveryGroupPowerTimeSchemes(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string) (*citrixorchestration.PowerTimeSchemeResponseModelCollection, error) {
 	getDeliveryGroupPowerTimeSchemesRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroupPowerTimeSchemes(ctx, deliveryGroupId)
-	deliveryGroupPowerTimeSchemes, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.PowerTimeSchemeResponseModelCollection](getDeliveryGroupPowerTimeSchemesRequest, client)
+	deliveryGroupPowerTimeSchemes, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.PowerTimeSchemeResponseModelCollection](getDeliveryGroupPowerTimeSchemesRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error reading Power Time Schemes for Delivery Group "+deliveryGroupId,
@@ -64,7 +64,7 @@ func getDeliveryGroupPowerTimeSchemes(ctx context.Context, client *citrixdaascli
 
 func getDeliveryGroupRebootSchedules(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, deliveryGroupId string) (*citrixorchestration.RebootScheduleResponseModelCollection, error) {
 	getDeliveryGroupRebootScheduleRequest := client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsGetDeliveryGroupRebootSchedules(ctx, deliveryGroupId)
-	deliveryGroupRebootSchedule, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.RebootScheduleResponseModelCollection](getDeliveryGroupRebootScheduleRequest, client)
+	deliveryGroupRebootSchedule, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.RebootScheduleResponseModelCollection](getDeliveryGroupRebootScheduleRequest, client)
 	if err != nil {
 		diagnostics.AddError(
 			"Error reading Reboot Schedule for Delivery Group "+deliveryGroupId,
@@ -1338,6 +1338,22 @@ func parseDeliveryGroupRebootScheduleToClientModel(ctx context.Context, diags *d
 	return res
 }
 
+// getRestrictToTagValue keeps the state value in the same format as the configured one.
+// `restrict_to_tag` accepts either the name or the id of a tag, so the configured value is
+// preserved when it refers to the tag by either one. Tag names and ids are compared case
+// insensitively, while terraform compares state against configuration case sensitively, so
+// the configured value has to be returned as is to avoid a perpetual diff. Otherwise the tag
+// name is used, which also covers the import case where there is no configured value.
+func getRestrictToTagValue(configuredValue types.String, restrictToTag citrixorchestration.RefResponseModel) types.String {
+	if !configuredValue.IsNull() &&
+		(strings.EqualFold(configuredValue.ValueString(), restrictToTag.GetId()) ||
+			strings.EqualFold(configuredValue.ValueString(), restrictToTag.GetName())) {
+		return configuredValue
+	}
+
+	return types.StringValue(restrictToTag.GetName())
+}
+
 func (schedule DeliveryGroupRebootSchedule) RefreshListItem(ctx context.Context, diags *diag.Diagnostics, rebootSchedule citrixorchestration.RebootScheduleResponseModel) util.ResourceModelWithAttributes {
 	schedule.Name = types.StringValue(rebootSchedule.GetName())
 	if rebootSchedule.GetDescription() != "" {
@@ -1345,8 +1361,10 @@ func (schedule DeliveryGroupRebootSchedule) RefreshListItem(ctx context.Context,
 	}
 
 	schedule.RebootScheduleEnabled = types.BoolValue(rebootSchedule.GetEnabled())
-	if rebootSchedule.GetRestrictToTag().Id.Get() != nil {
-		schedule.RestrictToTag = types.StringValue(*rebootSchedule.GetRestrictToTag().Name.Get())
+	if rebootSchedule.RestrictToTag != nil {
+		schedule.RestrictToTag = getRestrictToTagValue(schedule.RestrictToTag, rebootSchedule.GetRestrictToTag())
+	} else {
+		schedule.RestrictToTag = types.StringNull()
 	}
 	schedule.IgnoreMaintenanceMode = types.BoolValue(rebootSchedule.GetIgnoreMaintenanceMode()) //bug in orchestration side
 	schedule.Frequency = types.StringValue(string(rebootSchedule.GetFrequency()))
@@ -1396,8 +1414,7 @@ func (dgDesktop DeliveryGroupDesktop) RefreshListItem(ctx context.Context, diagn
 	dgDesktop.DesktopDescription = types.StringValue(desktop.GetDescription())
 
 	if desktop.RestrictToTag != nil {
-		restrictToTag := desktop.GetRestrictToTag()
-		dgDesktop.RestrictToTag = types.StringValue(restrictToTag.GetId())
+		dgDesktop.RestrictToTag = getRestrictToTagValue(dgDesktop.RestrictToTag, desktop.GetRestrictToTag())
 	} else {
 		dgDesktop.RestrictToTag = types.StringNull()
 	}
@@ -1646,8 +1663,8 @@ func verifyUsersAndParseDeliveryGroupDesktopsToClientModel(ctx context.Context, 
 		}
 
 		if !deliveryGroupDesktop.RestrictToTag.IsNull() {
-			tagId := deliveryGroupDesktop.RestrictToTag.ValueString()
-			getTagRequest := client.ApiClient.TagsAPIsDAAS.TagsGetTag(ctx, tagId)
+			tagNameOrId := deliveryGroupDesktop.RestrictToTag.ValueString()
+			getTagRequest := client.ApiClient.TagsAPIsDAAS.TagsGetTag(ctx, tagNameOrId)
 			tag, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.TagDetailResponseModel](getTagRequest, client)
 			if err != nil {
 				diagnostics.AddError(

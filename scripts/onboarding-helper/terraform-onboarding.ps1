@@ -68,8 +68,9 @@ Currently this script is still in TechPreview
 
 .Parameter QuickDeployHostname
     Optional override for the Quick Deploy catalog service base (host plus the `/catalogservice` path segment, e.g. `api.dev.cloud.com/catalogservice`).
-    For standard Cloud environments the host is derived from -Environment automatically; only set this for non-standard / internal environments.
-    Mirrors the provider's `CITRIX_QUICK_DEPLOY_HOST_NAME` override; if this parameter is omitted, the `CITRIX_QUICK_DEPLOY_HOST_NAME` environment variable is used when present.
+    Without it the base is derived from -Hostname (which defaults to `api.cloud.com`), so only set this when the catalog service is not on that host.
+    Takes precedence over the `CITRIX_QUICK_DEPLOY_HOST_NAME` environment variable, which is used when this parameter is omitted.
+    Note: the generated Terraform project does not record the host, so set `CITRIX_QUICK_DEPLOY_HOST_NAME` yourself before running terraform plan/apply in the output folder.
 
 .Parameter OutputFolder
     Subfolder (relative to this script) where the generated Terraform project is created and where all Terraform commands should be run.
@@ -160,8 +161,7 @@ function Get-UrlForQuickDeployObjects {
         [string] $requestPath
     )
 
-    # Allow overriding the catalog service base (host + /catalogservice path) for non-standard environments,
-    # mirroring the provider's CITRIX_QUICK_DEPLOY_HOST_NAME override. When set, it is used verbatim as the base.
+    # When overridden, the value is the catalog service base (host + path) and is used verbatim
     if (-not [string]::IsNullOrWhiteSpace($script:quickDeployHostnameOverride)) {
         $base = "https://$($script:quickDeployHostnameOverride)"
     }
@@ -456,29 +456,71 @@ function Get-ResourceList {
         $url = "$($script:urlBase)/$requestPath"
     }
 
-    # Check if the resource provider is supported in the current environment (eg. WEM is not supported for most environments)
-    try {
-        $response = Start-GetRequest -url $url
-    }
-    catch {
-        # Ignore 503 errors for WEM objects
-        if (-not($_.Exception.Response.StatusCode -eq 503)) {
-            Write-Error "Failed to get $resourceProviderName. Error: $($_.Exception.Message)" -ErrorAction Continue
+    # List endpoints cap each response at a default page size (250) and return a ContinuationToken when more
+    # results remain; follow it so every resource is onboarded instead of just the first page.
+    $items = [System.Collections.Generic.List[object]]::new()
+    $continuationToken = $null
+    $pageNumber = 0
+    $maxPages = 1000
+    do {
+        $pageUrl = $url
+        if ($continuationToken) {
+            $separator = if ($url.Contains("?")) { "&" } else { "?" }
+            $pageUrl = "$url$separator" + "continuationToken=$([uri]::EscapeDataString($continuationToken))"
         }
-        return @()
-    }
 
-    $items = $response.Items
+        # Check if the resource provider is supported in the current environment (eg. WEM is not supported for most environments)
+        try {
+            $response = Start-GetRequest -url $pageUrl
+        }
+        catch {
+            # Ignore 503 errors for WEM objects; Response is null on network/TLS failures so guard before reading StatusCode
+            if (($null -eq $_.Exception.Response) -or ($_.Exception.Response.StatusCode -ne 503)) {
+                Write-Error "Failed to get $resourceProviderName. Error: $($_.Exception.Message)" -ErrorAction Continue
+                $script:enumerationFailures.Add($resourceProviderName)
+            }
+            return @()
+        }
 
-    # Quick Deploy catalogs endpoint returns response.items[] (canonical) or response.catalogs[] (backward-compat alias)
-    if ($resourceProviderName -eq "quickdeploy_catalog") {
-        $items = if ($null -ne $response.items) { $response.items } else { $response.catalogs }
-    }
+        $pageItems = $response.Items
 
-    # Cloud resource locations endpoint wraps results under "locations" rather than "Items"
-    if ($resourceProviderName -eq "cloud_resource_location") {
-        $items = if ($null -ne $response.locations) { $response.locations } else { $response.Items }
-    }
+        # Quick Deploy catalogs endpoint returns response.items[] (canonical) or response.catalogs[] (backward-compat alias)
+        if ($resourceProviderName -eq "quickdeploy_catalog") {
+            $pageItems = if ($null -ne $response.items) { $response.items } else { $response.catalogs }
+        }
+
+        # Cloud resource locations endpoint wraps results under "locations" rather than "Items"
+        if ($resourceProviderName -eq "cloud_resource_location") {
+            $pageItems = if ($null -ne $response.locations) { $response.locations } else { $response.Items }
+        }
+
+        if ($null -ne $pageItems) {
+            $items.AddRange([object[]]@($pageItems))
+        }
+
+        $pageNumber++
+
+        $nextToken = $null
+        if ($response.PSObject.Properties.Name -contains "ContinuationToken") {
+            $nextToken = $response.ContinuationToken
+        }
+
+        if ([string]::IsNullOrEmpty($nextToken)) {
+            $continuationToken = $null
+        }
+        elseif ($nextToken -eq $continuationToken) {
+            # Some filtered endpoints keep returning the same token; stop so paging cannot loop forever.
+            Write-Verbose "Continuation token for $resourceProviderName did not advance; stopping after $pageNumber page(s)."
+            $continuationToken = $null
+        }
+        elseif ($pageNumber -ge $maxPages) {
+            Write-Warning "Reached the $maxPages page limit while paging $resourceProviderName; some items may be missing."
+            $continuationToken = $null
+        }
+        else {
+            $continuationToken = $nextToken
+        }
+    } while ($continuationToken)
 
 
 
@@ -1052,7 +1094,7 @@ function Invoke-TerraformImportWithRetry {
 
         # The provider's post-import read could not retrieve this object by id; retrying will not help, so stop immediately.
         if ($outputText -match "Cannot import non-existent remote object") {
-            Write-Warning "Skipping $ResourcePath (id '$Id'): the provider could not read this object by id after import. It was listed during enumeration but is not retrievable for import in this context."
+            Write-Warning "Import FAILED for $ResourcePath (id '$Id'): the provider could not read this object by id after import, so retrying will not help. It was listed during enumeration but is not retrievable for import in this context."
             return $false
         }
 
@@ -1073,22 +1115,28 @@ function Invoke-TerraformImportWithRetry {
 # Function to import terraform resources into state
 function Import-ResourcesToState {
     $script:newlyImportedResources = [System.Collections.Generic.List[string]]::new()
+    $script:failedImports = [System.Collections.Generic.List[string]]::new()
+    $script:skippedImports = [System.Collections.Generic.List[string]]::new()
 
     foreach ($resource in $script:cvadResourcesMap.Keys) {
         foreach ($id in $script:cvadResourcesMap[$resource].Keys) {
             $resourcePath = "citrix_$($resource).$($script:cvadResourcesMap[$resource][$id])"
             if ($script:existingStateEntries.ContainsKey($resourcePath)) {
                 Write-Verbose "Skipping $resourcePath (already in state)"
+                $script:skippedImports.Add($resourcePath)
                 continue
             }
             Write-Verbose "Importing $resourcePath with id '$id'"
             $imported = Invoke-TerraformImportWithRetry -ResourcePath $resourcePath -Id $id
             if ($imported) {
                 $script:newlyImportedResources.Add($resourcePath)
+            } else {
+                # Recorded rather than thrown so the remaining resources still get written to configuration
+                $script:failedImports.Add("$resourcePath (id '$id')")
             }
         }
     }
-    Write-Verbose "Imported $($script:newlyImportedResources.Count) new resource(s) into state."
+    Write-Verbose "Imported $($script:newlyImportedResources.Count) new resource(s) into state. $($script:failedImports.Count) failed, $($script:skippedImports.Count) already in state."
 }
 
 # On re-run, appends newly imported resources to their existing per-type .tf files using terraform state show.
@@ -1104,7 +1152,8 @@ function Add-NewResourcesToExistingTfFiles {
 
         $showOutput = terraform state show -no-color $resourcePath 2>&1
         if ($LASTEXITCODE -ne 0) {
-            Write-Warning "Failed to get state for $resourcePath. Skipping."
+            Write-Warning "Failed to get state for $resourcePath. It is in Terraform state but will be MISSING from the generated configuration."
+            $script:configGenerationFailures.Add($resourcePath)
             continue
         }
 
@@ -1577,8 +1626,16 @@ $script:domainFqdn = $DomainFqdn
 $script:hostname = $Hostname
 $script:environment = $Environment
 $script:disable_ssl = $DisableSSLValidation
-# Optional override for the Quick Deploy catalog service base; falls back to the provider's CITRIX_QUICK_DEPLOY_HOST_NAME env var.
+# Optional Quick Deploy catalog service override; -QuickDeployHostname takes precedence over the environment variable
 $script:quickDeployHostnameOverride = if (-not [string]::IsNullOrWhiteSpace($QuickDeployHostname)) { $QuickDeployHostname } else { $env:CITRIX_QUICK_DEPLOY_HOST_NAME }
+# Both this script and the provider expect a scheme-less host and add "https://" themselves
+if (-not [string]::IsNullOrWhiteSpace($script:quickDeployHostnameOverride)) {
+    $script:quickDeployHostnameOverride = $script:quickDeployHostnameOverride -replace '^https?://', ''
+}
+# GetEnvironmentVariable rather than $env: so an absent variable ($null) is distinguishable from an empty one
+$script:priorQuickDeployHostEnv = [Environment]::GetEnvironmentVariable('CITRIX_QUICK_DEPLOY_HOST_NAME')
+$script:quickDeployHostEnvPublished = $false
+$script:quickDeployHostPublished = $null
 # Single source of truth for Citrix Cloud endpoints per environment. ApiUrl backs the management APIs; AuthUrl ({0} = customer id) backs the OAuth token request. Values mirror the provider's environment mapping.
 $script:environmentConfig = @{
     "Production"   = @{ ApiUrl = "https://api.cloud.com";             AuthUrl = "https://api.cloud.com/cctrustoauth2/{0}/tokens/clients";             CwsUrl = "https://cws.citrixworkspacesapi.net" }
@@ -1623,6 +1680,14 @@ $script:usedNamesByType = @{}      # "citrix_<type>" -> HashSet of names already
 $script:siteFolder = $null         # Subfolder holding the generated Terraform project (config, state, icons)
 $script:pushedSiteLocation = $false
 
+# Import outcome tallies for the end-of-run summary; initialized here so they are never null if the run fails early
+$script:newlyImportedResources = [System.Collections.Generic.List[string]]::new() # resource paths imported by this run
+$script:failedImports = [System.Collections.Generic.List[string]]::new()          # "<resource path> (id '<id>')" for imports that never succeeded
+$script:skippedImports = [System.Collections.Generic.List[string]]::new()         # resource paths already present in state
+$script:configGenerationFailures = [System.Collections.Generic.List[string]]::new() # imported into state, but no .tf block could be generated
+$script:enumerationFailures = [System.Collections.Generic.List[string]]::new()    # resource types that could not be listed at all
+$script:exitCode = 0               # 1 when the generated project is missing resources
+
 # Set environment variables for client secret
 $env:CITRIX_CLIENT_SECRET = $ClientSecret
 
@@ -1634,6 +1699,15 @@ if ($ResourceTypes) {
 }
 
 try {
+    # The provider reads this host only from the environment, and the terraform child processes inherit it from here.
+    # Set inside the try so the finally always restores the caller's value.
+    if (-not $script:onPremise -and -not [string]::IsNullOrWhiteSpace($script:quickDeployHostnameOverride)) {
+        $script:quickDeployHostPublished = $script:quickDeployHostnameOverride
+        $env:CITRIX_QUICK_DEPLOY_HOST_NAME = $script:quickDeployHostPublished
+        $script:quickDeployHostEnvPublished = $true
+        Write-Verbose "Published Quick Deploy catalog service host to CITRIX_QUICK_DEPLOY_HOST_NAME: $($script:quickDeployHostPublished)"
+    }
+
     Get-Site
     Get-RequestBaseUrl
 
@@ -1694,7 +1768,7 @@ try {
         # Re-run: append only newly imported resources to their existing per-type .tf files
         if ($script:newlyImportedResources.Count -gt 0) {
             Add-NewResourcesToExistingTfFiles
-        } else {
+        } elseif ($script:failedImports.Count -eq 0) {
             Write-Host "All resources already in state. No new resources to add."
         }
 
@@ -1708,10 +1782,51 @@ try {
     # Format terraform files
     terraform fmt
 
+    # Summarize what actually reached the generated project
     Write-Host ""
-    Write-Host "Onboarding complete. The generated Terraform project is in: $script:siteFolder" -ForegroundColor Green
-    Write-Host "Run all Terraform commands (terraform plan, terraform apply) from that folder:" -ForegroundColor Green
-    Write-Host "    cd `"$script:siteFolder`"; terraform plan" -ForegroundColor Green
+    Write-Host "Import summary: $($script:newlyImportedResources.Count) imported, $($script:failedImports.Count) failed, $($script:configGenerationFailures.Count) imported but not written to configuration, $($script:skippedImports.Count) already in state."
+    if ($script:failedImports.Count -gt 0) {
+        Write-Host "The following resource(s) could not be imported and are NOT in the generated configuration:" -ForegroundColor Yellow
+        foreach ($failedImport in $script:failedImports) {
+            Write-Host "    $failedImport" -ForegroundColor Yellow
+        }
+        $script:exitCode = 1
+    }
+    if ($script:configGenerationFailures.Count -gt 0) {
+        Write-Host "The following resource(s) are in Terraform state but have NO configuration block, so terraform plan would propose destroying them. Re-run this script against the same -OutputFolder to write them out:" -ForegroundColor Yellow
+        foreach ($configGenerationFailure in $script:configGenerationFailures) {
+            Write-Host "    $configGenerationFailure" -ForegroundColor Yellow
+        }
+        $script:exitCode = 1
+    }
+    if ($script:enumerationFailures.Count -gt 0) {
+        # Reported but not failed: a customer is not necessarily entitled to every type the script enumerates
+        Write-Host "The following resource type(s) could not be listed, so none of them were onboarded. This is expected for resource types this customer is not entitled to; otherwise check the errors above (credentials, connectivity, -Hostname / -QuickDeployHostname):" -ForegroundColor Yellow
+        foreach ($enumerationFailure in ($script:enumerationFailures | Select-Object -Unique)) {
+            Write-Host "    citrix_$enumerationFailure" -ForegroundColor Yellow
+        }
+    }
+
+    Write-Host ""
+    if ($script:exitCode -ne 0) {
+        Write-Host "Onboarding INCOMPLETE: the generated Terraform project is missing resources (listed above). The partial project is in: $script:siteFolder" -ForegroundColor Yellow
+        Write-Host "Review the warnings above before relying on it, then run all Terraform commands (terraform plan, terraform apply) from that folder:" -ForegroundColor Yellow
+        Write-Host "    cd `"$script:siteFolder`"; terraform plan" -ForegroundColor Yellow
+    } else {
+        Write-Host "Onboarding complete. The generated Terraform project is in: $script:siteFolder" -ForegroundColor Green
+        Write-Host "Run all Terraform commands (terraform plan, terraform apply) from that folder:" -ForegroundColor Green
+        Write-Host "    cd `"$script:siteFolder`"; terraform plan" -ForegroundColor Green
+    }
+
+    if ($script:quickDeployHostEnvPublished) {
+        # What the provider would resolve on its own in the generated folder
+        $providerDefaultQuickDeployHost = "$((Get-CloudManagementBaseUrl) -replace '^https?://', '')/catalogservice"
+        # Stay quiet when that already matches, or when the caller's own environment variable still holds the host
+        if ($script:quickDeployHostPublished -ne $providerDefaultQuickDeployHost -and
+            $script:quickDeployHostPublished -ne $script:priorQuickDeployHostEnv) {
+            Write-Warning "The generated project does not record the Quick Deploy catalog service host this run used. Before running terraform plan/apply in that folder, set: `$env:CITRIX_QUICK_DEPLOY_HOST_NAME = '$($script:quickDeployHostPublished)'"
+        }
+    }
 }
 finally {
     # Return to the original directory if we switched into the site folder
@@ -1722,4 +1837,12 @@ finally {
     # Clean up environment variables for client secret and the shared import access token
     $env:CITRIX_CLIENT_SECRET = ''
     $env:CITRIX_ACCESS_TOKEN = ''
+
+    # Restored rather than blanked: unlike the two above, this variable can belong to the caller
+    if ($script:quickDeployHostEnvPublished) {
+        $env:CITRIX_QUICK_DEPLOY_HOST_NAME = $script:priorQuickDeployHostEnv
+    }
 }
+
+# After the finally so the cleanup above is guaranteed to have run first
+exit $script:exitCode

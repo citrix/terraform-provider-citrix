@@ -14,7 +14,7 @@ import (
 )
 
 // <summary>
-// Helper function to find Citrix Managed Azure region
+// Helper function to find Flex Azure region
 // </summary>
 // <param name="ctx">Context from caller</param>
 // <param name="client">Citrix DaaS client from provider context</param>
@@ -26,7 +26,7 @@ func GetCmaRegion(ctx context.Context, client *citrixdaasclient.CitrixDaasClient
 	regions, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickdeploy.DeploymentRegionsModel](regionsRequest, client)
 	if err != nil {
 		diagnostics.AddError(
-			"Error getting Citrix Managed Azure regions",
+			"Error getting Flex Azure regions",
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+ReadCatalogServiceClientError(err),
 		)
@@ -45,7 +45,7 @@ func GetCmaRegion(ctx context.Context, client *citrixdaasclient.CitrixDaasClient
 		}
 		diagnostics.AddError(
 			"Error validating Template Image configuration",
-			"Region "+regionValue+" is not a supported Citrix Managed Azure regions"+
+			"Region "+regionValue+" is not a supported Flex Azure region"+
 				"\nRegion should be one of the following: "+strings.Join(supportedRegions, ", ")+
 				"\nRegion format should be either region name (East US) or region ID (eastus)",
 		)
@@ -87,19 +87,19 @@ func GetTemplateImageWithId(ctx context.Context, client *citrixdaasclient.Citrix
 }
 
 // <summary>
-// Helper function to Get Citrix Managed Subscription with name
+// Helper function to Get Flex Azure Subscription with name
 // </summary>
 // <param name="ctx">Context from caller</param>
 // <param name="client">Citrix DaaS client from provider context</param>
 // <param name="diagnostics">Terraform diagnostics from context</param>
-// <param name="subscriptionName">Name of the Citrix Managed Azure subscription</param>
-// <returns>AzureSubscriptionOverview object of the queried Citrix Managed subscription</returns>
+// <param name="subscriptionName">Name of the Flex Azure subscription</param>
+// <returns>AzureSubscriptionOverview object of the queried Flex Azure subscription</returns>
 func GetCitrixManagedSubscriptionWithName(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, subscriptionName string) *citrixquickdeploy.AzureSubscriptionOverview {
 	getSubscriptionReq := client.QuickDeployClient.AzureSubscriptionsCMD.GetSubscriptions(ctx, client.ClientConfig.CustomerId, client.ClientConfig.SiteId)
 	subscriptionResp, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickdeploy.AzureSubscriptionsModel](getSubscriptionReq, client)
 	if err != nil {
 		diagnostics.AddError(
-			"Error getting Citrix Managed Azure subscription: "+subscriptionName,
+			"Error getting Flex Azure subscription: "+subscriptionName,
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+ReadCatalogServiceClientError(err),
 		)
@@ -113,7 +113,7 @@ func GetCitrixManagedSubscriptionWithName(ctx context.Context, client *citrixdaa
 	}
 
 	diagnostics.AddError(
-		"Error getting Citrix Managed Azure subscription: "+subscriptionName,
+		"Error getting Flex Azure subscription: "+subscriptionName,
 		"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 			"\nError message: Subscription not found",
 	)
@@ -149,13 +149,13 @@ func GetPersonaWithName(ctx context.Context, client *citrixdaasclient.CitrixDaas
 }
 
 // <summary>
-// Helper function to Get Citrix Managed Azure On-Prem Connection with name
+// Helper function to Get Flex Azure On-Prem Connection with name
 // </summary>
 // <param name="ctx">Context from caller</param>
 // <param name="client">Citrix DaaS client from provider context</param>
 // <param name="diagnostics">Terraform diagnostics from context</param>
-// <param name="subscriptionName">Name of the Citrix Managed Azure On-Prem Connection (VNet Peering or Azure VPN)</param>
-// <returns>AzureSubscriptionOverview object of the queried Citrix Managed Azure On-Prem Connection</returns>
+// <param name="subscriptionName">Name of the Flex Azure On-Prem Connection (VNet Peering or Azure VPN)</param>
+// <returns>AzureSubscriptionOverview object of the queried Flex Azure On-Prem Connection</returns>
 func GetCitrixManagedOnPremConnectionWithName(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, name string) (*citrixquickdeploy.OnPremConnectionModel, error) {
 	getOnPremConnection := client.QuickDeployClient.ManagedCapacityCMD.GetOnPremConnections(ctx, client.ClientConfig.CustomerId, client.ClientConfig.SiteId)
 	onPremConnections, _, err := citrixdaasclient.ExecuteWithRetry[*citrixquickdeploy.OnPremConnectionsModel](getOnPremConnection, client)
@@ -167,5 +167,5 @@ func GetCitrixManagedOnPremConnectionWithName(ctx context.Context, client *citri
 			return &onPremConnection, nil
 		}
 	}
-	return nil, fmt.Errorf("Citrix Managed Azure On-Prem Connection with name %s not found", name)
+	return nil, fmt.Errorf("Flex Azure On-Prem Connection with name %s not found", name)
 }

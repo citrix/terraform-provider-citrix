@@ -190,11 +190,11 @@ func (r *citrixManagedCatalogResource) Create(ctx context.Context, req resource.
 	createManagedCatalogRequest := r.client.QuickDeployClient.CatalogCMD.ConfigureAndDeployCitrixManagedCatalogApi(ctx, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId)
 	createManagedCatalogRequest = createManagedCatalogRequest.CitrixManagedCatalogConfigDeployModel(managedCatalogConfigBody)
 
-	// Create new Citrix Managed Catalog
+	// Create new Flex Catalog
 	catalogId, httpResp, err := citrixdaasclient.AddRequestData(createManagedCatalogRequest, r.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error creating Citrix Managed Catalog: "+plan.Name.ValueString(),
+			"Error creating Flex Catalog: "+plan.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadCatalogServiceClientError(err),
 		)
@@ -203,7 +203,7 @@ func (r *citrixManagedCatalogResource) Create(ctx context.Context, req resource.
 
 	catalogId = strings.Trim(catalogId, "\"") // Remove quotes from the catalog ID
 
-	// Try getting the new Citrix Managed Catalog
+	// Try getting the new Flex Catalog
 	catalog, httpResp, err := waitForCatalogDeployCompletion(ctx, r.client, &resp.Diagnostics, catalogId)
 	if err != nil {
 		return
@@ -212,7 +212,7 @@ func (r *citrixManagedCatalogResource) Create(ctx context.Context, req resource.
 	// Verify catalog state
 	if catalog.GetState() != citrixquickdeploy.CATALOGOVERALLSTATE_INPUT_REQUIRED && catalog.GetState() != citrixquickdeploy.CATALOGOVERALLSTATE_ACTIVE {
 		resp.Diagnostics.AddError(
-			"Error Creating Citrix Managed Catalog: "+plan.Name.ValueString(),
+			"Error Creating Flex Catalog: "+plan.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: Catalog state is "+string(catalog.GetState())+
 				"\nError details: "+catalog.GetStatusMessage(),
@@ -251,7 +251,7 @@ func (r *citrixManagedCatalogResource) Read(ctx context.Context, req resource.Re
 		return
 	}
 
-	// Try getting the Citrix Managed Azure Template Image
+	// Try getting the Flex Azure Template Image
 	catalog, _, err := getManagedCatalogWithId(ctx, r.client, &resp.Diagnostics, state.Id.ValueString(), true)
 	if err != nil {
 		// Remove from state
@@ -300,7 +300,7 @@ func (r *citrixManagedCatalogResource) Update(ctx context.Context, req resource.
 	var persona *citrixquickdeploy.Persona
 
 	catalogId := plan.Id.ValueString()
-	// Try getting the existing Citrix Managed Catalog
+	// Try getting the existing Flex Catalog
 	catalog, _, err := getManagedCatalogWithId(ctx, r.client, &resp.Diagnostics, catalogId, true)
 	if err != nil {
 		return
@@ -328,18 +328,18 @@ func (r *citrixManagedCatalogResource) Update(ctx context.Context, req resource.
 		updateCatalogImageRequest := r.client.QuickDeployClient.CatalogCMD.UpdateCatalogImage(ctx, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId, catalogId)
 		updateCatalogImageRequest = updateCatalogImageRequest.UpdateCatalogTemplateImageModel(templateImageUpdateModel)
 
-		// Update Citrix Managed Azure Template Image
+		// Update Flex Azure Template Image
 		_, httpResp, err := citrixdaasclient.AddRequestData(updateCatalogImageRequest, r.client).Execute()
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error updating Citrix Managed Catalog Image: "+plan.Name.ValueString(),
+				"Error updating Flex Catalog Image: "+plan.Name.ValueString(),
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadCatalogServiceClientError(err),
 			)
 			return
 		}
 
-		// Try getting the new Citrix Managed Catalog
+		// Try getting the new Flex Catalog
 		catalog, httpResp, err := waitForCatalogDeployCompletion(ctx, r.client, &resp.Diagnostics, catalogId)
 		if err != nil {
 			return
@@ -348,7 +348,7 @@ func (r *citrixManagedCatalogResource) Update(ctx context.Context, req resource.
 		// Verify catalog state
 		if catalog.GetState() != citrixquickdeploy.CATALOGOVERALLSTATE_INPUT_REQUIRED && catalog.GetState() != citrixquickdeploy.CATALOGOVERALLSTATE_ACTIVE {
 			resp.Diagnostics.AddError(
-				"Error Creating Citrix Managed Catalog: "+plan.Name.ValueString(),
+				"Error Creating Flex Catalog: "+plan.Name.ValueString(),
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: Catalog state is "+string(catalog.GetState())+
 					"\nError details: "+catalog.GetStatusMessage(),
@@ -390,11 +390,11 @@ func (r *citrixManagedCatalogResource) Update(ctx context.Context, req resource.
 	updateCatalogCapacityRequest := r.client.QuickDeployClient.CatalogCMD.UpdateCatalogScaleConfiguration(ctx, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId, catalogId)
 	updateCatalogCapacityRequest = updateCatalogCapacityRequest.CatalogCapacitySettingsModel(catalogCapacity)
 
-	// Update Citrix Managed Catalog Capacity Settings
+	// Update Flex Catalog Capacity Settings
 	httpResp, err := citrixdaasclient.AddRequestData(updateCatalogCapacityRequest, r.client).Execute()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error updating Citrix Managed Catalog Capacity Settings: "+plan.Name.ValueString(),
+			"Error updating Flex Catalog Capacity Settings: "+plan.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadCatalogServiceClientError(err),
 		)
@@ -410,14 +410,14 @@ func (r *citrixManagedCatalogResource) Update(ctx context.Context, req resource.
 	// Verify catalog state
 	if catalog.GetState() != citrixquickdeploy.CATALOGOVERALLSTATE_INPUT_REQUIRED && catalog.GetState() != citrixquickdeploy.CATALOGOVERALLSTATE_ACTIVE {
 		resp.Diagnostics.AddError(
-			"Error Creating Citrix Managed Catalog: "+plan.Name.ValueString(),
+			"Error Creating Flex Catalog: "+plan.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: Catalog state is "+string(catalog.GetState())+
 				"\nError details: "+catalog.GetStatusMessage(),
 		)
 	}
 
-	// Try getting the new Citrix Managed Catalog
+	// Try getting the new Flex Catalog
 	catalog, _, err = getManagedCatalogWithId(ctx, r.client, &resp.Diagnostics, catalogId, true)
 	if err != nil {
 		return
@@ -457,14 +457,14 @@ func (r *citrixManagedCatalogResource) Delete(ctx context.Context, req resource.
 	deleteModel.SetDeleteResourceLocationIfUnused(true)
 	deleteModel.SetDeleteVm(true)
 
-	// Delete Citrix Managed Catalog
+	// Delete Flex Catalog
 	deleteCatalogRequest := r.client.QuickDeployClient.CatalogCMD.DeleteCustomerCatalog(ctx, r.client.ClientConfig.CustomerId, r.client.ClientConfig.SiteId, state.Id.ValueString())
 	deleteCatalogRequest = deleteCatalogRequest.DeleteCatalogModel(deleteModel)
 	httpResp, err := citrixdaasclient.AddRequestData(deleteCatalogRequest, r.client).Execute()
 
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error removing Citrix Managed Catalog: "+state.Name.ValueString(),
+			"Error removing Flex Catalog: "+state.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadCatalogServiceClientError(err),
 		)
@@ -475,13 +475,13 @@ func (r *citrixManagedCatalogResource) Delete(ctx context.Context, req resource.
 	httpResp, err = waitForCatalogDeleteCompletion(ctx, r.client, &resp.Diagnostics, state.Id.ValueString())
 	if err != nil && httpResp != nil {
 		resp.Diagnostics.AddError(
-			"Error removing Citrix Managed Catalog: "+state.Name.ValueString(),
+			"Error removing Flex Catalog: "+state.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadCatalogServiceClientError(err),
 		)
 	} else if err != nil {
 		resp.Diagnostics.AddError(
-			"Error waiting for Citrix Managed Catalog deletion: "+state.Name.ValueString(),
+			"Error waiting for Flex Catalog deletion: "+state.Name.ValueString(),
 			"Error message: "+util.ReadCatalogServiceClientError(err),
 		)
 	}

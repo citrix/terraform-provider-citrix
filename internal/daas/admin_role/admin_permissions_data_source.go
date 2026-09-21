@@ -79,28 +79,17 @@ var errCacheLoad error
 func getAdminPermissions(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, filterCloudRestrictedPermissions bool) ([]citrixorchestration.PredefinedPermissionResponseModel, error) {
 	cacheLoad.Do(func() {
 		getPermissionsRequest := client.ApiClient.AdminAPIsDAAS.AdminGetPredefinedPermissions(ctx)
-		permissions := []citrixorchestration.PredefinedPermissionResponseModel{}
-		continuationToken := ""
-		for {
-			getPermissionsRequest = getPermissionsRequest.ContinuationToken(continuationToken)
-			resp, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.PredefinedPermissionResponseModelCollection](getPermissionsRequest, client)
-			if err != nil {
-				diagnostics.AddError(
-					"Error reading predefined admin permissions",
-					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-						"\nError message: "+util.ReadClientError(err),
-				)
-				errCacheLoad = err
-				return
-			}
-
-			permissions = append(permissions, resp.GetItems()...)
-			if resp.GetContinuationToken() == "" {
-				adminPermissionsCache = append(adminPermissionsCache, permissions...)
-				return
-			}
-			continuationToken = resp.GetContinuationToken()
+		resp, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.PredefinedPermissionResponseModelCollection](getPermissionsRequest, client)
+		if err != nil {
+			diagnostics.AddError(
+				"Error reading predefined admin permissions",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadClientError(err),
+			)
+			errCacheLoad = err
+			return
 		}
+		adminPermissionsCache = append(adminPermissionsCache, resp.GetItems()...)
 	})
 
 	if errCacheLoad != nil {

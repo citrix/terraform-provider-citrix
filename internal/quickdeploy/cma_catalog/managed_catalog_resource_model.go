@@ -49,7 +49,7 @@ type CitrixManagedCatalogResourceModel struct {
 
 func (CitrixManagedCatalogResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
-		Description: "DaaS Quick Deploy - Citrix Managed Azure --- Manages a Citrix Managed Catalog. **Note that this feature is in Tech Preview.**",
+		Description: "DaaS Quick Deploy for Azure --- Manages a Flex Catalog. **Note that this feature is in Tech Preview.**",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "GUID identifier of the managed catalog.",
@@ -94,7 +94,7 @@ func (CitrixManagedCatalogResourceModel) GetSchema() schema.Schema {
 				},
 			},
 			"subscription_name": schema.StringAttribute{
-				Description: "The name of the Citrix Managed Azure subscription to deploy the managed catalog. Defaults to `Citrix Managed` if omitted.",
+				Description: "The name of the Flex Azure subscription to deploy the managed catalog. Defaults to `Citrix Managed` if omitted.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString("Citrix Managed"),
@@ -251,7 +251,7 @@ type PowerScheduleModel struct {
 
 func (PowerScheduleModel) GetSchema() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
-		Description: "The power management schedule for the Citrix Managed catalog.",
+		Description: "The power management schedule for the Flex catalog.",
 		Required:    true,
 		Attributes: map[string]schema.Attribute{
 			"peak_disconnected_session_timeout": schema.Int64Attribute{
