@@ -321,6 +321,15 @@ resource "citrix_machine_catalog" "example-amazon-workspaces-core-mtsession" {
             }
             master_image_note = "Example Image Note"
             tenancy_type = "Shared"
+            billing_mode = "hourly"
+            writeback_cache = {
+                writeback_cache_disk_size_gb   = 16
+                writeback_cache_memory_size_mb = 512
+                wbc_disk_storage_type          = "gp3"
+                persist_os_disk                = true
+                persist_wbc                    = true
+                writeback_cache_drive_letter   = "E"
+            }
         }
 		number_of_total_machines =  1
         machine_account_creation_rules ={
