@@ -1252,39 +1252,42 @@ func parsePowerTimeSchemesPluginToClientModel(ctx context.Context, diags *diag.D
 	return res
 }
 
-func parsePowerTimeSchemesClientToPluginModel(ctx context.Context, diags *diag.Diagnostics, powerTimeSchemesResponse []citrixorchestration.PowerTimeSchemeResponseModel) []DeliveryGroupPowerTimeScheme {
-	var res []DeliveryGroupPowerTimeScheme
-	for _, powerTimeSchemeResponse := range powerTimeSchemesResponse {
-		var deliveryGroupPowerTimeScheme DeliveryGroupPowerTimeScheme
-
-		var daysOfWeek []string
-		for _, dayOfWeek := range powerTimeSchemeResponse.GetDaysOfWeek() {
-			timeSchemeDay := string(dayOfWeek)
-			daysOfWeek = append(daysOfWeek, timeSchemeDay)
+// getConfigurablePoolSizeSchedules drops the schedules the API returns for time ranges where no
+// machines are kept powered on. pool_size has to be at least 1 in configuration, so keeping them
+// would put values in state that can never be configured.
+func getConfigurablePoolSizeSchedules(poolSizeSchedules []citrixorchestration.PoolSizeScheduleResponseModel) []citrixorchestration.PoolSizeScheduleResponseModel {
+	res := []citrixorchestration.PoolSizeScheduleResponseModel{}
+	for _, poolSizeSchedule := range poolSizeSchedules {
+		if poolSizeSchedule.GetPoolSize() == 0 {
+			continue
 		}
 
-		var poolSizeScheduleRequests []PowerTimeSchemePoolSizeScheduleRequestModel
-		for _, poolSizeSchedule := range powerTimeSchemeResponse.GetPoolSizeSchedule() {
-			if poolSizeSchedule.GetPoolSize() == 0 {
-				continue
-			}
-
-			var poolSizeScheduleRequest PowerTimeSchemePoolSizeScheduleRequestModel
-			poolSizeScheduleRequest.TimeRange = types.StringValue(poolSizeSchedule.GetTimeRange())
-			poolSizeScheduleRequest.PoolSize = types.Int64Value(int64(poolSizeSchedule.GetPoolSize()))
-			poolSizeScheduleRequests = append(poolSizeScheduleRequests, poolSizeScheduleRequest)
-		}
-
-		deliveryGroupPowerTimeScheme.DisplayName = types.StringValue(powerTimeSchemeResponse.GetDisplayName())
-		deliveryGroupPowerTimeScheme.PeakTimeRanges = util.StringArrayToStringSet(ctx, diags, powerTimeSchemeResponse.GetPeakTimeRanges())
-		deliveryGroupPowerTimeScheme.PoolUsingPercentage = types.BoolValue(powerTimeSchemeResponse.GetPoolUsingPercentage())
-		deliveryGroupPowerTimeScheme.DaysOfWeek = util.StringArrayToStringSet(ctx, diags, daysOfWeek)
-		deliveryGroupPowerTimeScheme.PoolSizeSchedules = util.TypedArrayToObjectList[PowerTimeSchemePoolSizeScheduleRequestModel](ctx, diags, poolSizeScheduleRequests)
-
-		res = append(res, deliveryGroupPowerTimeScheme)
+		res = append(res, poolSizeSchedule)
 	}
 
 	return res
+}
+
+func (poolSizeSchedule PowerTimeSchemePoolSizeScheduleRequestModel) RefreshListItem(_ context.Context, _ *diag.Diagnostics, remotePoolSizeSchedule citrixorchestration.PoolSizeScheduleResponseModel) util.ResourceModelWithAttributes {
+	poolSizeSchedule.TimeRange = types.StringValue(remotePoolSizeSchedule.GetTimeRange())
+	poolSizeSchedule.PoolSize = types.Int64Value(int64(remotePoolSizeSchedule.GetPoolSize()))
+
+	return poolSizeSchedule
+}
+
+func (powerTimeScheme DeliveryGroupPowerTimeScheme) RefreshListItem(ctx context.Context, diags *diag.Diagnostics, remotePowerTimeScheme citrixorchestration.PowerTimeSchemeResponseModel) util.ResourceModelWithAttributes {
+	var daysOfWeek []string
+	for _, dayOfWeek := range remotePowerTimeScheme.GetDaysOfWeek() {
+		daysOfWeek = append(daysOfWeek, string(dayOfWeek))
+	}
+
+	powerTimeScheme.DisplayName = types.StringValue(remotePowerTimeScheme.GetDisplayName())
+	powerTimeScheme.DaysOfWeek = util.StringArrayToStringSet(ctx, diags, daysOfWeek)
+	powerTimeScheme.PeakTimeRanges = util.StringArrayToStringSet(ctx, diags, remotePowerTimeScheme.GetPeakTimeRanges())
+	powerTimeScheme.PoolUsingPercentage = types.BoolValue(remotePowerTimeScheme.GetPoolUsingPercentage())
+	powerTimeScheme.PoolSizeSchedules = util.RefreshListValueProperties[PowerTimeSchemePoolSizeScheduleRequestModel, citrixorchestration.PoolSizeScheduleResponseModel](ctx, diags, powerTimeScheme.PoolSizeSchedules, getConfigurablePoolSizeSchedules(remotePowerTimeScheme.GetPoolSizeSchedule()), util.GetOrchestrationPoolSizeScheduleKey)
+
+	return powerTimeScheme
 }
 
 func parseDeliveryGroupRebootScheduleToClientModel(ctx context.Context, diags *diag.Diagnostics, rebootSchedules []DeliveryGroupRebootSchedule) []citrixorchestration.RebootScheduleRequestModel {
@@ -1977,8 +1980,7 @@ func (r DeliveryGroupResourceModel) updatePlanWithAutoscaleSettings(ctx context.
 	autoscale.AutoscaleEnabled = types.BoolValue(deliveryGroup.GetAutoScaleEnabled())
 
 	if deliveryGroup.RestrictAutoscaleTag != nil {
-		restrictAutoScaleTag := deliveryGroup.GetRestrictAutoscaleTag()
-		autoscale.RestrictAutoscaleTag = types.StringValue(restrictAutoScaleTag.GetName())
+		autoscale.RestrictAutoscaleTag = getRestrictToTagValue(autoscale.RestrictAutoscaleTag, deliveryGroup.GetRestrictAutoscaleTag())
 
 		if deliveryGroup.GetRestrictAutoscaleMinIdleUntaggedPercentDuringOffPeak() >= 0 {
 			autoscale.RestrictAutoscaleMinIdleUntaggedPercentDuringOffPeak = types.Int32Value(deliveryGroup.GetRestrictAutoscaleMinIdleUntaggedPercentDuringOffPeak())
@@ -1991,6 +1993,10 @@ func (r DeliveryGroupResourceModel) updatePlanWithAutoscaleSettings(ctx context.
 		} else {
 			autoscale.RestrictAutoscaleMinIdleUntaggedPercentDuringPeak = types.Int32Null()
 		}
+	} else {
+		autoscale.RestrictAutoscaleTag = types.StringNull()
+		autoscale.RestrictAutoscaleMinIdleUntaggedPercentDuringPeak = types.Int32Null()
+		autoscale.RestrictAutoscaleMinIdleUntaggedPercentDuringOffPeak = types.Int32Null()
 	}
 
 	if !autoscale.Timezone.IsNull() {
@@ -2024,18 +2030,7 @@ func (r DeliveryGroupResourceModel) updatePlanWithAutoscaleSettings(ctx context.
 	autoscale.LogOffWarningTitle = types.StringValue(deliveryGroup.GetLogOffWarningTitle())
 	autoscale.LogOffWarningMessage = types.StringValue(deliveryGroup.GetLogOffWarningMessage())
 
-	parsedPowerTimeSchemes := parsePowerTimeSchemesClientToPluginModel(ctx, diags, dgPowerTimeSchemes.GetItems())
-	if parsedPowerTimeSchemes != nil {
-		autoscalePowerTimeSchemes := util.ObjectListToTypedArray[DeliveryGroupPowerTimeScheme](ctx, diags, autoscale.PowerTimeSchemes)
-		parsedPowerTimeSchemes = preserveOrderInPowerTimeSchemes(ctx, diags, autoscalePowerTimeSchemes, parsedPowerTimeSchemes)
-		autoscale.PowerTimeSchemes = util.TypedArrayToObjectList(ctx, diags, parsedPowerTimeSchemes)
-	} else {
-		if attributeMap, err := util.ResourceAttributeMapFromObject(DeliveryGroupPowerTimeScheme{}); err == nil {
-			autoscale.PowerTimeSchemes = types.ListNull(types.ObjectType{AttrTypes: attributeMap})
-		} else {
-			diags.AddWarning("Error converting schema to attribute map. Error: ", err.Error())
-		}
-	}
+	autoscale.PowerTimeSchemes = util.RefreshListValueProperties[DeliveryGroupPowerTimeScheme, citrixorchestration.PowerTimeSchemeResponseModel](ctx, diags, autoscale.PowerTimeSchemes, dgPowerTimeSchemes.GetItems(), util.GetOrchestrationPowerTimeSchemeKey)
 
 	autoscale.AutoscaleLogOffReminderEnabled = types.BoolValue(deliveryGroup.GetAutoscaleLogOffReminderEnabled())
 	autoscale.AutoscaleLogOffReminderIntervalSecondsOffPeak = types.Int32Value(deliveryGroup.GetAutoscaleLogOffReminderIntervalSecondsOffPeak())
@@ -2087,64 +2082,6 @@ func getDeliveryGroupAllocationType(ctx context.Context, client *citrixdaasclien
 		return catalog.GetAllocationType()
 	}
 	return ""
-}
-
-func preserveOrderInPowerTimeSchemes(ctx context.Context, diags *diag.Diagnostics, powerTimeSchemeInPlan, powerTimeSchemesInRemote []DeliveryGroupPowerTimeScheme) []DeliveryGroupPowerTimeScheme {
-	planPowerTimeSchemesMap := map[string]int{}
-
-	for index, powerTimeScheme := range powerTimeSchemeInPlan {
-		planPowerTimeSchemesMap[powerTimeScheme.DisplayName.ValueString()] = index
-	}
-
-	for _, powerTimeScheme := range powerTimeSchemesInRemote {
-		index, exists := planPowerTimeSchemesMap[powerTimeScheme.DisplayName.ValueString()]
-		if !exists {
-			powerTimeSchemeInPlan = append(powerTimeSchemeInPlan, powerTimeScheme)
-		} else {
-			updatedPoolSizeSchedule := preserveOrderInPoolSizeSchedule(
-				util.ObjectListToTypedArray[PowerTimeSchemePoolSizeScheduleRequestModel](ctx, diags, powerTimeSchemeInPlan[index].PoolSizeSchedules),
-				util.ObjectListToTypedArray[PowerTimeSchemePoolSizeScheduleRequestModel](ctx, diags, powerTimeScheme.PoolSizeSchedules))
-			powerTimeSchemeInPlan[index].PoolSizeSchedules = util.TypedArrayToObjectList[PowerTimeSchemePoolSizeScheduleRequestModel](ctx, diags, updatedPoolSizeSchedule)
-		}
-		planPowerTimeSchemesMap[powerTimeScheme.DisplayName.ValueString()] = -1
-	}
-
-	powerTimeSchemes := []DeliveryGroupPowerTimeScheme{}
-	for _, powerTimeScheme := range powerTimeSchemeInPlan {
-		if planPowerTimeSchemesMap[powerTimeScheme.DisplayName.ValueString()] == -1 {
-			powerTimeSchemes = append(powerTimeSchemes, powerTimeScheme)
-		}
-	}
-
-	return powerTimeSchemes
-}
-
-func preserveOrderInPoolSizeSchedule(poolSizeScheduleInPlan, poolSizeScheduleInRemote []PowerTimeSchemePoolSizeScheduleRequestModel) []PowerTimeSchemePoolSizeScheduleRequestModel {
-	if len(poolSizeScheduleInRemote) == 0 {
-		return nil
-	}
-
-	planPoolSizeScheduleMap := map[string]int{}
-	for index, poolSizeSchedule := range poolSizeScheduleInPlan {
-		planPoolSizeScheduleMap[poolSizeSchedule.TimeRange.ValueString()] = index
-	}
-
-	for _, poolSizeSchedule := range poolSizeScheduleInRemote {
-		_, exists := planPoolSizeScheduleMap[poolSizeSchedule.TimeRange.ValueString()]
-		if !exists {
-			poolSizeScheduleInPlan = append(poolSizeScheduleInPlan, poolSizeSchedule)
-		}
-		planPoolSizeScheduleMap[poolSizeSchedule.TimeRange.ValueString()] = -1
-	}
-
-	poolSizeSchedules := []PowerTimeSchemePoolSizeScheduleRequestModel{}
-	for _, poolSizeSchedule := range poolSizeScheduleInPlan {
-		if planPoolSizeScheduleMap[poolSizeSchedule.TimeRange.ValueString()] == -1 {
-			poolSizeSchedules = append(poolSizeSchedules, poolSizeSchedule)
-		}
-	}
-
-	return poolSizeSchedules
 }
 
 // resolvePerPolicyUserFilters resolves user filter request values for a per-policy restricted_access_users override.

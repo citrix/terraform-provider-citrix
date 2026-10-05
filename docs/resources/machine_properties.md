@@ -30,7 +30,7 @@ resource "citrix_machine_properties" "example_machine_properties" {
 
 ### Optional
 
-- `tags` (Set of String) A set of identifiers of tags to associate with the machine.
+- `tags` (Set of String) A set of identifiers of tags to associate with the machine directly. Tags the machine inherits from its delivery group, application groups, or applications are not tracked here and cannot be removed at the machine level. Must contain at least one element when specified; omit the attribute to assign no tags.
 
 ## Import
 

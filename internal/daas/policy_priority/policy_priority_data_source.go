@@ -98,7 +98,8 @@ func (d *policyPriorityDataSource) Read(ctx context.Context, req datasource.Read
 	}
 
 	// Refresh values
-	data = data.RefreshPropertyValues(ctx, &resp.Diagnostics, policySet, policiesInPolicySet)
+	// No configured list to narrow against, so report the whole set in its priority order.
+	data = data.RefreshPropertyValues(ctx, &resp.Diagnostics, policySet, policiesInPolicySet, true)
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

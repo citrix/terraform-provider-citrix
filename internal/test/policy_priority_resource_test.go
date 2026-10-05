@@ -66,6 +66,44 @@ func TestPolicyPriorityResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_policy_priority.test_policy_priority", "policy_names.2", policy2Name),
 				),
 			},
+			// XAC-77859: an unlisted policy in the set must not manufacture a diff (asserted by the
+			// automatic post-apply plan check). Must stay after the import step, which adopts all.
+			{
+				Config: composeTestResourceTf(
+					BuildPolicySetV2Resource(t),
+					BuildEnabledPolicyResource(t, testPolicy1Resource),
+					BuildEnabledPolicyResource(t, testPolicy2Resource),
+					BuildEnabledPolicyResource(t, testPolicy3Resource),
+					BuildEnabledPolicyResource(t, testPolicyUnlistedResource),
+					testPolicyPriorityResourceUpdated,
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// The unlisted policy stays out of both computed lists.
+					resource.TestCheckResourceAttr("citrix_policy_priority.test_policy_priority", "policy_priority.#", "3"),
+					resource.TestCheckResourceAttr("citrix_policy_priority.test_policy_priority", "policy_names.#", "3"),
+					resource.TestCheckResourceAttr("citrix_policy_priority.test_policy_priority", "policy_names.0", policy3Name),
+					resource.TestCheckResourceAttr("citrix_policy_priority.test_policy_priority", "policy_names.1", policy1Name),
+					resource.TestCheckResourceAttr("citrix_policy_priority.test_policy_priority", "policy_names.2", policy2Name),
+				),
+			},
+			// Reorder with the unlisted policy still present: the step that reaches Update.
+			{
+				Config: composeTestResourceTf(
+					BuildPolicySetV2Resource(t),
+					BuildEnabledPolicyResource(t, testPolicy1Resource),
+					BuildEnabledPolicyResource(t, testPolicy2Resource),
+					BuildEnabledPolicyResource(t, testPolicy3Resource),
+					BuildEnabledPolicyResource(t, testPolicyUnlistedResource),
+					testPolicyPriorityResource,
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("citrix_policy_priority.test_policy_priority", "policy_priority.#", "3"),
+					resource.TestCheckResourceAttr("citrix_policy_priority.test_policy_priority", "policy_names.#", "3"),
+					resource.TestCheckResourceAttr("citrix_policy_priority.test_policy_priority", "policy_names.0", policy1Name),
+					resource.TestCheckResourceAttr("citrix_policy_priority.test_policy_priority", "policy_names.1", policy2Name),
+					resource.TestCheckResourceAttr("citrix_policy_priority.test_policy_priority", "policy_names.2", policy3Name),
+				),
+			},
 		},
 	})
 }

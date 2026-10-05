@@ -5,7 +5,6 @@ package policy_priority
 import (
 	"context"
 	"regexp"
-	"sort"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	"github.com/citrix/terraform-provider-citrix/internal/util"
@@ -42,17 +41,22 @@ func (PolicyPriorityModel) GetSchema() schema.Schema {
 				Computed:    true,
 			},
 			"policy_priority": schema.ListAttribute{
-				Description: "Ordered list of policy IDs. \n\n-> **Note** The order of policy IDs in the list determines the priority of the policies.",
+				Description: "Ordered list of policy IDs. Each policy may be listed only once. \n\n-> **Note** The order of policy IDs in the list determines the priority of the policies." +
+					"\n\n-> **Note** The list does not have to name every policy in the policy set. Policies in the set that are not listed keep their relative order and are given lower priority than every listed policy." +
+					"\n\n~> **Warning** A policy added to the policy set outside Terraform, for example in Studio, is moved below the listed policies the next time this resource is applied. Such a policy does not itself produce a plan, so if it was given a higher priority than the listed policies, `terraform plan` reports no changes while it continues to outrank them. The order is only corrected once some other change causes this resource to be applied.",
 				Required:    true,
 				ElementType: types.StringType,
 				Validators: []validator.List{
 					listvalidator.ValueStringsAre(
 						stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
 					),
+					// Only catches literal repeats; unknown ids are deduped by dedupeFold.
+					listvalidator.UniqueValues(),
 				},
 			},
 			"policy_names": schema.ListAttribute{
-				Description: "Ordered list of policy names. \n\n-> **Note** The order of policy names in the list reflects the priority of the policies.",
+				Description: "Ordered list of policy names. \n\n-> **Note** The order of policy names in the list reflects the priority of the policies." +
+					"\n\n-> **Note** Only the policies named in `policy_priority` appear here. Policies in the policy set that are not listed are omitted, except immediately after `terraform import`, which adopts every policy in the set.",
 				Computed:    true,
 				ElementType: types.StringType,
 			},
@@ -68,25 +72,21 @@ func (PolicyPriorityModel) GetAttributesNamesToMask() map[string]bool {
 	return map[string]bool{}
 }
 
-func (r PolicyPriorityModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, policySet *citrixorchestration.PolicySetResponse, policies *citrixorchestration.CollectionEnvelopeOfPolicyResponse) PolicyPriorityModel {
+// RefreshPropertyValues maps the policy set onto the model. Read sets orderFromRemote to surface drift.
+func (r PolicyPriorityModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, policySet *citrixorchestration.PolicySetResponse, policies *citrixorchestration.CollectionEnvelopeOfPolicyResponse, orderFromRemote bool) PolicyPriorityModel {
 	r.PolicySetId = types.StringValue(policySet.GetPolicySetGuid())
 	r.PolicySetName = types.StringValue(policySet.GetName())
 
-	policyIds := []string{}
-	policyNames := []string{}
-	if policies != nil && policies.Items != nil {
-		policyItems := policies.Items
-		sort.Slice(policyItems, func(i, j int) bool {
-			return policyItems[i].GetPriority() < policyItems[j].GetPriority()
-		})
-		for _, policy := range policyItems {
-			policyIds = append(policyIds, policy.GetPolicyGuid())
-			policyNames = append(policyNames, policy.GetPolicyName())
-		}
-	} else {
-		r.PolicyPriority = util.StringArrayToStringList(ctx, diagnostics, []string{})
-		r.PolicyNames = util.StringArrayToStringList(ctx, diagnostics, []string{})
+	policyIds, policyNames := policyIdsAndNamesByPriority(policies)
+
+	// Narrow to the managed subset so an unlisted policy cannot manufacture a diff; import adopts all.
+	adoptAll := r.PolicyPriority.IsNull() || r.PolicyPriority.IsUnknown()
+	var managed []string
+	if !adoptAll {
+		managed = util.StringListToStringArray(ctx, diagnostics, r.PolicyPriority)
 	}
+	policyIds, policyNames = resolveManagedPolicies(managed, adoptAll, policyIds, policyNames, orderFromRemote)
+
 	r.PolicyPriority = util.StringArrayToStringList(ctx, diagnostics, policyIds)
 	r.PolicyNames = util.StringArrayToStringList(ctx, diagnostics, policyNames)
 

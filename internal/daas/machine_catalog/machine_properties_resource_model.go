@@ -48,7 +48,7 @@ func (MachinePropertiesModel) GetSchema() schema.Schema {
 			},
 			"tags": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "A set of identifiers of tags to associate with the machine.",
+				Description: "A set of identifiers of tags to associate with the machine directly. Tags the machine inherits from its delivery group, application groups, or applications are not tracked here and cannot be removed at the machine level. Must contain at least one element when specified; omit the attribute to assign no tags.",
 				Optional:    true,
 				Validators: []validator.Set{
 					setvalidator.SizeAtLeast(1),

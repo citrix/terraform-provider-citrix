@@ -358,6 +358,18 @@ func setProvSchemePropertiesForCreateCatalog(ctx context.Context, client *citrix
 		}
 		provisioningScheme.SetTenancyType(*tenancyType)
 
+		if !amazonWorkspacesCoreMachineConfig.WritebackCache.IsNull() {
+			writeBackCacheModel := util.ObjectValueToTypedObject[AmazonWorkspacesCoreWritebackCacheModel](ctx, diag, amazonWorkspacesCoreMachineConfig.WritebackCache)
+			provisioningScheme.SetUseWriteBackCache(true)
+			provisioningScheme.SetWriteBackCacheDiskSizeGB(int32(writeBackCacheModel.WriteBackCacheDiskSizeGB.ValueInt64()))
+			if !writeBackCacheModel.WriteBackCacheMemorySizeMB.IsNull() {
+				provisioningScheme.SetWriteBackCacheMemorySizeMB(int32(writeBackCacheModel.WriteBackCacheMemorySizeMB.ValueInt64()))
+			}
+			if !writeBackCacheModel.WriteBackCacheDriveLetter.IsNull() {
+				provisioningScheme.SetWriteBackCacheDriveLetter(writeBackCacheModel.WriteBackCacheDriveLetter.ValueString())
+			}
+		}
+
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
 		gcpMachineConfig := util.ObjectValueToTypedObject[GcpMachineConfigModel](ctx, diag, provisioningSchemePlan.GcpMachineConfig)
 		var imagePath string
@@ -782,6 +794,15 @@ func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan Provisioning
 			return body, err
 		}
 		body.SetServiceOfferingPath(serviceOffering)
+
+		// Write-back Cache values can be updated in place. Enabling/disabling Write-back Cache and changing the drive letter force a catalog recreate
+		if !amazonWorkspacesCoreMachineConfig.WritebackCache.IsNull() {
+			writeBackCacheModel := util.ObjectValueToTypedObject[AmazonWorkspacesCoreWritebackCacheModel](ctx, diagnostics, amazonWorkspacesCoreMachineConfig.WritebackCache)
+			body.SetWriteBackCacheDiskSizeGB(int32(writeBackCacheModel.WriteBackCacheDiskSizeGB.ValueInt64()))
+			if !writeBackCacheModel.WriteBackCacheMemorySizeMB.IsNull() {
+				body.SetWriteBackCacheMemorySizeMB(int32(writeBackCacheModel.WriteBackCacheMemorySizeMB.ValueInt64()))
+			}
+		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_XEN_SERVER:
 		xenserverMachineConfig := util.ObjectValueToTypedObject[XenserverMachineConfigModel](ctx, nil, provisioningSchemePlan.XenserverMachineConfig)
@@ -2012,6 +2033,19 @@ func parseCustomPropertiesToClientModel(ctx context.Context, diagnostics *diag.D
 			if writebackCacheModel.PersistOsDisk.ValueBool() {
 				util.AppendNameValueStringPair(res, "PersistOsDisk", "true")
 			}
+		}
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_AMAZON_WORK_SPACES_CORE:
+		amazonWorkspacesCoreMachineConfig := util.ObjectValueToTypedObject[AmazonWorkspacesCoreMachineConfigModel](ctx, nil, provisioningScheme.AmazonWorkspacesCoreMachineConfig)
+		if !amazonWorkspacesCoreMachineConfig.BillingMode.IsNull() {
+			util.AppendNameValueStringPair(res, "BillingMode", amazonWorkspacesCoreMachineConfig.BillingMode.ValueString())
+		}
+		if !amazonWorkspacesCoreMachineConfig.WritebackCache.IsNull() {
+			writebackCacheModel := util.ObjectValueToTypedObject[AmazonWorkspacesCoreWritebackCacheModel](ctx, nil, amazonWorkspacesCoreMachineConfig.WritebackCache)
+			if !writebackCacheModel.WBCDiskStorageType.IsNull() {
+				util.AppendNameValueStringPair(res, "WBCDiskStorageType", writebackCacheModel.WBCDiskStorageType.ValueString())
+			}
+			util.AppendNameValueStringPair(res, "PersistWBC", strconv.FormatBool(writebackCacheModel.PersistWBC.ValueBool()))
+			util.AppendNameValueStringPair(res, "PersistOsDisk", strconv.FormatBool(writebackCacheModel.PersistOsDisk.ValueBool()))
 		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_GOOGLE_CLOUD_PLATFORM:
 		gcpMachineConfig := util.ObjectValueToTypedObject[GcpMachineConfigModel](ctx, nil, provisioningScheme.GcpMachineConfig)

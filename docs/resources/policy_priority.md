@@ -29,9 +29,13 @@ resource "citrix_policy_priority" "example" {
 
 ### Required
 
-- `policy_priority` (List of String) Ordered list of policy IDs. 
+- `policy_priority` (List of String) Ordered list of policy IDs. Each policy may be listed only once. 
 
 -> **Note** The order of policy IDs in the list determines the priority of the policies.
+
+-> **Note** The list does not have to name every policy in the policy set. Policies in the set that are not listed keep their relative order and are given lower priority than every listed policy.
+
+~> **Warning** A policy added to the policy set outside Terraform, for example in Studio, is moved below the listed policies the next time this resource is applied. Such a policy does not itself produce a plan, so if it was given a higher priority than the listed policies, `terraform plan` reports no changes while it continues to outrank them. The order is only corrected once some other change causes this resource to be applied.
 - `policy_set_id` (String) GUID identifier of the policy set.
 
 ### Read-Only
@@ -39,6 +43,8 @@ resource "citrix_policy_priority" "example" {
 - `policy_names` (List of String) Ordered list of policy names. 
 
 -> **Note** The order of policy names in the list reflects the priority of the policies.
+
+-> **Note** Only the policies named in `policy_priority` appear here. Policies in the policy set that are not listed are omitted, except immediately after `terraform import`, which adopts every policy in the set.
 - `policy_set_name` (String) Name of the policy set.
 
 ## Import

@@ -56,7 +56,7 @@ func (TagResourceModel) GetSchema() schema.Schema {
 			},
 			"scopes": schema.SetAttribute{
 				ElementType: types.StringType,
-				Description: "The set of IDs of the scopes applied on the tag. Please note that the ALL scope will be applied to the tag by default.",
+				Description: "The set of IDs of the admin scopes applied on the tag.",
 				Optional:    true,
 				Validators: []validator.Set{
 					setvalidator.ValueStringsAre(
@@ -64,8 +64,9 @@ func (TagResourceModel) GetSchema() schema.Schema {
 							stringvalidator.RegexMatches(regexp.MustCompile(util.GuidRegex), "must be specified with ID in GUID format"),
 						),
 						validator.String(
-							stringvalidator.NoneOf(
+							stringvalidator.NoneOfCaseInsensitive(
 								util.AllScopeId,
+								util.AnyScopeId,
 							),
 						),
 					),
@@ -108,16 +109,7 @@ func (r TagResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics
 	r.Id = types.StringValue(tag.GetId())
 	r.Name = types.StringValue(tag.GetName())
 	r.Description = types.StringValue(tag.GetDescription())
-
-	if len(tag.GetScopeReferences()) > 0 {
-		remoteScopeIds := []string{}
-		for _, scope := range tag.GetScopeReferences() {
-			remoteScopeIds = append(remoteScopeIds, scope.GetScopeId())
-		}
-		r.Scopes = util.StringArrayToStringSet(ctx, diagnostics, remoteScopeIds)
-	} else {
-		r.Scopes = types.SetNull(types.StringType)
-	}
+	r.Scopes = refreshTagScopes(ctx, diagnostics, tag, r.Scopes)
 
 	// Refresh computed attributes
 	r.AssociatedMachineCount = types.Int32Value(tag.GetNumMachines())
