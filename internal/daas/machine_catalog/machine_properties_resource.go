@@ -84,9 +84,8 @@ func (r *MachinePropertiesResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
-	// setMachineTags succeeded, so the planned tags are the authoritative result. `tags` is Optional and
-	// not Computed, which means Terraform requires the post-apply state to equal the plan; reading the
-	// value back from Orchestration can only ever disagree with it. Drift is picked up by the next Read.
+	// `tags` is Optional and not Computed, so Terraform requires the post-apply state to equal the plan.
+	// Record the planned tags rather than a read-back, which can lag the write. Drift is caught by Read.
 	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, machineProperties, util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Tags))
 
 	// Set refreshed state
@@ -163,8 +162,7 @@ func (r *MachinePropertiesResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
-	// See the note in Create: record the planned tags rather than a read-back, which cannot be relied on
-	// to match the plan for a non-Computed attribute.
+	// See the note in Create.
 	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, machineProperties, util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Tags))
 
 	// Set refreshed state
@@ -261,6 +259,8 @@ func getMachineProperties(ctx context.Context, client *citrixdaasclient.CitrixDa
 
 func getMachineTagIds(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, machineNameOrId string) ([]string, error) {
 	getTagsRequest := client.ApiClient.MachinesAPIsDAAS.MachinesGetMachineTags(ctx, machineNameOrId)
+	// Deliberately unprojected. The filter below needs NumMachines, a non-pointer field, so a Fields()
+	// projection omitting it would decode 0 for every tag and silently discard them all.
 	machineTags, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.TagResponseModelCollection](getTagsRequest, client)
 	if err != nil {
 		diagnostics.AddError(
@@ -272,6 +272,11 @@ func getMachineTagIds(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 	}
 	tagIds := []string{}
 	for _, tag := range machineTags.GetItems() {
+		// This endpoint also returns tags inherited from the delivery group, application groups, or
+		// applications; only a tag assigned directly to the queried machine reports NumMachines as 1.
+		if tag.GetNumMachines() != 1 {
+			continue
+		}
 		tagIds = append(tagIds, tag.GetId())
 	}
 	return tagIds, err

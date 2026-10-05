@@ -66,9 +66,16 @@ func (DeliveryGroupMachineCatalogModel) GetAttributes() map[string]schema.Attrib
 	return DeliveryGroupMachineCatalogModel{}.GetSchema().Attributes
 }
 
+// ensure PowerTimeSchemePoolSizeScheduleRequestModel implements RefreshableListItemWithAttributes
+var _ util.RefreshableListItemWithAttributes[citrixorchestration.PoolSizeScheduleResponseModel] = PowerTimeSchemePoolSizeScheduleRequestModel{}
+
 type PowerTimeSchemePoolSizeScheduleRequestModel struct {
 	TimeRange types.String `tfsdk:"time_range"`
 	PoolSize  types.Int64  `tfsdk:"pool_size"`
+}
+
+func (r PowerTimeSchemePoolSizeScheduleRequestModel) GetKey() string {
+	return r.TimeRange.ValueString()
 }
 
 func (PowerTimeSchemePoolSizeScheduleRequestModel) GetSchema() schema.NestedAttributeObject {
@@ -97,12 +104,19 @@ func (PowerTimeSchemePoolSizeScheduleRequestModel) GetAttributes() map[string]sc
 	return PowerTimeSchemePoolSizeScheduleRequestModel{}.GetSchema().Attributes
 }
 
+// ensure DeliveryGroupPowerTimeScheme implements RefreshableListItemWithAttributes
+var _ util.RefreshableListItemWithAttributes[citrixorchestration.PowerTimeSchemeResponseModel] = DeliveryGroupPowerTimeScheme{}
+
 type DeliveryGroupPowerTimeScheme struct {
 	DaysOfWeek          types.Set    `tfsdk:"days_of_week"` //Set[string]
 	DisplayName         types.String `tfsdk:"display_name"`
 	PeakTimeRanges      types.Set    `tfsdk:"peak_time_ranges"`    //Set[string]
 	PoolSizeSchedules   types.List   `tfsdk:"pool_size_schedules"` //List[PowerTimeSchemePoolSizeScheduleRequestModel]
 	PoolUsingPercentage types.Bool   `tfsdk:"pool_using_percentage"`
+}
+
+func (r DeliveryGroupPowerTimeScheme) GetKey() string {
+	return r.DisplayName.ValueString()
 }
 
 func (DeliveryGroupPowerTimeScheme) GetSchema() schema.NestedAttributeObject {

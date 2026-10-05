@@ -134,6 +134,16 @@ resource "citrix_policy" "test_policy3" {
     enabled     	= %t
 }
 `
+
+	// XAC-77859: belongs to the policy set, deliberately absent from policy_priority.
+	testPolicyUnlistedResource = `
+resource "citrix_policy" "test_policy_unlisted" {
+	policy_set_id 	= citrix_policy_set_v2.test_policy_set_v2.id
+    name        	= "%s-unlisted"
+    description 	= "%s"
+    enabled     	= %t
+}
+`
 )
 
 func BuildEnabledPolicyResource(t *testing.T, policyResource string) string {

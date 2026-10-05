@@ -72,7 +72,8 @@ func (r *policyPriorityResource) Create(ctx context.Context, req resource.Create
 	}
 
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, policySet, policiesInRemote)
+	// Keep the plan's ordering; re-deriving it here turns a partial rank into an inconsistent-result error.
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, policySet, policiesInRemote, false)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -104,7 +105,8 @@ func (r *policyPriorityResource) Read(ctx context.Context, req resource.ReadRequ
 	}
 
 	// Map response body to schema and populate Computed attribute values
-	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, policySet, policiesInPolicySet)
+	// Read adopts the set's ordering so a reorder made outside Terraform surfaces as drift.
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, policySet, policiesInPolicySet, true)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, state)
@@ -141,7 +143,8 @@ func (r *policyPriorityResource) Update(ctx context.Context, req resource.Update
 	}
 
 	// Map response body to schema and populate Computed attribute values
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, policySet, policiesInRemote)
+	// Keep the plan's ordering; re-deriving it here turns a partial rank into an inconsistent-result error.
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, policySet, policiesInRemote, false)
 
 	// Set state to fully populated data
 	diags = resp.State.Set(ctx, plan)
@@ -212,6 +215,11 @@ func updatePolicySetPolicyPriorities(ctx context.Context, diagnostics *diag.Diag
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 					"\nError message: "+util.ReadClientError(err),
 			)
+			if err == nil {
+				// The API refused the rank without a transport error; returning nil here would
+				// let the caller carry on and persist an order the server never applied.
+				err = fmt.Errorf("policy priority request for policy set %s was rejected", policySetId)
+			}
 			return err
 		}
 	}
@@ -223,15 +231,12 @@ func validateAndUpdatePolicyPriorities(ctx context.Context, diagnostics *diag.Di
 	if err != nil {
 		return err
 	}
-	policyIdsInRemote := []string{}
-	for _, policy := range policiesInRemote.GetItems() {
-		policyIdsInRemote = append(policyIdsInRemote, policy.GetPolicyGuid())
-	}
 
-	// If not containing policies specified, throw error
+	policyIdsInRemote, _ := policyIdsAndNamesByPriority(policiesInRemote)
+
+	// A policy named in the list but absent from the set cannot be ranked.
 	policyPriority := util.StringListToStringArray(ctx, diagnostics, plan.PolicyPriority)
 	policiesNotInRemote := []string{}
-	policiesNotInPlan := []string{}
 	for _, policyId := range policyPriority {
 		if !slices.ContainsFunc(policyIdsInRemote, func(policyIdInRemote string) bool {
 			return strings.EqualFold(policyIdInRemote, policyId)
@@ -241,7 +246,9 @@ func validateAndUpdatePolicyPriorities(ctx context.Context, diagnostics *diag.Di
 	}
 
 	if len(policiesNotInRemote) > 0 {
-		err := fmt.Errorf("policy IDs %s in the `policy_priority` list are not found in the policy set %s", strings.Join(policiesNotInRemote, ", "), policySetId)
+		err := fmt.Errorf("policy IDs %s in the `policy_priority` list are not found in the policy set %s. "+
+			"Remove them from `policy_priority`, or re-create them in the policy set",
+			strings.Join(policiesNotInRemote, ", "), policySetId)
 		diagnostics.AddError(
 			"Error managing Policy Priority in Policy Set "+policySetId,
 			err.Error(),
@@ -249,26 +256,18 @@ func validateAndUpdatePolicyPriorities(ctx context.Context, diagnostics *diag.Di
 		return err
 	}
 
-	for _, policyId := range policyIdsInRemote {
-		if !slices.ContainsFunc(policyPriority, func(policyPriorityId string) bool {
-			return strings.EqualFold(policyPriorityId, policyId)
-		}) {
-			policiesNotInPlan = append(policiesNotInPlan, policyId)
-		}
-	}
-	if len(policiesNotInPlan) > 0 {
-		err := fmt.Errorf("policy IDs [%s] in the policy set are not found in the `policy_priority` list", strings.Join(policiesNotInPlan, ", "))
-		diagnostics.AddError(
-			"Error managing Policy Priority in Policy Set "+policySetId,
-			err.Error(),
-		)
-		return err
+	// StringListToStringArray also returns nil on a failed conversion, so fail the write rather
+	// than mistake it for an empty list.
+	if diagnostics.HasError() {
+		return fmt.Errorf("could not read `policy_priority` for policy set %s", policySetId)
 	}
 
-	err = updatePolicySetPolicyPriorities(ctx, diagnostics, client, policySetId, policyPriority)
-	if err != nil {
-		return err
+	// An empty list manages nothing, so there is no ranking to assert.
+	if len(policyPriority) == 0 {
+		return nil
 	}
 
-	return nil
+	// Unlisted policies rank after the managed ones instead of blocking the apply. See XAC-77859.
+	return updatePolicySetPolicyPriorities(ctx, diagnostics, client, policySetId,
+		mergePolicyPriority(policyPriority, policyIdsInRemote))
 }

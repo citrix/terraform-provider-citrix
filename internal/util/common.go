@@ -183,6 +183,9 @@ const DefaultHomeZone = "00000000-0000-0000-0000-000000000000"
 // ID of the Citrix Managed Users Scope
 const CtxManagedScopeId string = "f71a1148-7030-467a-a6d3-4a6bcf6a6532"
 
+// ID of the Any Scope
+const AnyScopeId string = "bb6cb365-909d-468e-8895-061a3e910b95"
+
 // Regex for uppercase letters only
 const UpperCaseRegex string = `^[A-Z]+$`
 
@@ -296,6 +299,15 @@ const AutoscalePluginProductMajorVersion = 7
 const AutoscalePluginProductMinorVersion = 44
 const DDCVersion125 = 125
 const DDCVersion126 = 126
+
+// Scopable tags, carried by CVAD 2611 on-premises.
+const ScopableTagsCloudOrchestrationApiVersion int32 = 131
+const ScopableTagsOnPremOrchestrationApiVersion int32 = 131
+const ScopableTagsProductMajorVersion = 7
+const ScopableTagsProductMinorVersion = 49
+
+// Names of the features reported by the site, for use with CitrixDaasClient.IsFeatureEnabled.
+const FeatureScopableTags = "ScopableTags"
 
 // CC Admin User
 const AdminUserMonitorAccessPolicySuffix = " - Access to 'Monitor' tab only"
@@ -869,6 +881,14 @@ func GetQcsAwsWorkspacesWithUsernameKey(remote citrixquickcreate.AwsEdcDeploymen
 
 func GetOrchestrationAutoscalePluginKey(remote citrixorchestration.AutoscaleGroupPluginModel) string {
 	return strconv.Itoa(int(remote.GetUid()))
+}
+
+func GetOrchestrationPowerTimeSchemeKey(remote citrixorchestration.PowerTimeSchemeResponseModel) string {
+	return remote.GetDisplayName()
+}
+
+func GetOrchestrationPoolSizeScheduleKey(remote citrixorchestration.PoolSizeScheduleResponseModel) string {
+	return remote.GetTimeRange()
 }
 
 // <summary>

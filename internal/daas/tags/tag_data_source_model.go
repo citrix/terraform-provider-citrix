@@ -52,6 +52,7 @@ func (TagDataSourceModel) GetSchema() schema.Schema {
 			},
 			"scopes": schema.SetAttribute{
 				ElementType: types.StringType,
+				Description: "The set of IDs of the admin scopes applied on the tag.",
 				Computed:    true,
 			},
 			"associated_machine_count": schema.Int32Attribute{
@@ -87,11 +88,14 @@ func (r TagDataSourceModel) RefreshPropertyValues(ctx context.Context, diagnosti
 	r.Name = types.StringValue(tag.GetName())
 	r.Description = types.StringValue(tag.GetDescription())
 
-	remoteScopeIds := []string{}
-	for _, scope := range tag.GetScopeReferences() {
-		remoteScopeIds = append(remoteScopeIds, scope.GetScopeId())
+	// Filtered the same way as the resource so that a tag reported here matches what the
+	// resource tracks in state. Unlike the resource, the data source always reports a set so
+	// that configurations can keep indexing into it.
+	scopes := refreshTagScopes(ctx, diagnostics, tag, types.SetNull(types.StringType))
+	if scopes.IsNull() {
+		scopes = util.StringArrayToStringSet(ctx, diagnostics, []string{})
 	}
-	r.Scopes = util.StringArrayToStringSet(ctx, diagnostics, remoteScopeIds)
+	r.Scopes = scopes
 
 	// Refresh computed attributes
 	r.AssociatedMachineCount = types.Int32Value(tag.GetNumMachines())

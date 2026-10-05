@@ -40,4 +40,4 @@ data "citrix_tag" "example_tag_by_id" {
 - `associated_machine_catalog_count` (Number) Number of machine catalogs associated with the tag.
 - `associated_machine_count` (Number) Number of machines associated with the tag.
 - `description` (String) Description of the tag.
-- `scopes` (Set of String)
+- `scopes` (Set of String) The set of IDs of the admin scopes applied on the tag.

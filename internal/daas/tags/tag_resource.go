@@ -68,12 +68,10 @@ func (r *TagResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 
-	plannedScopes := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes)
-
 	var body citrixorchestration.TagRequestModel
 	body.SetName(plan.Name.ValueString())
 	body.SetDescription(plan.Description.ValueString())
-	body.SetScopes(plannedScopes)
+	applyTagScopes(ctx, &resp.Diagnostics, &body, plan.Scopes)
 
 	createTagRequest := r.client.ApiClient.TagsAPIsDAAS.TagsCreateTag(ctx)
 	createTagRequest = createTagRequest.TagRequestModel(body)
@@ -155,13 +153,11 @@ func (r *TagResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	var tagId = plan.Id.ValueString()
 	var tagName = plan.Name.ValueString()
 
-	plannedScopes := util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes)
-
 	// Generate Update API request body from plan
 	var body citrixorchestration.TagRequestModel
 	body.SetName(plan.Name.ValueString())
 	body.SetDescription(plan.Description.ValueString())
-	body.SetScopes(plannedScopes)
+	applyTagScopes(ctx, &resp.Diagnostics, &body, plan.Scopes)
 
 	// Update tag using orchestration call
 	patchTagRequest := r.client.ApiClient.TagsAPIsDAAS.TagsPatchTag(ctx, tagId)
@@ -265,6 +261,16 @@ func (r *TagResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanReq
 	operation := "updating"
 	if create {
 		operation = "creating"
+	}
+
+	// Validate scopes support before the name availability call so an unsupported
+	// configuration fails without spending an API request. An unknown value is also
+	// checked, since it is being set even though it cannot be read yet.
+	if !plan.Scopes.IsNull() {
+		if !checkTagScopesSupport(r.client, &resp.Diagnostics,
+			fmt.Sprintf("Error %s Tag %s", operation, plan.Name.ValueString())) {
+			return
+		}
 	}
 
 	// Only validate tag name availability against tag ID during update operation.
