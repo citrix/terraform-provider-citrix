@@ -1130,12 +1130,7 @@ func updateCatalogMachineProfile(ctx context.Context, client *citrixdaasclient.C
 		return err
 	}
 
-	err = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating machine profile for Machine Catalog "+catalog.GetName(), &resp.Diagnostics, 15)
-	if errors.Is(err, &util.JobPollError{}) {
-		return err
-	} // if the job failed continue processing
-
-	return nil
+	return util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating machine profile for Machine Catalog "+catalog.GetName(), &resp.Diagnostics, 15)
 }
 
 func updateMemoryAndCpuCount(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.UpdateResponse, catalog *citrixorchestration.MachineCatalogDetailResponseModel, plan MachineCatalogResourceModel, connectionType citrixorchestration.HypervisorConnectionType) error {
@@ -1631,6 +1626,21 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 		}
 	}
 
+	// Machine profile must be updated before the image so the image preparation VM uses the new machine profile
+	if machineProfile.GetXDPath() != machineProfilePath {
+		err = updateCatalogMachineProfile(ctx, client, resp, plan, catalog, machineProfilePath, hypervisorResourcePool, hypervisor.GetPluginId())
+		if err != nil {
+			return err
+		}
+
+		if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT {
+			err = updateMemoryAndCpuCount(ctx, client, resp, catalog, plan, connectionType)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	// Updating image is not supported for PVSStreaming catalog
 	if *provisioningType != citrixorchestration.PROVISIONINGTYPE_PVS_STREAMING {
 		replicaRatio, replicaMaximum, useSharedGallery := setComputeGalleryValues(customProps)
@@ -1686,20 +1696,6 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 			if errors.Is(err, &util.JobPollError{}) {
 				return err
 			} // if the job failed continue processing
-		}
-	}
-
-	if machineProfile.GetXDPath() != machineProfilePath {
-		err = updateCatalogMachineProfile(ctx, client, resp, plan, catalog, machineProfilePath, hypervisorResourcePool, hypervisor.GetPluginId())
-		if err != nil {
-			return err
-		}
-
-		if connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_OPEN_SHIFT {
-			err = updateMemoryAndCpuCount(ctx, client, resp, catalog, plan, connectionType)
-			if err != nil {
-				return err
-			}
 		}
 	}
 
