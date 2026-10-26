@@ -19,10 +19,13 @@ import (
 
 // List of AdministratorServiceNames
 const (
-	ADMINISTRATORSERVICENAME_XENDESKTOP string = "XenDesktop"
-	ADMINISTRATORSERVICENAME_PLATFORM   string = "Platform"
-	ADMINISTRATORACCESSTYPE_WEM         string = "WEM"
-	ADMINISTRATORACCESSTYPE_CAS         string = "CAS"
+	ADMINISTRATORSERVICENAME_XENDESKTOP        string = "XenDesktop"
+	ADMINISTRATORSERVICENAME_PLATFORM          string = "Platform"
+	ADMINISTRATORACCESSTYPE_WEM                string = "WEM"
+	ADMINISTRATORACCESSTYPE_CAS                string = "CAS"
+	ADMINISTRATORSERVICENAME_MAS               string = "MAS"
+	ADMINISTRATORSERVICENAME_NETSCALERGATEWAY  string = "NetscalerGateway"
+	ADMINISTRATORSERVICENAME_SDWANORCHESTRATOR string = "SDWANOrchestrator"
 )
 
 func getAdminProviderType(providerType string) (ccadmins.AdministratorProviderType, error) {

@@ -433,6 +433,81 @@ provider "citrix" {
 
 }
 
+# The provider lists the service names it accepts in the service_name description. Reading them from the schema keeps
+# this script in step with whichever provider version terraform init installed.
+function Read-SupportedCloudAdminServiceNames {
+    $script:supportedCloudAdminServiceNames = $null
+
+    $schemaJson = terraform providers schema -json 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "Failed to read the provider schema. Cloud admin users will not be checked for unsupported service names."
+        return
+    }
+
+    try {
+        $schema = ($schemaJson | Out-String) | ConvertFrom-Json
+    }
+    catch {
+        Write-Warning "Failed to parse the provider schema. Cloud admin users will not be checked for unsupported service names. Error: $($_.Exception.Message)"
+        return
+    }
+
+    foreach ($providerSchema in $schema.provider_schemas.PSObject.Properties) {
+        if ($providerSchema.Name -notlike "*/citrix/citrix") {
+            continue
+        }
+        $description = $providerSchema.Value.resource_schemas.citrix_cloud_admin_user.block.attributes.policies.nested_type.attributes.service_name.description
+        if ($description) {
+            $script:supportedCloudAdminServiceNames = @([regex]::Matches($description, '`([^`]+)`') | ForEach-Object { $_.Groups[1].Value })
+            Write-Verbose "Cloud admin user service names supported by the provider: $($script:supportedCloudAdminServiceNames -join ', ')"
+            return
+        }
+    }
+
+    Write-Warning "The provider schema does not list supported service names. Cloud admin users will not be checked for unsupported service names."
+}
+
+# A Custom admin with a policy under a service the provider rejects is skipped. Dropping only that policy would cause the
+# first apply remove the admin's access to it.
+function Test-CloudAdminHasUnsupportedServices {
+    param(
+        [parameter(Mandatory = $true)][string] $adminsUrl,
+        [parameter(Mandatory = $true)] $admin,
+        [parameter(Mandatory = $true)][string] $adminId
+    )
+
+    if ($null -eq $script:supportedCloudAdminServiceNames) {
+        Read-SupportedCloudAdminServiceNames
+        if ($null -eq $script:supportedCloudAdminServiceNames) {
+            $script:supportedCloudAdminServiceNames = @() # Empty means the check is unavailable, so it is not retried per admin
+        }
+    }
+    if ($script:supportedCloudAdminServiceNames.Count -eq 0) {
+        return $false
+    }
+
+    $adminLabel = if ($admin.email) { $admin.email } elseif ($admin.displayName) { $admin.displayName } else { $adminId }
+    try {
+        $access = Start-GetRequest -url "$adminsUrl$adminId/access"
+    }
+    catch {
+        Write-Warning "Failed to read the access policies of cloud admin user $adminLabel, importing it without checking service names. Error: $($_.Exception.Message)"
+        return $false
+    }
+
+    $unsupportedServiceNames = @($access.policies |
+        Where-Object { $_.checkable.value -and ($script:supportedCloudAdminServiceNames -cnotcontains $_.serviceName) } |
+        ForEach-Object { $_.serviceName } |
+        Select-Object -Unique)
+    if ($unsupportedServiceNames.Count -eq 0) {
+        return $false
+    }
+
+    Write-Warning "Skipping cloud admin user $adminLabel because it has policies under service(s) the provider does not support: $($unsupportedServiceNames -join ', ')"
+    $script:unsupportedCloudAdmins.Add("$adminLabel (id '$adminId', services: $($unsupportedServiceNames -join ', '))")
+    return $true
+}
+
 # Function to get list of resources for a given resource provider
 function Get-ResourceList {
     param(
@@ -592,12 +667,15 @@ function Get-ResourceList {
 
         # Cloud Admin Users import by userId (accepted invitation) or ucOid; skip uninvited users
         if ($resourceProviderName -eq "cloud_admin_user") {
-            if ($item.userId) {
-                $resourceList += $item.userId
+            $adminId = if ($item.userId) { $item.userId } else { $item.ucOid }
+            if (-not $adminId) {
+                continue
             }
-            elseif ($item.ucOid) {
-                $resourceList += $item.ucOid
+            $alreadyInState = $script:existingNameById.ContainsKey("citrix_cloud_admin_user|$adminId") # Import skips these, so their access is not checked
+            if ($item.accessType -eq "Custom" -and -not $alreadyInState -and (Test-CloudAdminHasUnsupportedServices -adminsUrl $url -admin $item -adminId $adminId)) {
+                continue
             }
+            $resourceList += $adminId
             continue
         }
 
@@ -1150,7 +1228,7 @@ function Add-NewResourcesToExistingTfFiles {
         $resourceName = $parts[1]
         $filename = Resolve-TfFileName -resourceType $resourceTypeFull
 
-        $showOutput = terraform state show -no-color $resourcePath 2>&1
+        $showOutput = terraform state show -no-color -state="$($script:placeholderStateFile)" $resourcePath 2>&1
         if ($LASTEXITCODE -ne 0) {
             Write-Warning "Failed to get state for $resourcePath. It is in Terraform state but will be MISSING from the generated configuration."
             $script:configGenerationFailures.Add($resourcePath)
@@ -1162,6 +1240,7 @@ function Add-NewResourcesToExistingTfFiles {
         $content = RemoveApplicationSecretForManagedIdentity -content $content
         $content = ReplaceDependencyRelationships -content $content
         $content = RemoveComputedProperties -content $content
+        $content = Restore-MultiLineValues -content $content
 
         Add-Content -Path ".\$filename" -Value "`n$content" -Encoding utf8
         Write-Verbose "Appended $resourcePath to $filename"
@@ -1533,6 +1612,36 @@ function RemoveApplicationSecretForManagedIdentity {
     return [regex]::Replace($content, $azureBlockPattern, $evaluator)
 }
 
+# terraform show renders multi-line strings as heredocs that do not round-trip. It always implies a trailing newline, drops
+# carriage returns, and leaves ${ and %{ unescaped. Rendering a copy of the state with those strings swapped for
+# placeholders lets each one be written back as an exact quoted string.
+function New-PlaceholderState {
+    $script:multiLineValues = @{}
+    $state = Get-Content -Path ".\terraform.tfstate" -Raw -Encoding utf8
+    $state = [regex]::Replace($state, '"(?:[^"\\]|\\.)*?\\n(?:[^"\\]|\\.)*"', {
+            param($match)
+            $placeholder = "__CITRIX_MULTILINE_$($script:multiLineValues.Count)__"
+            $script:multiLineValues[$placeholder] = ConvertFrom-Json $match.Value
+            return "`"$placeholder`""
+        })
+    [System.IO.File]::WriteAllText((Join-Path $PWD $script:placeholderStateFile), $state, [System.Text.UTF8Encoding]::new($false))
+}
+
+function Restore-MultiLineValues {
+    param(
+        [parameter(Mandatory = $true)]
+        [string] $content
+    )
+
+    return [regex]::Replace($content, '"(__CITRIX_MULTILINE_\d+__)"', {
+            param($match)
+            $value = $script:multiLineValues[$match.Groups[1].Value]
+            $escaped = $value.Replace('\', '\\').Replace('"', '\"').Replace("`r", '\r').Replace("`n", '\n').Replace("`t", '\t')
+            $escaped = $escaped.Replace('${', '$${').Replace('%{', '%%{')
+            return "`"$escaped`""
+        })
+}
+
 # Maps a resource type name to the .tf filename it should be written to.
 # All policy-related types (policy sets, policies, settings, and all filter types) are grouped into a single file.
 function Resolve-TfFileName {
@@ -1589,6 +1698,9 @@ function PostProcessTerraformOutput {
 
     # Remove computed properties
     $content = RemoveComputedProperties -content $content
+
+    # Restored last so free-form text cannot match the attribute patterns above
+    $content = Restore-MultiLineValues -content $content
 
     # Overwrite extracted terraform with processed value
     Set-Content -Path ".\resource.tf" -Value $content -Encoding utf8
@@ -1686,6 +1798,10 @@ $script:failedImports = [System.Collections.Generic.List[string]]::new()        
 $script:skippedImports = [System.Collections.Generic.List[string]]::new()         # resource paths already present in state
 $script:configGenerationFailures = [System.Collections.Generic.List[string]]::new() # imported into state, but no .tf block could be generated
 $script:enumerationFailures = [System.Collections.Generic.List[string]]::new()    # resource types that could not be listed at all
+$script:unsupportedCloudAdmins = [System.Collections.Generic.List[string]]::new() # cloud admin users skipped for policies under services the provider does not support
+$script:supportedCloudAdminServiceNames = $null                                    # read from the provider schema on first use
+$script:placeholderStateFile = "terraform.placeholder.tfstate"                     # state copy rendered in place of terraform.tfstate, see New-PlaceholderState
+$script:multiLineValues = @{}                                                      # placeholder -> exact multi-line value it replaced
 $script:exitCode = 0               # 1 when the generated project is missing resources
 
 # Set environment variables for client secret
@@ -1754,19 +1870,23 @@ try {
     Import-ResourcesToState
 
     if ($script:preExistingStateCount -eq 0) {
-        # First run: generate .tf files from the full state dump
-        $prev = [Console]::OutputEncoding
-        [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
-        terraform show -no-color >> ".\resource.tf"
-        [Console]::OutputEncoding = $prev
+        # First run: generate .tf files from the full state dump. A first run that imported nothing has no state to dump.
+        if (Test-Path ".\terraform.tfstate") {
+            New-PlaceholderState
+            $prev = [Console]::OutputEncoding
+            [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+            terraform show -no-color $script:placeholderStateFile >> ".\resource.tf"
+            [Console]::OutputEncoding = $prev
 
-        PostProcessTerraformOutput
+            PostProcessTerraformOutput
+        }
 
         Remove-Item ".\import.tf"
-        Remove-Item ".\resource.tf"
+        Remove-Item ".\resource.tf" -ErrorAction SilentlyContinue
     } else {
         # Re-run: append only newly imported resources to their existing per-type .tf files
         if ($script:newlyImportedResources.Count -gt 0) {
+            New-PlaceholderState
             Add-NewResourcesToExistingTfFiles
         } elseif ($script:failedImports.Count -eq 0) {
             Write-Host "All resources already in state. No new resources to add."
@@ -1806,6 +1926,13 @@ try {
             Write-Host "    citrix_$enumerationFailure" -ForegroundColor Yellow
         }
     }
+    if ($script:unsupportedCloudAdmins.Count -gt 0) {
+        # Reported but not failed: these are left out on purpose so an apply cannot remove access the provider cannot express
+        Write-Host "The following cloud admin user(s) were skipped because they have policies under services this provider version does not support:" -ForegroundColor Yellow
+        foreach ($unsupportedCloudAdmin in $script:unsupportedCloudAdmins) {
+            Write-Host "    $unsupportedCloudAdmin" -ForegroundColor Yellow
+        }
+    }
 
     Write-Host ""
     if ($script:exitCode -ne 0) {
@@ -1831,6 +1958,8 @@ try {
 finally {
     # Return to the original directory if we switched into the site folder
     if ($script:pushedSiteLocation) {
+        # Holds a full copy of state including secrets, so it must not outlive a failed run either
+        Remove-Item ".\$($script:placeholderStateFile)" -ErrorAction SilentlyContinue
         Pop-Location
     }
 

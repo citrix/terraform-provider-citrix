@@ -122,7 +122,7 @@ Required:
 Optional:
 
 - `scopes` (Set of String) Scope names to be associated with the admin user.
-- `service_name` (String) Name of the service to be associated with the admin user. Currently, this attribute can be set to `XenDesktop`, `Platform`, `CAS`, or `WEM`.
+- `service_name` (String) Name of the service to be associated with the admin user. Currently, this attribute can be set to `XenDesktop`, `Platform`, `CAS`, `WEM`, `MAS`, `NetscalerGateway`, `SDWANOrchestrator`.
 
 ## Import
 

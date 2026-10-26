@@ -903,11 +903,12 @@ func GetOrchestrationPoolSizeScheduleKey(remote citrixorchestration.PoolSizeSche
 // <returns>Terraform list for new state</returns>
 func RefreshListValueProperties[tfType RefreshableListItemWithAttributes[clientType], clientType any](ctx context.Context, diagnostics *diag.Diagnostics, state types.List, remote []clientType, getClientKey func(clientType) string) types.List {
 	unwrappedList := ObjectListToTypedArray[tfType](ctx, diagnostics, state)
-	refreshedList := refreshListProperties[tfType, clientType](ctx, diagnostics, unwrappedList, remote, getClientKey)
+	refreshedList := RefreshListProperties[tfType, clientType](ctx, diagnostics, unwrappedList, remote, getClientKey)
 	return TypedArrayToObjectList[tfType](ctx, diagnostics, refreshedList)
 }
 
-func refreshListProperties[tfType RefreshableListItemWithAttributes[clientType], clientType any](ctx context.Context, diagnostics *diag.Diagnostics, state []tfType, remote []clientType, getClientKey func(clientType) string) []tfType {
+// RefreshListProperties is RefreshListValueProperties for callers that already hold the state as a typed array.
+func RefreshListProperties[tfType RefreshableListItemWithAttributes[clientType], clientType any](ctx context.Context, diagnostics *diag.Diagnostics, state []tfType, remote []clientType, getClientKey func(clientType) string) []tfType {
 	if len(remote) == 0 {
 		return nil
 	}
@@ -916,16 +917,22 @@ func refreshListProperties[tfType RefreshableListItemWithAttributes[clientType],
 		state = []tfType{}
 	}
 
-	stateItems := map[string]int{}
+	// Each state item is matched at most once, so duplicate keys pair up in order instead of collapsing onto one item
+	stateIndexesByKey := map[string][]int{}
 	for index, tfItem := range state {
-		stateItems[tfItem.GetKey()] = index
+		key := tfItem.GetKey()
+		stateIndexesByKey[key] = append(stateIndexesByKey[key], index)
 	}
 
 	newState := state
+	keptIndexes := map[int]bool{}
 	for _, clientItem := range remote {
 		clientKey := getClientKey(clientItem)
-		index, exists := stateItems[clientKey]
-		if exists {
+		if stateIndexes := stateIndexesByKey[clientKey]; len(stateIndexes) > 0 {
+			index := stateIndexes[0]
+			stateIndexesByKey[clientKey] = stateIndexes[1:]
+			keptIndexes[index] = true
+
 			tfItem := state[index]
 			refreshedItem := tfItem.RefreshListItem(ctx, diagnostics, clientItem)
 			if typedItem, ok := refreshedItem.(tfType); ok {
@@ -941,6 +948,7 @@ func refreshListProperties[tfType RefreshableListItemWithAttributes[clientType],
 				refreshedItem := tfStructItem.RefreshListItem(ctx, diagnostics, clientItem)
 				if newStateItem, ok := refreshedItem.(tfType); ok {
 					newState = append(newState, newStateItem)
+					keptIndexes[len(newState)-1] = true
 				} else {
 					diagnostics.AddError("Type assertion failed", "RefreshListItem did not return expected type")
 				}
@@ -948,14 +956,12 @@ func refreshListProperties[tfType RefreshableListItemWithAttributes[clientType],
 				diagnostics.AddWarning("Error when creating empty "+reflect.TypeOf(tfStructItem).String(), err.Error())
 			}
 		}
-
-		stateItems[clientKey] = -1 // Mark as visited. The ones not visited should be removed.
 	}
 
 	result := []tfType{}
-	for _, tfItem := range newState {
-		if stateItems[tfItem.GetKey()] == -1 {
-			result = append(result, tfItem) // if visited, include. Not visited ones will not be included.
+	for index, tfItem := range newState {
+		if keptIndexes[index] {
+			result = append(result, tfItem) // State items not matched by any remote item are removed
 		}
 	}
 
@@ -1760,8 +1766,13 @@ func PollQcsTask(ctx context.Context, client *citrixdaasclient.CitrixDaasClient,
 	return taskResponse, httpResp, err
 }
 
-func GetCCAdminAccessPolicyNameKey(r ccadmins.AdministratorAccessPolicyModel) string {
-	return r.GetDisplayName()
+func GetCCAdminAccessPolicyKey(r ccadmins.AdministratorAccessPolicyModel) string {
+	return CCAdminAccessPolicyKey(r.GetDisplayName(), r.GetServiceName())
+}
+
+// CCAdminAccessPolicyKey includes the service because the same policy name can exist under multiple services.
+func CCAdminAccessPolicyKey(name string, serviceName string) string {
+	return name + "|" + strings.ToLower(serviceName)
 }
 
 func RefreshTenantSet(ctx context.Context, diagnostics *diag.Diagnostics, tenants []citrixorchestration.RefResponseModel) types.Set {

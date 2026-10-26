@@ -957,9 +957,9 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 				advancedAccessPolicyRequest.SetAllowedUsers(policyAllowedUser)
 			} else {
 				advancedAccessPolicyRequest.SetIncludedUserFilterEnabled(includedUsersFilterEnabled)
-				advancedAccessPolicyRequest.SetIncludedUsers(includedUserIds)
+				advancedAccessPolicyRequest.SetIncludedUsers(emptySliceIfNil(includedUserIds))
 				advancedAccessPolicyRequest.SetExcludedUserFilterEnabled(excludedUsersFilterEnabled)
-				advancedAccessPolicyRequest.SetExcludedUsers(excludedUserIds)
+				advancedAccessPolicyRequest.SetExcludedUsers(emptySliceIfNil(excludedUserIds))
 				advancedAccessPolicyRequest.SetAllowedUsers(allowedUser)
 			}
 			advancedAccessPolicyRequest.SetAppProtectionKeyLoggingRequired(false)
@@ -972,9 +972,9 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 			advancedAccessPolicyRequest.SetId(existingAdvancedAccessPolicy.GetId())
 			advancedAccessPolicyRequest.SetName(existingAdvancedAccessPolicy.GetName())
 			advancedAccessPolicyRequest.SetIncludedUserFilterEnabled(includedUsersFilterEnabled)
-			advancedAccessPolicyRequest.SetIncludedUsers(includedUserIds)
+			advancedAccessPolicyRequest.SetIncludedUsers(emptySliceIfNil(includedUserIds))
 			advancedAccessPolicyRequest.SetExcludedUserFilterEnabled(excludedUsersFilterEnabled)
-			advancedAccessPolicyRequest.SetExcludedUsers(excludedUserIds)
+			advancedAccessPolicyRequest.SetExcludedUsers(emptySliceIfNil(excludedUserIds))
 			advancedAccessPolicyRequest.SetAllowedUsers(allowedUser)
 			advancedAccessPolicyRequest.SetAppProtectionKeyLoggingRequired(false)
 			advancedAccessPolicyRequest.SetAppProtectionScreenCaptureRequired(false)
@@ -1001,9 +1001,9 @@ func getRequestModelForDeliveryGroupUpdate(ctx context.Context, diagnostics *dia
 				advancedAccessPolicyRequest.SetAllowedUsers(policyAllowedUser)
 			} else {
 				advancedAccessPolicyRequest.SetIncludedUserFilterEnabled(includedUsersFilterEnabled)
-				advancedAccessPolicyRequest.SetIncludedUsers(includedUserIds)
+				advancedAccessPolicyRequest.SetIncludedUsers(emptySliceIfNil(includedUserIds))
 				advancedAccessPolicyRequest.SetExcludedUserFilterEnabled(excludedUsersFilterEnabled)
-				advancedAccessPolicyRequest.SetExcludedUsers(excludedUserIds)
+				advancedAccessPolicyRequest.SetExcludedUsers(emptySliceIfNil(excludedUserIds))
 				advancedAccessPolicyRequest.SetAllowedUsers(allowedUser)
 			}
 			advancedAccessPolicyRequest.SetAppProtectionKeyLoggingRequired(false)
@@ -1490,17 +1490,12 @@ func (dgAccessPolicy DeliveryGroupAccessPolicyModel) RefreshListItem(ctx context
 	// Only read per-policy user filters if the user had them set in state; otherwise the DG-level
 	// restricted_access_users covers this policy and we don't want to surface duplicated values here.
 	if !dgAccessPolicy.RestrictedAccessUsers.IsNull() {
-		if !accessPolicy.GetIncludedUserFilterEnabled() {
-			if attributes, err := util.ResourceAttributeMapFromObject(RestrictedAccessUsers{}); err == nil {
-				dgAccessPolicy.RestrictedAccessUsers = types.ObjectNull(attributes)
-			} else {
-				diagnostics.AddWarning("Error when creating null RestrictedAccessUsers", err.Error())
-			}
-			return dgAccessPolicy
-		}
+		// Keep the object non-null and refresh the lists in place. The API reports a user filter as
+		// disabled once it has no users, so nulling the whole object out on a disabled include filter
+		// would discard a populated block_list and contradict a plan that set the attribute.
 		users := util.ObjectValueToTypedObject[RestrictedAccessUsers](ctx, diagnostics, dgAccessPolicy.RestrictedAccessUsers)
-		users.AllowList = util.RefreshUsersList(ctx, diagnostics, users.AllowList, accessPolicy.GetIncludedUsers())
-		users.BlockList = util.RefreshUsersList(ctx, diagnostics, users.BlockList, accessPolicy.GetExcludedUsers())
+		users.AllowList = refreshRestrictedAccessUserList(ctx, diagnostics, users.AllowList, accessPolicy.GetIncludedUserFilterEnabled(), accessPolicy.GetIncludedUsers())
+		users.BlockList = refreshRestrictedAccessUserList(ctx, diagnostics, users.BlockList, accessPolicy.GetExcludedUserFilterEnabled(), accessPolicy.GetExcludedUsers())
 		dgAccessPolicy.RestrictedAccessUsers = util.TypedObjectToObjectValue(ctx, diagnostics, users)
 	}
 
@@ -1879,7 +1874,370 @@ func updateIdentityUserDetails(ctx context.Context, client *citrixdaasclient.Cit
 	return includedUsers, excludedUsers, nil
 }
 
-func (r DeliveryGroupResourceModel) updatePlanWithRestrictedAccessUsers(ctx context.Context, diagnostics *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel) DeliveryGroupResourceModel {
+// refreshRestrictedAccessUserList refreshes a single allow_list or block_list of a
+// restricted_access_users block against the user filter of an access policy.
+//
+// A disabled filter means no users are applied, whatever the API reports for the list itself.
+// Turning a filter off does not clear the users behind it: IncludedUsers and ExcludedUsers are
+// omitted from the request model when empty, so users written by an earlier apply stay on the
+// policy and would otherwise be appended back into a list the configuration leaves empty.
+//
+// A null list stays null so an unconfigured optional attribute does not become an empty set.
+func refreshRestrictedAccessUserList(ctx context.Context, diagnostics *diag.Diagnostics, usersInState types.Set, filterEnabled bool, usersInRemote []citrixorchestration.IdentityUserResponseModel) types.Set {
+	if usersInState.IsNull() {
+		return usersInState
+	}
+
+	if !filterEnabled {
+		return util.StringArrayToStringSet(ctx, diagnostics, []string{})
+	}
+
+	return util.RefreshUsersList(ctx, diagnostics, usersInState, usersInRemote)
+}
+
+// managedAccessPolicies returns the access policies that the DG-level restricted_access_users is
+// written to, in the order the configuration declares them.
+//
+// An update writes the DG-level user filters to every configured policy, custom policies included,
+// so a custom policy edited out of band drifts exactly like a built-in one. Built-in policies are
+// matched on allowed_connection and custom policies on name, mirroring how the access policy lists
+// themselves are refreshed.
+func managedAccessPolicies(ctx context.Context, diagnostics *diag.Diagnostics, defaultAccessPolicies types.List, customAccessPolicies types.List, advancedAccessPolicies []citrixorchestration.AdvancedAccessPolicyResponseModel) []citrixorchestration.AdvancedAccessPolicyResponseModel {
+	managedPolicies := []citrixorchestration.AdvancedAccessPolicyResponseModel{}
+
+	if !defaultAccessPolicies.IsNull() {
+		specifiedPolicies := util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, diagnostics, defaultAccessPolicies)
+		for _, specifiedPolicy := range specifiedPolicies {
+			allowedConnection := specifiedPolicy.AllowedConnection.ValueString()
+			for _, policy := range advancedAccessPolicies {
+				if policy.GetIsBuiltIn() && string(policy.GetAllowedConnection()) == allowedConnection {
+					managedPolicies = append(managedPolicies, policy)
+					break
+				}
+			}
+		}
+	}
+
+	if !customAccessPolicies.IsNull() {
+		specifiedPolicies := util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, diagnostics, customAccessPolicies)
+		for _, specifiedPolicy := range specifiedPolicies {
+			policyKey := specifiedPolicy.GetKey()
+			for _, policy := range advancedAccessPolicies {
+				if !policy.GetIsBuiltIn() && util.GetOrchestrationAccessPolicyKey(policy) == policyKey {
+					managedPolicies = append(managedPolicies, policy)
+					break
+				}
+			}
+		}
+	}
+
+	return managedPolicies
+}
+
+// declaresBothBuiltInAccessPolicies reports whether default_access_policies covers both built-in
+// access policies, which is what it takes for the configuration to govern every policy that an
+// update writes the delivery group level users to.
+func declaresBothBuiltInAccessPolicies(ctx context.Context, diagnostics *diag.Diagnostics, defaultAccessPolicies types.List) bool {
+	if defaultAccessPolicies.IsNull() || defaultAccessPolicies.IsUnknown() {
+		return false
+	}
+
+	viaAgDeclared := false
+	notViaAgDeclared := false
+	for _, accessPolicy := range util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, diagnostics, defaultAccessPolicies) {
+		switch accessPolicy.AllowedConnection.ValueString() {
+		case string(citrixorchestration.ALLOWEDCONNECTION_VIA_AG):
+			viaAgDeclared = true
+		case string(citrixorchestration.ALLOWEDCONNECTION_NOT_VIA_AG):
+			notViaAgDeclared = true
+		}
+	}
+
+	return viaAgDeclared && notViaAgDeclared
+}
+
+// configuredAccessPolicyUserKeys returns the allow and block lists an access policy declares, sorted
+// and lower cased so two policies can be compared. The second return is false when the value cannot
+// be compared yet because the configuration leaves part of it unknown.
+func configuredAccessPolicyUserKeys(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicy DeliveryGroupAccessPolicyModel) ([]string, []string, bool) {
+	if accessPolicy.RestrictedAccessUsers.IsNull() || accessPolicy.RestrictedAccessUsers.IsUnknown() {
+		return nil, nil, false
+	}
+
+	users := util.ObjectValueToTypedObject[RestrictedAccessUsers](ctx, diagnostics, accessPolicy.RestrictedAccessUsers)
+	if users.AllowList.IsUnknown() || users.BlockList.IsUnknown() {
+		return nil, nil, false
+	}
+
+	sortedLower := func(values []string) []string {
+		result := make([]string, 0, len(values))
+		for _, value := range values {
+			result = append(result, strings.ToLower(value))
+		}
+		slices.Sort(result)
+		return result
+	}
+
+	allowList := sortedLower(util.StringSetToStringArray(ctx, diagnostics, users.AllowList))
+	blockList := sortedLower(util.StringSetToStringArray(ctx, diagnostics, users.BlockList))
+
+	return allowList, blockList, true
+}
+
+// allAccessPoliciesShareConfiguredUsers reports whether every declared access policy restricts
+// access to the same users.
+//
+// Such a configuration is a delivery-group-wide restriction expressed one policy at a time. It
+// applies cleanly, but the next refresh reports those users back on the delivery group level
+// restricted_access_users, leaving a plan that never converges. Fewer than two declared policies is
+// never this shape: the policies the configuration does not declare are left untouched by an
+// update, so they differ and the access really is contextual.
+func allAccessPoliciesShareConfiguredUsers(ctx context.Context, diagnostics *diag.Diagnostics, defaultAccessPolicies types.List, customAccessPolicies types.List) bool {
+	// Both built-in policies are always present on a delivery group. Unless the configuration
+	// declares both of them they are left unrestricted by an update, so whatever the declared
+	// policies hold, the delivery group as a whole is under contextual access and the users do not
+	// belong at the delivery group level.
+	if !declaresBothBuiltInAccessPolicies(ctx, diagnostics, defaultAccessPolicies) {
+		return false
+	}
+
+	accessPolicies := []DeliveryGroupAccessPolicyModel{}
+	for _, policyList := range []types.List{defaultAccessPolicies, customAccessPolicies} {
+		if policyList.IsNull() || policyList.IsUnknown() {
+			continue
+		}
+		accessPolicies = append(accessPolicies, util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, diagnostics, policyList)...)
+	}
+
+	if len(accessPolicies) < 2 {
+		return false
+	}
+
+	allowList, blockList, isComparable := configuredAccessPolicyUserKeys(ctx, diagnostics, accessPolicies[0])
+	if !isComparable {
+		return false
+	}
+
+	for _, accessPolicy := range accessPolicies[1:] {
+		policyAllowList, policyBlockList, isComparable := configuredAccessPolicyUserKeys(ctx, diagnostics, accessPolicy)
+		if !isComparable {
+			return false
+		}
+		if !slices.Equal(allowList, policyAllowList) || !slices.Equal(blockList, policyBlockList) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// accessPolicyUserKeys returns stable identities for an access policy's included and excluded
+// users, sorted so that two policies can be compared regardless of the order the API returns.
+func accessPolicyUserKeys(accessPolicy citrixorchestration.AdvancedAccessPolicyResponseModel) ([]string, []string) {
+	identityKey := func(user citrixorchestration.IdentityUserResponseModel) string {
+		for _, candidate := range []string{user.GetSid(), user.GetOid(), user.GetSamName(), user.GetPrincipalName()} {
+			if candidate != "" {
+				return strings.ToLower(candidate)
+			}
+		}
+		return ""
+	}
+
+	keys := func(users []citrixorchestration.IdentityUserResponseModel, filterEnabled bool) []string {
+		if !filterEnabled {
+			return []string{}
+		}
+		result := []string{}
+		for _, user := range users {
+			result = append(result, identityKey(user))
+		}
+		slices.Sort(result)
+		return result
+	}
+
+	return keys(accessPolicy.GetIncludedUsers(), accessPolicy.GetIncludedUserFilterEnabled()),
+		keys(accessPolicy.GetExcludedUsers(), accessPolicy.GetExcludedUserFilterEnabled())
+}
+
+// accessPoliciesShareUsers reports whether every policy restricts access to the same users.
+//
+// The delivery group level restricted_access_users writes one value to every managed policy, so
+// policies that agree are expressing a delivery-group-wide restriction. Contextual access is the
+// opposite: the whole point is that at least one policy differs from the others.
+func accessPoliciesShareUsers(accessPolicies []citrixorchestration.AdvancedAccessPolicyResponseModel) bool {
+	if len(accessPolicies) < 2 {
+		return true
+	}
+
+	restricted := restrictsAccessToUsers(accessPolicies[0])
+	included, excluded := accessPolicyUserKeys(accessPolicies[0])
+	for _, accessPolicy := range accessPolicies[1:] {
+		if restrictsAccessToUsers(accessPolicy) != restricted {
+			return false
+		}
+		policyIncluded, policyExcluded := accessPolicyUserKeys(accessPolicy)
+		if !slices.Equal(included, policyIncluded) || !slices.Equal(excluded, policyExcluded) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// restrictsAccessToUsers reports whether an access policy restricts access to a set of users.
+//
+// The user filter flags cannot answer this on their own: the API reports a filter as disabled once
+// it holds no users, which is how both "every authenticated user has access" and "no user has
+// access" look. AllowedUsers is what separates them, and it is what makes an empty
+// restricted_access_users = {} distinguishable from an absent one.
+func restrictsAccessToUsers(accessPolicy citrixorchestration.AdvancedAccessPolicyResponseModel) bool {
+	allowedUsers := accessPolicy.GetAllowedUsers()
+	return allowedUsers == citrixorchestration.ALLOWEDUSER_FILTERED ||
+		allowedUsers == citrixorchestration.ALLOWEDUSER_FILTERED_OR_ANONYMOUS
+}
+
+// selectManagedPolicyForRefresh picks the managed access policy that the DG-level
+// restricted_access_users is refreshed from.
+//
+// An update writes identical user filters to every managed policy, so with no drift any of them is
+// representative. An out-of-band change can touch a single policy, so prefer one that no longer
+// agrees with state. Reading only the first match made drift detection depend on the order the
+// access policies happen to be declared in.
+func selectManagedPolicyForRefresh(ctx context.Context, diagnostics *diag.Diagnostics, restrictedAccessUsers types.Object, managedPolicies []citrixorchestration.AdvancedAccessPolicyResponseModel) citrixorchestration.AdvancedAccessPolicyResponseModel {
+	if restrictedAccessUsers.IsNull() || restrictedAccessUsers.IsUnknown() {
+		// Nothing in state to compare against, so any policy that restricts access is the drift.
+		for _, policy := range managedPolicies {
+			if restrictsAccessToUsers(policy) {
+				return policy
+			}
+		}
+		return managedPolicies[0]
+	}
+
+	users := util.ObjectValueToTypedObject[RestrictedAccessUsers](ctx, diagnostics, restrictedAccessUsers)
+	for _, policy := range managedPolicies {
+		if !restrictsAccessToUsers(policy) {
+			// The restriction was lifted entirely on this policy.
+			return policy
+		}
+		allowList := refreshRestrictedAccessUserList(ctx, diagnostics, users.AllowList, policy.GetIncludedUserFilterEnabled(), policy.GetIncludedUsers())
+		blockList := refreshRestrictedAccessUserList(ctx, diagnostics, users.BlockList, policy.GetExcludedUserFilterEnabled(), policy.GetExcludedUsers())
+		if !allowList.Equal(users.AllowList) || !blockList.Equal(users.BlockList) {
+			return policy
+		}
+	}
+
+	return managedPolicies[0]
+}
+
+// restrictedAccessUsersFromPolicy builds a restricted_access_users value from an access policy,
+// starting from usersInState so that a user already recorded in SID, UPN or OID form keeps that
+// form instead of being rewritten as a SAM name.
+func restrictedAccessUsersFromPolicy(ctx context.Context, diagnostics *diag.Diagnostics, usersInState types.Object, accessPolicy citrixorchestration.AdvancedAccessPolicyResponseModel) types.Object {
+	if !restrictsAccessToUsers(accessPolicy) {
+		if attributes, err := util.ResourceAttributeMapFromObject(RestrictedAccessUsers{}); err == nil {
+			return types.ObjectNull(attributes)
+		} else {
+			diagnostics.AddWarning("Error when creating null RestrictedAccessUsers", err.Error())
+			return usersInState
+		}
+	}
+
+	users := util.ObjectValueToTypedObject[RestrictedAccessUsers](ctx, diagnostics, usersInState)
+	if usersInState.IsNull() || usersInState.IsUnknown() {
+		users.AllowList = util.StringArrayToStringSet(ctx, diagnostics, []string{})
+		users.BlockList = util.StringArrayToStringSet(ctx, diagnostics, []string{})
+	}
+
+	users.AllowList = refreshRestrictedAccessUserList(ctx, diagnostics, users.AllowList, accessPolicy.GetIncludedUserFilterEnabled(), accessPolicy.GetIncludedUsers())
+	users.BlockList = refreshRestrictedAccessUserList(ctx, diagnostics, users.BlockList, accessPolicy.GetExcludedUserFilterEnabled(), accessPolicy.GetExcludedUsers())
+
+	return util.TypedObjectToObjectValue(ctx, diagnostics, users)
+}
+
+// setPerPolicyRestrictedAccessUsers rewrites restricted_access_users on each entry of an access
+// policy list. When fromPolicies is false every entry is nulled out, which is how a list looks once
+// the delivery group level attribute owns the users.
+func setPerPolicyRestrictedAccessUsers(ctx context.Context, diagnostics *diag.Diagnostics, policyList types.List, advancedAccessPolicies []citrixorchestration.AdvancedAccessPolicyResponseModel, isBuiltIn bool, fromPolicies bool) types.List {
+	if policyList.IsNull() || policyList.IsUnknown() {
+		return policyList
+	}
+
+	attributes, err := util.ResourceAttributeMapFromObject(RestrictedAccessUsers{})
+	if err != nil {
+		diagnostics.AddWarning("Error when creating null RestrictedAccessUsers", err.Error())
+		return policyList
+	}
+	nullUsers := types.ObjectNull(attributes)
+
+	policies := util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, diagnostics, policyList)
+	for index, policy := range policies {
+		if !fromPolicies {
+			policies[index].RestrictedAccessUsers = nullUsers
+			continue
+		}
+
+		policies[index].RestrictedAccessUsers = nullUsers
+		for _, advancedAccessPolicy := range advancedAccessPolicies {
+			matches := advancedAccessPolicy.GetIsBuiltIn() == isBuiltIn
+			if isBuiltIn {
+				matches = matches && string(advancedAccessPolicy.GetAllowedConnection()) == policy.AllowedConnection.ValueString()
+			} else {
+				matches = matches && util.GetOrchestrationAccessPolicyKey(advancedAccessPolicy) == policy.GetKey()
+			}
+			if matches {
+				policies[index].RestrictedAccessUsers = restrictedAccessUsersFromPolicy(ctx, diagnostics, policy.RestrictedAccessUsers, advancedAccessPolicy)
+				break
+			}
+		}
+	}
+
+	return util.TypedArrayToObjectList(ctx, diagnostics, policies)
+}
+
+// alignRestrictedAccessUsersWithPolicies decides, on a read, whether the users live at the delivery
+// group level or on the individual access policies, and rewrites both to match.
+//
+// Policies that all restrict access to the same users are a delivery-group-wide restriction, so the
+// users belong on restricted_access_users and the per-policy attributes are cleared. Policies that
+// differ are contextual access, so the users belong on each policy and the delivery group level
+// attribute is cleared.
+//
+// This only runs on a read. During an apply the configuration decides the shape, and rewriting it
+// here would contradict the plan.
+func (r DeliveryGroupResourceModel) alignRestrictedAccessUsersWithPolicies(ctx context.Context, diagnostics *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel) DeliveryGroupResourceModel {
+	advancedAccessPolicies := deliveryGroup.GetAdvancedAccessPolicy()
+	if len(advancedAccessPolicies) == 0 {
+		return r
+	}
+
+	// Whether a restriction is delivery-group-wide is a question about the delivery group, so it has
+	// to be answered from every policy on it rather than only the ones the configuration declares.
+	// A single declared policy would otherwise always compare as uniform, and its users would be
+	// moved to the delivery group level even while the undeclared policies stay unrestricted.
+	policiesShareUsers := accessPoliciesShareUsers(advancedAccessPolicies)
+
+	if policiesShareUsers {
+		r.RestrictedAccessUsers = restrictedAccessUsersFromPolicy(ctx, diagnostics, r.RestrictedAccessUsers, advancedAccessPolicies[0])
+	} else if attributes, err := util.ResourceAttributeMapFromObject(RestrictedAccessUsers{}); err == nil {
+		r.RestrictedAccessUsers = types.ObjectNull(attributes)
+	} else {
+		diagnostics.AddWarning("Error when creating null RestrictedAccessUsers", err.Error())
+	}
+
+	r.DefaultAccessPolicies = setPerPolicyRestrictedAccessUsers(ctx, diagnostics, r.DefaultAccessPolicies, advancedAccessPolicies, true, !policiesShareUsers)
+	r.CustomAccessPolicies = setPerPolicyRestrictedAccessUsers(ctx, diagnostics, r.CustomAccessPolicies, advancedAccessPolicies, false, !policiesShareUsers)
+
+	return r
+}
+
+// updatePlanWithRestrictedAccessUsers refreshes the DG-level restricted_access_users.
+//
+// isRead separates the two callers. During an apply the configuration is authoritative:
+// restricted_access_users is Optional and not Computed, so a null configuration has to stay null or
+// Terraform rejects the result. During a read there is no plan to honour, so a delivery group
+// restricted out of band must surface even though the configuration leaves the attribute unset.
+func (r DeliveryGroupResourceModel) updatePlanWithRestrictedAccessUsers(ctx context.Context, diagnostics *diag.Diagnostics, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, isRead bool) DeliveryGroupResourceModel {
 	advancedAccessPolicies := deliveryGroup.GetAdvancedAccessPolicy()
 
 	if len(advancedAccessPolicies) == 0 {
@@ -1895,32 +2253,21 @@ func (r DeliveryGroupResourceModel) updatePlanWithRestrictedAccessUsers(ctx cont
 	// When per-policy restricted_access_users is used instead, r.RestrictedAccessUsers is already
 	// null (mutual exclusivity) and the function is a no-op regardless of which policy is read.
 	//
-	// When the DG-level attribute IS set and default_access_policies is also configured, find one
-	// managed built-in policy to read filter-enabled flags from. The DG-level update writes
-	// identical user filters to all managed built-in policies, so any one of them is representative.
-	// We need a managed policy specifically because unmanaged built-in policies are not touched by
-	// the update and may still carry stale filter data from before this apply.
-	//
-	// custom_access_policies entries are never built-in policies and never receive DG-level users,
-	// so they are not relevant here and not searched. The GetIsBuiltIn() guard enforces this.
-	accessPolicy := advancedAccessPolicies[0]
-	managedPolicyFound := false
-	if !r.DefaultAccessPolicies.IsNull() {
-		specifiedPolicies := util.ObjectListToTypedArray[DeliveryGroupAccessPolicyModel](ctx, diagnostics, r.DefaultAccessPolicies)
-		for _, sp := range specifiedPolicies {
-			targetConn := sp.AllowedConnection.ValueString()
-			for _, p := range advancedAccessPolicies {
-				if p.GetIsBuiltIn() && string(p.GetAllowedConnection()) == targetConn {
-					accessPolicy = p
-					managedPolicyFound = true
-					break
-				}
-			}
-			if managedPolicyFound {
-				break
-			}
+	// When the DG-level attribute IS set, read the user filters from a policy the configuration
+	// manages. We need a managed policy specifically because policies the configuration does not
+	// declare are not touched by the update and may still carry stale filter data from before this
+	// apply.
+	comparisonPolicies := managedAccessPolicies(ctx, diagnostics, r.DefaultAccessPolicies, r.CustomAccessPolicies, advancedAccessPolicies)
+	if len(comparisonPolicies) == 0 {
+		if isRead {
+			// Nothing is declared, so there is no managed policy to prefer. A read still has to
+			// observe an out-of-band restriction on any policy, not just the first one.
+			comparisonPolicies = advancedAccessPolicies
+		} else {
+			comparisonPolicies = advancedAccessPolicies[:1]
 		}
 	}
+	accessPolicy := selectManagedPolicyForRefresh(ctx, diagnostics, r.RestrictedAccessUsers, comparisonPolicies)
 
 	if !r.AllowAnonymousAccess.IsNull() {
 		allowedUsers := accessPolicy.GetAllowedUsers()
@@ -1931,17 +2278,16 @@ func (r DeliveryGroupResourceModel) updatePlanWithRestrictedAccessUsers(ctx cont
 		}
 	}
 
-	// restricted_access_users is Optional and not Computed, so a null config must stay null after
-	// apply. When it is not set at the DG level the remote policy's filter flags are irrelevant;
-	// per-policy filters are surfaced through default_access_policies instead.
-	if r.RestrictedAccessUsers.IsNull() {
+	// An apply must leave a null configuration null. A read has no such obligation, and stopping
+	// here would hide a delivery group that was restricted outside of Terraform.
+	if r.RestrictedAccessUsers.IsNull() && !isRead {
 		return r
 	}
 
-	// Null out RestrictedAccessUsers only when no user filtering is configured at all.
-	// A policy with only an include filter (allow_list, no block_list) correctly has
-	// ExcludedUserFilterEnabled=false, which must not trigger a null-out.
-	if !accessPolicy.GetIncludedUserFilterEnabled() && !accessPolicy.GetExcludedUserFilterEnabled() {
+	// Null out only when the policy does not restrict access to a set of users at all. Checking the
+	// user filter flags instead would also null out a policy that filters on an empty allow list,
+	// which is restricted_access_users = {} and means the opposite: no user has access.
+	if !restrictsAccessToUsers(accessPolicy) {
 		if attributes, err := util.ResourceAttributeMapFromObject(RestrictedAccessUsers{}); err == nil {
 			r.RestrictedAccessUsers = types.ObjectNull(attributes)
 		} else {
@@ -1950,21 +2296,17 @@ func (r DeliveryGroupResourceModel) updatePlanWithRestrictedAccessUsers(ctx cont
 		return r
 	}
 
-	if managedPolicyFound {
-		// The matching policy was updated in this apply with the plan's user filter. Trusting the
-		// plan value avoids the remote-only SAM appending in RefreshUsersList, which would re-add
-		// users the plan intentionally removed (e.g., from a stale or not-yet-propagated API response).
-		return r
-	}
-
 	users := util.ObjectValueToTypedObject[RestrictedAccessUsers](ctx, diagnostics, r.RestrictedAccessUsers)
 
-	if accessPolicy.GetIncludedUserFilterEnabled() {
-		users.AllowList = util.RefreshUsersList(ctx, diagnostics, users.AllowList, accessPolicy.GetIncludedUsers())
+	if r.RestrictedAccessUsers.IsNull() {
+		// Read path: the attribute is absent from the configuration but the delivery group is
+		// restricted remotely. Start from empty lists so both are populated from the policy.
+		users.AllowList = util.StringArrayToStringSet(ctx, diagnostics, []string{})
+		users.BlockList = util.StringArrayToStringSet(ctx, diagnostics, []string{})
 	}
-	if accessPolicy.GetExcludedUserFilterEnabled() {
-		users.BlockList = util.RefreshUsersList(ctx, diagnostics, users.BlockList, accessPolicy.GetExcludedUsers())
-	}
+
+	users.AllowList = refreshRestrictedAccessUserList(ctx, diagnostics, users.AllowList, accessPolicy.GetIncludedUserFilterEnabled(), accessPolicy.GetIncludedUsers())
+	users.BlockList = refreshRestrictedAccessUserList(ctx, diagnostics, users.BlockList, accessPolicy.GetExcludedUserFilterEnabled(), accessPolicy.GetExcludedUsers())
 
 	r.RestrictedAccessUsers = util.TypedObjectToObjectValue(ctx, diagnostics, users)
 
@@ -2084,6 +2426,45 @@ func getDeliveryGroupAllocationType(ctx context.Context, client *citrixdaasclien
 	return ""
 }
 
+// emptySliceIfNil returns a non-nil slice so that the generated request models serialize the field
+// as an empty list instead of omitting it. ToMap guards these fields with a nil check, so a nil
+// slice leaves whatever the service already has in place rather than clearing it.
+func emptySliceIfNil(values []string) []string {
+	if values == nil {
+		return []string{}
+	}
+	return values
+}
+
+// applyAccessPolicyUserFilters sets the user filters on an access policy request.
+//
+// A policy that declares its own restricted_access_users owns its users; anything else inherits the
+// delivery group level values carried on the simplified access policy. Create builds its access
+// policy requests separately from update, so both paths have to make this choice the same way or a
+// policy created with per-policy users comes back from the API without them.
+func applyAccessPolicyUserFilters(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, request *citrixorchestration.AdvancedAccessPolicyRequestModel, accessPolicy DeliveryGroupAccessPolicyModel, simpleAccessPolicy citrixorchestration.SimplifiedAccessPolicyRequestModel, allowAnonymousAccess bool, inheritedAllowedUsers citrixorchestration.AllowedUser) error {
+	if !accessPolicy.RestrictedAccessUsers.IsNull() {
+		includedEnabled, includedUserIds, excludedEnabled, excludedUserIds, allowedUser, err := resolvePerPolicyUserFilters(ctx, diagnostics, client, accessPolicy.RestrictedAccessUsers, allowAnonymousAccess)
+		if err != nil {
+			return err
+		}
+		request.SetIncludedUserFilterEnabled(includedEnabled)
+		request.SetIncludedUsers(includedUserIds)
+		request.SetExcludedUserFilterEnabled(excludedEnabled)
+		request.SetExcludedUsers(excludedUserIds)
+		request.SetAllowedUsers(allowedUser)
+		return nil
+	}
+
+	request.SetIncludedUserFilterEnabled(simpleAccessPolicy.GetIncludedUserFilterEnabled())
+	request.SetIncludedUsers(emptySliceIfNil(simpleAccessPolicy.GetIncludedUsers()))
+	request.SetExcludedUserFilterEnabled(simpleAccessPolicy.GetExcludedUserFilterEnabled())
+	request.SetExcludedUsers(emptySliceIfNil(simpleAccessPolicy.GetExcludedUsers()))
+	request.SetAllowedUsers(inheritedAllowedUsers)
+
+	return nil
+}
+
 // resolvePerPolicyUserFilters resolves user filter request values for a per-policy restricted_access_users override.
 // Mirrors the global resolution logic in getRequestModelForDeliveryGroupUpdate.
 func resolvePerPolicyUserFilters(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, policyUsers types.Object, allowAnonymousAccess bool) (bool, []string, bool, []string, citrixorchestration.AllowedUser, error) {
@@ -2110,12 +2491,16 @@ func resolvePerPolicyUserFilters(ctx context.Context, diagnostics *diag.Diagnost
 		}
 	}
 
-	return true, includedUserIds, excludedFilterEnabled, excludedUserIds, allowedUser, nil
+	// The request model omits IncludedUsers and ExcludedUsers when the slice is nil, which leaves
+	// users written by a previous apply on the policy. Send an empty list so they are cleared.
+	return true, emptySliceIfNil(includedUserIds), excludedFilterEnabled, emptySliceIfNil(excludedUserIds), allowedUser, nil
 }
 
 func getAdvancedAccessPolicyRequest(ctx context.Context, diagnostics *diag.Diagnostics, accessPolicy DeliveryGroupAccessPolicyModel) (citrixorchestration.AdvancedAccessPolicyRequestModel, error) {
 	var advancedAccessPolicyRequest citrixorchestration.AdvancedAccessPolicyRequestModel
-	if !accessPolicy.Id.IsNull() {
+	// id is Computed and marked unknown for an access policy that has no prior state, so a create
+	// must not send it. Testing only for null would send an empty id for a brand new policy.
+	if !accessPolicy.Id.IsNull() && !accessPolicy.Id.IsUnknown() {
 		advancedAccessPolicyRequest.SetId(accessPolicy.Id.ValueString())
 	}
 	advancedAccessPolicyRequest.SetName(accessPolicy.Name.ValueString())
@@ -2640,7 +3025,7 @@ func (r *deliveryGroupResource) updateDeliveryGroupState(ctx context.Context, re
 
 	tags := getDeliveryGroupTags(ctx, &resp.Diagnostics, r.client, deliveryGroupId)
 
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, deliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule, deliveryGroupAutoscalePlugins, tags)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, deliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule, deliveryGroupAutoscalePlugins, tags, false)
 
 	// Set state to fully populated data
 	diags := resp.State.Set(ctx, plan)

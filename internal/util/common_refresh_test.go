@@ -26,7 +26,7 @@ func getFakeClientKey(c fakeRefreshClient) string { return c.key }
 // fakeRefreshModel is the minimal Terraform-side model implementing
 // RefreshableListItemWithAttributes[fakeRefreshClient]. Methods use VALUE
 // receivers so RefreshListItem returns the concrete type (required for the
-// (tfType) type assertion inside refreshListProperties).
+// (tfType) type assertion inside RefreshListProperties).
 type fakeRefreshModel struct {
 	Key   types.String `tfsdk:"key"`
 	Value types.String `tfsdk:"value"`
@@ -55,7 +55,7 @@ func newFakeModel(key, value string) fakeRefreshModel {
 	return fakeRefreshModel{Key: types.StringValue(key), Value: types.StringValue(value)}
 }
 
-// --- refreshListProperties (typed core) ------------------------------------
+// --- RefreshListProperties (typed core) ------------------------------------
 
 func TestRefreshListProperties(t *testing.T) {
 	t.Parallel()
@@ -134,6 +134,30 @@ func TestRefreshListProperties(t *testing.T) {
 			expectedKeys:   []string{"a"},
 			expectedValues: []string{"1"},
 		},
+		"duplicate remote keys on nil state are all kept": {
+			state:          nil,
+			remote:         []fakeRefreshClient{{key: "a", value: "1"}, {key: "a", value: "2"}},
+			expectedKeys:   []string{"a", "a"},
+			expectedValues: []string{"1", "2"},
+		},
+		"duplicate remote key refreshes state item then appends": {
+			state:          []fakeRefreshModel{newFakeModel("a", "0")},
+			remote:         []fakeRefreshClient{{key: "a", value: "1"}, {key: "a", value: "2"}},
+			expectedKeys:   []string{"a", "a"},
+			expectedValues: []string{"1", "2"},
+		},
+		"duplicate state keys pair with duplicate remote keys in order": {
+			state:          []fakeRefreshModel{newFakeModel("a", "0"), newFakeModel("b", "b"), newFakeModel("a", "1")},
+			remote:         []fakeRefreshClient{{key: "a", value: "x"}, {key: "a", value: "y"}, {key: "b", value: "b"}},
+			expectedKeys:   []string{"a", "b", "a"},
+			expectedValues: []string{"x", "b", "y"},
+		},
+		"unmatched duplicate state item is removed": {
+			state:          []fakeRefreshModel{newFakeModel("a", "0"), newFakeModel("a", "1")},
+			remote:         []fakeRefreshClient{{key: "a", value: "x"}},
+			expectedKeys:   []string{"a"},
+			expectedValues: []string{"x"},
+		},
 	}
 
 	for name, test := range tests {
@@ -142,7 +166,7 @@ func TestRefreshListProperties(t *testing.T) {
 			ctx := context.Background()
 			var diags diag.Diagnostics
 
-			got := refreshListProperties[fakeRefreshModel, fakeRefreshClient](ctx, &diags, test.state, test.remote, getFakeClientKey)
+			got := RefreshListProperties[fakeRefreshModel, fakeRefreshClient](ctx, &diags, test.state, test.remote, getFakeClientKey)
 
 			if diags.HasError() {
 				t.Fatalf("unexpected diagnostics error: %s", diags)
@@ -167,6 +191,25 @@ func TestRefreshListProperties(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestRefreshListPropertiesRepeatedRefreshWithDuplicateKeysIsStable(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	var diags diag.Diagnostics
+	remote := []fakeRefreshClient{{key: "a", value: "1"}, {key: "a", value: "2"}}
+
+	var state []fakeRefreshModel
+	for range 3 {
+		state = RefreshListProperties[fakeRefreshModel, fakeRefreshClient](ctx, &diags, state, remote, getFakeClientKey)
+
+		if diags.HasError() {
+			t.Fatalf("unexpected diagnostics error: %s", diags)
+		}
+		if len(state) != 2 || state[0].Value.ValueString() != "1" || state[1].Value.ValueString() != "2" {
+			t.Fatalf("expected [a/1 a/2], got %#v", state)
+		}
 	}
 }
 
@@ -411,7 +454,7 @@ func TestRefreshListValues(t *testing.T) {
 // the typed and string refresh wrappers for the identical scenario (state holds
 // exactly one item, remote is empty):
 //   - The TYPED wrapper (RefreshListValueProperties) returns a NULL list, because
-//     refreshListProperties returns nil and TypedArrayToObjectList(nil) -> ListNull.
+//     RefreshListProperties returns nil and TypedArrayToObjectList(nil) -> ListNull.
 //   - The STRING wrapper (RefreshListValues) returns a NON-null, empty list,
 //     because RefreshList returns []string{} and StringArrayToStringList only
 //     nulls on a nil input.

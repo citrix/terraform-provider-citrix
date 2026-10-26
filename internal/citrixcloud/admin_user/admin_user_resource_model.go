@@ -45,7 +45,23 @@ type CCAdminPolicyResourceModel struct {
 }
 
 func (r CCAdminPolicyResourceModel) GetKey() string {
-	return r.Name.ValueString()
+	return util.CCAdminAccessPolicyKey(r.Name.ValueString(), r.ServiceName.ValueString())
+}
+
+var supportedServiceNames = []string{
+	ADMINISTRATORSERVICENAME_XENDESKTOP,
+	ADMINISTRATORSERVICENAME_PLATFORM,
+	ADMINISTRATORACCESSTYPE_CAS,
+	ADMINISTRATORACCESSTYPE_WEM,
+	ADMINISTRATORSERVICENAME_MAS,
+	ADMINISTRATORSERVICENAME_NETSCALERGATEWAY,
+	ADMINISTRATORSERVICENAME_SDWANORCHESTRATOR,
+}
+
+// getServiceNameDescription lists the supported service names in backticks, which the onboarding script reads from the
+// provider schema to skip admins it cannot import.
+func getServiceNameDescription() string {
+	return "Name of the service to be associated with the admin user. Currently, this attribute can be set to `" + strings.Join(supportedServiceNames, "`, `") + "`."
 }
 
 // getServiceNameValidators restricts service_name to the public service names, except under -debug where internal
@@ -55,12 +71,7 @@ func getServiceNameValidators() []validator.String {
 		return nil
 	}
 	return []validator.String{
-		stringvalidator.OneOf(
-			ADMINISTRATORSERVICENAME_XENDESKTOP,
-			ADMINISTRATORSERVICENAME_PLATFORM,
-			ADMINISTRATORACCESSTYPE_CAS,
-			ADMINISTRATORACCESSTYPE_WEM,
-		),
+		stringvalidator.OneOf(supportedServiceNames...),
 	}
 }
 
@@ -72,7 +83,7 @@ func (CCAdminPolicyResourceModel) GetSchema() schema.NestedAttributeObject {
 				Required:    true,
 			},
 			"service_name": schema.StringAttribute{
-				Description: "Name of the service to be associated with the admin user. Currently, this attribute can be set to `XenDesktop`, `Platform`, `CAS`, or `WEM`.",
+				Description: getServiceNameDescription(),
 				Optional:    true,
 				Computed:    true,
 				Validators:  getServiceNameValidators(),
@@ -329,7 +340,36 @@ func (r CCAdminUserResourceModel) RefreshPropertyValuesForPolicies(ctx context.C
 	if adminAccessPolicy.GetPolicies() != nil {
 		policies := util.ObjectListToTypedArray[CCAdminPolicyResourceModel](ctx, diagnostics, r.Policies)
 		filteredPolicies := filterPolicies(adminAccessPolicy.GetPolicies(), policies)
-		r.Policies = util.RefreshListValueProperties[CCAdminPolicyResourceModel, ccadmins.AdministratorAccessPolicyModel](ctx, diagnostics, r.Policies, filteredPolicies, util.GetCCAdminAccessPolicyNameKey)
+		policies = resolvePolicyServiceNames(policies, filteredPolicies)
+		refreshedPolicies := util.RefreshListProperties[CCAdminPolicyResourceModel, ccadmins.AdministratorAccessPolicyModel](ctx, diagnostics, policies, filteredPolicies, util.GetCCAdminAccessPolicyKey)
+		r.Policies = util.TypedArrayToObjectList[CCAdminPolicyResourceModel](ctx, diagnostics, refreshedPolicies)
 	}
 	return r
+}
+
+// resolvePolicyServiceNames fills in service_name when config omits it so the policy keeps its position in the list.
+// Each remote policy is claimed at most once, so a name matching several remote policies resolves to them in order.
+func resolvePolicyServiceNames(policies []CCAdminPolicyResourceModel, remotePolicies []ccadmins.AdministratorAccessPolicyModel) []CCAdminPolicyResourceModel {
+	claimedKeys := map[string]bool{}
+	for _, policy := range policies {
+		if policy.ServiceName.ValueString() != "" {
+			claimedKeys[policy.GetKey()] = true
+		}
+	}
+
+	for index, policy := range policies {
+		if policy.ServiceName.ValueString() != "" {
+			continue
+		}
+
+		for _, remotePolicy := range remotePolicies {
+			remoteKey := util.GetCCAdminAccessPolicyKey(remotePolicy)
+			if remotePolicy.GetDisplayName() == policy.Name.ValueString() && !claimedKeys[remoteKey] {
+				policies[index].ServiceName = types.StringValue(remotePolicy.GetServiceName())
+				claimedKeys[remoteKey] = true
+				break
+			}
+		}
+	}
+	return policies
 }

@@ -436,7 +436,9 @@ Optional:
 
 ~> **Please Note** If omitted or set to `null`, the delivery group's `restricted_access_users` applies to this policy. If specified as an empty object `{}`, no user will have access via this policy.
 
-~> **Please Note** Mutually exclusive with `restricted_access_users` at the delivery group level. Use one or the other, not both. (see [below for nested schema](#nestedatt--custom_access_policies--restricted_access_users))
+~> **Please Note** Mutually exclusive with `restricted_access_users` at the delivery group level. Use one or the other, not both.
+
+~> **Please Note** Use this for contextual access, where at least one access policy restricts access to a different set of users. A restriction that applies to every access policy must be set with `restricted_access_users` at the delivery group level instead. (see [below for nested schema](#nestedatt--custom_access_policies--restricted_access_users))
 
 Read-Only:
 
@@ -496,7 +498,9 @@ Optional:
 
 ~> **Please Note** If omitted or set to `null`, the delivery group's `restricted_access_users` applies to this policy. If specified as an empty object `{}`, no user will have access via this policy.
 
-~> **Please Note** Mutually exclusive with `restricted_access_users` at the delivery group level. Use one or the other, not both. (see [below for nested schema](#nestedatt--default_access_policies--restricted_access_users))
+~> **Please Note** Mutually exclusive with `restricted_access_users` at the delivery group level. Use one or the other, not both.
+
+~> **Please Note** Use this for contextual access, where at least one access policy restricts access to a different set of users. A restriction that applies to every access policy must be set with `restricted_access_users` at the delivery group level instead. (see [below for nested schema](#nestedatt--default_access_policies--restricted_access_users))
 
 Read-Only:
 

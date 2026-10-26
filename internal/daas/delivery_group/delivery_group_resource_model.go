@@ -915,7 +915,8 @@ func (DeliveryGroupAccessPolicyModel) GetSchema() schema.NestedAttributeObject {
 	perPolicyUsersSchema.Description = "Restrict access via this access policy by specifying users and groups in the allow and block list. " +
 		"\n\n~> **Please Note** If omitted or set to `null`, the delivery group's `restricted_access_users` applies to this policy. " +
 		"If specified as an empty object `{}`, no user will have access via this policy." +
-		"\n\n~> **Please Note** Mutually exclusive with `restricted_access_users` at the delivery group level. Use one or the other, not both."
+		"\n\n~> **Please Note** Mutually exclusive with `restricted_access_users` at the delivery group level. Use one or the other, not both." +
+		"\n\n~> **Please Note** Use this for contextual access, where at least one access policy restricts access to a different set of users. A restriction that applies to every access policy must be set with `restricted_access_users` at the delivery group level instead."
 
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
@@ -1515,7 +1516,7 @@ func (DeliveryGroupResourceModel) GetAttributes() map[string]schema.Attribute {
 	return DeliveryGroupResourceModel{}.GetSchema().Attributes
 }
 
-func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixclient.CitrixDaasClient, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, dgDesktops *citrixorchestration.DesktopResponseModelCollection, dgPowerTimeSchemes *citrixorchestration.PowerTimeSchemeResponseModelCollection, dgMachines []citrixorchestration.MachineResponseModel, dgRebootSchedule *citrixorchestration.RebootScheduleResponseModelCollection, deliveryGroupAutoscalePlugins *citrixorchestration.AutoscaleGroupPluginModelCollection, tags []string) DeliveryGroupResourceModel {
+func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixclient.CitrixDaasClient, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, dgDesktops *citrixorchestration.DesktopResponseModelCollection, dgPowerTimeSchemes *citrixorchestration.PowerTimeSchemeResponseModelCollection, dgMachines []citrixorchestration.MachineResponseModel, dgRebootSchedule *citrixorchestration.RebootScheduleResponseModelCollection, deliveryGroupAutoscalePlugins *citrixorchestration.AutoscaleGroupPluginModelCollection, tags []string, isRead bool) DeliveryGroupResourceModel {
 	// Set required values
 	r.Id = types.StringValue(deliveryGroup.GetId())
 	r.Name = types.StringValue(deliveryGroup.GetName())
@@ -1560,7 +1561,7 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 		r.SharingKind = types.StringValue(string(deliveryGroup.GetSharingKind()))
 	}
 
-	r = r.updatePlanWithRestrictedAccessUsers(ctx, diagnostics, deliveryGroup)
+	r = r.updatePlanWithRestrictedAccessUsers(ctx, diagnostics, deliveryGroup, isRead)
 	r = r.updatePlanWithDesktops(ctx, diagnostics, dgDesktops)
 	r = r.updatePlanWithAssociatedCatalogs(ctx, diagnostics, dgMachines)
 	r = r.updatePlanWithAutoscaleSettings(ctx, diagnostics, client, deliveryGroup, dgPowerTimeSchemes)
@@ -1580,6 +1581,12 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 	}
 	r = r.updatePlanWithDefaultAccessPolicies(ctx, diagnostics, defaultAccessPolicies)
 	r = r.updatePlanWithCustomAccessPolicies(ctx, diagnostics, customAccessPolicies)
+
+	if isRead {
+		// The access policies are the source of truth for where the users live. Only a read may act
+		// on that; during an apply the configuration decides the shape.
+		r = r.alignRestrictedAccessUsersWithPolicies(ctx, diagnostics, deliveryGroup)
+	}
 
 	if len(deliveryGroup.GetStoreFrontServersForHostedReceiver()) > 0 || !r.StoreFrontServers.IsNull() {
 		var remoteAssociatedStoreFrontServers []string

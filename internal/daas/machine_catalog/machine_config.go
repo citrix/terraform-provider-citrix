@@ -1899,7 +1899,8 @@ func (mc *GcpMachineConfigModel) RefreshProperties(ctx context.Context, diagnost
 		if lastIndex > 4 {
 			// If path slices are more than 4, that means a snapshot was used for the catalog
 			mc.MachineSnapshot = types.StringValue(masterImage.GetName())
-			mc.MasterImage = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".snapshot"))
+			// Extract {VM name} from {VM name}.vm
+			mc.MasterImage = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".vm"))
 		} else {
 			// If path slices equals to 4, that means a VM was used for the catalog
 			mc.MasterImage = types.StringValue(masterImage.GetName())
