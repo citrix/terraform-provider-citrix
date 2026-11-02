@@ -71,7 +71,7 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 		// For Cloud customers, resource location ID is required and name is not allowed
 		resp.Diagnostics.AddError(
 			"Error Managing Zone",
-			"For Citrix Cloud customers, Zone has to be created in terraform by providing Resource Location ID. Zone name is not allowed.",
+			"For Citrix Cloud, set resource_location_id instead of name. The zone is automatically created and named after its resource location.",
 		)
 		return
 	}
@@ -80,7 +80,7 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 		// For On-prem customers, name is required and resource location ID is not allowed
 		resp.Diagnostics.AddError(
 			"Error Managing Zone",
-			"For On-prem customers, Zone has to be created in terraform by providing zone name. Resource location ID is not allowed.",
+			"For on-premises, set name instead of resource_location_id.",
 		)
 		return
 	}
@@ -91,21 +91,18 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 		if plan.ResourceLocationId.IsNull() || plan.ResourceLocationId.IsUnknown() {
 			resp.Diagnostics.AddError(
 				"Error creating Zone",
-				"Resource Location id is required to create a Zone.",
+				"resource_location_id is required to create a Zone.",
 			)
 			return
 		}
 
-		// If resource location id is provided, get resource location from Citrix Cloud and extract zone name to import zone
-		// Get resource location from remote using id
-		resourceLocation, err := resource_locations.GetResourceLocation(ctx, r.client, &resp.Diagnostics, plan.ResourceLocationId.ValueString())
+		// Fail fast on a missing resource location instead of waiting for a zone that will never sync
+		_, err := resource_locations.GetResourceLocation(ctx, r.client, &resp.Diagnostics, plan.ResourceLocationId.ValueString())
 		if err != nil {
 			return
 		}
 
-		zoneName := resourceLocation.GetName()
-
-		zone, err := util.PollZone(ctx, r.client, zoneName, false)
+		zone, httpResp, err := util.PollZoneForResourceLocation(ctx, r.client, plan.ResourceLocationId.ValueString())
 		if err == nil && zone != nil {
 			// zone exists. run an update on zone so that the description and metadata are updated
 			zone, err = plan.updateZoneAfterCreate(ctx, r.client, &resp.Diagnostics, zone)
@@ -120,9 +117,18 @@ func (r *zoneResource) Create(ctx context.Context, req resource.CreateRequest, r
 			diags = resp.State.Set(ctx, plan)
 			resp.Diagnostics.Append(diags...)
 		} else {
+			errorDetail := "Citrix Cloud automatically creates the zone when resource location " + plan.ResourceLocationId.ValueString() + " is created, " +
+				"but the zone was not found."
+			if err != nil {
+				errorDetail += "\n\n"
+				if httpResp != nil { // a timeout has no failed request to report
+					errorDetail += "TransactionId: " + citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp) + "\n"
+				}
+				errorDetail += "Error message: " + util.ReadClientError(err)
+			}
 			resp.Diagnostics.AddError(
 				"Error creating Zone",
-				"Zones and Cloud Connectors are managed only by Citrix Cloud. Ensure you have a resource location created manually or via terraform, then try again. If zone is for on-premises hypervisor, make sure you have cloud connectors deployed in it.",
+				errorDetail,
 			)
 		}
 
@@ -328,9 +334,8 @@ func (r *zoneResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRe
 
 	if req.Plan.Raw.IsNull() && !r.client.AuthConfig.OnPremises {
 		resp.Diagnostics.AddWarning(
-			"Attempting to delete Zone",
-			"Zones and Cloud Connectors are managed only by Citrix Cloud. The requested zone will be deleted from terraform state but you will still need to manually delete these resources "+
-				"by logging into Citrix Cloud.",
+			"Zone is managed by Citrix Cloud",
+			"The zone will only be removed from Terraform state. Citrix Cloud automatically deletes the zone after its resource location is deleted.",
 		)
 	}
 }

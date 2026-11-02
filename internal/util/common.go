@@ -903,11 +903,12 @@ func GetOrchestrationPoolSizeScheduleKey(remote citrixorchestration.PoolSizeSche
 // <returns>Terraform list for new state</returns>
 func RefreshListValueProperties[tfType RefreshableListItemWithAttributes[clientType], clientType any](ctx context.Context, diagnostics *diag.Diagnostics, state types.List, remote []clientType, getClientKey func(clientType) string) types.List {
 	unwrappedList := ObjectListToTypedArray[tfType](ctx, diagnostics, state)
-	refreshedList := refreshListProperties[tfType, clientType](ctx, diagnostics, unwrappedList, remote, getClientKey)
+	refreshedList := RefreshListProperties[tfType, clientType](ctx, diagnostics, unwrappedList, remote, getClientKey)
 	return TypedArrayToObjectList[tfType](ctx, diagnostics, refreshedList)
 }
 
-func refreshListProperties[tfType RefreshableListItemWithAttributes[clientType], clientType any](ctx context.Context, diagnostics *diag.Diagnostics, state []tfType, remote []clientType, getClientKey func(clientType) string) []tfType {
+// RefreshListProperties is RefreshListValueProperties for callers that already hold the state as a typed array.
+func RefreshListProperties[tfType RefreshableListItemWithAttributes[clientType], clientType any](ctx context.Context, diagnostics *diag.Diagnostics, state []tfType, remote []clientType, getClientKey func(clientType) string) []tfType {
 	if len(remote) == 0 {
 		return nil
 	}
@@ -916,16 +917,22 @@ func refreshListProperties[tfType RefreshableListItemWithAttributes[clientType],
 		state = []tfType{}
 	}
 
-	stateItems := map[string]int{}
+	// Each state item is matched at most once, so duplicate keys pair up in order instead of collapsing onto one item
+	stateIndexesByKey := map[string][]int{}
 	for index, tfItem := range state {
-		stateItems[tfItem.GetKey()] = index
+		key := tfItem.GetKey()
+		stateIndexesByKey[key] = append(stateIndexesByKey[key], index)
 	}
 
 	newState := state
+	keptIndexes := map[int]bool{}
 	for _, clientItem := range remote {
 		clientKey := getClientKey(clientItem)
-		index, exists := stateItems[clientKey]
-		if exists {
+		if stateIndexes := stateIndexesByKey[clientKey]; len(stateIndexes) > 0 {
+			index := stateIndexes[0]
+			stateIndexesByKey[clientKey] = stateIndexes[1:]
+			keptIndexes[index] = true
+
 			tfItem := state[index]
 			refreshedItem := tfItem.RefreshListItem(ctx, diagnostics, clientItem)
 			if typedItem, ok := refreshedItem.(tfType); ok {
@@ -941,6 +948,7 @@ func refreshListProperties[tfType RefreshableListItemWithAttributes[clientType],
 				refreshedItem := tfStructItem.RefreshListItem(ctx, diagnostics, clientItem)
 				if newStateItem, ok := refreshedItem.(tfType); ok {
 					newState = append(newState, newStateItem)
+					keptIndexes[len(newState)-1] = true
 				} else {
 					diagnostics.AddError("Type assertion failed", "RefreshListItem did not return expected type")
 				}
@@ -948,14 +956,12 @@ func refreshListProperties[tfType RefreshableListItemWithAttributes[clientType],
 				diagnostics.AddWarning("Error when creating empty "+reflect.TypeOf(tfStructItem).String(), err.Error())
 			}
 		}
-
-		stateItems[clientKey] = -1 // Mark as visited. The ones not visited should be removed.
 	}
 
 	result := []tfType{}
-	for _, tfItem := range newState {
-		if stateItems[tfItem.GetKey()] == -1 {
-			result = append(result, tfItem) // if visited, include. Not visited ones will not be included.
+	for index, tfItem := range newState {
+		if keptIndexes[index] {
+			result = append(result, tfItem) // State items not matched by any remote item are removed
 		}
 	}
 
@@ -1760,8 +1766,13 @@ func PollQcsTask(ctx context.Context, client *citrixdaasclient.CitrixDaasClient,
 	return taskResponse, httpResp, err
 }
 
-func GetCCAdminAccessPolicyNameKey(r ccadmins.AdministratorAccessPolicyModel) string {
-	return r.GetDisplayName()
+func GetCCAdminAccessPolicyKey(r ccadmins.AdministratorAccessPolicyModel) string {
+	return CCAdminAccessPolicyKey(r.GetDisplayName(), r.GetServiceName())
+}
+
+// CCAdminAccessPolicyKey includes the service because the same policy name can exist under multiple services.
+func CCAdminAccessPolicyKey(name string, serviceName string) string {
+	return name + "|" + strings.ToLower(serviceName)
 }
 
 func RefreshTenantSet(ctx context.Context, diagnostics *diag.Diagnostics, tenants []citrixorchestration.RefResponseModel) types.Set {
@@ -1818,43 +1829,44 @@ func GetAssignMachineToUserKey(r citrixorchestration.MachineResponseModel) strin
 	return strings.ToLower(r.GetName())
 }
 
-func PollZone(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, zoneName string, isZoneBeingDeleted bool) (*citrixorchestration.ZoneDetailResponseModel, error) {
+// PollZoneForResourceLocation waits for Citrix Cloud to sync the zone of a resource location.
+// Zones are matched by resource location id because a zone left from a deleted resource location can still have the same name.
+func PollZoneForResourceLocation(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resourceLocationId string) (*citrixorchestration.ZoneDetailResponseModel, *http.Response, error) {
 	// default polling to every 10 seconds
 	pollInterval := 10
 	startTime := time.Now()
-	getZoneRequest := client.ApiClient.ZonesAPIsDAAS.ZonesGetZone(ctx, zoneName)
 
-	var zone *citrixorchestration.ZoneDetailResponseModel
-	var err error
 	for time.Since(startTime) <= time.Minute*time.Duration(8) {
 		// Zone sync should be completed within 8 minutes
 
-		zone, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ZoneDetailResponseModel](getZoneRequest, client)
-		if isZoneBeingDeleted {
-			if httpResp.StatusCode == http.StatusNotFound {
-				// Zone deletion completed. Return nil
-				return nil, nil //nolint:nilnil // Explicitly returning nil for both values to indicate successful deletion
-			}
-		} else {
-			if err == nil {
-				// Zone sync completed. Return the zone
-				return zone, nil
-			}
+		getZonesRequest := client.ApiClient.ZonesAPIsDAAS.ZonesGetZones(ctx)
+		zones, httpResp, err := citrixdaasclient.GetAllPagesWithRetry[*citrixorchestration.ZoneResponseModelCollection](getZonesRequest, client)
+		if err != nil {
+			return nil, httpResp, err
 		}
-		if err != nil && httpResp.StatusCode != http.StatusNotFound {
-			// GET Zone call failed with an error other than 404. Return the error
-			return zone, err
+
+		zoneId := GetZoneIdForResourceLocation(zones.GetItems(), resourceLocationId)
+		if zoneId != "" {
+			getZoneRequest := client.ApiClient.ZonesAPIsDAAS.ZonesGetZone(ctx, zoneId)
+			return citrixdaasclient.ExecuteWithRetry[*citrixorchestration.ZoneDetailResponseModel](getZoneRequest, client)
 		}
 
 		time.Sleep(time.Second * time.Duration(pollInterval))
-		continue
 	}
 
-	if isZoneBeingDeleted {
-		err = fmt.Errorf("Timed out waiting for zone %s to be deleted", zoneName)
-	}
+	// No request failed, so there is no transaction to report
+	return nil, nil, fmt.Errorf("timed out waiting for the zone of resource location %s", resourceLocationId)
+}
 
-	return zone, err
+// GetZoneIdForResourceLocation returns the id of the zone synced from the resource location, or an empty string if there is none.
+func GetZoneIdForResourceLocation(zones []citrixorchestration.ZoneResponseModel, resourceLocationId string) string {
+	for _, zone := range zones {
+		resourceLocation := zone.GetResourceLocation()
+		if strings.EqualFold(resourceLocation.GetId(), resourceLocationId) {
+			return zone.GetId()
+		}
+	}
+	return ""
 }
 
 // ChunkSlice divides a slice into chunks of a given size.

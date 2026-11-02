@@ -14,6 +14,48 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 )
 
+func buildCreateImageVersionRequestModel(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, plan ImageVersionModel, operation string) (citrixorchestration.CreateImageVersionRequestModel, error) {
+	requestModel := citrixorchestration.CreateImageVersionRequestModel{}
+
+	hypervisorId := plan.Hypervisor.ValueString()
+	hypervisor, err := util.GetHypervisor(ctx, client, diagnostics, hypervisorId)
+	if err != nil {
+		return requestModel, err
+	}
+	hypervisorResourcePool, err := util.GetHypervisorResourcePool(ctx, client, diagnostics, hypervisorId, plan.ResourcePool.ValueString())
+	if err != nil {
+		return requestModel, err
+	}
+
+	var imageScheme citrixorchestration.CreateImageSchemeRequestModel
+	if !plan.NetworkMapping.IsNull() {
+		networkMappingModel := util.ObjectListToTypedArray[util.NetworkMappingModel](ctx, diagnostics, plan.NetworkMapping)
+		networkMapping, err := util.ParseNetworkMappingToClientModel(networkMappingModel, hypervisorResourcePool, hypervisor.GetPluginId())
+		if err != nil {
+			diagnostics.AddError(
+				"Error "+operation+" Image Version",
+				fmt.Sprintf("Failed to find hypervisor network, error: %s", err.Error()),
+			)
+			return requestModel, err
+		}
+		imageScheme.SetNetworkMapping(networkMapping)
+	}
+
+	masterImagePath, err := buildImageScheme(ctx, client, diagnostics, &imageScheme, plan, hypervisor, hypervisorResourcePool)
+	if err != nil {
+		return requestModel, err
+	}
+	if diagnostics.HasError() {
+		return requestModel, fmt.Errorf("failed to build image version request")
+	}
+
+	requestModel.SetDescription(plan.Description.ValueString())
+	requestModel.SetResourcePool(plan.ResourcePool.ValueString())
+	requestModel.SetMasterImagePath(masterImagePath)
+	requestModel.SetImageScheme(imageScheme)
+	return requestModel, nil
+}
+
 func buildImageScheme(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, imageScheme *citrixorchestration.CreateImageSchemeRequestModel, plan ImageVersionModel, hypervisor *citrixorchestration.HypervisorDetailResponseModel, hypervisorResourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel) (string, error) {
 	hypervisorId := hypervisor.GetId()
 	var masterImagePath string
@@ -119,6 +161,7 @@ func buildImageScheme(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 						return masterImagePath, err
 					}
 					if int32(machineProfileCpuCount) != vsphereImageSpecs.CpuCount.ValueInt32() {
+						err = fmt.Errorf("the specified `cpu_count` value %d does not match the number of CPU(s) %d of machine profile %s", vsphereImageSpecs.CpuCount.ValueInt32(), machineProfileCpuCount, machineProfileName)
 						diagnostics.AddError(
 							"Error creating vSphere Image Version",
 							fmt.Sprintf("The specified `cpu_count` value %d does not match the number of CPU(s) %d of machine profile %s.", vsphereImageSpecs.CpuCount.ValueInt32(), machineProfileCpuCount, machineProfileName),

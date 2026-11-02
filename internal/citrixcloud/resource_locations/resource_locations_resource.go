@@ -222,17 +222,6 @@ func (r *resourceLocationResource) Delete(ctx context.Context, req resource.Dele
 		)
 		return
 	}
-
-	// Check if zone got deleted
-	_, err = util.PollZone(ctx, r.client, state.Name.ValueString(), true)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error deleting zone with name: "+state.Name.ValueString(),
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-		return
-	}
 }
 
 func (r *resourceLocationResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -270,7 +259,7 @@ func (r *resourceLocationResource) ModifyPlan(ctx context.Context, req resource.
 	}
 
 	if r.client.AuthConfig.OnPremises {
-		resp.Diagnostics.AddError("Error managing resource location", "Resource locations are only supported for Cloud customers. On-premises customers can use the Zone resource directly.")
+		resp.Diagnostics.AddError("Error managing resource location", "Resource locations are only supported for Cloud customers. On-premises customers can use citrix_zone directly.")
 		return
 	}
 

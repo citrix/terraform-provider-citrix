@@ -7,7 +7,9 @@ import (
 	"os"
 	"testing"
 
+	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
@@ -40,6 +42,7 @@ func AzureImageVersionResourceTestHelper(t *testing.T, pre121 bool) {
 	desResourceGroup := os.Getenv("TEST_AZURE_IMAGE_VERSION_DES_RESOURCE_GROUP")
 
 	importStateVerifyIgnore := []string{"network_mapping"}
+	var imageVersionId, imageVersionNumber string
 
 	var imageDefinitionResource string
 	if pre121 {
@@ -60,9 +63,12 @@ func AzureImageVersionResourceTestHelper(t *testing.T, pre121 bool) {
 			{
 				Config: composeTestResourceTf(
 					imageDefinitionResource,
-					BuildAzureImageVersionBasicMasterImage(t, false),
+					BuildAzureImageVersionBasicMasterImage(t, false, util.StandardSSDLRS),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
+					// Capture the id and version number to verify in-place updates
+					resource.TestCheckResourceAttrWith("citrix_image_version.test_azure_image_version", "id", captureResourceAttr(&imageVersionId)),
+					resource.TestCheckResourceAttrWith("citrix_image_version.test_azure_image_version", "version_number", captureResourceAttr(&imageVersionNumber)),
 					// Verify the hypervisor of the image version
 					resource.TestCheckResourceAttr("citrix_image_version.test_azure_image_version", "hypervisor", hypervisor),
 					// Verify the resourcePool of the image version
@@ -95,7 +101,7 @@ func AzureImageVersionResourceTestHelper(t *testing.T, pre121 bool) {
 			{
 				Config: composeTestResourceTf(
 					imageDefinitionResource,
-					BuildAzureImageVersionBasicMasterImage(t, true),
+					BuildAzureImageVersionBasicMasterImage(t, true, util.StandardSSDLRS),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the hypervisor of the image version
@@ -116,6 +122,25 @@ func AzureImageVersionResourceTestHelper(t *testing.T, pre121 bool) {
 					resource.TestCheckNoResourceAttr("citrix_image_version.test_azure_image_version", "azure_image_specs.machine_profile"),
 					// Verify disk_encryption_set is not set
 					resource.TestCheckNoResourceAttr("citrix_image_version.test_azure_image_version", "azure_image_specs.disk_encryption_set"),
+				),
+			},
+			// In-place image specs update testing
+			{
+				Config: composeTestResourceTf(
+					imageDefinitionResource,
+					BuildAzureImageVersionBasicMasterImage(t, true, util.Premium_LRS),
+				),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("citrix_image_version.test_azure_image_version", plancheck.ResourceActionUpdate),
+					},
+				},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify the image version was updated without being recreated
+					resource.TestCheckResourceAttrPtr("citrix_image_version.test_azure_image_version", "id", &imageVersionId),
+					resource.TestCheckResourceAttrPtr("citrix_image_version.test_azure_image_version", "version_number", &imageVersionNumber),
+					// Verify the storage_type of the image version
+					resource.TestCheckResourceAttr("citrix_image_version.test_azure_image_version", "azure_image_specs.storage_type", util.Premium_LRS),
 				),
 			},
 			{
@@ -263,6 +288,13 @@ func AzureImageVersionResourceTestHelper(t *testing.T, pre121 bool) {
 	})
 }
 
+func captureResourceAttr(target *string) resource.CheckResourceAttrWithFunc {
+	return func(value string) error {
+		*target = value
+		return nil
+	}
+}
+
 func generateAzureImageVersionImportStateId(state *terraform.State) (string, error) {
 	resourceName := "citrix_image_version.test_azure_image_version"
 	var rawState map[string]string
@@ -277,7 +309,7 @@ func generateAzureImageVersionImportStateId(state *terraform.State) (string, err
 	return fmt.Sprintf("%s,%s", rawState["image_definition"], rawState["id"]), nil
 }
 
-func BuildAzureImageVersionBasicMasterImage(t *testing.T, updated bool) string {
+func BuildAzureImageVersionBasicMasterImage(t *testing.T, updated bool, storageType string) string {
 	hypervisor := os.Getenv("TEST_AZURE_IMAGE_VERSION_HYPERVISOR")
 	resourcePool := os.Getenv("TEST_AZURE_IMAGE_VERSION_RESOURCE_POOL")
 	description := os.Getenv("TEST_AZURE_IMAGE_VERSION_DESCRIPTION")
@@ -289,7 +321,7 @@ func BuildAzureImageVersionBasicMasterImage(t *testing.T, updated bool) string {
 	resourceGroup := os.Getenv("TEST_AZURE_IMAGE_VERSION_RESOURCE_GROUP")
 	masterImage := os.Getenv("TEST_AZURE_IMAGE_VERSION_MASTER_IMAGE")
 
-	return fmt.Sprintf(azureImageVersionTestResource_basicMasterImage, hypervisor, resourcePool, description, network, serviceOffering, resourceGroup, masterImage)
+	return fmt.Sprintf(azureImageVersionTestResource_basicMasterImage, hypervisor, resourcePool, description, network, serviceOffering, storageType, resourceGroup, masterImage)
 }
 
 func BuildAzureImageVersionFullMasterImage(t *testing.T) string {
@@ -360,6 +392,7 @@ func TestVSphereImageVersionResource(t *testing.T) {
 	machine_profile := os.Getenv("TEST_VSPHERE_IMAGE_VERSION_MACHINE_PROFILE")
 
 	importStateVerifyIgnore := []string{"network_mapping"}
+	var imageVersionId, imageVersionNumber string
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -373,9 +406,12 @@ func TestVSphereImageVersionResource(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildVSphereImageDefinitionTestResource(t),
-					BuildVSphereImageVersionBasicMasterImage(t, false),
+					BuildVSphereImageVersionBasicMasterImage(t, false, 4096),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
+					// Capture the id and version number to verify in-place updates
+					resource.TestCheckResourceAttrWith("citrix_image_version.test_vsphere_image_version", "id", captureResourceAttr(&imageVersionId)),
+					resource.TestCheckResourceAttrWith("citrix_image_version.test_vsphere_image_version", "version_number", captureResourceAttr(&imageVersionNumber)),
 					// Verify the resourcePool of the image version
 					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "hypervisor_resource_pool", resourcePool),
 					// Verify the description of the image version
@@ -404,7 +440,7 @@ func TestVSphereImageVersionResource(t *testing.T) {
 			{
 				Config: composeTestResourceTf(
 					BuildVSphereImageDefinitionTestResource(t),
-					BuildVSphereImageVersionBasicMasterImage(t, true),
+					BuildVSphereImageVersionBasicMasterImage(t, true, 4096),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					// Verify the resourcePool of the image version
@@ -421,6 +457,27 @@ func TestVSphereImageVersionResource(t *testing.T) {
 					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.image_snapshot", masterImageSnapshot),
 					// Verify machine_profile is not set
 					resource.TestCheckNoResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.machine_profile"),
+				),
+			},
+			// In-place image specs update testing
+			{
+				Config: composeTestResourceTf(
+					BuildVSphereImageDefinitionTestResource(t),
+					BuildVSphereImageVersionBasicMasterImage(t, true, 8192),
+				),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("citrix_image_version.test_vsphere_image_version", plancheck.ResourceActionUpdate),
+					},
+				},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					// Verify the image version was updated without being recreated
+					resource.TestCheckResourceAttrPtr("citrix_image_version.test_vsphere_image_version", "id", &imageVersionId),
+					resource.TestCheckResourceAttrPtr("citrix_image_version.test_vsphere_image_version", "version_number", &imageVersionNumber),
+					// Verify the memory_mb of the image version
+					resource.TestCheckResourceAttr("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.memory_mb", "8192"),
+					// Verify the disk_size of the image version is refreshed
+					resource.TestCheckResourceAttrSet("citrix_image_version.test_vsphere_image_version", "vsphere_image_specs.disk_size"),
 				),
 			},
 			// Update and Read testing with machine_profile
@@ -495,7 +552,7 @@ func generateVSphereImageVersionImportStateId(state *terraform.State) (string, e
 	return fmt.Sprintf("%s,%s", rawState["image_definition"], rawState["id"]), nil
 }
 
-func BuildVSphereImageVersionBasicMasterImage(t *testing.T, updated bool) string {
+func BuildVSphereImageVersionBasicMasterImage(t *testing.T, updated bool, memoryMb int) string {
 	resourcePool := os.Getenv("TEST_VSPHERE_IMAGE_VERSION_RESOURCE_POOL")
 	description := os.Getenv("TEST_VSPHERE_IMAGE_VERSION_DESCRIPTION")
 	if updated {
@@ -505,7 +562,7 @@ func BuildVSphereImageVersionBasicMasterImage(t *testing.T, updated bool) string
 	masterImageVm := os.Getenv("TEST_VSPHERE_IMAGE_VERSION_MASTER_IMAGE_VM")
 	masterImageSnapShot := os.Getenv("TEST_VSPHERE_IMAGE_VERSION_MASTER_IMAGE_SNAPSHOT")
 
-	return fmt.Sprintf(vSphereImageVersionTestResource_basicMasterImage, resourcePool, description, network, masterImageVm, masterImageSnapShot)
+	return fmt.Sprintf(vSphereImageVersionTestResource_basicMasterImage, resourcePool, description, network, masterImageVm, masterImageSnapShot, memoryMb)
 }
 
 func BuildVSphereImageVersionWithMachineProfile(t *testing.T, updated bool) string {
@@ -554,7 +611,7 @@ resource "citrix_image_version" "test_azure_image_version" {
 	]
 	azure_image_specs = {
 		service_offering = "%s"
-		storage_type = "StandardSSD_LRS"
+		storage_type = "%s"
 		resource_group = "%s"
 		master_image = "%s"
 	}
@@ -673,7 +730,7 @@ resource "citrix_image_version" "test_vsphere_image_version" {
 		master_image_vm = "%s"
 		image_snapshot = "%s"
 		cpu_count = 2
-		memory_mb = 4096
+		memory_mb = %d
 	}
 }
 `

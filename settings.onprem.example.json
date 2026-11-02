@@ -498,6 +498,7 @@
         // Tag Resource Go Tests Env Variables
         "TEST_TAG_RESOURCE_NAME": "{Name of the tag resource}",
         "TEST_TAG_RESOURCE_DESCRIPTION": "{Description of the tag resource}",
+        "TEST_RESOURCE_ACCESS_POLICY_NAME": "{Name of the resource access policy resource}",
 
         // Desktop Icon Go Tests
         "TEST_DESKTOP_ICON_RAW_DATA": "{Desktop Icon Raw Data}",

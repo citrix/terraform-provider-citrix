@@ -73,46 +73,10 @@ func (r *ImageVersionResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	// Construct image scheme
-	var imageScheme citrixorchestration.CreateImageSchemeRequestModel
-	// Fetch master image path
-	var masterImagePath string
-	var httpResp *http.Response
-
-	hypervisorId := plan.Hypervisor.ValueString()
-	hypervisor, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, hypervisorId)
+	createImageVersionRequestBody, err := buildCreateImageVersionRequestModel(ctx, r.client, &resp.Diagnostics, plan, "creating")
 	if err != nil {
 		return
 	}
-	hypervisorResourcePool, err := util.GetHypervisorResourcePool(ctx, r.client, &resp.Diagnostics, hypervisorId, plan.ResourcePool.ValueString())
-	if err != nil {
-		return
-	}
-
-	// Set NetworkMappings
-	if !plan.NetworkMapping.IsNull() {
-		networkMappingModel := util.ObjectListToTypedArray[util.NetworkMappingModel](ctx, &resp.Diagnostics, plan.NetworkMapping)
-		networkMapping, err := util.ParseNetworkMappingToClientModel(networkMappingModel, hypervisorResourcePool, hypervisor.GetPluginId())
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error creating Image Version",
-				fmt.Sprintf("Failed to find hypervisor network, error: %s", err.Error()),
-			)
-			return
-		}
-		imageScheme.SetNetworkMapping(networkMapping)
-	}
-
-	masterImagePath, err = buildImageScheme(ctx, r.client, &resp.Diagnostics, &imageScheme, plan, hypervisor, hypervisorResourcePool)
-	if err != nil {
-		return
-	}
-
-	createImageVersionRequestBody := citrixorchestration.CreateImageVersionRequestModel{}
-	createImageVersionRequestBody.SetDescription(plan.Description.ValueString())
-	createImageVersionRequestBody.SetResourcePool(plan.ResourcePool.ValueString())
-	createImageVersionRequestBody.SetMasterImagePath(masterImagePath)
-	createImageVersionRequestBody.SetImageScheme(imageScheme)
 
 	createImageVersionRequest := r.client.ApiClient.ImageDefinitionsAPIsDAAS.ImageDefinitionsCreateImageVersion(ctx, plan.ImageDefinition.ValueString())
 	createImageVersionRequest = createImageVersionRequest.CreateImageVersionRequestModel(createImageVersionRequestBody).Async(true)
@@ -269,31 +233,35 @@ func (r *ImageVersionResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	updateImageVersionRequestModel := citrixorchestration.UpdateImageVersionRequestModel{}
-	updateImageVersionRequestModel.SetDescription(plan.Description.ValueString())
-	updateImageVersionRequest := r.client.ApiClient.ImageVersionsAPIsDAAS.ImageVersionsUpdateImageVersion(ctx, state.Id.ValueString())
-	updateImageVersionRequest = updateImageVersionRequest.UpdateImageVersionRequestModel(updateImageVersionRequestModel)
-
-	imageVersion, httpResp, err := citrixdaasclient.AddRequestData(updateImageVersionRequest, r.client).Execute()
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error updating Image Version "+state.Id.ValueString(),
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-		return
-	}
-
 	timeoutConfigs := util.ObjectValueToTypedObject[ImageVersionTimeout](ctx, &resp.Diagnostics, plan.Timeout)
 	updateTimeout := timeoutConfigs.Update.ValueInt32()
 	if updateTimeout == 0 {
 		updateTimeout = getImageVersionTimeoutConfigs().UpdateDefault
 	}
-	updateImageVersionResourcePools(ctx, r.client, &resp.Diagnostics, plan, updateTimeout)
 
-	imageVersion, err = GetImageVersion(ctx, r.client, &resp.Diagnostics, plan.ImageDefinition.ValueString(), imageVersion.GetId())
+	if imageVersionSpecsChanged(plan, state) {
+		err = setImageVersion(ctx, r.client, &resp.Diagnostics, plan, updateTimeout)
+	} else {
+		err = updateImageVersionDescription(ctx, r.client, &resp.Diagnostics, plan)
+	}
 	if err != nil {
 		return
+	}
+
+	if !resp.Diagnostics.HasError() {
+		updateImageVersionResourcePools(ctx, r.client, &resp.Diagnostics, plan, updateTimeout)
+	}
+
+	imageVersion, err := GetImageVersion(ctx, r.client, &resp.Diagnostics, plan.ImageDefinition.ValueString(), plan.Id.ValueString())
+	if err != nil {
+		return
+	}
+
+	if !resp.Diagnostics.HasError() && imageVersion.GetImageVersionStatus() != citrixorchestration.IMAGEVERSIONSTATUS_SUCCESS {
+		resp.Diagnostics.AddError(
+			"Error updating Image Version "+plan.Id.ValueString(),
+			"Image Version update finished with status: "+string(imageVersion.GetImageVersionStatus()),
+		)
 	}
 
 	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, imageVersion)
@@ -462,6 +430,33 @@ func (r *ImageVersionResource) ModifyPlan(ctx context.Context, req resource.Modi
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	if req.State.Raw.IsNull() {
+		return
+	}
+
+	var state ImageVersionModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if vsphereMasterImageChanged(ctx, &resp.Diagnostics, plan, state) {
+		vsphereImageSpecs := util.ObjectValueToTypedObject[VsphereImageSpecsModel](ctx, &resp.Diagnostics, plan.VsphereImageSpecs)
+		vsphereImageSpecs.DiskSize = types.Int32Unknown()
+		plan.VsphereImageSpecs = util.TypedObjectToObjectValue(ctx, &resp.Diagnostics, vsphereImageSpecs)
+		resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
+	}
+}
+
+func vsphereMasterImageChanged(ctx context.Context, diagnostics *diag.Diagnostics, plan ImageVersionModel, state ImageVersionModel) bool {
+	if plan.VsphereImageSpecs.IsNull() || plan.VsphereImageSpecs.IsUnknown() || state.VsphereImageSpecs.IsNull() {
+		return false
+	}
+
+	planSpecs := util.ObjectValueToTypedObject[VsphereImageSpecsModel](ctx, diagnostics, plan.VsphereImageSpecs)
+	stateSpecs := util.ObjectValueToTypedObject[VsphereImageSpecsModel](ctx, diagnostics, state.VsphereImageSpecs)
+	return !planSpecs.MasterImageVm.Equal(stateSpecs.MasterImageVm) || !planSpecs.ImageSnapshot.Equal(stateSpecs.ImageSnapshot)
 }
 
 func readImageVersion(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, resp *resource.ReadResponse, imageDefinitionId string, imageVersionId string) (*citrixorchestration.ImageVersionResponseModel, error) {
@@ -656,4 +651,52 @@ func updateImageVersionResourcePools(ctx context.Context, client *citrixdaasclie
 
 	//nolint:errcheck // Errors added to diagnostics, continue so resource gets marked as tainted
 	_ = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error sharing Image Version", diagnostics, updateTimeout)
+}
+
+func imageVersionSpecsChanged(plan ImageVersionModel, state ImageVersionModel) bool {
+	return !plan.AzureImageSpecs.Equal(state.AzureImageSpecs) ||
+		!plan.AwsEc2ImageSpecs.Equal(state.AwsEc2ImageSpecs) ||
+		!plan.VsphereImageSpecs.Equal(state.VsphereImageSpecs) ||
+		!plan.AmazonWorkspacesCoreImageSpecs.Equal(state.AmazonWorkspacesCoreImageSpecs) ||
+		!plan.NetworkMapping.Equal(state.NetworkMapping)
+}
+
+func setImageVersion(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, plan ImageVersionModel, updateTimeout int32) error {
+	setImageVersionRequestModel, err := buildCreateImageVersionRequestModel(ctx, client, diagnostics, plan, "updating")
+	if err != nil {
+		return err
+	}
+
+	setImageVersionRequest := client.ApiClient.ImageVersionsAPIsDAAS.ImageVersionsSetImageVersion(ctx, plan.Id.ValueString())
+	setImageVersionRequest = setImageVersionRequest.CreateImageVersionRequestModel(setImageVersionRequestModel).Async(true)
+	httpResp, err := citrixdaasclient.AddRequestData(setImageVersionRequest, client).Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error updating Image Version "+plan.Id.ValueString(),
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+		return err
+	}
+
+	//nolint:errcheck // Errors added to diagnostics, continue so state reflects the image version after a failed job
+	_ = util.ProcessAsyncJobResponse(ctx, client, httpResp, "Error updating Image Version "+plan.Id.ValueString(), diagnostics, updateTimeout)
+	return nil
+}
+
+func updateImageVersionDescription(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, plan ImageVersionModel) error {
+	updateImageVersionRequestModel := citrixorchestration.UpdateImageVersionRequestModel{}
+	updateImageVersionRequestModel.SetDescription(plan.Description.ValueString())
+	updateImageVersionRequest := client.ApiClient.ImageVersionsAPIsDAAS.ImageVersionsUpdateImageVersion(ctx, plan.Id.ValueString())
+	updateImageVersionRequest = updateImageVersionRequest.UpdateImageVersionRequestModel(updateImageVersionRequestModel)
+
+	_, httpResp, err := citrixdaasclient.AddRequestData(updateImageVersionRequest, client).Execute()
+	if err != nil {
+		diagnostics.AddError(
+			"Error updating Image Version "+plan.Id.ValueString(),
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				"\nError message: "+util.ReadClientError(err),
+		)
+	}
+	return err
 }

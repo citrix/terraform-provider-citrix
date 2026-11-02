@@ -26,7 +26,13 @@ lint: custom-gcl # custom GolangCi-Linter build containing our custom linter mod
 	cd custom-linters && $(CUSTOM_GCL) run --allow-parallel-runners ./... # lint the custom linters
 	./custom-linters/$(CUSTOM_GCL) run --allow-parallel-runners ./...
 
-custom-gcl:
+custom-gcl: custom-linters/$(CUSTOM_GCL)
+
+# Rebuilding takes minutes and invalidates the lint cache, so only rebuild when the custom linters change
+CUSTOM_GCL_SRC := .custom-gcl.yml custom-linters/go.mod custom-linters/go.sum \
+	$(wildcard custom-linters/*.go custom-linters/*/*.go custom-linters/*/*/*.go)
+
+custom-linters/$(CUSTOM_GCL): $(CUSTOM_GCL_SRC)
 	@golangci-lint custom
 
 lint-fix:

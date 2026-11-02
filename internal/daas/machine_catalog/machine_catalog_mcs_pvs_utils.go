@@ -378,8 +378,7 @@ func setProvSchemePropertiesForCreateCatalog(ctx context.Context, client *citrix
 		snapshot := gcpMachineConfig.MachineSnapshot.ValueString()
 		imageVm := gcpMachineConfig.MasterImage.ValueString()
 		if snapshot != "" {
-			queryPath := fmt.Sprintf("%s.vm", imageVm)
-			imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, snapshot, util.SnapshotResourceType, "")
+			imagePath, httpResp, err = getGcpSnapshotPath(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), imageVm, snapshot)
 			if err != nil {
 				diag.AddError(
 					"Error creating Machine Catalog",
@@ -1419,8 +1418,7 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 		gcpMachineProfile := gcpMachineConfig.MachineProfile.ValueString()
 
 		if snapshot != "" {
-			queryPath := fmt.Sprintf("%s.vm", newImage)
-			imagePath, httpResp, err = util.GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), queryPath, snapshot, util.SnapshotResourceType, "")
+			imagePath, httpResp, err = getGcpSnapshotPath(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), newImage, snapshot)
 			if err != nil {
 				resp.Diagnostics.AddError(
 					"Error updating Machine Catalog",
@@ -2084,6 +2082,18 @@ func parseCustomPropertiesToClientModel(ctx context.Context, diagnostics *diag.D
 	}
 
 	return *res, nil
+}
+
+// GCP lists a snapshot under its source VM or under the resource pool's snapshots folder.
+func getGcpSnapshotPath(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diags *diag.Diagnostics, hypervisorName, resourcePoolName, imageVm, snapshot string) (string, *http.Response, error) {
+	// The source VM folder may not exist, so its lookup failure must not surface as an error
+	vmFolderDiags := diag.Diagnostics{}
+	imagePath, httpResp, err := util.GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx, client, &vmFolderDiags, hypervisorName, resourcePoolName, fmt.Sprintf("%s.vm", imageVm), snapshot, util.SnapshotResourceType, "")
+	if err == nil {
+		return imagePath, httpResp, nil
+	}
+
+	return util.GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx, client, diags, hypervisorName, resourcePoolName, gcpSnapshotsFolder, snapshot, util.SnapshotResourceType, "")
 }
 
 func getOnPremImage(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diags *diag.Diagnostics, hypervisorName, resourcePoolName, image, snapshot, resourcePoolPath, action string) (*citrixorchestration.HypervisorResourceResponseModel, error) {
