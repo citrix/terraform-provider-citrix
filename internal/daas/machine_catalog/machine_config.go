@@ -379,8 +379,11 @@ func (GcpMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 		},
 		Attributes: map[string]schema.Attribute{
 			"master_image": schema.StringAttribute{
-				Description: "The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors.",
-				Required:    true,
+				Description: "The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors. Required unless `machine_snapshot` is set. When `machine_snapshot` is set, this is the source VM of the snapshot and may be omitted if the snapshot is listed in the resource pool's snapshots folder.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.AtLeastOneOf(path.MatchRelative().AtParent().AtName("machine_snapshot")),
+				},
 			},
 			"master_image_note": schema.StringAttribute{
 				Description: "The note for the master image.",

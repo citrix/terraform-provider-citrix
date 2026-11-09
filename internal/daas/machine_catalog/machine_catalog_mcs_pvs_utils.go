@@ -2086,11 +2086,13 @@ func parseCustomPropertiesToClientModel(ctx context.Context, diagnostics *diag.D
 
 // GCP lists a snapshot under its source VM or under the resource pool's snapshots folder.
 func getGcpSnapshotPath(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diags *diag.Diagnostics, hypervisorName, resourcePoolName, imageVm, snapshot string) (string, *http.Response, error) {
-	// The source VM folder may not exist, so its lookup failure must not surface as an error
-	vmFolderDiags := diag.Diagnostics{}
-	imagePath, httpResp, err := util.GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx, client, &vmFolderDiags, hypervisorName, resourcePoolName, fmt.Sprintf("%s.vm", imageVm), snapshot, util.SnapshotResourceType, "")
-	if err == nil {
-		return imagePath, httpResp, nil
+	if imageVm != "" {
+		// The source VM folder may not exist, so its lookup failure must not surface as an error
+		vmFolderDiags := diag.Diagnostics{}
+		imagePath, httpResp, err := util.GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx, client, &vmFolderDiags, hypervisorName, resourcePoolName, fmt.Sprintf("%s.vm", imageVm), snapshot, util.SnapshotResourceType, "")
+		if err == nil {
+			return imagePath, httpResp, nil
+		}
 	}
 
 	return util.GetSingleResourcePathFromHypervisorWithNoCacheRetry(ctx, client, diags, hypervisorName, resourcePoolName, gcpSnapshotsFolder, snapshot, util.SnapshotResourceType, "")

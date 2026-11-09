@@ -167,8 +167,11 @@ func TestGcpMachineConfigRequiresReplace(t *testing.T) {
 	}
 }
 
-func mockResourcePoolLookup(mockHypervisorsAPI *citrixorchestration.MockHypervisorsAPIsDAAS, mockJobsAPI *citrixorchestration.MockJobsAPIsDAAS, job *citrixorchestration.JobResponseModel, results string) {
-	mockHypervisorsAPI.On("HypervisorsGetHypervisorResourcePoolResourcesExecute", mock.Anything).Return((*citrixorchestration.HypervisorResourceResponseModel)(nil), testutil.MockAsyncResponse(job.GetId(), "txn-"+job.GetId()), nil).Once()
+func mockResourcePoolLookup(mockHypervisorsAPI *citrixorchestration.MockHypervisorsAPIsDAAS, mockJobsAPI *citrixorchestration.MockJobsAPIsDAAS, folderPath string, job *citrixorchestration.JobResponseModel, results string) {
+	mockHypervisorsAPI.On("HypervisorsGetHypervisorResourcePoolResourcesExecute", mock.MatchedBy(func(r citrixorchestration.ApiHypervisorsGetHypervisorResourcePoolResourcesRequest) bool {
+		path := citrixorchestration.MockApiHypervisorsGetHypervisorResourcePoolResourcesRequest{ApiHypervisorsGetHypervisorResourcePoolResourcesRequest: r}.GetPath()
+		return path != nil && *path == folderPath
+	})).Return((*citrixorchestration.HypervisorResourceResponseModel)(nil), testutil.MockAsyncResponse(job.GetId(), "txn-"+job.GetId()), nil).Once()
 	mockJobsAPI.On("JobsGetJobExecute", mock.Anything).Return(job, testutil.MockSuccessResponse(), nil).Once()
 	if job.GetStatus() == citrixorchestration.JOBSTATUS_COMPLETE {
 		mockJobsAPI.On("JobsGetJobResultsExecute", mock.Anything).Return(results, testutil.MockSuccessResponse(), nil).Once()
@@ -187,33 +190,44 @@ func TestGetGcpSnapshotPath(t *testing.T) {
 
 	tests := []struct { // uses Table-driven-tests pattern https://go.dev/wiki/TableDrivenTests
 		name          string
+		imageVm       string
 		setupMocks    func(*citrixorchestration.MockHypervisorsAPIsDAAS, *citrixorchestration.MockJobsAPIsDAAS)
 		expectedPath  string
 		errorContains string
 	}{
 		{
-			name: "snapshot under the source VM",
+			name: "snapshot without a source VM only searches the snapshots folder",
 			setupMocks: func(mockHypervisorsAPI *citrixorchestration.MockHypervisorsAPIsDAAS, mockJobsAPI *citrixorchestration.MockJobsAPIsDAAS) {
-				mockResourcePoolLookup(mockHypervisorsAPI, mockJobsAPI, testutil.MockCompletedJob("job-vm", citrixorchestration.JOBTYPE_UNKNOWN), snapshotResult(vmFolderPath))
-			},
-			expectedPath: vmFolderPath,
-		},
-		{
-			name: "snapshot under the snapshots folder",
-			setupMocks: func(mockHypervisorsAPI *citrixorchestration.MockHypervisorsAPIsDAAS, mockJobsAPI *citrixorchestration.MockJobsAPIsDAAS) {
-				mockResourcePoolLookup(mockHypervisorsAPI, mockJobsAPI, missingVmFolder, "")
-				mockResourcePoolLookup(mockHypervisorsAPI, mockJobsAPI, missingVmFolder, "")
-				mockResourcePoolLookup(mockHypervisorsAPI, mockJobsAPI, testutil.MockCompletedJob("job-folder", citrixorchestration.JOBTYPE_UNKNOWN), snapshotResult(snapshotsFolderPath))
+				mockResourcePoolLookup(mockHypervisorsAPI, mockJobsAPI, gcpSnapshotsFolder, testutil.MockCompletedJob("job-folder", citrixorchestration.JOBTYPE_UNKNOWN), snapshotResult(snapshotsFolderPath))
 			},
 			expectedPath: snapshotsFolderPath,
 		},
 		{
-			name: "snapshot in neither location",
+			name:    "snapshot under the source VM",
+			imageVm: "vm-1",
 			setupMocks: func(mockHypervisorsAPI *citrixorchestration.MockHypervisorsAPIsDAAS, mockJobsAPI *citrixorchestration.MockJobsAPIsDAAS) {
-				mockResourcePoolLookup(mockHypervisorsAPI, mockJobsAPI, missingVmFolder, "")
-				mockResourcePoolLookup(mockHypervisorsAPI, mockJobsAPI, missingVmFolder, "")
-				mockResourcePoolLookup(mockHypervisorsAPI, mockJobsAPI, testutil.MockCompletedJob("job-folder", citrixorchestration.JOBTYPE_UNKNOWN), `{"Children":[]}`)
-				mockResourcePoolLookup(mockHypervisorsAPI, mockJobsAPI, testutil.MockCompletedJob("job-folder", citrixorchestration.JOBTYPE_UNKNOWN), `{"Children":[]}`)
+				mockResourcePoolLookup(mockHypervisorsAPI, mockJobsAPI, "vm-1.vm", testutil.MockCompletedJob("job-vm", citrixorchestration.JOBTYPE_UNKNOWN), snapshotResult(vmFolderPath))
+			},
+			expectedPath: vmFolderPath,
+		},
+		{
+			name:    "snapshot under the snapshots folder",
+			imageVm: "vm-1",
+			setupMocks: func(mockHypervisorsAPI *citrixorchestration.MockHypervisorsAPIsDAAS, mockJobsAPI *citrixorchestration.MockJobsAPIsDAAS) {
+				mockResourcePoolLookup(mockHypervisorsAPI, mockJobsAPI, "vm-1.vm", missingVmFolder, "")
+				mockResourcePoolLookup(mockHypervisorsAPI, mockJobsAPI, "vm-1.vm", missingVmFolder, "")
+				mockResourcePoolLookup(mockHypervisorsAPI, mockJobsAPI, gcpSnapshotsFolder, testutil.MockCompletedJob("job-folder", citrixorchestration.JOBTYPE_UNKNOWN), snapshotResult(snapshotsFolderPath))
+			},
+			expectedPath: snapshotsFolderPath,
+		},
+		{
+			name:    "snapshot in neither location",
+			imageVm: "vm-1",
+			setupMocks: func(mockHypervisorsAPI *citrixorchestration.MockHypervisorsAPIsDAAS, mockJobsAPI *citrixorchestration.MockJobsAPIsDAAS) {
+				mockResourcePoolLookup(mockHypervisorsAPI, mockJobsAPI, "vm-1.vm", missingVmFolder, "")
+				mockResourcePoolLookup(mockHypervisorsAPI, mockJobsAPI, "vm-1.vm", missingVmFolder, "")
+				mockResourcePoolLookup(mockHypervisorsAPI, mockJobsAPI, gcpSnapshotsFolder, testutil.MockCompletedJob("job-folder", citrixorchestration.JOBTYPE_UNKNOWN), `{"Children":[]}`)
+				mockResourcePoolLookup(mockHypervisorsAPI, mockJobsAPI, gcpSnapshotsFolder, testutil.MockCompletedJob("job-folder", citrixorchestration.JOBTYPE_UNKNOWN), `{"Children":[]}`)
 			},
 			errorContains: "could not find resource",
 		},
@@ -226,7 +240,7 @@ func TestGetGcpSnapshotPath(t *testing.T) {
 			testCase.setupMocks(citrixorchestration.GetMockHypervisorsAPIsDAAS(mockClient.APIClient), citrixorchestration.GetMockJobsAPIsDAAS(mockClient.APIClient))
 			diagnostics := diag.Diagnostics{}
 
-			imagePath, _, err := getGcpSnapshotPath(test.DaaSTestContext(), client, &diagnostics, "gcp-hyp", "vpc-net1", "vm-1", "snap-1")
+			imagePath, _, err := getGcpSnapshotPath(test.DaaSTestContext(), client, &diagnostics, "gcp-hyp", "vpc-net1", testCase.imageVm, "snap-1")
 
 			if testCase.errorContains != "" {
 				require.Error(t, err)

@@ -1222,7 +1222,6 @@ Required:
 
 Required:
 
-- `master_image` (String) The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors.
 - `storage_type` (String) Storage type used for provisioned virtual machine disks on GCP. Storage types include: `pd-standar`, `pd-balanced`, `pd-ssd` and `pd-extreme`.
 
 Optional:
@@ -1231,6 +1230,7 @@ Optional:
 - `image_update_reboot_options` (Attributes) The options for how rebooting is performed for image update. When omitted, image update on the VDAs will be performed on next shutdown. (see [below for nested schema](#nestedatt--provisioning_scheme--gcp_machine_config--image_update_reboot_options))
 - `machine_profile` (String) The name of the virtual machine template that will be used to identify the default value for the tags, virtual machine size, boot diagnostics, host cache property of OS disk, accelerated networking and availability zone. If not specified, the VM specified in master_image will be used as template.
 - `machine_snapshot` (String) The name of the virtual machine snapshot of a GCP VM that will be used as master image.
+- `master_image` (String) The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors. Required unless `machine_snapshot` is set. When `machine_snapshot` is set, this is the source VM of the snapshot and may be omitted if the snapshot is listed in the resource pool's snapshots folder.
 - `master_image_note` (String) The note for the master image.
 - `writeback_cache` (Attributes) Write-back Cache config. Leave this empty to disable Write-back Cache. (see [below for nested schema](#nestedatt--provisioning_scheme--gcp_machine_config--writeback_cache))
 
