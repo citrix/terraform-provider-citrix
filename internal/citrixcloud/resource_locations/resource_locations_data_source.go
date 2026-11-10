@@ -33,7 +33,7 @@ func (d *ResourceLocationsDataSource) Metadata(ctx context.Context, req datasour
 }
 
 func (d *ResourceLocationsDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
-	resp.Schema = ResourceLocationModel{}.GetDataSourceSchema()
+	resp.Schema = ResourceLocationDataSourceModel{}.GetSchema()
 }
 
 func (d *ResourceLocationsDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -53,7 +53,7 @@ func (d *ResourceLocationsDataSource) Read(ctx context.Context, req datasource.R
 		return
 	}
 
-	var data ResourceLocationModel
+	var data ResourceLocationDataSourceModel
 
 	// Read Terraform configuration data into the model
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
@@ -67,10 +67,11 @@ func (d *ResourceLocationsDataSource) Read(ctx context.Context, req datasource.R
 	resourceLocation, httpResp, err := citrixdaasclient.ExecuteWithRetry[*resourcelocations.CitrixCloudServicesRegistryApiModelsLocationsResourceLocationsResultsModel](getResourceLocationRequest, d.client)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Failed to get resource location."+err.Error(),
+			"Error reading resource locations",
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
 				"\nError message: "+util.ReadClientError(err),
 		)
+		return
 	}
 
 	var matchedResourceLocation *resourcelocations.CitrixCloudServicesRegistryApiModelsLocationsResourceLocationModel

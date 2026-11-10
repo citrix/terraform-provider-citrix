@@ -4,7 +4,7 @@ page_title: "citrix_cloud_resource_location Resource - citrix"
 subcategory: "Citrix Cloud"
 description: |-
   Manages a Citrix Cloud resource location.
-  ~> Please Note For Citrix Cloud Customer, DaaS Zone permissions are required to manage Citrix Cloud Resource Location.
+  ~> Please Note Resource locations only apply to Citrix Cloud customers. Citrix Cloud automatically creates a DaaS zone when the resource location is created, and automatically deletes the zone after the resource location is deleted. On-premises customers manage zones directly with citrix_zone.
   ~> Please Note A resource location cannot be deleted while it still contains Connectors. Set force_delete to true to have the provider remove those Connectors from Citrix Cloud when the resource location is deleted.
 ---
 
@@ -12,7 +12,7 @@ description: |-
 
 Manages a Citrix Cloud resource location.
 
-~> **Please Note** For Citrix Cloud Customer, DaaS Zone permissions are required to manage Citrix Cloud Resource Location.
+~> **Please Note** Resource locations only apply to Citrix Cloud customers. Citrix Cloud automatically creates a DaaS zone when the resource location is created, and automatically deletes the zone after the resource location is deleted. On-premises customers manage zones directly with `citrix_zone`.
 
 ~> **Please Note** A resource location cannot be deleted while it still contains Connectors. Set `force_delete` to `true` to have the provider remove those Connectors from Citrix Cloud when the resource location is deleted.
 

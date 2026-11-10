@@ -37,6 +37,7 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/daas/policy_resource"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/policy_set_resource"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/policy_setting"
+	"github.com/citrix/terraform-provider-citrix/internal/daas/resource_access_policy"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/service_account"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/site_backup_schedule"
 	"github.com/citrix/terraform-provider-citrix/internal/daas/storefront_server"
@@ -997,6 +998,7 @@ func (p *citrixProvider) DataSources(_ context.Context) []func() datasource.Data
 		cvad_site.NewSiteDataSource,
 		cvad_site.NewSiteSettingsDataSource,
 		tags.NewTagDataSource,
+		resource_access_policy.NewResourceAccessPolicyDataSource,
 		policies.NewPolicySetDataSource,
 		policy_set_resource.NewPolicySetV2DataSource,
 		policy_priority.NewPolicyPriorityDataSource,
@@ -1096,6 +1098,7 @@ func (p *citrixProvider) Resources(_ context.Context) []func() resource.Resource
 		resource_locations.NewResourceLocationResource,
 		cc_admin_user.NewCCAdminUserResource,
 		tags.NewTagResource,
+		resource_access_policy.NewResourceAccessPolicyResource,
 		image_definition.NewImageDefinitionResource,
 		image_definition.NewImageVersionResource,
 		service_account.NewServiceAccountResource,
