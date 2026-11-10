@@ -163,11 +163,10 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 				r.updateDeliveryGroupState(ctx, resp, plan, deliveryGroupId)
 				return
 			}
-			advancedAccessPolicyRequest.SetIncludedUserFilterEnabled(simpleAccessPolicy.GetIncludedUserFilterEnabled())
-			advancedAccessPolicyRequest.SetIncludedUsers(simpleAccessPolicy.GetIncludedUsers())
-			advancedAccessPolicyRequest.SetExcludedUserFilterEnabled(simpleAccessPolicy.GetExcludedUserFilterEnabled())
-			advancedAccessPolicyRequest.SetExcludedUsers(simpleAccessPolicy.GetExcludedUsers())
-			advancedAccessPolicyRequest.SetAllowedUsers(allowedUsers)
+			if err := applyAccessPolicyUserFilters(ctx, &resp.Diagnostics, r.client, &advancedAccessPolicyRequest, defaultAccessPolicy, simpleAccessPolicy, plan.AllowAnonymousAccess.ValueBool(), allowedUsers); err != nil {
+				r.updateDeliveryGroupState(ctx, resp, plan, deliveryGroupId)
+				return
+			}
 			advancedAccessPoliciesRequest = append(advancedAccessPoliciesRequest, advancedAccessPolicyRequest)
 		}
 
@@ -197,11 +196,10 @@ func (r *deliveryGroupResource) Create(ctx context.Context, req resource.CreateR
 				r.updateDeliveryGroupState(ctx, resp, plan, deliveryGroupId)
 				return
 			}
-			accessPolicyRequest.SetIncludedUserFilterEnabled(simpleAccessPolicy.GetIncludedUserFilterEnabled())
-			accessPolicyRequest.SetIncludedUsers(simpleAccessPolicy.GetIncludedUsers())
-			accessPolicyRequest.SetExcludedUserFilterEnabled(simpleAccessPolicy.GetExcludedUserFilterEnabled())
-			accessPolicyRequest.SetExcludedUsers(simpleAccessPolicy.GetExcludedUsers())
-			accessPolicyRequest.SetAllowedUsers(allowedUsers)
+			if err := applyAccessPolicyUserFilters(ctx, &resp.Diagnostics, r.client, &accessPolicyRequest, accessPolicy, simpleAccessPolicy, plan.AllowAnonymousAccess.ValueBool(), allowedUsers); err != nil {
+				r.updateDeliveryGroupState(ctx, resp, plan, deliveryGroupId)
+				return
+			}
 			advancedAccessPoliciesRequest = append(advancedAccessPoliciesRequest, accessPolicyRequest)
 		}
 
@@ -344,7 +342,7 @@ func (r *deliveryGroupResource) Read(ctx context.Context, req resource.ReadReque
 
 	tags := getDeliveryGroupTags(ctx, &resp.Diagnostics, r.client, deliveryGroupId)
 
-	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, deliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule, deliveryGroupAutoscalePlugins, tags)
+	state = state.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, deliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule, deliveryGroupAutoscalePlugins, tags, true)
 
 	// Set refreshed state
 	diags = resp.State.Set(ctx, &state)
@@ -476,7 +474,7 @@ func (r *deliveryGroupResource) Update(ctx context.Context, req resource.UpdateR
 
 	tags := getDeliveryGroupTags(ctx, &resp.Diagnostics, r.client, deliveryGroupId)
 
-	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, updatedDeliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule, deliveryGroupAutoscalePlugins, tags)
+	plan = plan.RefreshPropertyValues(ctx, &resp.Diagnostics, r.client, updatedDeliveryGroup, deliveryGroupDesktops, deliveryGroupPowerTimeSchemes, deliveryGroupMachines, deliveryGroupRebootSchedule, deliveryGroupAutoscalePlugins, tags, false)
 
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -626,6 +624,20 @@ func (r *deliveryGroupResource) ValidateConfig(ctx context.Context, req resource
 				}
 			}
 		}
+	}
+
+	if allAccessPoliciesShareConfiguredUsers(ctx, &resp.Diagnostics, data.DefaultAccessPolicies, data.CustomAccessPolicies) {
+		redundantAttribute := path.Root("default_access_policies")
+		if data.DefaultAccessPolicies.IsNull() || data.DefaultAccessPolicies.IsUnknown() {
+			redundantAttribute = path.Root("custom_access_policies")
+		}
+		resp.Diagnostics.AddAttributeError(
+			redundantAttribute,
+			"Conflicting Attribute Configuration",
+			"Every access policy sets the same restricted_access_users. A restriction that applies to every access policy belongs on the delivery group: remove restricted_access_users from the access policies and set it at the delivery group level instead. "+
+				"Set restricted_access_users on individual access policies only for contextual access, where at least one policy restricts access to a different set of users.",
+		)
+		return
 	}
 
 	if !data.AppProtection.IsNull() && !data.AppProtection.IsUnknown() {

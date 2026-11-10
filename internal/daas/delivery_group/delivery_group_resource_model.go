@@ -895,8 +895,8 @@ type DeliveryGroupAccessPolicyModel struct {
 	EnableCriteriaForIncludeConnections types.Bool   `tfsdk:"enable_criteria_for_include_connections"`
 	IncludeConnectionsCriteriaType      types.String `tfsdk:"include_connections_criteria_type"`
 	EnableCriteriaForExcludeConnections types.Bool   `tfsdk:"enable_criteria_for_exclude_connections"`
-	IncludeCriteriaFilters              types.List   `tfsdk:"include_criteria_filters"` //List[DeliveryGroupAccessPolicyCriteriaTagsModel]
-	ExcludeCriteriaFilters              types.List   `tfsdk:"exclude_criteria_filters"` //List[DeliveryGroupAccessPolicyCriteriaTagsModel]
+	IncludeCriteriaFilters              types.List   `tfsdk:"include_criteria_filters"` //List[util.SmartAccessTagModel]
+	ExcludeCriteriaFilters              types.List   `tfsdk:"exclude_criteria_filters"` //List[util.SmartAccessTagModel]
 	RestrictedAccessUsers               types.Object `tfsdk:"restricted_access_users"`  // RestrictedAccessUsers; mutually exclusive with the DG-level restricted_access_users
 }
 
@@ -915,7 +915,8 @@ func (DeliveryGroupAccessPolicyModel) GetSchema() schema.NestedAttributeObject {
 	perPolicyUsersSchema.Description = "Restrict access via this access policy by specifying users and groups in the allow and block list. " +
 		"\n\n~> **Please Note** If omitted or set to `null`, the delivery group's `restricted_access_users` applies to this policy. " +
 		"If specified as an empty object `{}`, no user will have access via this policy." +
-		"\n\n~> **Please Note** Mutually exclusive with `restricted_access_users` at the delivery group level. Use one or the other, not both."
+		"\n\n~> **Please Note** Mutually exclusive with `restricted_access_users` at the delivery group level. Use one or the other, not both." +
+		"\n\n~> **Please Note** Use this for contextual access, where at least one access policy restricts access to a different set of users. A restriction that applies to every access policy must be set with `restricted_access_users` at the delivery group level instead."
 
 	return schema.NestedAttributeObject{
 		Attributes: map[string]schema.Attribute{
@@ -973,7 +974,7 @@ func (DeliveryGroupAccessPolicyModel) GetSchema() schema.NestedAttributeObject {
 			"include_criteria_filters": schema.ListNestedAttribute{
 				Description:  "The list of filters that meet the criteria for include connections.",
 				Optional:     true,
-				NestedObject: DeliveryGroupAccessPolicyCriteriaTagsModel{}.GetSchema(),
+				NestedObject: util.SmartAccessTagModel{}.GetSchema(),
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
 				},
@@ -985,7 +986,7 @@ func (DeliveryGroupAccessPolicyModel) GetSchema() schema.NestedAttributeObject {
 			"exclude_criteria_filters": schema.ListNestedAttribute{
 				Description:  "The list of filters that meet the criteria for exclude connections.",
 				Optional:     true,
-				NestedObject: DeliveryGroupAccessPolicyCriteriaTagsModel{}.GetSchema(),
+				NestedObject: util.SmartAccessTagModel{}.GetSchema(),
 				Validators: []validator.List{
 					listvalidator.SizeAtLeast(1),
 				},
@@ -997,36 +998,6 @@ func (DeliveryGroupAccessPolicyModel) GetSchema() schema.NestedAttributeObject {
 
 func (DeliveryGroupAccessPolicyModel) GetAttributes() map[string]schema.Attribute {
 	return DeliveryGroupAccessPolicyModel{}.GetSchema().Attributes
-}
-
-var _ util.RefreshableListItemWithAttributes[citrixorchestration.SmartAccessTagResponseModel] = DeliveryGroupAccessPolicyCriteriaTagsModel{}
-
-type DeliveryGroupAccessPolicyCriteriaTagsModel struct {
-	FilterName  types.String `tfsdk:"filter_name"`
-	FilterValue types.String `tfsdk:"filter_value"`
-}
-
-func (r DeliveryGroupAccessPolicyCriteriaTagsModel) GetKey() string {
-	return r.FilterName.ValueString() + r.FilterValue.ValueString()
-}
-
-func (DeliveryGroupAccessPolicyCriteriaTagsModel) GetSchema() schema.NestedAttributeObject {
-	return schema.NestedAttributeObject{
-		Attributes: map[string]schema.Attribute{
-			"filter_name": schema.StringAttribute{
-				Description: "The name of the filter.",
-				Required:    true,
-			},
-			"filter_value": schema.StringAttribute{
-				Description: "The value of the filter.",
-				Required:    true,
-			},
-		},
-	}
-}
-
-func (DeliveryGroupAccessPolicyCriteriaTagsModel) GetAttributes() map[string]schema.Attribute {
-	return DeliveryGroupAccessPolicyCriteriaTagsModel{}.GetSchema().Attributes
 }
 
 type DeliveryGroupAssignMachinesToUsersModel struct {
@@ -1515,7 +1486,7 @@ func (DeliveryGroupResourceModel) GetAttributes() map[string]schema.Attribute {
 	return DeliveryGroupResourceModel{}.GetSchema().Attributes
 }
 
-func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixclient.CitrixDaasClient, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, dgDesktops *citrixorchestration.DesktopResponseModelCollection, dgPowerTimeSchemes *citrixorchestration.PowerTimeSchemeResponseModelCollection, dgMachines []citrixorchestration.MachineResponseModel, dgRebootSchedule *citrixorchestration.RebootScheduleResponseModelCollection, deliveryGroupAutoscalePlugins *citrixorchestration.AutoscaleGroupPluginModelCollection, tags []string) DeliveryGroupResourceModel {
+func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixclient.CitrixDaasClient, deliveryGroup *citrixorchestration.DeliveryGroupDetailResponseModel, dgDesktops *citrixorchestration.DesktopResponseModelCollection, dgPowerTimeSchemes *citrixorchestration.PowerTimeSchemeResponseModelCollection, dgMachines []citrixorchestration.MachineResponseModel, dgRebootSchedule *citrixorchestration.RebootScheduleResponseModelCollection, deliveryGroupAutoscalePlugins *citrixorchestration.AutoscaleGroupPluginModelCollection, tags []string, isRead bool) DeliveryGroupResourceModel {
 	// Set required values
 	r.Id = types.StringValue(deliveryGroup.GetId())
 	r.Name = types.StringValue(deliveryGroup.GetName())
@@ -1560,7 +1531,7 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 		r.SharingKind = types.StringValue(string(deliveryGroup.GetSharingKind()))
 	}
 
-	r = r.updatePlanWithRestrictedAccessUsers(ctx, diagnostics, deliveryGroup)
+	r = r.updatePlanWithRestrictedAccessUsers(ctx, diagnostics, deliveryGroup, isRead)
 	r = r.updatePlanWithDesktops(ctx, diagnostics, dgDesktops)
 	r = r.updatePlanWithAssociatedCatalogs(ctx, diagnostics, dgMachines)
 	r = r.updatePlanWithAutoscaleSettings(ctx, diagnostics, client, deliveryGroup, dgPowerTimeSchemes)
@@ -1580,6 +1551,12 @@ func (r DeliveryGroupResourceModel) RefreshPropertyValues(ctx context.Context, d
 	}
 	r = r.updatePlanWithDefaultAccessPolicies(ctx, diagnostics, defaultAccessPolicies)
 	r = r.updatePlanWithCustomAccessPolicies(ctx, diagnostics, customAccessPolicies)
+
+	if isRead {
+		// The access policies are the source of truth for where the users live. Only a read may act
+		// on that; during an apply the configuration decides the shape.
+		r = r.alignRestrictedAccessUsersWithPolicies(ctx, diagnostics, deliveryGroup)
+	}
 
 	if len(deliveryGroup.GetStoreFrontServersForHostedReceiver()) > 0 || !r.StoreFrontServers.IsNull() {
 		var remoteAssociatedStoreFrontServers []string

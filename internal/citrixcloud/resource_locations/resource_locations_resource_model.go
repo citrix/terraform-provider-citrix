@@ -26,7 +26,8 @@ func (ResourceLocationModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		// This description is used by the documentation generator and the language server.
 		Description: "Citrix Cloud --- Manages a Citrix Cloud resource location." +
-			"\n\n~> **Please Note** For Citrix Cloud Customer, DaaS Zone permissions are required to manage Citrix Cloud Resource Location." +
+			"\n\n~> **Please Note** Resource locations only apply to Citrix Cloud customers. Citrix Cloud automatically creates a DaaS zone when the resource location is created, and automatically deletes the zone after the resource location is deleted. " +
+			"On-premises customers manage zones directly with `citrix_zone`." +
 			"\n\n~> **Please Note** A resource location cannot be deleted while it still contains Connectors. Set `force_delete` to `true` to have the provider remove those Connectors from Citrix Cloud when the resource location is deleted.",
 
 		Attributes: map[string]schema.Attribute{

@@ -4,12 +4,15 @@ page_title: "citrix_zone Resource - citrix"
 subcategory: "CVAD"
 description: |-
   Manages a zone.
+  ~> Please Note For Citrix Cloud customers, Citrix Cloud automatically creates the zone when its resource location is created, and automatically deletes it after the resource location is deleted. This resource adopts the existing zone and manages its description and metadata. For on-premises customers there is no resource location, and this resource creates and deletes the zone directly.
   ~> Please Note For Citrix Cloud Customer, Citrix Cloud Resource Location permissions are required to manage DaaS Zones.
 ---
 
 # citrix_zone (Resource)
 
 Manages a zone. 
+
+~> **Please Note** For Citrix Cloud customers, Citrix Cloud automatically creates the zone when its resource location is created, and automatically deletes it after the resource location is deleted. This resource adopts the existing zone and manages its description and metadata. For on-premises customers there is no resource location, and this resource creates and deletes the zone directly.
 
 ~> **Please Note** For Citrix Cloud Customer, Citrix Cloud Resource Location permissions are required to manage DaaS Zones.
 

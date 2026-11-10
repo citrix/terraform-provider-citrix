@@ -419,7 +419,7 @@ func (AzureImageSpecsModel) GetSchema() schema.SingleNestedAttribute {
 			"gallery_image": galleryImageSchema,
 		},
 		PlanModifiers: []planmodifier.Object{
-			objectplanmodifier.RequiresReplace(),
+			ImageSpecsRequiresReplaceIfAddedOrRemoved("azure_image_specs"),
 		},
 		Validators: []validator.Object{
 			objectvalidator.ExactlyOneOf(
@@ -429,6 +429,17 @@ func (AzureImageSpecsModel) GetSchema() schema.SingleNestedAttribute {
 			),
 		},
 	}
+}
+
+func ImageSpecsRequiresReplaceIfAddedOrRemoved(attributeName string) planmodifier.Object {
+	description := fmt.Sprintf("Force replace when `%s` is added or removed. Other changes update the existing image version.", attributeName)
+	return objectplanmodifier.RequiresReplaceIf(
+		func(_ context.Context, req planmodifier.ObjectRequest, resp *objectplanmodifier.RequiresReplaceIfFuncResponse) {
+			resp.RequiresReplace = req.ConfigValue.IsNull() != req.StateValue.IsNull()
+		},
+		description,
+		description,
+	)
 }
 
 func (AzureImageSpecsModel) GetAttributes() map[string]schema.Attribute {

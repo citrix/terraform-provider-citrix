@@ -30,6 +30,8 @@ type ZoneResourceModel struct {
 func (ZoneResourceModel) GetSchema() schema.Schema {
 	return schema.Schema{
 		Description: "CVAD --- Manages a zone. " +
+			"\n\n~> **Please Note** For Citrix Cloud customers, Citrix Cloud automatically creates the zone when its resource location is created, and automatically deletes it after the resource location is deleted. " +
+			"This resource adopts the existing zone and manages its description and metadata. For on-premises customers there is no resource location, and this resource creates and deletes the zone directly." +
 			"\n\n~> **Please Note** For Citrix Cloud Customer, Citrix Cloud Resource Location permissions are required to manage DaaS Zones.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{

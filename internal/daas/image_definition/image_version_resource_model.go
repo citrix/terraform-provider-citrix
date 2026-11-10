@@ -19,7 +19,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int32planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -67,7 +66,7 @@ func (AwsEc2ImageSpecsModel) GetSchema() schema.SingleNestedAttribute {
 			"machine_profile": machineProfileSchema,
 		},
 		PlanModifiers: []planmodifier.Object{
-			objectplanmodifier.RequiresReplace(),
+			util.ImageSpecsRequiresReplaceIfAddedOrRemoved("aws_ec2_image_specs"),
 		},
 	}
 }
@@ -146,7 +145,7 @@ func (VsphereImageSpecsModel) GetSchema() schema.SingleNestedAttribute {
 			},
 		},
 		PlanModifiers: []planmodifier.Object{
-			objectplanmodifier.RequiresReplace(),
+			util.ImageSpecsRequiresReplaceIfAddedOrRemoved("vsphere_image_specs"),
 		},
 	}
 }
@@ -182,7 +181,7 @@ func (AmazonWorkspacesCoreImageSpecsModel) GetSchema() schema.SingleNestedAttrib
 			"machine_profile": util.AmazonWorkspacesCoreMachineProfileModel{}.GetSchema(),
 		},
 		PlanModifiers: []planmodifier.Object{
-			objectplanmodifier.RequiresReplace(),
+			util.ImageSpecsRequiresReplaceIfAddedOrRemoved("amazon_workspaces_core_image_specs"),
 		},
 	}
 }
@@ -447,7 +446,7 @@ func (r ImageVersionModel) RefreshPropertyValues(ctx context.Context, diagnostic
 		awsEc2ImageSpecs.AmiId = types.StringValue(strings.TrimSuffix((strings.Split(masterImage.GetName(), " (")[1]), ")"))
 
 		updatedMachineProfile := refreshAwsEc2ImageVersionMachineProfile(ctx, diagnostics, true, imageScheme)
-		if updatedMachineProfile.IsNull() {
+		if !updatedMachineProfile.IsNull() {
 			awsEc2ImageSpecs.MachineProfile = updatedMachineProfile
 		}
 

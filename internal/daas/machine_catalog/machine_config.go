@@ -352,6 +352,8 @@ func (AwsMachineConfigModel) GetAttributes() map[string]schema.Attribute {
 	return AwsMachineConfigModel{}.GetSchema().Attributes
 }
 
+const gcpSnapshotsFolder = "snapshots.folder"
+
 type GcpMachineConfigModel struct {
 	MasterImage              types.String `tfsdk:"master_image"`
 	MasterImageNote          types.String `tfsdk:"master_image_note"`
@@ -369,12 +371,19 @@ func (GcpMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 		Description: "Machine Configuration For GCP MCS catalog.",
 		Optional:    true,
 		PlanModifiers: []planmodifier.Object{
-			objectplanmodifier.RequiresReplace(),
+			objectplanmodifier.RequiresReplaceIf(
+				gcpMachineConfigRequiresReplace,
+				"Changing the GCP machine configuration forces replacement, except when setting a master image that state does not know yet.",
+				"Changing the GCP machine configuration forces replacement, except when setting a master image that state does not know yet.",
+			),
 		},
 		Attributes: map[string]schema.Attribute{
 			"master_image": schema.StringAttribute{
-				Description: "The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors.",
-				Required:    true,
+				Description: "The name of the virtual machine snapshot or VM template that will be used. This identifies the hard disk to be used and the default values for the memory and processors. Required unless `machine_snapshot` is set. When `machine_snapshot` is set, this is the source VM of the snapshot and may be omitted if the snapshot is listed in the resource pool's snapshots folder.",
+				Optional:    true,
+				Validators: []validator.String{
+					stringvalidator.AtLeastOneOf(path.MatchRelative().AtParent().AtName("machine_snapshot")),
+				},
 			},
 			"master_image_note": schema.StringAttribute{
 				Description: "The note for the master image.",
@@ -414,6 +423,19 @@ func (GcpMachineConfigModel) GetSchema() schema.SingleNestedAttribute {
 
 func (GcpMachineConfigModel) GetAttributes() map[string]schema.Attribute {
 	return GcpMachineConfigModel{}.GetSchema().Attributes
+}
+
+// A catalog imported from a snapshot under snapshots.folder has no master image in state because the XDPath does not
+// identify the source VM. Earlier versions stored the folder name instead. Adopting the configured master image is not
+// a change to the catalog.
+func gcpMachineConfigRequiresReplace(ctx context.Context, req planmodifier.ObjectRequest, resp *objectplanmodifier.RequiresReplaceIfFuncResponse) {
+	state := util.ObjectValueToTypedObject[GcpMachineConfigModel](ctx, &resp.Diagnostics, req.StateValue)
+	stateImage := state.MasterImage.ValueString()
+	if (stateImage == "" || strings.EqualFold(stateImage, gcpSnapshotsFolder)) && state.MachineSnapshot.ValueString() != "" {
+		plan := util.ObjectValueToTypedObject[GcpMachineConfigModel](ctx, &resp.Diagnostics, req.PlanValue)
+		state.MasterImage = plan.MasterImage
+	}
+	resp.RequiresReplace = !util.TypedObjectToObjectValue(ctx, &resp.Diagnostics, state).Equal(req.PlanValue)
 }
 
 type VsphereMachineConfigModel struct {
@@ -1886,8 +1908,9 @@ func (mc *GcpMachineConfigModel) RefreshProperties(ctx context.Context, diagnost
 	provScheme := catalog.GetProvisioningScheme()
 
 	// Refresh Master Image
-	/* For GCP snapshot image, the XDPath looks like:
+	/* For GCP snapshot image, the XDPath looks like either:
 	 * XDHyp:\\HostingUnits\\{resource pool}\\{VM name}.vm\\{VM snapshot name}.snapshot
+	 * XDHyp:\\HostingUnits\\{resource pool}\\snapshots.folder\\{VM snapshot name}.snapshot
 	 * The Name property in MasterImage will be VM snapshot name instead of VM name
 	 */
 	masterImage := provScheme.GetMasterImage()
@@ -1899,7 +1922,11 @@ func (mc *GcpMachineConfigModel) RefreshProperties(ctx context.Context, diagnost
 		if lastIndex > 4 {
 			// If path slices are more than 4, that means a snapshot was used for the catalog
 			mc.MachineSnapshot = types.StringValue(masterImage.GetName())
-			mc.MasterImage = types.StringValue(strings.TrimSuffix(segments[lastIndex-2], ".snapshot"))
+			// The snapshots folder does not identify the source VM, so keep the configured master image
+			if parent := segments[lastIndex-2]; !strings.EqualFold(parent, gcpSnapshotsFolder) {
+				// Extract {VM name} from {VM name}.vm
+				mc.MasterImage = types.StringValue(strings.TrimSuffix(parent, ".vm"))
+			}
 		} else {
 			// If path slices equals to 4, that means a VM was used for the catalog
 			mc.MasterImage = types.StringValue(masterImage.GetName())
