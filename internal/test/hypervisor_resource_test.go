@@ -390,6 +390,62 @@ func TestHypervisorResourceNutanix(t *testing.T) {
 	})
 }
 
+func TestHypervisorPreCheck_NutanixPC(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
+	for _, v := range []string{
+		"TEST_ZONE_INPUT_NUTANIX_PC",
+		"TEST_HYPERV_NAME_NUTANIX_PC",
+		"TEST_HYPERV_USERNAME_NUTANIX_PC",
+		"TEST_HYPERV_PASSWORD_PLAINTEXT_NUTANIX_PC",
+		"TEST_HYPERV_ADDRESS_NUTANIX_PC",
+		"TEST_HYPERV_SSL_THUMBPRINT_NUTANIX_PC",
+	} {
+		if os.Getenv(v) == "" {
+			t.Fatal(v + " must be set for acceptance tests")
+		}
+	}
+}
+
+func TestHypervisorResourceNutanixPC(t *testing.T) {
+	name := os.Getenv("TEST_HYPERV_NAME_NUTANIX_PC")
+	username := os.Getenv("TEST_HYPERV_USERNAME_NUTANIX_PC")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_NUTANIX_PC")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck: func() {
+			TestProviderPreCheck(t)
+			TestHypervisorPreCheck_NutanixPC(t)
+		},
+		Steps: []resource.TestStep{
+			{
+				Config: composeTestResourceTf(BuildHypervisorResourceNutanixPC(t, hypervisor_testResources_nutanix_pc), BuildZoneResource(t, zoneInput, false)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("citrix_nutanix_pc_hypervisor.testHypervisor", "name", name),
+					resource.TestCheckResourceAttr("citrix_nutanix_pc_hypervisor.testHypervisor", "username", username),
+					resource.TestCheckResourceAttr("citrix_nutanix_pc_hypervisor.testHypervisor", "addresses.#", "1"),
+					resource.TestCheckResourceAttr("citrix_nutanix_pc_hypervisor.testHypervisor", "ssl_thumbprints.#", "1"),
+				),
+			},
+			{
+				ResourceName:            "citrix_nutanix_pc_hypervisor.testHypervisor",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"password", "password_format"},
+			},
+			{
+				Config: composeTestResourceTf(BuildHypervisorResourceNutanixPC(t, hypervisor_testResources_updated_nutanix_pc), BuildZoneResource(t, zoneInput, false)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("citrix_nutanix_pc_hypervisor.testHypervisor", "name", fmt.Sprintf("%s-updated", name)),
+				),
+			},
+		},
+	})
+}
+
 func TestHypervisorPreCheck_SCVMM(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping acceptance test")
@@ -702,6 +758,41 @@ var (
 	`
 )
 
+// test resources for Nutanix Prism Central hypervisor
+var (
+	hypervisor_testResources_nutanix_pc = `
+	resource citrix_nutanix_pc_hypervisor "testHypervisor" {
+		name                = "%s"
+		zone                = %s
+		username = "%s"
+		password = "%s"
+		password_format = "PlainText"
+		addresses = [
+			"%s"
+		]
+		ssl_thumbprints = [
+			"%s"
+		]
+	}
+	`
+
+	hypervisor_testResources_updated_nutanix_pc = `
+	resource citrix_nutanix_pc_hypervisor "testHypervisor" {
+		name                = "%s-updated"
+		zone                = %s
+		username = "%s"
+		password = "%s"
+		password_format = "PlainText"
+		addresses = [
+			"%s"
+		]
+		ssl_thumbprints = [
+			"%s"
+		]
+	}
+	`
+)
+
 // test resources for SCVMM hypervisor
 var (
 	hypervisor_testResources_scvmm = `
@@ -803,6 +894,16 @@ func BuildHypervisorResourceNutanix(t *testing.T, hypervisor string) string {
 	address := os.Getenv("TEST_HYPERV_ADDRESS_NUTANIX")
 	zoneValueForHypervisor := "citrix_zone.test.id"
 	return fmt.Sprintf(hypervisor, name, zoneValueForHypervisor, username, password, address)
+}
+
+func BuildHypervisorResourceNutanixPC(t *testing.T, hypervisor string) string {
+	name := os.Getenv("TEST_HYPERV_NAME_NUTANIX_PC")
+	username := os.Getenv("TEST_HYPERV_USERNAME_NUTANIX_PC")
+	password := os.Getenv("TEST_HYPERV_PASSWORD_PLAINTEXT_NUTANIX_PC")
+	address := os.Getenv("TEST_HYPERV_ADDRESS_NUTANIX_PC")
+	sslThumbprint := os.Getenv("TEST_HYPERV_SSL_THUMBPRINT_NUTANIX_PC")
+	zoneValueForHypervisor := "citrix_zone.test.id"
+	return fmt.Sprintf(hypervisor, name, zoneValueForHypervisor, username, password, address, sslThumbprint)
 }
 
 func BuildHypervisorResourceSCVMM(t *testing.T, hypervisor string) string {

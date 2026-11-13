@@ -62,7 +62,8 @@ Each of the following examples creates a single multi-session domain joined VDA 
 * [Microsoft Azure](basic_azure_mcs_vda/)
   * If using an Azure image gallery, uncomment the `gallery_image` in [machine_catalogs.tf](basic_azure_mcs_vda/machine_catalogs.tf) and remove the VHD parameters.
 * [Google Cloud Compute](basic_gcp_mcs_vda/)
-* [Nutanix](basic_nutanix_mcs_vda/)
+* [Nutanix Prism Element](basic_nutanix_mcs_vda/)
+* [Nutanix Prism Central](basic_nutanix_pc_mcs_vda/)
 * [VMware vSphere](basic_vsphere_mcs_vda/)
 * [XenServer](basic_xenserver_mcs_vda/)
 

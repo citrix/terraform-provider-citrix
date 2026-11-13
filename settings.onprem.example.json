@@ -15,6 +15,7 @@
         // "TEST_ZONE_INPUT_VSPHERE": "test-zone",
         // "TEST_ZONE_INPUT_XENSERVER": "test-zone",
         // "TEST_ZONE_INPUT_NUTANIX": "test-zone",
+        "TEST_ZONE_INPUT_NUTANIX_PC": "{zone_name}",
         // "TEST_ZONE_INPUT_SCVMM": "test-zone",
         "TEST_ZONE_DESCRIPTION" :"test zone description",
         
@@ -50,6 +51,11 @@
         "TEST_HYPERV_USERNAME_NUTANIX": "{nutanix_hypervisor_user_name}",
         "TEST_HYPERV_PASSWORD_PLAINTEXT_NUTANIX": "{nutanix_hypervisor_password}",
         "TEST_HYPERV_ADDRESS_NUTANIX": "{nutanix_hypervisor_management_ip}",
+        "TEST_HYPERV_NAME_NUTANIX_PC": "{hypervisor_name}",
+        "TEST_HYPERV_USERNAME_NUTANIX_PC": "{nutanix_pc_user_name}",
+        "TEST_HYPERV_PASSWORD_PLAINTEXT_NUTANIX_PC": "{nutanix_pc_password}",
+        "TEST_HYPERV_ADDRESS_NUTANIX_PC": "{nutanix_pc_ip_without_scheme}",
+        "TEST_HYPERV_SSL_THUMBPRINT_NUTANIX_PC": "{nutanix_pc_ssl_thumbprint}",
 
         //Hypervisor Go Tests - SCVMM
         "TEST_HYPERV_NAME_SCVMM" : "{hypervisor_name}",
@@ -97,6 +103,7 @@
         // Hypervisor Resource Pool Nutanix Testing Env Variables
         "TEST_HYPERV_RP_NAME_NUTANIX"   : "{hypervisor_resource_pool_name}",
         "TEST_HYPERV_RP_NETWORK_NUTANIX": "{network_name}",
+        "TEST_HYPERV_RP_NAME_NUTANIX_PC": "{hypervisor_resource_pool_name}",
 
         // Hyeprvisor Resource Pool SCVMM Testing Env Variables
         "TEST_HYPERV_RP_NAME_SCVMM" : "{hypervisor_resource_pool_name}",
@@ -163,6 +170,24 @@
         "TEST_MC_MEMORY_MB_NUTANIX"           : "4096",
         "TEST_MC_CPU_COUNT_NUTANIX"           : "2",
         "TEST_MC_CORES_PER_CPU_COUNT_NUTANIX" : "2",
+        "TEST_MC_NAME_NUTANIX_PC"                 :"{catalog_name}",
+        "TEST_MC_SERVICE_ACCOUNT_NUTANIX_PC"      :"{admin_username}",
+        "TEST_MC_SERVICE_ACCOUNT_PASS_NUTANIX_PC" :"{admin_password}",
+        "TEST_MC_DOMAIN_NUTANIX_PC"               :"domain.local",
+        "TEST_MC_CLUSTER_NUTANIX_PC"              :"{prism_central_cluster_name}",
+        "TEST_MC_MASTER_IMAGE_NUTANIX_PC"         :"{template_name}",
+        "TEST_MC_MASTER_IMAGE_VERSION_NUTANIX_PC" :"{template_version_name}",
+        "TEST_MC_NETWORK_NUTANIX_PC"              :"{subnet_name}",
+        "TEST_MC_MEMORY_MB_NUTANIX_PC"            :"4096",
+        "TEST_MC_CPU_COUNT_NUTANIX_PC"            :"2",
+        "TEST_MC_CORES_PER_CPU_COUNT_NUTANIX_PC"  :"2",
+        "TEST_NUTANIX_PC_IMAGE_DEFINITION_NAME"                 : "{image_definition_name}",
+        "TEST_NUTANIX_PC_IMAGE_VERSION_CLUSTER"                 : "{prism_central_cluster_name}",
+        "TEST_NUTANIX_PC_IMAGE_VERSION_MASTER_IMAGE"            : "{template_name}",
+        "TEST_NUTANIX_PC_IMAGE_VERSION_MASTER_IMAGE_VERSION"    : "{template_version_name}",
+        "TEST_NUTANIX_PC_IMAGE_VERSION_MACHINE_PROFILE"         : "{machine_profile_template_name}",
+        "TEST_NUTANIX_PC_IMAGE_VERSION_MACHINE_PROFILE_VERSION" : "{machine_profile_template_version_name}",
+        "TEST_NUTANIX_PC_IMAGE_VERSION_NETWORK"                 : "{subnet_name}",
 
         // Machine Catalog Go Tests - XenServer
         "TEST_MC_NAME_XENSERVER"                    :"{catalog_name}",

@@ -96,6 +96,9 @@ const StoreFrontServerIdRegex string = `^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9
 // IPv4
 const IPv4Regex string = `^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$`
 
+// Host name or IP address with an optional port, and no scheme or path
+const HostWithOptionalPortRegex string = `^[^:/]+(:\d{1,5})?$`
+
 // IPv4 with https
 const IPv4RegexWithProtocol string = `^(http|https)://((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$`
 
@@ -242,6 +245,7 @@ const VirtualMachineResourceType string = "Vm"
 const TemplateResourceType string = "Template"
 const StorageResourceType string = "Storage"
 const NetworkResourceType string = "Network"
+const ClusterResourceType string = "Cluster"
 const NamespaceResourceType string = "Namespace"
 const SecurityGroupResourceType = "SecurityGroup"
 const HostResourceType = "Host"

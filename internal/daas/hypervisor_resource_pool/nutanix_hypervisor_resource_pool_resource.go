@@ -72,10 +72,10 @@ func (r *nutanixHypervisorResourcePoolResource) Create(ctx context.Context, req 
 
 	var resourcePoolDetails citrixorchestration.CreateHypervisorResourcePoolRequestModel
 	hypervisorConnectionType := hypervisor.GetConnectionType()
-	if hypervisorConnectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && hypervisor.GetPluginId() != util.NUTANIX_PLUGIN_ID {
+	if !isNutanixPrismElement(hypervisorConnectionType, hypervisor.GetPluginId()) {
 		resp.Diagnostics.AddError(
 			"Error creating Hypervisor Resource Pool for Nutanix",
-			"Unsupported hypervisor connection type.",
+			"Hypervisor "+hypervisor.GetName()+" is not a Nutanix AHV Prism Element hypervisor.",
 		)
 		return
 	}
@@ -174,11 +174,10 @@ func (r *nutanixHypervisorResourcePoolResource) Update(ctx context.Context, req 
 
 	resourcePoolId := plan.Id.ValueString()
 
-	hypervisorConnectionType := hypervisor.GetConnectionType()
-	if hypervisorConnectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && hypervisor.GetPluginId() != util.NUTANIX_PLUGIN_ID {
+	if !isNutanixPrismElement(hypervisor.GetConnectionType(), hypervisor.GetPluginId()) {
 		resp.Diagnostics.AddError(
 			"Error updating Resource Pool for Nutanix",
-			"Unsupported hypervisor connection type.",
+			"Hypervisor "+hypervisor.GetName()+" is not a Nutanix AHV Prism Element hypervisor.",
 		)
 		return
 	}
@@ -242,6 +241,18 @@ func (r *nutanixHypervisorResourcePoolResource) ImportState(ctx context.Context,
 			return
 		}
 
+		hypervisor, err := util.GetHypervisor(ctx, r.client, &resp.Diagnostics, idParts[0])
+		if err != nil {
+			return
+		}
+		if !isNutanixPrismElement(hypervisor.GetConnectionType(), hypervisor.GetPluginId()) {
+			resp.Diagnostics.AddError(
+				"Error importing Hypervisor Resource Pool",
+				"Hypervisor "+hypervisor.GetName()+" is not a Nutanix AHV Prism Element hypervisor.",
+			)
+			return
+		}
+
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("hypervisor"), idParts[0])...)
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), idParts[1])...)
 		return
@@ -260,7 +271,7 @@ func (r *nutanixHypervisorResourcePoolResource) ImportState(ctx context.Context,
 	}
 
 	for _, hypervisorAndResourcePool := range hypervisorAndResourcePools.GetItems() {
-		if hypervisorAndResourcePool.ConnectionType != citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && hypervisorAndResourcePool.GetPluginId() != util.NUTANIX_PLUGIN_ID {
+		if !isNutanixPrismElement(hypervisorAndResourcePool.GetConnectionType(), hypervisorAndResourcePool.GetPluginId()) {
 			continue
 		}
 
@@ -339,6 +350,10 @@ func (plan NutanixHypervisorResourcePoolResourceModel) GetNetworksList(ctx conte
 	}
 
 	return networks
+}
+
+func isNutanixPrismElement(connectionType citrixorchestration.HypervisorConnectionType, pluginId string) bool {
+	return connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_CUSTOM && pluginId == util.NUTANIX_PLUGIN_ID
 }
 
 func (r *nutanixHypervisorResourcePoolResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {

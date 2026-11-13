@@ -892,6 +892,84 @@ func TestMachineCatalogResourceNutanix(t *testing.T) {
 	})
 }
 
+func TestMachineCatalogPreCheck_NutanixPC(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
+	for _, v := range []string{
+		"TEST_MC_NAME_NUTANIX_PC",
+		"TEST_MC_SERVICE_ACCOUNT_NUTANIX_PC",
+		"TEST_MC_SERVICE_ACCOUNT_PASS_NUTANIX_PC",
+		"TEST_MC_DOMAIN_NUTANIX_PC",
+		"TEST_MC_CLUSTER_NUTANIX_PC",
+		"TEST_MC_MASTER_IMAGE_NUTANIX_PC",
+		"TEST_MC_MASTER_IMAGE_VERSION_NUTANIX_PC",
+		"TEST_MC_NETWORK_NUTANIX_PC",
+		"TEST_MC_MEMORY_MB_NUTANIX_PC",
+		"TEST_MC_CPU_COUNT_NUTANIX_PC",
+		"TEST_MC_CORES_PER_CPU_COUNT_NUTANIX_PC",
+	} {
+		if os.Getenv(v) == "" {
+			t.Fatal(v + " must be set for acceptance tests")
+		}
+	}
+}
+
+func TestMachineCatalogResourceNutanixPC(t *testing.T) {
+	name := os.Getenv("TEST_MC_NAME_NUTANIX_PC")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_NUTANIX_PC")
+	resourceName := "citrix_machine_catalog.testMachineCatalog"
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck: func() {
+			TestProviderPreCheck(t)
+			TestHypervisorPreCheck_NutanixPC(t)
+			TestHypervisorResourcePoolPreCheck_NutanixPC(t)
+			TestMachineCatalogPreCheck_NutanixPC(t)
+		},
+		Steps: []resource.TestStep{
+			{
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceNutanixPC(t, machine_catalog_testResources_nutanix_pc),
+					BuildHypervisorResourcePoolResourceNutanixPC(t, hypervisor_resource_pool_testResource_nutanix_pc),
+					BuildHypervisorResourceNutanixPC(t, hypervisor_testResources_nutanix_pc),
+					BuildZoneResource(t, zoneInput, false),
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "name", name),
+					resource.TestCheckResourceAttr(resourceName, "provisioning_scheme.nutanix_pc_machine_config.cluster", os.Getenv("TEST_MC_CLUSTER_NUTANIX_PC")),
+					resource.TestCheckResourceAttr(resourceName, "provisioning_scheme.nutanix_pc_machine_config.master_image", os.Getenv("TEST_MC_MASTER_IMAGE_NUTANIX_PC")),
+					resource.TestCheckResourceAttr(resourceName, "provisioning_scheme.nutanix_pc_machine_config.master_image_version", os.Getenv("TEST_MC_MASTER_IMAGE_VERSION_NUTANIX_PC")),
+					resource.TestCheckResourceAttr(resourceName, "provisioning_scheme.nutanix_pc_machine_config.cores_per_cpu_count", os.Getenv("TEST_MC_CORES_PER_CPU_COUNT_NUTANIX_PC")),
+					resource.TestCheckResourceAttr(resourceName, "provisioning_scheme.network_mapping.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "provisioning_scheme.number_of_total_machines", "1"),
+				),
+			},
+			{
+				ResourceName:            resourceName,
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"provisioning_scheme.machine_domain_identity.service_account", "provisioning_scheme.machine_domain_identity.service_account_password", "delete_machine_accounts", "force_delete"},
+			},
+			{
+				Config: composeTestResourceTf(
+					BuildMachineCatalogResourceNutanixPC(t, machine_catalog_testResources_nutanix_pc_updated),
+					BuildHypervisorResourcePoolResourceNutanixPC(t, hypervisor_resource_pool_testResource_nutanix_pc),
+					BuildHypervisorResourceNutanixPC(t, hypervisor_testResources_nutanix_pc),
+					BuildZoneResource(t, zoneInput, false),
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "description", "updatedCatalog"),
+					resource.TestCheckResourceAttr(resourceName, "provisioning_scheme.number_of_total_machines", "2"),
+					resource.TestCheckResourceAttr(resourceName, "provisioning_scheme.nutanix_pc_machine_config.cores_per_cpu_count", os.Getenv("TEST_MC_CORES_PER_CPU_COUNT_NUTANIX_PC")),
+				),
+			},
+		},
+	})
+}
+
 func TestMachineCatalogPreCheck_SCVMM(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping acceptance test")
@@ -2660,6 +2738,86 @@ resource "citrix_machine_catalog" "testMachineCatalog%s" {
 	}
 	`
 
+	machine_catalog_testResources_nutanix_pc = `
+	resource "citrix_machine_catalog" "testMachineCatalog" {
+		name                = "%s"
+		description         = "nutanix prism central catalog for acceptance testing"
+		provisioning_type   = "MCS"
+		allocation_type     = "Random"
+		session_support     = "MultiSession"
+		zone                = citrix_zone.test.id
+		provisioning_scheme = {
+			identity_type            = "ActiveDirectory"
+			number_of_total_machines = 1
+			machine_account_creation_rules = {
+				naming_scheme      = "test-pc-##"
+				naming_scheme_type = "Numeric"
+			}
+			hypervisor               = citrix_nutanix_pc_hypervisor.testHypervisor.id
+			hypervisor_resource_pool = citrix_nutanix_pc_hypervisor_resource_pool.testHypervisorResourcePool.id
+			nutanix_pc_machine_config = {
+				cluster              = "%s"
+				master_image         = "%s"
+				master_image_version = "%s"
+				memory_mb            = "%s"
+				cpu_count            = "%s"
+				cores_per_cpu_count  = "%s"
+			}
+			network_mapping = [
+				{
+					network_device = "0"
+					network        = "%s"
+				}
+			]
+			machine_domain_identity = {
+				service_account          = "%s"
+				domain                   = "%s"
+				service_account_password = "%s"
+			}
+		}
+	}
+	`
+
+	machine_catalog_testResources_nutanix_pc_updated = `
+	resource "citrix_machine_catalog" "testMachineCatalog" {
+		name                = "%s"
+		description         = "updatedCatalog"
+		provisioning_type   = "MCS"
+		allocation_type     = "Random"
+		session_support     = "MultiSession"
+		zone                = citrix_zone.test.id
+		provisioning_scheme = {
+			identity_type            = "ActiveDirectory"
+			number_of_total_machines = 2
+			machine_account_creation_rules = {
+				naming_scheme      = "test-pc-##"
+				naming_scheme_type = "Numeric"
+			}
+			hypervisor               = citrix_nutanix_pc_hypervisor.testHypervisor.id
+			hypervisor_resource_pool = citrix_nutanix_pc_hypervisor_resource_pool.testHypervisorResourcePool.id
+			nutanix_pc_machine_config = {
+				cluster              = "%s"
+				master_image         = "%s"
+				master_image_version = "%s"
+				memory_mb            = "%s"
+				cpu_count            = "%s"
+				cores_per_cpu_count  = "%s"
+			}
+			network_mapping = [
+				{
+					network_device = "0"
+					network        = "%s"
+				}
+			]
+			machine_domain_identity = {
+				service_account          = "%s"
+				domain                   = "%s"
+				service_account_password = "%s"
+			}
+		}
+	}
+	`
+
 	machinecatalog_testResources_aws_ec2 = `
 	resource "citrix_machine_catalog" "testMachineCatalog" {
 		name                        = "%s"
@@ -3208,6 +3366,22 @@ func BuildMachineCatalogResourceNutanix(t *testing.T, machineResource string) st
 	service_account_pass := os.Getenv("TEST_MC_SERVICE_ACCOUNT_PASS_NUTANIX")
 
 	return fmt.Sprintf(machineResource, name, container, master_image, memory_mb, cpu_count, cores_per_cpu_count, service_account, domain, service_account_pass)
+}
+
+func BuildMachineCatalogResourceNutanixPC(t *testing.T, machineResource string) string {
+	return fmt.Sprintf(machineResource,
+		os.Getenv("TEST_MC_NAME_NUTANIX_PC"),
+		os.Getenv("TEST_MC_CLUSTER_NUTANIX_PC"),
+		os.Getenv("TEST_MC_MASTER_IMAGE_NUTANIX_PC"),
+		os.Getenv("TEST_MC_MASTER_IMAGE_VERSION_NUTANIX_PC"),
+		os.Getenv("TEST_MC_MEMORY_MB_NUTANIX_PC"),
+		os.Getenv("TEST_MC_CPU_COUNT_NUTANIX_PC"),
+		os.Getenv("TEST_MC_CORES_PER_CPU_COUNT_NUTANIX_PC"),
+		os.Getenv("TEST_MC_NETWORK_NUTANIX_PC"),
+		os.Getenv("TEST_MC_SERVICE_ACCOUNT_NUTANIX_PC"),
+		os.Getenv("TEST_MC_DOMAIN_NUTANIX_PC"),
+		os.Getenv("TEST_MC_SERVICE_ACCOUNT_PASS_NUTANIX_PC"),
+	)
 }
 
 func BuildMachineCatalogResourceAwsEc2(t *testing.T, machineResource string) string {

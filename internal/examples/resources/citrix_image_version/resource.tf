@@ -103,3 +103,27 @@ resource "citrix_image_version" "example_workspaces_core_image_version" {
         }
 	}
 }
+resource "citrix_image_version" "example_nutanix_pc_image_version" {
+    image_definition         = citrix_image_definition.example_nutanix_pc_image_definition.id
+    hypervisor               = citrix_nutanix_pc_hypervisor.example-nutanix-pc-hypervisor.id
+    hypervisor_resource_pool = citrix_nutanix_pc_hypervisor_resource_pool.example-nutanix-pc-hypervisor-resource-pool.id
+    description              = "example Nutanix Prism Central image version description"
+
+    network_mapping = [
+        {
+            network_device = "0"
+            network        = "<Subnet name in the cluster>"
+        }
+    ]
+
+    nutanix_pc_image_specs = {
+        cluster                 = "<Prism Central cluster name>"
+        master_image            = "<Template name>"
+        master_image_version    = "<Template version name>"
+        machine_profile         = "<Template name>"
+        machine_profile_version = "<Template version name>"
+        cpu_count               = 2
+        cores_per_cpu_count     = 2
+        memory_mb               = 8192
+    }
+}

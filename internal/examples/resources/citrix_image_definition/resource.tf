@@ -38,3 +38,12 @@ resource "citrix_image_definition" "example_workspaces_core_image_definition" {
     hypervisor      = citrix_amazon_workspaces_core_hypervisor.example-amazon-workspaces-core-hypervisor-using-api-key.id
     hypervisor_resource_pool = citrix_amazon_workspaces_core_hypervisor_resource_pool.example-amazon-workspaces-core-hypervisor-resource-pool.id
 }
+
+resource "citrix_image_definition" "example_nutanix_pc_image_definition" {
+    name            = "Example Nutanix Prism Central Image Definition"
+    description     = "Example Nutanix Prism Central Image Definition Description"
+    os_type         = "Windows"
+    session_support = "MultiSession"
+    hypervisor      = citrix_nutanix_pc_hypervisor.example-nutanix-pc-hypervisor.id
+    hypervisor_resource_pool = citrix_nutanix_pc_hypervisor_resource_pool.example-nutanix-pc-hypervisor-resource-pool.id
+}

@@ -41,6 +41,8 @@ var MappedCustomProperties = map[string]string{
 	"SharedImageGalleryReplicaRatio":   "replica_ratio",
 	"SharedImageGalleryReplicaMaximum": "replica_maximum",
 	"UseEphemeralOsDisk":               "storage_type",
+	util.NutanixPCClusterIdKey:         "cluster",
+	util.NutanixPCCpuCoresKey:          "cores_per_cpu_count",
 }
 
 func getProvSchemeForCreateCatalog(plan MachineCatalogResourceModel, ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, isOnPremises bool, provisioningType *citrixorchestration.ProvisioningType) (*citrixorchestration.CreateMachineCatalogProvisioningSchemeRequestModel, error) {
@@ -122,6 +124,19 @@ func setProvSchemePropertiesForCreateCatalog(ctx context.Context, client *citrix
 			return nil, err
 		}
 		provisioningScheme.SetCustomProperties(customProperties)
+	}
+
+	isNutanixPC := hypervisor.GetConnectionType() == citrixorchestration.HYPERVISORCONNECTIONTYPE_NUTANIX_AHV_PC
+	if isNutanixPC == provisioningSchemePlan.NutanixPCMachineConfig.IsNull() {
+		diag.AddError(
+			"Error creating Machine Catalog",
+			nutanixPCMachineConfigMismatchMessage(hypervisor),
+		)
+		return nil, fmt.Errorf("nutanix_pc_machine_config does not match the hypervisor connection type")
+	}
+	var nutanixPCMachineConfig NutanixPCMachineConfigModel
+	if isNutanixPC {
+		nutanixPCMachineConfig = util.ObjectValueToTypedObject[NutanixPCMachineConfigModel](ctx, diag, provisioningSchemePlan.NutanixPCMachineConfig)
 	}
 
 	switch hypervisor.GetConnectionType() {
@@ -618,11 +633,60 @@ func setProvSchemePropertiesForCreateCatalog(ctx context.Context, client *citrix
 		customProperties := provisioningScheme.GetCustomProperties()
 		util.AppendNameValueStringPair(&customProperties, "NutanixContainerId", containerId)
 		provisioningScheme.SetCustomProperties(customProperties)
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_NUTANIX_AHV_PC:
+		cluster, httpResp, err := util.GetNutanixPCCluster(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), nutanixPCMachineConfig.Cluster.ValueString())
+		if err != nil {
+			diag.AddError(
+				"Error creating Machine Catalog",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					fmt.Sprintf("\nFailed to locate cluster %s on Nutanix Prism Central, error: %s", nutanixPCMachineConfig.Cluster.ValueString(), err.Error()),
+			)
+			return nil, err
+		}
+
+		if !nutanixPCMachineConfig.PreparedImage.IsNull() {
+			provisioningScheme.SetPrepareImage(true)
+			preparedImageConfig := util.ObjectValueToTypedObject[PreparedImageConfigModel](ctx, diag, nutanixPCMachineConfig.PreparedImage)
+
+			var assignImageVersionToProvScheme citrixorchestration.AssignImageVersionToProvisioningSchemeRequestModel
+			assignImageVersionToProvScheme.SetImageDefinition(preparedImageConfig.ImageDefinition.ValueString())
+			assignImageVersionToProvScheme.SetImageVersion(preparedImageConfig.ImageVersion.ValueString())
+			provisioningScheme.SetAssignImageVersionToProvisioningScheme(assignImageVersionToProvScheme)
+			provisioningScheme.SetResourcePool(hypervisorResourcePool.GetName()) // Override with name to adapt to image version workflow
+		} else {
+			imagePath, httpResp, err := util.GetNutanixPCTemplateVersionPath(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), nutanixPCMachineConfig.MasterImage.ValueString(), nutanixPCMachineConfig.MasterImageVersion.ValueString())
+			if err != nil {
+				diag.AddError(
+					"Error creating Machine Catalog",
+					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+						fmt.Sprintf("\nFailed to locate master image template %s version %s on Nutanix Prism Central, error: %s", nutanixPCMachineConfig.MasterImage.ValueString(), nutanixPCMachineConfig.MasterImageVersion.ValueString(), err.Error()),
+				)
+				return nil, err
+			}
+			provisioningScheme.SetMasterImagePath(imagePath)
+			provisioningScheme.SetMasterImageNote(nutanixPCMachineConfig.MasterImageNote.ValueString())
+		}
+
+		machineProfilePath, err := nutanixPCMachineConfig.getMachineProfilePath(ctx, client, diag, hypervisor.GetName(), hypervisorResourcePool.GetName(), "Error creating Machine Catalog")
+		if err != nil {
+			return nil, err
+		}
+		if machineProfilePath != "" {
+			provisioningScheme.SetMachineProfilePath(machineProfilePath)
+		}
+
+		provisioningScheme.SetCpuCount(int32(nutanixPCMachineConfig.CpuCount.ValueInt64()))
+		provisioningScheme.SetMemoryMB(int32(nutanixPCMachineConfig.MemoryMB.ValueInt64()))
+
+		customProperties := provisioningScheme.GetCustomProperties()
+		util.AppendNameValueStringPair(&customProperties, util.NutanixPCClusterIdKey, cluster.GetId())
+		util.AppendNameValueStringPair(&customProperties, util.NutanixPCCpuCoresKey, strconv.FormatInt(nutanixPCMachineConfig.CoresPerCpuCount.ValueInt64(), 10))
+		provisioningScheme.SetCustomProperties(customProperties)
 	}
 
 	if !provisioningSchemePlan.NetworkMapping.IsNull() && hypervisor.GetConnectionType() != citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM {
 		networkMappingModel := util.ObjectListToTypedArray[util.NetworkMappingModel](ctx, diag, provisioningSchemePlan.NetworkMapping)
-		networkMapping, err := util.ParseNetworkMappingToClientModel(networkMappingModel, hypervisorResourcePool, hypervisor.GetPluginId())
+		networkMapping, err := util.GetNetworkMappingRequestModels(ctx, client, diag, hypervisor.GetName(), hypervisor.GetPluginId(), hypervisorResourcePool, nutanixPCMachineConfig.Cluster.ValueString(), networkMappingModel)
 		if err != nil {
 			diag.AddError(
 				"Error creating Machine Catalog",
@@ -700,6 +764,20 @@ func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan Provisioning
 		return body, err
 	}
 	body.SetCustomProperties(customProperties)
+
+	isNutanixPC := hypervisor.GetConnectionType() == citrixorchestration.HYPERVISORCONNECTIONTYPE_NUTANIX_AHV_PC
+	if isNutanixPC == provisioningSchemePlan.NutanixPCMachineConfig.IsNull() {
+		err = fmt.Errorf("nutanix_pc_machine_config does not match the hypervisor connection type")
+		diagnostics.AddError(
+			"Error updating Machine Catalog",
+			nutanixPCMachineConfigMismatchMessage(hypervisor),
+		)
+		return body, err
+	}
+	var nutanixPCMachineConfig NutanixPCMachineConfigModel
+	if isNutanixPC {
+		nutanixPCMachineConfig = util.ObjectValueToTypedObject[NutanixPCMachineConfigModel](ctx, diagnostics, provisioningSchemePlan.NutanixPCMachineConfig)
+	}
 
 	// Resolve resource path for service offering and master image
 	switch hypervisor.GetConnectionType() {
@@ -829,6 +907,21 @@ func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan Provisioning
 
 			body.SetMachineProfilePath(machineProfile)
 		}
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_NUTANIX_AHV_PC:
+		body.SetCpuCount(int32(nutanixPCMachineConfig.CpuCount.ValueInt64()))
+		body.SetMemoryMB(int32(nutanixPCMachineConfig.MemoryMB.ValueInt64()))
+		customProperties := body.GetCustomProperties()
+		util.AppendNameValueStringPair(&customProperties, util.NutanixPCCpuCoresKey, strconv.FormatInt(nutanixPCMachineConfig.CoresPerCpuCount.ValueInt64(), 10))
+		body.SetCustomProperties(customProperties)
+
+		// Sent with the network mapping so a template version with a different NIC count passes the plugin's preflight check.
+		machineProfilePath, err := nutanixPCMachineConfig.getMachineProfilePath(ctx, client, diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), "Error updating Machine Catalog")
+		if err != nil {
+			return body, err
+		}
+		if machineProfilePath != "" {
+			body.SetMachineProfilePath(machineProfilePath)
+		}
 	case citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM:
 		scvmmMachineConfig := util.ObjectValueToTypedObject[SCVMMMachineConfigModel](ctx, nil, provisioningSchemePlan.SCVMMMachineConfigModel)
 		body.SetCpuCount(int32(scvmmMachineConfig.CpuCount.ValueInt64()))
@@ -850,7 +943,7 @@ func setProvSchemePropertiesForUpdateCatalog(provisioningSchemePlan Provisioning
 
 	if !provisioningSchemePlan.NetworkMapping.IsNull() && hypervisor.GetConnectionType() != citrixorchestration.HYPERVISORCONNECTIONTYPE_SCVMM {
 		networkMappingModel := util.ObjectListToTypedArray[util.NetworkMappingModel](ctx, diagnostics, provisioningSchemePlan.NetworkMapping)
-		networkMapping, err := util.ParseNetworkMappingToClientModel(networkMappingModel, hypervisorResourcePool, hypervisor.GetPluginId())
+		networkMapping, err := util.GetNetworkMappingRequestModels(ctx, client, diagnostics, hypervisor.GetName(), hypervisor.GetPluginId(), hypervisorResourcePool, nutanixPCMachineConfig.Cluster.ValueString(), networkMappingModel)
 		if err != nil {
 			diagnostics.AddError(
 				"Error updating Machine Catalog",
@@ -1106,10 +1199,12 @@ func updateCatalogMachineProfile(ctx context.Context, client *citrixdaasclient.C
 		}
 	} else {
 		networkMappingModel := util.ObjectListToTypedArray[util.NetworkMappingModel](ctx, &resp.Diagnostics, provSchemeModel.NetworkMapping)
-		networkMapping, err := util.ParseNetworkMappingToClientModel(networkMappingModel, resourcePool, hypervisorPluginId)
+		nutanixPCMachineConfig := util.ObjectValueToTypedObject[NutanixPCMachineConfigModel](ctx, &resp.Diagnostics, provSchemeModel.NutanixPCMachineConfig)
+		hypervisorConnection := resourcePool.GetHypervisorConnection()
+		networkMapping, err := util.GetNetworkMappingRequestModels(ctx, client, &resp.Diagnostics, hypervisorConnection.GetName(), hypervisorPluginId, resourcePool, nutanixPCMachineConfig.Cluster.ValueString(), networkMappingModel)
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error creating Machine Catalog",
+				"Error updating Machine Catalog "+catalog.GetName(),
 				fmt.Sprintf("Failed to find hypervisor network, error: %s", err.Error()),
 			)
 			return err
@@ -1622,6 +1717,51 @@ func updateCatalogImageAndMachineProfile(ctx context.Context, client *citrixdaas
 				}
 			}
 		}
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_NUTANIX_AHV_PC:
+		nutanixPCMachineConfig := util.ObjectValueToTypedObject[NutanixPCMachineConfigModel](ctx, &resp.Diagnostics, provisioningSchemePlan.NutanixPCMachineConfig)
+		if !nutanixPCMachineConfig.PreparedImage.IsNull() {
+			usePreparedImage = true
+			preparedImageModel := util.ObjectValueToTypedObject[PreparedImageConfigModel](ctx, &resp.Diagnostics, nutanixPCMachineConfig.PreparedImage)
+			currentImageVersionDetails := currentImageDetails.GetImageVersion()
+			currentImageDefinitionDetails := currentImageVersionDetails.GetImageDefinition()
+			imageDefinition = preparedImageModel.ImageDefinition.ValueString()
+			imageVersion = preparedImageModel.ImageVersion.ValueString()
+			currentImageVersion = currentImageVersionDetails.GetId()
+			currentImageDefinition = currentImageDefinitionDetails.GetId()
+			// Orchestration takes the image update's custom properties only from this request, and the provisioning service merges
+			// them into the catalog's. Without ClusterId, the image version isn't added to the catalog's cluster.
+			updateCustomProperties = util.NutanixPCCustomProperties(util.GetNutanixPCClusterId(customProps), nutanixPCMachineConfig.CoresPerCpuCount.ValueInt64())
+		} else {
+			imagePath, httpResp, err = util.GetNutanixPCTemplateVersionPath(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), nutanixPCMachineConfig.MasterImage.ValueString(), nutanixPCMachineConfig.MasterImageVersion.ValueString())
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Error updating Machine Catalog",
+					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+						fmt.Sprintf("\nFailed to locate master image template %s version %s on Nutanix Prism Central, error: %s", nutanixPCMachineConfig.MasterImage.ValueString(), nutanixPCMachineConfig.MasterImageVersion.ValueString(), err.Error()),
+				)
+				return err
+			}
+			masterImageNote = nutanixPCMachineConfig.MasterImageNote.ValueString()
+		}
+
+		machineProfilePath, err = nutanixPCMachineConfig.getMachineProfilePath(ctx, client, &resp.Diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), "Error updating Machine Catalog")
+		if err != nil {
+			return err
+		}
+
+		if !nutanixPCMachineConfig.ImageUpdateRebootOptions.IsNull() {
+			rebootOptionsPlan := util.ObjectValueToTypedObject[ImageUpdateRebootOptionsModel](ctx, &resp.Diagnostics, nutanixPCMachineConfig.ImageUpdateRebootOptions)
+			rebootOption.SetRebootDuration(int32(rebootOptionsPlan.RebootDuration.ValueInt64()))
+			warningDuration := int32(rebootOptionsPlan.WarningDuration.ValueInt64())
+			rebootOption.SetWarningDuration(warningDuration)
+			if warningDuration > 0 || warningDuration == -1 {
+				// if warning duration is not 0, it's set in plan and requires warning message body
+				rebootOption.SetWarningMessage(rebootOptionsPlan.WarningMessage.ValueString())
+				if !rebootOptionsPlan.WarningRepeatInterval.IsNull() {
+					rebootOption.SetWarningRepeatInterval(int32(rebootOptionsPlan.WarningRepeatInterval.ValueInt64()))
+				}
+			}
+		}
 	}
 
 	// Machine profile must be updated before the image so the image preparation VM uses the new machine profile
@@ -1821,6 +1961,24 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Con
 			nutanixMachineConfig.RefreshProperties(*catalog)
 			provSchemeModel.NutanixMachineConfig = util.TypedObjectToObjectValue(ctx, diagnostics, nutanixMachineConfig)
 		}
+	case citrixorchestration.HYPERVISORCONNECTIONTYPE_NUTANIX_AHV_PC:
+		nutanixPCMachineConfig := util.ObjectValueToTypedObject[NutanixPCMachineConfigModel](ctx, diagnostics, provSchemeModel.NutanixPCMachineConfig)
+		clusterName := ""
+		if nutanixPCMachineConfig.Cluster.ValueString() == "" {
+			// Only after an import: the cluster can't change once the catalog exists, so it is never re-resolved.
+			clusterId := util.GetNutanixPCClusterId(customProperties)
+			name, httpResp, err := util.GetNutanixPCClusterName(ctx, client, diagnostics, hypervisor.GetName(), resourcePool.GetName(), clusterId)
+			if err != nil {
+				diagnostics.AddError(
+					"Error refreshing Machine Catalog "+catalog.GetName(),
+					"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+						fmt.Sprintf("\nFailed to resolve Nutanix Prism Central cluster ID %s to a cluster name, error: %s", clusterId, err.Error()),
+				)
+			}
+			clusterName = name
+		}
+		nutanixPCMachineConfig.RefreshProperties(ctx, diagnostics, *catalog, clusterName)
+		provSchemeModel.NutanixPCMachineConfig = util.TypedObjectToObjectValue(ctx, diagnostics, nutanixPCMachineConfig)
 	}
 
 	remoteCustomProperties := map[string]string{}
@@ -1856,8 +2014,9 @@ func (r MachineCatalogResourceModel) updateCatalogWithProvScheme(ctx context.Con
 
 	// Refresh Network Mapping
 	networkMaps := provScheme.GetNetworkMaps()
-
-	if len(networkMaps) > 0 && !provSchemeModel.NetworkMapping.IsNull() {
+	// network_mapping is required for Nutanix Prism Central, so refresh it even when state has none (import).
+	isNutanixPC := *connectionType == citrixorchestration.HYPERVISORCONNECTIONTYPE_NUTANIX_AHV_PC
+	if len(networkMaps) > 0 && (!provSchemeModel.NetworkMapping.IsNull() || isNutanixPC) {
 		provSchemeModel.NetworkMapping = util.RefreshListValueProperties[util.NetworkMappingModel, citrixorchestration.NetworkMapResponseModel](ctx, diagnostics, provSchemeModel.NetworkMapping, networkMaps, util.GetOrchestrationNetworkMappingKey)
 	} else {
 		provSchemeModel.NetworkMapping = util.TypedArrayToObjectList[util.NetworkMappingModel](ctx, diagnostics, nil)

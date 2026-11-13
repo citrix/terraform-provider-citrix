@@ -30,7 +30,8 @@ func buildCreateImageVersionRequestModel(ctx context.Context, client *citrixdaas
 	var imageScheme citrixorchestration.CreateImageSchemeRequestModel
 	if !plan.NetworkMapping.IsNull() {
 		networkMappingModel := util.ObjectListToTypedArray[util.NetworkMappingModel](ctx, diagnostics, plan.NetworkMapping)
-		networkMapping, err := util.ParseNetworkMappingToClientModel(networkMappingModel, hypervisorResourcePool, hypervisor.GetPluginId())
+		nutanixPCImageSpecs := util.ObjectValueToTypedObject[NutanixPCImageSpecsModel](ctx, diagnostics, plan.NutanixPCImageSpecs)
+		networkMapping, err := util.GetNetworkMappingRequestModels(ctx, client, diagnostics, hypervisor.GetName(), hypervisor.GetPluginId(), hypervisorResourcePool, nutanixPCImageSpecs.Cluster.ValueString(), networkMappingModel)
 		if err != nil {
 			diagnostics.AddError(
 				"Error "+operation+" Image Version",
@@ -248,6 +249,42 @@ func buildImageScheme(ctx context.Context, client *citrixdaasclient.CitrixDaasCl
 			imageScheme.SetMachineProfile(machineProfilePath)
 		}
 
+	case util.NUTANIX_PC_PLUGIN_ID:
+		nutanixPCImageSpecs := util.ObjectValueToTypedObject[NutanixPCImageSpecsModel](ctx, diagnostics, plan.NutanixPCImageSpecs)
+		cluster, httpResp, err := util.GetNutanixPCCluster(ctx, client, diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), nutanixPCImageSpecs.Cluster.ValueString())
+		if err != nil {
+			diagnostics.AddError(
+				"Error building Nutanix Prism Central Image Version",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					fmt.Sprintf("\nFailed to locate cluster %s on Nutanix Prism Central, error: %s", nutanixPCImageSpecs.Cluster.ValueString(), err.Error()),
+			)
+			return masterImagePath, err
+		}
+
+		masterImagePath, httpResp, err = util.GetNutanixPCTemplateVersionPath(ctx, client, diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), nutanixPCImageSpecs.MasterImage.ValueString(), nutanixPCImageSpecs.MasterImageVersion.ValueString())
+		if err != nil {
+			diagnostics.AddError(
+				"Error building Nutanix Prism Central Image Version",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					fmt.Sprintf("\nFailed to locate master image template %s version %s on Nutanix Prism Central, error: %s", nutanixPCImageSpecs.MasterImage.ValueString(), nutanixPCImageSpecs.MasterImageVersion.ValueString(), err.Error()),
+			)
+			return masterImagePath, err
+		}
+
+		machineProfilePath, httpResp, err := util.GetNutanixPCTemplateVersionPath(ctx, client, diagnostics, hypervisor.GetName(), hypervisorResourcePool.GetName(), nutanixPCImageSpecs.MachineProfile.ValueString(), nutanixPCImageSpecs.MachineProfileVersion.ValueString())
+		if err != nil {
+			diagnostics.AddError(
+				"Error building Nutanix Prism Central Image Version",
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					fmt.Sprintf("\nFailed to locate machine profile template %s version %s on Nutanix Prism Central, error: %s", nutanixPCImageSpecs.MachineProfile.ValueString(), nutanixPCImageSpecs.MachineProfileVersion.ValueString(), err.Error()),
+			)
+			return masterImagePath, err
+		}
+
+		imageScheme.SetMachineProfile(machineProfilePath)
+		imageScheme.SetCpuCount(nutanixPCImageSpecs.CpuCount.ValueInt32())
+		imageScheme.SetMemoryMB(nutanixPCImageSpecs.MemoryMB.ValueInt32())
+		imageScheme.SetCustomProperties(util.NutanixPCCustomProperties(cluster.GetId(), int64(nutanixPCImageSpecs.CoresPerCpuCount.ValueInt32())))
 	default:
 		err = fmt.Errorf("unsupported hypervisor connection: %s", hypervisorId)
 		diagnostics.AddError(

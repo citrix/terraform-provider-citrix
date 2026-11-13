@@ -180,6 +180,7 @@ type ProvisioningSchemeModel struct {
 	VsphereMachineConfig              types.Object `tfsdk:"vsphere_machine_config"`                // VsphereMachineConfigModel
 	XenserverMachineConfig            types.Object `tfsdk:"xenserver_machine_config"`              // XenserverMachineConfigModel
 	NutanixMachineConfig              types.Object `tfsdk:"nutanix_machine_config"`                // NutanixMachineConfigModel
+	NutanixPCMachineConfig            types.Object `tfsdk:"nutanix_pc_machine_config"`             // NutanixPCMachineConfigModel
 	SCVMMMachineConfigModel           types.Object `tfsdk:"scvmm_machine_config"`                  // SCVMMMachineConfigModel
 	OpenshiftMachineConfig            types.Object `tfsdk:"openshift_machine_config"`              // OpenshiftMachineConfigModel
 	NumTotalMachines                  types.Int64  `tfsdk:"number_of_total_machines"`
@@ -222,6 +223,7 @@ func (ProvisioningSchemeModel) GetSchema() schema.SingleNestedAttribute {
 			"vsphere_machine_config":                VsphereMachineConfigModel{}.GetSchema(),
 			"xenserver_machine_config":              XenserverMachineConfigModel{}.GetSchema(),
 			"nutanix_machine_config":                NutanixMachineConfigModel{}.GetSchema(),
+			"nutanix_pc_machine_config":             NutanixPCMachineConfigModel{}.GetSchema(),
 			"openshift_machine_config":              OpenshiftMachineConfigModel{}.GetSchema(),
 			"scvmm_machine_config":                  SCVMMMachineConfigModel{}.GetSchema(),
 			"machine_domain_identity":               util.MachineDomainIdentityModel{}.GetSchema(),

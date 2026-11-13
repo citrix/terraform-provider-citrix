@@ -386,6 +386,11 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 			return
 		}
 
+		err = ensureNutanixPCCoresPerCpu(ctx, r.client, resp, plan, catalog.GetId(), updateTimeout)
+		if err != nil {
+			return
+		}
+
 		if catalog.GetTotalCount() > int32(planProvSchemeModel.NumTotalMachines.ValueInt64()) {
 			// delete machines from machine catalog
 			err = deleteMachinesFromMcsPvsCatalog(ctx, r.client, resp, catalog, planProvSchemeModel, machineAccountsInPlan)
@@ -1137,6 +1142,14 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 				if !nutanixMachineConfigModel.ImageUpdateRebootOptions.IsNull() {
 					// Validate Image Update Reboot Options
 					rebootOptions := util.ObjectValueToTypedObject[ImageUpdateRebootOptionsModel](ctx, &resp.Diagnostics, nutanixMachineConfigModel.ImageUpdateRebootOptions)
+					rebootOptions.ValidateConfig(&resp.Diagnostics)
+				}
+			}
+
+			if !provSchemeModel.NutanixPCMachineConfig.IsUnknown() && !provSchemeModel.NutanixPCMachineConfig.IsNull() {
+				nutanixPCMachineConfigModel := util.ObjectValueToTypedObject[NutanixPCMachineConfigModel](ctx, &resp.Diagnostics, provSchemeModel.NutanixPCMachineConfig)
+				if !nutanixPCMachineConfigModel.ImageUpdateRebootOptions.IsUnknown() && !nutanixPCMachineConfigModel.ImageUpdateRebootOptions.IsNull() {
+					rebootOptions := util.ObjectValueToTypedObject[ImageUpdateRebootOptionsModel](ctx, &resp.Diagnostics, nutanixPCMachineConfigModel.ImageUpdateRebootOptions)
 					rebootOptions.ValidateConfig(&resp.Diagnostics)
 				}
 			}

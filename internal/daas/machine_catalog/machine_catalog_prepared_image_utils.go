@@ -5,6 +5,7 @@ package machine_catalog
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -174,6 +175,27 @@ func validateImageVersion(ctx context.Context, diagnostics *diag.Diagnostics, cl
 					}
 				}
 			}
+		} else if !provSchemePlan.NutanixPCMachineConfig.IsNull() {
+			nutanixPCMachineConfig := util.ObjectValueToTypedObject[NutanixPCMachineConfigModel](ctx, diagnostics, provSchemePlan.NutanixPCMachineConfig)
+			if !nutanixPCMachineConfig.PreparedImage.IsNull() {
+				preparedImage := util.ObjectValueToTypedObject[PreparedImageConfigModel](ctx, diagnostics, nutanixPCMachineConfig.PreparedImage)
+				_, _, imageSpecs, err := validateImageVersionHelper(ctx, diagnostics, client, sessionSupport, preparedImage, "nutanix_pc_machine_config")
+				if err != nil {
+					return err
+				}
+
+				resourcePoolFound := slices.ContainsFunc(imageSpecs.GetResourcePools(), func(pool citrixorchestration.ImageVersionSpecResourcePoolResponseModel) bool {
+					return strings.EqualFold(pool.GetId(), provSchemePlan.HypervisorResourcePool.ValueString())
+				})
+				if !resourcePoolFound {
+					err := fmt.Errorf("the image version in prepared_image does not belong to resource pool %s; Nutanix Prism Central image versions can't be shared across resource pools", provSchemePlan.HypervisorResourcePool.ValueString())
+					diagnostics.AddError(
+						"Error validating `nutanix_pc_machine_config`",
+						err.Error(),
+					)
+					return err
+				}
+			}
 		}
 	}
 	return nil
@@ -202,7 +224,7 @@ func validateImageVersionHelper(ctx context.Context, diagnostics *diag.Diagnosti
 	if imageVersionStatus != citrixorchestration.IMAGEVERSIONSTATUS_SUCCESS {
 		err := fmt.Errorf("image version in state `%s` cannot be used to create machine catalog", string(imageVersionStatus))
 		diagnostics.AddError(
-			"Error validating azure_machine_config",
+			fmt.Sprintf("Error validating `%s`", machineConfigAttributeName),
 			err.Error(),
 		)
 		return imageDefinition, imageScheme, imageSpecs, err

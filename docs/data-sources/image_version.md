@@ -48,6 +48,7 @@ data "citrix_image_version" "example_image_version_by_version_number" {
 - `hypervisor` (String) Id of the hypervisor to use for creating this image version.
 - `hypervisor_resource_pool` (String) Id of the hypervisor resource pool to use for creating this image version.
 - `network_mapping` (Attributes List) Specifies how the attached NICs are mapped to networks. (see [below for nested schema](#nestedatt--network_mapping))
+- `nutanix_pc_image_specs` (Attributes) Image configuration for Nutanix AHV Prism Central image version. (see [below for nested schema](#nestedatt--nutanix_pc_image_specs))
 - `os_type` (String) The OS type of the image version.
 - `session_support` (String) Session support for the image version.
 - `share_with_resources` (Attributes Set) Specifies the resources the image version is shared with. (see [below for nested schema](#nestedatt--share_with_resources))
@@ -149,6 +150,21 @@ Required:
 
 - `network` (String) The name of the virtual network that the device should be attached to. This must be a subnet within a Virtual Private Cloud item in the resource pool to which the Machine Catalog is associated.<br />For AWS, please specify the network mask of the network you want to use within the VPC.
 - `network_device` (String) Name or Id of the network device.
+
+
+<a id="nestedatt--nutanix_pc_image_specs"></a>
+### Nested Schema for `nutanix_pc_image_specs`
+
+Read-Only:
+
+- `cluster` (String) Name of the Prism Central-managed cluster the image is prepared in.
+- `cores_per_cpu_count` (Number) Number of cores per CPU socket of the machines.
+- `cpu_count` (Number) Number of CPU sockets of the machines.
+- `machine_profile` (String) Name of the Prism Central template used as the machine profile.
+- `machine_profile_version` (String) Name of the template version used as the machine profile.
+- `master_image` (String) Name of the Prism Central template used as the master image.
+- `master_image_version` (String) Name of the template version used as the master image.
+- `memory_mb` (Number) Memory of the machines in MB.
 
 
 <a id="nestedatt--share_with_resources"></a>

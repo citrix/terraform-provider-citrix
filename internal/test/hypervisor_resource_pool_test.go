@@ -423,6 +423,60 @@ func TestHypervisorResourcePoolNutanix(t *testing.T) {
 	})
 }
 
+func TestHypervisorResourcePoolPreCheck_NutanixPC(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping acceptance test")
+	}
+
+	if v := os.Getenv("TEST_HYPERV_RP_NAME_NUTANIX_PC"); v == "" {
+		t.Fatal("TEST_HYPERV_RP_NAME_NUTANIX_PC must be set for acceptance tests")
+	}
+}
+
+func TestHypervisorResourcePoolNutanixPC(t *testing.T) {
+	name := os.Getenv("TEST_HYPERV_RP_NAME_NUTANIX_PC")
+	zoneInput := os.Getenv("TEST_ZONE_INPUT_NUTANIX_PC")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck: func() {
+			TestProviderPreCheck(t)
+			TestHypervisorPreCheck_NutanixPC(t)
+			TestHypervisorResourcePoolPreCheck_NutanixPC(t)
+		},
+		Steps: []resource.TestStep{
+			{
+				Config: composeTestResourceTf(
+					BuildHypervisorResourcePoolResourceNutanixPC(t, hypervisor_resource_pool_testResource_nutanix_pc),
+					BuildHypervisorResourceNutanixPC(t, hypervisor_testResources_nutanix_pc),
+					BuildZoneResource(t, zoneInput, false),
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("citrix_nutanix_pc_hypervisor_resource_pool.testHypervisorResourcePool", "name", name),
+					resource.TestCheckResourceAttr("citrix_nutanix_pc_hypervisor_resource_pool.testHypervisorResourcePool", "vm_tagging", "true"),
+				),
+			},
+			{
+				ResourceName:      "citrix_nutanix_pc_hypervisor_resource_pool.testHypervisorResourcePool",
+				ImportState:       true,
+				ImportStateIdFunc: generateImportStateId_NutanixPC,
+				ImportStateVerify: true,
+			},
+			{
+				Config: composeTestResourceTf(
+					BuildHypervisorResourcePoolResourceNutanixPC(t, hypervisor_resource_pool_updated_testResource_nutanix_pc),
+					BuildHypervisorResourceNutanixPC(t, hypervisor_testResources_nutanix_pc),
+					BuildZoneResource(t, zoneInput, false),
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("citrix_nutanix_pc_hypervisor_resource_pool.testHypervisorResourcePool", "name", fmt.Sprintf("%s-updated", name)),
+					resource.TestCheckResourceAttr("citrix_nutanix_pc_hypervisor_resource_pool.testHypervisorResourcePool", "vm_tagging", "false"),
+				),
+			},
+		},
+	})
+}
+
 func TestHypervisorResourcePoolPreCheck_SCVMM(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping acceptance test")
@@ -643,6 +697,20 @@ func generateImportStateId_Nutanix(state *terraform.State) (string, error) {
 	return fmt.Sprintf("%s,%s", rawState["hypervisor"], rawState["id"]), nil
 }
 
+func generateImportStateId_NutanixPC(state *terraform.State) (string, error) {
+	resourceName := "citrix_nutanix_pc_hypervisor_resource_pool.testHypervisorResourcePool"
+	var rawState map[string]string
+	for _, m := range state.Modules {
+		if len(m.Resources) > 0 {
+			if v, ok := m.Resources[resourceName]; ok {
+				rawState = v.Primary.Attributes
+			}
+		}
+	}
+
+	return fmt.Sprintf("%s,%s", rawState["hypervisor"], rawState["id"]), nil
+}
+
 func generateImportStateId_SCVMM(state *terraform.State) (string, error) {
 	resourceName := "citrix_scvmm_hypervisor_resource_pool.testHypervisorResourcePool"
 	var rawState map[string]string
@@ -833,6 +901,21 @@ resource "citrix_nutanix_hypervisor_resource_pool" "testHypervisorResourcePool" 
 }
 `
 
+	hypervisor_resource_pool_testResource_nutanix_pc = `
+resource "citrix_nutanix_pc_hypervisor_resource_pool" "testHypervisorResourcePool" {
+	name = "%s"
+	hypervisor = citrix_nutanix_pc_hypervisor.testHypervisor.id
+}
+`
+
+	hypervisor_resource_pool_updated_testResource_nutanix_pc = `
+resource "citrix_nutanix_pc_hypervisor_resource_pool" "testHypervisorResourcePool" {
+	name = "%s-updated"
+	hypervisor = citrix_nutanix_pc_hypervisor.testHypervisor.id
+	vm_tagging = false
+}
+`
+
 	hypervisor_resource_pool_testResource_aws_ec2 = `
 resource "citrix_aws_hypervisor_resource_pool" "testHypervisorResourcePool" {
     name = "%s"
@@ -921,6 +1004,10 @@ func BuildHypervisorResourcePoolResourceNutanix(t *testing.T, hypervisorRP strin
 	network := os.Getenv("TEST_HYPERV_RP_NETWORK_NUTANIX")
 
 	return fmt.Sprintf(hypervisorRP, name, network)
+}
+
+func BuildHypervisorResourcePoolResourceNutanixPC(t *testing.T, hypervisorRP string) string {
+	return fmt.Sprintf(hypervisorRP, os.Getenv("TEST_HYPERV_RP_NAME_NUTANIX_PC"))
 }
 
 func BuildHypervisorResourcePoolResourceSCVMM(t *testing.T, hypervisorRP string) string {
