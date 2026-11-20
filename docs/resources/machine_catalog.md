@@ -520,6 +520,88 @@ resource "citrix_machine_catalog" "example-nutanix-mtsession" {
     }
 }
 
+resource "citrix_machine_catalog" "example-nutanix-pc-mtsession" {
+    name                        = "example-nutanix-pc-mtsession"
+    description                 = "Example multi-session catalog on a Nutanix Prism Central hypervisor"
+    zone                        = citrix_zone.example-zone.id
+    allocation_type             = "Random"
+    session_support             = "MultiSession"
+    provisioning_type           = "MCS"
+    provisioning_scheme         = {
+        hypervisor = citrix_nutanix_pc_hypervisor.example-nutanix-pc-hypervisor.id
+        hypervisor_resource_pool = citrix_nutanix_pc_hypervisor_resource_pool.example-nutanix-pc-hypervisor-resource-pool.id
+        identity_type = "ActiveDirectory"
+        machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+        nutanix_pc_machine_config = {
+            cluster                 = "<Prism Central cluster name>"
+            master_image            = "<Template name>"
+            master_image_version    = "<Template version name>"
+            machine_profile         = "<Template name>"
+            machine_profile_version = "<Template version name>"
+            cpu_count               = 2
+            cores_per_cpu_count     = 2
+            memory_mb               = 4096
+        }
+        network_mapping = [
+            {
+                network_device = "0"
+                network        = "<Subnet name in the cluster>"
+            }
+        ]
+        number_of_total_machines = 1
+        machine_account_creation_rules = {
+            naming_scheme = "catalog-##"
+            naming_scheme_type = "Numeric"
+        }
+    }
+}
+
+resource "citrix_machine_catalog" "example-nutanix-pc-prepared-image" {
+    name                        = "example-nutanix-pc-prepared-image"
+    description                 = "Example catalog on a Nutanix Prism Central hypervisor from a prepared image"
+    zone                        = citrix_zone.example-zone.id
+    allocation_type             = "Random"
+    session_support             = "MultiSession"
+    provisioning_type           = "MCS"
+    provisioning_scheme         = {
+        hypervisor = citrix_nutanix_pc_hypervisor.example-nutanix-pc-hypervisor.id
+        hypervisor_resource_pool = citrix_nutanix_pc_hypervisor_resource_pool.example-nutanix-pc-hypervisor-resource-pool.id
+        identity_type = "ActiveDirectory"
+        machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+        nutanix_pc_machine_config = {
+            cluster = "<Prism Central cluster name>"
+            prepared_image = {
+                image_definition = citrix_image_definition.example_nutanix_pc_image_definition.id
+                image_version    = citrix_image_version.example_nutanix_pc_image_version.id
+            }
+            machine_profile         = "<Template name>"
+            machine_profile_version = "<Template version name>"
+            cpu_count               = 2
+            cores_per_cpu_count     = 2
+            memory_mb               = 8192
+        }
+        network_mapping = [
+            {
+                network_device = "0"
+                network        = "<Subnet name in the cluster>"
+            }
+        ]
+        number_of_total_machines = 1
+        machine_account_creation_rules = {
+            naming_scheme = "catalog-##"
+            naming_scheme_type = "Numeric"
+        }
+    }
+}
+
 resource "citrix_machine_catalog" "example-scvmm-mtsession" {
     name                        = "example-scvmm-mtsession"
     description                 = "Example multi-session catalog on SCVMM hypervisor"
@@ -897,6 +979,7 @@ Optional:
  **Please Note** In-Place update of metadata is only supported for Cloud environments and On-Premises DDC version 2505 or later. (see [below for nested schema](#nestedatt--provisioning_scheme--metadata))
 - `network_mapping` (Attributes List) Specifies how the attached NICs are mapped to networks. If this parameter is omitted, provisioned VMs are created with a single NIC, which is mapped to the default network in the hypervisor resource pool. If this parameter is supplied, machines are created with the number of NICs specified in the map, and each NIC is attached to the specified network.<br />Required when `provisioning_scheme.identity_type` is `AzureAD`. (see [below for nested schema](#nestedatt--provisioning_scheme--network_mapping))
 - `nutanix_machine_config` (Attributes) Machine Configuration For Nutanix MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--nutanix_machine_config))
+- `nutanix_pc_machine_config` (Attributes) Machine Configuration for Nutanix AHV Prism Central MCS catalog. Requires `network_mapping`, whose networks are looked up under `cluster`. (see [below for nested schema](#nestedatt--provisioning_scheme--nutanix_pc_machine_config))
 - `openshift_machine_config` (Attributes) Machine Configuration For OpenShift MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--openshift_machine_config))
 - `scvmm_machine_config` (Attributes) Machine Configuration for SCVMM MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--scvmm_machine_config))
 - `vsphere_machine_config` (Attributes) Machine Configuration for vSphere MCS catalog. (see [below for nested schema](#nestedatt--provisioning_scheme--vsphere_machine_config))
@@ -1355,6 +1438,50 @@ Optional:
 - `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.-> **Note** When `reboot_duration` is set to `-1`, if a warning message should be displayed, `warning_duration` has to be set to `-1` to show the warning message immediately.-> **Note** When `reboot_duration` is not set to `-1`, `warning_duration` cannot be set to `-1`.
 - `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot. The optional pattern '%m%' is replaced by the number of minutes until the reboot.
 - `warning_repeat_interval` (Number) Number of minutes to wait before showing the reboot warning message again.
+
+
+
+<a id="nestedatt--provisioning_scheme--nutanix_pc_machine_config"></a>
+### Nested Schema for `provisioning_scheme.nutanix_pc_machine_config`
+
+Required:
+
+- `cluster` (String) Name of the Prism Central-managed cluster to provision machines in. The cluster can't be changed after the catalog is created; changing it replaces the catalog.
+- `cores_per_cpu_count` (Number) Number of cores per CPU socket of each machine.
+- `cpu_count` (Number) Number of CPU sockets of each machine.
+- `memory_mb` (Number) Memory of each machine in MB.
+
+Optional:
+
+- `image_update_reboot_options` (Attributes) The options for how rebooting is performed for image update. When omitted, image update on the VDAs will be performed on next shutdown. (see [below for nested schema](#nestedatt--provisioning_scheme--nutanix_pc_machine_config--image_update_reboot_options))
+- `machine_profile` (String) Name of the Prism Central template used as the machine profile. Changing the machine profile between templates updates the catalog; adding or removing it replaces the catalog. Required with `prepared_image`.
+- `machine_profile_version` (String) Name of the template version used as the machine profile.
+- `master_image` (String) Name of the Prism Central template used as the master image. Exactly one of `master_image` and `prepared_image` must be specified.
+- `master_image_note` (String) The note for the master image. Can't be set with `prepared_image`. Defaults to an empty string.
+- `master_image_version` (String) Name of the template version used as the master image. Changing it publishes the new image to the catalog.
+- `prepared_image` (Attributes) The prepared image (image definition and image version) to use for the catalog. The image version must belong to the catalog's resource pool, because Nutanix Prism Central image versions can't be shared across resource pools. Requires `machine_profile` and `machine_profile_version`. (see [below for nested schema](#nestedatt--provisioning_scheme--nutanix_pc_machine_config--prepared_image))
+
+<a id="nestedatt--provisioning_scheme--nutanix_pc_machine_config--image_update_reboot_options"></a>
+### Nested Schema for `provisioning_scheme.nutanix_pc_machine_config.image_update_reboot_options`
+
+Required:
+
+- `reboot_duration` (Number) Approximate maximum duration over which the reboot cycle runs, in minutes. -> **Note** Set to `-1` to skip reboot, and perform image update on the VDAs on next shutdown. Set to `0` to reboot all machines immediately.
+
+Optional:
+
+- `warning_duration` (Number) Time in minutes prior to a machine reboot at which a warning message is displayed in all user sessions on that machine. When omitted, no warning about reboot will be displayed in user session.-> **Note** When `reboot_duration` is set to `-1`, if a warning message should be displayed, `warning_duration` has to be set to `-1` to show the warning message immediately.-> **Note** When `reboot_duration` is not set to `-1`, `warning_duration` cannot be set to `-1`.
+- `warning_message` (String) Warning message displayed in user sessions on a machine scheduled for a reboot. The optional pattern '%m%' is replaced by the number of minutes until the reboot.
+- `warning_repeat_interval` (Number) Number of minutes to wait before showing the reboot warning message again.
+
+
+<a id="nestedatt--provisioning_scheme--nutanix_pc_machine_config--prepared_image"></a>
+### Nested Schema for `provisioning_scheme.nutanix_pc_machine_config.prepared_image`
+
+Required:
+
+- `image_definition` (String) ID of the image definition.
+- `image_version` (String) ID of the image version.
 
 
 

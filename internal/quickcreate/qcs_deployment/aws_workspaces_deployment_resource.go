@@ -185,7 +185,7 @@ func (r *awsWorkspacesDeploymentResource) Read(ctx context.Context, req resource
 	// Try getting the AWS WorkSpaces Deployment
 	deployment, httpResp, err := getAwsWorkspacesDeploymentUsingId(ctx, r.client, &resp.Diagnostics, state.Id.ValueString(), false)
 	if err != nil {
-		if httpResp.StatusCode == http.StatusNotFound {
+		if util.IsNotFound(httpResp) {
 			resp.Diagnostics.AddWarning(
 				fmt.Sprintf("AWS WorkSpaces Deployment with ID: %s not found", state.Id.ValueString()),
 				fmt.Sprintf("AWS WorkSpaces Deployment with ID: %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", state.Id.ValueString()),
@@ -463,7 +463,7 @@ func getAwsWorkspacesDeploymentUsingId(ctx context.Context, client *citrixdaascl
 	deployment, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickcreate.AwsEdcDeployment](getDeploymentRequest, client)
 
 	if err != nil {
-		if !addErrorIfNotFound {
+		if !addErrorIfNotFound && util.IsNotFound(httpResp) {
 			return nil, httpResp, err
 		}
 		diagnostics.AddError(
@@ -574,16 +574,18 @@ func WaitForQcsDeployment(ctx context.Context, diagnostics *diag.Diagnostics, cl
 
 	for {
 		if time.Since(startTime) > time.Minute*time.Duration(maxWaitTimeInMinutes) {
+			err = fmt.Errorf("wait time exceeded the maximum allowed time of %d minutes", maxWaitTimeInMinutes)
 			diagnostics.AddError(
 				"Error waiting for AWS WorkSpaces Deployment: "+deploymentId,
-				fmt.Sprintf("Error message: wait time exceeded the maximum allowed time of %d minutes", maxWaitTimeInMinutes),
+				"Error message: "+err.Error(),
 			)
-			break
+			return deploymentResponseModel, err
 		}
 
-		deploymentResponseModel, httpResp, err := getAwsWorkspacesDeploymentUsingId(ctx, client, diagnostics, deploymentId, false)
+		var httpResp *http.Response
+		deploymentResponseModel, httpResp, err = getAwsWorkspacesDeploymentUsingId(ctx, client, diagnostics, deploymentId, deploymentNotFoundCounter >= 5)
 		if err != nil {
-			if deploymentNotFoundCounter < 5 && httpResp.StatusCode == http.StatusNotFound {
+			if util.IsNotFound(httpResp) && deploymentNotFoundCounter < 5 {
 				deploymentNotFoundCounter++
 				time.Sleep(sleepDuration)
 				continue
@@ -603,8 +605,6 @@ func WaitForQcsDeployment(ctx context.Context, diagnostics *diag.Diagnostics, cl
 
 		return deploymentResponseModel, err
 	}
-
-	return deploymentResponseModel, err
 }
 
 func generateBatchApiHeaders(ctx context.Context, client *citrixdaasclient.CitrixDaasClient) (context.Context, []citrixorchestration.NameValueStringPairModel, *http.Response, error) {

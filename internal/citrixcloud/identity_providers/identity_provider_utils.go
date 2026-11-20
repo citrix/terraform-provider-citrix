@@ -198,6 +198,9 @@ func deleteIdentityProvider(ctx context.Context, diagnostics *diag.Diagnostics, 
 	deleteIdpRequest := client.CwsClient.IdentityProvidersDAAS.CustomerIdentityProvidersTypeIdDelete(ctx, idpType, idpInstanceId, client.ClientConfig.CustomerId)
 	_, httpResp, err := citrixdaasclient.AddRequestData(deleteIdpRequest, client).Execute()
 	if err != nil {
+		if util.IsNotFound(httpResp) {
+			return
+		}
 		errBody := ""
 		if httpResp != nil && httpResp.Body != nil {
 			body, readErr := io.ReadAll(httpResp.Body)
@@ -207,7 +210,7 @@ func deleteIdentityProvider(ctx context.Context, diagnostics *diag.Diagnostics, 
 			}
 		}
 
-		if httpResp.StatusCode == http.StatusBadRequest && strings.Contains(errBody, "it is the currently selected authentication method") {
+		if httpResp != nil && httpResp.StatusCode == http.StatusBadRequest && strings.Contains(errBody, "it is the currently selected authentication method") {
 			diagnostics.AddError(
 				fmt.Sprintf("Error deleting %s Identity Provider with id: %s", idpType, idpInstanceId),
 				"\n\nError message: "+util.ReadClientError(err)+errBody+
@@ -236,7 +239,7 @@ func checkAuthDomainNameAvailability(ctx context.Context, client *citrixdaasclie
 	checkAuthDomainRequest = checkAuthDomainRequest.Name(authDomainName)
 	isAuthDomainAvailable, httpResp, err := citrixdaasclient.ExecuteWithRetry[bool](checkAuthDomainRequest, client)
 	if err != nil {
-		if httpResp.StatusCode == http.StatusNotFound {
+		if util.IsNotFound(httpResp) {
 			return nil
 		}
 		diagnostics.AddError(

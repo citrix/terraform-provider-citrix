@@ -5,7 +5,6 @@ package image_definition
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
@@ -292,12 +291,7 @@ func (r *ImageVersionResource) Delete(ctx context.Context, req resource.DeleteRe
 	deleteImageVersionRequest := r.client.ApiClient.ImageDefinitionsAPIsDAAS.ImageDefinitionsDeleteImageDefinitionImageVersion(ctx, imageDefinitionId, imageVersionId)
 	deleteImageVersionRequest = deleteImageVersionRequest.Async(true)
 	httpResp, err := citrixdaasclient.AddRequestData(deleteImageVersionRequest, r.client).Execute()
-	if err != nil && httpResp.StatusCode != http.StatusNotFound {
-		resp.Diagnostics.AddError(
-			"Error deleting Image Version "+imageVersionId,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
+	if !util.CheckDeleteResponse(&resp.Diagnostics, httpResp, err, "Error deleting Image Version "+imageVersionId) {
 		return
 	}
 
@@ -574,6 +568,15 @@ func validateImageVersionConfigs(ctx context.Context, client *citrixdaasclient.C
 			)
 			return err
 		}
+	case util.NUTANIX_PC_PLUGIN_ID:
+		if plan.NutanixPCImageSpecs.IsNull() {
+			err := fmt.Errorf("nutanix_pc_image_specs is required when creating image version with a Nutanix AHV Prism Central hypervisor connection")
+			diagnostics.AddError(
+				"Error "+operation+" Image Version",
+				err.Error(),
+			)
+			return err
+		}
 	default:
 		err := fmt.Errorf("Unsupported hypervisor connection type: %s", hypervisor.GetPluginId())
 		diagnostics.AddError(
@@ -658,6 +661,7 @@ func imageVersionSpecsChanged(plan ImageVersionModel, state ImageVersionModel) b
 		!plan.AwsEc2ImageSpecs.Equal(state.AwsEc2ImageSpecs) ||
 		!plan.VsphereImageSpecs.Equal(state.VsphereImageSpecs) ||
 		!plan.AmazonWorkspacesCoreImageSpecs.Equal(state.AmazonWorkspacesCoreImageSpecs) ||
+		!plan.NutanixPCImageSpecs.Equal(state.NutanixPCImageSpecs) ||
 		!plan.NetworkMapping.Equal(state.NetworkMapping)
 }
 

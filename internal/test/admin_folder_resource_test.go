@@ -6,12 +6,12 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"testing"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
@@ -242,7 +242,7 @@ func adminFolderSweeper(ctx context.Context, adminFolderName string, client *cit
 	getAdminFolderRequest := client.ApiClient.AdminFoldersAPIsDAAS.AdminFoldersGetAdminFolder(ctx, adminFolderName)
 	adminFolder, httpResp, err := citrixclient.ExecuteWithRetry[*citrixorchestration.AdminFolderResponseModel](getAdminFolderRequest, client)
 	if err != nil {
-		if httpResp.StatusCode == http.StatusNotFound {
+		if util.IsNotFound(httpResp) {
 			// Resource does not exist in remote, no need to delete
 			return nil
 		}
@@ -250,7 +250,7 @@ func adminFolderSweeper(ctx context.Context, adminFolderName string, client *cit
 	}
 	deleteAdminFolderRequest := client.ApiClient.AdminFoldersAPIsDAAS.AdminFoldersDeleteAdminFolder(ctx, adminFolder.GetId())
 	httpResp, err = citrixclient.AddRequestData(deleteAdminFolderRequest, client).Execute()
-	if err != nil && httpResp.StatusCode != http.StatusNotFound {
+	if err != nil && !util.IsNotFound(httpResp) {
 		log.Printf("Error destroying %s during sweep: %s", adminFolderName, err)
 	}
 	return nil

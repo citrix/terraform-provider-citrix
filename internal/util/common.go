@@ -96,6 +96,9 @@ const StoreFrontServerIdRegex string = `^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9
 // IPv4
 const IPv4Regex string = `^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$`
 
+// Host name or IP address with an optional port, and no scheme or path
+const HostWithOptionalPortRegex string = `^[^:/]+(:\d{1,5})?$`
+
 // IPv4 with https
 const IPv4RegexWithProtocol string = `^(http|https)://((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$`
 
@@ -242,6 +245,7 @@ const VirtualMachineResourceType string = "Vm"
 const TemplateResourceType string = "Template"
 const StorageResourceType string = "Storage"
 const NetworkResourceType string = "Network"
+const ClusterResourceType string = "Cluster"
 const NamespaceResourceType string = "Namespace"
 const SecurityGroupResourceType = "SecurityGroup"
 const HostResourceType = "Host"
@@ -358,12 +362,18 @@ func IsValidUUID(u string) bool {
 	return err == nil
 }
 
+// noClientErrorDetails is reported by the Read*Error helpers when they are given a nil error.
+const noClientErrorDetails = "no error details are available"
+
 // <summary>
 // Helper function to read inner error message from a generic error returned from citrix-daas-rest-go
 // </summary>
 // <param name="err">Generic error returned from citrix-daas-rest-go</param>
 // <returns>Inner error message</returns>
 func ReadClientError(err error) string {
+	if err == nil {
+		return noClientErrorDetails
+	}
 	genericOpenApiError := &citrixorchestration.GenericOpenAPIError{}
 	ok := errors.As(err, &genericOpenApiError)
 	if !ok {
@@ -383,6 +393,9 @@ func ReadClientError(err error) string {
 }
 
 func ReadGacError(err error) string {
+	if err == nil {
+		return noClientErrorDetails
+	}
 	genericOpenApiError := &globalappconfiguration.GenericOpenAPIError{}
 	ok := errors.As(err, &genericOpenApiError)
 	if !ok {
@@ -402,6 +415,9 @@ func ReadGacError(err error) string {
 }
 
 func ReadQcsClientError(err error) string {
+	if err == nil {
+		return noClientErrorDetails
+	}
 	genericOpenApiError := &citrixquickcreate.GenericOpenAPIError{}
 	ok := errors.As(err, &genericOpenApiError)
 	if !ok {
@@ -423,6 +439,9 @@ func ReadQcsClientError(err error) string {
 }
 
 func ReadCatalogServiceClientError(err error) string {
+	if err == nil {
+		return noClientErrorDetails
+	}
 	genericOpenApiError := &citrixquickdeploy.GenericOpenAPIError{}
 	ok := errors.As(err, &genericOpenApiError)
 	if !ok {
@@ -556,7 +575,7 @@ func ReadResource[ResponseType any](request any, ctx context.Context, client *ci
 
 	// Resource Location does not return an error if not found
 	if resourceType == "Resource Location" {
-		if httpResp.StatusCode == http.StatusNoContent {
+		if httpResp != nil && httpResp.StatusCode == http.StatusNoContent {
 			resp.Diagnostics.AddWarning(
 				fmt.Sprintf("%s not found", resourceType),
 				fmt.Sprintf("%s %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", resourceType, resourceIdOrName),
@@ -569,24 +588,28 @@ func ReadResource[ResponseType any](request any, ctx context.Context, client *ci
 		}
 	}
 	if err != nil && resp != nil {
-		body, _ := io.ReadAll(httpResp.Body) //nolint:errcheck // Best-effort reading of error response, we are already in an error handler
 		httpErrorBody := HttpErrorBody{}
-		_ = json.Unmarshal(body, &httpErrorBody) //nolint:errcheck // Best-effort parsing of error response body, we are already in an error handler
-		if httpResp.StatusCode == http.StatusNotFound {
+		statusCode := 0
+		if httpResp != nil {
+			body, _ := io.ReadAll(httpResp.Body)     //nolint:errcheck // Best-effort reading of error response, we are already in an error handler
+			_ = json.Unmarshal(body, &httpErrorBody) //nolint:errcheck // Best-effort parsing of error response body, we are already in an error handler
+			statusCode = httpResp.StatusCode
+		}
+		if statusCode == http.StatusNotFound {
 			resp.Diagnostics.AddWarning(
 				fmt.Sprintf("%s not found", resourceType),
 				fmt.Sprintf("%s %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", resourceType, resourceIdOrName),
 			)
 
 			resp.State.RemoveResource(ctx)
-		} else if httpResp.StatusCode == http.StatusInternalServerError && httpErrorBody.Detail == "Object does not exist." {
+		} else if statusCode == http.StatusInternalServerError && httpErrorBody.Detail == "Object does not exist." {
 			resp.Diagnostics.AddWarning(
 				fmt.Sprintf("%s not found", resourceType),
 				fmt.Sprintf("%s %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", resourceType, resourceIdOrName),
 			)
 
 			resp.State.RemoveResource(ctx)
-		} else if httpResp.StatusCode == http.StatusBadRequest && httpErrorBody.ErrorMessage == "Cannot find this administrator "+resourceIdOrName {
+		} else if statusCode == http.StatusBadRequest && httpErrorBody.ErrorMessage == "Cannot find this administrator "+resourceIdOrName {
 			resp.Diagnostics.AddWarning(
 				fmt.Sprintf("%s not found", resourceType),
 				fmt.Sprintf("%s %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", resourceType, resourceIdOrName),
@@ -649,16 +672,29 @@ func ProcessAsyncJobResponse(ctx context.Context, client *citrixdaasclient.Citri
 func ProcessAsyncJobResponseWithAddToDiagsOption(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int32, addToDiagnostics bool) error {
 	txId := citrixdaasclient.GetTransactionIdFromHttpResponse(jobResp)
 
+	if jobResp == nil {
+		err := errors.New("the request returned no response, so there is no job to poll")
+		// Callers that reach here have usually reported the request error already; only add one if they have not.
+		if addToDiagnostics && !diagnostics.HasError() {
+			diagnostics.AddError(errContext, "TransactionId: "+txId+"\nError message: "+err.Error())
+		}
+		return &JobPollError{err: err}
+	}
+
 	jobId := citrixdaasclient.GetJobIdFromHttpResponse(*jobResp)
 	jobResponseModel, err := client.WaitForJob(ctx, jobId, maxTimeout)
 
 	if err != nil {
 		if addToDiagnostics {
+			errorMessage := jobResponseModel.GetErrorString()
+			if errorMessage == "" {
+				errorMessage = ReadClientError(err)
+			}
 			diagnostics.AddError(
 				errContext,
 				"TransactionId: "+txId+
-					"\nJobId: "+jobResponseModel.GetId()+
-					"\nError message: "+jobResponseModel.GetErrorString(),
+					"\nJobId: "+jobId+
+					"\nError message: "+errorMessage,
 			)
 		}
 		return &JobPollError{err: err}
@@ -758,7 +794,6 @@ func GetAsyncJobResult[ResponseType any](ctx context.Context, client *citrixdaas
 // <param name="maxTimeout">Maximum timeout threashold for job status polling</param>
 // <returns>Error if job polling failed or job itself ended in failed state</returns>
 func GetAsyncJobResultWithAddToDiagsOption[ResponseType any](ctx context.Context, client *citrixdaasclient.CitrixDaasClient, jobResp *http.Response, errContext string, diagnostics *diag.Diagnostics, maxTimeout int32, addToDiagnostics bool) (ResponseType, error) {
-	jobId := citrixdaasclient.GetJobIdFromHttpResponse(*jobResp)
 	err := ProcessAsyncJobResponseWithAddToDiagsOption(ctx, client, jobResp, errContext, diagnostics, maxTimeout, addToDiagnostics)
 
 	var response ResponseType
@@ -768,6 +803,7 @@ func GetAsyncJobResultWithAddToDiagsOption[ResponseType any](ctx context.Context
 	}
 
 	// Job is completed successfully. Get results
+	jobId := citrixdaasclient.GetJobIdFromHttpResponse(*jobResp)
 	ss := client.ApiClient.JobsAPIsDAAS.JobsGetJobResults(ctx, jobId)
 	res, _, err := citrixdaasclient.ExecuteWithRetry[string](ss, client)
 
@@ -780,13 +816,16 @@ func GetAsyncJobResultWithAddToDiagsOption[ResponseType any](ctx context.Context
 }
 
 func WaitForQcsDeploymentTaskWithDiags(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, maxWaitTimeInSeconds int, taskId string, taskName, deploymentName string, errorContext string) error {
-	task, httpResp, err := PollQcsTask(ctx, client, diagnostics, taskId, 10, maxWaitTimeInSeconds)
-	if err != nil {
+	var taskDiagnostics diag.Diagnostics
+	task, httpResp, err := PollQcsTask(ctx, client, &taskDiagnostics, taskId, 10, maxWaitTimeInSeconds)
+	diagnostics.Append(taskDiagnostics.Warnings()...)
+	for _, taskError := range taskDiagnostics.Errors() {
 		diagnostics.AddError(
 			fmt.Sprintf("Error %s AWS WorkSpaces Deployment: %s", errorContext, deploymentName),
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+ReadClientError(err),
+			taskError.Summary()+"\n"+taskError.Detail(),
 		)
+	}
+	if err != nil {
 		return err
 	}
 	if task.DeploymentTask.GetTaskState() != citrixquickcreate.TASKSTATE_COMPLETED {
@@ -1334,13 +1373,17 @@ func RefreshUsersList(ctx context.Context, diags *diag.Diagnostics, usersSet typ
 // <summary>
 // Helper function to fetch scope ids from scope names
 // </summary>
-func FetchScopeIdsByNames(ctx context.Context, diagnostics diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, scopeNames []string) ([]string, error) {
-	getScopesResponse, httpResp, err := FetchScopes(ctx, client, &diagnostics)
-	if err != nil || getScopesResponse == nil {
+func FetchScopeIdsByNames(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, scopeNames []string) ([]string, error) {
+	getScopesResponse, httpResp, err := FetchScopes(ctx, client, diagnostics)
+	if err != nil {
+		return nil, err
+	}
+	if getScopesResponse == nil {
+		err = fmt.Errorf("no admin scopes were returned")
 		diagnostics.AddError(
 			"Error fetch scope ids from names",
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+ReadClientError(err),
+				"\nError message: "+err.Error(),
 		)
 		return nil, err
 	}
@@ -1361,13 +1404,17 @@ func FetchScopeIdsByNames(ctx context.Context, diagnostics diag.Diagnostics, cli
 // <summary>
 // Helper function to fetch scope names from scope ids
 // </summary>
-func FetchScopeNamesByIds(ctx context.Context, diagnostics diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, scopeIds []string) ([]string, error) {
-	getScopesResponse, httpResp, err := FetchScopes(ctx, client, &diagnostics)
-	if err != nil || getScopesResponse == nil {
+func FetchScopeNamesByIds(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, scopeIds []string) ([]string, error) {
+	getScopesResponse, httpResp, err := FetchScopes(ctx, client, diagnostics)
+	if err != nil {
+		return nil, err
+	}
+	if getScopesResponse == nil {
+		err = fmt.Errorf("no admin scopes were returned")
 		diagnostics.AddError(
 			"Error fetch scope names from ids",
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+ReadClientError(err),
+				"\nError message: "+err.Error(),
 		)
 		return nil, err
 	}
@@ -1736,7 +1783,7 @@ func PollQcsTask(ctx context.Context, client *citrixdaasclient.CitrixDaasClient,
 	var err error
 
 	for time.Since(startTime) <= time.Second*time.Duration(maxWaitTimeSeconds) {
-		taskResponse, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickcreate.GetTaskAsync200Response](getTaskRequest, client)
+		taskResponse, httpResp, err = citrixdaasclient.ExecuteWithRetry[*citrixquickcreate.GetTaskAsync200Response](getTaskRequest, client)
 		if err != nil {
 			diagnostics.AddError(
 				"Error polling task: "+taskId,
@@ -1744,13 +1791,16 @@ func PollQcsTask(ctx context.Context, client *citrixdaasclient.CitrixDaasClient,
 					"\nError message: "+ReadQcsClientError(err),
 			)
 			return nil, httpResp, err
-		} else if taskResponse != nil &&
-			((taskResponse.ResourceConnectionTask != nil && taskResponse.ResourceConnectionTask.GetTaskState() == citrixquickcreate.TASKSTATE_ERROR) ||
-				(taskResponse.DeploymentTask != nil && taskResponse.DeploymentTask.GetTaskState() == citrixquickcreate.TASKSTATE_ERROR)) {
+		} else if failedTask := failedQcsTask(taskResponse); failedTask != nil {
+			err = qcsTaskError(taskId, failedTask)
+			transactionId := failedTask.GetTransactionId()
+			if transactionId == "" {
+				transactionId = citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)
+			}
 			diagnostics.AddError(
 				"Task failed: "+taskId,
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+ReadQcsClientError(err),
+				"TransactionId: "+transactionId+
+					"\nError message: "+err.Error(),
 			)
 			return nil, httpResp, err
 		} else if taskResponse != nil &&
@@ -1763,7 +1813,44 @@ func PollQcsTask(ctx context.Context, client *citrixdaasclient.CitrixDaasClient,
 		continue
 	}
 
-	return taskResponse, httpResp, err
+	err = fmt.Errorf("task %s did not finish within %d seconds", taskId, maxWaitTimeSeconds)
+	diagnostics.AddError(
+		"Error polling task: "+taskId,
+		"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+			"\nError message: "+err.Error(),
+	)
+	return nil, httpResp, err
+}
+
+// failedQcsTask returns the resource connection or deployment task in the response if it ended in the ERROR state.
+func failedQcsTask(taskResponse *citrixquickcreate.GetTaskAsync200Response) *citrixquickcreate.TaskBase {
+	if taskResponse == nil {
+		return nil
+	}
+	if task := taskResponse.ResourceConnectionTask; task != nil && task.GetTaskState() == citrixquickcreate.TASKSTATE_ERROR {
+		return &task.TaskBase
+	}
+	if task := taskResponse.DeploymentTask; task != nil && task.GetTaskState() == citrixquickcreate.TASKSTATE_ERROR {
+		return &task.TaskBase
+	}
+	return nil
+}
+
+// qcsTaskError describes a failed task with the status and error messages the service reported for it.
+func qcsTaskError(taskId string, task *citrixquickcreate.TaskBase) error {
+	details := []string{}
+	if status := task.GetStatus(); status != "" {
+		details = append(details, status)
+	}
+	for _, taskError := range task.GetErrors() {
+		if message := taskError.GetMessage(); message != "" {
+			details = append(details, message)
+		}
+	}
+	if len(details) == 0 {
+		return fmt.Errorf("task %s ended in state %s", taskId, citrixquickcreate.TASKSTATE_ERROR)
+	}
+	return fmt.Errorf("task %s ended in state %s: %s", taskId, citrixquickcreate.TASKSTATE_ERROR, strings.Join(details, "; "))
 }
 
 func GetCCAdminAccessPolicyKey(r ccadmins.AdministratorAccessPolicyModel) string {

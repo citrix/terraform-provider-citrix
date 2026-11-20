@@ -248,7 +248,7 @@ func getAwsWorkspacesImageWithId(ctx context.Context, client *citrixdaasclient.C
 	image, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickcreate.AwsEdcImage](getImageRequest, client)
 
 	if err != nil {
-		if addWarningIfNotFound && httpResp.StatusCode == http.StatusNotFound {
+		if addWarningIfNotFound && util.IsNotFound(httpResp) {
 			diagnostics.AddWarning(
 				fmt.Sprintf("AWS WorkSpaces Image with ID: %s not found", imageId),
 				fmt.Sprintf("AWS WorkSpaces Image with ID: %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", imageId),
@@ -270,9 +270,12 @@ func waitForImageImportCompletion(ctx context.Context, client *citrixdaasclient.
 	// default polling to every 10 seconds
 	startTime := time.Now()
 	imageId := image.GetImageId()
+	accountId := image.GetAccountId()
 
+	var httpResp *http.Response
+	var err error
 	for time.Since(startTime) <= time.Minute*time.Duration(120) {
-		image, httpResp, err := getAwsWorkspacesImageWithId(ctx, client, diagnostics, image.GetAccountId(), imageId, false)
+		image, httpResp, err = getAwsWorkspacesImageWithId(ctx, client, diagnostics, accountId, imageId, false)
 		if err != nil {
 			return nil, httpResp, err
 		}
@@ -282,8 +285,8 @@ func waitForImageImportCompletion(ctx context.Context, client *citrixdaasclient.
 			continue
 		}
 
-		return image, httpResp, err
+		return image, httpResp, nil
 	}
 
-	return image, nil, nil
+	return image, httpResp, nil
 }

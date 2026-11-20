@@ -6,12 +6,12 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"testing"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
@@ -255,7 +255,7 @@ func zoneSweeper(ctx context.Context, zoneName string, client *citrixclient.Citr
 	getZoneRequest := client.ApiClient.ZonesAPIsDAAS.ZonesGetZone(ctx, zoneName)
 	zone, httpResp, err := citrixclient.ExecuteWithRetry[*citrixorchestration.ZoneDetailResponseModel](getZoneRequest, client)
 	if err != nil {
-		if httpResp.StatusCode == http.StatusNotFound {
+		if util.IsNotFound(httpResp) {
 			// Resource does not exist in remote, no need to delete
 			return nil
 		}
@@ -263,7 +263,7 @@ func zoneSweeper(ctx context.Context, zoneName string, client *citrixclient.Citr
 	}
 	deleteZoneRequest := client.ApiClient.ZonesAPIsDAAS.ZonesDeleteZone(ctx, zone.GetId())
 	httpResp, err = citrixclient.AddRequestData(deleteZoneRequest, client).Execute()
-	if err != nil && httpResp.StatusCode != http.StatusNotFound {
+	if err != nil && !util.IsNotFound(httpResp) {
 		log.Printf("Error destroying %s during sweep: %s", zoneName, err)
 	}
 	return nil

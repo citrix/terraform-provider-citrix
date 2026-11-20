@@ -230,14 +230,7 @@ func (r *storeFrontServerResource) Delete(ctx context.Context, req resource.Dele
 	sfServerName := state.Name.ValueString()
 	deleteStoreFrontServerRequest := r.client.ApiClient.StoreFrontServersAPIsDAAS.StoreFrontServersDeleteStoreFrontServer(ctx, sfServerId)
 	httpResp, err := citrixdaasclient.AddRequestData(deleteStoreFrontServerRequest, r.client).Execute()
-	if err != nil && httpResp.StatusCode != http.StatusNotFound {
-		resp.Diagnostics.AddError(
-			"Error deleting StoreFront Server "+sfServerName,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-		return
-	}
+	util.CheckDeleteResponse(&resp.Diagnostics, httpResp, err, "Error deleting StoreFront Server "+sfServerName)
 }
 
 func (r *storeFrontServerResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

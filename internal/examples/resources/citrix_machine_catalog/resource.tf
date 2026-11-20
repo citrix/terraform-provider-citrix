@@ -502,6 +502,88 @@ resource "citrix_machine_catalog" "example-nutanix-mtsession" {
     }
 }
 
+resource "citrix_machine_catalog" "example-nutanix-pc-mtsession" {
+    name                        = "example-nutanix-pc-mtsession"
+    description                 = "Example multi-session catalog on a Nutanix Prism Central hypervisor"
+    zone                        = citrix_zone.example-zone.id
+    allocation_type             = "Random"
+    session_support             = "MultiSession"
+    provisioning_type           = "MCS"
+    provisioning_scheme         = {
+        hypervisor = citrix_nutanix_pc_hypervisor.example-nutanix-pc-hypervisor.id
+        hypervisor_resource_pool = citrix_nutanix_pc_hypervisor_resource_pool.example-nutanix-pc-hypervisor-resource-pool.id
+        identity_type = "ActiveDirectory"
+        machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+        nutanix_pc_machine_config = {
+            cluster                 = "<Prism Central cluster name>"
+            master_image            = "<Template name>"
+            master_image_version    = "<Template version name>"
+            machine_profile         = "<Template name>"
+            machine_profile_version = "<Template version name>"
+            cpu_count               = 2
+            cores_per_cpu_count     = 2
+            memory_mb               = 4096
+        }
+        network_mapping = [
+            {
+                network_device = "0"
+                network        = "<Subnet name in the cluster>"
+            }
+        ]
+        number_of_total_machines = 1
+        machine_account_creation_rules = {
+            naming_scheme = "catalog-##"
+            naming_scheme_type = "Numeric"
+        }
+    }
+}
+
+resource "citrix_machine_catalog" "example-nutanix-pc-prepared-image" {
+    name                        = "example-nutanix-pc-prepared-image"
+    description                 = "Example catalog on a Nutanix Prism Central hypervisor from a prepared image"
+    zone                        = citrix_zone.example-zone.id
+    allocation_type             = "Random"
+    session_support             = "MultiSession"
+    provisioning_type           = "MCS"
+    provisioning_scheme         = {
+        hypervisor = citrix_nutanix_pc_hypervisor.example-nutanix-pc-hypervisor.id
+        hypervisor_resource_pool = citrix_nutanix_pc_hypervisor_resource_pool.example-nutanix-pc-hypervisor-resource-pool.id
+        identity_type = "ActiveDirectory"
+        machine_domain_identity = {
+            domain                   = "<DomainFQDN>"
+            service_account          = "<Admin Username>"
+            service_account_password = "<Admin Password>"
+        }
+        nutanix_pc_machine_config = {
+            cluster = "<Prism Central cluster name>"
+            prepared_image = {
+                image_definition = citrix_image_definition.example_nutanix_pc_image_definition.id
+                image_version    = citrix_image_version.example_nutanix_pc_image_version.id
+            }
+            machine_profile         = "<Template name>"
+            machine_profile_version = "<Template version name>"
+            cpu_count               = 2
+            cores_per_cpu_count     = 2
+            memory_mb               = 8192
+        }
+        network_mapping = [
+            {
+                network_device = "0"
+                network        = "<Subnet name in the cluster>"
+            }
+        ]
+        number_of_total_machines = 1
+        machine_account_creation_rules = {
+            naming_scheme = "catalog-##"
+            naming_scheme_type = "Numeric"
+        }
+    }
+}
+
 resource "citrix_machine_catalog" "example-scvmm-mtsession" {
     name                        = "example-scvmm-mtsession"
     description                 = "Example multi-session catalog on SCVMM hypervisor"

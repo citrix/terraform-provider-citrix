@@ -5,7 +5,6 @@ package admin_folder
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
@@ -213,14 +212,7 @@ func (r *adminFolderResource) Delete(ctx context.Context, req resource.DeleteReq
 	}
 	deleteAdminFolderRequest = deleteAdminFolderRequest.ObjectsToRemove(adminFolderObjectsEnumArray)
 	httpResp, err := citrixdaasclient.AddRequestData(deleteAdminFolderRequest, r.client).Execute()
-	if err != nil && httpResp.StatusCode != http.StatusNotFound {
-		resp.Diagnostics.AddError(
-			"Error deleting Admin Folder "+adminFolderName,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-		return
-	}
+	util.CheckDeleteResponse(&resp.Diagnostics, httpResp, err, "Error deleting Admin Folder "+adminFolderName)
 }
 
 func (r *adminFolderResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

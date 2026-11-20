@@ -5,7 +5,6 @@ package application
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"slices"
 	"strings"
 
@@ -404,12 +403,7 @@ func (r *applicationResource) Delete(ctx context.Context, req resource.DeleteReq
 	applicationName := state.Name.ValueString()
 	deleteApplicationRequest := r.client.ApiClient.ApplicationsAPIsDAAS.ApplicationsDeleteApplication(ctx, applicationId)
 	httpResp, err := citrixdaasclient.AddRequestData(deleteApplicationRequest, r.client).Async(true).Execute()
-	if err != nil && httpResp.StatusCode != http.StatusNotFound {
-		resp.Diagnostics.AddError(
-			"Error deleting Application "+applicationName,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
+	if !util.CheckDeleteResponse(&resp.Diagnostics, httpResp, err, "Error deleting Application "+applicationName) {
 		return
 	}
 
@@ -593,7 +587,7 @@ func checkIfApplicationFolderPathExist(ctx context.Context, client *citrixdaascl
 	appFolderExistRequest := client.ApiClient.ApplicationFoldersAPIsDAAS.ApplicationFoldersCheckApplicationFolderPathExists(ctx, tempFolderPath)
 	httpResp, err := citrixdaasclient.AddRequestData(appFolderExistRequest, client).Execute()
 	if err != nil {
-		if httpResp.StatusCode == http.StatusNotFound {
+		if util.IsNotFound(httpResp) {
 			diagnostics.AddError("Application Folder Path \""+applicationFolderPath+"\" does not exist. Create the folder first and then create the application in it", "")
 		} else {
 			diagnostics.AddError(

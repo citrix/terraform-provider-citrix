@@ -122,7 +122,7 @@ func (r *awsWorkspacesDirectoryConnectionResource) Read(ctx context.Context, req
 	// Try getting the AWS WorkSpaces Directory Connection
 	directoryConnection, httpResp, err := getAwsWorkspacesDirectoryConnection(ctx, r.client, &resp.Diagnostics, state.AccountId.ValueString(), state.DirectoryConnectionId.ValueString(), true)
 	if err != nil {
-		if httpResp.StatusCode == http.StatusNotFound {
+		if util.IsNotFound(httpResp) {
 			// Remove from state
 			resp.Diagnostics.AddWarning(
 				fmt.Sprintf("AWS WorkSpaces Directory Connection with ID: %s not found", state.DirectoryConnectionId.ValueString()),
@@ -179,7 +179,7 @@ func (r *awsWorkspacesDirectoryConnectionResource) Update(ctx context.Context, r
 	// Try getting the AWS WorkSpaces Directory Connection
 	directoryConnection, httpResp, err := getAwsWorkspacesDirectoryConnection(ctx, r.client, &resp.Diagnostics, plan.AccountId.ValueString(), connectionId, true)
 	if err != nil {
-		if httpResp.StatusCode == http.StatusNotFound {
+		if util.IsNotFound(httpResp) {
 			// Remove from state
 			resp.Diagnostics.AddWarning(
 				fmt.Sprintf("AWS WorkSpaces Directory Connection with ID: %s not found", connectionId),
@@ -214,11 +214,8 @@ func (r *awsWorkspacesDirectoryConnectionResource) Delete(ctx context.Context, r
 	}
 
 	// Try getting the AWS WorkSpaces Directory Connection
-	_, httpResp, err := getAwsWorkspacesDirectoryConnection(ctx, r.client, &resp.Diagnostics, state.AccountId.ValueString(), state.DirectoryConnectionId.ValueString(), true)
+	_, _, err := getAwsWorkspacesDirectoryConnection(ctx, r.client, &resp.Diagnostics, state.AccountId.ValueString(), state.DirectoryConnectionId.ValueString(), true)
 	if err != nil {
-		if httpResp.StatusCode == http.StatusNotFound {
-			return
-		}
 		return
 	}
 
@@ -293,7 +290,7 @@ func getAwsWorkspacesDirectoryConnection(ctx context.Context, client *citrixdaas
 	directoryConnection, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickcreate.AwsEdcDirectoryConnection](getDirectoryConnectionRequest, client)
 
 	if err != nil {
-		if returnIfNotFound && httpResp.StatusCode == http.StatusNotFound {
+		if returnIfNotFound && util.IsNotFound(httpResp) {
 			return nil, httpResp, err
 		}
 		diagnostics.AddError(

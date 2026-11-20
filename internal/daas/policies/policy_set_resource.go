@@ -262,7 +262,7 @@ func (r *policySetResource) Create(ctx context.Context, req resource.CreateReque
 	createPolicySetRequestBody.SetPolicySetType(plan.Type.ValueString())
 
 	// Use scope names instead of IDs for create request to support 2311
-	plannedScopeNames, err := util.FetchScopeNamesByIds(ctx, resp.Diagnostics, r.client, util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes))
+	plannedScopeNames, err := util.FetchScopeNamesByIds(ctx, &resp.Diagnostics, r.client, util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes))
 	if err != nil {
 		return
 	}
@@ -333,6 +333,9 @@ func (r *policySetResource) Create(ctx context.Context, req resource.CreateReque
 		// Update policy priorities in the Policy Set
 		policyPriorityResponse, httpResp, err := citrixdaasclient.AddRequestData(policyPriorityRequest, r.client).Execute()
 		if err != nil || !policyPriorityResponse {
+			if err == nil {
+				err = fmt.Errorf("policy priority request for policy set %s was rejected", policySet.GetPolicySetGuid())
+			}
 			resp.Diagnostics.AddError(
 				"Error Changing Policy Priorities in Policy Set "+policySet.GetPolicySetGuid(),
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
@@ -353,7 +356,7 @@ func (r *policySetResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	policySetScopes, err := util.FetchScopeIdsByNames(ctx, resp.Diagnostics, r.client, policySet.GetScopes())
+	policySetScopes, err := util.FetchScopeIdsByNames(ctx, &resp.Diagnostics, r.client, policySet.GetScopes())
 	if err != nil {
 		return
 	}
@@ -396,7 +399,7 @@ func (r *policySetResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	policySetScopes, err := util.FetchScopeIdsByNames(ctx, resp.Diagnostics, r.client, policySet.GetScopes())
+	policySetScopes, err := util.FetchScopeIdsByNames(ctx, &resp.Diagnostics, r.client, policySet.GetScopes())
 	if err != nil {
 		return
 	}
@@ -790,6 +793,9 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 		// Update policy priorities in the Policy Set
 		policyPriorityResponse, httpResp, err := citrixdaasclient.AddRequestData(policyPriorityRequest, r.client).Execute()
 		if err != nil || !policyPriorityResponse {
+			if err == nil {
+				err = fmt.Errorf("policy priority request for policy set %s was rejected", policySet.GetPolicySetGuid())
+			}
 			resp.Diagnostics.AddError(
 				"Error Changing Policy Priorities in Policy Set "+policySet.GetPolicySetGuid(),
 				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
@@ -831,7 +837,7 @@ func (r *policySetResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	policySetScopes, err := util.FetchScopeIdsByNames(ctx, resp.Diagnostics, r.client, policySet.GetScopes())
+	policySetScopes, err := util.FetchScopeIdsByNames(ctx, &resp.Diagnostics, r.client, policySet.GetScopes())
 	if err != nil {
 		return
 	}
@@ -943,14 +949,7 @@ func (r *policySetResource) Delete(ctx context.Context, req resource.DeleteReque
 	// Delete existing Policy Set
 	deletePolicySetRequest := r.client.ApiClient.GpoDAAS.GpoDeleteGpoPolicySet(ctx, policySetId)
 	httpResp, err := citrixdaasclient.AddRequestData(deletePolicySetRequest, r.client).Execute()
-	if err != nil && httpResp.StatusCode != http.StatusNotFound {
-		resp.Diagnostics.AddError(
-			"Error Deleting Policy Set "+policySetName,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-		return
-	}
+	util.CheckDeleteResponse(&resp.Diagnostics, httpResp, err, "Error Deleting Policy Set "+policySetName)
 }
 
 // ImportState implements resource.ResourceWithImportState.

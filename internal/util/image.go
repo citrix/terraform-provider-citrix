@@ -426,6 +426,7 @@ func (AzureImageSpecsModel) GetSchema() schema.SingleNestedAttribute {
 				path.MatchRelative().AtParent().AtName("vsphere_image_specs"),
 				path.MatchRelative().AtParent().AtName("amazon_workspaces_core_image_specs"),
 				path.MatchRelative().AtParent().AtName("aws_ec2_image_specs"),
+				path.MatchRelative().AtParent().AtName("nutanix_pc_image_specs"),
 			),
 		},
 	}
@@ -1055,6 +1056,15 @@ func ParseNetworkMappingToClientModel(networkMappings []NetworkMappingModel, res
 	}
 
 	return res, nil
+}
+
+// GetNetworkMappingRequestModels resolves network mappings for any hypervisor. A Nutanix Prism Central resource pool has no
+// networks of its own, so its networks are resolved under nutanixPCCluster, which other hypervisors ignore.
+func GetNetworkMappingRequestModels(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, hypervisorName, hypervisorPluginId string, resourcePool *citrixorchestration.HypervisorResourcePoolDetailResponseModel, nutanixPCCluster string, networkMappings []NetworkMappingModel) ([]citrixorchestration.NetworkMapRequestModel, error) {
+	if resourcePool.GetConnectionType() == citrixorchestration.HYPERVISORCONNECTIONTYPE_NUTANIX_AHV_PC {
+		return GetNutanixPCNetworkMapping(ctx, client, diagnostics, hypervisorName, resourcePool.GetName(), nutanixPCCluster, networkMappings)
+	}
+	return ParseNetworkMappingToClientModel(networkMappings, resourcePool, hypervisorPluginId)
 }
 
 func BuildAzureMasterImagePath(ctx context.Context, client *citrixdaasclient.CitrixDaasClient, diagnostics *diag.Diagnostics, galleryImage types.Object, sharedSubscription string, resourceGroup string, storageAccount string, storageContainer string, masterImage string, hypervisor string, hypervisorResourcePool string, errorTitle string) (string, error) {

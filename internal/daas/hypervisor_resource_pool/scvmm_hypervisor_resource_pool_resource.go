@@ -5,7 +5,6 @@ package hypervisor_resource_pool
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"slices"
 	"strings"
 
@@ -454,12 +453,7 @@ func (r *scvmmHypervisorResourcePoolResource) Delete(ctx context.Context, req re
 	hypervisorId := state.Hypervisor.ValueString()
 	deleteHypervisorResourcePoolRequest := r.client.ApiClient.HypervisorsAPIsDAAS.HypervisorsDeleteHypervisorResourcePool(ctx, hypervisorId, state.Id.ValueString())
 	httpResp, err := citrixdaasclient.AddRequestData(deleteHypervisorResourcePoolRequest, r.client).Async(true).Execute()
-	if err != nil && httpResp.StatusCode != http.StatusNotFound {
-		resp.Diagnostics.AddError(
-			"Error deleting Resource Pool for Hypervisor "+hypervisorId,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
+	if !util.CheckDeleteResponse(&resp.Diagnostics, httpResp, err, "Error deleting Resource Pool for Hypervisor "+hypervisorId) {
 		return
 	}
 

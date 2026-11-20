@@ -5,7 +5,6 @@ package machine_catalog
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
@@ -189,7 +188,7 @@ func (r *MachinePropertiesResource) Delete(ctx context.Context, req resource.Del
 	getMachinePropertiesRequest := r.client.ApiClient.MachinesAPIsDAAS.MachinesGetMachine(ctx, machineName)
 	_, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.MachineDetailResponseModel](getMachinePropertiesRequest, r.client)
 	if err != nil {
-		if httpResp.StatusCode == http.StatusNotFound {
+		if util.IsNotFound(httpResp) {
 			resp.State.RemoveResource(ctx)
 			return
 		}

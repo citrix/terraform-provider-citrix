@@ -5,7 +5,6 @@ package admin_user
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -225,12 +224,7 @@ func (r *adminUserResource) Delete(ctx context.Context, req resource.DeleteReque
 	adminUserName := state.Name.ValueString()
 	deleteAdminUserRequest := r.client.ApiClient.AdminAPIsDAAS.AdminDeleteAdminAdministrator(ctx, adminUserId)
 	httpResp, err := citrixdaasclient.AddRequestData(deleteAdminUserRequest, r.client).Async(true).Execute()
-	if err != nil && httpResp.StatusCode != http.StatusNotFound {
-		resp.Diagnostics.AddError(
-			"Error deleting Admin User: "+adminUserName,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
+	if !util.CheckDeleteResponse(&resp.Diagnostics, httpResp, err, "Error deleting Admin User: "+adminUserName) {
 		return
 	}
 

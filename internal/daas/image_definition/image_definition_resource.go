@@ -5,7 +5,6 @@ package image_definition
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -261,12 +260,7 @@ func (r *ImageDefinitionResource) Delete(ctx context.Context, req resource.Delet
 	deleteImageDefinitionRequest := r.client.ApiClient.ImageDefinitionsAPIsDAAS.ImageDefinitionsDeleteImageDefinition(ctx, imageDefinitionId)
 	deleteImageDefinitionRequest = deleteImageDefinitionRequest.Async(true)
 	httpResp, err := citrixdaasclient.AddRequestData(deleteImageDefinitionRequest, r.client).Execute()
-	if err != nil && httpResp.StatusCode != http.StatusNotFound {
-		resp.Diagnostics.AddError(
-			"Error deleting Image Definition "+imageDefinitionName,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
+	if !util.CheckDeleteResponse(&resp.Diagnostics, httpResp, err, "Error deleting Image Definition "+imageDefinitionName) {
 		return
 	}
 

@@ -169,6 +169,62 @@ func (VsphereImageSpecsDataSourceModel) GetDataSourceAttributes() map[string]sch
 	return VsphereImageSpecsDataSourceModel{}.GetDataSourceSchema().Attributes
 }
 
+type NutanixPCImageSpecsDataSourceModel struct {
+	Cluster               types.String `tfsdk:"cluster"`
+	MasterImage           types.String `tfsdk:"master_image"`
+	MasterImageVersion    types.String `tfsdk:"master_image_version"`
+	MachineProfile        types.String `tfsdk:"machine_profile"`
+	MachineProfileVersion types.String `tfsdk:"machine_profile_version"`
+	CpuCount              types.Int32  `tfsdk:"cpu_count"`
+	CoresPerCpuCount      types.Int32  `tfsdk:"cores_per_cpu_count"`
+	MemoryMB              types.Int32  `tfsdk:"memory_mb"`
+}
+
+func (NutanixPCImageSpecsDataSourceModel) GetDataSourceSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "Image configuration for Nutanix AHV Prism Central image version.",
+		Computed:    true,
+		Attributes: map[string]schema.Attribute{
+			"cluster": schema.StringAttribute{
+				Description: "Name of the Prism Central-managed cluster the image is prepared in.",
+				Computed:    true,
+			},
+			"master_image": schema.StringAttribute{
+				Description: "Name of the Prism Central template used as the master image.",
+				Computed:    true,
+			},
+			"master_image_version": schema.StringAttribute{
+				Description: "Name of the template version used as the master image.",
+				Computed:    true,
+			},
+			"machine_profile": schema.StringAttribute{
+				Description: "Name of the Prism Central template used as the machine profile.",
+				Computed:    true,
+			},
+			"machine_profile_version": schema.StringAttribute{
+				Description: "Name of the template version used as the machine profile.",
+				Computed:    true,
+			},
+			"cpu_count": schema.Int32Attribute{
+				Description: "Number of CPU sockets of the machines.",
+				Computed:    true,
+			},
+			"cores_per_cpu_count": schema.Int32Attribute{
+				Description: "Number of cores per CPU socket of the machines.",
+				Computed:    true,
+			},
+			"memory_mb": schema.Int32Attribute{
+				Description: "Memory of the machines in MB.",
+				Computed:    true,
+			},
+		},
+	}
+}
+
+func (NutanixPCImageSpecsDataSourceModel) GetDataSourceAttributes() map[string]schema.Attribute {
+	return NutanixPCImageSpecsDataSourceModel{}.GetDataSourceSchema().Attributes
+}
+
 func (ImageVersionModel) GetDataSourceSchema() schema.Schema {
 	return schema.Schema{
 		Description: "CVAD --- Data source an image version.",
@@ -213,6 +269,7 @@ func (ImageVersionModel) GetDataSourceSchema() schema.Schema {
 			"aws_ec2_image_specs":                AwsEc2ImageSpecsDataSourceModel{}.GetDataSourceSchema(),
 			"vsphere_image_specs":                VsphereImageSpecsDataSourceModel{}.GetDataSourceSchema(),
 			"amazon_workspaces_core_image_specs": AmazonWorkspacesCoreImageSpecsDataSourceModel{}.GetDataSourceSchema(),
+			"nutanix_pc_image_specs":             NutanixPCImageSpecsDataSourceModel{}.GetDataSourceSchema(),
 			"session_support": schema.StringAttribute{
 				Description: "Session support for the image version.",
 				Computed:    true,
@@ -246,7 +303,8 @@ func (r ImageVersionModel) RefreshDataSourcePropertyValues(ctx context.Context, 
 	imageScheme := imageContext.GetImageScheme()
 	// Refresh NetworkMapping
 	networkMaps := imageScheme.GetNetworkMaps()
-	if len(networkMaps) > 0 && !r.NetworkMapping.IsNull() {
+	isNutanixPC := imageContext.GetPluginFactoryName() == util.NUTANIX_PC_PLUGIN_ID
+	if len(networkMaps) > 0 && (!r.NetworkMapping.IsNull() || isNutanixPC) {
 		r.NetworkMapping = util.RefreshListValueProperties[util.NetworkMappingModel, citrixorchestration.NetworkMapResponseModel](ctx, diagnostics, r.NetworkMapping, networkMaps, util.GetOrchestrationNetworkMappingKey)
 	} else {
 		r.NetworkMapping = util.TypedArrayToObjectList[util.NetworkMappingModel](ctx, diagnostics, nil)
@@ -363,6 +421,13 @@ func (r ImageVersionModel) RefreshDataSourcePropertyValues(ctx context.Context, 
 		}
 
 		r.AmazonWorkspacesCoreImageSpecs = util.DataSourceTypedObjectToObjectValue(ctx, diagnostics, amazonWSCImageSpecs)
+	case util.NUTANIX_PC_PLUGIN_ID:
+		nutanixPCImageSpecs := NutanixPCImageSpecsModel{}
+		nutanixPCImageSpecs.refreshFromImageScheme(masterImage, imageScheme)
+		primaryResourcePool := imageSpecs.GetResourcePool()
+		primaryHypervisor := primaryResourcePool.GetHypervisor()
+		nutanixPCImageSpecs.Cluster = types.StringValue(resolveNutanixPCClusterName(ctx, diagnostics, client, primaryHypervisor.GetId(), primaryResourcePool.GetId(), imageScheme))
+		r.NutanixPCImageSpecs = util.DataSourceTypedObjectToObjectValue(ctx, diagnostics, NutanixPCImageSpecsDataSourceModel(nutanixPCImageSpecs))
 	default:
 		diagnostics.AddError(
 			"Error refreshing Image Version data source",

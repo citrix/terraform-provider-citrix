@@ -13,10 +13,12 @@ import (
 	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int32validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int32planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -154,6 +156,110 @@ func (VsphereImageSpecsModel) GetAttributes() map[string]schema.Attribute {
 	return VsphereImageSpecsModel{}.GetSchema().Attributes
 }
 
+type NutanixPCImageSpecsModel struct {
+	Cluster               types.String `tfsdk:"cluster"`
+	MasterImage           types.String `tfsdk:"master_image"`
+	MasterImageVersion    types.String `tfsdk:"master_image_version"`
+	MachineProfile        types.String `tfsdk:"machine_profile"`
+	MachineProfileVersion types.String `tfsdk:"machine_profile_version"`
+	CpuCount              types.Int32  `tfsdk:"cpu_count"`
+	CoresPerCpuCount      types.Int32  `tfsdk:"cores_per_cpu_count"`
+	MemoryMB              types.Int32  `tfsdk:"memory_mb"`
+}
+
+func (NutanixPCImageSpecsModel) GetSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: "Image configuration for Nutanix AHV Prism Central image version. Requires `network_mapping`.",
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			"cluster": schema.StringAttribute{
+				Description: "Name of the Prism Central-managed cluster the image is prepared in. Changing it replaces the image version.",
+				Required:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"master_image": schema.StringAttribute{
+				Description: "Name of the Prism Central template used as the master image.",
+				Required:    true,
+			},
+			"master_image_version": schema.StringAttribute{
+				Description: "Name of the template version used as the master image.",
+				Required:    true,
+			},
+			"machine_profile": schema.StringAttribute{
+				Description: "Name of the Prism Central template used as the machine profile.",
+				Required:    true,
+			},
+			"machine_profile_version": schema.StringAttribute{
+				Description: "Name of the template version used as the machine profile.",
+				Required:    true,
+			},
+			"cpu_count": schema.Int32Attribute{
+				Description: "Number of CPU sockets of the machines.",
+				Required:    true,
+				Validators: []validator.Int32{
+					int32validator.AtLeast(1),
+				},
+			},
+			"cores_per_cpu_count": schema.Int32Attribute{
+				Description: "Number of cores per CPU socket of the machines.",
+				Required:    true,
+				Validators: []validator.Int32{
+					int32validator.AtLeast(1),
+				},
+			},
+			"memory_mb": schema.Int32Attribute{
+				Description: "Memory of the machines in MB.",
+				Required:    true,
+				Validators: []validator.Int32{
+					int32validator.AtLeast(1),
+				},
+			},
+		},
+		PlanModifiers: []planmodifier.Object{
+			util.ImageSpecsRequiresReplaceIfAddedOrRemoved("nutanix_pc_image_specs"),
+		},
+		Validators: []validator.Object{
+			objectvalidator.AlsoRequires(path.MatchRelative().AtParent().AtName("network_mapping")),
+		},
+	}
+}
+
+func (NutanixPCImageSpecsModel) GetAttributes() map[string]schema.Attribute {
+	return NutanixPCImageSpecsModel{}.GetSchema().Attributes
+}
+
+func (specs *NutanixPCImageSpecsModel) refreshFromImageScheme(masterImage citrixorchestration.HypervisorResourceRefResponseModel, imageScheme citrixorchestration.ImageSchemeResponseModel) {
+	if template, version, ok := util.ParseNutanixPCTemplateVersionPath(masterImage.GetXDPath()); ok {
+		specs.MasterImage = types.StringValue(template)
+		specs.MasterImageVersion = types.StringValue(version)
+	}
+	machineProfile := imageScheme.GetMachineProfile()
+	if template, version, ok := util.ParseNutanixPCTemplateVersionPath(machineProfile.GetXDPath()); ok {
+		specs.MachineProfile = types.StringValue(template)
+		specs.MachineProfileVersion = types.StringValue(version)
+	}
+	specs.CpuCount = types.Int32Value(imageScheme.GetCpuCount())
+	specs.MemoryMB = types.Int32Value(imageScheme.GetMemoryMB())
+	if cores, ok := util.GetNutanixPCCoresPerCpu(imageScheme.GetCustomProperties()); ok {
+		specs.CoresPerCpuCount = types.Int32Value(int32(cores))
+	}
+}
+
+func resolveNutanixPCClusterName(ctx context.Context, diagnostics *diag.Diagnostics, client *citrixdaasclient.CitrixDaasClient, hypervisorId, resourcePoolId string, imageScheme citrixorchestration.ImageSchemeResponseModel) string {
+	clusterId := util.GetNutanixPCClusterId(imageScheme.GetCustomProperties())
+	name, httpResp, err := util.GetNutanixPCClusterName(ctx, client, diagnostics, hypervisorId, resourcePoolId, clusterId)
+	if err != nil {
+		diagnostics.AddError(
+			"Error refreshing Image Version",
+			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+				fmt.Sprintf("\nFailed to resolve Nutanix Prism Central cluster ID %s to a cluster name, error: %s", clusterId, err.Error()),
+		)
+	}
+	return name
+}
+
 type AmazonWorkspacesCoreImageSpecsModel struct {
 	ServiceOffering types.String `tfsdk:"service_offering"`
 	MasterImage     types.String `tfsdk:"master_image"`
@@ -207,6 +313,7 @@ type ImageVersionModel struct {
 	AwsEc2ImageSpecs               types.Object `tfsdk:"aws_ec2_image_specs"`
 	VsphereImageSpecs              types.Object `tfsdk:"vsphere_image_specs"`
 	AmazonWorkspacesCoreImageSpecs types.Object `tfsdk:"amazon_workspaces_core_image_specs"`
+	NutanixPCImageSpecs            types.Object `tfsdk:"nutanix_pc_image_specs"`
 	SessionSupport                 types.String `tfsdk:"session_support"`
 	OsType                         types.String `tfsdk:"os_type"`
 	Timeout                        types.Object `tfsdk:"timeout"`
@@ -279,6 +386,7 @@ func (ImageVersionModel) GetSchema() schema.Schema {
 			"aws_ec2_image_specs":                AwsEc2ImageSpecsModel{}.GetSchema(),
 			"vsphere_image_specs":                VsphereImageSpecsModel{}.GetSchema(),
 			"amazon_workspaces_core_image_specs": AmazonWorkspacesCoreImageSpecsModel{}.GetSchema(),
+			"nutanix_pc_image_specs":             NutanixPCImageSpecsModel{}.GetSchema(),
 			"session_support": schema.StringAttribute{
 				Description: "Session support for the image version.",
 				Computed:    true,
@@ -360,7 +468,9 @@ func (r ImageVersionModel) RefreshPropertyValues(ctx context.Context, diagnostic
 	imageScheme := imageContext.GetImageScheme()
 	// Refresh NetworkMapping
 	networkMaps := imageScheme.GetNetworkMaps()
-	if len(networkMaps) > 0 && !r.NetworkMapping.IsNull() {
+	// network_mapping is required for Nutanix Prism Central, so refresh it even when state has none (import).
+	isNutanixPC := imageContext.GetPluginFactoryName() == util.NUTANIX_PC_PLUGIN_ID
+	if len(networkMaps) > 0 && (!r.NetworkMapping.IsNull() || isNutanixPC) {
 		r.NetworkMapping = util.RefreshListValueProperties[util.NetworkMappingModel, citrixorchestration.NetworkMapResponseModel](ctx, diagnostics, r.NetworkMapping, networkMaps, util.GetOrchestrationNetworkMappingKey)
 	} else {
 		r.NetworkMapping = util.TypedArrayToObjectList[util.NetworkMappingModel](ctx, diagnostics, nil)
@@ -489,6 +599,14 @@ func (r ImageVersionModel) RefreshPropertyValues(ctx context.Context, diagnostic
 			}
 		}
 		r.AmazonWorkspacesCoreImageSpecs = util.TypedObjectToObjectValue(ctx, diagnostics, amazonWorkspacesCoreImageSpecs)
+	case util.NUTANIX_PC_PLUGIN_ID:
+		nutanixPCImageSpecs := util.ObjectValueToTypedObject[NutanixPCImageSpecsModel](ctx, diagnostics, r.NutanixPCImageSpecs)
+		nutanixPCImageSpecs.refreshFromImageScheme(masterImage, imageScheme)
+		if nutanixPCImageSpecs.Cluster.ValueString() == "" {
+			// Only after an import: the cluster can't change once the image version exists, so it is never re-resolved.
+			nutanixPCImageSpecs.Cluster = types.StringValue(resolveNutanixPCClusterName(ctx, diagnostics, client, hypervisor.GetId(), resourcePool.GetId(), imageScheme))
+		}
+		r.NutanixPCImageSpecs = util.TypedObjectToObjectValue(ctx, diagnostics, nutanixPCImageSpecs)
 	default:
 		diagnostics.AddError(
 			"Error refreshing Image Version",

@@ -380,9 +380,10 @@ func (r *machineCatalogResource) Update(ctx context.Context, req resource.Update
 		}
 
 		machineAccountsInPlan := util.ObjectListToTypedArray[MachineADAccountModel](ctx, &resp.Diagnostics, planProvSchemeModel.MachineADAccounts)
-		err = updateCatalogImageAndMachineProfile(ctx, r.client, resp, catalog, plan, provisioningType, updateTimeout)
-
-		if err != nil {
+		imageErr := updateCatalogImageAndMachineProfile(ctx, r.client, resp, catalog, plan, provisioningType, updateTimeout)
+		// Restore cores per CPU even if the image update failed, since a machine profile change before it may have reset them
+		coresErr := ensureNutanixPCCoresPerCpu(ctx, r.client, resp, plan, catalog.GetId(), updateTimeout)
+		if imageErr != nil || coresErr != nil {
 			return
 		}
 
@@ -750,7 +751,7 @@ func (r *machineCatalogResource) Delete(ctx context.Context, req resource.Delete
 	catalog, httpResp, err := readMachineCatalog(ctx, r.client, nil, catalogId)
 
 	if err != nil {
-		if httpResp.StatusCode == http.StatusNotFound {
+		if util.IsNotFound(httpResp) {
 			return
 		}
 
@@ -820,12 +821,7 @@ func (r *machineCatalogResource) Delete(ctx context.Context, req resource.Delete
 
 	deleteMachineCatalogRequest = deleteMachineCatalogRequest.DeleteVm(deleteVmOption).DeleteAccount(deleteAccountOption).Async(true)
 	httpResp, err = citrixdaasclient.AddRequestData(deleteMachineCatalogRequest, r.client).Execute()
-	if err != nil && httpResp.StatusCode != http.StatusNotFound {
-		resp.Diagnostics.AddError(
-			"Error deleting Machine Catalog "+catalogName,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
+	if !util.CheckDeleteResponse(&resp.Diagnostics, httpResp, err, "Error deleting Machine Catalog "+catalogName) {
 		return
 	}
 
@@ -1137,6 +1133,14 @@ func (r *machineCatalogResource) ValidateConfig(ctx context.Context, req resourc
 				if !nutanixMachineConfigModel.ImageUpdateRebootOptions.IsNull() {
 					// Validate Image Update Reboot Options
 					rebootOptions := util.ObjectValueToTypedObject[ImageUpdateRebootOptionsModel](ctx, &resp.Diagnostics, nutanixMachineConfigModel.ImageUpdateRebootOptions)
+					rebootOptions.ValidateConfig(&resp.Diagnostics)
+				}
+			}
+
+			if !provSchemeModel.NutanixPCMachineConfig.IsUnknown() && !provSchemeModel.NutanixPCMachineConfig.IsNull() {
+				nutanixPCMachineConfigModel := util.ObjectValueToTypedObject[NutanixPCMachineConfigModel](ctx, &resp.Diagnostics, provSchemeModel.NutanixPCMachineConfig)
+				if !nutanixPCMachineConfigModel.ImageUpdateRebootOptions.IsUnknown() && !nutanixPCMachineConfigModel.ImageUpdateRebootOptions.IsNull() {
+					rebootOptions := util.ObjectValueToTypedObject[ImageUpdateRebootOptionsModel](ctx, &resp.Diagnostics, nutanixPCMachineConfigModel.ImageUpdateRebootOptions)
 					rebootOptions.ValidateConfig(&resp.Diagnostics)
 				}
 			}

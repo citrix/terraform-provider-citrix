@@ -4,7 +4,6 @@ package zone
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -294,12 +293,7 @@ func (r *zoneResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	zoneName := state.Name.ValueString()
 	deleteZoneRequest := r.client.ApiClient.ZonesAPIsDAAS.ZonesDeleteZone(ctx, zoneId)
 	httpResp, err := citrixdaasclient.AddRequestData(deleteZoneRequest, r.client).Async(true).Execute()
-	if err != nil && httpResp.StatusCode != http.StatusNotFound {
-		resp.Diagnostics.AddError(
-			"Error deleting Zone "+zoneName,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
+	if !util.CheckDeleteResponse(&resp.Diagnostics, httpResp, err, "Error deleting Zone "+zoneName) {
 		return
 	}
 

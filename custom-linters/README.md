@@ -85,6 +85,49 @@ func getAll(ctx context.Context, client *citrixdaasclient.CitrixDaasClient) (*ci
 }
 ```
 
+### NilResponse
+
+**Purpose:** Enforces a nil check before using an `*http.Response` that was returned alongside an `error`.
+
+**Why?** When a request fails without a response (DNS, TLS or connection failure, or a cancelled run), the generated clients return a nil `*http.Response` and an error. Reading `StatusCode`, `Body` or any other field, calling a method, or dereferencing the response on that path panics, and the provider reports "An unexpected error occurred" instead of the real error.
+
+**Required fix:** use `util.IsNotFound(httpResp)` for not-found checks and `util.CheckDeleteResponse` for delete results. Otherwise use the response only after `err == nil` is known (generated client calls only, see below), or guard it with `httpResp != nil`. `citrixdaasclient.GetTransactionIdFromHttpResponse` is already nil-safe.
+
+**How it Works:**
+- Tracks variables of type `*http.Response` assigned with `:=` or `=` from a call whose `error` is assigned to a named variable (`_, httpResp, err := request.Execute()`). Not checked: responses whose error is discarded with `_`, responses declared with `var x = call()`, responses from calls without an error, function parameters and literals
+- Flags any use (`httpResp.X` or `*httpResp`) unless the response is known to be non-nil at that point:
+  - inside an `if` whose condition includes `httpResp != nil`, `err == nil` or `util.CheckDeleteResponse(..., err, ...)`, or in the `else` of `if httpResp == nil` / `if err != nil` / `if !util.CheckDeleteResponse(...)`
+  - on the right of `httpResp != nil && ...` or `httpResp == nil || ...`
+  - after an earlier `if err != nil` / `if httpResp == nil` / `if !util.CheckDeleteResponse(...)` branch that always leaves (`return`, `break`, `continue`, `goto`, `panic`, `t.Fatal*`, `t.FailNow`, `t.Skip*`, `log.Fatal*`, `log.Panic*`, `os.Exit`, `runtime.Goexit`)
+  - after testify `require.NotNil(t, httpResp)` or `require.NoError(t, err)`, including the `require.New(t)` and `s.Require()` forms. These are matched by the `testify/require` package path, not by name
+- An error check only proves the response non-nil for **trusted** calls that return one whenever the error is nil: generated client `Execute()` methods and the `ExecuteWithRetry`, `ExecuteWithRetryContext`, `ExecuteWithRetryOnNotFound`, `GetAllPagesWithRetry` and `GetAllPagesWithRetryContext` wrappers from citrix-daas-rest-go, plus `net/http` functions such as `Client.Do`. Calls are matched by the callee's package, so a same-named function elsewhere is not trusted. Other helpers can return a nil response with a nil error (for example `SignIn`, or a provider helper that passes a response through), so their responses need an explicit nil check
+- A guard only counts if it runs after the response's latest assignment, and an error check does not count if `err` was overwritten by another call in between
+
+**Code Examples:**
+
+```go
+// ✗ Flagged - on a transport error httpResp is nil
+httpResp, err := citrixdaasclient.AddRequestData(deleteRequest, r.client).Execute()
+if err != nil && httpResp.StatusCode != http.StatusNotFound {
+    ...
+}
+
+// ✓ Correct - nil-safe helpers
+httpResp, err := citrixdaasclient.AddRequestData(deleteRequest, r.client).Execute()
+if !util.CheckDeleteResponse(&resp.Diagnostics, httpResp, err, "Error deleting Zone "+zoneName) {
+    return
+}
+
+// ✓ Correct - the error path returns before the response is read
+_, httpResp, err := citrixdaasclient.ExecuteWithRetry[*Model](request, client)
+if err != nil {
+    return
+}
+if httpResp.StatusCode == http.StatusNoContent {
+    ...
+}
+```
+
 ### PanicHandler
 
 **Purpose:** Enforces that all Terraform provider SDK interface functions start with `defer util.PanicHandler(&resp.Diagnostics)`.

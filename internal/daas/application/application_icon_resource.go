@@ -5,7 +5,6 @@ package application
 import (
 	"context"
 	"encoding/base64"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -187,14 +186,7 @@ func (r *applicationIconResource) Delete(ctx context.Context, req resource.Delet
 
 	deleteApplicationIconRequest := r.client.ApiClient.IconsAPIsDAAS.IconsRemoveIcon(ctx, int32(applicationIconId))
 	httpResp, err := citrixdaasclient.AddRequestData(deleteApplicationIconRequest, r.client).Execute()
-	if err != nil && httpResp.StatusCode != http.StatusNotFound {
-		resp.Diagnostics.AddError(
-			"Error deleting Application Icon "+state.Id.ValueString(),
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-		return
-	}
+	util.CheckDeleteResponse(&resp.Diagnostics, httpResp, err, "Error deleting Application Icon "+state.Id.ValueString())
 }
 
 func (r *applicationIconResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

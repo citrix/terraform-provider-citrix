@@ -379,11 +379,13 @@ func waitForImageImportCompletion(ctx context.Context, client *citrixdaasclient.
 	imageId := imageResp.GetId()
 
 	var image *citrixquickdeploy.TemplateImageDetails
+	var httpResp *http.Response
+	var err error
 	for time.Since(startTime) <= time.Minute*time.Duration(120) {
 		// Sleep ahead of getting the image to account for the time of resource group creation
 		time.Sleep(time.Second * time.Duration(30))
 
-		image, httpResp, err := util.GetTemplateImageWithId(ctx, client, diagnostics, imageId, false)
+		image, httpResp, err = util.GetTemplateImageWithId(ctx, client, diagnostics, imageId, false)
 		if err != nil {
 			return nil, httpResp, err
 		}
@@ -392,8 +394,8 @@ func waitForImageImportCompletion(ctx context.Context, client *citrixdaasclient.
 			continue
 		}
 
-		return image, httpResp, err
+		return image, httpResp, nil
 	}
 
-	return image, nil, nil
+	return image, httpResp, nil
 }

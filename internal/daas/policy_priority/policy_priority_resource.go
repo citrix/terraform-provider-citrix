@@ -210,16 +210,16 @@ func updatePolicySetPolicyPriorities(ctx context.Context, diagnostics *diag.Diag
 		// Update policy priorities in the Policy Set
 		policyPriorityResponse, httpResp, err := citrixdaasclient.AddRequestData(policyPriorityRequest, client).Execute()
 		if err != nil || !policyPriorityResponse {
-			diagnostics.AddError(
-				"Error Changing Policy Priorities in Policy Set "+policySetId,
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+util.ReadClientError(err),
-			)
 			if err == nil {
 				// The API refused the rank without a transport error; returning nil here would
 				// let the caller carry on and persist an order the server never applied.
 				err = fmt.Errorf("policy priority request for policy set %s was rejected", policySetId)
 			}
+			diagnostics.AddError(
+				"Error Changing Policy Priorities in Policy Set "+policySetId,
+				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
+					"\nError message: "+util.ReadClientError(err),
+			)
 			return err
 		}
 	}

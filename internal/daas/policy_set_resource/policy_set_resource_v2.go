@@ -76,7 +76,7 @@ func (r *policySetV2Resource) Create(ctx context.Context, req resource.CreateReq
 	createPolicySetRequestBody.SetPolicySetType(string(citrixorchestration.SDKGPOPOLICYSETTYPE_DELIVERY_GROUP_POLICIES))
 
 	// Use scope names instead of IDs for create request to support 2311
-	plannedScopeNames, err := util.FetchScopeNamesByIds(ctx, resp.Diagnostics, r.client, util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes))
+	plannedScopeNames, err := util.FetchScopeNamesByIds(ctx, &resp.Diagnostics, r.client, util.StringSetToStringArray(ctx, &resp.Diagnostics, plan.Scopes))
 	if err != nil {
 		return
 	}

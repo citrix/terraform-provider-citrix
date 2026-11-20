@@ -5,7 +5,6 @@ package cc_admin_user
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"regexp"
 	"strings"
 
@@ -307,26 +306,12 @@ func (r *ccAdminUserResource) Delete(ctx context.Context, req resource.DeleteReq
 		deleteAdminInvitationRequest = deleteAdminInvitationRequest.CitrixCustomerId(r.client.ClientConfig.CustomerId)
 		deleteAdminInvitationRequest = deleteAdminInvitationRequest.Email(state.Email.ValueString())
 		_, httpResp, err := citrixdaasclient.AddRequestData(deleteAdminInvitationRequest, r.client).Execute()
-		if err != nil && httpResp.StatusCode != http.StatusNotFound {
-			resp.Diagnostics.AddError(
-				"Error deleting admin user invitation with email: "+state.Email.ValueString(),
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+util.ReadClientError(err),
-			)
-			return
-		}
+		util.CheckDeleteResponse(&resp.Diagnostics, httpResp, err, "Error deleting admin user invitation with email: "+state.Email.ValueString())
 	} else {
 		deleteAdminUserRequest := r.client.CCAdminsClient.AdministratorsAPI.DeleteAdministrator(ctx, state.AdminId.ValueString())
 		deleteAdminUserRequest = deleteAdminUserRequest.CitrixCustomerId(r.client.ClientConfig.CustomerId)
 		httpResp, err := citrixdaasclient.AddRequestData(deleteAdminUserRequest, r.client).Execute()
-		if err != nil && httpResp.StatusCode != http.StatusNotFound {
-			resp.Diagnostics.AddError(
-				"Error deleting admin user with id: "+state.AdminId.ValueString(),
-				"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-					"\nError message: "+util.ReadClientError(err),
-			)
-			return
-		}
+		util.CheckDeleteResponse(&resp.Diagnostics, httpResp, err, "Error deleting admin user with id: "+state.AdminId.ValueString())
 	}
 }
 
