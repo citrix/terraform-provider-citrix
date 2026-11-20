@@ -4,6 +4,7 @@ package cc_identity_providers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixcws"
 	citrixdaasclient "github.com/citrix/citrix-daas-rest-go/client"
@@ -93,6 +94,9 @@ func (r *GoogleIdentityProviderResource) Create(ctx context.Context, req resourc
 	idpValidationRequest = idpValidationRequest.GoogleConnectionModel(googleIdpConnectBody)
 	idpValidationResult, httpResp, err := citrixdaasclient.AddRequestData(idpValidationRequest, r.client).Execute()
 	if err != nil || !idpValidationResult.GetValidCredentials() {
+		if err == nil {
+			err = fmt.Errorf("the Google credentials were not accepted")
+		}
 		resp.Diagnostics.AddError(
 			"Error validating credentials for Google Identity Provider "+plan.Name.ValueString(),
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+

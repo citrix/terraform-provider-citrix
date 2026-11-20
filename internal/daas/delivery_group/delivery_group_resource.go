@@ -5,7 +5,6 @@ package delivery_group
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
@@ -502,12 +501,7 @@ func (r *deliveryGroupResource) Delete(ctx context.Context, req resource.DeleteR
 	deleteDeliveryGroupRequest := r.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsDeleteDeliveryGroup(ctx, deliveryGroupId)
 	deleteDeliveryGroupRequest = deleteDeliveryGroupRequest.Force(forceDelete)
 	httpResp, err := citrixdaasclient.AddRequestData(deleteDeliveryGroupRequest, r.client).Async(true).Execute()
-	if err != nil && httpResp.StatusCode != http.StatusNotFound {
-		resp.Diagnostics.AddError(
-			"Error deleting Delivery Group "+deliveryGroupName,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
+	if !util.CheckDeleteResponse(&resp.Diagnostics, httpResp, err, "Error deleting Delivery Group "+deliveryGroupName) {
 		return
 	}
 

@@ -118,6 +118,7 @@ func (r *citrixManagedCatalogResource) Create(ctx context.Context, req resource.
 	addCatalog.SetIsAzureAdJoined(false)
 	addCatalog.SetPersistStaticAllocatedVmDisks(true)
 	addCatalog.SetMinUniqueUsers(int32(plan.NumberOfUsers.ValueInt64()))
+	addCatalog.SetEnableAcceleratedNetworking(plan.EnableAcceleratedNetworking.ValueBool())
 
 	if !plan.MachineNamingScheme.IsNull() {
 		var namingScheme citrixquickdeploy.MachineNamingSchemeModel
@@ -742,13 +743,11 @@ func getManagedCatalogWithId(ctx context.Context, client *citrixdaasclient.Citri
 	catalog, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickdeploy.CatalogOverview](getCatalogRequest, client)
 
 	if err != nil {
-		if httpResp.StatusCode == http.StatusNotFound {
-			if addWarningIfNotFound {
-				diagnostics.AddWarning(
-					fmt.Sprintf("Managed Catalog with ID: %s not found", catalogId),
-					fmt.Sprintf("Managed Catalog with ID: %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", catalogId),
-				)
-			}
+		if addWarningIfNotFound && util.IsNotFound(httpResp) {
+			diagnostics.AddWarning(
+				fmt.Sprintf("Managed Catalog with ID: %s not found", catalogId),
+				fmt.Sprintf("Managed Catalog with ID: %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", catalogId),
+			)
 			return nil, httpResp, err
 		}
 		diagnostics.AddError(
@@ -786,7 +785,7 @@ func getManagedCatalogCapacityWithId(ctx context.Context, client *citrixdaasclie
 	capacitySettings, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickdeploy.CatalogCapacitySettingsModel](getCatalogCapacityRequest, client)
 
 	if err != nil {
-		if addWarningIfNotFound && httpResp.StatusCode == http.StatusNotFound {
+		if addWarningIfNotFound && util.IsNotFound(httpResp) {
 			diagnostics.AddWarning(
 				fmt.Sprintf("Managed Catalog with ID: %s not found", catalogId),
 				fmt.Sprintf("Managed Catalog with ID: %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", catalogId),

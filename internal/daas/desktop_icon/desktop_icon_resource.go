@@ -5,7 +5,6 @@ package desktop_icon
 import (
 	"context"
 	"encoding/base64"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -187,14 +186,7 @@ func (r *desktopIconResource) Delete(ctx context.Context, req resource.DeleteReq
 
 	deleteDesktopIconRequest := r.client.ApiClient.IconsAPIsDAAS.IconsRemoveIcon(ctx, int32(desktopIconId))
 	httpResp, err := citrixdaasclient.AddRequestData(deleteDesktopIconRequest, r.client).Execute()
-	if err != nil && httpResp.StatusCode != http.StatusNotFound {
-		resp.Diagnostics.AddError(
-			"Error deleting Desktop Icon "+state.Id.ValueString(),
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-		return
-	}
+	util.CheckDeleteResponse(&resp.Diagnostics, httpResp, err, "Error deleting Desktop Icon "+state.Id.ValueString())
 }
 
 func (r *desktopIconResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

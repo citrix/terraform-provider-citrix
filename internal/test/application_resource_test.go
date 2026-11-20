@@ -6,12 +6,12 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"testing"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
@@ -365,7 +365,7 @@ func applicationSweeper(ctx context.Context, appName string, client *citrixclien
 	getApplicationRequest := client.ApiClient.ApplicationsAPIsDAAS.ApplicationsGetApplication(ctx, appName)
 	application, httpResp, err := citrixclient.ExecuteWithRetry[*citrixorchestration.ApplicationDetailResponseModel](getApplicationRequest, client)
 	if err != nil {
-		if httpResp.StatusCode == http.StatusNotFound {
+		if util.IsNotFound(httpResp) {
 			// Resource does not exist in remote, no need to delete
 			return nil
 		}
@@ -373,7 +373,7 @@ func applicationSweeper(ctx context.Context, appName string, client *citrixclien
 	}
 	deleteApplicationRequest := client.ApiClient.ApplicationsAPIsDAAS.ApplicationsDeleteApplication(ctx, application.GetId())
 	httpResp, err = citrixclient.AddRequestData(deleteApplicationRequest, client).Execute()
-	if err != nil && httpResp.StatusCode != http.StatusNotFound {
+	if err != nil && !util.IsNotFound(httpResp) {
 		log.Printf("Error destroying %s during sweep: %s", appName, err)
 	}
 	return nil

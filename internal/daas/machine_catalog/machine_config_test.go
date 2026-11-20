@@ -253,3 +253,94 @@ func TestGetGcpSnapshotPath(t *testing.T) {
 		})
 	}
 }
+
+func TestImageUpdateRebootOptionsValidateConfig(t *testing.T) {
+	tests := []struct { // uses Table-driven-tests pattern https://go.dev/wiki/TableDrivenTests
+		name                  string
+		rebootDuration        types.Int64
+		warningDuration       types.Int64
+		warningRepeatInterval types.Int64
+		expectedError         string
+	}{
+		{
+			name:                  "unknown reboot_duration skips the reboot_duration checks",
+			rebootDuration:        types.Int64Unknown(),
+			warningDuration:       types.Int64Value(-1),
+			warningRepeatInterval: types.Int64Null(),
+		},
+		{
+			name:                  "unknown warning_duration skips the repeat interval check",
+			rebootDuration:        types.Int64Value(60),
+			warningDuration:       types.Int64Unknown(),
+			warningRepeatInterval: types.Int64Value(5),
+		},
+		{
+			name:                  "unknown warning_repeat_interval skips the repeat interval check",
+			rebootDuration:        types.Int64Value(-1),
+			warningDuration:       types.Int64Value(-1),
+			warningRepeatInterval: types.Int64Unknown(),
+		},
+		{
+			name:                  "unknown warning_repeat_interval still checks a known warning_duration",
+			rebootDuration:        types.Int64Value(60),
+			warningDuration:       types.Int64Value(-1),
+			warningRepeatInterval: types.Int64Unknown(),
+			expectedError:         "warning_duration cannot be set to -1 when reboot_duration is not set to -1.",
+		},
+		{
+			name:                  "unknown reboot_duration still checks a known warning_repeat_interval",
+			rebootDuration:        types.Int64Unknown(),
+			warningDuration:       types.Int64Value(10),
+			warningRepeatInterval: types.Int64Value(10),
+			expectedError:         "warning_repeat_interval must be shorter than warning_duration.",
+		},
+		{
+			name:                  "warning_duration -1 without reboot_duration -1 is rejected",
+			rebootDuration:        types.Int64Value(60),
+			warningDuration:       types.Int64Value(-1),
+			warningRepeatInterval: types.Int64Null(),
+			expectedError:         "warning_duration cannot be set to -1 when reboot_duration is not set to -1.",
+		},
+		{
+			name:                  "positive warning_duration with reboot_duration -1 is rejected",
+			rebootDuration:        types.Int64Value(-1),
+			warningDuration:       types.Int64Value(30),
+			warningRepeatInterval: types.Int64Null(),
+			expectedError:         "warning_duration can only be set to -1 or 0 when reboot_duration is set to -1.",
+		},
+		{
+			name:                  "warning_repeat_interval not shorter than warning_duration is rejected",
+			rebootDuration:        types.Int64Value(60),
+			warningDuration:       types.Int64Value(10),
+			warningRepeatInterval: types.Int64Value(10),
+			expectedError:         "warning_repeat_interval must be shorter than warning_duration.",
+		},
+		{
+			name:                  "known valid values pass",
+			rebootDuration:        types.Int64Value(60),
+			warningDuration:       types.Int64Value(30),
+			warningRepeatInterval: types.Int64Value(10),
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			diagnostics := diag.Diagnostics{}
+			rebootOptions := ImageUpdateRebootOptionsModel{
+				RebootDuration:        testCase.rebootDuration,
+				WarningDuration:       testCase.warningDuration,
+				WarningMessage:        types.StringValue("Rebooting in %m% minutes."),
+				WarningRepeatInterval: testCase.warningRepeatInterval,
+			}
+
+			rebootOptions.ValidateConfig(&diagnostics)
+
+			if testCase.expectedError == "" {
+				assert.False(t, diagnostics.HasError(), "unexpected diagnostics: %s", diagnostics)
+				return
+			}
+			require.Equal(t, 1, diagnostics.ErrorsCount(), "diagnostics: %s", diagnostics)
+			assert.Equal(t, testCase.expectedError, diagnostics.Errors()[0].Detail())
+		})
+	}
+}

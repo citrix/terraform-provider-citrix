@@ -81,16 +81,16 @@ func (r *adminRoleResource) Create(ctx context.Context, req resource.CreateReque
 	httpResp, err := citrixdaasclient.AddRequestData(createAdminRoleRequest, r.client).Execute()
 	if err != nil {
 		// If httpresponse is forbidden, then check if the role exists and delete it
-		if httpResp.StatusCode == http.StatusForbidden {
+		if httpResp != nil && httpResp.StatusCode == http.StatusForbidden {
 			_, getRoleError := getAdminRole(ctx, r.client, &resp.Diagnostics, plan.Name.ValueString())
 			if getRoleError == nil {
 				deleteAdminRoleRequest := r.client.ApiClient.AdminAPIsDAAS.AdminDeleteAdminRole(ctx, plan.Name.ValueString())
-				_, err = citrixdaasclient.AddRequestData(deleteAdminRoleRequest, r.client).Execute()
-				if err != nil {
+				cleanupResp, cleanupErr := citrixdaasclient.AddRequestData(deleteAdminRoleRequest, r.client).Execute()
+				if cleanupErr != nil {
 					resp.Diagnostics.AddError(
 						"Error cleaning up Admin Role "+plan.Name.ValueString()+" after create failure",
-						"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-							"\nError message: "+util.ReadClientError(err),
+						"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(cleanupResp)+
+							"\nError message: "+util.ReadClientError(cleanupErr),
 					)
 					return
 				}
@@ -227,14 +227,7 @@ func (r *adminRoleResource) Delete(ctx context.Context, req resource.DeleteReque
 	adminRoleName := state.Name.ValueString()
 	deleteAdminRoleRequest := r.client.ApiClient.AdminAPIsDAAS.AdminDeleteAdminRole(ctx, adminRoleId)
 	httpResp, err := citrixdaasclient.AddRequestData(deleteAdminRoleRequest, r.client).Execute()
-	if err != nil && httpResp.StatusCode != http.StatusNotFound {
-		resp.Diagnostics.AddError(
-			"Error deleting Admin Role: "+adminRoleName,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-		return
-	}
+	util.CheckDeleteResponse(&resp.Diagnostics, httpResp, err, "Error deleting Admin Role: "+adminRoleName)
 }
 
 func (r *adminRoleResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

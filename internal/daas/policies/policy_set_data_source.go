@@ -92,7 +92,7 @@ func (d *PolicySetDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	policySetScopes, err := util.FetchScopeIdsByNames(ctx, resp.Diagnostics, d.client, policySet.GetScopes())
+	policySetScopes, err := util.FetchScopeIdsByNames(ctx, &resp.Diagnostics, d.client, policySet.GetScopes())
 	if err != nil {
 		return
 	}

@@ -18,6 +18,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
@@ -30,21 +32,22 @@ import (
 )
 
 type CitrixManagedCatalogResourceModel struct {
-	Id                  types.String `tfsdk:"id"`
-	Name                types.String `tfsdk:"name"`
-	CatalogType         types.String `tfsdk:"catalog_type"`
-	Region              types.String `tfsdk:"region"`
-	SubscriptionName    types.String `tfsdk:"subscription_name"`
-	TemplateImageId     types.String `tfsdk:"template_image_id"`
-	MachineSize         types.String `tfsdk:"machine_size"`
-	StorageType         types.String `tfsdk:"storage_type"`
-	NumberOfUsers       types.Int64  `tfsdk:"number_of_users"`
-	MaxNumberOfUsers    types.Int64  `tfsdk:"max_number_of_users"`
-	MaxUsersPerVm       types.Int64  `tfsdk:"max_users_per_vm"`
-	MachineNamingScheme types.Object `tfsdk:"machine_naming_scheme"` // MachineNamingSchemeModel
-	PowerSchedule       types.Object `tfsdk:"power_schedule"`        // PowerScheduleModel
-	OnPremConnectivity  types.Object `tfsdk:"on_prem_connectivity"`  // OnPremConnectivityModel
-	Persona             types.String `tfsdk:"persona"`
+	Id                          types.String `tfsdk:"id"`
+	Name                        types.String `tfsdk:"name"`
+	CatalogType                 types.String `tfsdk:"catalog_type"`
+	Region                      types.String `tfsdk:"region"`
+	SubscriptionName            types.String `tfsdk:"subscription_name"`
+	TemplateImageId             types.String `tfsdk:"template_image_id"`
+	MachineSize                 types.String `tfsdk:"machine_size"`
+	StorageType                 types.String `tfsdk:"storage_type"`
+	NumberOfUsers               types.Int64  `tfsdk:"number_of_users"`
+	MaxNumberOfUsers            types.Int64  `tfsdk:"max_number_of_users"`
+	MaxUsersPerVm               types.Int64  `tfsdk:"max_users_per_vm"`
+	MachineNamingScheme         types.Object `tfsdk:"machine_naming_scheme"` // MachineNamingSchemeModel
+	PowerSchedule               types.Object `tfsdk:"power_schedule"`        // PowerScheduleModel
+	OnPremConnectivity          types.Object `tfsdk:"on_prem_connectivity"`  // OnPremConnectivityModel
+	Persona                     types.String `tfsdk:"persona"`
+	EnableAcceleratedNetworking types.Bool   `tfsdk:"enable_accelerated_networking"`
 }
 
 func (CitrixManagedCatalogResourceModel) GetSchema() schema.Schema {
@@ -178,6 +181,16 @@ func (CitrixManagedCatalogResourceModel) GetSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"enable_accelerated_networking": schema.BoolAttribute{
+				Description: "Whether to enable accelerated networking on the network interfaces of the catalog's machines. The machine size must support accelerated networking. Defaults to `false`. Changing it replaces the catalog." +
+					"\n\n -> **Note** A catalog that already has accelerated networking on, such as one created in the console and imported, must set this to `true`, or the catalog is replaced.",
+				Optional: true,
+				Computed: true,
+				Default:  booldefault.StaticBool(false),
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.RequiresReplace(),
 				},
 			},
 		},
@@ -439,6 +452,7 @@ func (r CitrixManagedCatalogResourceModel) RefreshPropertyValues(ctx context.Con
 		r.Region = types.StringValue(catalog.GetRegion())
 	}
 	r.TemplateImageId = types.StringValue(catalog.GetImageId())
+	r.EnableAcceleratedNetworking = types.BoolValue(catalog.GetEnableAcceleratedNetworking())
 	computerWorker := capacity.GetComputeWorker()
 	r.MachineSize = types.StringValue(computerWorker.GetInstanceTypeId())
 	r.StorageType = types.StringValue(string(computerWorker.GetStorageType()))

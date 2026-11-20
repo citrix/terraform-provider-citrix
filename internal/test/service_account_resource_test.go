@@ -5,13 +5,13 @@ package test
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
@@ -253,7 +253,7 @@ func serviceAccountSweeper(ctx context.Context, client *citrixclient.CitrixDaasC
 			serviceAccountId := serviceAccount.GetServiceAccountUid()
 			deleteServiceAccountRequest := client.ApiClient.IdentityAPIsDAAS.IdentityDeleteServiceAccount(ctx, serviceAccountId)
 			httpResp, err := citrixclient.AddRequestData(deleteServiceAccountRequest, client).Execute()
-			if err != nil && httpResp.StatusCode != http.StatusNotFound {
+			if err != nil && !util.IsNotFound(httpResp) {
 				return fmt.Errorf("Error deleting Service Account %s during sweep", serviceAccountName)
 			}
 

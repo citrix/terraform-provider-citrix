@@ -4,7 +4,6 @@ package wem_machine_ad_object
 
 import (
 	"context"
-	"net/http"
 	"strconv"
 	"sync"
 
@@ -115,7 +114,7 @@ func (w *wemDirectoryResource) Create(ctx context.Context, req resource.CreateRe
 	_, httpResp, err := citrixdaasclient.ExecuteWithRetry[any](machineADObjectCreateRequest, w.client)
 
 	// In case of 400 Bad Request, add it to diagnostics and return
-	if httpResp.StatusCode == http.StatusBadRequest && err.Error() == "400 Bad Request  (Duplicate property)" {
+	if err != nil && err.Error() == "400 Bad Request  (Duplicate property)" {
 		resp.Diagnostics.AddError(
 			"Failed to create directory object for catalog '"+machineCatalogName+"'",
 			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+"\nError message: A Directory Object with the same Machine Catalog ID already exists.",
@@ -135,6 +134,10 @@ func (w *wemDirectoryResource) Create(ctx context.Context, req resource.CreateRe
 	// Get newly created machine AD object from remote
 	machineADObject, err := getMachineADObjectBySid(ctx, w.client, machineCatalogId)
 	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading directory object for catalog '"+machineCatalogName+"' after creating it",
+			err.Error(),
+		)
 		return
 	}
 
@@ -271,6 +274,10 @@ func (w *wemDirectoryResource) Update(ctx context.Context, req resource.UpdateRe
 	// Get Newly Updated Machine AD Object from remote by Id
 	machineADObject, err := getMachineADObjectById(ctx, w.client, plan.Id.ValueString())
 	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading WEM directory object "+plan.Id.ValueString()+" after updating it",
+			err.Error(),
+		)
 		return
 	}
 

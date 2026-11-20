@@ -94,6 +94,9 @@ resource citrix_quickdeploy_catalog domain-joined-catalog {
 - `catalog_type` (String) Denotes how the machines in the catalog are allocated to a user. Choose between `MultiSession`, `SingleSessionStatic` and `SingleSessionRandom`.
 
  -> **Note** Catalog type is required when `persona` is not specified. When a persona is specified, the catalog type associated with the persona will be used. However, catalog type can still be specified alongside certain personas as an add-on (extra credits).
+- `enable_accelerated_networking` (Boolean) Whether to enable accelerated networking on the network interfaces of the catalog's machines. The machine size must support accelerated networking. Defaults to `false`. Changing it replaces the catalog.
+
+ -> **Note** A catalog that already has accelerated networking on, such as one created in the console and imported, must set this to `true`, or the catalog is replaced.
 - `machine_naming_scheme` (Attributes) Rules specifying how Active Directory machine accounts should be created when machines are provisioned.
 
 ~> **Please Note** When importing a `citrix_quickdeploy_catalog` resource, `machine_naming_scheme` must be omitted in the terraform resource body. Explicitly setting it will result in replacing the quick deploy catalog. (see [below for nested schema](#nestedatt--machine_naming_scheme))

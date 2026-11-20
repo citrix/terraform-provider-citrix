@@ -5,7 +5,6 @@ package tags
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
@@ -207,14 +206,7 @@ func (r *TagResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 
 	deleteTagRequest := r.client.ApiClient.TagsAPIsDAAS.TagsDeleteTag(ctx, tagId)
 	httpResp, err := citrixdaasclient.AddRequestData(deleteTagRequest, r.client).Execute()
-	if err != nil && httpResp.StatusCode != http.StatusNotFound {
-		resp.Diagnostics.AddError(
-			"Error deleting tag: "+tagName,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-		return
-	}
+	util.CheckDeleteResponse(&resp.Diagnostics, httpResp, err, "Error deleting tag: "+tagName)
 }
 
 func (r *TagResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -296,7 +288,7 @@ func checkTagNameAvailability(ctx context.Context, client *citrixdaasclient.Citr
 	getTagRequest := client.ApiClient.TagsAPIsDAAS.TagsGetTag(ctx, tagName)
 	tag, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixorchestration.TagDetailResponseModel](getTagRequest, client)
 	if err != nil {
-		if httpResp.StatusCode == http.StatusNotFound {
+		if util.IsNotFound(httpResp) {
 			return true, nil
 		}
 		diagnostics.AddError(

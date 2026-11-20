@@ -94,7 +94,7 @@ func getPolicySetDetailsForRefreshState(ctx context.Context, diagnostics *diag.D
 		return nil, nil, nil, err
 	}
 
-	policySetScopes, err := util.FetchScopeIdsByNames(ctx, *diagnostics, client, policySet.GetScopes())
+	policySetScopes, err := util.FetchScopeIdsByNames(ctx, diagnostics, client, policySet.GetScopes())
 	if err != nil {
 		return policySet, nil, nil, err
 	}

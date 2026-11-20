@@ -1412,23 +1412,28 @@ func (ImageUpdateRebootOptionsModel) GetAttributes() map[string]schema.Attribute
 }
 
 func (rebootOptions ImageUpdateRebootOptionsModel) ValidateConfig(diagnostics *diag.Diagnostics) {
-	rebootDuration := int32(rebootOptions.RebootDuration.ValueInt64())
+	if rebootOptions.WarningDuration.IsUnknown() {
+		return
+	}
 	warningDuration := int32(rebootOptions.WarningDuration.ValueInt64())
-	if rebootDuration == -1 && warningDuration > 0 {
-		diagnostics.AddAttributeError(
-			path.Root("warning_duration"),
-			"Invalid Reboot Warning Duration",
-			"warning_duration can only be set to -1 or 0 when reboot_duration is set to -1.",
-		)
+	if !rebootOptions.RebootDuration.IsUnknown() {
+		rebootDuration := int32(rebootOptions.RebootDuration.ValueInt64())
+		if rebootDuration == -1 && warningDuration > 0 {
+			diagnostics.AddAttributeError(
+				path.Root("warning_duration"),
+				"Invalid Reboot Warning Duration",
+				"warning_duration can only be set to -1 or 0 when reboot_duration is set to -1.",
+			)
+		}
+		if rebootDuration != -1 && warningDuration == -1 {
+			diagnostics.AddAttributeError(
+				path.Root("warning_duration"),
+				"Invalid Reboot Warning Duration",
+				"warning_duration cannot be set to -1 when reboot_duration is not set to -1.",
+			)
+		}
 	}
-	if rebootDuration != -1 && warningDuration == -1 {
-		diagnostics.AddAttributeError(
-			path.Root("warning_duration"),
-			"Invalid Reboot Warning Duration",
-			"warning_duration cannot be set to -1 when reboot_duration is not set to -1.",
-		)
-	}
-	if !rebootOptions.WarningRepeatInterval.IsNull() && rebootOptions.WarningRepeatInterval.ValueInt64() >= rebootOptions.WarningDuration.ValueInt64() {
+	if !rebootOptions.WarningRepeatInterval.IsUnknown() && !rebootOptions.WarningRepeatInterval.IsNull() && rebootOptions.WarningRepeatInterval.ValueInt64() >= rebootOptions.WarningDuration.ValueInt64() {
 		diagnostics.AddAttributeError(
 			path.Root("warning_repeat_interval"),
 			"Invalid Reboot Warning Repeat Interval",

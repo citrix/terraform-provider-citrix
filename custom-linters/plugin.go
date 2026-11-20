@@ -5,6 +5,7 @@ package linters
 import (
 	"github.com/citrix/terraform-provider-citrix/custom-linters/continuationtoken"
 	"github.com/citrix/terraform-provider-citrix/custom-linters/executewithretry"
+	"github.com/citrix/terraform-provider-citrix/custom-linters/nilresponse"
 	"github.com/citrix/terraform-provider-citrix/custom-linters/panichandler"
 	"github.com/citrix/terraform-provider-citrix/custom-linters/unknowncheck"
 	"github.com/golangci/plugin-module-register/register"
@@ -16,6 +17,7 @@ func init() {
 	register.Plugin("unknowncheck", NewUnknownCheck)
 	register.Plugin("executewithretry", NewExecuteWithRetry)
 	register.Plugin("continuationtoken", NewContinuationToken)
+	register.Plugin("nilresponse", NewNilResponse)
 }
 
 type PanicHandlerPlugin struct{}
@@ -79,5 +81,21 @@ func (p *ContinuationTokenPlugin) BuildAnalyzers() ([]*analysis.Analyzer, error)
 }
 
 func (p *ContinuationTokenPlugin) GetLoadMode() string {
+	return register.LoadModeTypesInfo
+}
+
+type NilResponsePlugin struct{}
+
+func NewNilResponse(settings any) (register.LinterPlugin, error) {
+	return &NilResponsePlugin{}, nil
+}
+
+func (p *NilResponsePlugin) BuildAnalyzers() ([]*analysis.Analyzer, error) {
+	return []*analysis.Analyzer{
+		nilresponse.Analyzer,
+	}, nil
+}
+
+func (p *NilResponsePlugin) GetLoadMode() string {
 	return register.LoadModeTypesInfo
 }

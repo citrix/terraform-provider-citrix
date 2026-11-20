@@ -68,7 +68,7 @@ func GetTemplateImageWithId(ctx context.Context, client *citrixdaasclient.Citrix
 	image, httpResp, err := citrixdaasclient.ExecuteWithRetry[*citrixquickdeploy.TemplateImageDetails](getImageRequest, client)
 
 	if err != nil {
-		if addWarningIfNotFound && httpResp.StatusCode == http.StatusNotFound {
+		if addWarningIfNotFound && IsNotFound(httpResp) {
 			diagnostics.AddWarning(
 				fmt.Sprintf("Template Image with ID: %s not found", imageId),
 				fmt.Sprintf("Template Image with ID: %s was not found and will be removed from the state file. An apply action will result in the creation of a new resource.", imageId),

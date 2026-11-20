@@ -6,12 +6,12 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"testing"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
 	citrixclient "github.com/citrix/citrix-daas-rest-go/client"
+	"github.com/citrix/terraform-provider-citrix/internal/util"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
@@ -178,7 +178,7 @@ func adminUserSweeper(ctx context.Context, adminUserName string, client *citrixc
 	getAdminUserRequest := client.ApiClient.AdminAPIsDAAS.AdminGetAdminAdministrator(ctx, adminUserName)
 	adminUser, httpResp, err := citrixclient.ExecuteWithRetry[*citrixorchestration.AdministratorResponseModel](getAdminUserRequest, client)
 	if err != nil {
-		if httpResp.StatusCode == http.StatusNotFound {
+		if util.IsNotFound(httpResp) {
 			// Resource does not exist in remote, no need to delete
 			return nil
 		}
@@ -187,7 +187,7 @@ func adminUserSweeper(ctx context.Context, adminUserName string, client *citrixc
 	userDetails := adminUser.GetUser()
 	deleteAdminUserRequest := client.ApiClient.AdminAPIsDAAS.AdminDeleteAdminAdministrator(ctx, userDetails.GetSid())
 	httpResp, err = citrixclient.AddRequestData(deleteAdminUserRequest, client).Execute()
-	if err != nil && httpResp.StatusCode != http.StatusNotFound {
+	if err != nil && !util.IsNotFound(httpResp) {
 		log.Printf("Error destroying %s during sweep: %s", adminUserName, err)
 	}
 	return nil

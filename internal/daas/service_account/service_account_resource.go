@@ -259,14 +259,7 @@ func (r *serviceAccountResource) Delete(ctx context.Context, req resource.Delete
 	serviceAccountName := state.DisplayName.ValueString()
 	deleteServiceAccountRequest := r.client.ApiClient.IdentityAPIsDAAS.IdentityDeleteServiceAccount(ctx, serviceAccountId)
 	httpResp, err := citrixdaasclient.AddRequestData(deleteServiceAccountRequest, r.client).Execute()
-	if err != nil && httpResp.StatusCode != http.StatusNotFound {
-		resp.Diagnostics.AddError(
-			"Error deleting Service Account "+serviceAccountName,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-		return
-	}
+	util.CheckDeleteResponse(&resp.Diagnostics, httpResp, err, "Error deleting Service Account "+serviceAccountName)
 }
 
 func (r *serviceAccountResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

@@ -5,7 +5,6 @@ package autoscale_plugin_template
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/citrix/citrix-daas-rest-go/citrixorchestration"
@@ -219,14 +218,7 @@ func (r *autoscalePluginTemplateResource) Delete(ctx context.Context, req resour
 	autoscalePluginTemplateName := state.Name.ValueString()
 	deleteAutoscalePluginTemplateRequest := r.client.ApiClient.DeliveryGroupsAPIsDAAS.DeliveryGroupsDeleteAutoscalePluginTemplate(ctx, state.Type.ValueString(), autoscalePluginTemplateName)
 	httpResp, err := citrixdaasclient.AddRequestData(deleteAutoscalePluginTemplateRequest, r.client).Execute()
-	if err != nil && httpResp.StatusCode != http.StatusNotFound {
-		resp.Diagnostics.AddError(
-			"Error deleting Autoscale Plugin Template "+autoscalePluginTemplateName,
-			"TransactionId: "+citrixdaasclient.GetTransactionIdFromHttpResponse(httpResp)+
-				"\nError message: "+util.ReadClientError(err),
-		)
-		return
-	}
+	util.CheckDeleteResponse(&resp.Diagnostics, httpResp, err, "Error deleting Autoscale Plugin Template "+autoscalePluginTemplateName)
 }
 
 // ImportState implements resource.ResourceWithImportState.
